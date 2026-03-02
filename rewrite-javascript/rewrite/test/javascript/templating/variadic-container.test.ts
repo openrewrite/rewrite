@@ -46,7 +46,7 @@ describe('variadic pattern matching in containers', () => {
         // Parse and cache
         const parseGen = parser.parse({text: code, sourcePath: 'test.ts'});
         const cu = (await parseGen.next()).value as JS.CompilationUnit;
-        const result = cu.statements[0].element;
+        const result = cu.statements[0];
         parseCache.set(code, result);
         return result;
     }

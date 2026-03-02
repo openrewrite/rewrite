@@ -19,7 +19,7 @@ import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor, JS} from "../index";
 import {maybeAddImport} from "../add-import";
-import {J, isIdentifier, Type} from "../../java";
+import {Expression, J, isIdentifier, Statement, Type} from "../../java";
 import {create as produce, Draft} from "mutative";
 
 /**
@@ -130,7 +130,7 @@ export class ChangeImport extends Recipe {
 
                 // First pass: check if the old import exists and capture any alias
                 for (const statement of cu.statements) {
-                    const stmt = statement.element ?? statement;
+                    const stmt = statement as Statement;
                     if (stmt.kind === JS.Kind.Import) {
                         const jsImport = stmt as JS.Import;
                         const aliasInfo = this.checkForOldImport(jsImport);
@@ -206,7 +206,8 @@ export class ChangeImport extends Recipe {
                     this.transformedImport = true;
                     return produce(imp, draft => {
                         if (draft.moduleSpecifier) {
-                            const literal = draft.moduleSpecifier.element as Draft<J.Literal>;
+                            // For tree types, the padded value IS the element (intersection type)
+                            const literal = draft.moduleSpecifier as unknown as Draft<J.Literal>;
                             literal.value = newModule;
                             // Update valueSource to preserve quote style
                             const originalSource = literal.valueSource || `"${oldModule}"`;
@@ -219,7 +220,8 @@ export class ChangeImport extends Recipe {
                             if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
                                 const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
                                 for (const elem of namedImports.elements.elements) {
-                                    const specifier = elem.element;
+                                    // For tree types, elem IS the specifier with padding mixed in
+                                    const specifier = elem as unknown as Draft<JS.ImportSpecifier>;
                                     if (specifier.specifier.kind === J.Kind.Identifier &&
                                         specifier.specifier.simpleName === oldMember) {
                                         specifier.specifier.simpleName = newMember;
@@ -244,7 +246,8 @@ export class ChangeImport extends Recipe {
                     const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
                     const elements = namedImports.elements.elements;
                     const filteredElements = elements.filter(elem => {
-                        const specifier = elem.element;
+                        // For tree types, elem IS the specifier with padding mixed in
+                        const specifier = elem as unknown as Draft<JS.ImportSpecifier>;
                         const specifierNode = specifier.specifier;
 
                         if (specifierNode.kind === J.Kind.Identifier) {
@@ -253,7 +256,7 @@ export class ChangeImport extends Recipe {
 
                         if (specifierNode.kind === JS.Kind.Alias) {
                             const alias = specifierNode as JS.Alias;
-                            const propertyName = alias.propertyName.element;
+                            const propertyName = alias.propertyName;
                             if (propertyName.kind === J.Kind.Identifier) {
                                 return propertyName.simpleName !== memberToRemove;
                             }
@@ -276,14 +279,14 @@ export class ChangeImport extends Recipe {
 
                 const namedImports = namedBindings as JS.NamedImports;
                 for (const elem of namedImports.elements.elements) {
-                    const specifier = elem.element;
+                    const specifier = elem;
                     const specifierNode = specifier.specifier;
 
                     if (isIdentifier(specifierNode)) {
                         imports.push(specifierNode.simpleName);
                     } else if (specifierNode.kind === JS.Kind.Alias) {
                         const alias = specifierNode as JS.Alias;
-                        const propertyName = alias.propertyName.element;
+                        const propertyName = alias.propertyName;
                         if (isIdentifier(propertyName)) {
                             imports.push(propertyName.simpleName);
                         }
@@ -628,7 +631,7 @@ export class ChangeImport extends Recipe {
                 const moduleSpecifier = jsImport.moduleSpecifier;
                 if (!moduleSpecifier) return { found: false };
 
-                const literal = moduleSpecifier.element;
+                const literal = moduleSpecifier;
                 if (literal.kind !== J.Kind.Literal) return { found: false };
 
                 const value = (literal as J.Literal).value;
@@ -643,7 +646,7 @@ export class ChangeImport extends Recipe {
                 // Check for default import
                 if (oldMember === 'default') {
                     if (importClause.name) {
-                        const nameElem = importClause.name.element;
+                        const nameElem = importClause.name;
                         if (isIdentifier(nameElem)) {
                             return { found: true, alias: nameElem.simpleName };
                         }
@@ -673,7 +676,7 @@ export class ChangeImport extends Recipe {
                 const elements = namedImports.elements.elements;
 
                 for (const elem of elements) {
-                    const specifier = elem.element;
+                    const specifier = elem;
                     const specifierNode = specifier.specifier;
 
                     // Handle direct import: import { act }
@@ -684,7 +687,7 @@ export class ChangeImport extends Recipe {
                     // Handle aliased import: import { act as something }
                     if (specifierNode.kind === JS.Kind.Alias) {
                         const alias = specifierNode as JS.Alias;
-                        const propertyName = alias.propertyName.element;
+                        const propertyName = alias.propertyName;
                         if (isIdentifier(propertyName) && propertyName.simpleName === oldMember) {
                             if (isIdentifier(alias.alias)) {
                                 return { found: true, alias: alias.alias.simpleName };

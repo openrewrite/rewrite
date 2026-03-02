@@ -85,9 +85,9 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         // Note: typeParameters should NOT have space before them - they immediately follow the class name
         // e.g., "class DataTable<Row>" not "class DataTable <Row>"
 
-        if (c.extends && c.extends.before.whitespace === "") {
+        if (c.extends && c.extends.padding.before.whitespace === "") {
             c = produce(c, draft => {
-                this.ensureSpace(draft.extends!.before);
+                this.ensureSpace(draft.extends!.padding.before);
             });
         }
 
@@ -95,7 +95,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             c = produce(c, draft => {
                 this.ensureSpace(draft.implements!.before);
                 if (draft.implements != undefined && draft.implements.elements.length > 0) {
-                    this.ensureSpace(draft.implements.elements[0].element.prefix);
+                    // For tree types, the padded value IS the element (intersection type)
+                    this.ensureSpace(draft.implements.elements[0].prefix);
                 }
             });
         }
@@ -150,9 +151,10 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitNamespaceDeclaration(namespaceDeclaration, p) as JS.NamespaceDeclaration;
         return produce(ret, draft => {
             if (draft.modifiers.length > 0) {
-                draft.keywordType.before.whitespace=" ";
+                draft.keywordType.padding.before.whitespace=" ";
             }
-            this.ensureSpace(draft.name.element.prefix);
+            // For tree types, the padded value IS the element (intersection type)
+            this.ensureSpace(draft.name.prefix);
         });
     }
 
@@ -189,9 +191,10 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         const ret = await super.visitTypeDeclaration(typeDeclaration, p) as JS.TypeDeclaration;
         return produce(ret, draft => {
             if (draft.modifiers.length > 0) {
-                this.ensureSpace(draft.name.before);
+                this.ensureSpace(draft.name.padding.before);
             }
-            this.ensureSpace(draft.name.element.prefix);
+            // For tree types, the padded value IS the element (intersection type)
+            this.ensureSpace(draft.name.prefix);
         });
     }
 
@@ -207,7 +210,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
         return produce(ret, draft => {
             if (draft.bounds && draft.bounds.elements.length > 0) {
                 this.ensureSpace(draft.bounds.before);
-                this.ensureSpace(draft.bounds.elements[0].element.prefix);
+                // For tree types, the padded value IS the element (intersection type)
+                this.ensureSpace(draft.bounds.elements[0].prefix);
             }
         });
     }
@@ -227,7 +231,8 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
 
         if (!first) {
             ret = produce(ret, draft => {
-                this.ensureSpace(draft.variables[0].element.prefix);
+                // For tree types, the padded value IS the element (intersection type)
+                this.ensureSpace(draft.variables[0].prefix);
             });
         }
 
@@ -238,10 +243,10 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
     protected async visitCase(caseNode: J.Case, p: P): Promise<J | undefined> {
         const c = await super.visitCase(caseNode, p) as J.Case;
 
-        if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].after.whitespace === "") {
+        if (c.guard && c.caseLabels.elements.length > 0 && c.caseLabels.elements[c.caseLabels.elements.length - 1].padding.after.whitespace === "") {
             return produce(c, draft => {
                 const last = draft.caseLabels.elements.length - 1;
-                draft.caseLabels.elements[last].after.whitespace = " ";
+                draft.caseLabels.elements[last].padding.after.whitespace = " ";
             });
         }
 

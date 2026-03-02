@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {J} from '../../java';
+import {getPaddedElement, isRightPadded, J} from '../../java';
 import {
     Any,
     Capture,
@@ -629,7 +629,7 @@ export class MatchResult implements IMatchResult {
 
     /**
      * Extracts semantic elements from storage value.
-     * For wrappers, extracts the .element; for arrays, returns array of elements.
+     * For wrappers, extracts the element; for arrays, returns array of elements.
      *
      * @param value The storage value
      * @returns The semantic element(s)
@@ -637,20 +637,23 @@ export class MatchResult implements IMatchResult {
     private extractElements(value: CaptureStorageValue): J {
         if (Array.isArray(value)) {
             // Check if it's an array of wrappers
-            if (value.length > 0 && (value[0] as any).element !== undefined) {
-                // Array of J.RightPadded - extract elements
-                return (value as J.RightPadded<J>[]).map(w => w.element) as any;
+            // For tree types, check for RightPaddingMixin's padding property
+            if (value.length > 0 && isRightPadded(value[0])) {
+                // Array of J.RightPadded - extract elements using getPaddedElement
+                return (value as J.RightPadded<J>[]).map(w => getPaddedElement(w)) as any;
             }
             // Already an array of elements
             return value as any;
         }
-        // Check if it's a scalar wrapper
-        if ((value as any).element !== undefined) {
-            return (value as J.RightPadded<J>).element;
+        // Check if it's a scalar wrapper (has RightPaddingMixin properties)
+        if (isRightPadded(value)) {
+            return getPaddedElement(value as J.RightPadded<J>);
         }
         // Scalar element
         return value as J;
     }
+
+
 
     /**
      * Internal method to get wrappers (used by template expansion).
@@ -660,10 +663,10 @@ export class MatchResult implements IMatchResult {
     [WRAPPERS_MAP_SYMBOL](): Map<string, J.RightPadded<J> | J.RightPadded<J>[]> {
         const result = new Map<string, J.RightPadded<J> | J.RightPadded<J>[]>();
         for (const [name, value] of this.storage) {
-            if (Array.isArray(value) && value.length > 0 && (value[0] as any).element !== undefined) {
+            if (Array.isArray(value) && value.length > 0 && isRightPadded(value[0])) {
                 // This is an array of wrappers (variadic)
                 result.set(name, value as J.RightPadded<J>[]);
-            } else if (!Array.isArray(value) && (value as any).element !== undefined) {
+            } else if (!Array.isArray(value) && isRightPadded(value)) {
                 // This is a scalar wrapper
                 result.set(name, value as J.RightPadded<J>);
             }
@@ -734,7 +737,7 @@ class Matcher {
 
     /**
      * Extracts semantic elements from storage value.
-     * For wrappers, extracts the .element; for arrays, returns array of elements.
+     * For wrappers, extracts the element; for arrays, returns array of elements.
      *
      * @param value The storage value
      * @returns The semantic element(s)
@@ -742,20 +745,23 @@ class Matcher {
     private extractElements(value: CaptureStorageValue): J {
         if (Array.isArray(value)) {
             // Check if it's an array of wrappers
-            if (value.length > 0 && (value[0] as any).element !== undefined) {
-                // Array of J.RightPadded - extract elements
-                return (value as J.RightPadded<J>[]).map(w => w.element) as any;
+            // For tree types, check for RightPaddingMixin's padding property
+            if (value.length > 0 && isRightPadded(value[0])) {
+                // Array of J.RightPadded - extract elements using getPaddedElement
+                return (value as J.RightPadded<J>[]).map(w => getPaddedElement(w)) as any;
             }
             // Already an array of elements
             return value as any;
         }
-        // Check if it's a scalar wrapper
-        if ((value as any).element !== undefined) {
-            return (value as J.RightPadded<J>).element;
+        // Check if it's a scalar wrapper (has RightPaddingMixin properties)
+        if (isRightPadded(value)) {
+            return getPaddedElement(value as J.RightPadded<J>);
         }
         // Scalar element
         return value as J;
     }
+
+
 
     /**
      * Logs a debug message if debugging is enabled.

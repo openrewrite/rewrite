@@ -27,7 +27,7 @@ describe('arithmetic operator mapping', () => {
                 '1 + 2'
             ),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const binary = (cu.statements[0].element as JS.ExpressionStatement).expression;
+                const binary = (cu.statements[0] as unknown as JS.ExpressionStatement).expression;
                 expect(binary.type).toBe(Type.Primitive.Double);
             }
         }));
@@ -39,7 +39,7 @@ describe('arithmetic operator mapping', () => {
                 '"1" + 2'
             ),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const binary = (cu.statements[0].element as JS.ExpressionStatement).expression;
+                const binary = (cu.statements[0] as unknown as JS.ExpressionStatement).expression;
                 expect(binary.type).toBe(Type.Primitive.String);
             }
         }));

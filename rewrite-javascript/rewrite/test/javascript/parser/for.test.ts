@@ -241,7 +241,7 @@ describe('for mapping', () => {
             ...typescript(`for (let i = 0; i < 5; i++) {
             }`),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                expect((<J.ForLoop>cu.statements[0].element).control.init[0].element.kind).toBe(J.Kind.VariableDeclarations);
+                expect((cu.statements[0] as unknown as J.ForLoop).control.init[0].kind).toBe(J.Kind.VariableDeclarations);
             }
         }));
 
@@ -256,9 +256,9 @@ describe('for mapping', () => {
             //language=typescript
             ...typescript(`let i; for (i of [1,2,3]) {}`),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const forOfLoop = <JS.ForOfLoop>cu.statements[1].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
-                const expressionStatement = <JS.ExpressionStatement>forOfLoop.loop.control.variable.element;
+                const forOfLoop = cu.statements[1] as unknown as JS.ForOfLoop;
+                expect(forOfLoop.loop.control.variable.kind).toBe(JS.Kind.ExpressionStatement);
+                const expressionStatement = forOfLoop.loop.control.variable as unknown as JS.ExpressionStatement;
                 expect(expressionStatement.expression.kind).toBe(J.Kind.Identifier);
             }
         }));
@@ -268,9 +268,9 @@ describe('for mapping', () => {
             //language=typescript
             ...typescript(`let i; for (i in [1,2,3]) {}`),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const forInLoop = <JS.ForInLoop>cu.statements[1].element;
-                expect(forInLoop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
-                const expressionStatement = <JS.ExpressionStatement>forInLoop.control.variable.element;
+                const forInLoop = cu.statements[1] as unknown as JS.ForInLoop;
+                expect(forInLoop.control.variable.kind).toBe(JS.Kind.ExpressionStatement);
+                const expressionStatement = forInLoop.control.variable as unknown as JS.ExpressionStatement;
                 expect(expressionStatement.expression.kind).toBe(J.Kind.Identifier);
             }
         }));
@@ -291,14 +291,14 @@ describe('for mapping', () => {
                 }
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const forOfLoop = <JS.ForOfLoop>cu.statements[3].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
-                expect((forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
-                const arrayBinding = <JS.ArrayBindingPattern>(forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression;
-                expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
-                expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("firstName");
-                expect(arrayBinding.elements.elements[1].element.kind).toBe(J.Kind.Identifier);
-                expect((arrayBinding.elements.elements[1].element as J.Identifier).simpleName).toBe("age");
+                const forOfLoop = cu.statements[3] as unknown as JS.ForOfLoop;
+                expect(forOfLoop.loop.control.variable.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((forOfLoop.loop.control.variable as unknown as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = (forOfLoop.loop.control.variable as unknown as JS.ExpressionStatement).expression as unknown as JS.ArrayBindingPattern;
+                expect(arrayBinding.elements.elements[0].kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[0] as unknown as J.Identifier).simpleName).toBe("firstName");
+                expect(arrayBinding.elements.elements[1].kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[1] as unknown as J.Identifier).simpleName).toBe("age");
             }
         }));
 
@@ -318,12 +318,12 @@ describe('for mapping', () => {
                 }
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const forOfLoop = <JS.ForOfLoop>cu.statements[2].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ObjectBindingPattern);
-                const objectBinding = <JS.ObjectBindingPattern>forOfLoop.loop.control.variable.element;
+                const forOfLoop = cu.statements[2] as unknown as JS.ForOfLoop;
+                expect(forOfLoop.loop.control.variable.kind).toBe(JS.Kind.ObjectBindingPattern);
+                const objectBinding = forOfLoop.loop.control.variable as unknown as JS.ObjectBindingPattern;
                 expect(objectBinding.bindings.elements.length).toBe(3);
                 for (let i = 0; i < 3; i++) {
-                    expect(objectBinding.bindings.elements[i].element.kind).toBe(JS.Kind.PropertyAssignment);
+                    expect(objectBinding.bindings.elements[i].kind).toBe(JS.Kind.PropertyAssignment);
                 }
             }
         }));
@@ -338,15 +338,15 @@ describe('for mapping', () => {
                 }
             `),
             afterRecipe: (cu: JS.CompilationUnit) => {
-                const forOfLoop = <JS.ForOfLoop>cu.statements[1].element;
-                expect(forOfLoop.loop.control.variable.element.kind).toBe(JS.Kind.ExpressionStatement);
-                expect((forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
-                const arrayBinding = <JS.ArrayBindingPattern>(forOfLoop.loop.control.variable.element as JS.ExpressionStatement).expression;
-                expect(arrayBinding.elements.elements[0].element.kind).toBe(J.Kind.Identifier);
-                expect((arrayBinding.elements.elements[0].element as J.Identifier).simpleName).toBe("first");
+                const forOfLoop = cu.statements[1] as unknown as JS.ForOfLoop;
+                expect(forOfLoop.loop.control.variable.kind).toBe(JS.Kind.ExpressionStatement);
+                expect((forOfLoop.loop.control.variable as unknown as JS.ExpressionStatement).expression.kind).toBe(JS.Kind.ArrayBindingPattern);
+                const arrayBinding = (forOfLoop.loop.control.variable as unknown as JS.ExpressionStatement).expression as unknown as JS.ArrayBindingPattern;
+                expect(arrayBinding.elements.elements[0].kind).toBe(J.Kind.Identifier);
+                expect((arrayBinding.elements.elements[0] as unknown as J.Identifier).simpleName).toBe("first");
                 // The spread element is now a JS.Spread wrapping the identifier
-                expect(arrayBinding.elements.elements[1].element.kind).toBe(JS.Kind.Spread);
-                const spread = arrayBinding.elements.elements[1].element as JS.Spread;
+                expect(arrayBinding.elements.elements[1].kind).toBe(JS.Kind.Spread);
+                const spread = arrayBinding.elements.elements[1] as unknown as JS.Spread;
                 expect(spread.expression.kind).toBe(J.Kind.Identifier);
                 expect((spread.expression as J.Identifier).simpleName).toBe("rest");
             }

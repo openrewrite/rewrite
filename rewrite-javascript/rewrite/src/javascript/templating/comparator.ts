@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, Tree} from '../..';
-import {J} from '../../java';
+import {getPaddedElement, isRightPadded, J} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
 import {CaptureMarker, CaptureStorageValue, PlaceholderUtils} from './utils';
@@ -187,12 +187,14 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
         // Check if this RightPadded has a CaptureMarker (attached during pattern construction)
         // Note: Markers are now only at the wrapper level, not at the element level
-        const captureMarker = PlaceholderUtils.getCaptureMarker(right);
+        const captureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(right);
         if (captureMarker) {
             // Extract the target wrapper if it's also a RightPadded
-            const isRightPadded = (p as any).kind === J.Kind.RightPadded;
-            const targetWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
-            const targetElement = isRightPadded ? targetWrapper!.element : p;
+            // With intersection types, RightPadded elements have `padding` property but no `element`
+            const isRightPaddedOther = isRightPadded(p);
+            const targetWrapper = isRightPaddedOther ? (p as unknown) as J.RightPadded<T> : undefined;
+            // For tree types, the padded value IS the element (use getPaddedElement helper)
+            const targetElement = isRightPaddedOther ? getPaddedElement(targetWrapper!) : p;
 
             // Push targetCursor to position it at the captured element for constraint evaluation
             const savedTargetCursor = this.targetCursor;
@@ -228,7 +230,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visitContainer<T extends J>(container: J.Container<T>, p: J): Promise<J.Container<T>> {
         // Check if any elements are variadic captures
         const hasVariadicCapture = container.elements.some(elem =>
-            PlaceholderUtils.isVariadicCapture(elem)
+            PlaceholderUtils.isVariadicCaptureFromPadded(elem)
         );
 
         // If no variadic captures, use parent implementation
@@ -298,7 +300,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
         // Check if any arguments are variadic captures
         const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
-            PlaceholderUtils.isVariadicCapture(arg)
+            PlaceholderUtils.isVariadicCaptureFromPadded(arg)
         );
 
         // If no variadic captures, use parent implementation (which includes semantic/type-aware matching)
@@ -339,8 +341,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             }
 
             // Visit select if present
+            // For tree types, the padded value IS the element (use getPaddedElement helper)
             if (methodInvocation.select && otherMethodInvocation.select) {
-                await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
+                await this.visit(getPaddedElement(methodInvocation.select), getPaddedElement(otherMethodInvocation.select));
                 if (!this.match) return methodInvocation;
             }
 
@@ -383,7 +386,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
         // Check if any statements have CaptureMarker indicating they're variadic
         const hasVariadicCapture = block.statements.some(stmt => {
-            const captureMarker = PlaceholderUtils.getCaptureMarker(stmt);
+            const captureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(stmt);
             return captureMarker?.variadicOptions !== undefined;
         });
 
@@ -434,7 +437,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, other: J): Promise<J | undefined> {
         // Check if any statements are variadic captures
         const hasVariadicCapture = compilationUnit.statements.some(stmt => {
-            return PlaceholderUtils.isVariadicCapture(stmt);
+            return PlaceholderUtils.isVariadicCaptureFromPadded(stmt);
         });
 
         // If no variadic captures, use parent implementation
@@ -531,7 +534,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
         // Check for markers at wrapper level only (markers are now only at the outermost level)
         const patternWrapper = patternElements[patternIdx];
-        const captureMarker = PlaceholderUtils.getCaptureMarker(patternWrapper);
+        const captureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(patternWrapper);
         const isVariadic = captureMarker?.variadicOptions !== undefined;
 
         if (isVariadic) {
@@ -544,7 +547,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             let nonVariadicRemainingPatterns = 0;
             let allRemainingPatternsAreDeterministic = true;
             for (let i = patternIdx + 1; i < patternElements.length; i++) {
-                const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(patternElements[i]);
+                const nextCaptureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(patternElements[i]);
                 const nextIsVariadic = nextCaptureMarker?.variadicOptions !== undefined;
                 if (!nextIsVariadic) {
                     nonVariadicRemainingPatterns++;
@@ -577,7 +580,7 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                         const candidateElement = targetElements[targetIdx + tryConsume];
 
                         // Skip J.Empty for arguments
-                        if (filterEmpty && candidateElement.element.kind === J.Kind.Empty) {
+                        if (filterEmpty && candidateElement.kind === J.Kind.Empty) {
                             continue;
                         }
 
@@ -629,9 +632,9 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
                 // For empty argument lists, there will be a single J.Empty element that we need to filter out
                 const rawWrappers = targetElements.slice(targetIdx, targetIdx + consume);
                 const capturedWrappers = filterEmpty
-                    ? rawWrappers.filter(w => w.element.kind !== J.Kind.Empty)
+                    ? rawWrappers.filter(w => w.kind !== J.Kind.Empty)
                     : rawWrappers;
-                const capturedElements: J[] = capturedWrappers.map(w => w.element);
+                const capturedElements: J[] = capturedWrappers.map(w => getPaddedElement(w as J.RightPadded<J>));
 
                 // Check min/max constraints against filtered elements
                 if (capturedElements.length < min || capturedElements.length > max) {
@@ -684,7 +687,8 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             }
 
             const targetWrapper = targetElements[targetIdx];
-            const targetElement = targetWrapper.element;
+            // For tree types, the padded value IS the element
+            const targetElement = getPaddedElement(targetWrapper as J.RightPadded<J>);
 
             // For arguments, J.Empty represents no argument, so regular captures should not match it
             if (filterEmpty && targetElement.kind === J.Kind.Empty) {
@@ -940,7 +944,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
 
         for (const key of Object.keys(j)) {
-            if (key.startsWith('_') || key === 'kind' || key === 'id' || key === 'markers' || key === 'prefix') {
+            // Skip internal/private properties, id, markers, prefix, and padding (handled by visitor framework)
+            if (key.startsWith('_') || key === 'kind' || key === 'id' || key === 'markers' || key === 'prefix' || key === 'padding') {
                 continue;
             }
 
@@ -990,11 +995,13 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             return right;
         }
 
-        const captureMarker = PlaceholderUtils.getCaptureMarker(right);
+        const captureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(right);
         if (captureMarker) {
-            const isRightPadded = (p as any).kind === J.Kind.RightPadded;
-            const targetWrapper = isRightPadded ? (p as unknown) as J.RightPadded<T> : undefined;
-            const targetElement = isRightPadded ? targetWrapper!.element : p;
+            // With intersection types, RightPadded elements have `padding` property but no `element`
+            const isRightPaddedOther = isRightPadded(p);
+            const targetWrapper = isRightPaddedOther ? (p as unknown) as J.RightPadded<T> : undefined;
+            // For tree types, the padded value IS the element (use getPaddedElement helper)
+            const targetElement = isRightPaddedOther ? getPaddedElement(targetWrapper!) : p;
 
             const savedTargetCursor = this.targetCursor;
             const cursorAtCapturedNode = this.targetCursor !== undefined
@@ -1038,7 +1045,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         const otherContainer = p as unknown as J.Container<T>;
 
         const hasVariadicCapture = container.elements.some(elem =>
-            PlaceholderUtils.isVariadicCapture(elem)
+            PlaceholderUtils.isVariadicCaptureFromPadded(elem)
         );
 
         const savedCursor = this.cursor;
@@ -1260,7 +1267,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
         }
 
         const patternWrapper = patternElements[patternIdx];
-        const captureMarker = PlaceholderUtils.getCaptureMarker(patternWrapper);
+        const captureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(patternWrapper);
         const isVariadic = captureMarker?.variadicOptions !== undefined;
 
         if (isVariadic) {
@@ -1271,7 +1278,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             let nonVariadicRemainingPatterns = 0;
             let allRemainingPatternsAreDeterministic = true;
             for (let i = patternIdx + 1; i < patternElements.length; i++) {
-                const nextCaptureMarker = PlaceholderUtils.getCaptureMarker(patternElements[i]);
+                const nextCaptureMarker = PlaceholderUtils.getCaptureMarkerFromPadded(patternElements[i]);
                 const nextIsVariadic = nextCaptureMarker?.variadicOptions !== undefined;
                 if (!nextIsVariadic) {
                     nonVariadicRemainingPatterns++;
@@ -1297,7 +1304,7 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                     if (targetIdx + tryConsume < targetElements.length) {
                         const candidateElement = targetElements[targetIdx + tryConsume];
 
-                        if (filterEmpty && candidateElement.element.kind === J.Kind.Empty) {
+                        if (filterEmpty && candidateElement.kind === J.Kind.Empty) {
                             continue;
                         }
 
@@ -1343,9 +1350,9 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
                 // For empty argument lists, there will be a single J.Empty element that we need to filter out
                 const rawWrappers = targetElements.slice(targetIdx, targetIdx + consume);
                 const capturedWrappers = filterEmpty
-                    ? rawWrappers.filter(w => w.element.kind !== J.Kind.Empty)
+                    ? rawWrappers.filter(w => w.kind !== J.Kind.Empty)
                     : rawWrappers;
-                const capturedElements: J[] = capturedWrappers.map(w => w.element);
+                const capturedElements: J[] = capturedWrappers.map(w => getPaddedElement(w as J.RightPadded<J>));
 
                 // Check min/max constraints against filtered elements
                 if (capturedElements.length < min || capturedElements.length > max) {
@@ -1400,7 +1407,8 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             }
 
             const targetWrapper = targetElements[targetIdx];
-            const targetElement = targetWrapper.element;
+            // For tree types, the padded value IS the element
+            const targetElement = getPaddedElement(targetWrapper as J.RightPadded<J>);
 
             if (filterEmpty && targetElement.kind === J.Kind.Empty) {
                 return false;

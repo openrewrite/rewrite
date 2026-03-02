@@ -159,7 +159,7 @@ describe('template2 replace', () => {
                     return await template`${select}.newMethod()`.apply(
                         method,
                         this.cursor,
-                        {values: new Map([[select, method.select.element]])}
+                        {values: new Map([[select, method.select]])}
                     );
                 }
                 return method;

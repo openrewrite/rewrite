@@ -395,8 +395,9 @@ describe("LST Debug Utilities", () => {
                 await visitor.visit(cu, new ExecutionContext());
 
                 const output = logs.join('\n');
-                // Literal should show the value inline with property path and braces
-                expect(output).toContain('element: J$Literal{"hello"');
+                // Literal should show the value inline with braces
+                // With intersection types, it's printed directly (not under element:)
+                expect(output).toContain('J$Literal{"hello"');
             } finally {
                 console.info = originalInfo;
             }

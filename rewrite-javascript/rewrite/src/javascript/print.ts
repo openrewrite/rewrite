@@ -105,10 +105,11 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     override async visitJsxTag(element: JSX.Tag, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(element, p);
-        // Print < first, then the space after < (openName.before), then the tag name
+        // Print < first, then the space after < (openName.padding.before), then the tag name
         p.append("<");
-        await this.visitSpace(element.openName.before, p);
-        await this.visit(element.openName.element, p);
+        // With intersection types for LeftPadded tree types, the element IS the tree with padding mixed in
+        await this.visitSpace(element.openName.padding.before, p);
+        await this.visit(element.openName, p);
         if (element.typeArguments) {
             await this.visitContainerLocal("<", element.typeArguments, ",", ">", p);
         }
@@ -124,10 +125,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 for (let i = 0; i < element.children.length; i++) {
                     await this.visit(element.children[i], p)
                 }
-                // Print </ first, then the space after </ (closingName.before), then the tag name
+                // Print </ first, then the space after </ (closingName.padding.before), then the tag name
                 p.append("</");
-                await this.visitSpace(element.closingName!.before, p);
-                await this.visit(element.closingName!.element, p);
+                await this.visitSpace(element.closingName!.padding.before, p);
+                await this.visit(element.closingName!, p);
                 await this.visitSpace(element.afterClosingName, p);
                 p.append(">");
             }
@@ -142,7 +143,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visit(attribute.key, p);
         if (attribute.value) {
             p.append("=");
-            await this.visit(attribute.value.element, p);
+            // With intersection types, value IS the expression with padding mixed in
+            await this.visit(attribute.value, p);
         }
         await this.afterSyntax(attribute, p);
         return attribute;
@@ -237,7 +239,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         for (const it of namespaceDeclaration.modifiers) {
             await this.visitModifier(it, p);
         }
-        await this.visitSpace(namespaceDeclaration.keywordType.before, p);
+        await this.visitSpace(namespaceDeclaration.keywordType.padding.before, p);
 
         switch (namespaceDeclaration.keywordType.element) {
             case JS.NamespaceDeclaration.KeywordType.Namespace:
@@ -306,7 +308,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitTryCatch(aCatch: J.Try.Catch, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(aCatch, p);
         p.append("catch");
-        if (aCatch.parameter.tree.element.variables.length > 0) {
+        // With intersection types, tree IS the VariableDeclarations with padding mixed in
+        if (aCatch.parameter.tree.variables.length > 0) {
             await this.visit(aCatch.parameter, p);
         }
         await this.visit(aCatch.body, p);
@@ -334,9 +337,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visitNodes(arrayType.annotations, p);
 
         if (arrayType.dimension) {
-            await this.visitSpace(arrayType.dimension.before, p);
+            await this.visitSpace(arrayType.dimension.padding.before, p);
             p.append("[");
-            await this.visitSpace(arrayType.dimension.element, p);
+            // For LeftPadded<Space>, Space uses intersection - dimension IS the Space
+            await this.visitSpace(arrayType.dimension as J.Space, p);
             p.append("]");
 
             if (arrayType.elementType.kind === J.Kind.ArrayType) {
@@ -351,10 +355,11 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     private async printDimensions(arrayType: J.ArrayType, p: PrintOutputCapture) {
         await this.beforeSyntax(arrayType, p);
         await this.visitNodes(arrayType.annotations, p);
-        await this.visitSpace(arrayType.dimension?.before ?? emptySpace, p);
+        await this.visitSpace(arrayType.dimension?.padding.before ?? emptySpace, p);
 
         p.append("[");
-        await this.visitSpace(arrayType.dimension?.element ?? emptySpace, p);
+        // For LeftPadded<Space>, Space uses intersection - dimension IS the Space
+        await this.visitSpace((arrayType.dimension as J.Space | undefined) ?? emptySpace, p);
         p.append("]");
 
         if (arrayType.elementType.kind === J.Kind.ArrayType) {
@@ -490,29 +495,30 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         const variables = multiVariable.variables;
         for (let i = 0; i < variables.length; i++) {
+            // With intersection types, variable IS the NamedVariable with padding mixed in
             const variable = variables[i];
 
-            await this.beforeSyntax(variable.element, p);
+            await this.beforeSyntax(variable, p);
 
             if (multiVariable.varargs) {
                 p.append("...");
             }
 
-            await this.visit(variable.element.name, p);
+            await this.visit(variable.name, p);
             // print non-null assertions or optional
-            await this.postVisit(variable.element, p);
+            await this.postVisit(variable, p);
 
-            await this.visitSpace(variable.after, p);
+            await this.visitSpace(variable.padding.after, p);
 
             if (multiVariable.typeExpression) {
                 await this.visit(multiVariable.typeExpression, p);
             }
 
-            if (variable.element.initializer) {
-                await this.visitLeftPaddedLocal("=", variable.element.initializer, p);
+            if (variable.initializer) {
+                await this.visitLeftPaddedLocal("=", variable.initializer, p);
             }
 
-            await this.afterSyntax(variable.element, p);
+            await this.afterSyntax(variable, p);
 
             if (i < variables.length - 1) {
                 p.append(",");
@@ -642,7 +648,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         if (functionCall.function) {
             await this.visitRightPadded(functionCall.function, p);
-            if (functionCall.function.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+            // With intersection types, function IS the expression with padding mixed in
+            if (functionCall.function.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
                 p.append("?.");
             }
         }
@@ -807,7 +814,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         } else {
             if (method.select) {
                 await this.visitRightPadded(method.select, p);
-                if (!method.select.element.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
+                // With intersection types, select IS the expression with padding mixed in
+                if (!method.select.markers.markers.find(m => m.kind === JS.Markers.Optional)) {
                     p.append(".");
                 } else {
                     p.append("?.");
@@ -834,15 +842,16 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         const bounds = typeParameter.bounds;
         if (bounds) {
             await this.visitSpace(bounds.before, p);
+            // With intersection types, constraintType IS the type with padding mixed in
             const constraintType = bounds.elements[0];
 
-            if (!(constraintType.element.kind === J.Kind.Empty)) {
+            if (!(constraintType.kind === J.Kind.Empty)) {
                 p.append("extends");
                 await this.visitRightPadded(constraintType, p);
             }
 
             const defaultType = bounds.elements[1];
-            if (!(defaultType.element.kind === J.Kind.Empty)) {
+            if (!(defaultType.kind === J.Kind.Empty)) {
                 p.append("=");
                 await this.visitRightPadded(defaultType, p);
             }
@@ -1118,7 +1127,8 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
             await this.visitLeftPaddedLocal("?", mappedType.hasQuestionToken, p);
         }
 
-        const colon = mappedType.valueType.elements[0].element.kind === J.Kind.Empty ? "" : ":";
+        // With intersection types, the element IS the type with padding mixed in
+        const colon = mappedType.valueType.elements[0].kind === J.Kind.Empty ? "" : ":";
         await this.visitContainerLocal(colon, mappedType.valueType, "", "", p);
 
         p.append("}");
@@ -1318,8 +1328,9 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     override async visitCase(case_: J.Case, p: PrintOutputCapture): Promise<J | undefined> {
         await this.beforeSyntax(case_, p);
 
-        const elem = case_.caseLabels.elements[0].element;
-        if (elem.kind !== J.Kind.Identifier || (elem as J.Identifier).simpleName !== "default") {
+        // With intersection types, elem IS the expression with padding mixed in
+        const elem = case_.caseLabels.elements[0];
+        if (elem.kind !== J.Kind.Identifier || (elem as J.Identifier & J.RightPaddingMixin).simpleName !== "default") {
             p.append("case");
         }
 
@@ -1470,7 +1481,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         await this.beforeSyntax(assignOp, p);
         await this.visit(assignOp.variable, p);
-        await this.visitSpace(assignOp.operator.before, p);
+        await this.visitSpace(assignOp.operator.padding.before, p);
         p.append(keyword);
         await this.visit(assignOp.assignment, p);
         await this.afterSyntax(assignOp, p);
@@ -1500,7 +1511,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         await this.beforeSyntax(assignOp, p);
         await this.visit(assignOp.variable, p);
-        await this.visitSpace(assignOp.operator.before, p);
+        await this.visitSpace(assignOp.operator.padding.before, p);
         p.append(keyword);
         await this.visit(assignOp.assignment, p);
         await this.afterSyntax(assignOp, p);
@@ -1602,7 +1613,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
         await this.beforeSyntax(binary, p);
         await this.visit(binary.left, p);
-        await this.visitSpace(binary.operator.before, p);
+        await this.visitSpace(binary.operator.padding.before, p);
         p.append(keyword);
         await this.visit(binary.right, p);
         await this.afterSyntax(binary, p);
@@ -1634,7 +1645,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 break;
         }
 
-        await this.visitSpace(binary.operator.before, p);
+        await this.visitSpace(binary.operator.padding.before, p);
         p.append(keyword);
 
         await this.visit(binary.right, p);
@@ -1656,12 +1667,12 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
                 break;
             case J.Unary.Type.PostIncrement:
                 await this.visit(unary.expression, p);
-                await this.visitSpace(unary.operator.before, p);
+                await this.visitSpace(unary.operator.padding.before, p);
                 p.append("++");
                 break;
             case J.Unary.Type.PostDecrement:
                 await this.visit(unary.expression, p);
-                await this.visitSpace(unary.operator.before, p);
+                await this.visitSpace(unary.operator.padding.before, p);
                 p.append("--");
                 break;
             case J.Unary.Type.Positive:
@@ -1773,9 +1784,10 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async visitStatementLocal(paddedStat: J.RightPadded<Statement> | undefined, p: PrintOutputCapture) {
         if (paddedStat) {
-            await this.visit(paddedStat.element, p);
-            await this.visitSpace(paddedStat.after, p);
-            await this.visitMarkers(paddedStat.markers, p);
+            // With intersection types, paddedStat IS the statement with padding mixed in
+            await this.visit(paddedStat, p);
+            await this.visitSpace(paddedStat.padding.after, p);
+            await this.visitMarkers(paddedStat.padding.markers, p);
         }
     }
 
@@ -1831,12 +1843,13 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async visitRightPaddedLocal(nodes: J.RightPadded<J>[], suffixBetween: string, p: PrintOutputCapture) {
         for (let i = 0; i < nodes.length; i++) {
+            // With intersection types, node IS the element with padding mixed in
             const node = nodes[i];
 
-            await this.visit(node.element, p);
+            await this.visit(node, p);
 
-            await this.visitSpace(node.after, p);
-            await this.visitMarkers(node.markers, p);
+            await this.visitSpace(node.padding.after, p);
+            await this.visitMarkers(node.padding.markers, p);
 
             if (i < nodes.length - 1) {
                 p.append(suffixBetween);
@@ -1845,21 +1858,26 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     public async visitRightPadded<T extends J | boolean>(right: J.RightPadded<T>, p: PrintOutputCapture): Promise<J.RightPadded<T>> {
-        if (isTree(right.element)) {
+        // With intersection types for tree types, right IS the element with padding mixed in
+        // For boolean, right has .element property
+        if (typeof right === 'object' && 'kind' in right && isTree(right)) {
+            await this.visit(right, p);
+        } else if (typeof right === 'object' && 'element' in right && isTree(right.element)) {
             await this.visit(right.element, p);
         }
 
-        await this.visitSpace(right.after, p);
-        await this.visitMarkers(right.markers, p);
+        await this.visitSpace(right.padding.after, p);
+        await this.visitMarkers(right.padding.markers, p);
         return right;
     }
 
     private async visitRightPaddedLocalSingle(node: J.RightPadded<J> | undefined, suffix: string, p: PrintOutputCapture) {
         if (node) {
-            await this.visit(node.element, p);
+            // With intersection types, node IS the element with padding mixed in
+            await this.visit(node, p);
 
-            await this.visitSpace(node.after, p);
-            await this.visitMarkers(node.markers, p);
+            await this.visitSpace(node.padding.after, p);
+            await this.visitMarkers(node.padding.markers, p);
 
             p.append(suffix);
         }
@@ -1867,19 +1885,26 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
     private async visitLeftPaddedLocal(prefix: string | undefined, leftPadded: J.LeftPadded<J> | J.LeftPadded<boolean> | J.LeftPadded<string> | undefined, p: PrintOutputCapture) {
         if (leftPadded) {
-            await this.beforeSyntaxExt(leftPadded.before, leftPadded.markers, p);
+            await this.beforeSyntaxExt(leftPadded.padding.before, leftPadded.padding.markers, p);
 
             if (prefix) {
                 p.append(prefix);
             }
 
-            if (typeof leftPadded.element === 'string') {
-                p.append(leftPadded.element);
-            } else if (typeof leftPadded.element !== 'boolean') {
-                await this.visit(leftPadded.element, p);
+            // With intersection types for tree types: leftPadded IS the element for tree types
+            // For primitives (boolean, string), leftPadded has .element property
+            if ('element' in leftPadded) {
+                // Primitive wrapper type
+                if (typeof leftPadded.element === 'string') {
+                    p.append(leftPadded.element);
+                }
+                // boolean case - no output needed
+            } else if ('kind' in leftPadded && isTree(leftPadded)) {
+                // Tree intersection type
+                await this.visit(leftPadded, p);
             }
 
-            await this.afterSyntaxMarkers(leftPadded.markers, p);
+            await this.afterSyntaxMarkers(leftPadded.padding.markers, p);
         }
     }
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../src/test";
-import {javascript, JavaScriptVisitor, npm, packageJson, tsx, typescript} from "../../src/javascript";
+import {javascript, JavaScriptVisitor, JS, npm, packageJson, tsx, typescript} from "../../src/javascript";
 import {J, Type} from "../../src/java";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {withDir} from "tmp-promise";
@@ -455,6 +455,53 @@ describe('JavaScript type mapping', () => {
                 )
             }, {unsafeCleanup: true});
         })
+
+        test('default export function call has <default> method name', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (Type.isMethod(type)) {
+                    const method = type as Type.Method;
+                    if (FullyQualified.getFullyQualifiedName(method.declaringType) === 'express') {
+                        return `${FullyQualified.getFullyQualifiedName(method.declaringType)} ${method.name}`;
+                    }
+                }
+                return null;
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                                import express from 'express';
+                                const app = express();
+                            `,
+                            //@formatter:off
+                            `
+                                import express from 'express';
+                                const app = /*~~(express <default>)~~>*/express();
+                            `
+                            //@formatter:on
+                        ),
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "express": "^4.18.2"
+                                },
+                                "devDependencies": {
+                                  "@types/express": "^4.17.21"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
+        });
 
         test('deprecated node methods with ES6 imports', async () => {
             const spec = new RecipeSpec();
@@ -1403,7 +1450,7 @@ describe('JavaScript type mapping', () => {
                                 const fa = paramType.class as J.FieldAccess;
                                 const targetName = fa.target.kind === J.Kind.Identifier ?
                                     (fa.target as J.Identifier).simpleName : '';
-                                const fieldName = fa.name.element.simpleName;
+                                const fieldName = fa.name.simpleName;
 
                                 if (targetName === 'React' && fieldName === 'Ref') {
                                     reactRefType = paramType.type;

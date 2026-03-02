@@ -478,10 +478,11 @@ export class JavaScriptParserVisitor {
         // If there's trailing whitespace/comments after the shebang, prepend to first statement's prefix
         if (shebangTrailingSpace && statements.length > 0) {
             const firstStmt = statements[0];
+            // With intersection types, firstStmt IS the statement with padding mixed in
             statements = [
                 produce(firstStmt, draft => {
-                    const existingPrefix = draft.element.prefix;
-                    draft.element.prefix = {
+                    const existingPrefix = draft.prefix;
+                    draft.prefix = {
                         kind: J.Kind.Space,
                         whitespace: shebangTrailingSpace!.whitespace + existingPrefix.whitespace,
                         comments: [...shebangTrailingSpace!.comments, ...existingPrefix.comments]
@@ -641,12 +642,20 @@ export class JavaScriptParserVisitor {
     }
 
     private rightPadded<T extends J | boolean>(t: T, trailing: J.Space, markers?: Markers): J.RightPadded<T> {
+        // For tree types (J), use intersection type: spread element and add padding
+        // For primitives (boolean), use wrapper type with element property
+        const padding: J.Suffix = { after: trailing ?? emptySpace, markers: markers ?? emptyMarkers };
+        if (typeof t === 'boolean') {
+            return {
+                element: t,
+                padding
+            } as J.RightPadded<T>;
+        }
+        // Cast to object to satisfy TypeScript spread type requirement
         return {
-            kind: J.Kind.RightPadded,
-            element: t,
-            after: trailing ?? emptySpace,
-            markers: markers ?? emptyMarkers
-        };
+            ...(t as object),
+            padding
+        } as J.RightPadded<T>;
     }
 
     private rightPaddedList<N extends ts.Node, T extends J>(nodes: N[], trailing: (node: N) => J.Space, markers?: (node: N) => Markers): J.RightPadded<T>[] {
@@ -675,12 +684,19 @@ export class JavaScriptParserVisitor {
     }
 
     private leftPadded<T extends J | J.Space | number | string | boolean>(before: J.Space, t: T, markers?: Markers): J.LeftPadded<T> {
+        // For primitives (boolean, number, string), use wrapper type with element property
+        const padding: J.Prefix = { before: before ?? emptySpace, markers: markers ?? emptyMarkers };
+        if (typeof t === 'boolean' || typeof t === 'number' || typeof t === 'string') {
+            return {
+                element: t,
+                padding
+            } as J.LeftPadded<T>;
+        }
+        // For tree types (J) and Space, use intersection type: spread element and add padding
         return {
-            kind: J.Kind.LeftPadded,
-            before: before ?? emptySpace,
-            element: t,
-            markers: markers ?? emptyMarkers
-        };
+            ...(t as J | J.Space),
+            padding
+        } as J.LeftPadded<T>;
     }
 
     private semicolonPrefix = (node: ts.Node) => {
@@ -1536,12 +1552,13 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
                 markers: emptyMarkers,
                 static: this.rightPadded(false, emptySpace),
-                statements: node.members.map(te => ({
-                    kind: J.Kind.RightPadded,
-                    element: this.convert(te),
-                    after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
-                    markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
-                })),
+                // For tree types, use intersection type: spread element and add padding
+                statements: node.members.map(te => {
+                    const converted = this.convert(te);
+                    const after = (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace;
+                    const paddingMarkersVal = (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers;
+                    return { ...converted, padding: { after, markers: paddingMarkersVal } } as J.RightPadded<Statement>;
+                }),
                 end: this.prefix(node.getLastToken()!)
             },
             type: this.mapType(node)
@@ -1630,6 +1647,17 @@ export class JavaScriptParserVisitor {
     }
 
     visitConditionalType(node: ts.ConditionalTypeNode): JS.ConditionalType {
+        // For tree types, use intersection type: spread element and add padding
+        const ternary: J.Ternary = {
+            kind: J.Kind.Ternary,
+            id: randomId(),
+            prefix: this.prefix(node.extendsType),
+            markers: emptyMarkers,
+            condition: this.convert(node.extendsType),
+            truePart: this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),
+            falsePart: this.leftPadded(this.suffix(node.trueType), this.convert(node.falseType)),
+            type: this.mapType(node)
+        };
         return {
             kind: JS.Kind.ConditionalType,
             id: randomId(),
@@ -1637,20 +1665,12 @@ export class JavaScriptParserVisitor {
             markers: emptyMarkers,
             checkType: this.visit(node.checkType),
             condition: {
-                kind: J.Kind.LeftPadded,
-                before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword)!),
-                element: {
-                    kind: J.Kind.Ternary,
-                    id: randomId(),
-                    prefix: this.prefix(node.extendsType),
-                    markers: emptyMarkers,
-                    condition: this.convert(node.extendsType),
-                    truePart: this.leftPadded(this.suffix(node.extendsType), this.convert(node.trueType)),
-                    falsePart: this.leftPadded(this.suffix(node.trueType), this.convert(node.falseType)),
-                    type: this.mapType(node)
-                },
-                markers: emptyMarkers
-            },
+                ...ternary,
+                padding: {
+                    before: this.prefix(this.findChildNode(node, ts.SyntaxKind.ExtendsKeyword)!),
+                    markers: emptyMarkers
+                }
+            } as J.LeftPadded<J.Ternary>,
             type: this.mapType(node)
         };
     }
@@ -2109,8 +2129,9 @@ export class JavaScriptParserVisitor {
         } else if (ts.isPropertyAccessExpression(node.expression)) {
             select = this.rightPadded(this.visit(node.expression.expression), this.suffix(node.expression.expression));
             if (node.expression.questionDotToken) {
+                // With intersection types, select IS the expression with padding mixed in
                 select = produce(select, draft => {
-                    draft!.element.markers.markers.push({
+                    draft!.markers.markers.push({
                         kind: JS.Markers.Optional,
                         id: randomId(),
                         prefix: emptySpace
@@ -2688,19 +2709,20 @@ export class JavaScriptParserVisitor {
                     prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
                     markers: emptyMarkers,
                     static: this.rightPadded(false, emptySpace),
-                    statements: node.members.map(ce => ({
-                        kind: J.Kind.RightPadded,
-                        element: this.convert(ce),
-                        after: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace,
-                        markers: ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
+                    // For tree types, use intersection type: spread element and add padding
+                    statements: node.members.map(ce => {
+                        const converted = this.convert(ce);
+                        const after = ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? this.prefix(ce.getLastToken()!) : emptySpace;
+                        const paddingMarkers = ce.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken ? markers({
                             kind: J.Markers.Semicolon,
                             id: randomId()
-                        }) : emptyMarkers
-                    })),
+                        }) : emptyMarkers;
+                        return { ...converted, padding: { after, markers: paddingMarkers } } as J.RightPadded<Statement>;
+                    }),
                     end: this.prefix(node.getLastToken()!)
                 },
                 type: this.mapType(node)
-            } satisfies J.ClassDeclaration as J.ClassDeclaration,
+            } as J.ClassDeclaration,
         }
     }
 
@@ -3284,7 +3306,10 @@ export class JavaScriptParserVisitor {
         });
 
         if (varDecls.length === 1) {
-            return varDecls[0].element;
+            // With intersection types, varDecls[0] IS the VariableDeclarations with padding mixed in
+            // We need to return just the VariableDeclarations without the padding
+            const { padding, ...varDeclWithoutPadding } = varDecls[0] as J.RightPadded<J.VariableDeclarations>;
+            return varDeclWithoutPadding as J.VariableDeclarations;
         } else {
             return {
                 kind: JS.Kind.ScopedVariableDeclarations,
@@ -3381,12 +3406,13 @@ export class JavaScriptParserVisitor {
                 prefix: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenBraceToken)!),
                 markers: emptyMarkers,
                 static: this.rightPadded(false, emptySpace),
-                statements: node.members.map(te => ({
-                    kind: J.Kind.RightPadded,
-                    element: this.convert(te),
-                    after: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace,
-                    markers: (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers
-                })),
+                // For tree types, use intersection type: spread element and add padding
+                statements: node.members.map(te => {
+                    const converted = this.convert(te);
+                    const after = (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? this.prefix(te.getLastToken()!) : emptySpace;
+                    const paddingMarkersVal = (te.getLastToken()?.kind === ts.SyntaxKind.SemicolonToken) || (te.getLastToken()?.kind === ts.SyntaxKind.CommaToken) ? markers(this.convertToken(te.getLastToken())!) : emptyMarkers;
+                    return { ...converted, padding: { after, markers: paddingMarkersVal } } as J.RightPadded<Statement>;
+                }),
                 end: this.prefix(node.getLastToken()!)
             },
             type: this.mapType(node)
@@ -3477,24 +3503,23 @@ export class JavaScriptParserVisitor {
                     namespaceKeyword ? this.prefix(namespaceKeyword) : emptySpace,
                     keywordType
                 ),
+                // With intersection types, body.name IS the expression with padding mixed in
                 name: this.rightPadded(
-                    (body.name.element.kind === J.Kind.FieldAccess)
-                        ? this.remapFieldAccess(body.name.element, node.name)
+                    (body.name.kind === J.Kind.FieldAccess)
+                        ? this.remapFieldAccess(body.name as J.FieldAccess & J.RightPaddingMixin, node.name)
                         : {
                             kind: J.Kind.FieldAccess,
                             id: randomId(),
                             prefix: emptySpace,
                             markers: emptyMarkers,
                             target: this.visit(node.name),
-                            name: {
-                                kind: J.Kind.LeftPadded,
-                                before: this.suffix(node.name),
-                                element: body.name.element as J.Identifier,
-                                markers: emptyMarkers
-                            },
+                            name: this.leftPadded(
+                                this.suffix(node.name),
+                                body.name as J.Identifier & J.RightPaddingMixin
+                            ),
                             type: undefined
                         },
-                    body.name.after
+                    body.name.padding.after
                 ),
                 body: body.body
             };

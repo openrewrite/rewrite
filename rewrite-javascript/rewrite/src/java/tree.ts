@@ -754,20 +754,88 @@ export namespace J {
         readonly text: string;
     }
 
-    export interface LeftPadded<T extends J | Space | number | string | boolean> {
-        readonly kind: typeof Kind.LeftPadded;
+    /**
+     * Represents padding information that appears before an element.
+     * Used in LeftPadded types to hold the prefix space and markers.
+     */
+    export interface Prefix {
         readonly before: Space;
-        readonly element: T;
         readonly markers: Markers;
     }
 
-    export interface RightPadded<T extends J | boolean> {
-        readonly kind: typeof Kind.RightPadded;
-        readonly element: T;
+    /**
+     * Represents padding information that appears after an element.
+     * Used in RightPadded types to hold the suffix space and markers.
+     */
+    export interface Suffix {
         readonly after: Space;
         readonly markers: Markers;
     }
 
+    /**
+     * Padding mixin for left-padded elements.
+     * Nests padding info under `padding` to avoid conflicts with element's own `markers`.
+     */
+    export interface LeftPaddingMixin {
+        readonly padding: Prefix;
+    }
+
+    /**
+     * Padding mixin for right-padded elements.
+     * Nests padding info under `padding` to avoid conflicts with element's own `markers`.
+     */
+    export interface RightPaddingMixin {
+        readonly padding: Suffix;
+    }
+
+    /**
+     * Wrapper for primitive values in padding (boolean, number, string).
+     * Primitives cannot use intersection types, so they use this wrapper.
+     * Space is an object type, so it uses intersection instead.
+     */
+    export interface PaddedPrimitive<T extends number | string | boolean> {
+        readonly element: T;
+    }
+
+    /**
+     * LeftPadded represents an element with whitespace/comments before it.
+     *
+     * For tree nodes (J) and Space: Uses intersection type - access properties directly.
+     *   Example: `fieldAccess.name.simpleName` (no `.element` needed)
+     *   Example: `arrayType.dimension.whitespace` (Space properties directly)
+     *   Padding accessed via: `node.padding.before`, `node.padding.markers`
+     *
+     * For primitives (boolean, number, string): Uses wrapper - access via `.element` property.
+     *   Example: `import.static.element` (boolean value)
+     *   Padding accessed via: `node.padding.before`, `node.padding.markers`
+     */
+    export type LeftPadded<T extends J | Space | number | string | boolean> =
+        T extends J
+            ? T & LeftPaddingMixin
+            : T extends Space
+                ? Space & LeftPaddingMixin
+                : PaddedPrimitive<Extract<T, number | string | boolean>> & LeftPaddingMixin;
+
+    /**
+     * RightPadded represents an element with whitespace/comments after it.
+     *
+     * For tree nodes (J): Uses intersection type - access properties directly.
+     *   Example: `stmt.kind` (no `.element` needed)
+     *   Padding accessed via: `stmt.padding.after`, `stmt.padding.markers`
+     *
+     * For booleans: Uses wrapper - access via `.element` property.
+     *   Padding accessed via: `node.padding.after`, `node.padding.markers`
+     */
+    export type RightPadded<T extends J | boolean> =
+        T extends J
+            ? T & RightPaddingMixin
+            : PaddedPrimitive<T & boolean> & RightPaddingMixin;
+
+    /**
+     * Container represents a bracketed group of elements (e.g., method arguments,
+     * type parameters). Has space before the opening bracket and a list of
+     * right-padded elements.
+     */
     export interface Container<T extends J> {
         readonly kind: typeof Kind.Container;
         readonly before: Space;
@@ -851,13 +919,120 @@ export const isNewClass = (n: any): n is J.NewClass => n.kind === J.Kind.NewClas
 export const isReturn = (n: any): n is J.Return => n.kind === J.Kind.Return;
 export const isVariableDeclarations = (n: any): n is J.VariableDeclarations => n.kind === J.Kind.VariableDeclarations;
 
-export function rightPadded<T extends J | boolean>(t: T, trailing: J.Space, markers?: Markers): J.RightPadded<T> {
-    return {
-        kind: J.Kind.RightPadded,
-        element: t,
-        after: trailing,
-        markers: markers ?? emptyMarkers
-    };
+/**
+ * Creates a RightPadded value.
+ *
+ * For tree nodes (J): Returns intersection type with nested padding.
+ * For booleans: Returns wrapper with `element` property and nested padding.
+ */
+export function rightPadded<T extends J>(t: T, trailing: J.Space, paddingMarkers?: Markers): J.RightPadded<T>;
+export function rightPadded(t: boolean, trailing: J.Space, paddingMarkers?: Markers): J.RightPadded<boolean>;
+export function rightPadded<T extends J | boolean>(t: T, trailing: J.Space, paddingMarkers?: Markers): J.RightPadded<T> {
+    const padding: J.Suffix = { after: trailing, markers: paddingMarkers ?? emptyMarkers };
+    if (typeof t === 'boolean') {
+        // Primitive: create wrapper with nested padding
+        return { element: t, padding } as J.RightPadded<T>;
+    } else {
+        // Tree node: merge with nested padding
+        return { ...t as object, padding } as J.RightPadded<T>;
+    }
+}
+
+/**
+ * Creates a LeftPadded value.
+ *
+ * For tree nodes (J) and Space: Returns intersection type with nested padding.
+ * For primitives (boolean, number, string): Returns wrapper with `element` property and nested padding.
+ */
+export function leftPadded<T extends J>(t: T, leading: J.Space, paddingMarkers?: Markers): J.LeftPadded<T>;
+export function leftPadded(t: J.Space, leading: J.Space, paddingMarkers?: Markers): J.LeftPadded<J.Space>;
+export function leftPadded<T extends number | string | boolean>(t: T, leading: J.Space, paddingMarkers?: Markers): J.LeftPadded<T>;
+export function leftPadded<T extends J | J.Space | number | string | boolean>(t: T, leading: J.Space, paddingMarkers?: Markers): J.LeftPadded<T> {
+    const padding: J.Prefix = { before: leading, markers: paddingMarkers ?? emptyMarkers };
+    if (typeof t === 'boolean' || typeof t === 'number' || typeof t === 'string') {
+        // Primitive: create wrapper with nested padding
+        return { element: t, padding } as J.LeftPadded<T>;
+    } else {
+        // Tree node or Space: merge with nested padding (intersection)
+        return { ...t as object, padding } as J.LeftPadded<T>;
+    }
+}
+
+/**
+ * Type guard to check if a padded value uses intersection type (tree nodes or Space)
+ * vs a primitive wrapper (has `element` property for boolean, number, string).
+ */
+export function isIntersectionPadded(padded: any): boolean {
+    // All padded values have a `padding` property
+    // Intersection types (tree nodes, Space) don't have `element`
+    // Primitive wrappers have both `padding` and `element`
+    return padded && typeof padded === 'object' && 'padding' in padded && !('element' in padded);
+}
+
+/**
+ * @deprecated Use isIntersectionPadded instead
+ */
+export const isTreePadded = isIntersectionPadded;
+
+/** Is this value a RightPadded of any form (intersection or primitive wrapper)? */
+export function isRightPadded(value: any): boolean {
+    if (value === null || typeof value !== 'object' || !('padding' in value)) return false;
+    return typeof value.padding === 'object' && value.padding !== null && 'after' in value.padding;
+}
+
+/** Is this value a LeftPadded of any form (intersection or primitive wrapper)? */
+export function isLeftPadded(value: any): boolean {
+    if (value === null || typeof value !== 'object' || !('padding' in value)) return false;
+    return typeof value.padding === 'object' && value.padding !== null && 'before' in value.padding;
+}
+
+/** Is this a primitive-wrapper RightPadded value (has `element` property)? */
+export function isPrimitiveRightPadded(value: any): boolean {
+    return isRightPadded(value) && 'element' in value;
+}
+
+/** Is this a primitive-wrapper LeftPadded value (has `element` property)? */
+export function isPrimitiveLeftPadded(value: any): boolean {
+    return isLeftPadded(value) && 'element' in value;
+}
+
+/**
+ * Extracts the element from a padded value.
+ * For tree nodes and Space: returns the padded value itself (it IS the element with padding mixed in).
+ * For primitives (boolean, number, string): returns the `.element` property.
+ */
+export function getPaddedElement<T extends J>(padded: J.LeftPadded<T> | J.RightPadded<T>): T;
+export function getPaddedElement(padded: J.LeftPadded<J.Space>): J.Space;
+export function getPaddedElement<T extends number | string | boolean>(padded: J.LeftPadded<T>): T;
+export function getPaddedElement<T extends boolean>(padded: J.RightPadded<T>): T;
+// Catch-all overloads for union types with J and primitives
+export function getPaddedElement<T extends J | boolean>(padded: J.RightPadded<T>): T;
+export function getPaddedElement<T extends J | J.Space | number | string | boolean>(padded: J.LeftPadded<T>): T;
+export function getPaddedElement<T>(padded: any): T {
+    if ('element' in padded) {
+        return padded.element;
+    }
+    // For tree nodes and Space, the padded value IS the element
+    return padded as T;
+}
+
+/**
+ * Sets the element in a padded value, returning a new padded value.
+ * For tree nodes and Space: merges the new element with existing padding.
+ * For primitives (boolean, number, string): creates a new wrapper with the new element.
+ */
+export function withPaddedElement<T extends J>(padded: J.LeftPadded<T>, newElement: T): J.LeftPadded<T>;
+export function withPaddedElement<T extends J>(padded: J.RightPadded<T>, newElement: T): J.RightPadded<T>;
+export function withPaddedElement(padded: J.LeftPadded<J.Space>, newElement: J.Space): J.LeftPadded<J.Space>;
+export function withPaddedElement<T extends number | string | boolean>(padded: J.LeftPadded<T>, newElement: T): J.LeftPadded<T>;
+export function withPaddedElement<T extends boolean>(padded: J.RightPadded<T>, newElement: T): J.RightPadded<T>;
+export function withPaddedElement<T>(padded: any, newElement: T): any {
+    if ('element' in padded) {
+        // Primitive wrapper - update element, preserve padding
+        return { ...padded, element: newElement };
+    }
+    // Tree node or Space - merge new element with existing padding
+    return { ...newElement as object, padding: padded.padding };
 }
 
 export namespace TypedTree {
@@ -883,7 +1058,7 @@ export namespace TypedTree {
 
     registerTypeGetter(J.Kind.MethodDeclaration, (tree: J.MethodDeclaration) => tree.methodType?.returnType);
     registerTypeGetter(J.Kind.MethodInvocation, (tree: J.MethodInvocation) => tree.methodType?.returnType);
-    registerTypeGetter(J.Kind.Parentheses, (tree: J.Parentheses<TypedTree>) => getType(tree.tree.element));
+    registerTypeGetter(J.Kind.Parentheses, (tree: J.Parentheses<TypedTree>) => getType(tree.tree));
     registerTypeGetter(J.Kind.NewClass, (tree: J.NewClass) => tree.constructorType?.returnType);
 
     // TODO ControlParentheses here isn't a TypedTree so why does this compile?
@@ -891,10 +1066,10 @@ export namespace TypedTree {
 
     registerTypeGetter(J.Kind.Empty, () => Type.unknownType);
     registerTypeGetter(J.Kind.MultiCatch, (tree: J.MultiCatch) => {
-        const bounds = tree.alternatives.map(a => getType(a.element));
+        const bounds = tree.alternatives.map(a => getType(a));
         return {kind: Type.Kind.Union, bounds: bounds};
     });
-    registerTypeGetter(J.Kind.NullableType, (tree: J.NullableType) => getType(tree.typeTree.element));
+    registerTypeGetter(J.Kind.NullableType, (tree: J.NullableType) => getType(tree.typeTree));
     registerTypeGetter(J.Kind.Wildcard, () => Type.unknownType);
     registerTypeGetter(J.Kind.Unknown, () => Type.unknownType);
 }

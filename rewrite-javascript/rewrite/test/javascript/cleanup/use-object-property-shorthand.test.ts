@@ -162,7 +162,7 @@ describe("UseObjectPropertyShorthand", () => {
                     // Find the shorthand property (no initializer means shorthand)
                     if (!prop.initializer) {
                         foundShorthandProperty = true;
-                        const nameIdent = prop.name.element as J.Identifier;
+                        const nameIdent = prop.name as unknown as J.Identifier;
                         expect(nameIdent.simpleName).toBe('foo');
                         // The identifier should retain type information as Primitive.Boolean
                         expect(nameIdent.type).toBe(Type.Primitive.Boolean);

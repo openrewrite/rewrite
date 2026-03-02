@@ -30,7 +30,7 @@ describe('JavaScriptComparatorVisitor', () => {
     // Helper function to get the first statement from a compilation unit
     function getFirstStatement(cu: J): J {
         const jscu = cu as JS.CompilationUnit;
-        return jscu.statements[0].element;
+        return jscu.statements[0];
     }
 
     test('identical literals match', async () => {
