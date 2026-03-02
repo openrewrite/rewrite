@@ -1380,14 +1380,15 @@ def read_message() -> Optional[dict]:
 
 
 def write_message(response: dict):
-    """Write a JSON-RPC message to stdout."""
-    content = json.dumps(response)
-    content_bytes = content.encode('utf-8')
+    """Write a JSON-RPC message to stdout.
 
-    sys.stdout.write(f"Content-Length: {len(content_bytes)}\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.write(content)
-    sys.stdout.flush()
+    Uses unbuffered binary I/O to avoid line-ending translation on Windows
+    that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
+    used by read_message() which uses os.read() on the read side.
+    """
+    content_bytes = json.dumps(response).encode('utf-8')
+    header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
+    os.write(sys.stdout.fileno(), header + content_bytes)
 
 
 def main():
