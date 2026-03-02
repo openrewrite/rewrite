@@ -100,12 +100,7 @@ public interface RewriteTest extends SourceSpecs {
                 softly.assertThatCode(() -> {
                     try {
                         rewriteRun(
-                                spec -> {
-                                    spec.recipe(recipe);
-                                    if (skipValidation) {
-                                        spec.validateRecipe(false);
-                                    }
-                                },
+                                spec -> spec.recipe(recipe).validateRecipe(recipe instanceof DeclarativeRecipe),
                                 new SourceSpecs[0]
                         );
                     } catch (Throwable t) {
