@@ -141,7 +141,7 @@ class MavenArtifactDownloaderTest {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
                     if (request.getHeader("Authorization") != null) {
-                        return new MockResponse().setResponseCode(403);
+                        return new MockResponse().setResponseCode(403); // Throw if used; it should not be called at all
                     }
                     return new MockResponse().setResponseCode(200)
                       .setBody(new okio.Buffer().write(jarBytes));
@@ -158,8 +158,8 @@ class MavenArtifactDownloaderTest {
                     <servers>
                         <server>
                             <id>mock-repo</id>
-                            <username>baduser</username>
-                            <password>badpass</password>
+                            <username>${placeholder}</username>
+                            <password>${placeholder}</password>
                         </server>
                     </servers>
                 </settings>
@@ -183,7 +183,7 @@ class MavenArtifactDownloaderTest {
 
             assertThat(artifact).isNotNull();
             assertThat(error.get()).isNull();
-            assertThat(mockRepo.getRequestCount()).isGreaterThanOrEqualTo(2);
+            assertThat(mockRepo.getRequestCount()).isEqualTo(1);
         }
     }
 }
