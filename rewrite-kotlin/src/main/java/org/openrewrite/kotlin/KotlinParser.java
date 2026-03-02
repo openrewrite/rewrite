@@ -16,9 +16,7 @@
 package org.openrewrite.kotlin;
 
 import kotlin.Pair;
-import kotlin.Unit;
 import kotlin.annotation.AnnotationTarget;
-import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
@@ -33,15 +31,10 @@ import org.jetbrains.kotlin.cli.jvm.compiler.CliCompilerUtilsKt;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
 import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
-import org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelineArtifact;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFir2IrPipelinePhase;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelineArtifact;
 import org.jetbrains.kotlin.cli.pipeline.jvm.JvmFrontendPipelinePhase;
-import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
-import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
-import org.jetbrains.kotlin.diagnostics.impl.SimpleDiagnosticsCollector;
-import org.openrewrite.kotlin.internal.ScriptCompilerPlugin;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
@@ -53,7 +46,10 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
+import org.jetbrains.kotlin.compiler.plugin.CompilerPluginRegistrar;
 import org.jetbrains.kotlin.config.*;
+import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
+import org.jetbrains.kotlin.diagnostics.impl.SimpleDiagnosticsCollector;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
@@ -63,10 +59,10 @@ import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
 import org.jetbrains.kotlin.fir.pipeline.ModuleCompilerAnalyzedOutput;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
-import org.jetbrains.kotlin.ir.declarations.IrFile;
-import org.jetbrains.kotlin.ir.declarations.IrModuleFragment;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
+import org.jetbrains.kotlin.ir.declarations.IrFile;
+import org.jetbrains.kotlin.ir.declarations.IrModuleFragment;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.KtFile;
@@ -77,10 +73,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.kotlin.internal.CompiledSource;
-import org.openrewrite.kotlin.internal.KotlinSource;
-import org.openrewrite.kotlin.internal.KotlinTreeParserVisitor;
-import org.openrewrite.kotlin.internal.PsiElementAssociations;
+import org.openrewrite.kotlin.internal.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -96,11 +89,11 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
 import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
@@ -173,7 +166,7 @@ public class KotlinParser implements Parser {
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
         Set<Path> dependsOnPaths = dependsOn == null ? emptySet() :
-                dependsOn.stream().map(Input::getPath).collect(Collectors.toSet());
+                dependsOn.stream().map(Input::getPath).collect(toSet());
 
         // TODO: FIR and disposable may not be necessary using the IR.
         Disposable disposable = Disposer.newDisposable();
