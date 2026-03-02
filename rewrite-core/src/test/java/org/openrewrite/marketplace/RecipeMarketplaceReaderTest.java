@@ -402,6 +402,40 @@ class RecipeMarketplaceReaderTest {
         }
     }
 
+    @Test
+    void mergePreservesMetadata() {
+        // Source marketplace has a recipe with metadata in "Java" category
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.TestRecipe,Test Recipe,A test recipe,Java,maven,org.example:test,abc123
+          """);
+
+        // Verify metadata was read
+        RecipeListing sourceRecipe = source.getAllRecipes().iterator().next();
+        assertThat(sourceRecipe.getMetadata().get("embedding")).isEqualTo("abc123");
+
+        // Target marketplace also has a recipe in "Java" (overlapping category)
+        RecipeMarketplace target = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.OtherRecipe,Other Recipe,Another recipe,Java,maven,org.example:other,xyz789
+          """);
+
+        // Merge source into target — both have "Java" category so this exercises
+        // the recursive merge path where withMarketplace() is called
+        target.getRoot().merge(source.getRoot());
+
+        // Verify both recipes exist and metadata is preserved
+        RecipeListing mergedTest = target.findRecipe("org.example.TestRecipe");
+        assertThat(mergedTest).isNotNull();
+        assertThat(mergedTest.getMetadata().get("embedding"))
+          .as("Metadata should be preserved through merge when categories overlap")
+          .isEqualTo("abc123");
+
+        RecipeListing mergedOther = target.findRecipe("org.example.OtherRecipe");
+        assertThat(mergedOther).isNotNull();
+        assertThat(mergedOther.getMetadata().get("embedding")).isEqualTo("xyz789");
+    }
+
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {
         return category.getCategories().stream()
           .filter(c -> c.getDisplayName().equals(name))
