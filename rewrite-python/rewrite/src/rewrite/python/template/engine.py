@@ -228,8 +228,10 @@ class TemplateEngine:
         """
         Parse Python code into an LST CompilationUnit.
 
-        When *options* specifies dependencies, a cached workspace is created
-        and ``TyTypesClient`` is used for type attribution during parsing.
+        Always attempts type attribution via ``TyTypesClient``.  When
+        *options* specifies dependencies, a cached virtualenv workspace is
+        used; otherwise a temporary directory suffices (enough for stdlib
+        and already-installed packages).
 
         Args:
             code: Python source code.
@@ -244,27 +246,33 @@ class TemplateEngine:
 
         ty_client = None
         tmp_file = None
+        owns_workspace = False
+        workspace = None
         try:
-            if options and options.dependencies:
-                try:
-                    import tempfile as _tmpmod
+            try:
+                import tempfile as _tmpmod
+                from rewrite.python.ty_client import TyTypesClient
+
+                if options and options.dependencies:
                     from .dependency_workspace import DependencyWorkspace
-                    from rewrite.python.ty_client import TyTypesClient
-
                     workspace = DependencyWorkspace.get_or_create(options.dependencies)
-                    ty_client = TyTypesClient()
-                    ty_client.initialize(workspace)
+                else:
+                    workspace = _tmpmod.mkdtemp()
+                    owns_workspace = True
 
-                    # ty needs a real file path for type resolution
-                    fd, tmp_file = _tmpmod.mkstemp(suffix=".py", dir=workspace)
-                    try:
-                        os.write(fd, code.encode())
-                    finally:
-                        os.close(fd)
-                except (ImportError, RuntimeError):
-                    # uv or ty-types not available — parse without type attribution
-                    ty_client = None
-                    tmp_file = None
+                ty_client = TyTypesClient()
+                ty_client.initialize(workspace)
+
+                # ty needs a real file path for type resolution
+                fd, tmp_file = _tmpmod.mkstemp(suffix=".py", dir=workspace)
+                try:
+                    os.write(fd, code.encode())
+                finally:
+                    os.close(fd)
+            except (ImportError, RuntimeError):
+                # ty-types not available — parse without type attribution
+                ty_client = None
+                tmp_file = None
 
             visitor = ParserVisitor(code, file_path=tmp_file, ty_client=ty_client)
             return visitor.visit(tree)
@@ -276,6 +284,9 @@ class TemplateEngine:
                     os.unlink(tmp_file)
                 except OSError:
                     pass
+            if owns_workspace and workspace is not None:
+                import shutil
+                shutil.rmtree(workspace, ignore_errors=True)
 
     @classmethod
     def _extract_from_wrapper(cls, cu: 'CompilationUnit', is_expression: bool) -> J:
