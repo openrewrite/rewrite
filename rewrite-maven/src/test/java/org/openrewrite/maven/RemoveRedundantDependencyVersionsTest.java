@@ -2290,12 +2290,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/1942")
     @Nested
     class SkipMarker {
-        private static final String GUAVA_POM = """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
+
+        @Test
+        void dependencyWithSkipMarkerKeepsVersion() {
+            String pom = """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <version>29.0-jre</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>com.google.guava</groupId>
@@ -2303,21 +2314,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                               <version>29.0-jre</version>
                           </dependency>
                       </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>29.0-jre</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """;
-
-        @Test
-        void dependencyWithSkipMarkerKeepsVersion() {
+                  </project>
+                  """;
             rewriteRun(
-              spec -> spec.expectedCyclesThatMakeChanges(1).recipe(toRecipe(() -> new MavenIsoVisitor<>() {
+              spec -> spec.recipe(toRecipe(() -> new MavenIsoVisitor<>() {
                   @Override
                   public Xml.Tag visitTag(Xml.Tag tag, org.openrewrite.ExecutionContext ctx) {
                       Xml.Tag t = super.visitTag(tag, ctx);
@@ -2331,7 +2331,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       return t;
                   }
               })),
-              pomXml(GUAVA_POM, GUAVA_POM)
+              pomXml(pom, pom)
             );
         }
 
@@ -2339,7 +2339,6 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         void dependencyWithoutSkipMarkerHasVersionRemoved() {
             rewriteRun(
               pomXml(
-                GUAVA_POM,
                 """
                   <project>
                       <groupId>com.mycompany.app</groupId>
@@ -2358,6 +2357,116 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                           <dependency>
                               <groupId>com.google.guava</groupId>
                               <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <version>29.0-jre</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipMarkerOnlyAffectsMarkedDependency() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new MavenIsoVisitor<>() {
+                  @Override
+                  public Xml.Tag visitTag(Xml.Tag tag, org.openrewrite.ExecutionContext ctx) {
+                      Xml.Tag t = super.visitTag(tag, ctx);
+                      if (isDependencyTag("com.google.guava", "guava") &&
+                          !t.getMarkers().findFirst(RemoveRedundantDependencyVersions.Skip.class).isPresent()) {
+                          t = t.withMarkers(t.getMarkers().add(new RemoveRedundantDependencyVersions.Skip(Tree.randomId())));
+                      }
+                      if (isProjectTag()) {
+                          doAfterVisit(new RemoveRedundantDependencyVersions(null, null, null, null).getVisitor());
+                      }
+                      return t;
+                  }
+              })),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <version>29.0-jre</version>
+                              </dependency>
+                              <dependency>
+                                  <groupId>commons-io</groupId>
+                                  <artifactId>commons-io</artifactId>
+                                  <version>2.11.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>commons-io</groupId>
+                              <artifactId>commons-io</artifactId>
+                              <version>2.11.0</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <version>29.0-jre</version>
+                              </dependency>
+                              <dependency>
+                                  <groupId>commons-io</groupId>
+                                  <artifactId>commons-io</artifactId>
+                                  <version>2.11.0</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>commons-io</groupId>
+                              <artifactId>commons-io</artifactId>
                           </dependency>
                       </dependencies>
                   </project>
