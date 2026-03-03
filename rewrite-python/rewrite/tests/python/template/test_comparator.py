@@ -332,15 +332,18 @@ class TestBinaryMatching:
         assert result is None
 
     def test_nested_binary(self):
-        """{a} + {b} should capture a nested binary in one operand."""
+        """{a} + {b} captures a nested binary expression in one operand."""
         captures = {'a': capture('a'), 'b': capture('b')}
         pattern_tree = TemplateEngine.get_template_tree("{a} + {b}", captures)
-        target_tree = TemplateEngine.get_template_tree("x + y", {})
+        target_tree = TemplateEngine.get_template_tree("(x * y) + z", {})
         cursor = _make_cursor(target_tree)
 
         comparator = PatternMatchingComparator(captures)
         result = comparator.match(pattern_tree, target_tree, cursor)
         assert result is not None
+        assert isinstance(result['a'], j.Parentheses)
+        assert isinstance(result['b'], j.Identifier)
+        assert result['b'].simple_name == 'z'
 
     def test_concrete_binary_match(self):
         """x + y should match x + y."""
@@ -589,6 +592,81 @@ class TestCaptureSemantics:
         result = comparator.match(pattern_tree, target_tree, cursor)
         # 'y' was never captured, so match should fail
         assert result is None
+
+
+class TestVariadicCapture:
+    """Tests for variadic capture recording."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def teardown_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_variadic_captures_all_arguments(self):
+        """Variadic capture records all matched arguments as a list."""
+        args = capture('args', variadic=True)
+        captures = {'args': args}
+        pattern_tree = TemplateEngine.get_template_tree("func({args})", captures)
+        target_tree = TemplateEngine.get_template_tree("func(a, b, c)", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator(captures)
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is not None
+        assert 'args' in result
+        matched = result['args']
+        assert isinstance(matched, list)
+        assert len(matched) == 3
+        assert all(isinstance(a, j.Identifier) for a in matched)
+        assert [a.simple_name for a in matched] == ['a', 'b', 'c']
+
+    def test_variadic_captures_zero_arguments(self):
+        """Variadic capture with no arguments records empty list."""
+        args = capture('args', variadic=True)
+        captures = {'args': args}
+        pattern_tree = TemplateEngine.get_template_tree("func({args})", captures)
+        target_tree = TemplateEngine.get_template_tree("func()", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator(captures)
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is not None
+        assert 'args' in result
+        matched = result['args']
+        assert isinstance(matched, list)
+        assert len(matched) == 0
+
+    def test_variadic_captures_single_argument(self):
+        """Variadic capture with one argument records single-element list."""
+        args = capture('args', variadic=True)
+        captures = {'args': args}
+        pattern_tree = TemplateEngine.get_template_tree("func({args})", captures)
+        target_tree = TemplateEngine.get_template_tree("func(x)", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator(captures)
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is not None
+        matched = result['args']
+        assert isinstance(matched, list)
+        assert len(matched) == 1
+        assert matched[0].simple_name == 'x'
+
+    def test_variadic_not_required_for_match_success(self):
+        """A variadic capture that's declared but unused doesn't fail the match."""
+        x = capture('x')
+        args = capture('args', variadic=True)
+        captures = {'x': x, 'args': args}
+        pattern_tree = TemplateEngine.get_template_tree("{x}", captures)
+        target_tree = TemplateEngine.get_template_tree("hello", {})
+        cursor = _make_cursor(target_tree)
+
+        comparator = PatternMatchingComparator(captures)
+        result = comparator.match(pattern_tree, target_tree, cursor)
+        assert result is not None
+        assert result['x'].simple_name == 'hello'
+        assert 'args' not in result
 
 
 class TestTypeMismatch:

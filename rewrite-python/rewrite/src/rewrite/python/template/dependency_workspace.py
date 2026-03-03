@@ -251,6 +251,8 @@ class DependencyWorkspace:
                 "uv is not installed or not on PATH. "
                 "Install it with: pip install uv"
             )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("uv sync timed out after 300 seconds")
 
     @classmethod
     def clear_cache(cls) -> None:

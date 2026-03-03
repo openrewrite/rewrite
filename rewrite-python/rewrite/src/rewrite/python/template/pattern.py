@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, overload
 
 from rewrite.java import J
 
@@ -33,27 +33,31 @@ class MatchResult:
     Result of a successful pattern match.
 
     Provides access to captured values by name or Capture object.
+    Scalar captures return a single ``J`` node; variadic captures
+    return a ``List[J]`` of matched elements.
 
     Examples:
         match = pattern.match(node, cursor)
         if match:
-            x_value = match.get('x')
+            x_value = match.get('x')          # J node
+            args = match.get('args')           # List[J] for variadic
             # or
             x_value = match.get(x_capture)
             # or
             x_value = match['x']
     """
 
-    def __init__(self, captures: Dict[str, J]):
+    def __init__(self, captures: Dict[str, Union[J, List[J]]]):
         """
         Initialize match result.
 
         Args:
             captures: Dict mapping capture names to their matched AST values.
+                Scalar captures map to a single J; variadic captures to List[J].
         """
         self._captures = captures
 
-    def get(self, capture: Union[str, Capture]) -> Optional[J]:
+    def get(self, capture: Union[str, Capture]) -> Optional[Union[J, List[J]]]:
         """
         Get a captured value.
 
@@ -61,12 +65,13 @@ class MatchResult:
             capture: The capture name or Capture object.
 
         Returns:
-            The captured AST node, or None if not found.
+            The captured AST node (``J``), list of nodes (``List[J]``
+            for variadic captures), or ``None`` if not found.
         """
         name = capture.name if isinstance(capture, Capture) else capture
         return self._captures.get(name)
 
-    def __getitem__(self, key: Union[str, Capture]) -> J:
+    def __getitem__(self, key: Union[str, Capture]) -> Union[J, List[J]]:
         """
         Get a captured value (dict-style access).
 
@@ -74,7 +79,7 @@ class MatchResult:
             key: The capture name or Capture object.
 
         Returns:
-            The captured AST node.
+            The captured AST node or list of nodes.
 
         Raises:
             KeyError: If the capture was not matched.
@@ -105,7 +110,7 @@ class MatchResult:
         """Get all capture names in this result."""
         return list(self._captures.keys())
 
-    def as_dict(self) -> Dict[str, J]:
+    def as_dict(self) -> Dict[str, Union[J, List[J]]]:
         """Get all captures as a dictionary."""
         return dict(self._captures)
 

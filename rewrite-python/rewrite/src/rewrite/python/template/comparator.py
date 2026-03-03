@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import dataclasses
 import functools
-from typing import Dict, Optional, TYPE_CHECKING, cast
+from typing import Dict, List, Optional, TYPE_CHECKING, Union, cast
 
 from rewrite.java import J, JavaType, JContainer, JLeftPadded, JRightPadded, Space
 from rewrite.java import tree as j
@@ -148,7 +148,9 @@ class PythonComparatorVisitor:
                 print(f"None mismatch for field '{field_name}'")
             return False
 
-        # Formatting — skip
+        # Formatting — skip.  All Space-typed fields are purely formatting
+        # (e.g., _negation on py.Binary is Optional[Space]).  This complements
+        # _SKIP_FIELDS which handles the universal _prefix/_markers by name.
         if isinstance(p_val, Space):
             return True
 
@@ -389,7 +391,7 @@ class PatternMatchingComparator(PythonSemanticComparator):
     ) -> None:
         super().__init__(lenient_type_matching)
         self._captures = captures
-        self._captured: Dict[str, J] = {}
+        self._captured: Dict[str, Union[J, List[J]]] = {}
 
     def match(
         self,
@@ -398,7 +400,7 @@ class PatternMatchingComparator(PythonSemanticComparator):
         cursor: Cursor,
         *,
         debug: bool = False,
-    ) -> Optional[Dict[str, J]]:
+    ) -> Optional[Dict[str, Union[J, List[J]]]]:
         """
         Match pattern against target, returning captures if successful.
 
@@ -410,6 +412,8 @@ class PatternMatchingComparator(PythonSemanticComparator):
 
         Returns:
             Dict of captured values if matched, None otherwise.
+            Scalar captures map to a single ``J`` node; variadic captures
+            map to a ``List[J]`` of matched elements.
         """
         self._captured = {}
         self._debug = debug
@@ -465,7 +469,9 @@ class PatternMatchingComparator(PythonSemanticComparator):
                 print(f"Unknown capture: {name}")
             return False
 
-        # Check if this capture already has a value
+        # Check if this capture already has a value.  Uses AST node identity
+        # (UUID), not structural equality — intentionally strict so that the
+        # same capture in a pattern must refer to the exact same target node.
         if name in self._captured:
             existing = self._captured[name]
             if self._debug:
@@ -494,7 +500,9 @@ class PatternMatchingComparator(PythonSemanticComparator):
         p_padded = pattern_args._elements
         t_padded = target_args._elements
 
-        # Check for variadic capture
+        # Variadic capture: matches any number of arguments and records
+        # them as a List[J] in self._captured so they can be extracted
+        # from the match result and spliced into templates.
         if len(p_padded) == 1:
             pattern_arg = p_padded[0].element
             if isinstance(pattern_arg, j.Identifier):
@@ -502,6 +510,15 @@ class PatternMatchingComparator(PythonSemanticComparator):
                 if cap_name:
                     cap = self._captures.get(cap_name)
                     if cap is not None and cap.variadic:
+                        self._captured[cap_name] = [
+                            rp.element for rp in t_padded
+                            if not isinstance(rp.element, j.Empty)
+                        ]
+                        if self._debug:
+                            print(
+                                f"Variadic capture '{cap_name}': "
+                                f"{len(t_padded)} elements"
+                            )
                         return True
 
         # Non-variadic: must have same number of arguments
