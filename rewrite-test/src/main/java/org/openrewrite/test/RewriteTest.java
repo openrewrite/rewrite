@@ -91,15 +91,10 @@ public interface RewriteTest extends SourceSpecs {
             // scanRuntimeClasspath picks up all recipes in META-INF/rewrite regardless of whether their
             // names start with the package we intend to filter on here
             if (recipe.getName().startsWith(packageName)) {
-                // Imperative recipes are loaded with no user-provided arguments, so all optional
-                // parameters are null. Skip recipe validation for these since custom validate()
-                // methods (e.g. requiring at least one of several optional parameters) would
-                // fail on an unconfigured instance. Declarative recipes have their options
-                // configured from YAML and should still be validated.
                 softly.assertThatCode(() -> {
                     try {
                         rewriteRun(
-                                spec -> spec.recipe(recipe).validateRecipe(recipe instanceof DeclarativeRecipe),
+                                spec -> spec.recipe(recipe),
                                 new SourceSpecs[0]
                         );
                     } catch (Throwable t) {
@@ -232,7 +227,12 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
         }
-        if (testClassSpec.recipeValidation && testMethodSpec.recipeValidation) {
+
+        // Imperative recipes are loaded with no user-provided arguments, so all optional parameters are null.
+        // Skip recipe validation for these since custom validate() methods (e.g. requiring at least one of several
+        // optional parameters) would fail on an unconfigured instance.
+        if (recipe instanceof DeclarativeRecipe
+                || recipe.getDescriptor().getOptions().stream().anyMatch(opt -> !opt.isRequired())) {
             List<Validated<Object>> validations = new ArrayList<>();
             recipe.validateAll(ctx, validations);
             assertThat(validations.stream().filter(Validated::isInvalid))

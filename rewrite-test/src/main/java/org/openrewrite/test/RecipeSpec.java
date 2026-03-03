@@ -92,8 +92,6 @@ public class RecipeSpec {
 
     boolean serializationValidation = true;
 
-    boolean recipeValidation = true;
-
     PrintOutputCapture.@Nullable MarkerPrinter markerPrinter;
 
     List<UncheckedConsumer<List<SourceFile>>> beforeRecipes = new ArrayList<>();
@@ -257,11 +255,6 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
-        return this;
-    }
-
-    public RecipeSpec validateRecipe(boolean validate) {
-        this.recipeValidation = validate;
         return this;
     }
 
