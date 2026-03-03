@@ -207,6 +207,15 @@ class DependencyWorkspace:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise
 
+    _PEP508_COMPARATORS = ('>=', '<=', '==', '!=', '~=', '>', '<')
+
+    @classmethod
+    def _normalize_version(cls, version: str) -> str:
+        """Ensure *version* has a PEP 508 comparator prefix, defaulting to ``>=``."""
+        if any(version.startswith(op) for op in cls._PEP508_COMPARATORS):
+            return version
+        return f">={version}"
+
     @classmethod
     def _generate_pyproject(cls, dependencies: Tuple[Tuple[str, str], ...]) -> str:
         """Generate a minimal ``pyproject.toml`` for the given dependencies."""
@@ -218,7 +227,7 @@ class DependencyWorkspace:
             'dependencies = [',
         ]
         for pkg, ver in sorted(dependencies):
-            lines.append(f'    "{pkg}=={ver}",')
+            lines.append(f'    "{pkg}{cls._normalize_version(ver)}",')
         lines.append(']')
         return "\n".join(lines) + "\n"
 

@@ -40,10 +40,24 @@ WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 
 @dataclass(frozen=True)
 class TemplateOptions:
-    """Configuration options for template parsing."""
+    """Configuration options for template parsing.
+
+    Attributes:
+        imports: Deprecated — use ``context`` instead.  Import statements
+            prepended to the template code for parsing.  Kept for backward
+            compatibility; new code should pass import strings via ``context``.
+        context: Arbitrary statements (imports, assignments, type aliases, …)
+            prepended to the template code before parsing.  This is the
+            preferred way to supply any setup code the template needs.
+        dependencies: PyPI ``(package, version)`` pairs.  When set, the
+            template is parsed inside a cached virtualenv that has these
+            packages installed, enabling type attribution.
+        context_sensitive: Whether the template requires cursor context
+            for correct parsing.
+    """
     imports: Tuple[str, ...] = ()
     context: Tuple[str, ...] = ()
-    dependencies: Tuple[Tuple[str, str], ...] = ()  # (package, version) pairs
+    dependencies: Tuple[Tuple[str, str], ...] = ()
     context_sensitive: bool = False
 
 

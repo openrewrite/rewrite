@@ -153,8 +153,9 @@ class Pattern:
         Args:
             code: Python code with {name} placeholders.
             captures: Dict mapping capture names to Capture objects.
-            imports: Import statements for type resolution (shorthand for context).
-            context: Arbitrary statements prepended to pattern code for parsing.
+            imports: Deprecated — use ``context`` instead.
+            context: Arbitrary statements (imports, assignments, …) prepended
+                to the pattern code for parsing.
             dependencies: PyPI packages required by the pattern (``{package: version}``).
         """
         self._code = code
@@ -289,8 +290,9 @@ def pattern(
     Args:
         code: Python code with {name} placeholders, or a t-string
               (Python 3.14+) with Capture/RawCode interpolations.
-        imports: Optional import statements for type resolution.
-        context: Optional arbitrary statements prepended to pattern code for parsing.
+        imports: Deprecated — use ``context`` instead.
+        context: Optional statements (imports, assignments, …) prepended to
+            the pattern code for parsing.
         dependencies: Optional PyPI packages required by the pattern (``{package: version}``).
         **captures: Named capture specifications (not allowed with t-strings).
 

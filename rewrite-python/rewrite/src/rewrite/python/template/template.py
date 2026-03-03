@@ -66,8 +66,9 @@ class Template:
         Args:
             code: Python code with {name} placeholders.
             captures: Dict mapping capture names to Capture objects.
-            imports: Import statements to include for parsing (shorthand for context).
-            context: Arbitrary statements prepended to template code for parsing.
+            imports: Deprecated — use ``context`` instead.
+            context: Arbitrary statements (imports, assignments, …) prepended
+                to the template code for parsing.
             dependencies: PyPI packages required by the template (``{package: version}``).
         """
         self._code = code
@@ -301,8 +302,7 @@ class TemplateBuilder:
         return self
 
     def imports(self, *import_statements: str) -> 'TemplateBuilder':
-        """
-        Add import statements for type resolution.
+        """Deprecated — use :meth:`context` instead.
 
         Args:
             *import_statements: Import statements.
@@ -372,8 +372,9 @@ def template(
     Args:
         code: Python code with {name} placeholders, or a t-string
               (Python 3.14+) with Capture/RawCode interpolations.
-        imports: Optional import statements for type resolution.
-        context: Optional arbitrary statements prepended to template code for parsing.
+        imports: Deprecated — use ``context`` instead.
+        context: Optional statements (imports, assignments, …) prepended to
+            the template code for parsing.
         dependencies: Optional PyPI packages required by the template (``{package: version}``).
         **captures: Named capture specifications (not allowed with t-strings).
 

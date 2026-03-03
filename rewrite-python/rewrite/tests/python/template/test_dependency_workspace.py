@@ -90,12 +90,12 @@ class TestDependencyWorkspaceUnit:
 
     def test_generate_pyproject(self):
         """Generated pyproject.toml contains correct dependencies."""
-        deps = (("requests", "2.31.0"), ("flask", "3.0.0"))
+        deps = (("requests", "2.31.0"), ("flask", ">=3.0.0"))
         content = DependencyWorkspace._generate_pyproject(deps)
 
         assert '[project]' in content
-        assert '"requests==2.31.0"' in content
-        assert '"flask==3.0.0"' in content
+        assert '"requests>=2.31.0"' in content  # bare version gets >= prefix
+        assert '"flask>=3.0.0"' in content  # explicit comparator preserved
         assert 'requires-python' in content
 
     def test_is_valid_nonexistent(self):
