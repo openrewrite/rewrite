@@ -17,6 +17,7 @@
 import pytest
 
 from rewrite.python.template import capture, raw, Capture, RawCode
+from rewrite.python.template._fstring_support import clear_registry, collect_captures
 
 
 class TestCapture:
@@ -98,3 +99,145 @@ class TestRawCode:
 
         assert r1 == r2
         assert r1 != r3
+
+
+class TestRawCodeFormat:
+    """Tests for RawCode.__format__."""
+
+    def test_fstring_splice(self):
+        """RawCode splices directly into an f-string."""
+        r = raw('warn')
+        result = f"logger.{r}(msg)"
+        assert result == "logger.warn(msg)"
+
+    def test_format_spec_rejected(self):
+        """Format specs are not allowed."""
+        r = raw('x')
+        with pytest.raises(ValueError, match="format specs"):
+            format(r, '.2f')
+
+
+class TestCaptureFormat:
+    """Tests for Capture.__format__ and auto-registration."""
+
+    def setup_method(self):
+        """Clear the registry before each test."""
+        clear_registry()
+
+    def test_fstring_produces_template_code(self):
+        """f-string with Capture produces internal placeholder identifier."""
+        expr = capture('expr')
+        result = f"print({expr})"
+        assert result == "print(__plh_expr__)"
+
+    def test_format_spec_rejected(self):
+        """Format specs are not allowed on Capture."""
+        cap = capture('x')
+        with pytest.raises(ValueError, match="format specs"):
+            format(cap, '>10')
+
+    def test_auto_registration(self):
+        """Formatting a Capture registers it in the contextvars registry."""
+        cap = capture('expr')
+        code = f"print({cap})"  # triggers __format__
+        collected = collect_captures(code)
+        assert 'expr' in collected
+        assert collected['expr'] is cap
+
+    def test_registration_only_matching(self):
+        """collect_captures only returns captures whose placeholder appears in the code."""
+        a = capture('a')
+        b = capture('b')
+        f"{a} + {b}"
+        # Only collect 'a' — 'b' is not in the code string
+        collected = collect_captures("__plh_a__ + x")
+        assert 'a' in collected
+        assert 'b' not in collected
+
+
+class TestCaptureOptionalName:
+    """Tests for optional name in capture()."""
+
+    def test_auto_generated_name(self):
+        """capture() without name generates an auto name."""
+        cap = capture()
+        assert cap.name.startswith('_capture_')
+
+    def test_auto_names_are_unique(self):
+        """Each call to capture() generates a different name."""
+        c1 = capture()
+        c2 = capture()
+        assert c1.name != c2.name
+
+
+class TestFstringIntegration:
+    """Integration tests for f-string support with template() and pattern()."""
+
+    def setup_method(self):
+        """Clear the registry before each test."""
+        clear_registry()
+
+    def test_template_with_fstring(self):
+        """template(f"...{cap}...") picks up auto-registered capture."""
+        from rewrite.python.template import template
+
+        expr = capture('expr')
+        tmpl = template(f"print({expr})")
+        assert tmpl.code == "print(__plh_expr__)"
+        assert 'expr' in tmpl.captures
+        assert tmpl.captures['expr'] is expr
+
+    def test_pattern_with_fstring(self):
+        """pattern(f"...{cap}...") picks up auto-registered capture."""
+        from rewrite.python.template import pattern
+
+        expr = capture('expr')
+        pat = pattern(f"print({expr})")
+        assert pat.code == "print(__plh_expr__)"
+        assert 'expr' in pat.captures
+        assert pat.captures['expr'] is expr
+
+    def test_unnamed_capture_fstring(self):
+        """Unnamed captures work with f-strings."""
+        from rewrite.python.template import template
+
+        expr = capture()
+        tmpl = template(f"print({expr})")
+        assert expr.name in tmpl.captures
+        assert tmpl.captures[expr.name] is expr
+
+    def test_mixed_rawcode_and_capture(self):
+        """RawCode and Capture can be mixed in a single f-string."""
+        from rewrite.python.template import template
+
+        method = raw('warn')
+        expr = capture('expr')
+        tmpl = template(f"logger.{method}({expr})")
+        assert tmpl.code == "logger.warn(__plh_expr__)"
+        assert 'expr' in tmpl.captures
+        assert tmpl.captures['expr'] is expr
+
+    def test_explicit_kwargs_override(self):
+        """Explicit kwargs take priority over auto-registered captures."""
+        from rewrite.python.template import template
+
+        expr = capture('expr')
+        expr2 = capture('expr', variadic=True)
+        # f-string registers expr, but explicit kwarg overrides
+        tmpl = template(f"print({expr})", expr=expr2)
+        assert tmpl.captures['expr'] is expr2
+        assert tmpl.captures['expr'].variadic is True
+
+    def test_stale_entries_cleared_by_template(self):
+        """Stale registry entries are cleared when template() is called."""
+        from rewrite.python.template import template
+
+        stale = capture('stale')
+        f"unused {stale}"  # registers but never consumed
+
+        # Next template() call should clear the registry
+        tmpl = template("print(x)")
+        assert 'stale' not in tmpl.captures
+
+        # Registry should be empty now
+        assert collect_captures("__plh_stale__") == {}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XPathParser.g4 by ANTLR 4.13.2
+// Generated from rewrite-xml/src/main/antlr/XPathParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -32,29 +32,29 @@ public class XPathParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, SLASH=2, DOUBLE_SLASH=3, AXIS_SEP=4, LBRACKET=5, RBRACKET=6, LPAREN=7, 
-		RPAREN=8, AT=9, DOTDOT=10, DOT=11, COMMA=12, EQUALS=13, NOT_EQUALS=14, 
-		LTE=15, GTE=16, LT=17, GT=18, WILDCARD=19, NUMBER=20, AND=21, OR=22, TEXT=23, 
-		COMMENT=24, NODE=25, PROCESSING_INSTRUCTION=26, STRING_LITERAL=27, QNAME=28, 
+		WS=1, SLASH=2, DOUBLE_SLASH=3, AXIS_SEP=4, LBRACKET=5, RBRACKET=6, LPAREN=7,
+		RPAREN=8, AT=9, DOTDOT=10, DOT=11, COMMA=12, EQUALS=13, NOT_EQUALS=14,
+		LTE=15, GTE=16, LT=17, GT=18, WILDCARD=19, NUMBER=20, AND=21, OR=22, TEXT=23,
+		COMMENT=24, NODE=25, PROCESSING_INSTRUCTION=26, STRING_LITERAL=27, QNAME=28,
 		NCNAME=29;
 	public static final int
-		RULE_xpathExpression = 0, RULE_expr = 1, RULE_orExpr = 2, RULE_andExpr = 3, 
-		RULE_equalityExpr = 4, RULE_relationalExpr = 5, RULE_unaryExpr = 6, RULE_unionExpr = 7, 
-		RULE_pathExpr = 8, RULE_functionCallExpr = 9, RULE_bracketedExpr = 10, 
-		RULE_literalOrNumber = 11, RULE_filterExpr = 12, RULE_primaryExpr = 13, 
-		RULE_locationPath = 14, RULE_absoluteLocationPath = 15, RULE_relativeLocationPath = 16, 
-		RULE_pathSeparator = 17, RULE_step = 18, RULE_axisSpecifier = 19, RULE_axisName = 20, 
-		RULE_abbreviatedStep = 21, RULE_attributeStep = 22, RULE_nodeTest = 23, 
-		RULE_nameTest = 24, RULE_nodeType = 25, RULE_predicate = 26, RULE_predicateExpr = 27, 
+		RULE_xpathExpression = 0, RULE_expr = 1, RULE_orExpr = 2, RULE_andExpr = 3,
+		RULE_equalityExpr = 4, RULE_relationalExpr = 5, RULE_unaryExpr = 6, RULE_unionExpr = 7,
+		RULE_pathExpr = 8, RULE_functionCallExpr = 9, RULE_bracketedExpr = 10,
+		RULE_literalOrNumber = 11, RULE_filterExpr = 12, RULE_primaryExpr = 13,
+		RULE_locationPath = 14, RULE_absoluteLocationPath = 15, RULE_relativeLocationPath = 16,
+		RULE_pathSeparator = 17, RULE_step = 18, RULE_axisSpecifier = 19, RULE_axisName = 20,
+		RULE_abbreviatedStep = 21, RULE_attributeStep = 22, RULE_nodeTest = 23,
+		RULE_nameTest = 24, RULE_nodeType = 25, RULE_predicate = 26, RULE_predicateExpr = 27,
 		RULE_functionCall = 28, RULE_functionName = 29, RULE_argument = 30, RULE_literal = 31;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"xpathExpression", "expr", "orExpr", "andExpr", "equalityExpr", "relationalExpr", 
-			"unaryExpr", "unionExpr", "pathExpr", "functionCallExpr", "bracketedExpr", 
-			"literalOrNumber", "filterExpr", "primaryExpr", "locationPath", "absoluteLocationPath", 
-			"relativeLocationPath", "pathSeparator", "step", "axisSpecifier", "axisName", 
-			"abbreviatedStep", "attributeStep", "nodeTest", "nameTest", "nodeType", 
-			"predicate", "predicateExpr", "functionCall", "functionName", "argument", 
+			"xpathExpression", "expr", "orExpr", "andExpr", "equalityExpr", "relationalExpr",
+			"unaryExpr", "unionExpr", "pathExpr", "functionCallExpr", "bracketedExpr",
+			"literalOrNumber", "filterExpr", "primaryExpr", "locationPath", "absoluteLocationPath",
+			"relativeLocationPath", "pathSeparator", "step", "axisSpecifier", "axisName",
+			"abbreviatedStep", "attributeStep", "nodeTest", "nameTest", "nodeType",
+			"predicate", "predicateExpr", "functionCall", "functionName", "argument",
 			"literal"
 		};
 	}
@@ -62,18 +62,18 @@ public class XPathParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'/'", "'//'", "'::'", "'['", "']'", "'('", "')'", "'@'", 
-			"'..'", "'.'", "','", "'='", "'!='", "'<='", "'>='", "'<'", "'>'", "'*'", 
+			null, null, "'/'", "'//'", "'::'", "'['", "']'", "'('", "')'", "'@'",
+			"'..'", "'.'", "','", "'='", "'!='", "'<='", "'>='", "'<'", "'>'", "'*'",
 			null, "'and'", "'or'", "'text'", "'comment'", "'node'", "'processing-instruction'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "SLASH", "DOUBLE_SLASH", "AXIS_SEP", "LBRACKET", "RBRACKET", 
-			"LPAREN", "RPAREN", "AT", "DOTDOT", "DOT", "COMMA", "EQUALS", "NOT_EQUALS", 
-			"LTE", "GTE", "LT", "GT", "WILDCARD", "NUMBER", "AND", "OR", "TEXT", 
-			"COMMENT", "NODE", "PROCESSING_INSTRUCTION", "STRING_LITERAL", "QNAME", 
+			null, "WS", "SLASH", "DOUBLE_SLASH", "AXIS_SEP", "LBRACKET", "RBRACKET",
+			"LPAREN", "RPAREN", "AT", "DOTDOT", "DOT", "COMMA", "EQUALS", "NOT_EQUALS",
+			"LTE", "GTE", "LT", "GT", "WILDCARD", "NUMBER", "AND", "OR", "TEXT",
+			"COMMENT", "NODE", "PROCESSING_INSTRUCTION", "STRING_LITERAL", "QNAME",
 			"NCNAME"
 		};
 	}

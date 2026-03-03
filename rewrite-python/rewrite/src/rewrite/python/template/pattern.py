@@ -127,7 +127,7 @@ class Pattern:
     Examples:
         # Pattern with named capture
         x = capture('x')
-        pat = pattern("print({x})", x=x)
+        pat = pattern(f"print({x})")
 
         # Match against a node
         match = pat.match(node, cursor)
@@ -136,7 +136,7 @@ class Pattern:
 
         # Pattern with multiple captures
         a, b = capture('a'), capture('b')
-        pat = pattern("{a} + {b}", a=a, b=b)
+        pat = pattern(f"{a} + {b}")
     """
 
     def __init__(
@@ -258,9 +258,13 @@ def pattern(
         A Pattern instance.
 
     Examples:
-        # Pattern with capture
+        # Pattern with capture (explicit kwargs)
         x = capture('x')
         pat = pattern("print({x})", x=x)
+
+        # With f-string (Python 3.6+, no name duplication)
+        x = capture('x')
+        pat = pattern(f"print({x})")
 
         # With t-string (Python 3.14+)
         x = capture('x')
@@ -268,21 +272,14 @@ def pattern(
 
         # Pattern with multiple captures
         a, b = capture('a'), capture('b')
-        pat = pattern("{a} + {b}", a=a, b=b)
+        pat = pattern(f"{a} + {b}")
 
         # Variadic pattern (matches multiple arguments)
         args = capture('args', variadic=True)
-        pat = pattern("func({args})", args=args)
+        pat = pattern(f"func({args})")
     """
-    from rewrite.python.template._tstring_support import is_tstring, convert_tstring
-
-    if is_tstring(code):
-        if captures:
-            raise TypeError(
-                "Cannot pass keyword captures when using a t-string; "
-                "interpolate Capture objects directly in the t-string instead"
-            )
-        code, captures = convert_tstring(code)
+    from ._fstring_support import resolve_captures
+    code, captures = resolve_captures(code, captures)
 
     return Pattern(
         code=code,

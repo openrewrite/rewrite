@@ -58,7 +58,7 @@ class TestConvertTstring:
         expr = capture('expr')
         tpl = MockTemplate("print(", MockInterpolation(expr, "expr"), ")")
         code, captures = convert_tstring(tpl)
-        assert code == "print({expr})"
+        assert code == "print(__plh_expr__)"
         assert captures == {'expr': expr}
 
     def test_multiple_captures(self):
@@ -66,7 +66,7 @@ class TestConvertTstring:
         b = capture('b')
         tpl = MockTemplate("", MockInterpolation(a, "a"), " + ", MockInterpolation(b, "b"), "")
         code, captures = convert_tstring(tpl)
-        assert code == "{a} + {b}"
+        assert code == "__plh_a__ + __plh_b__"
         assert captures == {'a': a, 'b': b}
 
     def test_raw_code_spliced(self):
@@ -84,7 +84,7 @@ class TestConvertTstring:
             "(", MockInterpolation(expr, "expr"), ")"
         )
         code, captures = convert_tstring(tpl)
-        assert code == "logger.info({expr})"
+        assert code == "logger.info(__plh_expr__)"
         assert captures == {'expr': expr}
 
     def test_non_capture_interpolation_raises(self):
@@ -97,5 +97,5 @@ class TestConvertTstring:
         my_var = capture('x')
         tpl = MockTemplate("f(", MockInterpolation(my_var, "my_var"), ")")
         code, captures = convert_tstring(tpl)
-        assert code == "f({x})"
+        assert code == "f(__plh_x__)"
         assert captures == {'x': my_var}

@@ -22,8 +22,8 @@ from typing import Dict, List, Optional, Tuple
 
 from .capture import Capture
 
-# Placeholder identifier format: __placeholder_name__
-PLACEHOLDER_PREFIX = "__placeholder_"
+# Placeholder identifier format: __plh_name__
+PLACEHOLDER_PREFIX = "__plh_"
 PLACEHOLDER_SUFFIX = "__"
 
 # Regex to find {name} placeholders in template code
@@ -43,9 +43,9 @@ def to_placeholder(name: str) -> str:
 
     Examples:
         >>> to_placeholder('expr')
-        '__placeholder_expr__'
+        '__plh_expr__'
         >>> to_placeholder('x')
-        '__placeholder_x__'
+        '__plh_x__'
     """
     return f"{PLACEHOLDER_PREFIX}{name}{PLACEHOLDER_SUFFIX}"
 
@@ -61,7 +61,7 @@ def from_placeholder(identifier: str) -> Optional[str]:
         The capture name if this is a placeholder, None otherwise.
 
     Examples:
-        >>> from_placeholder('__placeholder_expr__')
+        >>> from_placeholder('__plh_expr__')
         'expr'
         >>> from_placeholder('regular_var')
         None
@@ -145,7 +145,7 @@ def substitute_placeholders(code: str, captures: Dict[str, Capture]) -> Tuple[st
         >>> code = "print({x})"
         >>> captures = {'x': capture('x')}
         >>> substitute_placeholders(code, captures)
-        ('print(__placeholder_x__)', {'__placeholder_x__': 'x'})
+        ('print(__plh_x__)', {'__plh_x__': 'x'})
     """
     placeholders = find_placeholders(code)
     mapping: Dict[str, str] = {}

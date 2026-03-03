@@ -73,7 +73,7 @@ class TestPlaceholderReplacement:
         result = visitor.visit(tree, None)
 
         assert isinstance(result, j.Identifier)
-        assert result.simple_name == '__placeholder_x__'
+        assert result.simple_name == '__plh_x__'
 
     def test_replace_in_nested_expression(self):
         """Replace placeholder in a binary expression."""
