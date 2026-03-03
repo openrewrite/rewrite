@@ -18,8 +18,10 @@ package org.openrewrite.maven;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -172,6 +174,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             @Override
             public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag()) {
+                    if (tag.getMarkers().findFirst(Skip.class).isPresent()) {
+                        return tag;
+                    }
                     ResolvedDependency d = findDependency(tag);
                     if (d != null &&
                             matchesGroup(d) &&
@@ -182,6 +187,9 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         return tag.withContent(withoutVersion(tag, version));
                     }
                 } else if (isManagedDependencyTag()) {
+                    if (tag.getMarkers().findFirst(Skip.class).isPresent()) {
+                        return tag;
+                    }
                     ResolvedManagedDependency managed = findManagedDependency(tag);
                     if (managed != null &&
                             matchesGroup(managed) &&
@@ -408,5 +416,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
             return t;
         }
+    }
+
+    /**
+     * A marker that can be placed on a Maven dependency tag to indicate that its explicit
+     * {@code <version>} should be retained, even when this recipe would otherwise remove it
+     * as redundant.
+     */
+    @Value
+    @With
+    public static class Skip implements Marker {
+        UUID id;
     }
 }
