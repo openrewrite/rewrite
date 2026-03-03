@@ -38,6 +38,13 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             return es.WithId(pvId).WithExpression(rp!.Element);
         }
 
+        // DeconstructionPattern is a J type that implements Cs.Pattern
+        // but must be received via JavaReceiver which has the actual visit method
+        if (tree is DeconstructionPattern)
+        {
+            return _delegate.Visit(tree, q);
+        }
+
         if (tree is not Cs)
         {
             return _delegate.Visit(tree, q);
@@ -1058,6 +1065,14 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
         public override J? Visit(Tree? tree, RpcReceiveQueue q)
         {
+            // DeconstructionPattern is a J type whose visit method lives in JavaReceiver,
+            // but it implements Pattern which extends Cs. Without this check,
+            // the Cs guard below bounces it back to CSharpReceiver.Visit, which
+            // re-delegates here, creating infinite mutual recursion (stack overflow).
+            if (tree is DeconstructionPattern)
+            {
+                return base.Visit(tree, q);
+            }
             if (tree is Cs || tree is ExpressionStatement)
             {
                 return _outer.Visit(tree, q);

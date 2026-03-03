@@ -338,6 +338,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
         private @Nullable Path workingDirectory;
+        private @Nullable Path profileOutputPath;
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
@@ -404,6 +405,20 @@ public class CSharpRewriteRpc extends RewriteRpc {
             return this;
         }
 
+        /**
+         * Enable .NET EventPipe profiling on the C# process. Captures CPU sampling,
+         * GC events, sampled allocations, and runtime counters into a {@code .nettrace}
+         * file that can be analyzed with {@code dotnet-trace convert}, PerfView, or
+         * Visual Studio.
+         *
+         * @param outputPath Path for the {@code .nettrace} output file
+         * @return This builder
+         */
+        public Builder profile(Path outputPath) {
+            this.profileOutputPath = outputPath;
+            return this;
+        }
+
         @Override
         public CSharpRewriteRpc get() {
             Path entry = findCSharpServerEntry();
@@ -435,6 +450,20 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
 
             process.environment().putAll(environment);
+
+            if (profileOutputPath != null) {
+                Map<String, String> env = process.environment();
+                env.put("DOTNET_EnableEventPipe", "1");
+                env.put("DOTNET_EventPipeOutputPath", profileOutputPath.toAbsolutePath().normalize().toString());
+                env.put("DOTNET_EventPipeOutputStreaming", "1");
+                env.put("DOTNET_EventPipeCircularMB", "256");
+                // CPU sampling + GC events + sampled allocations (low rate) + type loading + runtime counters
+                env.put("DOTNET_EventPipeConfig",
+                        "Microsoft-DotNETCore-SampleProfiler:0:5;" +
+                        "Microsoft-Windows-DotNETRuntime:2088009:4;" +
+                        "System.Runtime:0:4");
+            }
+
             process.start();
 
             try {

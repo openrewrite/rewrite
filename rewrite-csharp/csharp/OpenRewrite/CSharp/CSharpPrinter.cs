@@ -751,6 +751,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             CsBinary.OperatorType.As => "as",
             CsBinary.OperatorType.NullCoalescing => "??",
+            CsBinary.OperatorType.And => "and",
+            CsBinary.OperatorType.Or => "or",
             _ => throw new InvalidOperationException($"Unknown CsBinary operator: {csb.Operator.Element}")
         });
         Visit(csb.Right, p);
@@ -1830,19 +1832,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(binary, p);
         Visit(binary.Left, p);
         VisitSpace(binary.Operator.Before, p);
-
-        var op = binary.Operator.Element;
-        // Pattern combinator marker means this Binary came from a BinaryPatternSyntax (and/or keywords)
-        if (binary.Markers.FindFirst<PatternCombinator>() != null &&
-            op is Binary.OperatorType.And or Binary.OperatorType.Or)
-        {
-            p.Append(op == Binary.OperatorType.And ? "and" : "or");
-        }
-        else
-        {
-            p.Append(GetOperatorString(op));
-        }
-
+        p.Append(GetOperatorString(binary.Operator.Element));
         Visit(binary.Right, p);
         AfterSyntax(binary, p);
         return binary;

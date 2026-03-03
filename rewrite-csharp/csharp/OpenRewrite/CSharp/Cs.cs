@@ -2265,7 +2265,7 @@ public sealed class CsBinary(
     JLeftPadded<CsBinary.OperatorType> @operator,
     Expression right,
     JavaType? type
-) : Cs, Expression, IEquatable<CsBinary>
+) : Cs, Expression, Pattern, IEquatable<CsBinary>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -2293,7 +2293,9 @@ public sealed class CsBinary(
     public enum OperatorType
     {
         As,
-        NullCoalescing
+        NullCoalescing,
+        And,
+        Or
     }
 
     Tree Tree.WithId(Guid id) => WithId(id);

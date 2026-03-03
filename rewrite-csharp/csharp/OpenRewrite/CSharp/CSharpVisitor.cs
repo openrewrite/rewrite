@@ -10,6 +10,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 {
     protected override J? Accept(J tree, P p)
     {
+        // DeconstructionPattern is a J type that implements Cs.Pattern
+        // but must be visited via JavaVisitor which has the actual visit method
+        if (tree is DeconstructionPattern) return base.Accept(tree, p);
+
         if (tree is not Cs) return base.Accept(tree, p);
 
         return tree switch

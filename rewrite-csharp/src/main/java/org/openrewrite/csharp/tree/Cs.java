@@ -1965,7 +1965,7 @@ public interface Cs extends J {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class Binary implements Cs, Expression, TypedTree {
+    final class Binary implements Cs, Expression, TypedTree, Pattern {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2022,7 +2022,9 @@ public interface Cs extends J {
 
         public enum OperatorType {
             As,
-            NullCoalescing
+            NullCoalescing,
+            And,
+            Or
         }
 
         public Padding getPadding() {
@@ -7860,12 +7862,12 @@ public interface Cs extends J {
 
         @Override
         public JavaType getType() {
-            return expression.getType();
+            return expression == null ? null : expression.getType();
         }
 
         @Override
         public PointerDereference withType(@Nullable JavaType type) {
-            return withExpression(expression.withType(type));
+            return expression == null ? this : withExpression(expression.withType(type));
         }
 
         @Override

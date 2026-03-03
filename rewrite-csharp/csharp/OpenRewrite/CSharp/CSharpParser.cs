@@ -2496,9 +2496,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             ? new List<JRightPadded<NamedVariable>> { new JRightPadded<NamedVariable>(namedVar, Space.Empty, Markers.Empty) }
             : new List<JRightPadded<NamedVariable>>();
 
-        return new VariableDeclarations(
+        var varDecl = new VariableDeclarations(
             Guid.NewGuid(),
-            Space.Empty,  // Prefix is handled by the case label itself
+            Space.Empty,
             Markers.Empty,
             [],           // Leading annotations
             [],           // Modifiers
@@ -2506,6 +2506,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null,         // Varargs
             [],           // Dimensions before name
             variables
+        );
+
+        // Wrap in StatementExpression so it implements Pattern
+        return new StatementExpression(
+            Guid.NewGuid(),
+            Space.Empty,  // Prefix is handled by the case label itself
+            Markers.Empty,
+            varDecl
         );
     }
 
@@ -2541,7 +2549,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             ? new List<JRightPadded<NamedVariable>> { new JRightPadded<NamedVariable>(namedVar, Space.Empty, Markers.Empty) }
             : new List<JRightPadded<NamedVariable>>();
 
-        return new VariableDeclarations(
+        var varDecl = new VariableDeclarations(
             Guid.NewGuid(),
             Space.Empty,
             Markers.Empty,
@@ -2551,6 +2559,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null,
             [],
             variables
+        );
+
+        // Wrap in StatementExpression so it implements Pattern
+        return new StatementExpression(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            varDecl
         );
     }
 
@@ -2626,12 +2642,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             ? leftExpr
             : new StatementExpression(Guid.NewGuid(), Space.Empty, Markers.Empty, (Statement)leftJ);
 
-        // Parse the operator — reuse J.Binary with And/Or; printer detects pattern context
+        // Parse the operator — use CsBinary with And/Or which implements Pattern
         var operatorPrefix = ExtractSpaceBefore(node.OperatorToken);
         var operatorType = node.OperatorToken.Kind() switch
         {
-            SyntaxKind.AndKeyword => Binary.OperatorType.And,
-            SyntaxKind.OrKeyword => Binary.OperatorType.Or,
+            SyntaxKind.AndKeyword => CsBinary.OperatorType.And,
+            SyntaxKind.OrKeyword => CsBinary.OperatorType.Or,
             _ => throw new InvalidOperationException($"Unsupported operator '{node.OperatorToken}' in BinaryPattern")
         };
         _cursor = node.OperatorToken.Span.End;
@@ -2642,12 +2658,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             ? rightExpr
             : new StatementExpression(Guid.NewGuid(), Space.Empty, Markers.Empty, (Statement)rightJ);
 
-        return new Binary(
+        return new CsBinary(
             Guid.NewGuid(),
             Space.Empty,
-            Markers.Empty.Add(PatternCombinator.Instance),
+            Markers.Empty,
             left,
-            new JLeftPadded<Binary.OperatorType>(operatorPrefix, operatorType),
+            new JLeftPadded<CsBinary.OperatorType>(operatorPrefix, operatorType),
             right,
             null
         );

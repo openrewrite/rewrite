@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using Serilog;
 
 namespace OpenRewrite.CSharp;
 
@@ -23,9 +24,14 @@ internal static class DotNetRestore
         // Fast path: already restored in this process
         lock (Restored)
         {
-            if (Restored.Contains(key)) return;
+            if (Restored.Contains(key))
+            {
+                Log.Debug("dotnet restore: skipped (already restored) {Path}", path);
+                return;
+            }
         }
 
+        Log.Debug("dotnet restore: waiting for gate {Path}", path);
         await Gate.WaitAsync(ct);
         try
         {
@@ -50,6 +56,7 @@ internal static class DotNetRestore
 
     private static async Task RunCoreAsync(string path, CancellationToken ct)
     {
+        Log.Debug("dotnet restore: starting for {Path}", path);
         var psi = new ProcessStartInfo("dotnet", $"restore \"{path}\"")
         {
             WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
@@ -60,8 +67,13 @@ internal static class DotNetRestore
         };
 
         using var process = Process.Start(psi);
-        if (process == null) return;
+        if (process == null)
+        {
+            Log.Debug("dotnet restore: process failed to start");
+            return;
+        }
 
+        Log.Debug("dotnet restore: process started (PID {ProcessId})", process.Id);
         using var restoreCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         restoreCts.CancelAfter(Timeout);
 
@@ -74,11 +86,13 @@ internal static class DotNetRestore
             var stderrTask = process.StandardError.ReadToEndAsync(restoreCts.Token);
             await Task.WhenAll(stdoutTask, stderrTask);
             await process.WaitForExitAsync(restoreCts.Token);
+            Log.Debug("dotnet restore: completed (exit code {ExitCode})", process.ExitCode);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Restore timed out but overall operation is still running — kill and continue
             try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            Log.Debug("dotnet restore: TIMED OUT after 2 minutes, killed process");
             Console.WriteLine("  dotnet restore timed out after 2 minutes, continuing without full restore");
         }
     }
@@ -102,31 +116,39 @@ public class SolutionParser
     /// </summary>
     public async Task<Solution> LoadAsync(string path, CancellationToken ct = default)
     {
+        Log.Debug("LoadAsync: starting for {Path}", path);
         EnsureMSBuildRegistered();
 
         // Run dotnet restore to ensure NuGet packages are available for MSBuildWorkspace
         var sw = Stopwatch.StartNew();
+        Log.Debug(">> dotnet restore ({FileName})", Path.GetFileName(path));
         await DotNetRestore.RunAsync(path, ct);
+        Log.Debug("<< dotnet restore ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
         Console.WriteLine($"  dotnet restore completed in {sw.Elapsed}");
 
         sw.Restart();
+        Log.Debug("MSBuildWorkspace: creating workspace");
         var workspace = MSBuildWorkspace.Create();
-        var logFile = Path.Combine(Path.GetTempPath(), $"msbuild_load_progress_{Environment.ProcessId}_{Thread.CurrentThread.ManagedThreadId}.log");
         var progress = new Progress<ProjectLoadProgress>(p =>
-            File.AppendAllText(logFile, $"[{sw.Elapsed:mm\\:ss}] {p.Operation}: {Path.GetFileName(p.FilePath)}\n"));
-        File.WriteAllText(logFile, $"Loading: {path}\n");
+        {
+            Log.Debug("MSBuild progress: {Operation} {FilePath}", p.Operation, Path.GetFileName(p.FilePath));
+        });
+
         Solution solution;
+        Log.Debug(">> MSBuildWorkspace.Open ({FileName})", Path.GetFileName(path));
         if (path.EndsWith(".sln", StringComparison.OrdinalIgnoreCase) ||
             path.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
             solution = await workspace.OpenSolutionAsync(path, progress, cancellationToken: ct);
         else
             solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;
+        Log.Debug("<< MSBuildWorkspace.Open ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
         Console.WriteLine($"  MSBuildWorkspace.Open completed in {sw.Elapsed}");
 
         // Report any workspace diagnostics
         var diags = workspace.Diagnostics;
         if (diags.Count > 0)
         {
+            Log.Debug("MSBuildWorkspace: {DiagCount} diagnostics", diags.Count);
             Console.WriteLine($"  Workspace diagnostics ({diags.Count}):");
             foreach (var d in diags.Take(5))
                 Console.WriteLine($"    {d.Kind}: {d.Message}");
@@ -134,6 +156,9 @@ public class SolutionParser
                 Console.WriteLine($"    ... and {diags.Count - 5} more");
         }
 
+        var projectCount = solution.Projects.Count();
+        var docCount = solution.Projects.Sum(p => p.Documents.Count());
+        Log.Debug("LoadAsync: loaded {ProjectCount} projects, {DocCount} documents", projectCount, docCount);
         return solution;
     }
 
@@ -146,51 +171,87 @@ public class SolutionParser
     public List<CompilationUnit> ParseProject(
         Solution solution, string projectPath, string rootDir)
     {
+        var projectName = Path.GetFileNameWithoutExtension(projectPath);
+        Log.Debug("ParseProject: starting {ProjectName}", projectName);
+
         var project = solution.Projects.FirstOrDefault(p =>
             string.Equals(p.FilePath, projectPath, StringComparison.OrdinalIgnoreCase));
 
         if (project == null)
             throw new ArgumentException($"Project not found in solution: {projectPath}");
 
-        var compilation = project.GetCompilationAsync().Result;
+        Compilation? compilation;
+        var compileSw = Stopwatch.StartNew();
+        Log.Debug(">> GetCompilation ({ProjectName})", projectName);
+        compilation = project.GetCompilationAsync().Result;
+        compileSw.Stop();
+        Log.Debug("<< GetCompilation ({ProjectName}) ({Elapsed})", projectName, compileSw.Elapsed);
 
         // Get preprocessor symbols from all solution configurations
         var configSymbolSets = GetConfigurationSymbolSets(solution, projectPath);
 
-        var results = new List<CompilationUnit>();
-        foreach (var doc in project.Documents)
-        {
-            if (doc.FilePath == null) continue;
-            if (!IsUserSource(doc, project)) continue;
+        var userDocs = project.Documents
+            .Where(d => d.FilePath != null && IsUserSource(d, project))
+            .ToList();
+        Log.Debug("ParseProject: {ProjectName} has {UserDocCount} user source files (of {TotalDocCount} total)",
+            projectName, userDocs.Count, project.Documents.Count());
 
+        var results = new List<CompilationUnit>();
+        var fileIndex = 0;
+        var projectSw = Stopwatch.StartNew();
+        foreach (var doc in userDocs)
+        {
+            fileIndex++;
             var source = doc.GetTextAsync().Result?.ToString();
             if (source == null) continue;
 
-            var relativePath = Path.GetRelativePath(rootDir, doc.FilePath);
+            var relativePath = Path.GetRelativePath(rootDir, doc.FilePath!);
             // Normalize path separators to forward slashes for cross-platform consistency
             relativePath = relativePath.Replace('\\', '/');
 
-            SemanticModel? semanticModel = null;
-            if (compilation != null)
+            var fileSw = Stopwatch.StartNew();
+            try
             {
-                var syntaxTree = doc.GetSyntaxTreeAsync().Result;
-                if (syntaxTree != null)
-                    semanticModel = compilation.GetSemanticModel(syntaxTree);
-            }
+                SemanticModel? semanticModel = null;
+                if (compilation != null)
+                {
+                    var syntaxTree = doc.GetSyntaxTreeAsync().Result;
+                    if (syntaxTree != null)
+                        semanticModel = compilation.GetSemanticModel(syntaxTree);
+                }
 
-            CompilationUnit cu;
-            if (configSymbolSets.Count > 1)
-            {
-                cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets);
-            }
-            else
-            {
-                cu = _parser.Parse(source, relativePath, semanticModel);
-            }
+                CompilationUnit cu;
+                if (configSymbolSets.Count > 1)
+                {
+                    cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets);
+                }
+                else
+                {
+                    cu = _parser.Parse(source, relativePath, semanticModel);
+                }
 
-            results.Add(cu);
+                results.Add(cu);
+                fileSw.Stop();
+
+                // Log every file with duration — slow files (>1s) get a warning prefix
+                var prefix = fileSw.Elapsed.TotalSeconds > 1.0 ? "SLOW " : "";
+                Log.Debug("  {Prefix}[{FileIndex}/{TotalFiles}] {RelativePath} ({ElapsedMs}ms)",
+                    prefix, fileIndex, userDocs.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"));
+            }
+            catch (Exception ex)
+            {
+                fileSw.Stop();
+                Log.Debug("  ERROR [{FileIndex}/{TotalFiles}] {RelativePath} ({ElapsedMs}ms): {ExType}: {ExMessage}",
+                    fileIndex, userDocs.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"),
+                    ex.GetType().Name, ex.Message);
+                // Re-throw to let the caller handle it
+                throw;
+            }
         }
 
+        projectSw.Stop();
+        Log.Debug("ParseProject: {ProjectName} completed {ResultCount} files in {ElapsedSec}s",
+            projectName, results.Count, projectSw.Elapsed.TotalSeconds.ToString("F1"));
         return results;
     }
 

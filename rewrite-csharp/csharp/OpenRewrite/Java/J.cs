@@ -2570,7 +2570,7 @@ public sealed class DeconstructionPattern(
     Expression deconstructor,
     JContainer<J> nested,
     JavaType? type
-) : J, Expression, IEquatable<DeconstructionPattern>
+) : J, Expression, OpenRewrite.CSharp.Pattern, IEquatable<DeconstructionPattern>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;

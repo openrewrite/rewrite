@@ -9,6 +9,7 @@ using Newtonsoft.Json.Serialization;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
+using Serilog;
 using StreamJsonRpc;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -145,20 +146,40 @@ public class RewriteRpcServer
     [JsonRpcMethod("ParseSolution", UseSingleObjectParameterDeserialization = true)]
     public async Task<List<ParseSolutionResponseItem>> ParseSolution(ParseSolutionRequest request)
     {
+        Log.Debug("RPC ParseSolution: received request path={Path} rootDir={RootDir}", request.Path, request.RootDir);
         var solutionParser = new SolutionParser();
         var path = ResolvePath(request.Path);
         var rootDir = ResolvePath(request.RootDir);
+
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
 
         var items = new List<ParseSolutionResponseItem>();
         var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var projectList = solution.Projects.Where(p => p.FilePath != null).ToList();
+        Log.Debug("RPC ParseSolution: {ProjectCount} projects to parse", projectList.Count);
 
-        foreach (var project in solution.Projects.Where(p => p.FilePath != null))
+        var projectIndex = 0;
+        foreach (var project in projectList)
         {
             if (!seenProjects.Add(project.FilePath!))
                 continue;
 
-            var results = solutionParser.ParseProject(solution, project.FilePath!, rootDir);
+            projectIndex++;
+            Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
+                projectIndex, projectList.Count, Path.GetFileNameWithoutExtension(project.FilePath));
+
+            List<CompilationUnit> results;
+            try
+            {
+                results = solutionParser.ParseProject(solution, project.FilePath!, rootDir);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("RPC ParseSolution: EXCEPTION parsing project {ProjectPath}: {ExType}: {ExMessage}",
+                    project.FilePath, ex.GetType().Name, ex.Message);
+                throw;
+            }
+
             foreach (var cu in results)
             {
                 var id = cu.Id.ToString();
@@ -172,6 +193,7 @@ public class RewriteRpcServer
             }
         }
 
+        Log.Debug("RPC ParseSolution: completed, {ItemCount} compilation units total", items.Count);
         return items;
     }
 
@@ -202,6 +224,7 @@ public class RewriteRpcServer
 
         if (after == null)
         {
+            Log.Debug("RPC GetObject: {Id} not found, returning DELETE", request.Id);
             return Task.FromResult(new List<RpcObjectData>
             {
                 new() { State = DELETE },
@@ -210,6 +233,7 @@ public class RewriteRpcServer
         }
 
         var before = _remoteObjects.GetValueOrDefault(request.Id);
+        var sw = Stopwatch.StartNew();
 
         // Accumulate all RPC data into a single list
         var allData = new List<RpcObjectData>();
@@ -228,6 +252,8 @@ public class RewriteRpcServer
         }
         catch (Exception ex)
         {
+            Log.Debug("RPC GetObject: EXCEPTION sending {Id} ({ObjType}): {ExType}: {ExMessage}",
+                request.Id, after.GetType().Name, ex.GetType().Name, ex.Message);
             throw new InvalidOperationException(
                 $"Failed to send object {request.Id} (type: {after.GetType().Name}): {ex.Message}\n{ex.StackTrace}", ex);
         }
@@ -236,6 +262,10 @@ public class RewriteRpcServer
 
         // Update our understanding of remote's state
         _remoteObjects[request.Id] = after;
+
+        sw.Stop();
+        Log.Debug("RPC GetObject: {Id} sent {ItemCount} items ({ElapsedMs}ms)",
+            request.Id, allData.Count, sw.Elapsed.TotalMilliseconds.ToString("F0"));
 
         return Task.FromResult(allData);
     }

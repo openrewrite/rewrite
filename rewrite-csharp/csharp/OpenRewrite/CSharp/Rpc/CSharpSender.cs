@@ -43,6 +43,13 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             return es;
         }
 
+        // DeconstructionPattern is a J type that implements Cs.Pattern
+        // but must be sent via JavaSender which has the actual visit method
+        if (tree is DeconstructionPattern)
+        {
+            return _delegate.Visit(tree, q);
+        }
+
         if (tree is not Cs)
         {
             return _delegate.Visit(tree, q);
@@ -1066,6 +1073,14 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 
         public override J? Visit(Tree? tree, RpcSendQueue q)
         {
+            // DeconstructionPattern is a J type whose visit method lives in JavaSender,
+            // but it implements Pattern which extends Cs. Without this check,
+            // the Cs guard below bounces it back to CSharpSender.Visit, which
+            // re-delegates here, creating infinite mutual recursion (stack overflow).
+            if (tree is DeconstructionPattern)
+            {
+                return base.Visit(tree, q);
+            }
             if (tree is Cs || tree is ExpressionStatement)
             {
                 return _outer.Visit(tree, q);
