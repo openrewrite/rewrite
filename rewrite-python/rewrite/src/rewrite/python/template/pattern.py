@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rewrite.java import J
 
@@ -144,6 +144,8 @@ class Pattern:
         code: str,
         captures: Optional[Dict[str, Capture]] = None,
         imports: Optional[List[str]] = None,
+        context: Optional[List[str]] = None,
+        dependencies: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize a pattern.
@@ -151,14 +153,48 @@ class Pattern:
         Args:
             code: Python code with {name} placeholders.
             captures: Dict mapping capture names to Capture objects.
-            imports: Import statements for type resolution.
+            imports: Import statements for type resolution (shorthand for context).
+            context: Arbitrary statements prepended to pattern code for parsing.
+            dependencies: PyPI packages required by the pattern (``{package: version}``).
         """
         self._code = code
         self._captures = captures or {}
         self._options = TemplateOptions(
             imports=tuple(imports) if imports else (),
+            context=tuple(context) if context else (),
+            dependencies=tuple(sorted(dependencies.items())) if dependencies else (),
         )
         self._cached_tree: Optional[J] = None
+
+    def configure(
+        self,
+        *,
+        context: Optional[List[str]] = None,
+        dependencies: Optional[Dict[str, str]] = None,
+    ) -> 'Pattern':
+        """Configure pattern options. Returns self (invalidates cache).
+
+        Args:
+            context: Arbitrary statements prepended to pattern code for parsing.
+            dependencies: PyPI packages required by the pattern (``{package: version}``).
+
+        Returns:
+            This pattern instance for chaining.
+        """
+        new_context = tuple(context) if context is not None else self._options.context
+        new_deps = (
+            tuple(sorted(dependencies.items()))
+            if dependencies is not None
+            else self._options.dependencies
+        )
+        self._options = TemplateOptions(
+            imports=self._options.imports,
+            context=new_context,
+            dependencies=new_deps,
+            context_sensitive=self._options.context_sensitive,
+        )
+        self._cached_tree = None
+        return self
 
     @property
     def code(self) -> str:
@@ -241,6 +277,8 @@ def pattern(
     code,
     *,
     imports: Optional[List[str]] = None,
+    context: Optional[List[str]] = None,
+    dependencies: Optional[Dict[str, str]] = None,
     **captures: Capture
 ) -> Pattern:
     """
@@ -252,6 +290,8 @@ def pattern(
         code: Python code with {name} placeholders, or a t-string
               (Python 3.14+) with Capture/RawCode interpolations.
         imports: Optional import statements for type resolution.
+        context: Optional arbitrary statements prepended to pattern code for parsing.
+        dependencies: Optional PyPI packages required by the pattern (``{package: version}``).
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
@@ -288,4 +328,6 @@ def pattern(
         code=code,
         captures=captures,
         imports=imports,
+        context=context,
+        dependencies=dependencies,
     )

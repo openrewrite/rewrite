@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Union, TYPE_CHECKING, cast
+from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, cast
 
 from rewrite.java import J
 from .capture import Capture
@@ -57,6 +57,8 @@ class Template:
         code: str,
         captures: Optional[Dict[str, Capture]] = None,
         imports: Optional[List[str]] = None,
+        context: Optional[List[str]] = None,
+        dependencies: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize a template.
@@ -64,14 +66,48 @@ class Template:
         Args:
             code: Python code with {name} placeholders.
             captures: Dict mapping capture names to Capture objects.
-            imports: Import statements to include for parsing.
+            imports: Import statements to include for parsing (shorthand for context).
+            context: Arbitrary statements prepended to template code for parsing.
+            dependencies: PyPI packages required by the template (``{package: version}``).
         """
         self._code = code
         self._captures = captures or {}
         self._options = TemplateOptions(
             imports=tuple(imports) if imports else (),
+            context=tuple(context) if context else (),
+            dependencies=tuple(sorted(dependencies.items())) if dependencies else (),
         )
         self._cached_tree: Optional[J] = None
+
+    def configure(
+        self,
+        *,
+        context: Optional[List[str]] = None,
+        dependencies: Optional[Dict[str, str]] = None,
+    ) -> 'Template':
+        """Configure template options. Returns self (invalidates cache).
+
+        Args:
+            context: Arbitrary statements prepended to template code for parsing.
+            dependencies: PyPI packages required by the template (``{package: version}``).
+
+        Returns:
+            This template instance for chaining.
+        """
+        new_context = tuple(context) if context is not None else self._options.context
+        new_deps = (
+            tuple(sorted(dependencies.items()))
+            if dependencies is not None
+            else self._options.dependencies
+        )
+        self._options = TemplateOptions(
+            imports=self._options.imports,
+            context=new_context,
+            dependencies=new_deps,
+            context_sensitive=self._options.context_sensitive,
+        )
+        self._cached_tree = None
+        return self
 
     @property
     def code(self) -> str:
@@ -217,6 +253,8 @@ class TemplateBuilder:
         self._parts: List[str] = []
         self._captures: Dict[str, Capture] = {}
         self._imports: List[str] = []
+        self._context: List[str] = []
+        self._dependencies: Dict[str, str] = {}
 
     def code(self, code: str) -> 'TemplateBuilder':
         """
@@ -275,6 +313,32 @@ class TemplateBuilder:
         self._imports.extend(import_statements)
         return self
 
+    def context(self, *statements: str) -> 'TemplateBuilder':
+        """
+        Add context statements prepended to the template for parsing.
+
+        Args:
+            *statements: Arbitrary Python statements (imports, type aliases, etc.).
+
+        Returns:
+            This builder for chaining.
+        """
+        self._context.extend(statements)
+        return self
+
+    def dependencies(self, deps: Dict[str, str]) -> 'TemplateBuilder':
+        """
+        Set PyPI dependencies required by the template.
+
+        Args:
+            deps: Mapping of package name to version string.
+
+        Returns:
+            This builder for chaining.
+        """
+        self._dependencies.update(deps)
+        return self
+
     def build(self) -> Template:
         """
         Build the template.
@@ -287,6 +351,8 @@ class TemplateBuilder:
             code=code,
             captures=self._captures,
             imports=self._imports,
+            context=self._context if self._context else None,
+            dependencies=self._dependencies if self._dependencies else None,
         )
 
 
@@ -294,6 +360,8 @@ def template(
     code,
     *,
     imports: Optional[List[str]] = None,
+    context: Optional[List[str]] = None,
+    dependencies: Optional[Dict[str, str]] = None,
     **captures: Capture
 ) -> Template:
     """
@@ -305,6 +373,8 @@ def template(
         code: Python code with {name} placeholders, or a t-string
               (Python 3.14+) with Capture/RawCode interpolations.
         imports: Optional import statements for type resolution.
+        context: Optional arbitrary statements prepended to template code for parsing.
+        dependencies: Optional PyPI packages required by the template (``{package: version}``).
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
@@ -327,6 +397,12 @@ def template(
             "datetime.now()",
             imports=["from datetime import datetime"]
         )
+
+        # With dependencies (enables ty type attribution)
+        tmpl = template(
+            "requests.get(url)",
+            dependencies={"requests": "2.31.0"}
+        )
     """
     from ._tstring_support import is_tstring, convert_tstring
 
@@ -342,4 +418,6 @@ def template(
         code=code,
         captures=captures,
         imports=imports,
+        context=context,
+        dependencies=dependencies,
     )

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import textwrap
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
@@ -41,6 +42,8 @@ WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 class TemplateOptions:
     """Configuration options for template parsing."""
     imports: Tuple[str, ...] = ()
+    context: Tuple[str, ...] = ()
+    dependencies: Tuple[Tuple[str, str], ...] = ()  # (package, version) pairs
     context_sensitive: bool = False
 
 
@@ -100,7 +103,7 @@ class TemplateEngine:
 
         # Generate wrapper and parse
         wrapper_code = cls._generate_wrapper(substituted_code, options)
-        compilation_unit = cls._parse_code(wrapper_code)
+        compilation_unit = cls._parse_code(wrapper_code, options)
 
         # Extract template content from wrapper
         extracted = cls._extract_from_wrapper(compilation_unit, is_expression)
@@ -143,7 +146,11 @@ class TemplateEngine:
         """Generate a cache key from template components."""
         capture_names = ",".join(sorted(captures.keys()))
         imports_key = ",".join(sorted(options.imports))
-        return f"{code}::{capture_names}::{imports_key}"
+        context_key = ",".join(sorted(options.context))
+        deps_key = ",".join(
+            f"{pkg}=={ver}" for pkg, ver in sorted(options.dependencies)
+        )
+        return f"{code}::{capture_names}::{imports_key}::{context_key}::{deps_key}"
 
     @classmethod
     def _generate_wrapper(cls, code: str, options: TemplateOptions) -> str:
@@ -159,9 +166,13 @@ class TemplateEngine:
         """
         lines: List[str] = []
 
-        # Add imports
+        # Add imports (backward-compat shorthand)
         for imp in options.imports:
             lines.append(imp)
+
+        # Add context statements (general-purpose, may include imports or other code)
+        for ctx in options.context:
+            lines.append(ctx)
 
         # Dedent the code to handle indented template strings
         dedented = textwrap.dedent(code).strip()
@@ -194,12 +205,16 @@ class TemplateEngine:
             return False
 
     @classmethod
-    def _parse_code(cls, code: str) -> 'CompilationUnit':
+    def _parse_code(cls, code: str, options: Optional[TemplateOptions] = None) -> 'CompilationUnit':
         """
         Parse Python code into an LST CompilationUnit.
 
+        When *options* specifies dependencies, a cached workspace is created
+        and ``TyTypesClient`` is used for type attribution during parsing.
+
         Args:
             code: Python source code.
+            options: Optional template options (for dependency-aware parsing).
 
         Returns:
             CompilationUnit LST node.
@@ -207,8 +222,31 @@ class TemplateEngine:
         from rewrite.python._parser_visitor import ParserVisitor
 
         tree = ast.parse(code)
-        visitor = ParserVisitor(code)
-        return visitor.visit(tree)
+
+        ty_client = None
+        tmp_file = None
+        if options and options.dependencies:
+            import tempfile as _tmpmod
+            from .dependency_workspace import DependencyWorkspace
+            from rewrite.python.ty_client import TyTypesClient
+
+            workspace = DependencyWorkspace.get_or_create(options.dependencies)
+            ty_client = TyTypesClient()
+            ty_client.initialize(workspace)
+
+            # ty needs a real file path for type resolution
+            fd, tmp_file = _tmpmod.mkstemp(suffix=".py", dir=workspace)
+            try:
+                os.write(fd, code.encode())
+            finally:
+                os.close(fd)
+
+        try:
+            visitor = ParserVisitor(code, file_path=tmp_file, ty_client=ty_client)
+            return visitor.visit(tree)
+        finally:
+            if tmp_file and os.path.exists(tmp_file):
+                os.unlink(tmp_file)
 
     @classmethod
     def _extract_from_wrapper(cls, cu: 'CompilationUnit', is_expression: bool) -> J:

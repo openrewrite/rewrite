@@ -242,3 +242,53 @@ class TestPatternMatching:
 
         assert pat.matches(target_x, self._cursor_for(target_x)) is True
         assert pat.matches(target_y, self._cursor_for(target_y)) is False
+
+
+class TestPatternConfigure:
+    """Tests for Pattern.configure() method."""
+
+    def test_configure_context(self):
+        """configure(context=...) updates context and invalidates cache."""
+        from rewrite.python.template.engine import TemplateEngine
+        TemplateEngine.clear_cache()
+
+        pat = pattern("x + 1")
+        tree1 = pat.get_tree()
+
+        pat.configure(context=["MyType = int"])
+        tree2 = pat.get_tree()
+
+        # Cache was invalidated so a new tree was parsed
+        assert tree1 is not tree2
+
+    def test_configure_dependencies(self):
+        """configure(dependencies=...) stores dependencies in options."""
+        pat = pattern("x")
+        assert pat._options.dependencies == ()
+
+        pat.configure(dependencies={"requests": "2.31.0"})
+        assert pat._options.dependencies == (("requests", "2.31.0"),)
+
+    def test_configure_preserves_imports(self):
+        """configure() doesn't discard existing imports."""
+        pat = pattern("x", imports=["import os"])
+        pat.configure(context=["MY_CONST = 1"])
+
+        assert pat._options.imports == ("import os",)
+        assert pat._options.context == ("MY_CONST = 1",)
+
+    def test_configure_returns_self(self):
+        """configure() returns the same Pattern instance for chaining."""
+        pat = pattern("x")
+        result = pat.configure(context=["y = 1"])
+        assert result is pat
+
+    def test_pattern_factory_with_context(self):
+        """pattern() factory accepts context parameter."""
+        pat = pattern("x + 1", context=["MyType = int"])
+        assert pat._options.context == ("MyType = int",)
+
+    def test_pattern_factory_with_dependencies(self):
+        """pattern() factory accepts dependencies parameter."""
+        pat = pattern("x", dependencies={"flask": "3.0.0"})
+        assert pat._options.dependencies == (("flask", "3.0.0"),)
