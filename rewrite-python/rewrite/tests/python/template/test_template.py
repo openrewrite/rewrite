@@ -627,44 +627,11 @@ class TestTemplateApplyPrecedenceInContext:
         )
 
 
-class TestTemplateConfigure:
-    """Tests for Template.configure() method."""
+class TestTemplateFactoryOptions:
+    """Tests for context/dependencies keyword arguments on template() and TemplateBuilder."""
 
     def setup_method(self):
         TemplateEngine.clear_cache()
-
-    def test_configure_context(self):
-        """configure(context=...) updates context and invalidates cache."""
-        tmpl = template("x + 1")
-        tree1 = tmpl.get_tree()
-
-        tmpl.configure(context=["MyType = int"])
-        tree2 = tmpl.get_tree()
-
-        # Cache was invalidated so a new tree was parsed
-        assert tree1 is not tree2
-
-    def test_configure_dependencies(self):
-        """configure(dependencies=...) stores dependencies in options."""
-        tmpl = template("x")
-        assert tmpl._options.dependencies == ()
-
-        tmpl.configure(dependencies={"requests": "2.31.0"})
-        assert tmpl._options.dependencies == (("requests", "2.31.0"),)
-
-    def test_configure_preserves_imports(self):
-        """configure() doesn't discard existing imports."""
-        tmpl = template("x", imports=["import os"])
-        tmpl.configure(context=["MY_CONST = 1"])
-
-        assert tmpl._options.imports == ("import os",)
-        assert tmpl._options.context == ("MY_CONST = 1",)
-
-    def test_configure_returns_self(self):
-        """configure() returns the same Template instance for chaining."""
-        tmpl = template("x")
-        result = tmpl.configure(context=["y = 1"])
-        assert result is tmpl
 
     def test_template_factory_with_context(self):
         """template() factory accepts context parameter."""

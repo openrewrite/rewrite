@@ -173,37 +173,6 @@ class Pattern:
         )
         self._cached_tree: Optional[J] = None
 
-    def configure(
-        self,
-        *,
-        context: Optional[List[str]] = None,
-        dependencies: Optional[Dict[str, str]] = None,
-    ) -> 'Pattern':
-        """Configure pattern options. Returns self (invalidates cache).
-
-        Args:
-            context: Arbitrary statements prepended to pattern code for parsing.
-            dependencies: PyPI packages required by the pattern
-                (``{package: ">=version"}``; bare versions default to ``>=``).
-
-        Returns:
-            This pattern instance for chaining.
-        """
-        new_context = tuple(context) if context is not None else self._options.context
-        new_deps = (
-            tuple(sorted(dependencies.items()))
-            if dependencies is not None
-            else self._options.dependencies
-        )
-        self._options = TemplateOptions(
-            imports=self._options.imports,
-            context=new_context,
-            dependencies=new_deps,
-            context_sensitive=self._options.context_sensitive,
-        )
-        self._cached_tree = None
-        return self
-
     @property
     def code(self) -> str:
         """The pattern code string."""
