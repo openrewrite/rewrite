@@ -55,7 +55,6 @@ public class Plugin {
     List<Dependency> dependencies;
     List<Execution> executions;
 
-    @NonNull
     public String getGroupId() {
         return groupId == null ? PLUGIN_DEFAULT_GROUPID : groupId;
     }
