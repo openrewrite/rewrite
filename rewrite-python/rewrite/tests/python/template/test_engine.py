@@ -54,7 +54,7 @@ class TestTemplateEngine:
         assert len(args) == 1
         arg = args[0]
         assert isinstance(arg, j.Identifier)
-        assert arg.simple_name == '__placeholder_x__'
+        assert arg.simple_name == '__plh_x__'
 
     def test_parse_statement(self):
         """Test parsing a statement template."""
@@ -172,7 +172,7 @@ class TestTemplateEngineExtraTypes:
         tree = TemplateEngine.get_template_tree("return {x}", captures)
         assert isinstance(tree, j.Return)
         assert isinstance(tree.expression, j.Identifier)
-        assert tree.expression.simple_name == '__placeholder_x__'
+        assert tree.expression.simple_name == '__plh_x__'
 
     def test_parse_multiple_placeholders(self):
         """Test parsing an expression with multiple placeholders."""
@@ -180,9 +180,9 @@ class TestTemplateEngineExtraTypes:
         tree = TemplateEngine.get_template_tree("{a} + {b}", captures)
         assert isinstance(tree, j.Binary)
         assert isinstance(tree.left, j.Identifier)
-        assert tree.left.simple_name == '__placeholder_a__'
+        assert tree.left.simple_name == '__plh_a__'
         assert isinstance(tree.right, j.Identifier)
-        assert tree.right.simple_name == '__placeholder_b__'
+        assert tree.right.simple_name == '__plh_b__'
 
 
 class TestEngineEdgeCases:

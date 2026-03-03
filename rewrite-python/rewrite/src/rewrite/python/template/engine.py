@@ -52,7 +52,7 @@ class TemplateEngine:
     Core engine for parsing and processing templates.
 
     Handles:
-    - Placeholder substitution: {name} -> __placeholder_name__
+    - Placeholder substitution: {name} -> __plh_name__
     - Wrapper generation: def __WRAPPER__(): <template>
     - AST parsing via ParserVisitor
     - Tree extraction from wrapper

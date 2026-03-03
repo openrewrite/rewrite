@@ -149,7 +149,7 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
     Visitor that replaces placeholder identifiers with actual values.
 
     This visitor traverses a template AST and replaces any identifiers
-    that match the placeholder pattern (__placeholder_name__) with
+    that match the placeholder pattern (__plh_name__) with
     the corresponding captured values.
 
     When a substituted value has lower operator precedence than the
