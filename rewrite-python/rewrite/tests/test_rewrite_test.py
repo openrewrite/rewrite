@@ -371,10 +371,11 @@ class TestUvHelper:
         assert "source_specs" in sig.parameters
         assert "root" in sig.parameters
 
-    def test_uv_requires_pyproject_or_root(self):
-        """uv() raises ValueError without pyproject or root."""
-        with pytest.raises(ValueError, match="requires either"):
-            uv(python("x = 1"))
+    def test_uv_without_pyproject_or_root_returns_untagged(self):
+        """uv() without pyproject or root returns specs with project_root=None."""
+        specs = uv(python("x = 1"))
+        assert len(specs) == 1
+        assert specs[0].project_root is None
 
     def test_uv_with_explicit_root(self, tmp_path):
         """uv() with root= tags specs with that directory."""

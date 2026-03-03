@@ -226,20 +226,25 @@ class TemplateEngine:
         ty_client = None
         tmp_file = None
         if options and options.dependencies:
-            import tempfile as _tmpmod
-            from .dependency_workspace import DependencyWorkspace
-            from rewrite.python.ty_client import TyTypesClient
-
-            workspace = DependencyWorkspace.get_or_create(options.dependencies)
-            ty_client = TyTypesClient()
-            ty_client.initialize(workspace)
-
-            # ty needs a real file path for type resolution
-            fd, tmp_file = _tmpmod.mkstemp(suffix=".py", dir=workspace)
             try:
-                os.write(fd, code.encode())
-            finally:
-                os.close(fd)
+                import tempfile as _tmpmod
+                from .dependency_workspace import DependencyWorkspace
+                from rewrite.python.ty_client import TyTypesClient
+
+                workspace = DependencyWorkspace.get_or_create(options.dependencies)
+                ty_client = TyTypesClient()
+                ty_client.initialize(workspace)
+
+                # ty needs a real file path for type resolution
+                fd, tmp_file = _tmpmod.mkstemp(suffix=".py", dir=workspace)
+                try:
+                    os.write(fd, code.encode())
+                finally:
+                    os.close(fd)
+            except (ImportError, RuntimeError):
+                # uv or ty-types not available — parse without type attribution
+                ty_client = None
+                tmp_file = None
 
         try:
             visitor = ParserVisitor(code, file_path=tmp_file, ty_client=ty_client)

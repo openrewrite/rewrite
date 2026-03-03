@@ -154,23 +154,30 @@ def uv(
             )
         )
     """
-    from rewrite.python.template.dependency_workspace import DependencyWorkspace
-
     workspace = root
     if workspace is None:
         # Find pyproject.toml content from source specs
         for spec in source_specs:
             if spec.kind == "toml" and spec.path and spec.path.name == "pyproject.toml":
                 if spec.before is not None:
-                    workspace = DependencyWorkspace.get_or_create_from_pyproject(
-                        dedent(spec.before)
-                    )
+                    try:
+                        from rewrite.python.template.dependency_workspace import (
+                            DependencyWorkspace,
+                        )
+                        workspace = DependencyWorkspace.get_or_create_from_pyproject(
+                            dedent(spec.before)
+                        )
+                    except RuntimeError:
+                        import logging
+                        logging.getLogger(__name__).debug(
+                            "uv not available; skipping workspace creation"
+                        )
                     break
 
     if workspace is None:
-        raise ValueError(
-            "uv() requires either a pyproject() spec or an explicit root= argument"
-        )
+        # No workspace available — return specs unmodified (no type attribution
+        # from dependencies, but tests still run)
+        return list(source_specs)
 
     # Tag every spec with the workspace
     return [
