@@ -2287,7 +2287,6 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1942")
     @Nested
     class SkipMarker {
 
