@@ -12,23 +12,359 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Pattern matching comparator for comparing pattern and target ASTs."""
+"""
+Layered comparator for matching pattern ASTs against target ASTs.
+
+Architecture (3-layer):
+  PythonComparatorVisitor        — Layer 1: Structural comparison via dataclasses.fields()
+    └─ PythonSemanticComparator  — Layer 2: Type-aware + lenient matching
+         └─ PatternMatchingComparator — Layer 3: Capture/placeholder handling
+"""
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Dict, Optional, TYPE_CHECKING, cast
 
-from rewrite.java import J
+from rewrite.java import J, JavaType, JContainer, JLeftPadded, JRightPadded, Space
 from rewrite.java import tree as j
-from rewrite.python import tree as py
 from .capture import Capture
 from .placeholder import from_placeholder
 
 if TYPE_CHECKING:
     from rewrite.visitor import Cursor
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Layer 1: Structural comparison
+# ──────────────────────────────────────────────────────────────────────────────
 
-class PatternMatchingComparator:
+_SKIP_FIELDS = frozenset({'_id', '_prefix', '_markers', '_padding'})
+
+
+class PythonComparatorVisitor:
+    """
+    Generic structural comparison of two AST trees.
+
+    Iterates ``dataclasses.fields()`` on each node, skipping identity/formatting
+    fields (_id, _prefix, _markers, _padding) and recursing into child nodes,
+    padded wrappers, containers, and lists.
+    """
+
+    def __init__(self) -> None:
+        self._debug = False
+
+    def compare(
+        self,
+        tree1: J,
+        tree2: J,
+        cursor: Cursor,
+        *,
+        debug: bool = False
+    ) -> bool:
+        self._debug = debug
+        return self._compare(tree1, tree2, cursor)
+
+    # -- core dispatch --------------------------------------------------------
+
+    def _compare(
+        self,
+        pattern: Optional[J],
+        target: Optional[J],
+        cursor: Cursor,
+    ) -> bool:
+        if pattern is None and target is None:
+            return True
+        if pattern is None or target is None:
+            if self._debug:
+                print(
+                    f"None mismatch: pattern="
+                    f"{'None' if pattern is None else type(pattern).__name__}, "
+                    f"target="
+                    f"{'None' if target is None else type(target).__name__}"
+                )
+            return False
+
+        if type(pattern) != type(target):
+            if self._debug:
+                print(
+                    f"Type mismatch: {type(pattern).__name__} "
+                    f"vs {type(target).__name__}"
+                )
+            return False
+
+        # Special cases
+        if isinstance(pattern, j.Literal):
+            return self._compare_literal(
+                cast(j.Literal, pattern), cast(j.Literal, target)
+            )
+        if isinstance(pattern, j.Empty):
+            return True
+
+        # Default: generic structural comparison
+        return self._compare_fields(pattern, target, cursor)
+
+    # -- literal (special case) -----------------------------------------------
+
+    def _compare_literal(
+        self, pattern: j.Literal, target: j.Literal
+    ) -> bool:
+        """Compare two literals.
+
+        Uses a two-level comparison:
+        1. Value types must match (prevents cross-type false positives like
+           None vs b"" where both might serialize to the same representation).
+        2. When both values are None (Ellipsis, None keyword, or literals with
+           unicode escapes all store value=None), fall back to value_source
+           comparison to distinguish them.
+        """
+        if type(pattern.value) != type(target.value):
+            return False
+        if pattern.value is None:
+            return pattern.value_source == target.value_source
+        return pattern.value == target.value
+
+    # -- generic field iteration ----------------------------------------------
+
+    def _compare_fields(self, pattern, target, cursor: Cursor) -> bool:
+        if not dataclasses.is_dataclass(pattern):
+            return pattern == target
+        for f in dataclasses.fields(pattern):
+            if f.name in _SKIP_FIELDS:
+                continue
+            p_val = getattr(pattern, f.name)
+            t_val = getattr(target, f.name)
+            if not self._compare_value(p_val, t_val, f.name, cursor):
+                return False
+        return True
+
+    def _compare_value(self, p_val, t_val, field_name: str, cursor: Cursor) -> bool:
+        # None
+        if p_val is None and t_val is None:
+            return True
+        if p_val is None or t_val is None:
+            if self._debug:
+                print(f"None mismatch for field '{field_name}'")
+            return False
+
+        # Formatting — skip
+        if isinstance(p_val, Space):
+            return True
+
+        # Padded wrappers — compare element only
+        if isinstance(p_val, JLeftPadded):
+            return self._compare_value(
+                p_val.element, t_val.element, field_name, cursor
+            )
+        if isinstance(p_val, JRightPadded):
+            return self._compare_value(
+                p_val.element, t_val.element, field_name, cursor
+            )
+
+        # Container — compare elements pairwise
+        if isinstance(p_val, JContainer):
+            return self._compare_container(p_val, t_val, field_name, cursor)
+
+        # AST node — recursive structural compare
+        if isinstance(p_val, J):
+            return self._compare(p_val, t_val, cursor)
+
+        # List — pairwise
+        if isinstance(p_val, list):
+            return self._compare_list(p_val, t_val, field_name, cursor)
+
+        # Enum / primitive — direct equality
+        return p_val == t_val
+
+    def _compare_container(
+        self,
+        p_container: JContainer,
+        t_container: JContainer,
+        field_name: str,
+        cursor: Cursor,
+    ) -> bool:
+        p_elements = p_container.elements
+        t_elements = t_container.elements
+        if len(p_elements) != len(t_elements):
+            if self._debug:
+                print(
+                    f"Container size mismatch for '{field_name}': "
+                    f"{len(p_elements)} vs {len(t_elements)}"
+                )
+            return False
+        for p_elem, t_elem in zip(p_elements, t_elements):
+            if not self._compare(p_elem, t_elem, cursor):
+                return False
+        return True
+
+    def _compare_list(
+        self,
+        p_list: list,
+        t_list: list,
+        field_name: str,
+        cursor: Cursor,
+    ) -> bool:
+        if len(p_list) != len(t_list):
+            if self._debug:
+                print(
+                    f"List size mismatch for '{field_name}': "
+                    f"{len(p_list)} vs {len(t_list)}"
+                )
+            return False
+        for p_elem, t_elem in zip(p_list, t_list):
+            if not self._compare_value(p_elem, t_elem, field_name, cursor):
+                return False
+        return True
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Layer 2: Semantic / type-aware comparison
+# ──────────────────────────────────────────────────────────────────────────────
+
+_TYPE_FIELDS = frozenset({'_type', '_method_type', '_field_type'})
+
+
+class PythonSemanticComparator(PythonComparatorVisitor):
+    """
+    Adds type attribution awareness on top of structural comparison.
+
+    - Type fields (_type, _method_type, _field_type) are compared via
+      ``_compare_types()`` which allows one-sided None in lenient mode.
+    - MethodInvocations can be matched by FQN when ``method_type`` is
+      available, allowing different import styles to still match.
+    """
+
+    def __init__(self, lenient_type_matching: bool = True) -> None:
+        super().__init__()
+        self._lenient_type_matching = lenient_type_matching
+
+    # -- dispatch override (MethodInvocation) ---------------------------------
+
+    def _compare(self, pattern, target, cursor: Cursor) -> bool:
+        if (
+            pattern is not None
+            and target is not None
+            and isinstance(pattern, j.MethodInvocation)
+            and isinstance(target, j.MethodInvocation)
+        ):
+            return self._compare_method_invocation(
+                cast(j.MethodInvocation, pattern),
+                cast(j.MethodInvocation, target),
+                cursor,
+            )
+        return super()._compare(pattern, target, cursor)
+
+    # -- type field override --------------------------------------------------
+
+    def _compare_value(self, p_val, t_val, field_name: str, cursor: Cursor) -> bool:
+        if field_name in _TYPE_FIELDS:
+            return self._compare_types(p_val, t_val)
+        return super()._compare_value(p_val, t_val, field_name, cursor)
+
+    # -- type comparison ------------------------------------------------------
+
+    def _compare_types(self, p_type, t_type) -> bool:
+        if p_type is None and t_type is None:
+            return True
+        if p_type is None or t_type is None:
+            return self._lenient_type_matching
+
+        # Both non-None
+        if isinstance(p_type, JavaType.Primitive) and isinstance(
+            t_type, JavaType.Primitive
+        ):
+            return p_type == t_type
+
+        if isinstance(p_type, JavaType.Method) and isinstance(
+            t_type, JavaType.Method
+        ):
+            return self._compare_method_types(p_type, t_type)
+
+        # FullyQualified and subclasses
+        if hasattr(p_type, 'fully_qualified_name') and hasattr(
+            t_type, 'fully_qualified_name'
+        ):
+            return p_type.fully_qualified_name == t_type.fully_qualified_name
+
+        return self._lenient_type_matching
+
+    def _compare_method_types(
+        self, p_type: JavaType.Method, t_type: JavaType.Method
+    ) -> bool:
+        if p_type.name != t_type.name:
+            return False
+        p_decl = p_type.declaring_type
+        t_decl = t_type.declaring_type
+        if p_decl is not None and t_decl is not None:
+            if hasattr(p_decl, 'fully_qualified_name') and hasattr(
+                t_decl, 'fully_qualified_name'
+            ):
+                return (
+                    p_decl.fully_qualified_name == t_decl.fully_qualified_name
+                )
+        return self._lenient_type_matching
+
+    # -- method invocation (FQN-aware) ----------------------------------------
+
+    def _compare_method_invocation(
+        self,
+        pattern: j.MethodInvocation,
+        target: j.MethodInvocation,
+        cursor: Cursor,
+    ) -> bool:
+        p_mt = pattern.method_type
+        t_mt = target.method_type
+        if p_mt is not None and t_mt is not None:
+            p_decl = p_mt.declaring_type
+            t_decl = t_mt.declaring_type
+            if (
+                p_decl is not None
+                and t_decl is not None
+                and hasattr(p_decl, 'fully_qualified_name')
+                and hasattr(t_decl, 'fully_qualified_name')
+            ):
+                if (
+                    p_decl.fully_qualified_name == t_decl.fully_qualified_name
+                    and p_mt.name == t_mt.name
+                ):
+                    # FQN match — skip select comparison (allows different
+                    # import styles to match, e.g. os.path.join vs join).
+                    return self._compare_arguments(
+                        pattern.padding.arguments,
+                        target.padding.arguments,
+                        cursor,
+                    )
+
+        # Structural comparison
+        if not self._compare(pattern.select, target.select, cursor):
+            return False
+        if not self._compare(pattern.name, target.name, cursor):
+            return False
+        return self._compare_arguments(
+            pattern.padding.arguments, target.padding.arguments, cursor
+        )
+
+    def _compare_arguments(
+        self,
+        pattern_args: Optional[JContainer],
+        target_args: Optional[JContainer],
+        cursor: Cursor,
+    ) -> bool:
+        """Compare argument containers (overridable by Layer 3)."""
+        if pattern_args is None and target_args is None:
+            return True
+        if pattern_args is None or target_args is None:
+            return False
+        return self._compare_container(
+            pattern_args, target_args, '_arguments', cursor
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Layer 3: Pattern matching with captures
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class PatternMatchingComparator(PythonSemanticComparator):
     """
     Compares a pattern AST against a target AST, extracting captures.
 
@@ -47,27 +383,19 @@ class PatternMatchingComparator:
     def __init__(
         self,
         captures: Dict[str, Capture],
-        lenient_type_matching: bool = True
-    ):
-        """
-        Initialize the comparator.
-
-        Args:
-            captures: Dict mapping capture names to Capture objects.
-            lenient_type_matching: If True, ignore type differences when comparing.
-        """
+        lenient_type_matching: bool = True,
+    ) -> None:
+        super().__init__(lenient_type_matching)
         self._captures = captures
-        self._lenient_type_matching = lenient_type_matching
         self._captured: Dict[str, J] = {}
-        self._debug = False
 
     def match(
         self,
         pattern: J,
         target: J,
-        cursor: 'Cursor',
+        cursor: Cursor,
         *,
-        debug: bool = False
+        debug: bool = False,
     ) -> Optional[Dict[str, J]]:
         """
         Match pattern against target, returning captures if successful.
@@ -104,84 +432,21 @@ class PatternMatchingComparator:
             return self._captured
         return None
 
-    def _compare(
-        self,
-        pattern: Optional[J],
-        target: Optional[J],
-        cursor: 'Cursor'
-    ) -> bool:
-        """
-        Recursively compare pattern and target nodes.
+    # -- dispatch override (capture check first) ------------------------------
 
-        Args:
-            pattern: Pattern node (may contain placeholders).
-            target: Target node to compare against.
-            cursor: Current cursor position.
-
-        Returns:
-            True if nodes match.
-        """
-        # Both None is a match
+    def _compare(self, pattern, target, cursor: Cursor) -> bool:
         if pattern is None and target is None:
             return True
-
-        # Only one None is not a match
         if pattern is None or target is None:
             return False
 
-        # Check if pattern is a capture placeholder
+        # Check for capture placeholder BEFORE structural comparison
         if isinstance(pattern, j.Identifier):
             capture_name = from_placeholder(pattern.simple_name)
             if capture_name is not None:
                 return self._capture_node(capture_name, target)
 
-        # Types must match (unless lenient)
-        if type(pattern) != type(target):
-            if self._debug:
-                print(f"Type mismatch: {type(pattern).__name__} vs {type(target).__name__}")
-            return False
-
-        # Dispatch to type-specific comparison
-        if isinstance(pattern, j.Identifier):
-            return self._compare_identifier(pattern, cast(j.Identifier, target))
-        elif isinstance(pattern, j.Literal):
-            return self._compare_literal(pattern, cast(j.Literal, target))
-        elif isinstance(pattern, j.Empty):
-            # Two Empty sentinel nodes always match (used for absent values)
-            return True
-        elif isinstance(pattern, j.MethodInvocation):
-            return self._compare_method_invocation(pattern, cast(j.MethodInvocation, target), cursor)
-        elif isinstance(pattern, j.FieldAccess):
-            return self._compare_field_access(pattern, cast(j.FieldAccess, target), cursor)
-        elif isinstance(pattern, j.Binary):
-            return self._compare_binary(pattern, cast(j.Binary, target), cursor)
-        elif isinstance(pattern, j.Unary):
-            return self._compare_unary(pattern, cast(j.Unary, target), cursor)
-        elif isinstance(pattern, j.Assignment):
-            return self._compare_assignment(pattern, cast(j.Assignment, target), cursor)
-        elif isinstance(pattern, j.Parentheses):
-            return self._compare_parentheses(pattern, cast(j.Parentheses, target), cursor)
-        elif isinstance(pattern, j.Ternary):
-            return self._compare_ternary(pattern, cast(j.Ternary, target), cursor)
-        elif isinstance(pattern, j.Return):
-            return self._compare_return(pattern, cast(j.Return, target), cursor)
-        elif isinstance(pattern, j.ArrayAccess):
-            return self._compare_array_access(pattern, cast(j.ArrayAccess, target), cursor)
-        elif isinstance(pattern, py.ExpressionStatement):
-            return self._compare_expression_statement(pattern, cast(py.ExpressionStatement, target), cursor)
-        elif isinstance(pattern, py.Binary):
-            return self._compare_python_binary(pattern, cast(py.Binary, target), cursor)
-        elif isinstance(pattern, py.CollectionLiteral):
-            return self._compare_collection_literal(pattern, cast(py.CollectionLiteral, target), cursor)
-        elif isinstance(pattern, py.DictLiteral):
-            return self._compare_dict_literal(pattern, cast(py.DictLiteral, target), cursor)
-        else:
-            # Default: unhandled node type — reject the match to prevent
-            # false positives.  If a pattern uses a node type that reaches
-            # this branch, a specific comparator method should be added.
-            if self._debug:
-                print(f"No specific comparison for {type(pattern).__name__}, rejecting match")
-            return False
+        return super()._compare(pattern, target, cursor)
 
     def _capture_node(self, name: str, target: J) -> bool:
         """
@@ -199,14 +464,9 @@ class PatternMatchingComparator:
                 print(f"Unknown capture: {name}")
             return False
 
-        cap = self._captures[name]
-
         # Check if this capture already has a value
         if name in self._captured:
-            # Must match the existing captured value
             existing = self._captured[name]
-            # For now, require exact same node (by id)
-            # TODO: implement semantic equality
             if self._debug:
                 print(f"Capture '{name}' already has value, checking match")
             return existing.id == target.id
@@ -217,51 +477,14 @@ class PatternMatchingComparator:
             print(f"Captured '{name}': {type(target).__name__}")
         return True
 
-    def _compare_identifier(self, pattern: j.Identifier, target: j.Identifier) -> bool:
-        """Compare two identifiers."""
-        return pattern.simple_name == target.simple_name
-
-    def _compare_literal(self, pattern: j.Literal, target: j.Literal) -> bool:
-        """Compare two literals.
-
-        Uses a two-level comparison:
-        1. Value types must match (prevents cross-type false positives like
-           None vs b"" where both might serialize to the same representation).
-        2. When both values are None (Ellipsis, None keyword, or literals with
-           unicode escapes all store value=None), fall back to value_source
-           comparison to distinguish them.
-        """
-        if type(pattern.value) != type(target.value):
-            return False
-        if pattern.value is None:
-            return pattern.value_source == target.value_source
-        return pattern.value == target.value
-
-    def _compare_method_invocation(
-        self,
-        pattern: j.MethodInvocation,
-        target: j.MethodInvocation,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two method invocations."""
-        # Compare select (receiver)
-        if not self._compare(pattern.select, target.select, cursor):
-            return False
-
-        # Compare method name
-        if not self._compare(pattern.name, target.name, cursor):
-            return False
-
-        # Compare arguments
-        return self._compare_arguments(pattern.padding.arguments, target.padding.arguments, cursor)
+    # -- argument override (variadic capture) ---------------------------------
 
     def _compare_arguments(
         self,
-        pattern_args: Optional[j.JContainer],
-        target_args: Optional[j.JContainer],
-        cursor: 'Cursor'
+        pattern_args: Optional[JContainer],
+        target_args: Optional[JContainer],
+        cursor: Cursor,
     ) -> bool:
-        """Compare argument containers."""
         if pattern_args is None and target_args is None:
             return True
         if pattern_args is None or target_args is None:
@@ -275,185 +498,18 @@ class PatternMatchingComparator:
             pattern_arg = pattern_elements[0]
             if isinstance(pattern_arg, j.Identifier):
                 cap_name = from_placeholder(pattern_arg.simple_name)
-                if cap_name and self._captures.get(cap_name, Capture(name=cap_name)).variadic:
-                    # Variadic capture - capture all target arguments
-                    # TODO: implement proper variadic handling
+                if cap_name and self._captures.get(
+                    cap_name, Capture(name=cap_name)
+                ).variadic:
                     return True
 
         # Non-variadic: must have same number of arguments
         if len(pattern_elements) != len(target_elements):
             if self._debug:
-                print(f"Argument count mismatch: {len(pattern_elements)} vs {len(target_elements)}")
-            return False
-
-        # Compare each argument
-        for p_elem, t_elem in zip(pattern_elements, target_elements):
-            if not self._compare(p_elem, t_elem, cursor):
-                return False
-
-        return True
-
-    def _compare_field_access(
-        self,
-        pattern: j.FieldAccess,
-        target: j.FieldAccess,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two field accesses."""
-        # Compare target (receiver)
-        if not self._compare(pattern.target, target.target, cursor):
-            return False
-
-        # Compare name
-        return self._compare(pattern.name, target.name, cursor)
-
-    def _compare_binary(
-        self,
-        pattern: j.Binary,
-        target: j.Binary,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two Java binary expressions."""
-        # Compare operator
-        if pattern.operator != target.operator:
-            return False
-
-        # Compare operands
-        if not self._compare(pattern.left, target.left, cursor):
-            return False
-
-        return self._compare(pattern.right, target.right, cursor)
-
-    def _compare_python_binary(
-        self,
-        pattern: py.Binary,
-        target: py.Binary,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two Python binary expressions."""
-        # Compare operator
-        if pattern.operator != target.operator:
-            return False
-
-        # Compare operands
-        if not self._compare(pattern.left, target.left, cursor):
-            return False
-
-        return self._compare(pattern.right, target.right, cursor)
-
-    def _compare_unary(
-        self,
-        pattern: j.Unary,
-        target: j.Unary,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two unary expressions."""
-        if pattern.operator != target.operator:
-            return False
-
-        return self._compare(pattern.expression, target.expression, cursor)
-
-    def _compare_assignment(
-        self,
-        pattern: j.Assignment,
-        target: j.Assignment,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two assignments."""
-        if not self._compare(pattern.variable, target.variable, cursor):
-            return False
-
-        return self._compare(pattern.assignment, target.assignment, cursor)
-
-    def _compare_ternary(
-        self,
-        pattern: j.Ternary,
-        target: j.Ternary,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two ternary (conditional) expressions."""
-        if not self._compare(pattern.condition, target.condition, cursor):
-            return False
-
-        if not self._compare(pattern.true_part, target.true_part, cursor):
-            return False
-
-        return self._compare(pattern.false_part, target.false_part, cursor)
-
-    def _compare_array_access(
-        self,
-        pattern: j.ArrayAccess,
-        target: j.ArrayAccess,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two array/subscript accesses."""
-        if not self._compare(pattern.indexed, target.indexed, cursor):
-            return False
-
-        return self._compare(pattern.dimension.index, target.dimension.index, cursor)
-
-    def _compare_parentheses(
-        self,
-        pattern: j.Parentheses,
-        target: j.Parentheses,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two parenthesized expressions."""
-        return self._compare(pattern.tree, target.tree, cursor)
-
-    def _compare_return(
-        self,
-        pattern: j.Return,
-        target: j.Return,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two return statements."""
-        return self._compare(pattern.expression, target.expression, cursor)
-
-    def _compare_expression_statement(
-        self,
-        pattern: py.ExpressionStatement,
-        target: py.ExpressionStatement,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two Python expression statements."""
-        return self._compare(pattern.expression, target.expression, cursor)
-
-    def _compare_collection_literal(
-        self,
-        pattern: py.CollectionLiteral,
-        target: py.CollectionLiteral,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two Python collection literals."""
-        # Compare kind (list, set, tuple)
-        if pattern.kind != target.kind:
-            return False
-
-        # Compare elements
-        pattern_elements = pattern.elements
-        target_elements = target.elements
-
-        if len(pattern_elements) != len(target_elements):
-            return False
-
-        for p_elem, t_elem in zip(pattern_elements, target_elements):
-            if not self._compare(p_elem, t_elem, cursor):
-                return False
-
-        return True
-
-    def _compare_dict_literal(
-        self,
-        pattern: py.DictLiteral,
-        target: py.DictLiteral,
-        cursor: 'Cursor'
-    ) -> bool:
-        """Compare two Python dict literals."""
-        pattern_elements = pattern.elements
-        target_elements = target.elements
-
-        if len(pattern_elements) != len(target_elements):
+                print(
+                    f"Argument count mismatch: "
+                    f"{len(pattern_elements)} vs {len(target_elements)}"
+                )
             return False
 
         for p_elem, t_elem in zip(pattern_elements, target_elements):

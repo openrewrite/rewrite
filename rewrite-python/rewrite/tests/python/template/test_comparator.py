@@ -23,7 +23,12 @@ from rewrite.java import tree as j
 from rewrite.python import tree as py
 from rewrite.python.template import capture
 from rewrite.python.template.capture import Capture
-from rewrite.python.template.comparator import PatternMatchingComparator
+from rewrite.java.support_types import JavaType
+from rewrite.python.template.comparator import (
+    PatternMatchingComparator,
+    PythonComparatorVisitor,
+    PythonSemanticComparator,
+)
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.visitor import Cursor
 
@@ -812,3 +817,285 @@ class TestDefaultFallthrough:
         # Before the fix, this would have returned a match (default fallthrough was True)
         # After the fix with ArrayAccess handler, it correctly rejects
         assert result is None
+
+
+class TestGenericIteration:
+    """Tests that generic dataclasses.fields() iteration handles arbitrary node types."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def teardown_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_star_expression_matches_structurally(self):
+        """py.Star (previously unhandled) now matches via generic iteration."""
+        expr = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "args", None, None)
+        star1 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        star2 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        cursor = _make_cursor(star1)
+
+        comparator = PythonComparatorVisitor()
+        assert comparator.compare(star1, star2, cursor) is True
+
+    def test_star_kind_mismatch_rejects(self):
+        """py.Star with different Kind enum values should not match."""
+        expr = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "args", None, None)
+        star_list = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        star_dict = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.DICT, expr, None)
+        cursor = _make_cursor(star_list)
+
+        comparator = PythonComparatorVisitor()
+        assert comparator.compare(star_list, star_dict, cursor) is False
+
+    def test_previously_unhandled_types_no_longer_rejected(self):
+        """The generic approach handles any dataclass node — no more default rejection."""
+        expr = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        # py.Star was NOT handled in the old comparator — would have been rejected.
+        # Now handled via generic iteration.
+        star1 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        star2 = py.Star(uuid4(), Space.EMPTY, Markers.EMPTY, py.Star.Kind.LIST, expr, None)
+        cursor = _make_cursor(star1)
+
+        # Using the full PatternMatchingComparator (not just Layer 1) to verify
+        # the old rejection behavior is gone
+        comparator = PatternMatchingComparator({})
+        result = comparator.match(star1, star2, cursor)
+        assert result is not None
+
+    def test_nested_python_binary_with_negation_matches(self):
+        """py.Binary nodes with matching negation should match via generic iteration."""
+        left = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        right = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "y", None, None)
+        op = j.JLeftPadded(Space.EMPTY, py.Binary.Type.In, Markers.EMPTY)
+        # Both have negation (i.e., "not in")
+        bin1 = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
+        bin2 = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
+        cursor = _make_cursor(bin1)
+
+        visitor = PythonComparatorVisitor()
+        assert visitor.compare(bin1, bin2, cursor) is True
+
+    def test_python_binary_negation_mismatch(self):
+        """py.Binary 'in' vs 'not in' should NOT match (negation difference)."""
+        left = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        right = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "y", None, None)
+        op = j.JLeftPadded(Space.EMPTY, py.Binary.Type.In, Markers.EMPTY)
+        # "x in y" (no negation)
+        bin_in = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, None, right, None)
+        # "x not in y" (has negation)
+        bin_not_in = py.Binary(uuid4(), Space.EMPTY, Markers.EMPTY, left, op, Space.EMPTY, right, None)
+        cursor = _make_cursor(bin_in)
+
+        visitor = PythonComparatorVisitor()
+        assert visitor.compare(bin_in, bin_not_in, cursor) is False
+
+
+class TestLayer2TypeAwareness:
+    """Tests for PythonSemanticComparator type handling."""
+
+    def test_lenient_mode_allows_one_sided_none_type(self):
+        """In lenient mode, a node with type=None should match one with a type."""
+        # Pattern: identifier with no type
+        pattern = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        # Target: identifier with a type
+        target = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            JavaType.Primitive.String, None
+        )
+        cursor = _make_cursor(target)
+
+        comparator = PythonSemanticComparator(lenient_type_matching=True)
+        assert comparator.compare(pattern, target, cursor) is True
+
+    def test_strict_mode_rejects_one_sided_none_type(self):
+        """In strict mode, a node with type=None should NOT match one with a type."""
+        pattern = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        target = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            JavaType.Primitive.String, None
+        )
+        cursor = _make_cursor(target)
+
+        comparator = PythonSemanticComparator(lenient_type_matching=False)
+        assert comparator.compare(pattern, target, cursor) is False
+
+    def test_matching_primitive_types(self):
+        """Two identifiers with the same Primitive type should match."""
+        pattern = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            JavaType.Primitive.Int, None
+        )
+        target = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            JavaType.Primitive.Int, None
+        )
+        cursor = _make_cursor(target)
+
+        comparator = PythonSemanticComparator(lenient_type_matching=False)
+        assert comparator.compare(pattern, target, cursor) is True
+
+    def test_mismatching_primitive_types(self):
+        """Two identifiers with different Primitive types should not match."""
+        pattern = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            JavaType.Primitive.Int, None
+        )
+        target = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "x",
+            JavaType.Primitive.String, None
+        )
+        cursor = _make_cursor(target)
+
+        comparator = PythonSemanticComparator(lenient_type_matching=False)
+        assert comparator.compare(pattern, target, cursor) is False
+
+    def test_fqn_method_invocation_match_skips_select(self):
+        """When both invocations have matching FQN method types, select comparison is skipped."""
+        declaring_type = JavaType.Class()
+        declaring_type._fully_qualified_name = "os.path"
+        method_type = JavaType.Method(
+            _declaring_type=declaring_type, _name="join"
+        )
+
+        # Pattern: path.join() with select "path"
+        pattern_select = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "path", None, None
+        )
+        pattern_name = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
+        )
+        pattern = j.MethodInvocation(
+            uuid4(), Space.EMPTY, Markers.EMPTY,
+            j.JRightPadded(pattern_select, Space.EMPTY, Markers.EMPTY),
+            None,
+            pattern_name,
+            j.JContainer(Space.EMPTY, [], Markers.EMPTY),
+            method_type,
+        )
+
+        # Target: os_path.join() with select "os_path" (different name)
+        target_select = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "os_path", None, None
+        )
+        target_name = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
+        )
+        target = j.MethodInvocation(
+            uuid4(), Space.EMPTY, Markers.EMPTY,
+            j.JRightPadded(target_select, Space.EMPTY, Markers.EMPTY),
+            None,
+            target_name,
+            j.JContainer(Space.EMPTY, [], Markers.EMPTY),
+            method_type,
+        )
+
+        cursor = _make_cursor(target)
+        comparator = PythonSemanticComparator(lenient_type_matching=True)
+        # Should match because FQN ("os.path.join") is the same
+        assert comparator.compare(pattern, target, cursor) is True
+
+    def test_fqn_method_invocation_mismatch_different_method(self):
+        """When FQN method types differ in method name, the match should fail."""
+        declaring_type = JavaType.Class()
+        declaring_type._fully_qualified_name = "os.path"
+        p_method_type = JavaType.Method(
+            _declaring_type=declaring_type, _name="join"
+        )
+        t_method_type = JavaType.Method(
+            _declaring_type=declaring_type, _name="split"
+        )
+
+        name_join = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "join", None, None
+        )
+        name_split = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "split", None, None
+        )
+        select = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "path", None, None
+        )
+        empty_args = j.JContainer(Space.EMPTY, [], Markers.EMPTY)
+
+        pattern = j.MethodInvocation(
+            uuid4(), Space.EMPTY, Markers.EMPTY,
+            j.JRightPadded(select, Space.EMPTY, Markers.EMPTY),
+            None, name_join, empty_args, p_method_type,
+        )
+        target = j.MethodInvocation(
+            uuid4(), Space.EMPTY, Markers.EMPTY,
+            j.JRightPadded(select, Space.EMPTY, Markers.EMPTY),
+            None, name_split, empty_args, t_method_type,
+        )
+
+        cursor = _make_cursor(target)
+        comparator = PythonSemanticComparator(lenient_type_matching=True)
+        assert comparator.compare(pattern, target, cursor) is False
+
+    def test_both_none_types_match(self):
+        """When both nodes have type=None, they should always match."""
+        pattern = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        target = j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], "x", None, None)
+        cursor = _make_cursor(target)
+
+        # Even in strict mode, both-None is fine
+        comparator = PythonSemanticComparator(lenient_type_matching=False)
+        assert comparator.compare(pattern, target, cursor) is True
+
+
+class TestLayer3CaptureWithLayers:
+    """Tests that capture handling integrates correctly with the layered architecture."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def teardown_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_capture_on_typed_target(self):
+        """A placeholder should capture a target with type attribution."""
+        captures = {'x': capture('x')}
+        pattern_tree = TemplateEngine.get_template_tree("{x}", captures)
+        # Construct a typed target
+        target = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "hello",
+            JavaType.Primitive.String, None
+        )
+        cursor = _make_cursor(target)
+
+        comparator = PatternMatchingComparator(captures)
+        result = comparator.match(pattern_tree, target, cursor)
+        assert result is not None
+        assert 'x' in result
+        assert result['x'].simple_name == 'hello'
+
+    def test_template_method_matches_typed_target(self):
+        """A template pattern (no types) should match a typed target in lenient mode."""
+        captures = {'x': capture('x')}
+        pattern_tree = TemplateEngine.get_template_tree("print({x})", captures)
+
+        # Construct a typed target method invocation
+        target_name = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "print", None, None
+        )
+        target_arg = j.Identifier(
+            uuid4(), Space.EMPTY, Markers.EMPTY, [], "hello",
+            JavaType.Primitive.String, None
+        )
+        target = j.MethodInvocation(
+            uuid4(), Space.EMPTY, Markers.EMPTY,
+            None, None, target_name,
+            j.JContainer(
+                Space.EMPTY,
+                [j.JRightPadded(target_arg, Space.EMPTY, Markers.EMPTY)],
+                Markers.EMPTY,
+            ),
+            None,
+        )
+        cursor = _make_cursor(target)
+
+        comparator = PatternMatchingComparator(captures)
+        result = comparator.match(pattern_tree, target, cursor)
+        assert result is not None
+        assert 'x' in result
+        assert result['x'].simple_name == 'hello'
