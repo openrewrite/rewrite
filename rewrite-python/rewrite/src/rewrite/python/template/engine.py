@@ -50,7 +50,8 @@ class TemplateOptions:
         context: Arbitrary statements (imports, assignments, type aliases, …)
             prepended to the template code before parsing.  This is the
             preferred way to supply any setup code the template needs.
-        dependencies: PyPI ``(package, version)`` pairs.  When set, the
+        dependencies: PyPI ``(package, version)`` pairs (use explicit
+            operators like ``">=2.31.0"``; bare versions default to ``>=``).  When set, the
             template is parsed inside a cached virtualenv that has these
             packages installed, enabling type attribution.
         context_sensitive: Whether the template requires cursor context

@@ -69,7 +69,8 @@ class Template:
             imports: Deprecated — use ``context`` instead.
             context: Arbitrary statements (imports, assignments, …) prepended
                 to the template code for parsing.
-            dependencies: PyPI packages required by the template (``{package: version}``).
+            dependencies: PyPI packages required by the template
+                (``{package: ">=version"}``; bare versions default to ``>=``).
         """
         self._code = code
         self._captures = captures or {}
@@ -90,7 +91,8 @@ class Template:
 
         Args:
             context: Arbitrary statements prepended to template code for parsing.
-            dependencies: PyPI packages required by the template (``{package: version}``).
+            dependencies: PyPI packages required by the template
+                (``{package: ">=version"}``; bare versions default to ``>=``).
 
         Returns:
             This template instance for chaining.
@@ -375,7 +377,8 @@ def template(
         imports: Deprecated — use ``context`` instead.
         context: Optional statements (imports, assignments, …) prepended to
             the template code for parsing.
-        dependencies: Optional PyPI packages required by the template (``{package: version}``).
+        dependencies: Optional PyPI packages required by the template
+            (``{package: ">=version"}``; bare versions default to ``>=``).
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
@@ -410,7 +413,7 @@ def template(
         # With dependencies (enables ty type attribution)
         tmpl = template(
             "requests.get(url)",
-            dependencies={"requests": "2.31.0"}
+            dependencies={"requests": ">=2.31.0"}
         )
     """
     from ._fstring_support import resolve_captures

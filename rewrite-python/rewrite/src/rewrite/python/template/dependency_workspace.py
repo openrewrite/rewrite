@@ -53,7 +53,8 @@ class DependencyWorkspace:
         Parameters
         ----------
         dependencies:
-            ``(package, version)`` pairs, e.g. ``(("requests", "2.31.0"),)``.
+            ``(package, version)`` pairs, e.g. ``(("requests", ">=2.31.0"),)``.
+            Bare versions are normalized to ``>=``.
 
         Returns
         -------

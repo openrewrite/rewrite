@@ -161,7 +161,8 @@ class Pattern:
             imports: Deprecated — use ``context`` instead.
             context: Arbitrary statements (imports, assignments, …) prepended
                 to the pattern code for parsing.
-            dependencies: PyPI packages required by the pattern (``{package: version}``).
+            dependencies: PyPI packages required by the pattern
+                (``{package: ">=version"}``; bare versions default to ``>=``).
         """
         self._code = code
         self._captures = captures or {}
@@ -182,7 +183,8 @@ class Pattern:
 
         Args:
             context: Arbitrary statements prepended to pattern code for parsing.
-            dependencies: PyPI packages required by the pattern (``{package: version}``).
+            dependencies: PyPI packages required by the pattern
+                (``{package: ">=version"}``; bare versions default to ``>=``).
 
         Returns:
             This pattern instance for chaining.
@@ -298,7 +300,8 @@ def pattern(
         imports: Deprecated — use ``context`` instead.
         context: Optional statements (imports, assignments, …) prepended to
             the pattern code for parsing.
-        dependencies: Optional PyPI packages required by the pattern (``{package: version}``).
+        dependencies: Optional PyPI packages required by the pattern
+            (``{package: ">=version"}``; bare versions default to ``>=``).
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
