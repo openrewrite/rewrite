@@ -73,20 +73,22 @@ class Capture(Generic[T]):
         )
 
     def __format__(self, format_spec: str) -> str:
-        """Format as ``{name}`` placeholder and register for f-string capture.
+        """Format as internal placeholder identifier and register for f-string capture.
 
         When used inside an f-string like ``f"print({expr})"``, this returns
-        the literal text ``{expr}`` (with braces) so the resulting string is a
-        valid template code string, and registers the capture so that
-        ``template()`` / ``pattern()`` can pick it up automatically.
+        the internal placeholder identifier ``__plh_expr__`` so the resulting
+        string is already in the engine's internal format (a valid Python
+        identifier), and registers the capture so that ``template()`` /
+        ``pattern()`` can pick it up automatically.
         """
         if format_spec:
             raise ValueError(
                 f"Capture does not support format specs, got {format_spec!r}"
             )
         from ._fstring_support import register_capture
+        from .placeholder import to_placeholder
         register_capture(self)
-        return '{' + self.name + '}'
+        return to_placeholder(self.name)
 
 
 def capture(

@@ -125,10 +125,10 @@ class TestCaptureFormat:
         clear_registry()
 
     def test_fstring_produces_template_code(self):
-        """f-string with Capture produces valid template code string."""
+        """f-string with Capture produces internal placeholder identifier."""
         expr = capture('expr')
         result = f"print({expr})"
-        assert result == "print({expr})"
+        assert result == "print(__plh_expr__)"
 
     def test_format_spec_rejected(self):
         """Format specs are not allowed on Capture."""
@@ -139,18 +139,18 @@ class TestCaptureFormat:
     def test_auto_registration(self):
         """Formatting a Capture registers it in the contextvars registry."""
         cap = capture('expr')
-        f"print({cap})"  # triggers __format__
-        collected = collect_captures("print({expr})")
+        code = f"print({cap})"  # triggers __format__
+        collected = collect_captures(code)
         assert 'expr' in collected
         assert collected['expr'] is cap
 
     def test_registration_only_matching(self):
-        """collect_captures only returns captures whose {name} appears in the code."""
+        """collect_captures only returns captures whose placeholder appears in the code."""
         a = capture('a')
         b = capture('b')
         f"{a} + {b}"
         # Only collect 'a' — 'b' is not in the code string
-        collected = collect_captures("{a} + x")
+        collected = collect_captures("__plh_a__ + x")
         assert 'a' in collected
         assert 'b' not in collected
 
@@ -183,7 +183,7 @@ class TestFstringIntegration:
 
         expr = capture('expr')
         tmpl = template(f"print({expr})")
-        assert tmpl.code == "print({expr})"
+        assert tmpl.code == "print(__plh_expr__)"
         assert 'expr' in tmpl.captures
         assert tmpl.captures['expr'] is expr
 
@@ -193,7 +193,7 @@ class TestFstringIntegration:
 
         expr = capture('expr')
         pat = pattern(f"print({expr})")
-        assert pat.code == "print({expr})"
+        assert pat.code == "print(__plh_expr__)"
         assert 'expr' in pat.captures
         assert pat.captures['expr'] is expr
 
@@ -213,7 +213,7 @@ class TestFstringIntegration:
         method = raw('warn')
         expr = capture('expr')
         tmpl = template(f"logger.{method}({expr})")
-        assert tmpl.code == "logger.warn({expr})"
+        assert tmpl.code == "logger.warn(__plh_expr__)"
         assert 'expr' in tmpl.captures
         assert tmpl.captures['expr'] is expr
 
@@ -240,4 +240,4 @@ class TestFstringIntegration:
         assert 'stale' not in tmpl.captures
 
         # Registry should be empty now
-        assert collect_captures("{stale}") == {}
+        assert collect_captures("__plh_stale__") == {}

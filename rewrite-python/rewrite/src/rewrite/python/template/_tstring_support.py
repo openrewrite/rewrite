@@ -46,12 +46,15 @@ def convert_tstring(tpl: Any) -> Tuple[str, Dict[str, Capture]]:
     """Convert a t-string Template into a (code, captures) tuple.
 
     Iterates the t-string's args: static strings are concatenated as-is,
-    Capture interpolations become ``{name}`` placeholders, and RawCode
-    interpolations are spliced directly into the code string.
+    Capture interpolations become internal placeholder identifiers
+    (``__plh_name__``), and RawCode interpolations are spliced directly
+    into the code string.
 
     Raises:
         TypeError: If an interpolation is not a Capture or RawCode.
     """
+    from .placeholder import to_placeholder
+
     parts: list[str] = []
     captures: Dict[str, Capture] = {}
 
@@ -62,7 +65,7 @@ def convert_tstring(tpl: Any) -> Tuple[str, Dict[str, Capture]]:
             # Interpolation object: has .value, .expression, .conversion, .format_spec
             value = arg.value
             if isinstance(value, Capture):
-                parts.append('{' + value.name + '}')
+                parts.append(to_placeholder(value.name))
                 captures[value.name] = value
             elif isinstance(value, RawCode):
                 parts.append(value.code)

@@ -40,15 +40,16 @@ def register_capture(cap: 'Capture') -> None:
 
 
 def collect_captures(code: str) -> Dict[str, 'Capture']:
-    """Collect registered captures whose ``{name}`` appears in *code*, then clear the registry.
+    """Collect registered captures whose placeholder identifier appears in *code*, then clear the registry.
 
     All entries are cleared afterward, including non-matching ones, to prevent
     stale captures from leaking into subsequent ``template()``/``pattern()`` calls.
     """
+    from .placeholder import to_placeholder
     registry = _pending.get(None)
     if not registry:
         return {}
-    captures = {name: cap for name, cap in registry.items() if '{' + name + '}' in code}
+    captures = {name: cap for name, cap in registry.items() if to_placeholder(name) in code}
     registry.clear()
     return captures
 
