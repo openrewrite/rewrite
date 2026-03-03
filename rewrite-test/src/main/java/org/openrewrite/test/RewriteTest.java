@@ -232,7 +232,7 @@ public interface RewriteTest extends SourceSpecs {
         // Skip recipe validation for these since custom validate() methods (e.g. requiring at least one of several
         // optional parameters) would fail on an unconfigured instance.
         if (recipe instanceof DeclarativeRecipe
-                || recipe.getDescriptor().getOptions().stream().anyMatch(opt -> !opt.isRequired())) {
+                || recipe.getDescriptor().getOptions().stream().allMatch(OptionDescriptor::isRequired)) {
             List<Validated<Object>> validations = new ArrayList<>();
             recipe.validateAll(ctx, validations);
             assertThat(validations.stream().filter(Validated::isInvalid))

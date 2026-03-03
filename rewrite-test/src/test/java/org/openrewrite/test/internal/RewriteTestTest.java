@@ -156,24 +156,12 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
-    void rejectUnconfiguredRecipeWithOptionalOrValidation() {
+    void acceptUnconfiguredRecipeWithOptionalOrValidation() {
         // A recipe with optional params and validate() requiring at least one
-        // fails when loaded with no arguments and default validation is enabled
-        assertThrows(AssertionError.class, () ->
-          rewriteRun(
-            spec -> spec.recipe(new RecipeWithOptionalOrValidation(null, null)),
-            new SourceSpecs[0]
-          ));
-    }
-
-    @Test
-    void acceptUnconfiguredRecipeWithOptionalOrValidationWhenSkipped() {
-        // The same recipe succeeds when validation is disabled, as
-        // assertRecipesConfigure() does for imperative recipes
+        // should not fail when loaded with no arguments, because validation is
+        // skipped for imperative recipes that have optional parameters
         rewriteRun(
-          spec -> spec
-            .recipe(new RecipeWithOptionalOrValidation(null, null))
-            .validateRecipe(false),
+          spec -> spec.recipe(new RecipeWithOptionalOrValidation(null, null)),
           new SourceSpecs[0]
         );
     }
