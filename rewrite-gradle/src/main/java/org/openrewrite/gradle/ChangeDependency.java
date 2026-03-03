@@ -34,6 +34,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.properties.PropertiesVisitor;
@@ -163,8 +164,11 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     }
 
     public static class Accumulator {
-        // Version variable name → resolved new version (collected from GString/StringTemplate deps)
-        Map<String, String> versionVariableUpdates = new HashMap<>();
+        /**
+         * Version variable name → resolved new version or MavenDownloadingException
+         * (collected from GString/StringTemplate deps).
+         */
+        Map<String, Object> versionVariableUpdates = new HashMap<>();
     }
 
     @Override
@@ -255,7 +259,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                 acc.versionVariableUpdates.put(varName, resolvedVersion);
                             }
                         } catch (MavenDownloadingException e) {
-                            // Version resolution failed; will be handled in the visitor
+                            acc.versionVariableUpdates.put(varName, e);
                         }
                     }
                 }.visit(tree, ctx);
@@ -362,8 +366,12 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
                 J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
-                String resolvedVersion = acc.versionVariableUpdates.get(v.getSimpleName());
-                if (resolvedVersion != null && v.getInitializer() instanceof J.Literal) {
+                Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
+                if (scanResult instanceof Exception) {
+                    return Markup.warn(v, (Exception) scanResult);
+                }
+                if (scanResult instanceof String && v.getInitializer() instanceof J.Literal) {
+                    String resolvedVersion = (String) scanResult;
                     J.Literal initializer = (J.Literal) v.getInitializer();
                     if (initializer.getValue() instanceof String && !resolvedVersion.equals(initializer.getValue())) {
                         v = v.withInitializer(ChangeStringLiteral.withStringValue(initializer, resolvedVersion));
@@ -813,9 +821,15 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         return new PropertiesVisitor<ExecutionContext>() {
                             @Override
                             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                                String resolvedVersion = acc.versionVariableUpdates.get(entry.getKey());
-                                if (resolvedVersion != null && !resolvedVersion.equals(entry.getValue().getText())) {
-                                    return entry.withValue(entry.getValue().withText(resolvedVersion));
+                                Object scanResult = acc.versionVariableUpdates.get(entry.getKey());
+                                if (scanResult instanceof Exception) {
+                                    return Markup.warn(entry, (Exception) scanResult);
+                                }
+                                if (scanResult instanceof String) {
+                                    String resolvedVersion = (String) scanResult;
+                                    if (!resolvedVersion.equals(entry.getValue().getText())) {
+                                        return entry.withValue(entry.getValue().withText(resolvedVersion));
+                                    }
                                 }
                                 return entry;
                             }
