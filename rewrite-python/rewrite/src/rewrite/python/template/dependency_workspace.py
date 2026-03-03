@@ -105,9 +105,63 @@ class DependencyWorkspace:
             return False
 
     @classmethod
+    def get_or_create_from_pyproject(cls, pyproject_content: str) -> str:
+        """Return the path to a workspace created from raw ``pyproject.toml`` content.
+
+        This mirrors the Java ``DependencyWorkspace.getOrCreateWorkspace(pyprojectContent)``
+        API.  The content is hashed directly (rather than normalizing dependencies)
+        so any ``pyproject.toml`` — including those with extras, optional groups,
+        or tool sections — is supported.
+
+        Parameters
+        ----------
+        pyproject_content:
+            Complete ``pyproject.toml`` file content.
+
+        Returns
+        -------
+        str
+            Absolute path to the workspace directory (contains ``.venv/``).
+        """
+        cache_key = cls._hash_content(pyproject_content)
+
+        # 1. In-memory cache
+        if cache_key in cls._cache:
+            workspace = cls._cache[cache_key]
+            if cls._is_valid(workspace):
+                return workspace
+
+        # 2. Disk cache
+        workspace = os.path.join(WORKSPACE_BASE, cache_key)
+        if cls._is_valid(workspace):
+            cls._cache[cache_key] = workspace
+            return workspace
+
+        # 3. Create new workspace
+        workspace = cls._create_workspace_with_content(pyproject_content, cache_key)
+        cls._cache[cache_key] = workspace
+        return workspace
+
+    @classmethod
+    def _hash_content(cls, content: str) -> str:
+        """Produce a stable hash string from arbitrary content."""
+        digest = hashlib.sha256(content.encode()).hexdigest()
+        return digest[:16]
+
+    @classmethod
     def _create_workspace(
         cls,
         dependencies: Tuple[Tuple[str, str], ...],
+        cache_key: str,
+    ) -> str:
+        """Create a new workspace from dependency tuples."""
+        pyproject = cls._generate_pyproject(dependencies)
+        return cls._create_workspace_with_content(pyproject, cache_key)
+
+    @classmethod
+    def _create_workspace_with_content(
+        cls,
+        pyproject_content: str,
         cache_key: str,
     ) -> str:
         """Create a new workspace, install dependencies, and move it into place."""
@@ -126,9 +180,8 @@ class DependencyWorkspace:
             os.makedirs(tmp_dir)
 
             # Write pyproject.toml
-            pyproject = cls._generate_pyproject(dependencies)
             with open(os.path.join(tmp_dir, "pyproject.toml"), "w") as f:
-                f.write(pyproject)
+                f.write(pyproject_content)
 
             # Run uv sync
             cls._run_uv_sync(tmp_dir)

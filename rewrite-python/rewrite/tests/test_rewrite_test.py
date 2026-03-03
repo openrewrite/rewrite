@@ -17,7 +17,8 @@
 import pytest
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor
-from rewrite.test import RecipeSpec, python, from_visitor, dedent
+from rewrite.test import RecipeSpec, python, pyproject, uv, from_visitor, dedent
+from rewrite.test.spec import SourceSpec
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.tree import CompilationUnit
 from rewrite.java import J
@@ -332,4 +333,103 @@ class TestMultipleSourceSpecs:
                 z = 3
                 """
             ),
+        )
+
+
+def _uv_available() -> bool:
+    """Check if uv is installed."""
+    import shutil
+    return shutil.which("uv") is not None
+
+
+class TestPyprojectHelper:
+    """Tests for the pyproject() helper."""
+
+    def test_pyproject_returns_toml_spec(self):
+        """pyproject() returns a SourceSpec with kind='toml'."""
+        spec = pyproject("[project]\nname = \"test\"\n")
+        assert spec.kind == "toml"
+        assert spec.path is not None
+        assert spec.path.name == "pyproject.toml"
+        assert spec.ext == "toml"
+
+    def test_pyproject_with_after(self):
+        """pyproject() supports before/after."""
+        spec = pyproject("[project]\nv = \"1\"\n", "[project]\nv = \"2\"\n")
+        assert spec.before == "[project]\nv = \"1\"\n"
+        assert spec.after == "[project]\nv = \"2\"\n"
+
+
+class TestUvHelper:
+    """Tests for the uv() test helper."""
+
+    def test_uv_returns_list_of_specs(self):
+        """uv() returns a list of SourceSpec objects."""
+        from rewrite.test.spec import uv as uv_fn
+        import inspect
+        sig = inspect.signature(uv_fn)
+        assert "source_specs" in sig.parameters
+        assert "root" in sig.parameters
+
+    def test_uv_requires_pyproject_or_root(self):
+        """uv() raises ValueError without pyproject or root."""
+        with pytest.raises(ValueError, match="requires either"):
+            uv(python("x = 1"))
+
+    def test_uv_with_explicit_root(self, tmp_path):
+        """uv() with root= tags specs with that directory."""
+        specs = uv(python("x = 1"), root=str(tmp_path))
+        assert len(specs) == 1
+        assert specs[0].project_root == str(tmp_path)
+
+    def test_source_spec_project_root_default_none(self):
+        """SourceSpec.project_root defaults to None."""
+        spec = python("x = 1")
+        assert spec.project_root is None
+
+    @pytest.mark.skipif(not _uv_available(), reason="uv not installed")
+    def test_uv_creates_workspace_from_pyproject(self):
+        """uv() with pyproject() creates a workspace and tags all specs."""
+        import os
+        specs = uv(
+            pyproject(
+                """
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                dependencies = ["six==1.17.0"]
+                """
+            ),
+            python("import six\nx = 1\n"),
+        )
+        assert len(specs) == 2
+        # Both specs tagged with same workspace
+        assert specs[0].project_root is not None
+        assert specs[0].project_root == specs[1].project_root
+        assert os.path.isdir(specs[0].project_root)
+        assert os.path.isdir(os.path.join(specs[0].project_root, ".venv"))
+
+    @pytest.mark.skipif(not _uv_available(), reason="uv not installed")
+    def test_uv_spec_parses_with_type_attribution(self):
+        """Source specs from uv() are parsed with workspace type attribution."""
+        spec = RecipeSpec()
+        spec.rewrite_run(
+            *uv(
+                pyproject(
+                    """
+                    [project]
+                    name = "test"
+                    version = "0.0.0"
+                    requires-python = ">=3.10"
+                    dependencies = ["six==1.17.0"]
+                    """
+                ),
+                python(
+                    """
+                    import six
+                    x = 1
+                    """
+                ),
+            )
         )

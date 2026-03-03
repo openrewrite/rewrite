@@ -36,6 +36,24 @@ def _clear_cache():
 class TestDependencyWorkspaceUnit:
     """Unit tests that don't require uv or network access."""
 
+    def test_hash_content_stability(self):
+        """Same content always produces the same hash."""
+        content = "[project]\nname = \"test\"\n"
+        h1 = DependencyWorkspace._hash_content(content)
+        h2 = DependencyWorkspace._hash_content(content)
+        assert h1 == h2
+
+    def test_hash_content_varies(self):
+        """Different content produces different hashes."""
+        h1 = DependencyWorkspace._hash_content("[project]\nname = \"a\"\n")
+        h2 = DependencyWorkspace._hash_content("[project]\nname = \"b\"\n")
+        assert h1 != h2
+
+    def test_hash_content_length(self):
+        """Content hash is 16 characters long."""
+        h = DependencyWorkspace._hash_content("test")
+        assert len(h) == 16
+
     def test_hash_stability(self):
         """Same dependencies always produce the same hash."""
         deps = (("requests", "2.31.0"), ("flask", "3.0.0"))
@@ -138,4 +156,32 @@ class TestDependencyWorkspaceIntegration:
         deps = (("six", "1.17.0"),)
         ws1 = DependencyWorkspace.get_or_create(deps)
         ws2 = DependencyWorkspace.get_or_create(deps)
+        assert ws1 == ws2
+
+    def test_get_or_create_from_pyproject(self):
+        """get_or_create_from_pyproject creates a valid workspace."""
+        content = (
+            '[project]\n'
+            'name = "test"\n'
+            'version = "0.0.0"\n'
+            'requires-python = ">=3.10"\n'
+            'dependencies = ["six==1.17.0"]\n'
+        )
+        workspace = DependencyWorkspace.get_or_create_from_pyproject(content)
+
+        assert os.path.isdir(workspace)
+        assert os.path.isdir(os.path.join(workspace, ".venv"))
+        assert DependencyWorkspace._is_valid(workspace)
+
+    def test_get_or_create_from_pyproject_caches(self):
+        """Second call with same content returns the same workspace."""
+        content = (
+            '[project]\n'
+            'name = "test"\n'
+            'version = "0.0.0"\n'
+            'requires-python = ">=3.10"\n'
+            'dependencies = ["six==1.17.0"]\n'
+        )
+        ws1 = DependencyWorkspace.get_or_create_from_pyproject(content)
+        ws2 = DependencyWorkspace.get_or_create_from_pyproject(content)
         assert ws1 == ws2

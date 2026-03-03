@@ -19,7 +19,7 @@ from __future__ import annotations
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Union, TYPE_CHECKING
+from typing import Callable, List, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from rewrite.tree import SourceFile
@@ -51,6 +51,8 @@ class SourceSpec:
         before_recipe: Hook called after parsing but before recipe runs
         after_recipe: Hook called after recipe runs
         ext: File extension for auto-generated paths
+        project_root: Optional workspace directory for type attribution
+            (set by ``uv()`` — not normally used directly).
     """
 
     kind: str
@@ -60,6 +62,7 @@ class SourceSpec:
     before_recipe: Optional[Callable[["SourceFile"], Optional["SourceFile"]]] = None
     after_recipe: Optional[Callable[["SourceFile"], None]] = None
     ext: str = "py"
+    project_root: Optional[str] = None
 
 
 def dedent(s: Optional[str]) -> str:
@@ -110,6 +113,113 @@ def dedent(s: Optional[str]) -> str:
     s = s.replace('\r\n', _CR + '\n')
     s = textwrap.dedent(s)
     return s.replace(_CR + '\n', '\r\n')
+
+
+def uv(
+    *source_specs: SourceSpec,
+    root: Optional[str] = None,
+) -> List[SourceSpec]:
+    """Set up a Python workspace with dependencies for type attribution.
+
+    This is the Python equivalent of the Java ``Assertions.uv()`` and the
+    JavaScript ``npm()`` test helpers.  It finds a ``pyproject()`` spec
+    among the given source specs, creates (or reuses) a cached workspace
+    with the declared PyPI dependencies installed, and tags every spec
+    with the workspace path so ``TyTypesClient`` can resolve types
+    during parsing.
+
+    Args:
+        *source_specs: Source specifications, typically including a
+            ``pyproject(...)`` spec and one or more ``python(...)`` specs.
+        root: Optional workspace directory.  When omitted the workspace
+            is created/cached automatically from the ``pyproject.toml``
+            content.
+
+    Returns:
+        The source specs with ``project_root`` set on each.
+
+    Example::
+
+        spec = RecipeSpec(recipe=MyRecipe())
+        spec.rewrite_run(
+            *uv(
+                pyproject('''
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                dependencies = ["requests==2.31.0"]
+                '''),
+                python("import requests", ...),
+            )
+        )
+    """
+    from rewrite.python.template.dependency_workspace import DependencyWorkspace
+
+    workspace = root
+    if workspace is None:
+        # Find pyproject.toml content from source specs
+        for spec in source_specs:
+            if spec.kind == "toml" and spec.path and spec.path.name == "pyproject.toml":
+                if spec.before is not None:
+                    workspace = DependencyWorkspace.get_or_create_from_pyproject(
+                        dedent(spec.before)
+                    )
+                    break
+
+    if workspace is None:
+        raise ValueError(
+            "uv() requires either a pyproject() spec or an explicit root= argument"
+        )
+
+    # Tag every spec with the workspace
+    return [
+        SourceSpec(
+            kind=s.kind,
+            before=s.before,
+            after=s.after,
+            path=s.path,
+            before_recipe=s.before_recipe,
+            after_recipe=s.after_recipe,
+            ext=s.ext,
+            project_root=workspace,
+        )
+        for s in source_specs
+    ]
+
+
+def pyproject(
+    before: Optional[str],
+    after: AfterRecipeText = None,
+) -> SourceSpec:
+    """Create a SourceSpec for a ``pyproject.toml`` file.
+
+    Used inside ``uv()`` to declare the project's dependencies::
+
+        uv(
+            pyproject('''
+            [project]
+            name = "test"
+            version = "0.0.0"
+            dependencies = ["requests==2.31.0"]
+            '''),
+            python("import requests"),
+        )
+
+    Args:
+        before: ``pyproject.toml`` content before transformation.
+        after: Expected content after transformation (None = no change).
+
+    Returns:
+        A SourceSpec configured for TOML with path ``pyproject.toml``.
+    """
+    return SourceSpec(
+        kind="toml",
+        before=before,
+        after=after,
+        path=Path("pyproject.toml"),
+        ext="toml",
+    )
 
 
 def python(
