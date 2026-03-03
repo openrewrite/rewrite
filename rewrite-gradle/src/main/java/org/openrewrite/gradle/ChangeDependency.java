@@ -32,6 +32,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
@@ -167,9 +168,16 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     public static class Accumulator {
         /**
          * Version variable name → resolved new version or MavenDownloadingException
-         * (collected from GString/StringTemplate deps).
+         * (collected from GString/StringTemplate deps that match oldGroupId:oldArtifactId).
          */
         Map<String, Object> versionVariableUpdates = new HashMap<>();
+
+        /**
+         * Version variable name → all group:artifact pairs using this variable
+         * (collected from ALL GString/StringTemplate deps, not just matching ones).
+         * Used to determine if a variable can be safely updated without affecting unrelated dependencies.
+         */
+        Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
     }
 
     @Override
@@ -204,35 +212,59 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return m;
                 }
 
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+                // Record version variable usages from ALL dependency declarations (not just matching ones)
+                // so we can detect shared variables that shouldn't be updated
+                new GradleDependency.Matcher().get(getCursor()).ifPresent(dep -> {
+                    Expression firstArg = unwrapPlatform(m.getArguments().get(0));
+                    recordVariableUsage(firstArg, dep);
+                });
+
+                // For matching dependencies, also resolve the new version
+                GradleDependency.Matcher specificMatcher = new GradleDependency.Matcher()
                         .groupId(oldGroupId)
                         .artifactId(oldArtifactId);
-                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
+                if (!specificMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
 
-                List<Expression> depArgs = m.getArguments();
-                Expression firstArg = depArgs.get(0);
-
-                // Unwrap platform/enforcedPlatform wrappers
-                if (firstArg instanceof J.MethodInvocation) {
-                    J.MethodInvocation inner = (J.MethodInvocation) firstArg;
-                    if ("platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName())) {
-                        if (!inner.getArguments().isEmpty()) {
-                            firstArg = inner.getArguments().get(0);
-                        }
-                    }
-                }
-
+                Expression firstArg = unwrapPlatform(m.getArguments().get(0));
                 if (firstArg instanceof G.GString) {
-                    scanGString((G.GString) firstArg, m, ctx);
+                    scanVersionVariable((G.GString) firstArg, m, ctx);
                 } else if (firstArg instanceof K.StringTemplate) {
-                    scanStringTemplate((K.StringTemplate) firstArg, m, ctx);
+                    scanVersionVariable((K.StringTemplate) firstArg, m, ctx);
                 }
                 return m;
             }
 
-            private void scanGString(G.GString gstring, J.MethodInvocation m, ExecutionContext ctx) {
+            private Expression unwrapPlatform(Expression arg) {
+                if (arg instanceof J.MethodInvocation) {
+                    J.MethodInvocation inner = (J.MethodInvocation) arg;
+                    if (("platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName()))
+                            && !inner.getArguments().isEmpty()) {
+                        return inner.getArguments().get(0);
+                    }
+                }
+                return arg;
+            }
+
+            private void recordVariableUsage(Expression firstArg, GradleDependency dep) {
+                List<J> strings = null;
+                if (firstArg instanceof G.GString) {
+                    strings = ((G.GString) firstArg).getStrings();
+                } else if (firstArg instanceof K.StringTemplate) {
+                    strings = ((K.StringTemplate) firstArg).getStrings();
+                }
+                if (strings != null && strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+                    String varName = extractVersionVariableName(strings);
+                    if (varName != null) {
+                        acc.versionVariableUsages
+                                .computeIfAbsent(varName, k -> new HashSet<>())
+                                .add(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                    }
+                }
+            }
+
+            private void scanVersionVariable(G.GString gstring, J.MethodInvocation m, ExecutionContext ctx) {
                 List<J> strings = gstring.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                     String varName = extractVersionVariableName(strings);
@@ -242,7 +274,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
             }
 
-            private void scanStringTemplate(K.StringTemplate template, J.MethodInvocation m, ExecutionContext ctx) {
+            private void scanVersionVariable(K.StringTemplate template, J.MethodInvocation m, ExecutionContext ctx) {
                 List<J> strings = template.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                     String varName = extractVersionVariableName(strings);
@@ -366,6 +398,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
                 J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+                if (!canUpdateVariable(v.getSimpleName())) {
+                    return v;
+                }
                 Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
                 if (scanResult instanceof Exception) {
                     return Markup.warn(v, (Exception) scanResult);
@@ -378,6 +413,10 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                 }
                 return v;
+            }
+
+            private boolean canUpdateVariable(String varName) {
+                return ChangeDependency.this.canUpdateVariable(varName, depMatcher, acc);
             }
 
             private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx) {
@@ -429,17 +468,23 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
 
-                            // Preserve GString structure, only update the group:artifact prefix
-                            // Version variable updates are handled separately (gradle.properties or local variable declarations)
-                            if (original != updated) {
-                                String oldGav = original.getGroupId() + ":" + original.getArtifactId();
-                                String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
-                                String oldValue = (String) literal.getValue();
-                                String updatedValue = oldValue.replace(oldGav, newGav);
-                                J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
-                                m = m.withArguments(singletonList(
-                                        gstring.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
-                                ));
+                            String varName = extractVersionVariableName(strings);
+                            if (varName != null && canUpdateVariable(varName)) {
+                                // Preserve GString structure, only update the group:artifact prefix
+                                // Version variable updates are handled separately (gradle.properties or local variable declarations)
+                                if (original != updated) {
+                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                    String oldValue = (String) literal.getValue();
+                                    String updatedValue = oldValue.replace(oldGav, newGav);
+                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                    m = m.withArguments(singletonList(
+                                            gstring.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                    ));
+                                }
+                            } else {
+                                // Variable is shared with non-matching dependencies; collapse to literal
+                                m = collapseInterpolatedToLiteral(m, gstring, updated, original, varName, ctx);
                             }
                         }
                     }
@@ -717,22 +762,67 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
 
-                            // Preserve StringTemplate structure, only update the group:artifact prefix
-                            // Version variable updates are handled separately (gradle.properties or local variable declarations)
-                            if (original != updated) {
-                                String oldGav = original.getGroupId() + ":" + original.getArtifactId();
-                                String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
-                                String oldValue = (String) literal.getValue();
-                                String updatedValue = oldValue.replace(oldGav, newGav);
-                                J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
-                                m = m.withArguments(singletonList(
-                                        template.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
-                                ));
+                            String varName = extractVersionVariableName(strings);
+                            if (varName != null && canUpdateVariable(varName)) {
+                                // Preserve StringTemplate structure, only update the group:artifact prefix
+                                // Version variable updates are handled separately (gradle.properties or local variable declarations)
+                                if (original != updated) {
+                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                    String oldValue = (String) literal.getValue();
+                                    String updatedValue = oldValue.replace(oldGav, newGav);
+                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                    m = m.withArguments(singletonList(
+                                            template.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                    ));
+                                }
+                            } else {
+                                // Variable is shared with non-matching dependencies; collapse to literal
+                                m = collapseInterpolatedToLiteral(m, template, updated, original, varName, ctx);
                             }
                         }
                     }
                 }
 
+                return m;
+            }
+
+            /**
+             * When a version variable is shared with non-matching dependencies, collapse the
+             * interpolated string (GString/StringTemplate) to a plain literal with the resolved version.
+             */
+            private J.MethodInvocation collapseInterpolatedToLiteral(
+                    J.MethodInvocation m, Expression interpolated, Dependency updated,
+                    Dependency original, @Nullable String varName, ExecutionContext ctx) {
+                Object scanResult = varName != null ? acc.versionVariableUpdates.get(varName) : null;
+                if (scanResult instanceof Exception) {
+                    return ((MavenDownloadingException) scanResult).warn(m);
+                }
+                String resolvedVersion = scanResult instanceof String ? (String) scanResult : null;
+                if (resolvedVersion == null && !StringUtils.isBlank(newVersion)) {
+                    try {
+                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(m);
+                    }
+                }
+                if (resolvedVersion != null) {
+                    updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
+                }
+                if (original != updated) {
+                    String replacement = DependencyNotation.toStringNotation(updated);
+                    J.Literal newLiteral = new J.Literal(
+                            Tree.randomId(),
+                            interpolated.getPrefix(),
+                            interpolated.getMarkers(),
+                            replacement,
+                            "\"" + replacement + "\"",
+                            null,
+                            JavaType.Primitive.String
+                    );
+                    m = m.withArguments(singletonList(newLiteral));
+                }
                 return m;
             }
 
@@ -812,6 +902,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         });
 
         // Composite visitor: dispatches to gradle visitor for build files, properties visitor for gradle.properties
+        DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -821,6 +912,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         return new PropertiesVisitor<ExecutionContext>() {
                             @Override
                             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                                if (!canUpdateVariable(entry.getKey(), propsMatcher, acc)) {
+                                    return entry;
+                                }
                                 Object scanResult = acc.versionVariableUpdates.get(entry.getKey());
                                 if (scanResult instanceof Exception) {
                                     return Markup.warn(entry, (Exception) scanResult);
@@ -840,6 +934,23 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 return gradleVisitor.visit(tree, ctx);
             }
         };
+    }
+
+    /**
+     * A version variable can only be updated if ALL dependencies using it match
+     * the old group:artifact pattern. Otherwise, updating it would break unrelated dependencies.
+     */
+    private boolean canUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {
+        Set<GroupArtifact> usages = acc.versionVariableUsages.get(varName);
+        if (usages == null) {
+            return true;
+        }
+        for (GroupArtifact ga : usages) {
+            if (!depMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static @Nullable String extractVersionVariableName(List<J> strings) {
