@@ -2352,20 +2352,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>parent-project</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <version.swagger>2.2.43</version.swagger>
-                  </properties>
-                  <modules>
-                    <module>sub-project</module>
-                  </modules>
-                </project>
-                """,
-              spec -> spec.path("pom.xml")
+              spec -> spec.path("pom.xml").after(actual -> assertThat(actual)
+                .containsPattern("<version\\.swagger>2\\.2\\.\\d+</version\\.swagger>")
+                .doesNotContain("<version.swagger>1.5.16</version.swagger>")
+                .actual())
             ),
             mavenProject("sub-project",
               //language=xml
@@ -2390,27 +2380,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>sub-project</artifactId>
-                    <version>1</version>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>parent-project</artifactId>
-                      <version>1</version>
-                      <relativePath>../pom.xml</relativePath>
-                    </parent>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>${version.swagger}</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                spec -> spec.path("sub-project/pom.xml")
+                spec -> spec.path("sub-project/pom.xml").after(actual -> assertThat(actual)
+                  .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>\\$\\{version\\.swagger}</version>")
+                  .doesNotContain("<groupId>io.swagger</groupId>")
+                  .actual())
               )
             )
           )
@@ -2480,32 +2453,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>sub-project</artifactId>
-                    <version>1</version>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>parent-project</artifactId>
-                      <version>1</version>
-                      <relativePath>../pom.xml</relativePath>
-                    </parent>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>2.2.43</version>
-                      </dependency>
-                      <dependency>
-                        <groupId>io.swagger</groupId>
-                        <artifactId>swagger-models</artifactId>
-                        <version>${version.swagger}</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                spec -> spec.path("sub-project/pom.xml")
+                spec -> spec.path("sub-project/pom.xml").after(actual -> assertThat(actual)
+                  .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>2\\.2\\.\\d+</version>")
+                  .containsPattern("<groupId>io\\.swagger</groupId>\\s*<artifactId>swagger-models</artifactId>\\s*<version>\\$\\{version\\.swagger}</version>")
+                  .actual())
               )
             )
           )
@@ -2570,27 +2521,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>child-a</artifactId>
-                    <version>1</version>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>parent-project</artifactId>
-                      <version>1</version>
-                      <relativePath>../pom.xml</relativePath>
-                    </parent>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>2.2.43</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                spec -> spec.path("child-a/pom.xml")
+                spec -> spec.path("child-a/pom.xml").after(actual -> assertThat(actual)
+                  .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>2\\.2\\.\\d+</version>")
+                  .doesNotContain("<version>${version.swagger}</version>")
+                  .actual())
               )
             ),
             mavenProject("child-b",
@@ -2664,28 +2598,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
                 </project>
                 """,
-              //language=xml
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>parent-project</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <version.swagger>1.5.16</version.swagger>
-                  </properties>
-                  <modules>
-                    <module>sub-project</module>
-                  </modules>
-                  <dependencies>
-                    <dependency>
-                      <groupId>io.swagger.core.v3</groupId>
-                      <artifactId>swagger-annotations</artifactId>
-                      <version>2.2.43</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """,
-              spec -> spec.path("pom.xml")
+              spec -> spec.path("pom.xml").after(actual -> assertThat(actual)
+                .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>2\\.2\\.\\d+</version>")
+                .contains("<version.swagger>1.5.16</version.swagger>")
+                .actual())
             ),
             mavenProject("sub-project",
               pomXml(
