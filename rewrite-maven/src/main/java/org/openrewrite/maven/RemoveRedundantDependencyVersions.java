@@ -187,9 +187,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                         return tag.withContent(withoutVersion(tag, version));
                     }
                 } else if (isManagedDependencyTag()) {
-                    if (tag.getMarkers().findFirst(Skip.class).isPresent()) {
-                        return tag;
-                    }
                     ResolvedManagedDependency managed = findManagedDependency(tag);
                     if (managed != null &&
                             matchesGroup(managed) &&
