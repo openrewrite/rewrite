@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING, cast
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
 from rewrite.java import J
 from .capture import Capture

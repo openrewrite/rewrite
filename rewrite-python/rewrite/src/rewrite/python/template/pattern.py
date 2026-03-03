@@ -16,8 +16,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, overload
+from typing import Dict, List, Optional, Union, TYPE_CHECKING
 
 from rewrite.java import J
 
