@@ -7,7 +7,6 @@
     </picture>
   </a>
 </p>
-test
 
 <div align="center">
 
