@@ -30,6 +30,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -178,92 +179,91 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+        return new JavaVisitor<ExecutionContext>() {
+            @Nullable
+            GradleProject gradleProject;
+
             @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (!(tree instanceof SourceFile)) {
-                    return tree;
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return (sourceFile instanceof G.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle")) ||
+                        (sourceFile instanceof K.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle.kts"));
+            }
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                 }
-                SourceFile sourceFile = (SourceFile) tree;
+                return super.visit(tree, ctx);
+            }
 
-                // Scan build.gradle files for GString/StringTemplate dependencies with version variables
-                if (!(sourceFile instanceof G.CompilationUnit) && !(sourceFile instanceof K.CompilationUnit)) {
-                    return tree;
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (gradleProject == null) {
+                    return m;
                 }
-                Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()) {
-                    return tree;
+
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+                        .groupId(oldGroupId)
+                        .artifactId(oldArtifactId);
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
+                    return m;
                 }
-                GradleProject gradleProject = maybeGp.get();
-                DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
 
-                new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                        GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
-                                .groupId(oldGroupId)
-                                .artifactId(oldArtifactId);
-                        if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
-                            return m;
-                        }
+                List<Expression> depArgs = m.getArguments();
+                Expression firstArg = depArgs.get(0);
 
-                        List<Expression> depArgs = m.getArguments();
-                        Expression firstArg = depArgs.get(0);
-
-                        // Unwrap platform/enforcedPlatform wrappers
-                        if (firstArg instanceof J.MethodInvocation) {
-                            J.MethodInvocation inner = (J.MethodInvocation) firstArg;
-                            if ("platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName())) {
-                                if (!inner.getArguments().isEmpty()) {
-                                    firstArg = inner.getArguments().get(0);
-                                }
-                            }
-                        }
-
-                        if (firstArg instanceof G.GString) {
-                            scanGString((G.GString) firstArg, m, gradleProject, ctx);
-                        } else if (firstArg instanceof K.StringTemplate) {
-                            scanStringTemplate((K.StringTemplate) firstArg, m, gradleProject, ctx);
-                        }
-                        return m;
-                    }
-
-                    private void scanGString(G.GString gstring, J.MethodInvocation m, GradleProject gp, ExecutionContext ctx) {
-                        List<J> strings = gstring.getStrings();
-                        if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
-                            String varName = extractVersionVariableName(strings);
-                            if (varName != null && !StringUtils.isBlank(newVersion)) {
-                                resolveAndRecordVersion(varName, m, gp, ctx);
-                            }
+                // Unwrap platform/enforcedPlatform wrappers
+                if (firstArg instanceof J.MethodInvocation) {
+                    J.MethodInvocation inner = (J.MethodInvocation) firstArg;
+                    if ("platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName())) {
+                        if (!inner.getArguments().isEmpty()) {
+                            firstArg = inner.getArguments().get(0);
                         }
                     }
+                }
 
-                    private void scanStringTemplate(K.StringTemplate template, J.MethodInvocation m, GradleProject gp, ExecutionContext ctx) {
-                        List<J> strings = template.getStrings();
-                        if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
-                            String varName = extractVersionVariableName(strings);
-                            if (varName != null && !StringUtils.isBlank(newVersion)) {
-                                resolveAndRecordVersion(varName, m, gp, ctx);
-                            }
-                        }
-                    }
+                if (firstArg instanceof G.GString) {
+                    scanGString((G.GString) firstArg, m, ctx);
+                } else if (firstArg instanceof K.StringTemplate) {
+                    scanStringTemplate((K.StringTemplate) firstArg, m, ctx);
+                }
+                return m;
+            }
 
-                    private void resolveAndRecordVersion(String varName, J.MethodInvocation m, GradleProject gp, ExecutionContext ctx) {
-                        String resolvedGroupId = !StringUtils.isBlank(newGroupId) ? newGroupId : oldGroupId;
-                        String resolvedArtifactId = !StringUtils.isBlank(newArtifactId) ? newArtifactId : oldArtifactId;
-                        try {
-                            String resolvedVersion = new DependencyVersionSelector(metadataFailures, gp, null)
-                                    .select(new GroupArtifact(resolvedGroupId, resolvedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
-                            if (resolvedVersion != null) {
-                                acc.versionVariableUpdates.put(varName, resolvedVersion);
-                            }
-                        } catch (MavenDownloadingException e) {
-                            acc.versionVariableUpdates.put(varName, e);
-                        }
+            private void scanGString(G.GString gstring, J.MethodInvocation m, ExecutionContext ctx) {
+                List<J> strings = gstring.getStrings();
+                if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+                    String varName = extractVersionVariableName(strings);
+                    if (varName != null && !StringUtils.isBlank(newVersion)) {
+                        resolveAndRecordVersion(varName, m, ctx);
                     }
-                }.visit(tree, ctx);
-                return tree;
+                }
+            }
+
+            private void scanStringTemplate(K.StringTemplate template, J.MethodInvocation m, ExecutionContext ctx) {
+                List<J> strings = template.getStrings();
+                if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+                    String varName = extractVersionVariableName(strings);
+                    if (varName != null && !StringUtils.isBlank(newVersion)) {
+                        resolveAndRecordVersion(varName, m, ctx);
+                    }
+                }
+            }
+
+            private void resolveAndRecordVersion(String varName, J.MethodInvocation m, ExecutionContext ctx) {
+                String resolvedGroupId = !StringUtils.isBlank(newGroupId) ? newGroupId : oldGroupId;
+                String resolvedArtifactId = !StringUtils.isBlank(newArtifactId) ? newArtifactId : oldArtifactId;
+                try {
+                    String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                            .select(new GroupArtifact(resolvedGroupId, resolvedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                    if (resolvedVersion != null) {
+                        acc.versionVariableUpdates.put(varName, resolvedVersion);
+                    }
+                } catch (MavenDownloadingException e) {
+                    acc.versionVariableUpdates.put(varName, e);
+                }
             }
         };
     }
