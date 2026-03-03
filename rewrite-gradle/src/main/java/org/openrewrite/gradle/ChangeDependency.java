@@ -36,6 +36,8 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
@@ -46,7 +48,8 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeDependency extends Recipe {
+public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulator> {
+    private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
 
     // Individual dependencies tend to appear in several places within a given dependency graph.
     // Minimize the number of allocations by caching the updated dependencies.
@@ -159,9 +162,125 @@ public class ChangeDependency extends Recipe {
         ));
     }
 
+    public static class Accumulator {
+        // Property keys found in gradle.properties files
+        Set<String> gradlePropertyKeys = new HashSet<>();
+        // Version variable name → resolved new version (collected from GString/StringTemplate deps)
+        Map<String, String> versionVariableUpdates = new HashMap<>();
+    }
+
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+
+                // Collect property keys from gradle.properties
+                if (sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME) && tree instanceof Properties.File) {
+                    new PropertiesVisitor<ExecutionContext>() {
+                        @Override
+                        public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                            acc.gradlePropertyKeys.add(entry.getKey());
+                            return entry;
+                        }
+                    }.visit(tree, ctx);
+                    return tree;
+                }
+
+                // Scan build.gradle files for GString/StringTemplate dependencies with version variables
+                if (!(sourceFile instanceof G.CompilationUnit) && !(sourceFile instanceof K.CompilationUnit)) {
+                    return tree;
+                }
+                Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGp.isPresent()) {
+                    return tree;
+                }
+                GradleProject gradleProject = maybeGp.get();
+                DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
+
+                new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                        GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+                                .groupId(oldGroupId)
+                                .artifactId(oldArtifactId);
+                        if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
+                            return m;
+                        }
+
+                        List<Expression> depArgs = m.getArguments();
+                        Expression firstArg = depArgs.get(0);
+
+                        // Unwrap platform/enforcedPlatform wrappers
+                        if (firstArg instanceof J.MethodInvocation) {
+                            J.MethodInvocation inner = (J.MethodInvocation) firstArg;
+                            if ("platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName())) {
+                                if (!inner.getArguments().isEmpty()) {
+                                    firstArg = inner.getArguments().get(0);
+                                }
+                            }
+                        }
+
+                        if (firstArg instanceof G.GString) {
+                            scanGString((G.GString) firstArg, m, gradleProject, ctx);
+                        } else if (firstArg instanceof K.StringTemplate) {
+                            scanStringTemplate((K.StringTemplate) firstArg, m, gradleProject, ctx);
+                        }
+                        return m;
+                    }
+
+                    private void scanGString(G.GString gstring, J.MethodInvocation m, GradleProject gp, ExecutionContext ctx) {
+                        List<J> strings = gstring.getStrings();
+                        if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+                            String varName = extractVersionVariableName(strings);
+                            if (varName != null && !StringUtils.isBlank(newVersion)) {
+                                resolveAndRecordVersion(varName, m, gp, ctx);
+                            }
+                        }
+                    }
+
+                    private void scanStringTemplate(K.StringTemplate template, J.MethodInvocation m, GradleProject gp, ExecutionContext ctx) {
+                        List<J> strings = template.getStrings();
+                        if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+                            String varName = extractVersionVariableName(strings);
+                            if (varName != null && !StringUtils.isBlank(newVersion)) {
+                                resolveAndRecordVersion(varName, m, gp, ctx);
+                            }
+                        }
+                    }
+
+                    private void resolveAndRecordVersion(String varName, J.MethodInvocation m, GradleProject gp, ExecutionContext ctx) {
+                        String resolvedGroupId = !StringUtils.isBlank(newGroupId) ? newGroupId : oldGroupId;
+                        String resolvedArtifactId = !StringUtils.isBlank(newArtifactId) ? newArtifactId : oldArtifactId;
+                        try {
+                            String resolvedVersion = new DependencyVersionSelector(metadataFailures, gp, null)
+                                    .select(new GroupArtifact(resolvedGroupId, resolvedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                            if (resolvedVersion != null) {
+                                acc.versionVariableUpdates.put(varName, resolvedVersion);
+                            }
+                        } catch (MavenDownloadingException e) {
+                            // Version resolution failed; will be handled in the visitor
+                        }
+                    }
+                }.visit(tree, ctx);
+                return tree;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        TreeVisitor<?, ExecutionContext> gradleVisitor = Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
             final DependencyMatcher existingMatcher = requireNonNull(DependencyMatcher.build(newGroupId + ":" + newArtifactId + (newVersion == null ? "" : ":" + newVersion)).getValue());
 
@@ -302,23 +421,43 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
-                            if (!StringUtils.isBlank(newVersion)) {
-                                String resolvedVersion;
-                                try {
-                                    resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
-                                } catch (MavenDownloadingException e) {
-                                    return e.warn(m);
+
+                            // Check if the version variable is backed by a gradle property
+                            String varName = extractVersionVariableName(strings);
+                            boolean isGradleProperty = varName != null && acc.gradlePropertyKeys.contains(varName);
+
+                            if (isGradleProperty) {
+                                // Preserve GString structure, only update the group:artifact prefix
+                                if (original != updated) {
+                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                    String oldValue = (String) literal.getValue();
+                                    String updatedValue = oldValue.replace(oldGav, newGav);
+                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                    m = m.withArguments(singletonList(
+                                            gstring.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                    ));
                                 }
-                                if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                    updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
+                            } else {
+                                // No gradle property backing: collapse to literal (existing behavior)
+                                if (!StringUtils.isBlank(newVersion)) {
+                                    String resolvedVersion;
+                                    try {
+                                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                                .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    } catch (MavenDownloadingException e) {
+                                        return e.warn(m);
+                                    }
+                                    if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
+                                        updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
+                                    }
                                 }
-                            }
-                            if (original != updated) {
-                                String replacement = DependencyNotation.toStringNotation(updated);
-                                J.Literal newLiteral = literal.withValue(replacement)
-                                        .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                                m = m.withArguments(singletonList(newLiteral));
+                                if (original != updated) {
+                                    String replacement = DependencyNotation.toStringNotation(updated);
+                                    J.Literal newLiteral = literal.withValue(replacement)
+                                            .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
+                                    m = m.withArguments(singletonList(newLiteral));
+                                }
                             }
                         }
                     }
@@ -595,23 +734,43 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
-                            if (!StringUtils.isBlank(newVersion)) {
-                                String resolvedVersion;
-                                try {
-                                    resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
-                                } catch (MavenDownloadingException e) {
-                                    return e.warn(m);
+
+                            // Check if the version variable is backed by a gradle property
+                            String varName = extractVersionVariableName(strings);
+                            boolean isGradleProperty = varName != null && acc.gradlePropertyKeys.contains(varName);
+
+                            if (isGradleProperty) {
+                                // Preserve StringTemplate structure, only update the group:artifact prefix
+                                if (original != updated) {
+                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                    String oldValue = (String) literal.getValue();
+                                    String updatedValue = oldValue.replace(oldGav, newGav);
+                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                    m = m.withArguments(singletonList(
+                                            template.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                    ));
                                 }
-                                if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                    updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
+                            } else {
+                                // No gradle property backing: collapse to literal (existing behavior)
+                                if (!StringUtils.isBlank(newVersion)) {
+                                    String resolvedVersion;
+                                    try {
+                                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                                .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    } catch (MavenDownloadingException e) {
+                                        return e.warn(m);
+                                    }
+                                    if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
+                                        updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
+                                    }
                                 }
-                            }
-                            if (original != updated) {
-                                String replacement = DependencyNotation.toStringNotation(updated);
-                                J.Literal newLiteral = literal.withValue(replacement)
-                                        .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                                m = m.withArguments(singletonList(newLiteral));
+                                if (original != updated) {
+                                    String replacement = DependencyNotation.toStringNotation(updated);
+                                    J.Literal newLiteral = literal.withValue(replacement)
+                                            .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
+                                    m = m.withArguments(singletonList(newLiteral));
+                                }
                             }
                         }
                     }
@@ -694,5 +853,50 @@ public class ChangeDependency extends Recipe {
                 return gp;
             }
         });
+
+        // Composite visitor: dispatches to gradle visitor for build files, properties visitor for gradle.properties
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Properties.File) {
+                    Properties.File propsFile = (Properties.File) tree;
+                    if (propsFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME) && !acc.versionVariableUpdates.isEmpty()) {
+                        return new PropertiesVisitor<ExecutionContext>() {
+                            @Override
+                            public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                                String resolvedVersion = acc.versionVariableUpdates.get(entry.getKey());
+                                if (resolvedVersion != null && !resolvedVersion.equals(entry.getValue().getText())) {
+                                    return entry.withValue(entry.getValue().withText(resolvedVersion));
+                                }
+                                return entry;
+                            }
+                        }.visitNonNull(tree, ctx);
+                    }
+                    return tree;
+                }
+                return gradleVisitor.visit(tree, ctx);
+            }
+        };
+    }
+
+    private static @Nullable String extractVersionVariableName(List<J> strings) {
+        if (strings.size() >= 2) {
+            J versionPart = strings.get(strings.size() - 1);
+            // Groovy GString: the value wraps a J.Identifier
+            if (versionPart instanceof G.GString.Value) {
+                J inner = ((G.GString.Value) versionPart).getTree();
+                if (inner instanceof J.Identifier) {
+                    return ((J.Identifier) inner).getSimpleName();
+                }
+            }
+            // Kotlin StringTemplate: the expression wraps a J.Identifier
+            if (versionPart instanceof K.StringTemplate.Expression) {
+                J inner = ((K.StringTemplate.Expression) versionPart).getTree();
+                if (inner instanceof J.Identifier) {
+                    return ((J.Identifier) inner).getSimpleName();
+                }
+            }
+        }
+        return null;
     }
 }
