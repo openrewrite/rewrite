@@ -397,7 +397,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         return new JavaVisitor<AtomicReference<@Nullable String>>() {
             @Override
             public J visitLiteral(J.Literal literal, AtomicReference<@Nullable String> value) {
-                if (literal.getType() == JavaType.Primitive.String) {
+                if (literal.getType() == JavaType.Primitive.String && literal.getValue() instanceof String) {
                     value.compareAndSet(null, (String) literal.getValue());
                 }
                 return literal;
