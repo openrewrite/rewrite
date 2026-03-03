@@ -42,7 +42,7 @@ class Template:
 
         # Template with capture from pattern match
         expr = capture('expr')
-        tmpl = template("print({expr})", expr=expr)
+        tmpl = template(f"print({expr})")
         result = tmpl.apply(cursor, values=match_result)
 
         # Template with imports
@@ -314,9 +314,17 @@ def template(
         # Simple template
         tmpl = template("x + 1")
 
-        # Template with captures
+        # Template with captures (explicit kwargs)
         expr = capture('expr')
         tmpl = template("print({expr})", expr=expr)
+
+        # With f-string (Python 3.6+, no name duplication)
+        expr = capture('expr')
+        tmpl = template(f"print({expr})")
+
+        # Unnamed capture with f-string
+        expr = capture()
+        tmpl = template(f"print({expr})")
 
         # With t-string (Python 3.14+)
         expr = capture('expr')
@@ -329,6 +337,7 @@ def template(
         )
     """
     from ._tstring_support import is_tstring, convert_tstring
+    from ._fstring_support import collect_captures, clear_registry
 
     if is_tstring(code):
         if captures:
@@ -337,6 +346,13 @@ def template(
                 "interpolate Capture objects directly in the t-string instead"
             )
         code, captures = convert_tstring(code)
+        clear_registry()
+    elif captures:
+        clear_registry()
+    else:
+        auto = collect_captures(code)
+        if auto:
+            captures = auto
 
     return Template(
         code=code,

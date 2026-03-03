@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 T = TypeVar('T')
 
+_capture_counter = 0
+
 
 @dataclass(frozen=True)
 class Capture(Generic[T]):
@@ -69,9 +71,25 @@ class Capture(Generic[T]):
             self.type_hint == other.type_hint
         )
 
+    def __format__(self, format_spec: str) -> str:
+        """Format as ``{name}`` placeholder and register for f-string capture.
+
+        When used inside an f-string like ``f"print({expr})"``, this returns
+        the literal text ``{expr}`` (with braces) so the resulting string is a
+        valid template code string, and registers the capture so that
+        ``template()`` / ``pattern()`` can pick it up automatically.
+        """
+        if format_spec:
+            raise ValueError(
+                f"Capture does not support format specs, got {format_spec!r}"
+            )
+        from ._fstring_support import register_capture
+        register_capture(self)
+        return '{' + self.name + '}'
+
 
 def capture(
-    name: str,
+    name: Optional[str] = None,
     *,
     variadic: bool = False,
     min_count: Optional[int] = None,
@@ -83,7 +101,7 @@ def capture(
     Create a capture specification for use in patterns and templates.
 
     Args:
-        name: Name for the capture. Used to reference matched values.
+        name: Name for the capture (auto-generated if not provided).
         variadic: If True, matches zero or more elements (for argument lists, etc.).
         min_count: Minimum elements for variadic captures.
         max_count: Maximum elements for variadic captures.
@@ -97,6 +115,9 @@ def capture(
         # Named capture
         x = capture('x')
 
+        # Unnamed capture (name auto-generated)
+        expr = capture()
+
         # Variadic capture for function arguments
         args = capture('args', variadic=True)
 
@@ -106,6 +127,10 @@ def capture(
         # Typed capture
         typed = capture('expr', type_hint='int')
     """
+    if name is None:
+        global _capture_counter
+        _capture_counter += 1
+        name = f'_capture_{_capture_counter}'
     return Capture(
         name=name,
         variadic=variadic,
@@ -136,6 +161,19 @@ class RawCode:
     """
 
     code: str
+
+    def __format__(self, format_spec: str) -> str:
+        """Format by splicing the raw code directly.
+
+        When used inside an f-string like ``f"logger.{raw('warn')}(msg)"``,
+        this returns the raw code string so it is spliced into the template
+        code at construction time.
+        """
+        if format_spec:
+            raise ValueError(
+                f"RawCode does not support format specs, got {format_spec!r}"
+            )
+        return self.code
 
 
 def raw(code: str) -> RawCode:

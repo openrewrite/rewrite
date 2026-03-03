@@ -26,10 +26,10 @@ Examples:
     expr = capture('expr')
 
     # Create a pattern to match print() calls
-    pat = pattern("print({expr})", expr=expr)
+    pat = pattern(f"print({expr})")
 
     # Create a template to generate logging calls
-    tmpl = template("logging.info({expr})", expr=expr)
+    tmpl = template(f"logging.info({expr})")
 
     # In a visitor
     class MyVisitor(PythonVisitor):

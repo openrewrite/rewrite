@@ -127,7 +127,7 @@ class Pattern:
     Examples:
         # Pattern with named capture
         x = capture('x')
-        pat = pattern("print({x})", x=x)
+        pat = pattern(f"print({x})")
 
         # Match against a node
         match = pat.match(node, cursor)
@@ -136,7 +136,7 @@ class Pattern:
 
         # Pattern with multiple captures
         a, b = capture('a'), capture('b')
-        pat = pattern("{a} + {b}", a=a, b=b)
+        pat = pattern(f"{a} + {b}")
     """
 
     def __init__(
@@ -258,9 +258,13 @@ def pattern(
         A Pattern instance.
 
     Examples:
-        # Pattern with capture
+        # Pattern with capture (explicit kwargs)
         x = capture('x')
         pat = pattern("print({x})", x=x)
+
+        # With f-string (Python 3.6+, no name duplication)
+        x = capture('x')
+        pat = pattern(f"print({x})")
 
         # With t-string (Python 3.14+)
         x = capture('x')
@@ -268,13 +272,14 @@ def pattern(
 
         # Pattern with multiple captures
         a, b = capture('a'), capture('b')
-        pat = pattern("{a} + {b}", a=a, b=b)
+        pat = pattern(f"{a} + {b}")
 
         # Variadic pattern (matches multiple arguments)
         args = capture('args', variadic=True)
-        pat = pattern("func({args})", args=args)
+        pat = pattern(f"func({args})")
     """
     from rewrite.python.template._tstring_support import is_tstring, convert_tstring
+    from rewrite.python.template._fstring_support import collect_captures, clear_registry
 
     if is_tstring(code):
         if captures:
@@ -283,6 +288,13 @@ def pattern(
                 "interpolate Capture objects directly in the t-string instead"
             )
         code, captures = convert_tstring(code)
+        clear_registry()
+    elif captures:
+        clear_registry()
+    else:
+        auto = collect_captures(code)
+        if auto:
+            captures = auto
 
     return Pattern(
         code=code,
