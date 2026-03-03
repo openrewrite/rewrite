@@ -24,6 +24,7 @@ Architecture (3-layer):
 from __future__ import annotations
 
 import dataclasses
+import functools
 from typing import Dict, Optional, TYPE_CHECKING, cast
 
 from rewrite.java import J, JavaType, JContainer, JLeftPadded, JRightPadded, Space
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
 # ──────────────────────────────────────────────────────────────────────────────
 
 _SKIP_FIELDS = frozenset({'_id', '_prefix', '_markers', '_padding'})
+_get_dataclass_fields = functools.lru_cache(maxsize=None)(dataclasses.fields)
 
 
 class PythonComparatorVisitor:
@@ -128,7 +130,7 @@ class PythonComparatorVisitor:
     def _compare_fields(self, pattern, target, cursor: Cursor) -> bool:
         if not dataclasses.is_dataclass(pattern):
             return pattern == target
-        for f in dataclasses.fields(pattern):
+        for f in _get_dataclass_fields(type(pattern)):
             if f.name in _SKIP_FIELDS:
                 continue
             p_val = getattr(pattern, f.name)
@@ -182,17 +184,17 @@ class PythonComparatorVisitor:
         field_name: str,
         cursor: Cursor,
     ) -> bool:
-        p_elements = p_container.elements
-        t_elements = t_container.elements
-        if len(p_elements) != len(t_elements):
+        p_padded = p_container._elements
+        t_padded = t_container._elements
+        if len(p_padded) != len(t_padded):
             if self._debug:
                 print(
                     f"Container size mismatch for '{field_name}': "
-                    f"{len(p_elements)} vs {len(t_elements)}"
+                    f"{len(p_padded)} vs {len(t_padded)}"
                 )
             return False
-        for p_elem, t_elem in zip(p_elements, t_elements):
-            if not self._compare(p_elem, t_elem, cursor):
+        for p_rp, t_rp in zip(p_padded, t_padded):
+            if not self._compare(p_rp.element, t_rp.element, cursor):
                 return False
         return True
 
@@ -435,15 +437,14 @@ class PatternMatchingComparator(PythonSemanticComparator):
     # -- dispatch override (capture check first) ------------------------------
 
     def _compare(self, pattern, target, cursor: Cursor) -> bool:
-        if pattern is None and target is None:
-            return True
-        if pattern is None or target is None:
-            return False
-
         # Check for capture placeholder BEFORE structural comparison
-        if isinstance(pattern, j.Identifier):
+        if pattern is not None and isinstance(pattern, j.Identifier):
             capture_name = from_placeholder(pattern.simple_name)
             if capture_name is not None:
+                if target is None:
+                    if self._debug:
+                        print(f"Capture '{capture_name}' matched against None target")
+                    return False
                 return self._capture_node(capture_name, target)
 
         return super()._compare(pattern, target, cursor)
@@ -490,30 +491,30 @@ class PatternMatchingComparator(PythonSemanticComparator):
         if pattern_args is None or target_args is None:
             return False
 
-        pattern_elements = pattern_args.elements
-        target_elements = target_args.elements
+        p_padded = pattern_args._elements
+        t_padded = target_args._elements
 
         # Check for variadic capture
-        if len(pattern_elements) == 1:
-            pattern_arg = pattern_elements[0]
+        if len(p_padded) == 1:
+            pattern_arg = p_padded[0].element
             if isinstance(pattern_arg, j.Identifier):
                 cap_name = from_placeholder(pattern_arg.simple_name)
-                if cap_name and self._captures.get(
-                    cap_name, Capture(name=cap_name)
-                ).variadic:
-                    return True
+                if cap_name:
+                    cap = self._captures.get(cap_name)
+                    if cap is not None and cap.variadic:
+                        return True
 
         # Non-variadic: must have same number of arguments
-        if len(pattern_elements) != len(target_elements):
+        if len(p_padded) != len(t_padded):
             if self._debug:
                 print(
                     f"Argument count mismatch: "
-                    f"{len(pattern_elements)} vs {len(target_elements)}"
+                    f"{len(p_padded)} vs {len(t_padded)}"
                 )
             return False
 
-        for p_elem, t_elem in zip(pattern_elements, target_elements):
-            if not self._compare(p_elem, t_elem, cursor):
+        for p_rp, t_rp in zip(p_padded, t_padded):
+            if not self._compare(p_rp.element, t_rp.element, cursor):
                 return False
 
         return True
