@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from typing import Callable, Optional, TypeVar, Generic, TYPE_CHECKING
 
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 
 T = TypeVar('T')
 
-_capture_counter = 0
+_capture_counter = itertools.count(1)
 
 
 @dataclass(frozen=True)
@@ -128,9 +129,7 @@ def capture(
         typed = capture('expr', type_hint='int')
     """
     if name is None:
-        global _capture_counter
-        _capture_counter += 1
-        name = f'_capture_{_capture_counter}'
+        name = f'_capture_{next(_capture_counter)}'
     return Capture(
         name=name,
         variadic=variadic,

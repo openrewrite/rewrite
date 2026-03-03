@@ -22,7 +22,7 @@ evaluations.
 from __future__ import annotations
 
 import contextvars
-from typing import TYPE_CHECKING, Dict
+from typing import Any, TYPE_CHECKING, Dict, Tuple
 
 if TYPE_CHECKING:
     from .capture import Capture
@@ -40,7 +40,11 @@ def register_capture(cap: 'Capture') -> None:
 
 
 def collect_captures(code: str) -> Dict[str, 'Capture']:
-    """Collect registered captures whose ``{name}`` appears in *code*, then clear the registry."""
+    """Collect registered captures whose ``{name}`` appears in *code*, then clear the registry.
+
+    All entries are cleared afterward, including non-matching ones, to prevent
+    stale captures from leaking into subsequent ``template()``/``pattern()`` calls.
+    """
     registry = _pending.get(None)
     if not registry:
         return {}
@@ -54,3 +58,32 @@ def clear_registry() -> None:
     registry = _pending.get(None)
     if registry:
         registry.clear()
+
+
+def resolve_captures(code: Any, captures: Dict[str, 'Capture']) -> Tuple[str, Dict[str, 'Capture']]:
+    """Resolve captures from t-string, f-string auto-registration, or explicit kwargs.
+
+    Shared by ``template()`` and ``pattern()`` to avoid duplicating the
+    dispatch logic.
+
+    Returns:
+        A ``(code, captures)`` tuple ready to pass to Template/Pattern.
+    """
+    from ._tstring_support import is_tstring, convert_tstring
+
+    if is_tstring(code):
+        if captures:
+            raise TypeError(
+                "Cannot pass keyword captures when using a t-string; "
+                "interpolate Capture objects directly in the t-string instead"
+            )
+        code, captures = convert_tstring(code)
+        clear_registry()
+    elif captures:
+        clear_registry()
+    else:
+        auto = collect_captures(code)
+        if auto:
+            captures = auto
+
+    return code, captures

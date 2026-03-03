@@ -336,23 +336,8 @@ def template(
             imports=["from datetime import datetime"]
         )
     """
-    from ._tstring_support import is_tstring, convert_tstring
-    from ._fstring_support import collect_captures, clear_registry
-
-    if is_tstring(code):
-        if captures:
-            raise TypeError(
-                "Cannot pass keyword captures when using a t-string; "
-                "interpolate Capture objects directly in the t-string instead"
-            )
-        code, captures = convert_tstring(code)
-        clear_registry()
-    elif captures:
-        clear_registry()
-    else:
-        auto = collect_captures(code)
-        if auto:
-            captures = auto
+    from ._fstring_support import resolve_captures
+    code, captures = resolve_captures(code, captures)
 
     return Template(
         code=code,

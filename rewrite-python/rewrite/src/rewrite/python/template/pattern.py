@@ -278,23 +278,8 @@ def pattern(
         args = capture('args', variadic=True)
         pat = pattern(f"func({args})")
     """
-    from rewrite.python.template._tstring_support import is_tstring, convert_tstring
-    from rewrite.python.template._fstring_support import collect_captures, clear_registry
-
-    if is_tstring(code):
-        if captures:
-            raise TypeError(
-                "Cannot pass keyword captures when using a t-string; "
-                "interpolate Capture objects directly in the t-string instead"
-            )
-        code, captures = convert_tstring(code)
-        clear_registry()
-    elif captures:
-        clear_registry()
-    else:
-        auto = collect_captures(code)
-        if auto:
-            captures = auto
+    from ._fstring_support import resolve_captures
+    code, captures = resolve_captures(code, captures)
 
     return Pattern(
         code=code,

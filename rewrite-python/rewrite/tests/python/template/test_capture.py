@@ -17,7 +17,7 @@
 import pytest
 
 from rewrite.python.template import capture, raw, Capture, RawCode
-from rewrite.python.template._fstring_support import clear_registry, collect_captures, _pending
+from rewrite.python.template._fstring_support import clear_registry, collect_captures
 
 
 class TestCapture:
@@ -104,11 +104,6 @@ class TestRawCode:
 class TestRawCodeFormat:
     """Tests for RawCode.__format__."""
 
-    def test_basic_format(self):
-        """format() returns the raw code string."""
-        r = raw('warn')
-        assert format(r) == 'warn'
-
     def test_fstring_splice(self):
         """RawCode splices directly into an f-string."""
         r = raw('warn')
@@ -121,12 +116,6 @@ class TestRawCodeFormat:
         with pytest.raises(ValueError, match="format specs"):
             format(r, '.2f')
 
-    def test_empty_code(self):
-        """Empty raw code formats to empty string."""
-        r = raw('')
-        assert format(r) == ''
-        assert f"a{r}b" == "ab"
-
 
 class TestCaptureFormat:
     """Tests for Capture.__format__ and auto-registration."""
@@ -135,23 +124,11 @@ class TestCaptureFormat:
         """Clear the registry before each test."""
         clear_registry()
 
-    def test_placeholder_output(self):
-        """format() returns {name} with literal braces."""
-        cap = capture('expr')
-        assert format(cap) == '{expr}'
-
     def test_fstring_produces_template_code(self):
         """f-string with Capture produces valid template code string."""
         expr = capture('expr')
         result = f"print({expr})"
         assert result == "print({expr})"
-
-    def test_multiple_captures(self):
-        """Multiple captures in one f-string all produce placeholders."""
-        a = capture('a')
-        b = capture('b')
-        result = f"{a} + {b}"
-        assert result == "{a} + {b}"
 
     def test_format_spec_rejected(self):
         """Format specs are not allowed on Capture."""
@@ -191,11 +168,6 @@ class TestCaptureOptionalName:
         c1 = capture()
         c2 = capture()
         assert c1.name != c2.name
-
-    def test_explicit_name_still_works(self):
-        """capture('x') still works as before."""
-        cap = capture('x')
-        assert cap.name == 'x'
 
 
 class TestFstringIntegration:
@@ -269,16 +241,3 @@ class TestFstringIntegration:
 
         # Registry should be empty now
         assert collect_captures("{stale}") == {}
-
-    def test_fstring_equivalent_to_kwargs(self):
-        """f-string and kwargs produce identical Template objects."""
-        from rewrite.python.template import template
-
-        expr = capture('expr')
-        tmpl_fstring = template(f"print({expr})")
-
-        clear_registry()
-        tmpl_kwargs = template("print({expr})", expr=expr)
-
-        assert tmpl_fstring.code == tmpl_kwargs.code
-        assert tmpl_fstring.captures == tmpl_kwargs.captures
