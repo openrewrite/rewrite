@@ -1022,4 +1022,43 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void sharedKotlinDslStringTemplateVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("commons-lang:commons-lang:${version}")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """
+          )
+        );
+    }
 }
