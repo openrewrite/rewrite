@@ -21,7 +21,7 @@ import os
 import textwrap
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
@@ -136,7 +136,7 @@ class TemplateEngine:
     def apply_substitutions(
         cls,
         template_tree: J,
-        values: Dict[str, J],
+        values: Dict[str, 'Union[J, list]'],
     ) -> Optional[J]:
         """
         Substitute placeholder identifiers with actual values.
@@ -144,6 +144,7 @@ class TemplateEngine:
         Args:
             template_tree: The parsed template AST.
             values: Dict mapping capture names to their AST values.
+                Variadic captures map to List[J].
 
         Returns:
             The template with placeholders replaced by actual values.

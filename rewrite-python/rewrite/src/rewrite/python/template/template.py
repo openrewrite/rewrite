@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING, cast
+from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING, cast
 
 from rewrite.java import J
 from .capture import Capture
@@ -110,7 +110,7 @@ class Template:
         self,
         cursor: 'Cursor',
         *,
-        values: Optional[Union['MatchResult', Dict[str, J]]] = None,
+        values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
     ) -> Optional[J]:
         """
@@ -138,10 +138,10 @@ class Template:
         template_tree = self.get_tree()
 
         # Convert MatchResult to dict if needed
-        values_dict: Dict[str, J] = {}
+        values_dict: Dict[str, Union[J, List[J]]] = {}
         if values is not None:
             if isinstance(values, dict):
-                values_dict = cast(Dict[str, J], values)
+                values_dict = values
             else:
                 # Assume it's a MatchResult
                 values_dict = values.as_dict()
