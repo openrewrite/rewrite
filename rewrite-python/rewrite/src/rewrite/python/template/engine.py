@@ -146,7 +146,7 @@ class TemplateEngine:
         """Generate a cache key from template components."""
         capture_names = ",".join(sorted(captures.keys()))
         imports_key = ",".join(sorted(options.imports))
-        context_key = ",".join(sorted(options.context))
+        context_key = ",".join(options.context)  # preserve order: context is order-dependent
         deps_key = ",".join(
             f"{pkg}=={ver}" for pkg, ver in sorted(options.dependencies)
         )
@@ -245,8 +245,13 @@ class TemplateEngine:
             visitor = ParserVisitor(code, file_path=tmp_file, ty_client=ty_client)
             return visitor.visit(tree)
         finally:
-            if tmp_file and os.path.exists(tmp_file):
-                os.unlink(tmp_file)
+            if ty_client is not None:
+                ty_client.shutdown()
+            if tmp_file:
+                try:
+                    os.unlink(tmp_file)
+                except OSError:
+                    pass
 
     @classmethod
     def _extract_from_wrapper(cls, cu: 'CompilationUnit', is_expression: bool) -> J:
