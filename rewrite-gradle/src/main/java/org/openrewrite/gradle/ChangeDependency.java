@@ -163,8 +163,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     }
 
     public static class Accumulator {
-        // Property keys found in gradle.properties files
-        Set<String> gradlePropertyKeys = new HashSet<>();
         // Version variable name → resolved new version (collected from GString/StringTemplate deps)
         Map<String, String> versionVariableUpdates = new HashMap<>();
     }
@@ -183,18 +181,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-
-                // Collect property keys from gradle.properties
-                if (sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME) && tree instanceof Properties.File) {
-                    new PropertiesVisitor<ExecutionContext>() {
-                        @Override
-                        public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                            acc.gradlePropertyKeys.add(entry.getKey());
-                            return entry;
-                        }
-                    }.visit(tree, ctx);
-                    return tree;
-                }
 
                 // Scan build.gradle files for GString/StringTemplate dependencies with version variables
                 if (!(sourceFile instanceof G.CompilationUnit) && !(sourceFile instanceof K.CompilationUnit)) {
@@ -373,6 +359,19 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 return m;
             }
 
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+                String resolvedVersion = acc.versionVariableUpdates.get(v.getSimpleName());
+                if (resolvedVersion != null && v.getInitializer() instanceof J.Literal) {
+                    J.Literal initializer = (J.Literal) v.getInitializer();
+                    if (initializer.getValue() instanceof String && !resolvedVersion.equals(initializer.getValue())) {
+                        v = v.withInitializer(ChangeStringLiteral.withStringValue(initializer, resolvedVersion));
+                    }
+                }
+                return v;
+            }
+
             private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal) {
@@ -422,42 +421,17 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
 
-                            // Check if the version variable is backed by a gradle property
-                            String varName = extractVersionVariableName(strings);
-                            boolean isGradleProperty = varName != null && acc.gradlePropertyKeys.contains(varName);
-
-                            if (isGradleProperty) {
-                                // Preserve GString structure, only update the group:artifact prefix
-                                if (original != updated) {
-                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
-                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
-                                    String oldValue = (String) literal.getValue();
-                                    String updatedValue = oldValue.replace(oldGav, newGav);
-                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
-                                    m = m.withArguments(singletonList(
-                                            gstring.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
-                                    ));
-                                }
-                            } else {
-                                // No gradle property backing: collapse to literal (existing behavior)
-                                if (!StringUtils.isBlank(newVersion)) {
-                                    String resolvedVersion;
-                                    try {
-                                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                                .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
-                                    } catch (MavenDownloadingException e) {
-                                        return e.warn(m);
-                                    }
-                                    if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                        updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
-                                    }
-                                }
-                                if (original != updated) {
-                                    String replacement = DependencyNotation.toStringNotation(updated);
-                                    J.Literal newLiteral = literal.withValue(replacement)
-                                            .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
-                                    m = m.withArguments(singletonList(newLiteral));
-                                }
+                            // Preserve GString structure, only update the group:artifact prefix
+                            // Version variable updates are handled separately (gradle.properties or local variable declarations)
+                            if (original != updated) {
+                                String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                String oldValue = (String) literal.getValue();
+                                String updatedValue = oldValue.replace(oldGav, newGav);
+                                J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                m = m.withArguments(singletonList(
+                                        gstring.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                ));
                             }
                         }
                     }
@@ -735,42 +709,17 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                 updated = updated.withGav(updated.getGav().withArtifactId(newArtifactId));
                             }
 
-                            // Check if the version variable is backed by a gradle property
-                            String varName = extractVersionVariableName(strings);
-                            boolean isGradleProperty = varName != null && acc.gradlePropertyKeys.contains(varName);
-
-                            if (isGradleProperty) {
-                                // Preserve StringTemplate structure, only update the group:artifact prefix
-                                if (original != updated) {
-                                    String oldGav = original.getGroupId() + ":" + original.getArtifactId();
-                                    String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
-                                    String oldValue = (String) literal.getValue();
-                                    String updatedValue = oldValue.replace(oldGav, newGav);
-                                    J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
-                                    m = m.withArguments(singletonList(
-                                            template.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
-                                    ));
-                                }
-                            } else {
-                                // No gradle property backing: collapse to literal (existing behavior)
-                                if (!StringUtils.isBlank(newVersion)) {
-                                    String resolvedVersion;
-                                    try {
-                                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                                .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
-                                    } catch (MavenDownloadingException e) {
-                                        return e.warn(m);
-                                    }
-                                    if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
-                                        updated = updated.withGav(updated.getGav().withVersion(resolvedVersion));
-                                    }
-                                }
-                                if (original != updated) {
-                                    String replacement = DependencyNotation.toStringNotation(updated);
-                                    J.Literal newLiteral = literal.withValue(replacement)
-                                            .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
-                                    m = m.withArguments(singletonList(newLiteral));
-                                }
+                            // Preserve StringTemplate structure, only update the group:artifact prefix
+                            // Version variable updates are handled separately (gradle.properties or local variable declarations)
+                            if (original != updated) {
+                                String oldGav = original.getGroupId() + ":" + original.getArtifactId();
+                                String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
+                                String oldValue = (String) literal.getValue();
+                                String updatedValue = oldValue.replace(oldGav, newGav);
+                                J.Literal updatedLiteral = literal.withValue(updatedValue).withValueSource(updatedValue);
+                                m = m.withArguments(singletonList(
+                                        template.withStrings(ListUtils.mapFirst(strings, s -> updatedLiteral))
+                                ));
                             }
                         }
                     }

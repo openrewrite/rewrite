@@ -263,9 +263,9 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def version = '2.6'
+              def version = '3.11'
               dependencies {
-                  implementation platform("org.apache.commons:commons-lang3:3.11")
+                  implementation platform("org.apache.commons:commons-lang3:${version}")
               }
               """
           )
@@ -664,8 +664,8 @@ class ChangeDependencyTest implements RewriteTest {
               }
 
               dependencies {
-                  val commonsLangVersion = "2.6"
-                  implementation("org.apache.commons:commons-lang3:3.11")
+                  val commonsLangVersion = "3.11"
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
