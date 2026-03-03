@@ -377,3 +377,75 @@ class TestBlockStatementPlaceholder:
         assert isinstance(stmts[0], j.Return), (
             f"Expected Return in block, got {type(stmts[0]).__name__}"
         )
+
+
+class TestVariadicExpansion:
+    """Tests for variadic capture expansion in method arguments."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_splice_multiple_args(self):
+        """func({args}) with args=[a, b, c] should produce func(a, b, c)."""
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree("func({args})", {'args': args_cap})
+        visitor = PlaceholderReplacementVisitor({
+            'args': [_ident('a'), _ident('b'), _ident('c')],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        assert len(args) == 3
+        assert args[0].simple_name == 'a'
+        assert args[1].simple_name == 'b'
+        assert args[2].simple_name == 'c'
+
+    def test_splice_single_arg(self):
+        """func({args}) with args=[x] should produce func(x)."""
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree("func({args})", {'args': args_cap})
+        visitor = PlaceholderReplacementVisitor({
+            'args': [_ident('x')],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        assert len(args) == 1
+        assert args[0].simple_name == 'x'
+
+    def test_splice_empty_args(self):
+        """func({args}) with args=[] should produce func()."""
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree("func({args})", {'args': args_cap})
+        visitor = PlaceholderReplacementVisitor({
+            'args': [],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        # Should be empty (or just the Empty sentinel)
+        non_empty = [a for a in args if not isinstance(a, j.Empty)]
+        assert len(non_empty) == 0
+
+    def test_splice_mixed_with_scalar(self):
+        """func({x}, {args}) with x=val, args=[a, b] should produce func(val, a, b)."""
+        x_cap = capture('x')
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree(
+            "func({x}, {args})", {'x': x_cap, 'args': args_cap}
+        )
+        visitor = PlaceholderReplacementVisitor({
+            'x': _ident('val'),
+            'args': [_ident('a'), _ident('b')],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        assert len(args) == 3
+        assert args[0].simple_name == 'val'
+        assert args[1].simple_name == 'a'
+        assert args[2].simple_name == 'b'
