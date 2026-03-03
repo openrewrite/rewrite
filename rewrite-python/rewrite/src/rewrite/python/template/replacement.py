@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Union, TYPE_CHECKING
 from uuid import uuid4
 
 from rewrite.java import J, Expression
@@ -157,12 +157,13 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
     to preserve semantics.
     """
 
-    def __init__(self, values: Dict[str, J]):
+    def __init__(self, values: Dict[str, Union[J, List[J]]]):
         """
         Initialize the replacement visitor.
 
         Args:
             values: Dict mapping capture names to their AST values.
+                Variadic captures map to List[J].
         """
         super().__init__()
         self._values = values
@@ -315,7 +316,23 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
         if padded_args is not None:
             new_padded = []
             for rp in padded_args.padding.elements:
-                new_elem = self.visit(rp.element, p)
+                elem = rp.element
+                # Check if this argument is a variadic placeholder
+                if isinstance(elem, j.Identifier):
+                    cap_name = from_placeholder(elem.simple_name)
+                    if cap_name is not None and cap_name in self._values:
+                        value = self._values[cap_name]
+                        if isinstance(value, list):
+                            # Splice the list into the argument positions
+                            for i, item in enumerate(value):
+                                prefix = elem.prefix if i == 0 else j.Space([], ' ')
+                                spliced = item.replace(prefix=prefix) if hasattr(item, 'prefix') else item
+                                new_padded.append(JRightPadded(
+                                    spliced, j.Space([], ''), j.Markers.EMPTY,
+                                ))
+                            continue
+                # Scalar replacement (or non-placeholder) — visit normally
+                new_elem = self.visit(elem, p)
                 if new_elem is not None:
                     new_padded.append(rp.replace(element=new_elem))
             method = method.padding.replace(
@@ -325,34 +342,3 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
             )
 
         return method
-
-
-class VariadicExpansionVisitor(PythonVisitor[None]):
-    """
-    Visitor that expands variadic captures in containers.
-
-    When a variadic capture matches multiple elements (like function arguments),
-    this visitor handles expanding them into the appropriate container structure.
-    """
-
-    def __init__(
-        self,
-        values: Dict[str, J],
-        variadic_values: Dict[str, List[J]]
-    ):
-        """
-        Initialize the expansion visitor.
-
-        Args:
-            values: Dict mapping capture names to single AST values.
-            variadic_values: Dict mapping capture names to lists of AST values.
-        """
-        super().__init__()
-        self._values = values
-        self._variadic_values = variadic_values
-
-    # TODO: Implement variadic expansion for:
-    # - Function arguments
-    # - List/tuple/set elements
-    # - Dict key-value pairs
-    # - Block statements

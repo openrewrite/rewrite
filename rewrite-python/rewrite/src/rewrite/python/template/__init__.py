@@ -42,6 +42,7 @@ Examples:
 
 from .capture import Capture, capture, RawCode, raw
 from .coordinates import PythonCoordinates, CoordinateMode, CoordinateLocation
+from .dependency_workspace import DependencyWorkspace
 from .pattern import Pattern, MatchResult, pattern
 from .template import Template, TemplateBuilder, template
 from .engine import TemplateEngine, TemplateOptions
@@ -57,6 +58,9 @@ __all__ = [
     "PythonCoordinates",
     "CoordinateMode",
     "CoordinateLocation",
+
+    # Dependency workspace
+    "DependencyWorkspace",
 
     # Pattern
     "Pattern",

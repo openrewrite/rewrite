@@ -14,6 +14,7 @@
 
 """Tests for Template class."""
 
+import shutil
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -28,7 +29,7 @@ from rewrite.python.template import template, capture, pattern, Template, Templa
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.python.template.replacement import maybe_parenthesize
 from rewrite.python.visitor import PythonVisitor
-from rewrite.test import RecipeSpec, python
+from rewrite.test import RecipeSpec, python, pyproject, uv
 from rewrite.visitor import Cursor
 
 
@@ -622,5 +623,180 @@ class TestTemplateApplyPrecedenceInContext:
             python(
                 "if not (x and y) and z:\n    pass",
                 "if (not x or not y) and z:\n    pass",
+            )
+        )
+
+
+class TestTemplateFactoryOptions:
+    """Tests for context/dependencies keyword arguments on template() and TemplateBuilder."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_template_factory_with_context(self):
+        """template() factory accepts context parameter."""
+        tmpl = template("x + 1", context=["MyType = int"])
+        assert tmpl._options.context == ("MyType = int",)
+
+    def test_template_factory_with_dependencies(self):
+        """template() factory accepts dependencies parameter."""
+        tmpl = template("x", dependencies={"flask": "3.0.0"})
+        assert tmpl._options.dependencies == (("flask", "3.0.0"),)
+
+    def test_builder_with_context(self):
+        """TemplateBuilder supports .context() method."""
+        tmpl = (Template.builder()
+            .code("x + 1")
+            .context("MyType = int")
+            .build())
+        assert tmpl._options.context == ("MyType = int",)
+
+    def test_builder_with_dependencies(self):
+        """TemplateBuilder supports .dependencies() method."""
+        tmpl = (Template.builder()
+            .code("x")
+            .dependencies({"requests": "2.31.0"})
+            .build())
+        assert tmpl._options.dependencies == (("requests", "2.31.0"),)
+
+
+@pytest.mark.skipif(not shutil.which("uv"), reason="uv not installed")
+class TestTypeAttributedPatternMatching:
+    """Integration tests for pattern matching with type attribution.
+
+    These tests verify that uv() + pyproject() + pattern(dependencies=...)
+    produce type-attributed ASTs that the 3-layer comparator can use for
+    FQN-based semantic matching.
+    """
+
+    def test_fqn_match_different_import_styles(self):
+        """Pattern matches code that uses a different import style via FQN.
+
+        Code uses ``from six import ensure_str; ensure_str(x)`` (bare name).
+        Pattern uses ``six.ensure_str({val})`` (qualified name).
+        Without type attribution, these would NOT structurally match because
+        the select (None vs Identifier("six")) differs.  With type attribution,
+        Layer 2 FQN matching detects both resolve to ``six.ensure_str`` and
+        skips the select comparison.
+        """
+        val = capture('val')
+        pat = pattern(
+            f"six.ensure_str({val})",
+            imports=["import six"],
+            dependencies={"six": "1.17.0"},
+        )
+        tmpl = template(f"str({val})")
+
+        class ReplaceSixEnsureStr(Recipe):
+            @property
+            def name(self):
+                return "test.ReplaceSixEnsureStr"
+
+            @property
+            def display_name(self):
+                return "Test"
+
+            @property
+            def description(self):
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=ReplaceSixEnsureStr())
+        spec.rewrite_run(
+            *uv(
+                pyproject(
+                    """
+                    [project]
+                    name = "test"
+                    version = "0.0.0"
+                    requires-python = ">=3.10"
+                    dependencies = ["six==1.17.0"]
+                    """
+                ),
+                python(
+                    """
+                    from six import ensure_str
+                    x = ensure_str("hello")
+                    """,
+                    """
+                    from six import ensure_str
+                    x = str("hello")
+                    """,
+                ),
+            )
+        )
+
+    def test_fqn_match_with_aliased_import(self):
+        """Pattern matches code that uses an aliased import via FQN.
+
+        Code uses ``import six as s; s.ensure_str(x)`` (aliased select ``s``).
+        Pattern uses ``six.ensure_str({val})`` (canonical select ``six``).
+        Without type attribution, ``Identifier("s")`` != ``Identifier("six")``
+        so the structural comparison would fail.  With type attribution,
+        Layer 2 FQN matching detects both resolve to ``six.ensure_str``
+        and skips the select comparison entirely.
+        """
+        val = capture('val')
+        pat = pattern(
+            f"six.ensure_str({val})",
+            imports=["import six"],
+            dependencies={"six": "1.17.0"},
+        )
+        tmpl = template(f"str({val})")
+
+        class ReplaceSixEnsureStr(Recipe):
+            @property
+            def name(self):
+                return "test.ReplaceSixEnsureStr"
+
+            @property
+            def display_name(self):
+                return "Test"
+
+            @property
+            def description(self):
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=ReplaceSixEnsureStr())
+        spec.rewrite_run(
+            *uv(
+                pyproject(
+                    """
+                    [project]
+                    name = "test"
+                    version = "0.0.0"
+                    requires-python = ">=3.10"
+                    dependencies = ["six==1.17.0"]
+                    """
+                ),
+                python(
+                    """
+                    import six as s
+                    x = s.ensure_str("hello")
+                    """,
+                    """
+                    import six as s
+                    x = str("hello")
+                    """,
+                ),
             )
         )

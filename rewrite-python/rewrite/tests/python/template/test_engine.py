@@ -223,6 +223,65 @@ class TestEngineEdgeCases:
         assert isinstance(tree, j.Binary)
 
 
+class TestEngineContextAndDependencies:
+    """Tests for context and dependencies support in TemplateEngine."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_cache_key_varies_by_context(self):
+        """Test that different context statements produce different cache keys."""
+        key1 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(context=("x = 1",))
+        )
+        key2 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(context=("y = 2",))
+        )
+        assert key1 != key2
+
+    def test_cache_key_varies_by_dependencies(self):
+        """Test that different dependencies produce different cache keys."""
+        key1 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(dependencies=(("requests", "2.31.0"),))
+        )
+        key2 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(dependencies=(("flask", "3.0.0"),))
+        )
+        assert key1 != key2
+
+    def test_cache_key_same_when_all_match(self):
+        """Test that identical options produce the same cache key."""
+        opts = TemplateOptions(
+            imports=("import os",),
+            context=("x = 1",),
+            dependencies=(("requests", "2.31.0"),),
+        )
+        key1 = TemplateEngine._make_cache_key("x", {}, opts)
+        key2 = TemplateEngine._make_cache_key("x", {}, opts)
+        assert key1 == key2
+
+    def test_wrapper_with_context(self):
+        """Test that wrapper generation includes context statements."""
+        wrapper = TemplateEngine._generate_wrapper(
+            "x", TemplateOptions(context=("MyType = int",))
+        )
+        assert "MyType = int" in wrapper
+
+    def test_wrapper_includes_both_imports_and_context(self):
+        """Test that wrapper includes both imports and context."""
+        wrapper = TemplateEngine._generate_wrapper(
+            "x",
+            TemplateOptions(
+                imports=("import os",),
+                context=("MY_CONST = 42",),
+            ),
+        )
+        assert "import os" in wrapper
+        assert "MY_CONST = 42" in wrapper
+        # imports come before context
+        assert wrapper.index("import os") < wrapper.index("MY_CONST = 42")
+
+
 class TestAutoFormatIntegration:
     """Tests for auto-format integration via rewrite_run."""
 
