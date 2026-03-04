@@ -1248,6 +1248,8 @@ public sealed class PragmaChecksumDirective(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Arguments);
     public PragmaChecksumDirective WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Arguments);
+    public PragmaChecksumDirective WithArguments(string arguments) =>
+        arguments == Arguments ? this : new(Id, Prefix, Markers, arguments);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
