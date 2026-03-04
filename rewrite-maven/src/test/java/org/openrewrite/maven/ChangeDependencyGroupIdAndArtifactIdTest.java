@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -765,33 +765,17 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactId() {
-        assertThatExceptionOfType(AssertionError.class)
-          .isThrownBy(() -> rewriteRun(
-            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-              "javax.activation",
-              "javax.activation-api",
-              null,
-              null,
-              null,
-              null
-            ))
-          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+       ChangeDependencyGroupIdAndArtifactId recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", null, null, null, null);;
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("newGroupId OR newArtifactId must be different from before");
     }
 
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
-        assertThatExceptionOfType(AssertionError.class)
-          .isThrownBy(() -> rewriteRun(
-            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-              "javax.activation",
-              "javax.activation-api",
-              "javax.activation",
-              null,
-              null,
-              null
-            ))
-          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+        ChangeDependencyGroupIdAndArtifactId recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", null, null, null);
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("newGroupId OR newArtifactId must be different from before");
     }
 
     @Test
