@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -78,11 +79,12 @@ public class OpenRewriteModelBuilder {
     public static OpenRewriteModel forProjectDirectory(File projectDir, @Nullable File buildFile, @Nullable String initScript) throws IOException {
         DefaultGradleConnector connector = (DefaultGradleConnector) GradleConnector.newConnector();
         if (System.getProperty("org.openrewrite.test.gradleVersion") != null) {
-            connector.useGradleVersion(System.getProperty("org.openrewrite.test.gradleVersion"));
+            String version = System.getProperty("org.openrewrite.test.gradleVersion");
+            connector.useDistribution(URI.create("https://downloads.gradle.org/distributions/gradle-" + version + "-bin.zip"));
         } else if (Files.exists(projectDir.toPath().resolve("gradle/wrapper/gradle-wrapper.properties"))) {
             connector.useBuildDistribution();
         } else {
-            connector.useGradleVersion("8.12");
+            connector.useDistribution(URI.create("https://downloads.gradle.org/distributions/gradle-8.12-bin.zip"));
         }
         connector
                 // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
