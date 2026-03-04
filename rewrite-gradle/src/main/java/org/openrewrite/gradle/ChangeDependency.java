@@ -362,20 +362,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     if (scanResult instanceof Exception) {
                         return ((MavenDownloadingException) scanResult).warn(m);
                     }
-                    String resolvedVersion = scanResult instanceof String ? (String) scanResult : null;
-                    if (resolvedVersion == null && !StringUtils.isBlank(newVersion)) {
-                        try {
-                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(new GroupArtifact(
-                                                    !StringUtils.isBlank(newGroupId) ? newGroupId : dep.getGroupId(),
-                                                    !StringUtils.isBlank(newArtifactId) ? newArtifactId : dep.getArtifactId()),
-                                            dep.getConfigurationName(), newVersion, versionPattern, ctx);
-                        } catch (MavenDownloadingException e) {
-                            return e.warn(m);
-                        }
-                    }
-                    if (resolvedVersion != null) {
-                        updated = updated.withDeclaredVersion(resolvedVersion);
+                    if (scanResult instanceof String) {
+                        updated = updated.withDeclaredVersion((String) scanResult);
                     }
                 } else if (varName == null) {
                     String declaredVersion = dep.getDeclaredVersion();
