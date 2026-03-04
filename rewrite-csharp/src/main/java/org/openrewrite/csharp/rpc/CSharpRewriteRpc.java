@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
@@ -30,6 +31,7 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -38,6 +40,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -180,6 +183,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
     @RequiredArgsConstructor
     public static class Builder implements Supplier<CSharpRewriteRpc> {
+        private static final String TOOL_COMMAND = "rewrite-csharp";
+        private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp";
+        private static final String REWRITE_SOURCE_PATH_ENV = "REWRITE_SOURCE_PATH";
+
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private final Map<String, String> environment = new HashMap<>();
         private Path dotnetPath = Paths.get("dotnet");
@@ -207,13 +214,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Entry point that launches the C# RPC server. When the path has a {@code .csproj}
-         * extension, the server is launched from source via {@code dotnet run --project}.
-         * Otherwise the path is treated as a published executable (DLL) and launched
-         * via {@code dotnet <path>}.
-         *
-         * @param csharpServerEntry Path to either a {@code .csproj} file or a published DLL
-         * @return This builder
+         * Explicit entry point for the C# RPC server, primarily for tests.
+         * When set, the server is launched via {@code dotnet run --project <path>}
+         * (for {@code .csproj}) or {@code dotnet <path>} (for DLLs), bypassing
+         * both {@code REWRITE_SOURCE_PATH} and global tool auto-install.
          */
         public Builder csharpServerEntry(Path csharpServerEntry) {
             this.csharpServerEntry = csharpServerEntry;
@@ -271,26 +275,48 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         @Override
         public CSharpRewriteRpc get() {
-            Path entry = findCSharpServerEntry();
             Stream<@Nullable String> cmd;
-            if (entry.toString().endsWith(".csproj")) {
-                cmd = Stream.of(
-                        dotnetPath.toString(),
-                        "run",
-                        "--project", entry.toAbsolutePath().normalize().toString(),
-                        "--framework", "net10.0",
-                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        traceRpcMessages ? "--trace-rpc-messages" : null
-                );
+            if (csharpServerEntry != null) {
+                // Explicit override (used by tests)
+                if (csharpServerEntry.toString().endsWith(".csproj")) {
+                    cmd = buildCsprojCommand(csharpServerEntry);
+                } else {
+                    cmd = Stream.of(
+                            dotnetPath.toString(),
+                            csharpServerEntry.toAbsolutePath().normalize().toString(),
+                            log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                            traceRpcMessages ? "--trace-rpc-messages" : null
+                    );
+                }
             } else {
-                cmd = Stream.of(
-                        dotnetPath.toString(),
-                        entry.toAbsolutePath().normalize().toString(),
-                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        traceRpcMessages ? "--trace-rpc-messages" : null
-                );
+                // If REWRITE_SOURCE_PATH is set, launch from source via dotnet run
+                String rewriteSourcePath = System.getenv(REWRITE_SOURCE_PATH_ENV);
+                if (rewriteSourcePath != null && !rewriteSourcePath.isEmpty()) {
+                    Path csproj = Paths.get(rewriteSourcePath)
+                            .resolve("rewrite-csharp/csharp/OpenRewrite/OpenRewrite.csproj");
+                    if (!Files.exists(csproj)) {
+                        throw new IllegalStateException(
+                                REWRITE_SOURCE_PATH_ENV + " is set to " + rewriteSourcePath +
+                                " but " + csproj + " does not exist");
+                    }
+                    cmd = buildCsprojCommand(csproj);
+                } else {
+                    // Global tool route: ensure the pinned version is installed
+                    String version = StringUtils.readFully(
+                            CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                    ensureToolInstalled(version);
+                    cmd = Stream.of(
+                            TOOL_COMMAND,
+                            log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                            traceRpcMessages ? "--trace-rpc-messages" : null
+                    );
+                }
             }
 
+            return startProcess(cmd);
+        }
+
+        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
             RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
 
@@ -306,7 +332,6 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 env.put("DOTNET_EventPipeOutputPath", profileOutputPath.toAbsolutePath().normalize().toString());
                 env.put("DOTNET_EventPipeOutputStreaming", "1");
                 env.put("DOTNET_EventPipeCircularMB", "256");
-                // CPU sampling + GC events + sampled allocations (low rate) + type loading + runtime counters
                 env.put("DOTNET_EventPipeConfig",
                         "Microsoft-DotNETCore-SampleProfiler:0:5;" +
                         "Microsoft-Windows-DotNETRuntime:2088009:4;" +
@@ -326,51 +351,114 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
         }
 
-        private Path findCSharpServerEntry() {
-            if (csharpServerEntry != null) {
-                return csharpServerEntry;
-            }
+        private Stream<@Nullable String> buildCsprojCommand(Path csproj) {
+            return Stream.of(
+                    dotnetPath.toString(),
+                    "run",
+                    "--project", csproj.toAbsolutePath().normalize().toString(),
+                    "--framework", "net10.0",
+                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    traceRpcMessages ? "--trace-rpc-messages" : null
+            );
+        }
 
-            // Check for globally installed dotnet tool
-            Path toolStore = Paths.get(System.getProperty("user.home"), ".dotnet", "tools", ".store", "openrewrite.csharp");
-            if (Files.isDirectory(toolStore)) {
-                try (Stream<Path> versions = Files.list(toolStore)) {
-                    Optional<Path> dll = versions
-                            .sorted(Comparator.reverseOrder())
-                            .flatMap(versionDir -> {
-                                try {
-                                    return Files.walk(versionDir)
-                                            .filter(p -> p.getFileName().toString().equals("OpenRewrite.dll"));
-                                } catch (IOException e) {
-                                    return Stream.empty();
-                                }
-                            })
-                            .findFirst();
-                    if (dll.isPresent()) {
-                        return dll.get().toAbsolutePath().normalize();
+        /**
+         * Returns the currently installed version of the global tool, or
+         * {@code null} if not installed.
+         */
+        private @Nullable String getInstalledToolVersion() {
+            try {
+                ProcessBuilder pb = new ProcessBuilder(
+                        dotnetPath.toString(), "tool", "list", "-g");
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+                String output;
+                try (InputStream is = process.getInputStream()) {
+                    output = StringUtils.readFully(is);
+                }
+                if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                    return null;
+                }
+                if (process.exitValue() != 0) {
+                    return null;
+                }
+                // Output format:
+                // Package Id         Version      Commands
+                // -------------------------------------------
+                // openrewrite.csharp 8.75.0       rewrite-csharp
+                for (String line : output.split("\\R")) {
+                    String trimmed = line.trim().toLowerCase(Locale.ROOT);
+                    if (trimmed.startsWith("openrewrite.csharp")) {
+                        String[] parts = line.trim().split("\\s+");
+                        if (parts.length >= 2) {
+                            return parts[1];
+                        }
                     }
-                } catch (IOException ignored) {
                 }
+                return null;
+            } catch (IOException | InterruptedException e) {
+                return null;
+            }
+        }
+
+        /**
+         * Ensures the correct version of the global tool is installed.
+         * Installs or updates as needed.
+         */
+        private void ensureToolInstalled(String version) {
+            String installed = getInstalledToolVersion();
+            if (version.equals(installed)) {
+                return;
             }
 
-            // Fall back to development paths relative to working directory
-            Path basePath = workingDirectory != null ? workingDirectory : Paths.get(System.getProperty("user.dir"));
-            Path[] searchPaths = {
-                    basePath.resolve("csharp"),
-                    basePath.resolve("rewrite-csharp/csharp"),
-            };
-
-            for (Path searchPath : searchPaths) {
-                Path csproj = searchPath.resolve("OpenRewrite/OpenRewrite.csproj");
-                if (Files.exists(csproj)) {
-                    return csproj.toAbsolutePath().normalize();
+            try {
+                List<String> cmd;
+                if (installed != null) {
+                    cmd = Arrays.asList(dotnetPath.toString(), "tool", "update", "-g",
+                            NUGET_PACKAGE_ID, "--version", version, "--allow-downgrade");
+                } else {
+                    cmd = Arrays.asList(dotnetPath.toString(), "tool", "install", "-g",
+                            NUGET_PACKAGE_ID, "--version", version);
                 }
-            }
 
-            throw new IllegalStateException(
-                    "Could not find C# Rewrite project. Please set csharpServerEntry() on the builder. " +
-                    "Expected to find OpenRewrite.dll in ~/.dotnet/tools/.store/openrewrite.csharp/ " +
-                    "or OpenRewrite/OpenRewrite.csproj in the project directory.");
+                ProcessBuilder pb = new ProcessBuilder(cmd);
+                pb.redirectErrorStream(true);
+                if (log != null) {
+                    pb.redirectOutput(ProcessBuilder.Redirect.appendTo(
+                            log.toAbsolutePath().normalize().toFile()));
+                }
+
+                Process process = pb.start();
+                String output = "";
+                if (log == null) {
+                    try (InputStream is = process.getInputStream()) {
+                        output = StringUtils.readFully(is);
+                    }
+                }
+
+                boolean completed = process.waitFor(2, TimeUnit.MINUTES);
+                if (!completed) {
+                    process.destroyForcibly();
+                    throw new RuntimeException("Timed out installing " + NUGET_PACKAGE_ID + " " + version);
+                }
+
+                if (process.exitValue() != 0) {
+                    String message = "Failed to install " + NUGET_PACKAGE_ID + " " + version +
+                            " (dotnet tool exited with code " + process.exitValue() + ")";
+                    if (!output.isEmpty()) {
+                        message += ":\n" + output.trim();
+                    } else if (log != null) {
+                        message += ". See " + log.toAbsolutePath().normalize() + " for details";
+                    }
+                    throw new RuntimeException(message);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to install " + NUGET_PACKAGE_ID, e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while installing " + NUGET_PACKAGE_ID, e);
+            }
         }
     }
 }
