@@ -94,7 +94,7 @@ class ImportLayoutStyleTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4196")
     void addImportInPresenceOfDuplicateOtherImport() {
         ImportLayoutStyle style = new ImportLayoutStyle(
-          Integer.MAX_VALUE, Integer.MAX_VALUE, emptyList(), emptyList());
+          Integer.MAX_VALUE, Integer.MAX_VALUE, null, null);
         JRightPadded<J.Import> import1 = new JRightPadded<>(
           new J.Import(
             randomId(),
