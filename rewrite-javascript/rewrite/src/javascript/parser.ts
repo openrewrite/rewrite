@@ -2079,7 +2079,10 @@ export class JavaScriptParserVisitor {
 
     visitCallExpression(node: ts.CallExpression): J.MethodInvocation | JS.FunctionCall {
         const prefix = this.prefix(node);
-        const typeArguments = node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments);
+        const ltToken = this.findChildNode(node, ts.SyntaxKind.LessThanToken);
+        const typeArguments = node.typeArguments && ltToken
+            ? this.mapTypeArguments(this.prefix(ltToken), node.typeArguments)
+            : undefined;
 
         let select: J.RightPadded<Expression> | undefined;
         let name: J.Identifier = {
