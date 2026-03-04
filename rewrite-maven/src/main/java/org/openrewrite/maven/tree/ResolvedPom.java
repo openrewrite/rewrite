@@ -572,7 +572,28 @@ public class ResolvedPom {
         }
 
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
-            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
+            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion rawGav = pom.getParent().getGav();
+            if (rawGav.getVersion() == null) {
+                throw new MavenParsingException("Parent version must always specify a version " + rawGav);
+            }
+
+            // When the parent version contains unresolved property placeholders like
+            // ${project.version}, the properties needed to resolve it may only be available
+            // from the parent itself (see MavenXpp3Reader §4.0.0, "Inherited" on <version>).
+            // Try to find the parent in the reactor first using the raw GAV before attempting
+            // property resolution. MavenPomDownloader.download() checks the reactor (exact GAV
+            // match, property-merged match, and relative-path match) before going remote, so
+            // the exception is only thrown when the parent is genuinely not a local module.
+            if (rawGav.getVersion().contains("${")) {
+                try {
+                    return downloader.download(rawGav,
+                            pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                } catch (MavenDownloadingException ignored) {
+                    // Parent not found in reactor with raw GAV, fall through to property resolution
+                }
+            }
+
+            GroupArtifactVersion gav = getValues(rawGav);
             if (gav.getVersion() == null) {
                 throw new MavenParsingException("Parent version must always specify a version " + gav);
             }
