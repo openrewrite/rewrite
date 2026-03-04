@@ -624,3 +624,154 @@ class TestTemplateApplyPrecedenceInContext:
                 "if (not x or not y) and z:\n    pass",
             )
         )
+
+
+class TestTemplateFactoryOptions:
+    """Tests for context/dependencies keyword arguments on template() and TemplateBuilder."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_template_factory_with_context(self):
+        """template() factory accepts context parameter."""
+        tmpl = template("x + 1", context=["MyType = int"])
+        assert tmpl._options.context == ("MyType = int",)
+
+    def test_template_factory_with_dependencies(self):
+        """template() factory accepts dependencies parameter."""
+        tmpl = template("x", dependencies={"flask": "3.0.0"})
+        assert tmpl._options.dependencies == (("flask", "3.0.0"),)
+
+    def test_builder_with_context(self):
+        """TemplateBuilder supports .context() method."""
+        tmpl = (Template.builder()
+            .code("x + 1")
+            .context("MyType = int")
+            .build())
+        assert tmpl._options.context == ("MyType = int",)
+
+    def test_builder_with_dependencies(self):
+        """TemplateBuilder supports .dependencies() method."""
+        tmpl = (Template.builder()
+            .code("x")
+            .dependencies({"requests": "2.31.0"})
+            .build())
+        assert tmpl._options.dependencies == (("requests", "2.31.0"),)
+
+
+class TestTypeAttributedPatternMatching:
+    """Integration tests for pattern matching with type attribution.
+
+    These tests use stdlib ``json.dumps`` (no external dependencies) to verify
+    that type-attributed ASTs enable FQN-based semantic matching in the 3-layer
+    comparator.  ``ty`` consistently resolves ``json.dumps`` to
+    ``declaring_fqn=json`` regardless of import style.
+    """
+
+    def test_fqn_match_different_import_styles(self):
+        """Pattern matches code that uses a different import style via FQN.
+
+        Code uses ``from json import dumps; dumps(x)`` (bare name).
+        Pattern uses ``json.dumps({val})`` (qualified name).
+        Without type attribution, these would NOT structurally match because
+        the select (None vs Identifier("json")) differs.  With type attribution,
+        Layer 2 FQN matching detects both resolve to ``json.dumps`` and
+        skips the select comparison.
+        """
+        val = capture('val')
+        pat = pattern(
+            f"json.dumps({val})",
+            context=["import json"],
+        )
+        tmpl = template(f"str({val})")
+
+        class ReplaceJsonDumps(Recipe):
+            @property
+            def name(self):
+                return "test.ReplaceJsonDumps"
+
+            @property
+            def display_name(self):
+                return "Test"
+
+            @property
+            def description(self):
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=ReplaceJsonDumps())
+        spec.rewrite_run(
+            python(
+                """
+                from json import dumps
+                x = dumps({"key": "value"})
+                """,
+                """
+                from json import dumps
+                x = str({"key": "value"})
+                """,
+            ),
+        )
+
+    def test_fqn_match_with_aliased_import(self):
+        """Pattern matches code that uses an aliased import via FQN.
+
+        Code uses ``import json as j; j.dumps(x)`` (aliased select ``j``).
+        Pattern uses ``json.dumps({val})`` (canonical select ``json``).
+        Without type attribution, ``Identifier("j")`` != ``Identifier("json")``
+        so the structural comparison would fail.  With type attribution,
+        Layer 2 FQN matching detects both resolve to ``json.dumps``
+        and skips the select comparison entirely.
+        """
+        val = capture('val')
+        pat = pattern(
+            f"json.dumps({val})",
+            context=["import json"],
+        )
+        tmpl = template(f"str({val})")
+
+        class ReplaceJsonDumps(Recipe):
+            @property
+            def name(self):
+                return "test.ReplaceJsonDumps"
+
+            @property
+            def display_name(self):
+                return "Test"
+
+            @property
+            def description(self):
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=ReplaceJsonDumps())
+        spec.rewrite_run(
+            python(
+                """
+                import json as j
+                x = j.dumps({"key": "value"})
+                """,
+                """
+                import json as j
+                x = str({"key": "value"})
+                """,
+            ),
+        )
