@@ -51,7 +51,7 @@ fun findDotnet(): String {
             // Command not found, try next
         }
     }
-    throw GradleException(".NET SDK not found. Please install .NET 8.0+ SDK and ensure 'dotnet' is on your PATH.")
+    throw GradleException(".NET SDK not found. Please install .NET 10.0+ SDK and ensure 'dotnet' is on your PATH.")
 }
 
 val csharpBuild by tasks.registering(Exec::class) {
