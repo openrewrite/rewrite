@@ -972,7 +972,7 @@ class ChangeDependencyTest implements RewriteTest {
 
               def version = '2.6'
               dependencies {
-                  implementation( "org.apache.commons:commons-lang3:3.11")
+                  implementation "org.apache.commons:commons-lang3:3.11"
                   implementation "com.google.guava:guava:${version}"
               }
               """
@@ -1015,7 +1015,7 @@ class ChangeDependencyTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation( "org.apache.commons:commons-lang3:3.11")
+                  implementation "org.apache.commons:commons-lang3:3.11"
                   implementation "com.google.guava:guava:${sharedVersion}"
               }
               """

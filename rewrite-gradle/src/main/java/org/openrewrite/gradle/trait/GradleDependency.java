@@ -1245,7 +1245,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 }
             }
         } else if (firstArg instanceof G.GString) {
-            // For GString, we convert to a simple string literal with the new version
+            // For GString, collapse to a single-element GString to preserve Groovy command expression formatting
             G.GString gstring = (G.GString) firstArg;
             List<J> strings = gstring.getStrings();
             if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
@@ -1255,9 +1255,9 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     Dependency updatedDep = dep.withGav(dep.getGav().withVersion(newVersion));
                     String replacement = DependencyNotation.toStringNotation(updatedDep);
                     J.Literal newLiteral = literal.withValue(replacement)
-                            .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter())
-                            .withPrefix(gstring.getPrefix());
-                    updated = m.withArguments(singletonList(newLiteral));
+                            .withValueSource(replacement);
+                    G.GString collapsed = gstring.withStrings(singletonList(newLiteral));
+                    updated = m.withArguments(singletonList(collapsed));
                 }
             }
         } else if (firstArg instanceof G.MapEntry || firstArg instanceof G.MapLiteral) {
