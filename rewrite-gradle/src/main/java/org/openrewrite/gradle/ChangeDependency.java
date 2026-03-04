@@ -210,15 +210,17 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 GradleDependency.Matcher specificMatcher = new GradleDependency.Matcher()
                         .groupId(oldGroupId)
                         .artifactId(oldArtifactId);
-                if (!specificMatcher.get(getCursor()).isPresent()) {
+                Optional<GradleDependency> maybeDep = specificMatcher.get(getCursor());
+                if (!maybeDep.isPresent()) {
                     return m;
                 }
 
+                GradleDependency matchedDep = maybeDep.get();
                 Expression firstArg = unwrapPlatform(m.getArguments().get(0));
                 if (firstArg instanceof G.GString) {
-                    scanVersionVariable((G.GString) firstArg, m, ctx);
+                    scanVersionVariable((G.GString) firstArg, m, matchedDep, ctx);
                 } else if (firstArg instanceof K.StringTemplate) {
-                    scanVersionVariable((K.StringTemplate) firstArg, m, ctx);
+                    scanVersionVariable((K.StringTemplate) firstArg, m, matchedDep, ctx);
                 }
                 return m;
             }
@@ -251,29 +253,29 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 }
             }
 
-            private void scanVersionVariable(G.GString gstring, J.MethodInvocation m, ExecutionContext ctx) {
+            private void scanVersionVariable(G.GString gstring, J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
                 List<J> strings = gstring.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                     String varName = extractVersionVariableName(strings);
                     if (varName != null && !StringUtils.isBlank(newVersion)) {
-                        resolveAndRecordVersion(varName, m, ctx);
+                        resolveAndRecordVersion(varName, m, dep, ctx);
                     }
                 }
             }
 
-            private void scanVersionVariable(K.StringTemplate template, J.MethodInvocation m, ExecutionContext ctx) {
+            private void scanVersionVariable(K.StringTemplate template, J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
                 List<J> strings = template.getStrings();
                 if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                     String varName = extractVersionVariableName(strings);
                     if (varName != null && !StringUtils.isBlank(newVersion)) {
-                        resolveAndRecordVersion(varName, m, ctx);
+                        resolveAndRecordVersion(varName, m, dep, ctx);
                     }
                 }
             }
 
-            private void resolveAndRecordVersion(String varName, J.MethodInvocation m, ExecutionContext ctx) {
-                String resolvedGroupId = !StringUtils.isBlank(newGroupId) ? newGroupId : oldGroupId;
-                String resolvedArtifactId = !StringUtils.isBlank(newArtifactId) ? newArtifactId : oldArtifactId;
+            private void resolveAndRecordVersion(String varName, J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
+                String resolvedGroupId = !StringUtils.isBlank(newGroupId) ? newGroupId : dep.getGroupId();
+                String resolvedArtifactId = !StringUtils.isBlank(newArtifactId) ? newArtifactId : dep.getArtifactId();
                 try {
                     String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
                             .select(new GroupArtifact(resolvedGroupId, resolvedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
@@ -745,8 +747,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
                             String varName = extractVersionVariableName(strings);
                             if (varName != null && canUpdateVariable(varName)) {
-                                // Preserve StringTemplate structure, only update the group:artifact prefix
-                                // Version variable updates are handled separately (gradle.properties or local variable declarations)
                                 if (original != updated) {
                                     String oldGav = original.getGroupId() + ":" + original.getArtifactId();
                                     String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
