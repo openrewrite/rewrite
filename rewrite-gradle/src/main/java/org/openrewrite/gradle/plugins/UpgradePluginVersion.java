@@ -23,6 +23,7 @@ import org.openrewrite.gradle.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.table.GradlePluginVersionResolutions;
 import org.openrewrite.gradle.trait.GradlePlugin;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -33,9 +34,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
@@ -56,6 +55,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
+    @EqualsAndHashCode.Exclude
+    transient GradlePluginVersionResolutions versionResolutions = new GradlePluginVersionResolutions(this);
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
@@ -133,13 +135,40 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             @Nullable
             private GradleSettings gradleSettings;
 
+            private String sourcePath = "";
+
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
+                    sourcePath = ((SourceFile) tree).getSourcePath().toString();
                 }
                 return super.visit(tree, ctx);
+            }
+
+            private String reposDescription() {
+                if (gradleSettings != null) {
+                    return "settings.buildscript: " + repoUris(gradleSettings.getBuildscript().getMavenRepositories());
+                }
+                if (gradleProject != null) {
+                    return "project.buildscript: " + repoUris(gradleProject.getBuildscript().getMavenRepositories());
+                }
+                return "none (no GradleProject or GradleSettings marker)";
+            }
+
+            private String repoUris(List<MavenRepository> repos) {
+                if (repos.isEmpty()) {
+                    return "[]";
+                }
+                StringBuilder sb = new StringBuilder("[");
+                for (int i = 0; i < repos.size(); i++) {
+                    if (i > 0) {
+                        sb.append(", ");
+                    }
+                    sb.append(repos.get(i).getUri());
+                }
+                return sb.append("]").toString();
             }
 
             @Override
@@ -177,6 +206,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                     .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
                         }
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
+                        versionResolutions.insertRow(ctx, new GradlePluginVersionResolutions.Row(
+                                sourcePath, pluginId, currentVersion,
+                                resolvedVersion != null ? resolvedVersion : "",
+                                reposDescription(),
+                                resolvedVersion != null ? "resolved" : "no newer version found"));
                     } else if (versionArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) versionArgs.get(0);
                         if (gString.getStrings().isEmpty() || !(gString.getStrings().get(0) instanceof G.GString.Value)) {
@@ -191,6 +225,11 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
                         assert resolvedPluginVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                        versionResolutions.insertRow(ctx, new GradlePluginVersionResolutions.Row(
+                                sourcePath, pluginId, "(GString: " + versionVariableName + ")",
+                                resolvedPluginVersion,
+                                reposDescription(),
+                                "resolved via GString variable"));
                     } else if (versionArgs.get(0) instanceof J.Identifier) {
                         J.Identifier identifier = (J.Identifier) versionArgs.get(0);
                         String versionVariableName = identifier.getSimpleName();
@@ -200,9 +239,24 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
                         assert resolvedPluginVersion != null;
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                        versionResolutions.insertRow(ctx, new GradlePluginVersionResolutions.Row(
+                                sourcePath, pluginId, "(variable: " + versionVariableName + ")",
+                                resolvedPluginVersion,
+                                reposDescription(),
+                                "resolved via variable"));
+                    } else {
+                        versionResolutions.insertRow(ctx, new GradlePluginVersionResolutions.Row(
+                                sourcePath, pluginId, "(unknown expression type: " + versionArgs.get(0).getClass().getSimpleName() + ")",
+                                "",
+                                reposDescription(),
+                                "version argument is not a literal, GString, or identifier"));
                     }
                 } catch (MavenDownloadingException e) {
-                    // continue
+                    versionResolutions.insertRow(ctx, new GradlePluginVersionResolutions.Row(
+                            sourcePath, pluginId, literalValue(versionArgs.get(0)) != null ? literalValue(versionArgs.get(0)) : "",
+                            "",
+                            reposDescription(),
+                            "MavenDownloadingException: " + e.getMessage()));
                 }
                 return m;
             }
