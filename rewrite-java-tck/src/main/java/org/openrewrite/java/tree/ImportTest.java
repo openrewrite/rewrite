@@ -188,20 +188,25 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @Disabled("Parser does not support semicolon after package declaration yet")
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
     @Test
     void semicolonAfterPackage() {
-        //language=java
         rewriteRun(
           spec -> spec
-            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+            .typeValidationOptions(TypeValidation.all()
+              .allowNonWhitespaceInWhitespace(true)
+              .parseAndPrintEquality(false)),
           java(
+            //language=java
             """
               package p;;
               import java.util.List;
               class AfterPackage { }
-              """
+              """,
+            spec -> spec.beforeRecipe(cu -> {
+                System.out.println(cu.printAll());
+                assertThat(cu.getImports().getFirst().getQualid()).hasToString("java.util.List");
+            })
           )
         );
     }
