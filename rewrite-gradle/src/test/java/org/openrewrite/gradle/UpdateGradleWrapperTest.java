@@ -17,6 +17,8 @@ package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
@@ -175,7 +177,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
-                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://downloads.gradle.org/distributions/gradle-7.4.2-all.zip"));
                 assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -189,10 +191,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
             """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
-              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
-              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              distributionSha256Sum=e6d864e3b5bc05cc62041842b306383fc1fefcec359e70cebb1d470a6094ca82
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
           ),
@@ -209,7 +211,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
             .afterRecipe(run -> {
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
-                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://downloads.gradle.org/distributions/gradle-7.4.2-all.zip"));
                 assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -224,8 +226,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
             """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
-              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
-              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-all.zip
+              distributionSha256Sum=e6d864e3b5bc05cc62041842b306383fc1fefcec359e70cebb1d470a6094ca82
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
@@ -264,8 +266,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
               """
                 distributionBase=GRADLE_USER_HOME
                 distributionPath=wrapper/dists
-                distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
-                distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+                distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-all.zip
+                distributionSha256Sum=e6d864e3b5bc05cc62041842b306383fc1fefcec359e70cebb1d470a6094ca82
                 zipStoreBase=GRADLE_USER_HOME
                 zipStorePath=wrapper/dists
                 """,
@@ -288,8 +290,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
               """
                 distributionBase=GRADLE_USER_HOME
                 distributionPath=wrapper/dists
-                distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
-                distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+                distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-all.zip
+                distributionSha256Sum=e6d864e3b5bc05cc62041842b306383fc1fefcec359e70cebb1d470a6094ca82
                 zipStoreBase=GRADLE_USER_HOME
                 zipStorePath=wrapper/dists
                 """,
@@ -320,7 +322,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
-                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://downloads.gradle.org/distributions/gradle-5.6.4-bin.zip"));
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://downloads.gradle.org/distributions/gradle-5.6.4-all.zip"));
                 assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -334,10 +336,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
             """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
-              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-5.6.4-bin.zip
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-5.6.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
-              distributionSha256Sum=1f3067073041bc44554d0efe5d402a33bc3d3c93cc39ab684f308586d732a80d
+              distributionSha256Sum=abc10bcedb58806e8654210f96031db541bcd2d6fc3161e81cb0572d6a15e821
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
           ),
@@ -410,6 +412,44 @@ class UpdateGradleWrapperTest implements RewriteTest {
               zipStorePath=wrapper/dists
               distributionSha256Sum=1f3067073041bc44554d0efe5d402a33bc3d3c93cc39ab684f308586d732a80d
               """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "all, e6d864e3b5bc05cc62041842b306383fc1fefcec359e70cebb1d470a6094ca82",
+        "bin, 29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda"
+    })
+    void preserveExistingDistributionType(String distributionType, String expectedChecksum) {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .afterRecipe(run -> {
+                var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
+                assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://downloads.gradle.org/distributions/gradle-7.4.2-" + distributionType + ".zip"));
+            }),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-%s.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """.formatted(distributionType),
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-%s.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=%s
+              """.formatted(distributionType, expectedChecksum),
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
           ),
           gradlew,
