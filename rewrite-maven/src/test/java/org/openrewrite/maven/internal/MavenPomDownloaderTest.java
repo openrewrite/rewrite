@@ -1055,6 +1055,51 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1950")
+        @Test
+        void emptyRelativePathSkipsLocalParentLookup() {
+            // A local parent POM exists at ../pom.xml that matches the GAV,
+            // but the child specifies <relativePath/> (empty string) which means
+            // "do not look for the parent locally".
+            var gav = new GroupArtifactVersion("test", "parent", "1.0.0");
+
+            Path rootPomXml = Path.of("pom.xml");
+            Pom parentPom = Pom.builder()
+              .sourcePath(rootPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(null)
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test", "parent", "1.0.0", null))
+              .build();
+
+            Path childPomXml = Path.of("child/pom.xml");
+            // Empty string for relativePath simulates <relativePath/>
+            Pom childPom = Pom.builder()
+              .sourcePath(childPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(new Parent(gav, ""))
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test", "child", "1.0.0", null))
+              .build();
+
+            ResolvedPom resolvedPom = ResolvedPom.builder()
+              .requested(childPom)
+              .repositories(singletonList(MAVEN_CENTRAL))
+              .build();
+
+            Map<Path, Pom> pomsByPath = new HashMap<>();
+            pomsByPath.put(rootPomXml, parentPom);
+            pomsByPath.put(childPomXml, childPom);
+
+            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+            // With empty relativePath, the downloader should NOT find the parent locally
+            // via relative path resolution, and should instead go to remote repos.
+            // Since the parent IS available on Maven Central, this should succeed
+            // by downloading from the remote repository, not by local path resolution.
+            assertDoesNotThrow(() -> downloader.download(gav, "", resolvedPom, singletonList(MAVEN_CENTRAL)));
+        }
     }
 
     @Nested
