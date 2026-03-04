@@ -77,6 +77,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         K.AnnotatedExpression ae = annotatedExpression;
         ae = ae.withMarkers(visitMarkers(ae.getMarkers(), newAnnotatedExpression.getMarkers()));
         ae = ae.withAnnotations(ListUtils.map(ae.getAnnotations(), (index, a) -> visitAndCast(a, newAnnotatedExpression.getAnnotations().get(index))));
+        ae = ae.withExpression(visitAndCast(ae.getExpression(), newAnnotatedExpression.getExpression()));
         Expression temp = (Expression) visitExpression(ae, newAnnotatedExpression);
         if (!(temp instanceof K.AnnotatedExpression)) {
             return temp;

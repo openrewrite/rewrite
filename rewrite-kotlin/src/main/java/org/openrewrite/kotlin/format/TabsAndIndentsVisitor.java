@@ -163,7 +163,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         } else if (parent != null && !getCursor().getParentOrThrow().getPath(J.Annotation.class::isInstance).hasNext()) {
             // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
             alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
+                    !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation) &&
+                    //Unlike Java LST element, where the parent has a list of annotations, AnnotatedExpression has sibling annotation and Expression in this one.
+                    !(getCursor().getParentOrThrow().getValue() instanceof K.AnnotatedExpression);
 
             if ((loc == Space.Location.CLASS_KIND ||
                     loc == Space.Location.METHOD_DECLARATION_PREFIX) &&
