@@ -17,6 +17,7 @@ package org.openrewrite.maven.internal;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Profile;
@@ -24,9 +25,11 @@ import org.openrewrite.maven.tree.ProfileActivation;
 
 import java.io.ByteArrayInputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 class RawPomTest {
 
@@ -609,5 +612,28 @@ class RawPomTest {
         assertThat(child.getIntValue()).isEqualTo(123);
         assertThat(plugin.getConfigurationList("grandparent.parent.child.stringList", String.class)).hasSize(4)
           .contains("f", "r", "e", "d");
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6869")
+    @Test
+    void deserializeVersionlessParent() {
+        RawPom pom = RawPom.parse(new ByteArrayInputStream(
+          //language=xml
+          """
+            <project>
+                <parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                </parent>
+                <artifactId>child</artifactId>
+                <version>1.0.0</version>
+            </project>
+            """.getBytes()), null);
+        assertThat(pom.getParent()).isNotNull();
+        assertThat(pom.getParent().getGroupId()).isEqualTo("com.example");
+        assertThat(pom.getParent().getArtifactId()).isEqualTo("parent");
+        assertThat(pom.getParent().getVersion()).isNull();
+        // toPom() should still work when child has its own explicit version
+        assertDoesNotThrow(() -> pom.toPom(Path.of("child/pom.xml"), null));
     }
 }

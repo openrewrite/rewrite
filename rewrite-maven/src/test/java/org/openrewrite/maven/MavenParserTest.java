@@ -3445,6 +3445,47 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6869")
+    @Test
+    void maven4VersionlessParentReference() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>parent</artifactId>
+                      </parent>
+                      <artifactId>child</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                    assertThat(pom.getVersion()).isEqualTo("1.0.0");
+                    assertThat(pom.getGroupId()).isEqualTo("com.example");
+                })
+              )
+            )
+          )
+        );
+    }
+
     @Test
     void projectVersionPropertyOverriddenByBuilderProperty() {
         rewriteRun(

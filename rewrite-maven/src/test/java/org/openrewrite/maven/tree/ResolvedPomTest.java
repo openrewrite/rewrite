@@ -435,6 +435,45 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6869")
+    @Test
+    void resolveVersionlessParent() {
+        rewriteRun(
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                      <foo>bar</foo>
+                  </properties>
+              </project>
+              """
+          ),
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                  </parent>
+                  <artifactId>child</artifactId>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml").afterRecipe(doc -> {
+                ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class)
+                  .orElseThrow().getPom();
+                assertThat(pom.getVersion()).isEqualTo("1.0.0");
+                assertThat(pom.getValue("${foo}")).isEqualTo("bar");
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
     @Nested
     class TolerateMissingPom {

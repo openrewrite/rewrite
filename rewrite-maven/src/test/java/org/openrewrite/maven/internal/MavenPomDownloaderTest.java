@@ -1055,6 +1055,72 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/6869")
+        @Test
+        void shouldResolveVersionlessParentFromReactor() {
+            // GAV with null version (Maven 4 versionless parent)
+            var gav = new GroupArtifactVersion("com.example", "parent", null);
+
+            // Child POM referencing parent without version
+            Path childPomPath = Path.of("child/pom.xml");
+            Pom childPom = Pom.builder()
+              .sourcePath(childPomPath)
+              .parent(new Parent(gav, null))
+              .gav(new ResolvedGroupArtifactVersion(null, "com.example", "child", "1.0.0", null))
+              .build();
+
+            ResolvedPom resolvedChild = ResolvedPom.builder()
+              .requested(childPom)
+              .repositories(singletonList(MAVEN_CENTRAL))
+              .build();
+
+            // Parent POM at ../pom.xml (relative to child)
+            Path parentPomPath = Path.of("pom.xml");
+            Pom parentPom = Pom.builder()
+              .sourcePath(parentPomPath)
+              .gav(new ResolvedGroupArtifactVersion(null, "com.example", "parent", "1.0.0", null))
+              .build();
+
+            Map<Path, Pom> pomsByPath = new HashMap<>();
+            pomsByPath.put(childPomPath, childPom);
+            pomsByPath.put(parentPomPath, parentPom);
+
+            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+            assertDoesNotThrow(() -> {
+                Pom result = downloader.download(gav, null, resolvedChild, singletonList(MAVEN_CENTRAL));
+                assertThat(result.getArtifactId()).isEqualTo("parent");
+                assertThat(result.getVersion()).isEqualTo("1.0.0");
+            });
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/6869")
+        @Test
+        void shouldThrowForVersionlessParentNotInReactor() {
+            // GAV with null version but parent NOT in reactor
+            var gav = new GroupArtifactVersion("com.example", "nonexistent-parent", null);
+
+            Path childPomPath = Path.of("child/pom.xml");
+            Pom childPom = Pom.builder()
+              .sourcePath(childPomPath)
+              .parent(new Parent(gav, null))
+              .gav(new ResolvedGroupArtifactVersion(null, "com.example", "child", "1.0.0", null))
+              .build();
+
+            ResolvedPom resolvedChild = ResolvedPom.builder()
+              .requested(childPom)
+              .repositories(singletonList(MAVEN_CENTRAL))
+              .build();
+
+            Map<Path, Pom> pomsByPath = new HashMap<>();
+            pomsByPath.put(childPomPath, childPom);
+
+            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+            assertThrows(MavenDownloadingException.class,
+              () -> downloader.download(gav, null, resolvedChild, singletonList(MAVEN_CENTRAL)));
+        }
     }
 
     @Nested
