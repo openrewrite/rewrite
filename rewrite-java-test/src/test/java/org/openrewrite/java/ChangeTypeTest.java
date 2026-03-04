@@ -1427,6 +1427,55 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void doNotRenameFileWhenPathAlreadyHasNewTypeName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.A", "a.ANew", false)),
+          java(
+            """
+              package a;
+              public class A {
+              }
+              """,
+            """
+              package a;
+              public class ANew {
+              }
+              """,
+            spec -> spec.path("a/ANew.java").afterRecipe(cu -> {
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/ANew.java");
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "a.ANew")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void doNotCorruptPathWhenDirectoryMatchesOldFqn() {
+        String pathWithOriginalDir = "src/main/java/com/example/Original/Original.java";
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("com.example.Original", "com.example.NewName", false)),
+          java(
+            """
+              package com.example;
+              public class Original {
+              }
+              """,
+            """
+              package com.example;
+              public class NewName {
+              }
+              """,
+            spec -> spec.path(pathWithOriginalDir).afterRecipe(cu -> {
+              String path = PathUtils.separatorsToUnix(cu.getSourcePath().toString());
+              assertThat(path).isEqualTo(pathWithOriginalDir);
+              assertThat(path).doesNotContain("NewName/Original.java");
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "com.example.NewName")).isTrue();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     void updateImportPrefixWithEmptyPackage() {
