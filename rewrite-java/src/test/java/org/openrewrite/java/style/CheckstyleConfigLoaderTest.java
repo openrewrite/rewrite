@@ -16,6 +16,9 @@
 package org.openrewrite.java.style;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.style.NamedStyles;
+
+import java.util.Collections;
 
 import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1001,5 +1004,104 @@ class CheckstyleConfigLoaderTest {
 
         assertThat(checkstyle.getStyles()).anySatisfy(style ->
                 assertThat(style).isInstanceOf(HideUtilityClassConstructorStyle.class));
+    }
+
+    @Test
+    void avoidStarImportAndImportOrderMergeTogether() throws Exception {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="AvoidStarImport"/>
+                    <module name="ImportOrder">
+                        <property name="groups" value="java.,javax.,org.,com."/>
+                        <property name="option" value="top"/>
+                        <property name="separated" value="true"/>
+                    </module>
+                </module>
+            </module>
+        """, emptyMap());
+
+        // After merging, the single ImportLayoutStyle should combine:
+        // - star import thresholds from AvoidStarImport (MAX_VALUE)
+        // - layout ordering from ImportOrder (statics on top, grouped)
+        ImportLayoutStyle merged = NamedStyles.merge(ImportLayoutStyle.class,
+                Collections.singletonList(checkstyle));
+        assertThat(merged).isNotNull();
+        assertThat(merged.getClassCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(merged.getNameCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(merged.getLayout()).isNotEmpty();
+        // The layout should contain the ImportOrder groups, not just IntelliJ defaults
+        assertThat(merged.getLayout().stream()
+                .filter(b -> b instanceof ImportLayoutStyle.Block.ImportPackage &&
+                        !(b instanceof ImportLayoutStyle.Block.AllOthers))
+                .count()).isGreaterThan(0);
+    }
+
+    @Test
+    void avoidStarImportAndCustomImportOrderMergeTogether() throws Exception {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="AvoidStarImport"/>
+                    <module name="CustomImportOrder">
+                        <property name="customImportOrderRules"
+                            value="STATIC###STANDARD_JAVA_PACKAGE###THIRD_PARTY_PACKAGE"/>
+                    </module>
+                </module>
+            </module>
+        """, emptyMap());
+
+        ImportLayoutStyle merged = NamedStyles.merge(ImportLayoutStyle.class,
+                Collections.singletonList(checkstyle));
+        assertThat(merged).isNotNull();
+        assertThat(merged.getClassCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(merged.getNameCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(merged.getLayout()).isNotEmpty();
+    }
+
+    @Test
+    void allThreeImportLayoutStyleRulesMergeTogether() throws Exception {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="CustomImportOrder">
+                        <property name="customImportOrderRules"
+                            value="STATIC###STANDARD_JAVA_PACKAGE###THIRD_PARTY_PACKAGE"/>
+                    </module>
+                    <module name="AvoidStarImport"/>
+                    <module name="ImportOrder">
+                        <property name="groups" value="java.,javax.,org.,com."/>
+                        <property name="option" value="top"/>
+                        <property name="separated" value="true"/>
+                    </module>
+                </module>
+            </module>
+        """, emptyMap());
+
+        // All three produce ImportLayoutStyle. After merging:
+        // - AvoidStarImport contributes star import thresholds (MAX_VALUE)
+        // - ImportOrder contributes layout (comes last, so its layout wins over CustomImportOrder)
+        // - CustomImportOrder's layout is superseded by ImportOrder's
+        ImportLayoutStyle merged = NamedStyles.merge(ImportLayoutStyle.class,
+                Collections.singletonList(checkstyle));
+        assertThat(merged).isNotNull();
+        // Star thresholds from AvoidStarImport
+        assertThat(merged.getClassCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(merged.getNameCountToUseStarImport()).isEqualTo(Integer.MAX_VALUE);
+        // Layout from ImportOrder (not IntelliJ defaults, not CustomImportOrder)
+        assertThat(merged.getLayout()).isNotEmpty();
+        assertThat(merged.getLayout().stream()
+                .filter(b -> b instanceof ImportLayoutStyle.Block.ImportPackage &&
+                        !(b instanceof ImportLayoutStyle.Block.AllOthers))
+                .count()).isGreaterThan(0);
     }
 }
