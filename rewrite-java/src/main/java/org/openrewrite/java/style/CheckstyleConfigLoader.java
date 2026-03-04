@@ -33,7 +33,6 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static java.lang.Boolean.parseBoolean;
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
 import static org.openrewrite.java.style.Checkstyle.defaultOperatorWrapStyleOption;
@@ -93,7 +92,7 @@ public class CheckstyleConfigLoader {
                                 parenPadStyle(conf))
                         .filter(Objects::nonNull)
                         .flatMap(Set::stream)
-                        .collect(toSet()));
+                        .collect(toCollection(LinkedHashSet::new)));
     }
 
     private static @Nullable Set<DefaultComesLastStyle> defaultComesLast(Map<String, List<Module>> conf) {
@@ -269,7 +268,7 @@ public class CheckstyleConfigLoader {
                     boolean dot = false;
                     boolean inc = true;
                     boolean dec = true;
-                    boolean bnoc = true;
+                    boolean bnot = true;
                     boolean lnot = true;
                     boolean unaryPlus = true;
                     boolean unaryMinus = true;
@@ -285,7 +284,7 @@ public class CheckstyleConfigLoader {
                         dot = tokens.contains("DOT");
                         inc = tokens.contains("INC");
                         dec = tokens.contains("DEC");
-                        bnoc = tokens.contains("BNOT");
+                        bnot = tokens.contains("BNOT");
                         lnot = tokens.contains("LNOT");
                         unaryPlus = tokens.contains("UNARY_PLUS");
                         unaryMinus = tokens.contains("UNARY_MINUS");
@@ -301,7 +300,7 @@ public class CheckstyleConfigLoader {
                             dot,
                             inc,
                             dec,
-                            bnoc,
+                            bnot,
                             lnot,
                             unaryPlus,
                             unaryMinus
@@ -657,7 +656,9 @@ public class CheckstyleConfigLoader {
                         builder.importAllOthers();
                     }
 
-                    return builder.build();
+                    return builder.build()
+                            .withClassCountToUseStarImport(null)
+                            .withNameCountToUseStarImport(null);
                 })
                 .collect(toSet());
     }
@@ -690,8 +691,8 @@ public class CheckstyleConfigLoader {
                 .map(module -> new ImportLayoutStyle(
                         Integer.MAX_VALUE,
                         Integer.MAX_VALUE,
-                        emptyList(),
-                        emptyList()
+                        null,
+                        null
                 ))
                 .collect(toSet());
     }
@@ -1072,7 +1073,9 @@ public class CheckstyleConfigLoader {
                         builder.importStaticAllOthers();
                     }
 
-                    return builder.build();
+                    return builder.build()
+                            .withClassCountToUseStarImport(null)
+                            .withNameCountToUseStarImport(null);
                 })
                 .collect(toSet());
     }
