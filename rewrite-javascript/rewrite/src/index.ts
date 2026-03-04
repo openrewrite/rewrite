@@ -73,11 +73,13 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ExportAssignmentToExportDefault, MigrateTypeScript);
 
     const {
+        HoistFunctionDeclarationsFromBlocks,
         ModernizeOctalEscapeSequences,
         ModernizeOctalLiterals,
         RemoveDuplicateObjectKeys,
         MigrateES6
     } = await import("./javascript/migrate/es6/index.js");
+    await marketplace.install(HoistFunctionDeclarationsFromBlocks, MigrateES6);
     await marketplace.install(ModernizeOctalEscapeSequences, MigrateES6);
     await marketplace.install(ModernizeOctalLiterals, MigrateES6);
     await marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
@@ -101,4 +103,3 @@ RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
         });
     }
 });
-
