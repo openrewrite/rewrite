@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -31,6 +32,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -67,13 +69,37 @@ public class MavenParser implements Parser {
                                           ExecutionContext ctx) {
         List<SourceFile> parsed = new ArrayList<>();
 
-        Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
-        Map<Path, Pom> projectPomsByPath = new HashMap<>();
+        // Phase 1: Parse all RawPom objects to build a reactor map
+        List<Object[]> rawEntries = new ArrayList<>();
+        Map<Path, RawPom> rawPomsByPath = new HashMap<>();
         for (Input source : sources) {
             Path pomPath = source.getRelativePath(relativeTo);
             try {
-                Pom pom = RawPom.parse(source.getSource(ctx), null)
-                        .toPom(pomPath, null);
+                RawPom rawPom = RawPom.parse(source.getSource(ctx), null);
+                rawPomsByPath.put(pomPath, rawPom);
+                rawEntries.add(new Object[]{source, pomPath, rawPom});
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                parsed.add(ParseError.build(this, source, relativeTo, ctx, t));
+            }
+        }
+
+        // Phase 2: Create Pom objects and parse XML.
+        // For Maven 4 versionless parent references, resolve the child's effective version
+        // from the reactor before calling toPom(), since RawPom.getVersion() returns null
+        // when a child POM omits its own <version> and its parent reference also omits it.
+        Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
+        Map<Path, Pom> projectPomsByPath = new HashMap<>();
+        for (Object[] entry : rawEntries) {
+            Input source = (Input) entry[0];
+            Path pomPath = (Path) entry[1];
+            RawPom rawPom = (RawPom) entry[2];
+            try {
+                String effectiveVersion = rawPom.getVersion();
+                if (effectiveVersion == null) {
+                    effectiveVersion = resolveVersionFromReactor(pomPath, rawPom, rawPomsByPath);
+                }
+                Pom pom = rawPom.toPom(pomPath, null, effectiveVersion);
 
                 if (pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
@@ -176,6 +202,35 @@ public class MavenParser implements Parser {
         }
 
         return parsed.stream();
+    }
+
+    /**
+     * Maven 4 parent inference: when a child POM omits its own {@code <version>} and its
+     * {@code <parent>} reference also omits the version, {@link RawPom#getVersion()} returns null.
+     * This method walks the reactor (via relative paths) to find an ancestor with an explicit
+     * version so the child can inherit it before {@link RawPom#toPom} is called.
+     */
+    private static @Nullable String resolveVersionFromReactor(Path pomPath, RawPom rawPom,
+                                                               Map<Path, RawPom> rawPomsByPath) {
+        RawPom.Parent parent = rawPom.getParent();
+        if (parent == null || pomPath.getParent() == null) {
+            return null;
+        }
+        String relPath = parent.getRelativePath();
+        if (StringUtils.isBlank(relPath)) {
+            relPath = "..";
+        }
+        Path parentPath = pomPath.getParent().resolve(Paths.get(relPath)).resolve("pom.xml").normalize();
+        RawPom parentRaw = rawPomsByPath.get(parentPath);
+        if (parentRaw == null) {
+            return null;
+        }
+        String parentVersion = parentRaw.getVersion();
+        if (parentVersion != null) {
+            return parentVersion;
+        }
+        // Recurse: the parent itself may have a versionless parent
+        return resolveVersionFromReactor(parentPath, parentRaw, rawPomsByPath);
     }
 
     @Override

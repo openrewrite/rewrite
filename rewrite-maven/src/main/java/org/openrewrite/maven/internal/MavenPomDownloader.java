@@ -482,11 +482,35 @@ public class MavenPomDownloader {
                         @Nullable String relativePath,
                         @Nullable ResolvedPom containingPom,
                         List<MavenRepository> repositories) throws MavenDownloadingException {
-        if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
+        if (gav.getGroupId() == null || gav.getArtifactId() == null) {
             if (containingPom != null) {
                 ctx.getResolutionListener().downloadError(gav, emptyList(), containingPom.getRequested());
             }
-            throw new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav);
+            throw new MavenDownloadingException("Group id or artifact id is missing.", null, gav);
+        }
+
+        // Maven 4 versionless parent: only reactor path-based lookup is possible.
+        // Without a version, GAV-based lookups and remote downloads cannot work.
+        if (gav.getVersion() == null) {
+            if (containingPom != null && containingPom.getRequested().getSourcePath() != null) {
+                String effectiveRelativePath = StringUtils.isBlank(relativePath) ? ".." : relativePath;
+                if (!effectiveRelativePath.contains(":")) {
+                    Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
+                    if (folderContainingPom != null) {
+                        Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(effectiveRelativePath).resolve("pom.xml"))
+                                .normalize());
+                        if (maybeLocalPom != null &&
+                                gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                                gav.getArtifactId().equals(maybeLocalPom.getArtifactId())) {
+                            return maybeLocalPom;
+                        }
+                    }
+                }
+            }
+            if (containingPom != null) {
+                ctx.getResolutionListener().downloadError(gav, emptyList(), containingPom.getRequested());
+            }
+            throw new MavenDownloadingException("Version is missing and parent could not be resolved from reactor.", null, gav);
         }
 
         ctx.getResolutionListener().download(gav);

@@ -574,7 +574,17 @@ public class ResolvedPom {
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
             @SuppressWarnings("DataFlowIssue") GroupArtifactVersion rawGav = pom.getParent().getGav();
             if (rawGav.getVersion() == null) {
-                throw new MavenParsingException("Parent version must always specify a version " + rawGav);
+                // Maven 4 allows versionless parent references — resolve from reactor only.
+                // Without a version, remote repository lookup is impossible, so this only
+                // succeeds when the parent POM is available as a local project module.
+                try {
+                    return downloader.download(rawGav,
+                            pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                } catch (MavenDownloadingException e) {
+                    throw new MavenParsingException(
+                            "Could not resolve versionless parent " + rawGav + " from reactor. " +
+                            "Maven 4 parent inference requires the parent POM to be available locally.");
+                }
             }
 
             // When the parent version contains unresolved property placeholders like

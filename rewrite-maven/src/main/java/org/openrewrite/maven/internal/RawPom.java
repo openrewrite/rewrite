@@ -356,6 +356,10 @@ public class RawPom {
     public static class Parent {
         String groupId;
         String artifactId;
+
+        // Maven 4 (model version 4.1.0) allows omitting <version> from <parent> elements.
+        // The parent coordinates are then inferred from the POM at <relativePath>.
+        @Nullable
         String version;
 
         @Nullable
@@ -424,6 +428,17 @@ public class RawPom {
 
 
     public Pom toPom(@Nullable Path inputPath, @Nullable MavenRepository repo) {
+        return toPom(inputPath, repo, getVersion());
+    }
+
+    /**
+     * Convert this raw POM to a {@link Pom} using the given effective version.
+     * This overload is used by {@link org.openrewrite.maven.MavenParser} when Maven 4
+     * parent inference requires resolving the child's version from the reactor
+     * before the parent POM has been fully resolved.
+     */
+    public Pom toPom(@Nullable Path inputPath, @Nullable MavenRepository repo,
+                     @Nullable String effectiveVersion) {
         org.openrewrite.maven.tree.Parent parent = getParent() == null ? null : new org.openrewrite.maven.tree.Parent(new GroupArtifactVersion(
                 getParent().getGroupId(), getParent().getArtifactId(),
                 getParent().getVersion()), getParent().getRelativePath());
@@ -436,7 +451,7 @@ public class RawPom {
                         repo == null ? null : repo.getUri(),
                         Objects.requireNonNull(getGroupId()),
                         artifactId,
-                        Objects.requireNonNull(getVersion()),
+                        Objects.requireNonNull(effectiveVersion),
                         null))
                 .name(name)
                 .obsoletePomVersion(pomVersion)
