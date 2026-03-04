@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
+import org.openrewrite.javascript.tree.JS;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
@@ -177,7 +178,9 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 Parser.Input input = Parser.Input.fromFile(sourceFile.getSourcePath());
                 parsingListener.startedParsing(input);
                 try {
-                    validator.visit(sourceFile, 0);
+                    if (sourceFile instanceof JS.CompilationUnit) {
+                        validator.visit(sourceFile, 0);
+                    }
                 } catch (Exception e) {
                     sourceFile = new ParseError(
                             sourceFile.getId(),
