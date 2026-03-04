@@ -15,9 +15,11 @@ internal static class DotNetRestore
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
     private static readonly HashSet<string> Restored = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(10);
 
-    public static async Task RunAsync(string path, CancellationToken ct)
+    internal record RestoreResult(int ExitCode, string Stdout, string Stderr, TimeSpan Elapsed, bool TimedOut);
+
+    public static async Task<RestoreResult> RunAsync(string path, CancellationToken ct)
     {
         var key = Path.GetFullPath(path);
 
@@ -27,7 +29,7 @@ internal static class DotNetRestore
             if (Restored.Contains(key))
             {
                 Log.Debug("dotnet restore: skipped (already restored) {Path}", path);
-                return;
+                return new RestoreResult(0, "", "", TimeSpan.Zero, false);
             }
         }
 
@@ -38,15 +40,21 @@ internal static class DotNetRestore
             // Double-check after acquiring the gate
             lock (Restored)
             {
-                if (Restored.Contains(key)) return;
+                if (Restored.Contains(key))
+                    return new RestoreResult(0, "", "", TimeSpan.Zero, false);
             }
 
-            await RunCoreAsync(path, ct);
+            var result = await RunCoreAsync(path, ct);
 
-            lock (Restored)
+            if (result.ExitCode == 0 && !result.TimedOut)
             {
-                Restored.Add(key);
+                lock (Restored)
+                {
+                    Restored.Add(key);
+                }
             }
+
+            return result;
         }
         finally
         {
@@ -54,9 +62,10 @@ internal static class DotNetRestore
         }
     }
 
-    private static async Task RunCoreAsync(string path, CancellationToken ct)
+    private static async Task<RestoreResult> RunCoreAsync(string path, CancellationToken ct)
     {
         Log.Debug("dotnet restore: starting for {Path}", path);
+        var sw = Stopwatch.StartNew();
         var psi = new ProcessStartInfo("dotnet", $"restore \"{path}\"")
         {
             WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
@@ -70,7 +79,7 @@ internal static class DotNetRestore
         if (process == null)
         {
             Log.Debug("dotnet restore: process failed to start");
-            return;
+            return new RestoreResult(-1, "", "Failed to start dotnet restore process", sw.Elapsed, false);
         }
 
         Log.Debug("dotnet restore: process started (PID {ProcessId})", process.Id);
@@ -86,14 +95,17 @@ internal static class DotNetRestore
             var stderrTask = process.StandardError.ReadToEndAsync(restoreCts.Token);
             await Task.WhenAll(stdoutTask, stderrTask);
             await process.WaitForExitAsync(restoreCts.Token);
+            sw.Stop();
             Log.Debug("dotnet restore: completed (exit code {ExitCode})", process.ExitCode);
+            return new RestoreResult(process.ExitCode, stdoutTask.Result, stderrTask.Result, sw.Elapsed, false);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Restore timed out but overall operation is still running — kill and continue
             try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
-            Log.Debug("dotnet restore: TIMED OUT after 2 minutes, killed process");
-            Console.WriteLine("  dotnet restore timed out after 2 minutes, continuing without full restore");
+            sw.Stop();
+            Log.Debug("dotnet restore: TIMED OUT after {Timeout}, killed process", Timeout);
+            return new RestoreResult(-1, "", "", sw.Elapsed, true);
         }
     }
 }
@@ -120,13 +132,28 @@ public class SolutionParser
         EnsureMSBuildRegistered();
 
         // Run dotnet restore to ensure NuGet packages are available for MSBuildWorkspace
-        var sw = Stopwatch.StartNew();
         Log.Debug(">> dotnet restore ({FileName})", Path.GetFileName(path));
-        await DotNetRestore.RunAsync(path, ct);
-        Log.Debug("<< dotnet restore ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
-        Console.WriteLine($"  dotnet restore completed in {sw.Elapsed}");
+        var restoreResult = await DotNetRestore.RunAsync(path, ct);
+        Log.Debug("<< dotnet restore ({FileName}) ({Elapsed})", Path.GetFileName(path), restoreResult.Elapsed);
 
-        sw.Restart();
+        if (restoreResult.TimedOut)
+        {
+            throw new InvalidOperationException(
+                $"dotnet restore timed out after {restoreResult.Elapsed} for {path}");
+        }
+
+        if (restoreResult.ExitCode != 0)
+        {
+            var details = string.Join("\n",
+                new[] { restoreResult.Stdout, restoreResult.Stderr }
+                    .Where(s => !string.IsNullOrWhiteSpace(s)));
+            throw new InvalidOperationException(
+                $"dotnet restore failed (exit code {restoreResult.ExitCode}) for {path}\n{details}");
+        }
+
+        Log.Debug("dotnet restore succeeded in {Elapsed}", restoreResult.Elapsed);
+
+        var sw = Stopwatch.StartNew();
         Log.Debug("MSBuildWorkspace: creating workspace");
         var workspace = MSBuildWorkspace.Create();
         var progress = new Progress<ProjectLoadProgress>(p =>
@@ -142,18 +169,16 @@ public class SolutionParser
         else
             solution = (await workspace.OpenProjectAsync(path, progress, cancellationToken: ct)).Solution;
         Log.Debug("<< MSBuildWorkspace.Open ({FileName}) ({Elapsed})", Path.GetFileName(path), sw.Elapsed);
-        Console.WriteLine($"  MSBuildWorkspace.Open completed in {sw.Elapsed}");
 
         // Report any workspace diagnostics
         var diags = workspace.Diagnostics;
         if (diags.Count > 0)
         {
             Log.Debug("MSBuildWorkspace: {DiagCount} diagnostics", diags.Count);
-            Console.WriteLine($"  Workspace diagnostics ({diags.Count}):");
-            foreach (var d in diags.Take(5))
-                Console.WriteLine($"    {d.Kind}: {d.Message}");
-            if (diags.Count > 5)
-                Console.WriteLine($"    ... and {diags.Count - 5} more");
+            foreach (var d in diags.Take(10))
+                Log.Debug("  MSBuild diagnostic {Kind}: {Message}", d.Kind, d.Message);
+            if (diags.Count > 10)
+                Log.Debug("  ... and {Remaining} more diagnostics", diags.Count - 10);
         }
 
         var projectCount = solution.Projects.Count();
