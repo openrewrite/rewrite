@@ -166,17 +166,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     }
 
     public static class Accumulator {
-        /**
-         * Version variable name → resolved new version or MavenDownloadingException
-         * (collected from GString/StringTemplate deps that match oldGroupId:oldArtifactId).
-         */
         Map<String, Object> versionVariableUpdates = new HashMap<>();
-
-        /**
-         * Version variable name → all group:artifact pairs using this variable
-         * (collected from ALL GString/StringTemplate deps, not just matching ones).
-         * Used to determine if a variable can be safely updated without affecting unrelated dependencies.
-         */
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
     }
 
@@ -212,14 +202,11 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return m;
                 }
 
-                // Record version variable usages from ALL dependency declarations (not just matching ones)
-                // so we can detect shared variables that shouldn't be updated
                 new GradleDependency.Matcher().get(getCursor()).ifPresent(dep -> {
                     Expression firstArg = unwrapPlatform(m.getArguments().get(0));
                     recordVariableUsage(firstArg, dep);
                 });
 
-                // For matching dependencies, also resolve the new version
                 GradleDependency.Matcher specificMatcher = new GradleDependency.Matcher()
                         .groupId(oldGroupId)
                         .artifactId(oldArtifactId);
@@ -338,9 +325,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 return super.visit(tree, ctx);
             }
 
-            /**
-             * Avoid duplicating dependencies when the target dependency already exists in the project.
-             */
             private JavaSourceFile maybeRemoveDuplicateTargetDependency(JavaSourceFile sourceFile, ExecutionContext ctx) {
                 Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
                 if (!maybeGp.isPresent()){
@@ -470,8 +454,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
                             String varName = extractVersionVariableName(strings);
                             if (varName != null && canUpdateVariable(varName)) {
-                                // Preserve GString structure, only update the group:artifact prefix
-                                // Version variable updates are handled separately (gradle.properties or local variable declarations)
                                 if (original != updated) {
                                     String oldGav = original.getGroupId() + ":" + original.getArtifactId();
                                     String newGav = updated.getGroupId() + ":" + updated.getArtifactId();
@@ -483,7 +465,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                     ));
                                 }
                             } else {
-                                // Variable is shared with non-matching dependencies; collapse to literal
                                 m = collapseInterpolatedToLiteral(m, gstring, updated, original, varName, ctx);
                             }
                         }
@@ -777,7 +758,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                     ));
                                 }
                             } else {
-                                // Variable is shared with non-matching dependencies; collapse to literal
                                 m = collapseInterpolatedToLiteral(m, template, updated, original, varName, ctx);
                             }
                         }
@@ -787,10 +767,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 return m;
             }
 
-            /**
-             * When a version variable is shared with non-matching dependencies, collapse the
-             * interpolated string (GString/StringTemplate) to a plain literal with the resolved version.
-             */
             private J.MethodInvocation collapseInterpolatedToLiteral(
                     J.MethodInvocation m, Expression interpolated, Dependency updated,
                     Dependency original, @Nullable String varName, ExecutionContext ctx) {
@@ -901,7 +877,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             }
         });
 
-        // Composite visitor: dispatches to gradle visitor for build files, properties visitor for gradle.properties
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
@@ -936,10 +911,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         };
     }
 
-    /**
-     * A version variable can only be updated if ALL dependencies using it match
-     * the old group:artifact pattern. Otherwise, updating it would break unrelated dependencies.
-     */
     private boolean canUpdateVariable(String varName, DependencyMatcher depMatcher, Accumulator acc) {
         Set<GroupArtifact> usages = acc.versionVariableUsages.get(varName);
         if (usages == null) {
@@ -956,14 +927,12 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     private static @Nullable String extractVersionVariableName(List<J> strings) {
         if (strings.size() >= 2) {
             J versionPart = strings.get(strings.size() - 1);
-            // Groovy GString: the value wraps a J.Identifier
             if (versionPart instanceof G.GString.Value) {
                 J inner = ((G.GString.Value) versionPart).getTree();
                 if (inner instanceof J.Identifier) {
                     return ((J.Identifier) inner).getSimpleName();
                 }
             }
-            // Kotlin StringTemplate: the expression wraps a J.Identifier
             if (versionPart instanceof K.StringTemplate.Expression) {
                 J inner = ((K.StringTemplate.Expression) versionPart).getTree();
                 if (inner instanceof J.Identifier) {
