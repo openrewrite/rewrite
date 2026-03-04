@@ -32,6 +32,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -234,7 +235,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
                     }
                 } catch (MavenDownloadingException e) {
-                    // continue
+                    m = Markup.warn(m, e);
                 }
                 return m;
             }
@@ -273,17 +274,16 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         };
         JavaVisitor<ExecutionContext> javaVisitor = new JavaVisitor<ExecutionContext>() {
 
-            @Nullable
-            private GradleProject gradleProject;
-
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
-                    gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
-                    if (gradleProject != null) {
+                    GradleProject gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    String sbVersion = acc.pluginIdToNewVersion.get("org.springframework.boot");
+                    if (gradleProject != null && sbVersion != null) {
                         if (acc.pluginIdToNewVersion.containsKey("org.springframework.boot") &&
                                 gradleProject.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId())) &&
                                 gradleProject.getPlugins().stream().anyMatch(plugin -> "org.springframework.boot".equals(plugin.getId()))) {
+                            //noinspection NullableProblems
                             AtomicReference<@Nullable String> springBootPluginVersion = new GradlePlugin.Matcher()
                                     .pluginIdPattern("org.springframework.boot")
                                     .asVisitor((GradlePlugin plugin, AtomicReference<String> ref) -> {
@@ -304,7 +304,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                             .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
                                             .filter(requested::contains)
                                             .collect(toList());
-                                    List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", acc.pluginIdToNewVersion.get("org.springframework.boot")), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                    List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", sbVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
                                             .map(md -> new GroupArtifactVersion(md.getGroupId(), md.getArtifactId(), md.getVersion()))
                                             .filter(gav -> requested.stream().anyMatch(r -> r.equals(gav.asGroupArtifact())))
                                             .collect(toList());
@@ -324,11 +324,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                                     for (GroupArtifact ga : newlyManaged) {
                                         doAfterVisit(new RemoveRedundantDependencyVersions(ga.getGroupId(), ga.getArtifactId(), RemoveRedundantDependencyVersions.Comparator.GTE).getVisitor());
                                     }
-                                } catch (MavenDownloadingException ignored) {
+                                } catch (MavenDownloadingException e) {
+                                    tree = Markup.warn(tree, e);
                                 }
                             }
                         }
-                        gradleProject = gradleProject.upgradeBuildscriptDirectDependencyVersions(singletonList(new GroupArtifactVersion("org.springframework.boot", "org.springframework.boot.gradle.plugin", acc.pluginIdToNewVersion.get("org.springframework.boot"))), ctx);
+                        gradleProject = gradleProject.upgradeBuildscriptDirectDependencyVersions(singletonList(new GroupArtifactVersion("org.springframework.boot", "org.springframework.boot.gradle.plugin", sbVersion)), ctx);
                         tree = tree.withMarkers(tree.getMarkers().setByType(gradleProject));
                     }
                 }
@@ -362,10 +363,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (resolvedVersion == null) {
                     return m;
                 }
-                return m.withArguments(ListUtils.map(versionArgs, v -> {
-                    assert v != null;
-                    return ChangeStringLiteral.withStringValue(v, resolvedVersion);
-                }));
+                return m.withArguments(ListUtils.map(versionArgs, v -> ChangeStringLiteral.withStringValue(v, resolvedVersion)));
             }
 
             @Override
