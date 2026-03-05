@@ -225,6 +225,9 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
             remote_objects[obj_id] = before
         else:
             remote_objects.pop(obj_id, None)
+        # Back out refs registered during this failed receive
+        for ref_id in q.new_ref_ids:
+            remote_refs.pop(ref_id, None)
         raise
 
     if obj is not None:

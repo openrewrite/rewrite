@@ -498,6 +498,10 @@ public class RewriteRpc {
             } else {
                 remoteObjects.remove(id);
             }
+            // Back out refs registered during this failed receive
+            for (Integer refId : q.getNewRefIds()) {
+                remoteRefs.remove(refId);
+            }
             throw e;
         }
 

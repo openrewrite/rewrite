@@ -89,6 +89,13 @@ public class GetObject implements RpcRequest {
          */
         private final Map<String, @Nullable Object> actionBaseline = new HashMap<>();
 
+        /**
+         * Tracks objects newly registered as refs during each in-flight transfer.
+         * On revert or sender-side failure, these are removed from {@code localRefs}.
+         * On success (all data consumed), the entry is cleared.
+         */
+        private final Map<String, List<Object>> pendingNewRefs = new ConcurrentHashMap<>();
+
         @Override
         protected List<RpcObjectData> handle(GetObject request) throws Exception {
             String action = request.getAction();
@@ -142,6 +149,11 @@ public class GetObject implements RpcRequest {
                     try {
                         sendQueue.send(after, currentBefore, null);
 
+                        // Track newly registered refs for potential revert
+                        if (!sendQueue.getNewRefObjects().isEmpty()) {
+                            pendingNewRefs.put(id, sendQueue.getNewRefObjects());
+                        }
+
                         // Optimistically update remoteObjects — the receiver is
                         // expected to send action="revert" if deserialization fails,
                         // which will roll this back.
@@ -153,6 +165,14 @@ public class GetObject implements RpcRequest {
                         // forces a full object sync (ADD) instead of a delta (CHANGE)
                         // against the stale, partially-sent baseline.
                         remoteObjects.remove(id);
+                        // Remove the baseline so a subsequent "revert" from the
+                        // receiver doesn't restore the entry we just removed.
+                        actionBaseline.remove(id);
+                        // Back out refs registered during this failed send
+                        for (Object obj : sendQueue.getNewRefObjects()) {
+                            localRefs.remove(obj);
+                        }
+                        pendingNewRefs.remove(id);
                         PrintStream logFile = log.get();
                         //noinspection ConstantValue
                         if (logFile != null) {
@@ -170,6 +190,8 @@ public class GetObject implements RpcRequest {
             List<RpcObjectData> batch = inProgress.queue.take();
             if (batch.get(batch.size() - 1).getState() == END_OF_OBJECT) {
                 inProgressGetRpcObjects.remove(request.getId());
+                // Transfer completed successfully — refs are committed
+                pendingNewRefs.remove(request.getId());
             }
 
             return batch;

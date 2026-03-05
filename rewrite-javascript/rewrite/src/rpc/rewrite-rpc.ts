@@ -165,6 +165,10 @@ export class RewriteRpc {
             } else {
                 this.remoteObjects.delete(id);
             }
+            // Back out refs registered during this failed receive
+            for (const refId of q.newRefIds) {
+                this.remoteRefs.delete(refId);
+            }
             throw e;
         }
 
