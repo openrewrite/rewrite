@@ -184,6 +184,19 @@ class EnumTest implements RewriteTest {
           groovy(
             """
               enum A {
+                  A1, A2();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noArgumentsWithWhitespace() {
+        rewriteRun(
+          groovy(
+            """
+              enum A {
                   A1, A2( );
               }
               """

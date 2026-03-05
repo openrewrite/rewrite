@@ -289,9 +289,8 @@ public class GroovyParserVisitor {
                         J.VariableDeclarations varDecl = new J.VariableDeclarations(randomId(), compPrefix, Markers.EMPTY,
                                 emptyList(), emptyList(), typeExpr, null, emptyList(), singletonList(JRightPadded.build(namedVar)));
                         componentDecls.add(JRightPadded.build((Statement) varDecl)
-                                .withAfter(i == components.size() - 1 ? EMPTY : sourceBefore(",")));
+                                .withAfter(i == components.size() - 1 ? sourceBefore(")") : sourceBefore(",")));
                     }
-                    skip(")");
                     primaryConstructor = JContainer.build(pcPrefix, componentDecls, Markers.EMPTY);
                 }
             }
@@ -2774,7 +2773,9 @@ public class GroovyParserVisitor {
     private static boolean isDesugaredResourceBlock(org.codehaus.groovy.ast.stmt.Statement stmt) {
         if (!(stmt instanceof BlockStatement)) return false;
         List<org.codehaus.groovy.ast.stmt.Statement> stmts = ((BlockStatement) stmt).getStatements();
-        return !stmts.isEmpty() && stmts.get(0) instanceof BlockStatement;
+        if (stmts.isEmpty() || !(stmts.get(0) instanceof BlockStatement)) return false;
+        List<org.codehaus.groovy.ast.stmt.Statement> inner = ((BlockStatement) stmts.get(0)).getStatements();
+        return inner.size() >= 3 && inner.get(inner.size() - 1) instanceof TryCatchStatement;
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {

@@ -502,7 +502,7 @@ class ClassDeclarationTest implements RewriteTest {
               }
               final class Circle extends Shape {
               }
-              final class Square extends Shape {
+              non-sealed class Square extends Shape {
               }
               """
           )
