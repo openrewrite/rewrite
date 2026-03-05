@@ -453,28 +453,65 @@ public class GroovyParserVisitor {
 
             J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), enumName, typeMapping.type(field.getType()), typeMapping.variableType(field));
 
+            // Groovy 4 represents enum constants with anonymous class bodies by appending a
+            // ClassExpression as the last element of the ListExpression initializer
+            InnerClassNode anonymousClassNode = null;
+            if (field.getInitialExpression() instanceof ListExpression) {
+                ListExpression listExpr = (ListExpression) field.getInitialExpression();
+                List<org.codehaus.groovy.ast.expr.Expression> allExprs = listExpr.getExpressions();
+                if (!allExprs.isEmpty() && allExprs.get(allExprs.size() - 1) instanceof ClassExpression) {
+                    ClassExpression classExpr = (ClassExpression) allExprs.get(allExprs.size() - 1);
+                    if (classExpr.getType() instanceof InnerClassNode && ((InnerClassNode) classExpr.getType()).isAnonymous()) {
+                        anonymousClassNode = (InnerClassNode) classExpr.getType();
+                    }
+                }
+            }
+
             J.NewClass initializer = null;
             if (sourceStartsWith("(")) {
                 Space prefixNewClass = whitespace();
                 skip("(");
                 RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
                 ListExpression arguments = (ListExpression) field.getInitialExpression();
-                List<JRightPadded<Expression>> list = visitor.convertAll(arguments.getExpressions(), n -> sourceBefore(","), n -> whitespace(), n -> {
-                    if (n == arguments.getExpression(arguments.getExpressions().size() - 1) && source.charAt(cursor) == ',') {
-                        cursor++;
-                        return Markers.build(singleton(new TrailingComma(randomId(), whitespace())));
-                    }
-                    return Markers.EMPTY;
-                });
-                skip(")");
+                // Filter out the trailing ClassExpression that represents the anonymous class body
+                List<org.codehaus.groovy.ast.expr.Expression> realArgs = anonymousClassNode != null ?
+                        arguments.getExpressions().subList(0, arguments.getExpressions().size() - 1) :
+                        arguments.getExpressions();
+                List<JRightPadded<Expression>> list;
+                if (realArgs.isEmpty()) {
+                    list = singletonList(JRightPadded.build((Expression) new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
+                } else {
+                    list = visitor.convertAll(realArgs, n -> sourceBefore(","), n -> whitespace(), n -> {
+                        if (n == realArgs.get(realArgs.size() - 1) && source.charAt(cursor) == ',') {
+                            cursor++;
+                            return Markers.build(singleton(new TrailingComma(randomId(), whitespace())));
+                        }
+                        return Markers.EMPTY;
+                    });
+                    skip(")");
+                }
 
                 MethodNode ctor = null;
                 for (ConstructorNode constructor : field.getOwner().getDeclaredConstructors()) {
-                    if (constructor.getParameters().length == arguments.getExpressions().size()) {
+                    if (constructor.getParameters().length == realArgs.size()) {
                         ctor = constructor;
                     }
                 }
-                initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, JContainer.build(list), null, typeMapping.methodType(ctor));
+
+                J.Block body = anonymousClassNode != null ? visitClassBlock(anonymousClassNode) : null;
+                initializer = new J.NewClass(randomId(), prefixNewClass, Markers.EMPTY, null, EMPTY, null, JContainer.build(list), body, typeMapping.methodType(ctor));
+            } else if (anonymousClassNode != null) {
+                // Enum constant with anonymous body but no constructor args, e.g. `A2 { ... }`
+                MethodNode ctor = null;
+                for (ConstructorNode constructor : field.getOwner().getDeclaredConstructors()) {
+                    if (constructor.getParameters().length == 0) {
+                        ctor = constructor;
+                    }
+                }
+                JContainer<Expression> args = JContainer.<Expression>empty()
+                        .withMarkers(Markers.build(singleton(new OmitParentheses(randomId()))));
+                J.Block body = visitClassBlock(anonymousClassNode);
+                initializer = new J.NewClass(randomId(), EMPTY, Markers.EMPTY, null, EMPTY, null, args, body, typeMapping.methodType(ctor));
             }
 
             return new J.EnumValue(randomId(), prefix, Markers.EMPTY, annotations, name, initializer);

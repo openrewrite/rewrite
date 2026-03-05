@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -110,7 +109,6 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void anonymousClassInitializer() {
         rewriteRun(
@@ -186,7 +184,7 @@ class EnumTest implements RewriteTest {
           groovy(
             """
               enum A {
-                  A1, A2();
+                  A1, A2( );
               }
               """
           )
