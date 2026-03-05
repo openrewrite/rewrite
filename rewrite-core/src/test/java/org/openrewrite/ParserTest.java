@@ -21,7 +21,9 @@ import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.InputStream;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,6 +54,22 @@ class ParserTest implements RewriteTest {
           new RuntimeException("bad file!!"));
 
         assertThat(pe.printAll()).isEqualTo("bad file");
+    }
+
+    @Test
+    void getRelativePathWithRelativePathAndAbsoluteRelativeTo() {
+        // KotlinParser.determinePath() produces relative paths like "com/example/MyClass.kt".
+        // When a stub fails to parse, ParseError.build() calls input.getRelativePath(relativeTo)
+        // where relativeTo is an absolute project root from the Gradle plugin.
+        // On JDK 21+, Path.relativize() throws IllegalArgumentException when the paths
+        // are of different types (one absolute, one relative).
+        Path relativePath = Paths.get("com/example/MyClass.kt");
+        Path absoluteBase = Paths.get("/some/absolute/project/root");
+
+        Parser.Input input = new Parser.Input(relativePath, () -> InputStream.nullInputStream());
+
+        Path result = input.getRelativePath(absoluteBase);
+        assertThat(result).isEqualTo(relativePath);
     }
 
     @Test
