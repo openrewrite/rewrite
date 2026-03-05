@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class ChangeDependencyTest implements RewriteTest {
     @Override
@@ -262,9 +263,99 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def version = '2.6'
+              def version = '3.11'
               dependencies {
-                  implementation platform("org.apache.commons:commons-lang3:3.11")
+                  implementation platform("org.apache.commons:commons-lang3:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithGStringFromGradleProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            """
+              commonsLangVersion=3.11
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.apache.commons:commons-lang3:${commonsLangVersion}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslStringInterpolationFromGradleProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            """
+              commonsLangVersion=3.11
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val commonsLangVersion: String by project
+              dependencies {
+                  implementation("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val commonsLangVersion: String by project
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
@@ -573,8 +664,8 @@ class ChangeDependencyTest implements RewriteTest {
               }
 
               dependencies {
-                  val commonsLangVersion = "2.6"
-                  implementation("org.apache.commons:commons-lang3:3.11")
+                  val commonsLangVersion = "3.11"
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
@@ -846,6 +937,127 @@ class ChangeDependencyTest implements RewriteTest {
                 .containsOnlyOnce("tools.jackson.core:jackson-databind:3")
                 .doesNotContain("datatype")
                 .actual())
+          )
+        );
+    }
+
+    @Test
+    void sharedGStringVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation "commons-lang:commons-lang:${version}"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedGradlePropertiesVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              sharedVersion=2.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "commons-lang:commons-lang:${sharedVersion}"
+                  implementation "com.google.guava:guava:${sharedVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11"
+                  implementation "com.google.guava:guava:${sharedVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedKotlinDslStringTemplateVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("commons-lang:commons-lang:${version}")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """
           )
         );
     }
