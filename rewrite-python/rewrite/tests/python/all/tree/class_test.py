@@ -1,3 +1,9 @@
+from pathlib import Path
+
+from rewrite.java.support_types import JavaType
+from rewrite.java.tree import Assignment, ClassDeclaration, Identifier
+from rewrite.python.tree import CompilationUnit
+from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 
 
@@ -110,3 +116,123 @@ def test_starred_base():
             ...
         """
     ))
+
+
+def test_generic_class_type_params():
+    """Verify type parameters on a generic class like class Box[T]."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_assignment(self, assignment, p):
+                if not isinstance(assignment, Assignment):
+                    return assignment
+                # Only check the `x = Box(42)` assignment
+                if not isinstance(assignment.variable, Identifier) or assignment.variable.simple_name != 'x':
+                    return assignment
+                if assignment.type is None:
+                    errors.append("Assignment.type is None for x = Box(42)")
+                elif isinstance(assignment.type, JavaType.Class):
+                    if assignment.type._fully_qualified_name != 'Box':
+                        errors.append(f"Assignment.type fqn is '{assignment.type._fully_qualified_name}', expected 'Box'")
+                    type_params = getattr(assignment.type, '_type_parameters', None)
+                    if type_params is None:
+                        errors.append("Box class type has no _type_parameters")
+                    elif len(type_params) != 1:
+                        errors.append(f"Box class type has {len(type_params)} type params, expected 1")
+                    else:
+                        tp = type_params[0]
+                        if isinstance(tp, JavaType.Class):
+                            if tp._fully_qualified_name != 'T':
+                                errors.append(f"type_parameter fqn is '{tp._fully_qualified_name}', expected 'T'")
+                        else:
+                            errors.append(f"type_parameter is {type(tp).__name__}, expected Class")
+                return assignment
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        class Box[T]:
+            def __init__(self, value: T) -> None:
+                self.value = value
+        x = Box(42)
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+def test_class_literal_module_qualified_fqn():
+    """Verify that a class defined in a module gets a module-qualified FQN on its classLiteral type."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_class_declaration(self, class_decl, p):
+                if not isinstance(class_decl, ClassDeclaration):
+                    return class_decl
+                cd_type = class_decl.type
+                if cd_type is None:
+                    errors.append("ClassDeclaration.type is None for MyClass")
+                elif isinstance(cd_type, JavaType.Class):
+                    fqn = cd_type._fully_qualified_name
+                    # The FQN should contain a module prefix (not just bare 'MyClass')
+                    if '.' not in fqn:
+                        errors.append(f"ClassDeclaration.type fqn '{fqn}' has no module prefix, expected '<module>.MyClass'")
+                return class_decl
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        class MyClass:
+            pass
+        """,
+        path=Path("a.py"),
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
+def test_class_instance_type_attribution():
+    """Verify that x = Foo() assigns a type with fqn ending in 'Foo'."""
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_assignment(self, assignment, p):
+                if not isinstance(assignment, Assignment):
+                    return assignment
+                if assignment.type is None:
+                    errors.append("Assignment.type is None for Foo()")
+                elif isinstance(assignment.type, JavaType.Class):
+                    fqn = assignment.type._fully_qualified_name
+                    # Accept 'Foo' or '<module>.Foo' (module-qualified with newer ty-types)
+                    if not fqn.endswith('Foo'):
+                        errors.append(f"Assignment.type fqn is '{fqn}', expected to end with 'Foo'")
+                else:
+                    # Accept any non-None type
+                    pass
+                return assignment
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        class Foo:
+            pass
+        x = Foo()
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)

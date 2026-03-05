@@ -375,8 +375,7 @@ class BinaryTest implements RewriteTest {
     @Test
     void deeplyNestedStringConcatenation() {
         // Test parsing deeply nested string concatenations (many + operations)
-        // With very deep nesting, the Kotlin compiler's FIR builder causes a StackOverflowError
-        // which should be gracefully caught and converted to a ParseError
+        // K1's FIR builder caused a StackOverflowError at this depth; K2 handles it successfully
         StringBuilder sb = new StringBuilder();
         sb.append("val s = ");
         for (int i = 0; i < 2000; i++) {
@@ -388,11 +387,7 @@ class BinaryTest implements RewriteTest {
                 .parse(sb.toString())
                 .findFirst();
         assertThat(sf).isPresent();
-        assertThat(sf.get()).isInstanceOf(ParseError.class);
-        var parseError = (ParseError) sf.get();
-        ParseExceptionResult ex = parseError.getMarkers()
-                .findFirst(ParseExceptionResult.class)
-                .orElseThrow();
-        assertThat(ex.getExceptionType()).isEqualTo("StackOverflowError");
+        // K2 can handle this nesting depth without StackOverflow
+        assertThat(sf.get()).isNotInstanceOf(ParseError.class);
     }
 }

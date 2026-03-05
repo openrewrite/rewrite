@@ -227,6 +227,90 @@ class PyProjectTomlParserTest {
     }
 
     @Test
+    void skipsUvResolutionWhenPoetryLockExists(@TempDir Path tempDir) throws IOException {
+        String pyprojectToml = """
+          [project]
+          name = "poetry-managed"
+          version = "1.0.0"
+          dependencies = ["requests>=2.28.0"]
+          """;
+
+        Files.write(tempDir.resolve("pyproject.toml"), pyprojectToml.getBytes());
+        Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
+
+        PyProjectTomlParser parser = new PyProjectTomlParser();
+        Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
+        List<SourceFile> parsed = parser.parseInputs(
+          Collections.singletonList(input),
+          tempDir,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        Toml.Document doc = (Toml.Document) parsed.get(0);
+        PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getResolvedDependencies()).isEmpty();
+    }
+
+    @Test
+    void skipsUvResolutionWhenPdmLockExists(@TempDir Path tempDir) throws IOException {
+        String pyprojectToml = """
+          [project]
+          name = "pdm-managed"
+          version = "1.0.0"
+          dependencies = ["requests>=2.28.0"]
+          """;
+
+        Files.write(tempDir.resolve("pyproject.toml"), pyprojectToml.getBytes());
+        Files.write(tempDir.resolve("pdm.lock"), "".getBytes());
+
+        PyProjectTomlParser parser = new PyProjectTomlParser();
+        Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
+        List<SourceFile> parsed = parser.parseInputs(
+          Collections.singletonList(input),
+          tempDir,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        Toml.Document doc = (Toml.Document) parsed.get(0);
+        PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getResolvedDependencies()).isEmpty();
+    }
+
+    @Test
+    void skipsUvResolutionWhenPoetryToolSectionDetected(@TempDir Path tempDir) throws IOException {
+        String pyprojectToml = """
+          [project]
+          name = "poetry-tool"
+          version = "1.0.0"
+          dependencies = ["requests>=2.28.0"]
+
+          [tool.poetry]
+          name = "poetry-tool"
+          """;
+
+        Files.write(tempDir.resolve("pyproject.toml"), pyprojectToml.getBytes());
+
+        PyProjectTomlParser parser = new PyProjectTomlParser();
+        Parser.Input input = Parser.Input.fromFile(tempDir.resolve("pyproject.toml"));
+        List<SourceFile> parsed = parser.parseInputs(
+          Collections.singletonList(input),
+          tempDir,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        Toml.Document doc = (Toml.Document) parsed.get(0);
+        PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getResolvedDependencies()).isEmpty();
+        assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Poetry);
+    }
+
+    @Test
     void builderCreatesDslName() {
         PyProjectTomlParser.Builder builder = PyProjectTomlParser.builder();
         assertThat(builder.getDslName()).isEqualTo("pyproject.toml");

@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {JS, typescript} from "../../../src/javascript";
+import {J} from "../../../src/java";
 
 describe('import mapping', () => {
     const spec = new RecipeSpec();
@@ -146,6 +147,31 @@ describe('import mapping', () => {
             typescript(`
                 import   type my = require('my-library');
                 `)
+        ));
+
+    test('empty named import', () =>
+        spec.rewriteRun({
+            //language=typescript
+            ...typescript('import type {} from \'../..\''),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const imp = cu.statements[0].element as JS.Import;
+                expect(imp.kind).toEqual(JS.Kind.Import);
+                const clause = imp.importClause!;
+                expect(clause.kind).toEqual(JS.Kind.ImportClause);
+                expect(clause.typeOnly).toBe(true);
+                const namedImports = clause.namedBindings as JS.NamedImports;
+                expect(namedImports.kind).toEqual(JS.Kind.NamedImports);
+                expect(namedImports.elements.elements).toHaveLength(1);
+                const specifier = namedImports.elements.elements[0].element;
+                expect(specifier.kind).toEqual(JS.Kind.ImportSpecifier);
+                expect(specifier.specifier.kind).toEqual(J.Kind.Empty);
+            }
+        }));
+
+    test('empty named import with space', () =>
+        spec.rewriteRun(
+            //language=typescript
+            typescript('import type { } from \'../..\'')
         ));
 
     test('export import', () =>

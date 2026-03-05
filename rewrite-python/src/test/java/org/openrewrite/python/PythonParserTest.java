@@ -21,7 +21,6 @@ import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;

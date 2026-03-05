@@ -2079,7 +2079,10 @@ export class JavaScriptParserVisitor {
 
     visitCallExpression(node: ts.CallExpression): J.MethodInvocation | JS.FunctionCall {
         const prefix = this.prefix(node);
-        const typeArguments = node.typeArguments && this.mapTypeArguments(this.prefix(this.findChildNode(node, ts.SyntaxKind.LessThanToken)!), node.typeArguments);
+        const ltToken = this.findChildNode(node, ts.SyntaxKind.LessThanToken);
+        const typeArguments = node.typeArguments && ltToken
+            ? this.mapTypeArguments(this.prefix(ltToken), node.typeArguments)
+            : undefined;
 
         let select: J.RightPadded<Expression> | undefined;
         let name: J.Identifier = {
@@ -3695,12 +3698,34 @@ export class JavaScriptParserVisitor {
     }
 
     visitNamedImports(node: ts.NamedImports): JS.NamedImports {
+        const children = node.getChildren(this.sourceFile);
+        let elements: J.Container<JS.ImportSpecifier>;
+        if (node.elements.length === 0) {
+            const openBrace = children[0];
+            const closeBrace = children[children.length - 1];
+            elements = {
+                kind: J.Kind.Container,
+                before: this.prefix(openBrace),
+                elements: [this.rightPadded<JS.ImportSpecifier>({
+                    kind: JS.Kind.ImportSpecifier,
+                    id: randomId(),
+                    prefix: emptySpace,
+                    markers: emptyMarkers,
+                    importType: this.leftPadded(emptySpace, false),
+                    specifier: this.newEmpty(this.prefix(closeBrace)),
+                    type: undefined
+                }, emptySpace)],
+                markers: emptyMarkers
+            };
+        } else {
+            elements = this.mapCommaSeparatedList(children);
+        }
         return {
             kind: JS.Kind.NamedImports,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            elements: this.mapCommaSeparatedList(node.getChildren(this.sourceFile)),
+            elements,
             type: undefined
         };
     }

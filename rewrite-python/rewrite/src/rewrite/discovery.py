@@ -18,15 +18,12 @@ from __future__ import annotations
 
 import inspect
 from importlib.metadata import entry_points
-from typing import List, Tuple, Type, TYPE_CHECKING
+from typing import List, Tuple, Type
 
 from rewrite.category import CategoryDescriptor
 from rewrite.decorators import get_recipe_category
 from rewrite.marketplace import RecipeMarketplace
 from rewrite.recipe import Recipe
-
-if TYPE_CHECKING:
-    pass
 
 
 def discover_recipes() -> RecipeMarketplace:

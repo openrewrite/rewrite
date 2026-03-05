@@ -31,6 +31,7 @@ import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -517,73 +518,82 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitBinary(J.Binary binary, PrintOutputCapture<P> p) {
-            String keyword = "";
+            // Collect left-recursive binary chain to avoid StackOverflow on deeply nested expressions.
+            // For a left-associative tree like ((a + b) + c) + d, this collects [outer, middle, inner]
+            // and prints them iteratively instead of recursively.
+            List<J.Binary> chain = new ArrayList<>();
+            J.Binary current = binary;
+            while (true) {
+                chain.add(current);
+                if (current.getLeft() instanceof J.Binary) {
+                    current = (J.Binary) current.getLeft();
+                } else {
+                    break;
+                }
+            }
+
+            // Print beforeSyntax for each binary, outermost first
+            for (J.Binary b : chain) {
+                beforeSyntax(b, Space.Location.BINARY_PREFIX, p);
+            }
+
+            // Visit the leftmost non-binary expression
+            visit(chain.get(chain.size() - 1).getLeft(), p);
+
+            // Unwind from innermost to outermost: print operator + right + afterSyntax
+            for (int i = chain.size() - 1; i >= 0; i--) {
+                J.Binary b = chain.get(i);
+                visitSpace(b.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
+                p.append(binaryKeyword(b));
+                visit(b.getRight(), p);
+                afterSyntax(b, p);
+            }
+            return binary;
+        }
+
+        private String binaryKeyword(J.Binary binary) {
             switch (binary.getOperator()) {
                 case Addition:
-                    keyword = "+";
-                    break;
+                    return "+";
                 case Subtraction:
-                    keyword = "-";
-                    break;
+                    return "-";
                 case Multiplication:
-                    keyword = "*";
-                    break;
+                    return "*";
                 case Division:
-                    keyword = "/";
-                    break;
+                    return "/";
                 case Modulo:
-                    keyword = "%";
-                    break;
+                    return "%";
                 case LessThan:
-                    keyword = "<";
-                    break;
+                    return "<";
                 case GreaterThan:
-                    keyword = ">";
-                    break;
+                    return ">";
                 case LessThanOrEqual:
-                    keyword = "<=";
-                    break;
+                    return "<=";
                 case GreaterThanOrEqual:
-                    keyword = ">=";
-                    break;
+                    return ">=";
                 case Equal:
-                    keyword = "==";
-                    break;
+                    return "==";
                 case NotEqual:
-                    keyword = "!=";
-                    break;
+                    return "!=";
                 case BitAnd:
-                    keyword = "and";
-                    break;
+                    return "and";
                 case BitOr:
-                    keyword = "or";
-                    break;
+                    return "or";
                 case BitXor:
-                    keyword = "xor";
-                    break;
+                    return "xor";
                 case LeftShift:
-                    keyword = "shl";
-                    break;
+                    return "shl";
                 case RightShift:
-                    keyword = "shr";
-                    break;
+                    return "shr";
                 case UnsignedRightShift:
-                    keyword = "ushr";
-                    break;
+                    return "ushr";
                 case Or:
-                    keyword = (binary.getMarkers().findFirst(LogicalComma.class).isPresent()) ? "," : "||";
-                    break;
+                    return binary.getMarkers().findFirst(LogicalComma.class).isPresent() ? "," : "||";
                 case And:
-                    keyword = "&&";
-                    break;
+                    return "&&";
+                default:
+                    return "";
             }
-            beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
-            visit(binary.getLeft(), p);
-            visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
-            p.append(keyword);
-            visit(binary.getRight(), p);
-            afterSyntax(binary, p);
-            return binary;
         }
 
         @Override
@@ -718,7 +728,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitContainer("where", typeConstraints.getPadding().getConstraints(), JContainer.Location.TYPE_PARAMETERS, ",", "", p);
             }
 
-            if (!classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
+            if (classDecl.getBody() != null && !classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
                 visit(classDecl.getBody(), p);
             }
             afterSyntax(classDecl, p);

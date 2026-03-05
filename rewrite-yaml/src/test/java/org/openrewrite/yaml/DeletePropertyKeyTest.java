@@ -544,4 +544,22 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deleteLastEntryPreservesInlineCommentOnPreviousEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("root.delete-me", null, null, null)),
+          yaml(
+            """
+              root:
+                keep: yes # inline comment
+                delete-me: val
+              """,
+            """
+              root:
+                keep: yes # inline comment
+              """
+          )
+        );
+    }
 }

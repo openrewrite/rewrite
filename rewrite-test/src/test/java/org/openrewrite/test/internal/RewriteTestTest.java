@@ -21,9 +21,11 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -34,6 +36,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -75,10 +79,20 @@ class RewriteTestTest implements RewriteTest {
 
     @Test
     void multipleFilesWithSamePath() {
-        assertThrows(AssertionError.class,
+        AssertionError e = assertThrows(AssertionError.class,
           () -> rewriteRun(
             spec -> spec.recipe(new CreatesTwoFilesSamePath()),
             text(null, "duplicate", spec -> spec.path("duplicate.txt"))));
+        assertThat(e).hasStackTraceContaining("Recipe generated multiple source files at the same path");
+    }
+
+    @Test
+    void generatesFileCollidingWithExistingFile() {
+        AssertionError e = assertThrows(AssertionError.class,
+          () -> rewriteRun(
+            spec -> spec.recipe(new GeneratesExistingFile()),
+            text("existing content", spec -> spec.path("existing.txt"))));
+        assertThat(e).hasStackTraceContaining("Recipe generated a source file that already exists in the source set");
     }
 
     @Test
@@ -110,7 +124,7 @@ class RewriteTestTest implements RewriteTest {
               description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
               recipeList:
                 - org.openrewrite.DoesNotExist
-
+              
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }
@@ -140,6 +154,59 @@ class RewriteTestTest implements RewriteTest {
             .recipe(new ScannerEdit()),
           text("foo")
         );
+    }
+
+    @Nested
+    class RecipeValidation {
+
+        @Test
+        void validateRecipeWithNoOptions() {
+            rewriteRun(
+              spec -> spec.recipe(new RecipeWithNoOptions()),
+              new SourceSpecs[0]
+            );
+        }
+
+        @Test
+        void validateRecipeWithOnlyRequiredOptionsPositive() {
+            rewriteRun(
+              spec -> spec.recipe(new RecipeWithRequiredOptionValidateNoBlank("Test")),
+              new SourceSpecs[0]
+            );
+        }
+
+        @Test
+        void validateRecipeWithOnlyRequiredOptionsNegative() {
+            assertThatThrownBy(() ->
+              rewriteRun(
+                spec -> spec.recipe(new RecipeWithRequiredOptionValidateNoBlank("")),
+                new SourceSpecs[0]
+              )
+            );
+        }
+
+        @Test
+        void skipValidationForRecipeWithOptionalOptions() {
+            rewriteRun(
+              spec -> spec.recipe(new RecipeWithOptionalOrValidation(null, null)),
+              new SourceSpecs[0]
+            );
+        }
+
+        @Test
+        void validateDeclarativeRecipe() {
+            assertThrows(AssertionError.class, () ->
+              rewriteRun(
+                spec -> spec.recipeFromYaml("""
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.internal.StillValidated
+                  displayName: Still validated
+                  description: Declarative recipe with a non-existent sub-recipe should still fail validation.
+                  recipeList:
+                    - org.openrewrite.DoesNotExist
+                  """, "org.openrewrite.test.internal.StillValidated")
+              ));
+        }
     }
 }
 
@@ -219,7 +286,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     String displayName = "Creates two source files with the same path";
 
     String description = "A source file's path must be unique. " +
-          "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
+      "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -285,10 +352,10 @@ class RecipeWithDescriptionListOfLinks extends Recipe {
 
     @Getter
     final String description = """
-          A fancy description.
-          For more information, see:
-            - [link 1](https://example.com/link1)
-            - [link 2](https://example.com/link2)""";
+      A fancy description.
+      For more information, see:
+        - [link 1](https://example.com/link1)
+        - [link 2](https://example.com/link2)""";
 }
 
 @NullMarked
@@ -299,10 +366,10 @@ class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
 
     @Getter
     final String description = """
-          A fancy description.
-          For more information, see:
-            - First Resource [link 1](https://example.com/link1).
-            - Second Resource [link 2](https://example.com/link2).""";
+      A fancy description.
+      For more information, see:
+        - First Resource [link 1](https://example.com/link1).
+        - Second Resource [link 2](https://example.com/link2).""";
 }
 
 @NullMarked
@@ -313,4 +380,86 @@ class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
 
     @Getter
     final String description = "A fancy description";
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a file that already exists";
+
+    String description = "A recipe that generates a source file at a path that already exists in the source set.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("generated content")
+          .sourcePath(Path.of("existing.txt"))
+          .build());
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+class RecipeWithNoOptions extends Recipe {
+    String displayName = "Recipe with no options";
+    String description = "Has no configurable options at all.";
+}
+
+@Value
+@NullMarked
+@EqualsAndHashCode(callSuper = false)
+class RecipeWithRequiredOptionValidateNoBlank extends Recipe {
+    String displayName = "Recipe with required option";
+    String description = "Has a single required parameter.";
+
+    @Option(displayName = "Required param",
+      description = "A required parameter.")
+    String requiredParam;
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate()
+          .and(Validated.notBlank("Required param", requiredParam));
+    }
+}
+
+@Value
+@NullMarked
+@EqualsAndHashCode(callSuper = false)
+class RecipeWithOptionalOrValidation extends Recipe {
+    String displayName = "Recipe with optional OR validation";
+    String description = "Has two optional parameters where at least one must be set.";
+
+    @Option(displayName = "Option A",
+      description = "First optional parameter.",
+      example = "valueA",
+      required = false)
+    @Nullable
+    String optionA;
+
+    @Option(displayName = "Option B",
+      description = "Second optional parameter.",
+      example = "valueB",
+      required = false)
+    @Nullable
+    String optionB;
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(
+          Validated.required("optionA", optionA)
+            .or(Validated.required("optionB", optionB)));
+    }
 }

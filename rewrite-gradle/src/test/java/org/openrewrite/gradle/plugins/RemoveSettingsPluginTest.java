@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 
 class RemoveSettingsPluginTest implements RewriteTest {
     @DocumentExample
@@ -31,6 +32,21 @@ class RemoveSettingsPluginTest implements RewriteTest {
             """
               plugins {
                   id "com.gradle.enterprise" version "3.12.0"
+              }
+              """,
+            ""
+          )
+        );
+    }
+
+    @Test
+    void removePluginKts() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise")),
+          settingsGradleKts(
+            """
+              plugins {
+                  id("com.gradle.enterprise") version "3.12.0"
               }
               """,
             ""

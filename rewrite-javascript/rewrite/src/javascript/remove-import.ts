@@ -278,12 +278,20 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     // Otherwise, just remove the default import and fix spacing
                     return this.updateImportClause(jsImport, importClause, async draft => {
                         draft.name = undefined;
-                        // When removing the default import, we need to transfer its prefix to namedBindings
-                        // to maintain proper spacing (the default import's prefix is typically empty)
+                        // When removing the default import, we need to fix up spacing on the
+                        // namedBindings. The space between "import" and the clause content is
+                        // already in importClause.prefix, so we clear both namedBindings.prefix
+                        // and elements.before (the space before "{") to avoid a double space.
                         if (draft.namedBindings && importClause.name?.element) {
                             draft.namedBindings = await this.produceJava(
                                 draft.namedBindings, p, async bindingsDraft => {
                                     bindingsDraft.prefix = importClause.name!.element!.prefix;
+                                    if (bindingsDraft.elements) {
+                                        bindingsDraft.elements = {
+                                            ...bindingsDraft.elements,
+                                            before: importClause.name!.element!.prefix
+                                        };
+                                    }
                                 }
                             );
                         }

@@ -16,11 +16,14 @@
 package org.openrewrite.python;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.ReorderMethodArguments;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+
+import java.nio.file.Path;
 
 import static org.openrewrite.python.Assertions.python;
 
@@ -31,6 +34,14 @@ import static org.openrewrite.python.Assertions.python;
  */
 @SuppressWarnings("PyUnresolvedReferences")
 class ReorderMethodArgumentsIntegTest implements RewriteTest {
+
+    @BeforeEach
+    void before() {
+        PythonRewriteRpc.setFactory(PythonRewriteRpc.builder()
+                .log(Path.of("/tmp/python-rpc.log"))
+                .traceRpcMessages()
+        );
+    }
 
     @AfterEach
     void after() {

@@ -54,7 +54,7 @@ class TestTemplateEngine:
         assert len(args) == 1
         arg = args[0]
         assert isinstance(arg, j.Identifier)
-        assert arg.simple_name == '__placeholder_x__'
+        assert arg.simple_name == '__plh_x__'
 
     def test_parse_statement(self):
         """Test parsing a statement template."""
@@ -172,7 +172,7 @@ class TestTemplateEngineExtraTypes:
         tree = TemplateEngine.get_template_tree("return {x}", captures)
         assert isinstance(tree, j.Return)
         assert isinstance(tree.expression, j.Identifier)
-        assert tree.expression.simple_name == '__placeholder_x__'
+        assert tree.expression.simple_name == '__plh_x__'
 
     def test_parse_multiple_placeholders(self):
         """Test parsing an expression with multiple placeholders."""
@@ -180,9 +180,9 @@ class TestTemplateEngineExtraTypes:
         tree = TemplateEngine.get_template_tree("{a} + {b}", captures)
         assert isinstance(tree, j.Binary)
         assert isinstance(tree.left, j.Identifier)
-        assert tree.left.simple_name == '__placeholder_a__'
+        assert tree.left.simple_name == '__plh_a__'
         assert isinstance(tree.right, j.Identifier)
-        assert tree.right.simple_name == '__placeholder_b__'
+        assert tree.right.simple_name == '__plh_b__'
 
 
 class TestEngineEdgeCases:
@@ -221,6 +221,65 @@ class TestEngineEdgeCases:
         """Test that an empty captures dict works fine."""
         tree = TemplateEngine.get_template_tree("x + 1", {})
         assert isinstance(tree, j.Binary)
+
+
+class TestEngineContextAndDependencies:
+    """Tests for context and dependencies support in TemplateEngine."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_cache_key_varies_by_context(self):
+        """Test that different context statements produce different cache keys."""
+        key1 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(context=("x = 1",))
+        )
+        key2 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(context=("y = 2",))
+        )
+        assert key1 != key2
+
+    def test_cache_key_varies_by_dependencies(self):
+        """Test that different dependencies produce different cache keys."""
+        key1 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(dependencies=(("requests", "2.31.0"),))
+        )
+        key2 = TemplateEngine._make_cache_key(
+            "x", {}, TemplateOptions(dependencies=(("flask", "3.0.0"),))
+        )
+        assert key1 != key2
+
+    def test_cache_key_same_when_all_match(self):
+        """Test that identical options produce the same cache key."""
+        opts = TemplateOptions(
+            imports=("import os",),
+            context=("x = 1",),
+            dependencies=(("requests", "2.31.0"),),
+        )
+        key1 = TemplateEngine._make_cache_key("x", {}, opts)
+        key2 = TemplateEngine._make_cache_key("x", {}, opts)
+        assert key1 == key2
+
+    def test_wrapper_with_context(self):
+        """Test that wrapper generation includes context statements."""
+        wrapper = TemplateEngine._generate_wrapper(
+            "x", TemplateOptions(context=("MyType = int",))
+        )
+        assert "MyType = int" in wrapper
+
+    def test_wrapper_includes_both_imports_and_context(self):
+        """Test that wrapper includes both imports and context."""
+        wrapper = TemplateEngine._generate_wrapper(
+            "x",
+            TemplateOptions(
+                imports=("import os",),
+                context=("MY_CONST = 42",),
+            ),
+        )
+        assert "import os" in wrapper
+        assert "MY_CONST = 42" in wrapper
+        # imports come before context
+        assert wrapper.index("import os") < wrapper.index("MY_CONST = 42")
 
 
 class TestAutoFormatIntegration:
@@ -329,7 +388,7 @@ class TestAutoFormatIntegration:
         )
 
     def test_apply_coordinates_no_cu_context_does_not_crash(self):
-        """_apply_coordinates with cursor lacking CU context doesn't crash."""
+        """apply_coordinates with cursor lacking CU context doesn't crash."""
         from rewrite.visitor import Cursor
         from rewrite.python.template.coordinates import PythonCoordinates
 
@@ -340,5 +399,5 @@ class TestAutoFormatIntegration:
         coordinates = PythonCoordinates.replace(original)
         cursor = Cursor(parent=Cursor(None, Cursor.ROOT_VALUE), value=original)
 
-        out = TemplateEngine._apply_coordinates(result, cursor, coordinates)
+        out = TemplateEngine.apply_coordinates(result, cursor, coordinates)
         assert out is not None

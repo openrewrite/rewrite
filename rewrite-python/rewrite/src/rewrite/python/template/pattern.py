@@ -16,7 +16,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Union, TYPE_CHECKING
 
 from rewrite.java import J
@@ -33,27 +32,31 @@ class MatchResult:
     Result of a successful pattern match.
 
     Provides access to captured values by name or Capture object.
+    Scalar captures return a single ``J`` node; variadic captures
+    return a ``List[J]`` of matched elements.
 
     Examples:
         match = pattern.match(node, cursor)
         if match:
-            x_value = match.get('x')
+            x_value = match.get('x')          # J node
+            args = match.get('args')           # List[J] for variadic
             # or
             x_value = match.get(x_capture)
             # or
             x_value = match['x']
     """
 
-    def __init__(self, captures: Dict[str, J]):
+    def __init__(self, captures: Dict[str, Union[J, List[J]]]):
         """
         Initialize match result.
 
         Args:
             captures: Dict mapping capture names to their matched AST values.
+                Scalar captures map to a single J; variadic captures to List[J].
         """
         self._captures = captures
 
-    def get(self, capture: Union[str, Capture]) -> Optional[J]:
+    def get(self, capture: Union[str, Capture]) -> Optional[Union[J, List[J]]]:
         """
         Get a captured value.
 
@@ -61,12 +64,13 @@ class MatchResult:
             capture: The capture name or Capture object.
 
         Returns:
-            The captured AST node, or None if not found.
+            The captured AST node (``J``), list of nodes (``List[J]``
+            for variadic captures), or ``None`` if not found.
         """
         name = capture.name if isinstance(capture, Capture) else capture
         return self._captures.get(name)
 
-    def __getitem__(self, key: Union[str, Capture]) -> J:
+    def __getitem__(self, key: Union[str, Capture]) -> Union[J, List[J]]:
         """
         Get a captured value (dict-style access).
 
@@ -74,7 +78,7 @@ class MatchResult:
             key: The capture name or Capture object.
 
         Returns:
-            The captured AST node.
+            The captured AST node or list of nodes.
 
         Raises:
             KeyError: If the capture was not matched.
@@ -105,7 +109,7 @@ class MatchResult:
         """Get all capture names in this result."""
         return list(self._captures.keys())
 
-    def as_dict(self) -> Dict[str, J]:
+    def as_dict(self) -> Dict[str, Union[J, List[J]]]:
         """Get all captures as a dictionary."""
         return dict(self._captures)
 
@@ -127,7 +131,7 @@ class Pattern:
     Examples:
         # Pattern with named capture
         x = capture('x')
-        pat = pattern("print({x})", x=x)
+        pat = pattern(f"print({x})")
 
         # Match against a node
         match = pat.match(node, cursor)
@@ -136,7 +140,7 @@ class Pattern:
 
         # Pattern with multiple captures
         a, b = capture('a'), capture('b')
-        pat = pattern("{a} + {b}", a=a, b=b)
+        pat = pattern(f"{a} + {b}")
     """
 
     def __init__(
@@ -144,6 +148,8 @@ class Pattern:
         code: str,
         captures: Optional[Dict[str, Capture]] = None,
         imports: Optional[List[str]] = None,
+        context: Optional[List[str]] = None,
+        dependencies: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize a pattern.
@@ -151,12 +157,18 @@ class Pattern:
         Args:
             code: Python code with {name} placeholders.
             captures: Dict mapping capture names to Capture objects.
-            imports: Import statements for type resolution.
+            imports: Deprecated — use ``context`` instead.
+            context: Arbitrary statements (imports, assignments, …) prepended
+                to the pattern code for parsing.
+            dependencies: PyPI packages required by the pattern
+                (``{package: ">=version"}``; bare versions default to ``>=``).
         """
         self._code = code
         self._captures = captures or {}
         self._options = TemplateOptions(
             imports=tuple(imports) if imports else (),
+            context=tuple(context) if context else (),
+            dependencies=tuple(sorted(dependencies.items())) if dependencies else (),
         )
         self._cached_tree: Optional[J] = None
 
@@ -241,6 +253,8 @@ def pattern(
     code,
     *,
     imports: Optional[List[str]] = None,
+    context: Optional[List[str]] = None,
+    dependencies: Optional[Dict[str, str]] = None,
     **captures: Capture
 ) -> Pattern:
     """
@@ -251,16 +265,24 @@ def pattern(
     Args:
         code: Python code with {name} placeholders, or a t-string
               (Python 3.14+) with Capture/RawCode interpolations.
-        imports: Optional import statements for type resolution.
+        imports: Deprecated — use ``context`` instead.
+        context: Optional statements (imports, assignments, …) prepended to
+            the pattern code for parsing.
+        dependencies: Optional PyPI packages required by the pattern
+            (``{package: ">=version"}``; bare versions default to ``>=``).
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
         A Pattern instance.
 
     Examples:
-        # Pattern with capture
+        # Pattern with capture (explicit kwargs)
         x = capture('x')
         pat = pattern("print({x})", x=x)
+
+        # With f-string (Python 3.6+, no name duplication)
+        x = capture('x')
+        pat = pattern(f"print({x})")
 
         # With t-string (Python 3.14+)
         x = capture('x')
@@ -268,24 +290,19 @@ def pattern(
 
         # Pattern with multiple captures
         a, b = capture('a'), capture('b')
-        pat = pattern("{a} + {b}", a=a, b=b)
+        pat = pattern(f"{a} + {b}")
 
         # Variadic pattern (matches multiple arguments)
         args = capture('args', variadic=True)
-        pat = pattern("func({args})", args=args)
+        pat = pattern(f"func({args})")
     """
-    from rewrite.python.template._tstring_support import is_tstring, convert_tstring
-
-    if is_tstring(code):
-        if captures:
-            raise TypeError(
-                "Cannot pass keyword captures when using a t-string; "
-                "interpolate Capture objects directly in the t-string instead"
-            )
-        code, captures = convert_tstring(code)
+    from ._fstring_support import resolve_captures
+    code, captures = resolve_captures(code, captures)
 
     return Pattern(
         code=code,
         captures=captures,
         imports=imports,
+        context=context,
+        dependencies=dependencies,
     )

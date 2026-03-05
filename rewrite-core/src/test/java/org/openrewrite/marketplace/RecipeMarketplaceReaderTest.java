@@ -350,6 +350,44 @@ class RecipeMarketplaceReaderTest {
         assertThat(rtJsListing.getBundle().getRequestedVersion()).isEqualTo(requestedVersion);
     }
 
+    @Test
+    void nullLiteralVersionIsTreatedAsNull() {
+        // When a CSV contains the literal string "null" for version/requestedVersion,
+        // the reader should treat it as null (not the string "null")
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,requestedVersion,version
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses,Java Cleanup,maven,org.openrewrite:rewrite-java,null,null
+          """);
+
+        RecipeListing listing = marketplace.getAllRecipes().iterator().next();
+        RecipeBundle bundle = listing.getBundle();
+        assertThat(bundle.getRequestedVersion()).isNull();
+        assertThat(bundle.getVersion()).isNull();
+    }
+
+    @Test
+    void roundTripPreservesNullVersions() {
+        // Create a marketplace with null versions, write to CSV, read back,
+        // and verify versions remain null (not the string "null")
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName
+          org.openrewrite.java.cleanup.UnnecessaryParentheses,Remove Unnecessary Parentheses,Removes unnecessary parentheses,Java Cleanup,maven,org.openrewrite:rewrite-java
+          """);
+
+        // Verify initial state has null versions
+        RecipeListing listing = marketplace.getAllRecipes().iterator().next();
+        assertThat(listing.getBundle().getVersion()).isNull();
+        assertThat(listing.getBundle().getRequestedVersion()).isNull();
+
+        // Round-trip through CSV
+        @Language("csv") String csv = new RecipeMarketplaceWriter().toCsv(marketplace);
+        RecipeMarketplace roundTripped = new RecipeMarketplaceReader().fromCsv(csv);
+
+        RecipeListing rtListing = roundTripped.getAllRecipes().iterator().next();
+        assertThat(rtListing.getBundle().getVersion()).isNull();
+        assertThat(rtListing.getBundle().getRequestedVersion()).isNull();
+    }
+
     private void setVersionRecursive(RecipeMarketplace.Category category, String packageName,
                                      String requestedVersion, String version) {
         for (RecipeListing recipe : category.getRecipes()) {
@@ -362,6 +400,40 @@ class RecipeMarketplaceReaderTest {
         for (RecipeMarketplace.Category child : category.getCategories()) {
             setVersionRecursive(child, packageName, requestedVersion, version);
         }
+    }
+
+    @Test
+    void mergePreservesMetadata() {
+        // Source marketplace has a recipe with metadata in "Java" category
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.TestRecipe,Test Recipe,A test recipe,Java,maven,org.example:test,abc123
+          """);
+
+        // Verify metadata was read
+        RecipeListing sourceRecipe = source.getAllRecipes().iterator().next();
+        assertThat(sourceRecipe.getMetadata().get("embedding")).isEqualTo("abc123");
+
+        // Target marketplace also has a recipe in "Java" (overlapping category)
+        RecipeMarketplace target = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.OtherRecipe,Other Recipe,Another recipe,Java,maven,org.example:other,xyz789
+          """);
+
+        // Merge source into target — both have "Java" category so this exercises
+        // the recursive merge path where withMarketplace() is called
+        target.getRoot().merge(source.getRoot());
+
+        // Verify both recipes exist and metadata is preserved
+        RecipeListing mergedTest = target.findRecipe("org.example.TestRecipe");
+        assertThat(mergedTest).isNotNull();
+        assertThat(mergedTest.getMetadata().get("embedding"))
+          .as("Metadata should be preserved through merge when categories overlap")
+          .isEqualTo("abc123");
+
+        RecipeListing mergedOther = target.findRecipe("org.example.OtherRecipe");
+        assertThat(mergedOther).isNotNull();
+        assertThat(mergedOther.getMetadata().get("embedding")).isEqualTo("xyz789");
     }
 
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {

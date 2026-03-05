@@ -134,15 +134,21 @@ class RecipeSpec:
     # Whether to allow empty diffs (recipe modifies AST but printed output unchanged)
     allow_empty_diff: bool = False
 
+    # Whether to enable type attribution via ty-types.
+    # Set to False for pure parse/print tests to avoid the ty-types subprocess overhead.
+    type_attribution: bool = True
+
     def with_recipe(self, recipe: Recipe) -> "RecipeSpec":
         return RecipeSpec(recipe=recipe, execution_context=self.execution_context,
                           check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=self.allow_empty_diff)
+                          allow_empty_diff=self.allow_empty_diff,
+                          type_attribution=self.type_attribution)
 
     def with_allow_empty_diff(self, value: bool) -> "RecipeSpec":
         return RecipeSpec(recipe=self.recipe, execution_context=self.execution_context,
                           check_parse_print_idempotence=self.check_parse_print_idempotence,
-                          allow_empty_diff=value)
+                          allow_empty_diff=value,
+                          type_attribution=self.type_attribution)
 
     def with_recipes(self, *recipes: Recipe) -> "RecipeSpec":
         if len(recipes) == 1:
@@ -220,27 +226,78 @@ class RecipeSpec:
                 # Generated file - skip parsing
                 continue
 
+            if spec.kind != "python":
+                # Only Python specs are parsed (e.g., toml specs from pyproject()
+                # are consumed by uv() and don't need parsing)
+                continue
+
             # Determine source path
-            source_path = spec.path or Path(f"{uuid4().hex}.{spec.ext}")
+            source_path = spec.path or Path(f"_{uuid4().hex}.{spec.ext}")
 
             # Parse the source
             source = dedent(spec.before)
-            parsed = self._parse_python(source, source_path)
+            parsed = self._parse_python(source, source_path, spec.project_root)
 
             result.append((spec, parsed))
 
         return result
 
-    def _parse_python(self, source: str, source_path: Path) -> CompilationUnit:
-        """Parse Python source code into a CompilationUnit."""
+    def _parse_python(
+        self,
+        source: str,
+        source_path: Path,
+        project_root: Optional[str] = None,
+    ) -> CompilationUnit:
+        """Parse Python source code into a CompilationUnit.
+
+        Args:
+            source: Python source code.
+            source_path: Logical path for the source file.
+            project_root: Optional workspace directory for type attribution
+                (e.g., from ``uv()``).  When ``None`` a temporary directory is
+                created and cleaned up after parsing.
+        """
+        import tempfile
+        import os
         from rewrite.python._parser_visitor import ParserVisitor
 
-        visitor = ParserVisitor(source)
-        # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
-        source_for_ast = source[1:] if source.startswith('\ufeff') else source
-        tree = ast.parse(source_for_ast)
-        cu = visitor.visit_Module(tree)
-        return cu.replace(source_path=source_path)
+        ty_client = None
+        workspace = project_root
+        owns_workspace = workspace is None
+        file_path = None
+
+        if self.type_attribution:
+            try:
+                from rewrite.python.ty_client import TyTypesClient
+                if owns_workspace:
+                    workspace = tempfile.mkdtemp()
+                file_name = source_path.name if source_path.name else 'test.py'
+                file_path = os.path.join(workspace, file_name)
+                with open(file_path, 'w') as f:
+                    f.write(source)
+                ty_client = TyTypesClient()
+                ty_client.initialize(workspace)
+            except (ImportError, RuntimeError):
+                file_path = None
+
+        try:
+            visitor = ParserVisitor(source, file_path, ty_client)
+            # Strip BOM before passing to ast.parse (ParserVisitor does this internally)
+            source_for_ast = source[1:] if source.startswith('\ufeff') else source
+            tree = ast.parse(source_for_ast)
+            cu = visitor.visit_Module(tree)
+            return cu.replace(source_path=source_path)
+        finally:
+            if ty_client is not None:
+                ty_client.shutdown()
+            if owns_workspace and workspace is not None:
+                import shutil
+                shutil.rmtree(workspace, ignore_errors=True)
+            elif file_path is not None:
+                try:
+                    os.unlink(file_path)
+                except OSError:
+                    pass
 
     def _expect_no_parse_failures(
         self, parsed: List[Tuple[SourceSpec, SourceFile]]
@@ -325,7 +382,7 @@ class RecipeSpec:
     def _resolve_after(self, after: AfterRecipeText, actual: str) -> str:
         """Resolve the expected after value."""
         if callable(after):
-            result = after(actual)
+            result = after(actual)  # ty: ignore[call-top-callable]
             if result is None:
                 return actual  # Callable returned None = actual is acceptable
             return result

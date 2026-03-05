@@ -356,7 +356,6 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
 
-        @Disabled
         @Test
         void dontFetchSnapshotsFromReleaseRepos() throws Exception {
             try (MockWebServer snapshotRepo = new MockWebServer();
@@ -461,6 +460,50 @@ class MavenPomDownloaderTest implements RewriteTest {
 
                 assertThat(snapshotRepo.getRequestCount()).isGreaterThan(1);
                 assertThat(metadataPaths.get()).isEqualTo(0);
+            }
+        }
+
+        @Test
+        void datedSnapshotVersionIncludesSnapshotRepositories() throws Exception {
+            try (MockWebServer snapshotRepo = new MockWebServer()) {
+                snapshotRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(200);
+                        if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
+                            response.setBody(
+                              """
+                                <project>
+                                    <groupId>com.example</groupId>
+                                    <artifactId>my-lib</artifactId>
+                                    <version>3.28.0-SNAPSHOT</version>
+                                </project>
+                                """
+                            );
+                        }
+                        return response;
+                    }
+                });
+
+                snapshotRepo.start();
+
+                var downloader = new MavenPomDownloader(emptyMap(), ctx);
+                var snapshotRepoModel = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("http://%s:%d".formatted(snapshotRepo.getHostName(), snapshotRepo.getPort()))
+                  .releases("false")
+                  .snapshots(true)
+                  .build();
+
+                // A dated snapshot version should be recognized as a snapshot so that
+                // snapshot-only repositories are not excluded.
+                Pom pom = downloader.download(
+                  new GroupArtifactVersion("com.example", "my-lib", "3.28.0-20260220.175218-20"),
+                  null, null, List.of(snapshotRepoModel));
+
+                assertThat(pom).isNotNull();
+                assertThat(snapshotRepo.getRequestCount()).isGreaterThan(0);
             }
         }
 
@@ -1012,6 +1055,68 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1950")
+        @Test
+        void emptyRelativePathSkipsLocalParentLookup() {
+            // Parent POM at pom.xml with a version that does NOT match the placeholder
+            // in the child's parent reference. This means the parent can only be found
+            // via relativePath-based local lookup (step 3 in download()), not by GAV match.
+            Path rootPomXml = Path.of("pom.xml");
+            Pom parentPom = Pom.builder()
+              .sourcePath(rootPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(null)
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test.notreal", "parent", "1.0.0", null))
+              .build();
+
+            // Child requests parent with a placeholder version. The placeholder can't
+            // be resolved from the parent's own properties, so GAV-based lookup (steps
+            // 1 and 2 in download()) won't find the parent. Only step 3 (relativePath-
+            // based lookup) can find it, because it relaxes the version check when the
+            // requested version contains "${".
+            var requestedGav = new GroupArtifactVersion("test.notreal", "parent", "${revision}");
+            Path childPomXml = Path.of("child/pom.xml");
+            Pom childPom = Pom.builder()
+              .sourcePath(childPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(new Parent(requestedGav, ""))
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test.notreal", "child", "1.0.0", null))
+              .build();
+
+            ResolvedPom resolvedPom = ResolvedPom.builder()
+              .requested(childPom)
+              .repositories(singletonList(MAVEN_CENTRAL))
+              .build();
+
+            Map<Path, Pom> pomsByPath = new HashMap<>();
+            pomsByPath.put(rootPomXml, parentPom);
+            pomsByPath.put(childPomXml, childPom);
+
+            // Disable implicit Maven Central and local repo to isolate the test
+            var mavenCtx = MavenExecutionContextView.view(ctx);
+            mavenCtx.setAddCentralRepository(false);
+            mavenCtx.setAddLocalRepository(false);
+
+            String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+            MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+
+            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+            // With null relativePath (omitted <relativePath>), step 3 resolves
+            // ../pom.xml and finds the parent because the ${revision} placeholder
+            // relaxes the version check.
+            assertDoesNotThrow(() -> downloader.download(requestedGav, null, resolvedPom, singletonList(nonexistentRepo)));
+
+            // With empty relativePath (<relativePath/>), step 3 is skipped entirely.
+            // Since the parent can't be found by GAV match either, and the remote
+            // repo doesn't exist, download fails — proving local lookup was skipped.
+            assertThrows(Exception.class,
+              () -> downloader.download(requestedGav, "", resolvedPom, singletonList(nonexistentRepo)));
+        }
+
     }
 
     @Nested

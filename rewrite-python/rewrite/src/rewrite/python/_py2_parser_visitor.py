@@ -172,7 +172,7 @@ class Py2ParserVisitor:
         prefix = self._parse_space(leaf.prefix)
 
         # parso 0.7.x uses lowercase type names (e.g. 'name', 'number')
-        leaf_type = leaf.type.upper()
+        leaf_type = leaf.type.upper()  # ty: ignore[unresolved-attribute]  # parso leaf.type is always str
 
         if leaf_type == 'NAME' or leaf_type == 'KEYWORD':
             return j.Identifier(

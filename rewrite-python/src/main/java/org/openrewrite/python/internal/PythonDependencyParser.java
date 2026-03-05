@@ -312,6 +312,9 @@ public class PythonDependencyParser {
      */
     private static PythonResolutionResult.@Nullable PackageManager detectPackageManager(Map<String, Toml.Table> tables) {
         for (String tableName : tables.keySet()) {
+            if ("tool.poetry".equals(tableName) || tableName.startsWith("tool.poetry.")) {
+                return PythonResolutionResult.PackageManager.Poetry;
+            }
             if ("tool.pdm".equals(tableName) || tableName.startsWith("tool.pdm.")) {
                 return PythonResolutionResult.PackageManager.Pdm;
             }
@@ -339,7 +342,7 @@ public class PythonDependencyParser {
                     "\\s*$"
     );
 
-    static @Nullable Dependency parsePep508(String spec) {
+    public static @Nullable Dependency parsePep508(String spec) {
         Matcher m = PEP_508_PATTERN.matcher(spec);
         if (!m.matches()) {
             return null;

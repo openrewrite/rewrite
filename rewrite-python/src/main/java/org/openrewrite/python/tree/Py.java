@@ -401,7 +401,7 @@ public interface Py extends J {
 
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class CompilationUnit implements Py, JavaSourceFile, SourceFile {

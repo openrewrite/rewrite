@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
@@ -46,6 +47,7 @@ public final class Assertions {
      */
     public static SourceSpecs uv(Path relativeTo, SourceSpecs... sources) {
         String pyprojectContent = null;
+        SourceSpec<Toml.Document> pyprojectSpec = null;
 
         // First pass: find pyproject.toml content and write it
         for (SourceSpecs multiSpec : sources) {
@@ -54,6 +56,8 @@ public final class Assertions {
                 Path sourcePath = spec.getSourcePath();
                 if (sourcePath != null && "pyproject.toml".equals(sourcePath.toFile().getName())) {
                     pyprojectContent = spec.getBefore();
+                    //noinspection unchecked
+                    pyprojectSpec = (SourceSpec<Toml.Document>) multiSpec;
                     try {
                         Path pyproject = relativeTo.resolve(sourcePath);
                         Files.write(pyproject, requireNonNull(pyprojectContent).getBytes(StandardCharsets.UTF_8));
@@ -83,6 +87,16 @@ public final class Assertions {
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for .venv", e);
             }
+
+            // Delete symlinks after recipe run so JUnit's @TempDir cleanup
+            // doesn't warn about symlinks pointing outside the temp directory
+            pyprojectSpec.afterRecipe(doc -> {
+                try {
+                    Files.deleteIfExists(venvTarget);
+                    Files.deleteIfExists(lockFileTarget);
+                } catch (IOException ignored) {
+                }
+            });
         }
 
         return SourceSpecs.dir(relativeTo.toString(), sources);
@@ -143,6 +157,84 @@ public final class Assertions {
         toml.path("uv.lock");
         spec.accept(toml);
         return toml;
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before) {
+        return requirementsTxt(before, s -> {
+        });
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before,
+                                               Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, RequirementsTxtParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("requirements.txt");
+        spec.accept(text);
+        return text;
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before,
+                                               @Nullable String after) {
+        return requirementsTxt(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs requirementsTxt(@Nullable String before,
+                                               @Nullable String after,
+                                               Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, RequirementsTxtParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("requirements.txt");
+        text.after(s -> after);
+        spec.accept(text);
+        return text;
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before) {
+        return setupCfg(before, s -> {
+        });
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, SetupCfgParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("setup.cfg");
+        spec.accept(text);
+        return text;
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        @Nullable String after) {
+        return setupCfg(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs setupCfg(@Nullable String before,
+                                        @Nullable String after,
+                                        Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(
+                PlainText.class, null, SetupCfgParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        text.path("setup.cfg");
+        text.after(s -> after);
+        spec.accept(text);
+        return text;
     }
 
     public static SourceSpecs python(@Language("py") @Nullable String before) {
