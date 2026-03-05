@@ -188,6 +188,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    if (gradleProject == null) {
+                        return (J) tree;
+                    }
                 }
                 return super.visit(tree, ctx);
             }
@@ -195,9 +198,6 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (gradleProject == null) {
-                    return m;
-                }
 
                 new GradleDependency.Matcher().get(getCursor()).ifPresent(dep -> {
                     String varName = dep.getVersionVariable();
