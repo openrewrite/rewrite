@@ -20,10 +20,16 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
@@ -380,6 +386,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
                     return gradleWrapper.wrapperJar(sourceFile);
                 }
+                if (sourceFile instanceof JavaSourceFile && IsBuildGradle.matches(sourceFile.getSourcePath())) {
+                    SourceFile visited = (SourceFile) new WrapperDslVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
+                    if (visited != sourceFile) {
+                        return visited;
+                    }
+                }
                 return sourceFile;
             }
         };
@@ -402,6 +414,105 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     private String batchScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
         return StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx)).replaceAll("\r\n|\r|\n", "\r\n");
+    }
+
+    private static class WrapperDslVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+        private final GradleWrapper gradleWrapper;
+
+        public WrapperDslVisitor(GradleWrapper gradleWrapper) {
+            this.gradleWrapper = gradleWrapper;
+        }
+
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+            J.Assignment a = super.visitAssignment(assignment, ctx);
+            if (!isInsideWrapperTaskConfiguration()) {
+                return a;
+            }
+
+            String variableName = getAssignmentVariableName(a);
+            if (variableName == null) {
+                return a;
+            }
+
+            switch (variableName) {
+                case "gradleVersion":
+                    return updateStringAssignment(a, gradleWrapper.getVersion());
+                case "distributionUrl":
+                    return updateStringAssignment(a, gradleWrapper.getDistributionUrl());
+                case "distributionType":
+                    return updateDistributionTypeAssignment(a);
+                default:
+                    return a;
+            }
+        }
+
+        private boolean isInsideWrapperTaskConfiguration() {
+            Cursor cursor = getCursor();
+            while (cursor.getParent() != null) {
+                Object value = cursor.getValue();
+                if (value instanceof J.MethodInvocation && isWrapperTaskConfiguration((J.MethodInvocation) value)) {
+                    return true;
+                }
+                cursor = cursor.getParent();
+            }
+            return false;
+        }
+
+        private static boolean isWrapperTaskConfiguration(J.MethodInvocation m) {
+            // Pattern: tasks.named('wrapper') { ... } or tasks.named("wrapper") { ... }
+            if ("named".equals(m.getSimpleName()) && m.getSelect() instanceof J.Identifier &&
+                    "tasks".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                List<Expression> args = m.getArguments();
+                if (!args.isEmpty() && args.get(0) instanceof J.Literal) {
+                    return "wrapper".equals(((J.Literal) args.get(0)).getValue());
+                }
+            }
+            // Pattern: wrapper { ... } (direct method invocation)
+            if ("wrapper".equals(m.getSimpleName()) && m.getSelect() == null &&
+                    m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+                return true;
+            }
+            return false;
+        }
+
+        private static @Nullable String getAssignmentVariableName(J.Assignment a) {
+            if (a.getVariable() instanceof J.Identifier) {
+                return ((J.Identifier) a.getVariable()).getSimpleName();
+            }
+            if (a.getVariable() instanceof J.FieldAccess) {
+                return ((J.FieldAccess) a.getVariable()).getSimpleName();
+            }
+            return null;
+        }
+
+        private J.Assignment updateStringAssignment(J.Assignment a, String newValue) {
+            Expression rhs = a.getAssignment();
+            if (rhs instanceof J.Literal) {
+                J.Literal literal = (J.Literal) rhs;
+                if (literal.getType() == JavaType.Primitive.String) {
+                    String currentValue = (String) literal.getValue();
+                    if (!newValue.equals(currentValue)) {
+                        return a.withAssignment(ChangeStringLiteral.withStringValue(literal, newValue));
+                    }
+                }
+            }
+            return a;
+        }
+
+        private J.Assignment updateDistributionTypeAssignment(J.Assignment a) {
+            Expression rhs = a.getAssignment();
+            if (rhs instanceof J.FieldAccess) {
+                J.FieldAccess fieldAccess = (J.FieldAccess) rhs;
+                String currentType = fieldAccess.getSimpleName();
+                String newType = gradleWrapper.getDistributionUrl().contains("-all.zip") ? "ALL" : "BIN";
+                if (!newType.equals(currentType)) {
+                    return a.withAssignment(fieldAccess.withName(fieldAccess.getName().withSimpleName(newType)));
+                }
+            }
+            return a;
+        }
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
