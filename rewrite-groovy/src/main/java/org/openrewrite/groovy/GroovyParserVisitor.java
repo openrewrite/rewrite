@@ -254,6 +254,9 @@ public class GroovyParserVisitor {
             } else if (clazz.isEnum()) {
                 kindType = J.ClassDeclaration.Kind.Type.Enum;
                 skip("enum");
+            } else if (clazz.isRecord()) {
+                kindType = J.ClassDeclaration.Kind.Type.Record;
+                skip("record");
             } else {
                 throw new IllegalStateException("Unexpected class type: " + name());
             }
@@ -262,6 +265,35 @@ public class GroovyParserVisitor {
             JContainer<J.TypeParameter> typeParameterContainer = null;
             if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
                 typeParameterContainer = visitTypeParameters(clazz.getGenericsTypes());
+            }
+
+            JContainer<Statement> primaryConstructor = null;
+            if (kindType == J.ClassDeclaration.Kind.Type.Record) {
+                Space pcPrefix = sourceBefore("(");
+                List<RecordComponentNode> components = clazz.getRecordComponents();
+                if (components == null || components.isEmpty()) {
+                    primaryConstructor = JContainer.build(pcPrefix,
+                            singletonList(JRightPadded.build((Statement) new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
+                            Markers.EMPTY);
+                } else {
+                    List<JRightPadded<Statement>> componentDecls = new ArrayList<>(components.size());
+                    for (int i = 0; i < components.size(); i++) {
+                        RecordComponentNode rc = components.get(i);
+                        Space compPrefix = whitespace();
+                        TypeTree typeExpr = visitTypeTree(rc.getType());
+                        J.Identifier compName = new J.Identifier(randomId(), sourceBefore(rc.getName()), Markers.EMPTY,
+                                emptyList(), rc.getName(), typeMapping.type(rc.getType()), null);
+                        J.VariableDeclarations.NamedVariable namedVar = new J.VariableDeclarations.NamedVariable(
+                                randomId(), compName.getPrefix(), Markers.EMPTY,
+                                compName.withPrefix(EMPTY), emptyList(), null, typeMapping.variableType(compName.getSimpleName(), rc.getType()));
+                        J.VariableDeclarations varDecl = new J.VariableDeclarations(randomId(), compPrefix, Markers.EMPTY,
+                                emptyList(), emptyList(), typeExpr, null, emptyList(), singletonList(JRightPadded.build(namedVar)));
+                        componentDecls.add(JRightPadded.build((Statement) varDecl)
+                                .withAfter(i == components.size() - 1 ? EMPTY : sourceBefore(",")));
+                    }
+                    skip(")");
+                    primaryConstructor = JContainer.build(pcPrefix, componentDecls, Markers.EMPTY);
+                }
             }
 
             JLeftPadded<TypeTree> extendings = null;
@@ -296,16 +328,28 @@ public class GroovyParserVisitor {
                 }
             }
 
+            JContainer<TypeTree> permitting = null;
+            if (clazz.isSealed() && clazz.getPermittedSubclasses() != null && !clazz.getPermittedSubclasses().isEmpty()) {
+                Space permitsPrefix = sourceBefore("permits");
+                List<ClassNode> permitted = clazz.getPermittedSubclasses();
+                List<JRightPadded<TypeTree>> permitTypes = new ArrayList<>(permitted.size());
+                for (int i = 0; i < permitted.size(); i++) {
+                    permitTypes.add(JRightPadded.build(visitTypeTree(permitted.get(i)))
+                            .withAfter(i == permitted.size() - 1 ? EMPTY : sourceBefore(",")));
+                }
+                permitting = JContainer.build(permitsPrefix, permitTypes, Markers.EMPTY);
+            }
+
             queue.add(new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY,
                     leadingAnnotations,
                     modifiers,
                     kind,
                     name,
                     typeParameterContainer,
-                    null,
+                    primaryConstructor,
                     extendings,
                     implementings,
-                    null,
+                    permitting,
                     visitClassBlock(clazz),
                     TypeUtils.asFullyQualified(typeMapping.type(clazz))));
         }
@@ -349,12 +393,22 @@ public class GroovyParserVisitor {
               So keep track of inner classes that are part of field initializers so that they don't get parsed twice
              */
             Set<InnerClassNode> fieldInitializers = new HashSet<>();
+            Set<String> recordComponentNames = new HashSet<>();
+            if (clazz.getRecordComponents() != null) {
+                for (RecordComponentNode rc : clazz.getRecordComponents()) {
+                    recordComponentNames.add(rc.getName());
+                }
+            }
             for (FieldNode field : clazz.getFields()) {
                 if (!appearsInSource(field)) {
                     continue;
                 }
                 if (field.isEnum()) {
                     enumConstants.add(field);
+                    continue;
+                }
+                // Record component backing fields are synthetic but have source positions; skip them
+                if (field.isSynthetic() && recordComponentNames.contains(field.getName())) {
                     continue;
                 }
                 if (field.getInitialExpression() instanceof ConstructorCallExpression) {
@@ -2843,7 +2897,7 @@ public class GroovyParserVisitor {
                     classNode.getUnresolvedSuperClass().isUsingGenerics() &&
                     !classNode.getUnresolvedSuperClass().isGenericsPlaceHolder() &&
                     classNode.getGenericsTypes() == null;
-            if (isAnonymousClassWithGenericSuper || (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder())) {
+            if ((isAnonymousClassWithGenericSuper || (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder())) && sourceStartsWith("<")) {
                 JContainer<Expression> typeParameters = inferredType ?
                         JContainer.build(sourceBefore("<"), singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore(">"))), Markers.EMPTY) :
                         visitTypeParameterizations(isAnonymousClassWithGenericSuper ? classNode.getUnresolvedSuperClass().getGenericsTypes() : classNode.getGenericsTypes());
@@ -3491,6 +3545,8 @@ public class GroovyParserVisitor {
         modifierNameToType.put("synchronized", J.Modifier.Type.Synchronized);
         modifierNameToType.put("transient", J.Modifier.Type.Transient);
         modifierNameToType.put("native", J.Modifier.Type.Native);
+        modifierNameToType.put("sealed", J.Modifier.Type.Sealed);
+        modifierNameToType.put("non-sealed", J.Modifier.Type.NonSealed);
         modifierNameToType.put("default", J.Modifier.Type.Default);
         modifierNameToType.put("strictfp", J.Modifier.Type.Strictfp);
     }
