@@ -136,6 +136,58 @@ class RewriteRpcTest implements RewriteTest {
           .isEqualTo(syncedMarkersId);
     }
 
+    /**
+     * Verifies that when getObject() fails mid-serialization on the sender side,
+     * the sender removes the stale entry from remoteObjects. This ensures that
+     * a subsequent getObject() for the same ID sends a full ADD (not a CHANGE
+     * delta against a partially-sent, stale baseline).
+     * <p>
+     * Without the fix, the sender would keep the stale remoteObjects entry and
+     * attempt a CHANGE diff on retry, causing cascading desync errors.
+     */
+    @Test
+    void sendFailureCleansUpRemoteObjects() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // Step 1: successful sync — both sides establish remoteObjects baseline
+        server.localObjects.put(id, original);
+        PlainText synced = client.getObject(id, sourceFileType);
+        assertThat(synced.getText()).isEqualTo("Hello");
+        assertThat(server.remoteObjects).containsKey(id);
+
+        // Step 2: replace with a PlainText that has null sourcePath, causing
+        // NPE in PlainTextRpcCodec.rpcSend() at d.getSourcePath().toString()
+        PlainText badTree = PlainText.builder()
+          .id(original.getId())
+          .text("Bad")
+          .build(); // no sourcePath → null → NPE during send
+        server.localObjects.put(id, badTree);
+
+        // Step 3: client.getObject() should fail because the sender NPEs mid-serialization
+        try {
+            client.getObject(id, sourceFileType);
+        } catch (Exception expected) {
+            // Expected — sender failed and emitted premature END_OF_OBJECT
+        }
+
+        // Step 4: verify the sender cleaned up its stale remoteObjects entry
+        assertThat(server.remoteObjects)
+          .describedAs("Sender should remove stale remoteObjects entry after send failure")
+          .doesNotContainKey(id);
+
+        // Step 5: put back a valid tree and retry — should succeed via full ADD
+        PlainText fixed = original.withText("Fixed");
+        server.localObjects.put(id, fixed);
+        PlainText result = client.getObject(id, sourceFileType);
+        assertThat(result.getText()).isEqualTo("Fixed");
+    }
+
     @DocumentExample
     @Test
     void sendReceiveIdempotence() {

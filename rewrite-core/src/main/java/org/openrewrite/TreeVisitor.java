@@ -227,7 +227,9 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
         boolean topLevel = visitCount == 0;
 
         visitCount++;
-        setCursor(new Cursor(cursor, tree));
+        Cursor prevCursor = this.cursor;
+        Cursor currentCursor = new Cursor(prevCursor, tree);
+        setCursor(currentCursor);
 
         T t = null;
         // Do you visitor take tree and do you tree take visitor?
@@ -237,7 +239,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             if (isAcceptable) {
                 //noinspection unchecked
                 t = preVisit((T) tree, p);
-                if (!cursor.getMessage(STOP_AFTER_PRE_VISIT, false)) {
+                if (!currentCursor.getMessage(STOP_AFTER_PRE_VISIT, false)) {
                     if (t != null) {
                         t = t.accept(this, p);
                     }
@@ -249,13 +251,13 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
                     ExecutionContext ctx = (ExecutionContext) p;
                     for (TreeObserver.Subscription observer : ctx.getObservers()) {
                         if (observer.isSubscribed(tree)) {
-                            t = observer.treeChanged(getCursor(), t, tree);
+                            t = observer.treeChanged(currentCursor, t, tree);
                         }
                     }
                 }
             }
 
-            setCursor(cursor.getParent());
+            setCursor(prevCursor);
 
             if (topLevel) {
                 if (t != null && afterVisit != null) {
