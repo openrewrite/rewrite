@@ -16,7 +16,10 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.test.RewriteTest;
+
+import java.nio.file.Path;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -30,6 +33,26 @@ class KotlinParserTest implements RewriteTest {
 
             class MyClass
             """)),
+          kotlin(
+            """
+              import foo.bar.MyClass
+
+              val myClass: MyClass? = null
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependsOnWithAbsoluteRelativeTo(@TempDir Path tempDir) {
+        rewriteRun(
+          spec -> spec
+            .relativeTo(tempDir)
+            .parser(KotlinParser.builder().dependsOn("""
+              package foo.bar
+
+              class MyClass
+              """)),
           kotlin(
             """
               import foo.bar.MyClass

@@ -165,13 +165,28 @@ public class KotlinParser implements Parser {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
-        Set<Path> dependsOnPaths = dependsOn == null ? emptySet() :
-                dependsOn.stream().map(Input::getPath).collect(toSet());
+        // dependsOn inputs have relative paths (from determinePath), but source inputs
+        // may have absolute paths. Resolve dependsOn paths to match so that
+        // Path.relativize in getRelativePath doesn't throw IllegalArgumentException.
+        List<Input> resolvedDependsOn = dependsOn;
+        if (dependsOn != null && relativeTo != null && relativeTo.isAbsolute()) {
+            resolvedDependsOn = new ArrayList<>(dependsOn.size());
+            for (Input dep : dependsOn) {
+                if (!dep.getPath().isAbsolute()) {
+                    resolvedDependsOn.add(Input.fromString(relativeTo.resolve(dep.getPath()), dep.getSource(pctx).readFully()));
+                } else {
+                    resolvedDependsOn.add(dep);
+                }
+            }
+        }
+
+        Set<Path> dependsOnPaths = resolvedDependsOn == null ? emptySet() :
+                resolvedDependsOn.stream().map(i -> i.getRelativePath(relativeTo)).collect(toSet());
 
         // TODO: FIR and disposable may not be necessary using the IR.
         Disposable disposable = Disposer.newDisposable();
         CompiledSource compilerCus;
-        List<Input> acceptedInputs = ListUtils.concatAll(dependsOn, acceptedInputs(sources).collect(toList()));
+        List<Input> acceptedInputs = ListUtils.concatAll(resolvedDependsOn, acceptedInputs(sources).collect(toList()));
         try {
             compilerCus = parse(acceptedInputs, disposable, pctx);
         } catch (Throwable t) {
