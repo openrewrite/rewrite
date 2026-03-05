@@ -1236,8 +1236,6 @@ public class GroovyParserVisitor {
             Space parenPrefix = sourceBefore("(");
             List<J.Modifier> modifiers = getModifiers();
 
-            // This does not handle multi-catch statements like catch(ExceptionTypeA | ExceptionTypeB e)
-            // The Groovy AST seems to only record the first type in the list, so some extra hacking is required to get the others
             Parameter param = node.getVariable();
             TypeTree paramType;
             Space paramPrefix = whitespace();
@@ -1276,6 +1274,52 @@ public class GroovyParserVisitor {
             ).withAfter(rightPad);
             J.ControlParentheses<J.VariableDeclarations> catchControl = new J.ControlParentheses<>(randomId(), parenPrefix, Markers.EMPTY, variable);
             queue.add(new J.Try.Catch(randomId(), prefix, Markers.EMPTY, catchControl, doVisit(node.getCode())));
+        }
+
+        private void visitMultiCatchStatement(List<CatchStatement> catchStatements) {
+            Space prefix = sourceBefore("catch");
+            Space parenPrefix = sourceBefore("(");
+            List<J.Modifier> modifiers = getModifiers();
+
+            // Build J.MultiCatch from the exception types of each catch statement
+            List<JRightPadded<NameTree>> alternatives = new ArrayList<>(catchStatements.size());
+            for (int i = 0; i < catchStatements.size(); i++) {
+                Space typePrefix = whitespace();
+                TypeTree alt = visitTypeTree(catchStatements.get(i).getVariable().getOriginType()).withPrefix(typePrefix);
+                alternatives.add(i < catchStatements.size() - 1 ?
+                        padRight(alt, sourceBefore("|")) :
+                        JRightPadded.build(alt));
+            }
+            TypeTree paramType = new J.MultiCatch(randomId(), EMPTY, Markers.EMPTY, alternatives);
+
+            // All catch statements in a multi-catch share the same variable name
+            Parameter param = catchStatements.get(0).getVariable();
+            JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
+                    new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), param.getName(), null, null),
+                            emptyList(), null, null)
+            );
+            cursor += param.getName().length();
+            Space rightPad = whitespace();
+            skip(")");
+
+            Space varDeclPrefix = alternatives.get(0).getElement().getPrefix();
+            TypeTree varDeclTypeExpression = paramType;
+            // Strip prefix from first alternative since it moves to varDecl
+            alternatives.set(0, alternatives.get(0).withElement(alternatives.get(0).getElement().withPrefix(EMPTY)));
+            if (!modifiers.isEmpty()) {
+                varDeclPrefix = modifiers.get(0).getPrefix();
+                modifiers = ListUtils.mapFirst(modifiers, it -> it.withPrefix(EMPTY));
+            }
+
+            JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), varDeclPrefix,
+                    Markers.EMPTY, emptyList(), modifiers, varDeclTypeExpression,
+                    null,
+                    singletonList(paramName))
+            ).withAfter(rightPad);
+            J.ControlParentheses<J.VariableDeclarations> catchControl = new J.ControlParentheses<>(randomId(), parenPrefix, Markers.EMPTY, variable);
+            // Use the code block from the first catch statement (they all share the same block)
+            queue.add(new J.Try.Catch(randomId(), prefix, Markers.EMPTY, catchControl, doVisit(catchStatements.get(0).getCode())));
         }
 
         @Override
@@ -2201,17 +2245,97 @@ public class GroovyParserVisitor {
         @Override
         public void visitTryCatchFinally(TryCatchStatement node) {
             Space prefix = sourceBefore("try");
-            // Recent versions of groovy support try-with-resources, usage of this pattern in groovy is uncommon
+
+            // Groovy 4 desugars try-with-resources at parse time (getResourceStatements() is always empty).
+            // Detect from source: if "(" follows "try", parse resources from source text.
             JContainer<J.Try.Resource> resources = null;
-            J.Block body = doVisit(node.getTryStatement());
+            boolean hasTryWithResources = source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(';
+            if (hasTryWithResources) {
+                Space beforeParen = sourceBefore("(");
+                List<JRightPadded<J.Try.Resource>> resourceList = new ArrayList<>();
+
+                // Groovy 4 desugars each resource into a nested structure:
+                //   BlockStatement -> BlockStatement -> [resourceDecl, sentinel, innerTryCatch]
+                // Multiple resources nest recursively: innerTryCatch.tryStmt wraps the next resource.
+                org.codehaus.groovy.ast.stmt.Statement current = node.getTryStatement();
+                while (isDesugaredResourceBlock(current)) {
+                    BlockStatement innerBlock = (BlockStatement) ((BlockStatement) current).getStatements().get(0);
+                    ExpressionStatement resourceStmt = (ExpressionStatement) innerBlock.getStatements().get(0);
+                    J resourceVar = doVisit(resourceStmt.getExpression());
+                    Space resourcePrefix = resourceVar.getPrefix();
+                    resourceVar = resourceVar.withPrefix(EMPTY);
+
+                    TryCatchStatement innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
+                    boolean hasMoreResources = isDesugaredResourceBlock(innerTry.getTryStatement());
+
+                    int nextNonWs = indexOfNextNonWhitespace(cursor, source);
+                    boolean semicolonPresent = nextNonWs < source.length() && source.charAt(nextNonWs) == ';';
+                    if (semicolonPresent && resourceVar instanceof J.VariableDeclarations) {
+                        J.VariableDeclarations resourceVarDecl = (J.VariableDeclarations) resourceVar;
+                        resourceVar = resourceVarDecl.getPadding().withVariables(Space.formatLastSuffix(resourceVarDecl
+                                .getPadding().getVariables(), sourceBefore(";")));
+                    }
+
+                    J.Try.Resource tryResource = new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
+                            resourceVar.withPrefix(EMPTY), semicolonPresent);
+                    skip(";");
+
+                    if (hasMoreResources) {
+                        resourceList.add(padRight(tryResource, EMPTY));
+                        current = innerTry.getTryStatement();
+                    } else {
+                        resourceList.add(padRight(tryResource, sourceBefore(")")));
+                        break;
+                    }
+                }
+                resources = JContainer.build(beforeParen, resourceList, Markers.EMPTY);
+            }
+
+            // When try-with-resources, find the actual body by walking down the nested structure
+            // to the innermost TryCatchStatement's tryStmt.
+            J.Block body;
+            if (hasTryWithResources) {
+                org.codehaus.groovy.ast.stmt.Statement current = node.getTryStatement();
+                TryCatchStatement innerTry = null;
+                while (isDesugaredResourceBlock(current)) {
+                    BlockStatement innerBlock = (BlockStatement) ((BlockStatement) current).getStatements().get(0);
+                    innerTry = (TryCatchStatement) innerBlock.getStatements().get(innerBlock.getStatements().size() - 1);
+                    if (isDesugaredResourceBlock(innerTry.getTryStatement())) {
+                        current = innerTry.getTryStatement();
+                    } else {
+                        break;
+                    }
+                }
+                body = doVisit(innerTry != null ? innerTry.getTryStatement() : node.getTryStatement());
+            } else {
+                body = doVisit(node.getTryStatement());
+            }
+
+            // Handle catches, merging multi-catch statements.
+            // Groovy 4 splits catch(A | B e) into separate CatchStatements at the same source position.
             List<J.Try.Catch> catches;
             if (node.getCatchStatements().isEmpty()) {
                 catches = emptyList();
             } else {
                 catches = new ArrayList<>(node.getCatchStatements().size());
-                for (CatchStatement catchStatement : node.getCatchStatements()) {
-                    visitCatchStatement(catchStatement);
+                List<CatchStatement> catchStatements = node.getCatchStatements();
+                for (int i = 0; i < catchStatements.size(); ) {
+                    CatchStatement catchStatement = catchStatements.get(i);
+                    // Detect multi-catch: consecutive catches at the same line/col
+                    int j = i + 1;
+                    while (j < catchStatements.size() &&
+                            catchStatements.get(j).getLineNumber() == catchStatement.getLineNumber() &&
+                            catchStatements.get(j).getColumnNumber() == catchStatement.getColumnNumber()) {
+                        j++;
+                    }
+                    if (j > i + 1) {
+                        // Multi-catch: parse a single catch with J.MultiCatch type
+                        visitMultiCatchStatement(catchStatements.subList(i, j));
+                    } else {
+                        visitCatchStatement(catchStatement);
+                    }
                     catches.add((J.Try.Catch) queue.poll());
+                    i = j;
                 }
             }
 
@@ -2550,6 +2674,16 @@ public class GroovyParserVisitor {
 
     private <T> JRightPadded<T> padRight(T tree, Space right, Markers markers) {
         return new JRightPadded<>(tree, right, markers);
+    }
+
+    /**
+     * Groovy 4 desugars each try-with-resource into:
+     * BlockStatement -> BlockStatement -> [resourceDecl, sentinel, innerTryCatchStatement]
+     */
+    private static boolean isDesugaredResourceBlock(org.codehaus.groovy.ast.stmt.Statement stmt) {
+        if (!(stmt instanceof BlockStatement)) return false;
+        List<org.codehaus.groovy.ast.stmt.Statement> stmts = ((BlockStatement) stmt).getStatements();
+        return !stmts.isEmpty() && stmts.get(0) instanceof BlockStatement;
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
