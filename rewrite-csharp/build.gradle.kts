@@ -1,7 +1,11 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.hierynomus.gradle.license.tasks.LicenseCheck
+import com.hierynomus.gradle.license.tasks.LicenseFormat
+import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
 
 plugins {
     id("org.openrewrite.build.language-library")
@@ -177,3 +181,32 @@ val csharpPublish by tasks.registering(Exec::class) {
 tasks.named("publish") {
     dependsOn(csharpPublish)
 }
+
+// ============================================
+// License Header Configuration
+// ============================================
+
+extensions.configure<LicenseExtension> {
+    header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+}
+
+val licenseCsharp by tasks.registering(LicenseCheck::class) {
+    group = "license"
+    description = "Check license headers on C# files"
+    source = fileTree(csharpDir) { include("**/*.cs") }
+    header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+    mapping("cs", "SLASHSTAR_STYLE")
+    ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
+}
+
+val licenseFormatCsharp by tasks.registering(LicenseFormat::class) {
+    group = "license"
+    description = "Apply license headers to C# files"
+    source = fileTree(csharpDir) { include("**/*.cs") }
+    header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
+    mapping("cs", "SLASHSTAR_STYLE")
+    ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
+}
+
+tasks.named("licenseMain") { dependsOn(licenseCsharp) }
+tasks.named("licenseFormatMain") { dependsOn(licenseFormatCsharp) }
