@@ -177,9 +177,11 @@ val csharpPublish by tasks.registering(Exec::class) {
     }
 }
 
-// Wire into the main publish task
-tasks.named("publish") {
-    dependsOn(csharpPublish)
+// Wire into the main publish task only when the NuGet API key is available
+if (project.hasProperty("nugetApiKey")) {
+    tasks.named("publish") {
+        dependsOn(csharpPublish)
+    }
 }
 
 // ============================================
