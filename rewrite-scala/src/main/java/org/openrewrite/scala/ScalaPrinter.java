@@ -187,6 +187,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitWildcard((S.Wildcard) tree, p);
         } else if (tree instanceof S.TuplePattern) {
             return visitTuplePattern((S.TuplePattern) tree, p);
+        } else if (tree instanceof S.BlockExpression) {
+            return visitBlockExpression((S.BlockExpression) tree, p);
         }
         return super.visit(tree, p);
     }
@@ -540,6 +542,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
         visit(multiVariable.getLeadingAnnotations(), p);
         
+        // If we have annotations, ensure space after them before modifiers/val/var
+        if (!multiVariable.getLeadingAnnotations().isEmpty()) {
+            p.append(" ");
+        }
+        
         // Check if this is a lambda parameter - if so, don't print val/var
         boolean isLambdaParam = multiVariable.getMarkers().findFirst(
             org.openrewrite.scala.marker.LambdaParameter.class).isPresent();
@@ -607,21 +614,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             // The type expression should have the space after colon in its prefix
             visit(parent.getTypeExpression(), p);
             
-            // If there's an initializer, we need to handle the space before equals
-            if (variable.getPadding().getInitializer() != null) {
-                // The space before equals is in the initializer's before
-                visitSpace(variable.getPadding().getInitializer().getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
-                p.append("=");
-                visit(variable.getPadding().getInitializer().getElement(), p);
-            }
+            // If there's an initializer, use visitLeftPadded to handle it properly
+            visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
         } else {
             // No type annotation, handle initializer normally
-            if (variable.getPadding().getInitializer() != null) {
-                // Print the space that's in the initializer's before
-                visitSpace(variable.getPadding().getInitializer().getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
-                p.append("=");
-                visit(variable.getPadding().getInitializer().getElement(), p);
-            }
+            visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
         }
         
         afterSyntax(variable, p);
@@ -737,6 +734,27 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return method;
         }
         
+        // Check if this is infix notation (list map func instead of list.map(func))
+        if (method.getMarkers().findFirst(org.openrewrite.scala.marker.InfixNotation.class).isPresent()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+            
+            // Print the select (e.g., "list")
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+            
+            // Print the method name with its prefix space (e.g., " map")
+            visit(method.getName(), p);
+            
+            // Print the arguments without parentheses, just with their prefix space
+            if (method.getArguments() != null && !method.getArguments().isEmpty()) {
+                for (Expression arg : method.getArguments()) {
+                    visit(arg, p);
+                }
+            }
+            
+            afterSyntax(method, p);
+            return method;
+        }
+        
         // For regular method calls, use the default Java printing
         return super.visitMethodInvocation(method, p);
     }
@@ -807,5 +825,13 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append('_');
         afterSyntax(wildcard, p);
         return wildcard;
+    }
+
+    public J visitBlockExpression(S.BlockExpression blockExpression, PrintOutputCapture<P> p) {
+        beforeSyntax(blockExpression, Space.Location.LANGUAGE_EXTENSION, p);
+        // Simply visit the contained block - it will print itself with braces
+        visit(blockExpression.getBlock(), p);
+        afterSyntax(blockExpression, p);
+        return blockExpression;
     }
 }

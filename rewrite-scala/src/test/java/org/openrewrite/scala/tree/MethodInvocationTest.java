@@ -132,6 +132,21 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void explicitApplyMethod() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val list = List(1, 2, 3)
+                val explicit = list.apply(0)
+                val implicitApply = list(0)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodCallInExpression() {
         rewriteRun(
           scala(

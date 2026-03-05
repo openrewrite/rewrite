@@ -32,6 +32,14 @@ class ImportTest implements RewriteTest {
           )
         );
     }
+    
+    @Test
+    void singleImportNoNewline() {
+        // Test import without trailing newline (from SingleImportDebugTest)
+        rewriteRun(
+          scala("import scala.collection.mutable")
+        );
+    }
 
     @Test
     void javaImport() {

@@ -74,4 +74,12 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         w = w.withMarkers(visitMarkers(w.getMarkers(), p));
         return w;
     }
+
+    public J visitBlockExpression(S.BlockExpression blockExpression, P p) {
+        S.BlockExpression b = blockExpression;
+        b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        b = b.withBlock(visitAndCast(b.getBlock(), p));
+        return b;
+    }
 }

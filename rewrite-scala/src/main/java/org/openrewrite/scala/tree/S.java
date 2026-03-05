@@ -275,7 +275,6 @@ public interface S extends J {
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     final class TuplePattern implements S, Expression, TypedTree, VariableDeclarator {
@@ -295,6 +294,10 @@ public interface S extends J {
         Markers markers;
 
         JContainer<Expression> elements;
+        
+        public static TuplePattern build(UUID id, Space prefix, Markers markers, JContainer<Expression> elements, JavaType type) {
+            return new TuplePattern(null, id, prefix, markers, elements, type);
+        }
 
         public List<Expression> getElements() {
             return elements.getElements();
@@ -359,7 +362,7 @@ public interface S extends J {
             }
 
             public S.TuplePattern withElements(JContainer<Expression> elements) {
-                return t.elements == elements ? t : new S.TuplePattern(t.id, t.prefix, t.markers, elements, t.type);
+                return t.elements == elements ? t : new S.TuplePattern(null, t.id, t.prefix, t.markers, elements, t.type);
             }
         }
     }
@@ -398,6 +401,52 @@ public interface S extends J {
         @Override
         public <P> J acceptScala(ScalaVisitor<P> v, P p) {
             return v.visitWildcard(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a block used as an expression in Scala.
+     * In Scala, blocks are expressions that return the value of their last statement.
+     * For example: val x = { val temp = 10; temp * 2 }
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class BlockExpression implements S, Expression, TypedTree {
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+        
+        @With
+        J.Block block;
+
+        @With
+        @Nullable
+        JavaType type;
+
+        public BlockExpression(UUID id, Space prefix, Markers markers, J.Block block, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.block = block;
+            this.type = type;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitBlockExpression(this, p);
         }
 
         @Override
