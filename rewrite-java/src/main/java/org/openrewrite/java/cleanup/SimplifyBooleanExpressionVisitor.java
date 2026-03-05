@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -192,7 +193,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (isLiteralFalse(expr)) {
             j = ((J.Literal) expr).withValue(true).withValueSource("true");
         } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
-            j = ((J.Unary) expr).getExpression();
+            if (canSimplifyDoubleNegation(((J.Unary) expr).getExpression())) {
+                j = ((J.Unary) expr).getExpression();
+            }
         } else if (expr instanceof J.Parentheses) {
             J parenthesized = ((J.Parentheses<?>) expr).getTree();
             if (parenthesized instanceof J.Binary) {
@@ -204,7 +207,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             } else if (parenthesized instanceof J.Unary) {
                 J.Unary unary1 = (J.Unary) parenthesized;
                 J.Unary.Type operator = unary1.getOperator();
-                if (operator == J.Unary.Type.Not) {
+                if (operator == J.Unary.Type.Not && canSimplifyDoubleNegation(unary1.getExpression())) {
                     j = unary1.getExpression().withPrefix(j.getPrefix());
                 }
             } else if (parenthesized instanceof J.Ternary) {
@@ -425,6 +428,20 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                         .withPrefix(Space.EMPTY)
                         .withMarkers(Markers.EMPTY),
                 JavaType.Primitive.Boolean);
+    }
+
+    /**
+     * In Java, {@code !} only applies to boolean expressions, so {@code !!x} is always
+     * equivalent to {@code x}. In other languages like JavaScript/TypeScript and Groovy,
+     * {@code !!x} is an idiomatic boolean coercion that converts any truthy/falsy value
+     * to a strict boolean. In those cases, simplifying {@code !!x} to {@code x} changes
+     * semantics when {@code x} is not boolean-typed.
+     */
+    private boolean canSimplifyDoubleNegation(Expression innerExpression) {
+        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+            return true;
+        }
+        return innerExpression.getType() == JavaType.Primitive.Boolean;
     }
 
     /**

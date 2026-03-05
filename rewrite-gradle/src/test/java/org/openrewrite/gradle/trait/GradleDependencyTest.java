@@ -383,6 +383,246 @@ class GradleDependencyTest implements RewriteTest {
     }
 
     @Test
+    void withDeclaredGroupIdPreservesGString() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredGroupId("org.example").getTree()))),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  def version = "28.2-jre"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  def version = "28.2-jre"
+                  implementation "org.example:guava:${version}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withDeclaredArtifactIdPreservesGString() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredArtifactId("banana").getTree()))),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  def version = "28.2-jre"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  def version = "28.2-jre"
+                  implementation "com.google.guava:banana:${version}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withDeclaredVersionCollapsesGString() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredVersion("29.0-jre").getTree()))),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  def version = "28.2-jre"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  def version = "28.2-jre"
+                  implementation "com.google.guava:guava:29.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withDeclaredGroupIdPreservesKotlinStringTemplate() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredGroupId("org.example").getTree()))),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "28.2-jre"
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "28.2-jre"
+                  implementation("org.example:guava:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withDeclaredArtifactIdPreservesKotlinStringTemplate() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredArtifactId("banana").getTree()))),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "28.2-jre"
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "28.2-jre"
+                  implementation("com.google.guava:banana:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withDeclaredVersionCollapsesKotlinStringTemplate() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(RewriteTest.toRecipe(() -> new GradleDependency.Matcher()
+              .groupId("com.google.guava").artifactId("guava")
+              .asVisitor(dep -> dep.withDeclaredVersion("29.0-jre").getTree()))),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "28.2-jre"
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "28.2-jre"
+                  implementation("com.google.guava:guava:29.0-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multiComponentLiteralsTwoArgs() {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi()),

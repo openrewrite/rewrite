@@ -28,6 +28,7 @@ import os
 import select
 import sys
 import tempfile
+import time
 import traceback
 import threading
 
@@ -198,7 +199,12 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     try:
         obj = receiver.receive(before, q)
 
-        # Verify we received the complete object (END_OF_OBJECT was in the final batch)
+        # After receive() completes, END_OF_OBJECT may still be pending in a
+        # separate batch (happens when data items are an exact multiple of the
+        # handler's batchSize). Drain it — analogous to Java's explicit
+        # q.take() after receive().
+        if not received_end:
+            pull_batch()
         if not received_end:
             raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
     except Exception:
@@ -284,8 +290,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             # Convert to OpenRewrite LST
             cu = ParserVisitor(source, path, ty_client).visit(tree)
 
-        cu = cu.replace(source_path=source_path)
-        cu = cu.replace(markers=Markers.EMPTY)
+        cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
 
         # Store and return
         obj_id = str(cu.id)
@@ -1074,10 +1079,9 @@ def handle_visit(params: dict) -> dict:
         if p_id:
             _execution_contexts[p_id] = ctx
 
-    # Get the tree - fetch from Java if we don't have it locally
-    tree = local_objects.get(tree_id)
-    if tree is None:
-        tree = get_object_from_java(tree_id, source_file_type)
+    # Always fetch the tree from Java to ensure we have the latest version.
+    # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
+    tree = get_object_from_java(tree_id, source_file_type)
 
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
@@ -1260,11 +1264,73 @@ def handle_request(method: str, params: dict) -> Any:
         raise ValueError(f"Unknown method: {method}")
 
 
+class _StdinBuffer:
+    """Buffered reader for raw stdin file descriptor.
+
+    Reads in chunks to reduce syscall overhead.  A single module-level
+    instance is shared by read_message() and read_message_with_timeout().
+    """
+
+    _CHUNK_SIZE = 8192
+
+    def __init__(self):
+        self._fd: Optional[int] = None
+        self._buf = bytearray()
+
+    def _get_fd(self) -> int:
+        fd = self._fd
+        if fd is None:
+            fd = sys.stdin.fileno()
+            self._fd = fd
+        return fd
+
+    def read_line(self, deadline: Optional[float] = None) -> Optional[bytes]:
+        """Read until ``\\n``.  Returns the line including the newline,
+        or ``None`` on EOF/timeout."""
+        while True:
+            idx = self._buf.find(b'\n')
+            if idx >= 0:
+                line = bytes(self._buf[:idx + 1])
+                del self._buf[:idx + 1]
+                return line
+            if not self._fill(deadline):
+                return None
+
+    def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
+        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout."""
+        while len(self._buf) < n:
+            if not self._fill(deadline):
+                return None
+        result = bytes(self._buf[:n])
+        del self._buf[:n]
+        return result
+
+    def _fill(self, deadline: Optional[float] = None) -> bool:
+        """Read more data into the internal buffer.
+
+        When *deadline* is set, uses ``select()`` to respect the timeout;
+        otherwise blocks in ``os.read()``.  Returns ``False`` on
+        EOF or timeout.
+        """
+        if deadline is not None:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return False
+            readable, _, _ = select.select([self._get_fd()], [], [], remaining)
+            if not readable:
+                return False
+        chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
+        if not chunk:
+            return False
+        self._buf += chunk
+        return True
+
+
+_stdin_buffer = _StdinBuffer()
+
+
 def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
     """Read a JSON-RPC message from stdin with timeout.
-
-    Uses select() on the raw file descriptor and unbuffered binary I/O
-    to avoid issues with Python's buffered TextIOWrapper.
 
     Args:
         timeout_seconds: Maximum time to wait for complete message
@@ -1272,54 +1338,11 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
     Returns:
         Parsed JSON message, or None on timeout/error
     """
-    import time
-    import os
-    start_time = time.time()
-    fd = sys.stdin.fileno()
-
-    def remaining_timeout() -> float:
-        elapsed = time.time() - start_time
-        return max(0, timeout_seconds - elapsed)
-
-    def read_bytes_with_timeout(n: int) -> Optional[bytes]:
-        """Read exactly n bytes from stdin fd with timeout."""
-        result = []
-        remaining = n
-        while remaining > 0:
-            timeout = remaining_timeout()
-            if timeout <= 0:
-                return None
-            readable, _, _ = select.select([fd], [], [], timeout)
-            if not readable:
-                return None
-            chunk = os.read(fd, remaining)
-            if not chunk:
-                return None  # EOF
-            result.append(chunk)
-            remaining -= len(chunk)
-        return b''.join(result)
-
-    def read_line_with_timeout() -> Optional[bytes]:
-        """Read a line (up to \n) from stdin fd with timeout."""
-        result = []
-        while True:
-            timeout = remaining_timeout()
-            if timeout <= 0:
-                return None
-            readable, _, _ = select.select([fd], [], [], timeout)
-            if not readable:
-                return None
-            byte = os.read(fd, 1)
-            if not byte:
-                return None  # EOF
-            result.append(byte)
-            if byte == b'\n':
-                break
-        return b''.join(result)
+    deadline = time.time() + timeout_seconds
 
     try:
         # Read Content-Length header
-        header_line = read_line_with_timeout()
+        header_line = _stdin_buffer.read_line(deadline)
         if not header_line:
             logger.warning(f"Timeout waiting for RPC response header after {timeout_seconds}s")
             return None
@@ -1332,13 +1355,13 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
         content_length = int(header_str.split(':')[1].strip())
 
         # Read empty line (separator)
-        separator = read_line_with_timeout()
+        separator = _stdin_buffer.read_line(deadline)
         if separator is None:
             logger.warning(f"Timeout waiting for header separator")
             return None
 
         # Read content
-        content_bytes = read_bytes_with_timeout(content_length)
+        content_bytes = _stdin_buffer.read_bytes(content_length, deadline)
         if content_bytes is None:
             logger.warning(f"Timeout waiting for message content")
             return None
@@ -1350,41 +1373,10 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
 
 
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin (blocking, no timeout).
-
-    Uses unbuffered binary I/O (os.read) to be consistent with
-    read_message_with_timeout() and avoid buffering conflicts.
-    """
-    import os
-    fd = sys.stdin.fileno()
-
-    def read_line() -> Optional[bytes]:
-        """Read a line (up to \n) from stdin fd."""
-        result = []
-        while True:
-            byte = os.read(fd, 1)
-            if not byte:
-                return None  # EOF
-            result.append(byte)
-            if byte == b'\n':
-                break
-        return b''.join(result)
-
-    def read_bytes(n: int) -> Optional[bytes]:
-        """Read exactly n bytes from stdin fd."""
-        result = []
-        remaining = n
-        while remaining > 0:
-            chunk = os.read(fd, remaining)
-            if not chunk:
-                return None  # EOF
-            result.append(chunk)
-            remaining -= len(chunk)
-        return b''.join(result)
-
+    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
     try:
         # Read Content-Length header
-        header_line = read_line()
+        header_line = _stdin_buffer.read_line()
         if not header_line:
             return None
 
@@ -1396,10 +1388,10 @@ def read_message() -> Optional[dict]:
         content_length = int(header_str.split(':')[1].strip())
 
         # Read empty line (separator)
-        read_line()
+        _stdin_buffer.read_line()
 
         # Read content
-        content_bytes = read_bytes(content_length)
+        content_bytes = _stdin_buffer.read_bytes(content_length)
         if not content_bytes:
             return None
         return json.loads(content_bytes.decode('utf-8'))
@@ -1409,14 +1401,15 @@ def read_message() -> Optional[dict]:
 
 
 def write_message(response: dict):
-    """Write a JSON-RPC message to stdout."""
-    content = json.dumps(response)
-    content_bytes = content.encode('utf-8')
+    """Write a JSON-RPC message to stdout.
 
-    sys.stdout.write(f"Content-Length: {len(content_bytes)}\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.write(content)
-    sys.stdout.flush()
+    Uses unbuffered binary I/O to avoid line-ending translation on Windows
+    that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
+    used by read_message() which uses os.read() on the read side.
+    """
+    content_bytes = json.dumps(response).encode('utf-8')
+    header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
+    os.write(sys.stdout.fileno(), header + content_bytes)
 
 
 def main():

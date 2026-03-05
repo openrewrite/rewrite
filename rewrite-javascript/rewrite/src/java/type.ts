@@ -410,6 +410,11 @@ export namespace Type {
                     parameterizedStack = new Set<Type>();
                 }
 
+                // Check for recursion
+                if (parameterizedStack.has(parameterized)) {
+                    return FullyQualified.getFullyQualifiedName(parameterized);
+                }
+
                 // Add to stack to track cycles
                 parameterizedStack.add(parameterized);
 

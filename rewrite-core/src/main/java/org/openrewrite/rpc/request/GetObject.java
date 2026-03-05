@@ -149,6 +149,10 @@ public class GetObject implements RpcRequest {
                             remoteObjects.put(id, after);
                         }
                     } catch (Throwable t) {
+                        // Reset our tracking of the remote state so the next interaction
+                        // forces a full object sync (ADD) instead of a delta (CHANGE)
+                        // against the stale, partially-sent baseline.
+                        remoteObjects.remove(id);
                         PrintStream logFile = log.get();
                         //noinspection ConstantValue
                         if (logFile != null) {

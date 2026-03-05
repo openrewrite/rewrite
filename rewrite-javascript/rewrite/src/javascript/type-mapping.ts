@@ -166,26 +166,30 @@ export class JavaScriptTypeMapping {
                                 this.populateClassType(classType, declaredType);
                             }
 
-                            // Resolve type arguments
+                            // Shell-cache: Create parameterized type wrapper with empty typeParameters
+                            // BEFORE resolving type arguments, to prevent infinite recursion
+                            // when type argument resolution cycles back to this parameterized type
+                            const parameterized = {
+                                kind: Type.Kind.Parameterized,
+                                type: classType,
+                                typeParameters: [],
+                                fullyQualifiedName: classType.fullyQualifiedName,
+                                toJSON: function () {
+                                    return Type.signature(this);
+                                }
+                            } as Type.Parameterized;
+                            this.typeCache.set(signature, parameterized);
+
+                            // Resolve type arguments (may recursively reference this parameterized type)
                             const typeParameters: Type[] = [];
                             for (const typeArg of typeRef.typeArguments!) {
                                 const resolvedArg = this.getType(typeArg as ts.Type);
                                 typeParameters.push(resolvedArg);
                             }
 
-                            // Create the parameterized type wrapper
-                            const parameterized = {
-                                kind: Type.Kind.Parameterized,
-                                type: classType,
-                                typeParameters: typeParameters,
-                                fullyQualifiedName: classType.fullyQualifiedName,
-                                toJSON: function () {
-                                    return Type.signature(this);
-                                }
-                            } as Type.Parameterized;
+                            // Update the shell with resolved type parameters
+                            (parameterized as any).typeParameters = typeParameters;
 
-                            // Cache the parameterized type
-                            this.typeCache.set(signature, parameterized);
                             return parameterized;
                         }
                     }
@@ -287,7 +291,9 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        // For non-object types, we can create them directly without recursion concerns
+        // Pre-cache as unknownType before resolving type aliases to prevent infinite
+        // recursion when alias resolution cycles back through getType with different type.ids
+        this.typeCache.set(signature, Type.unknownType);
         const result = this.createPrimitiveOrUnknownType(type);
         this.typeCache.set(signature, result);
         return result;

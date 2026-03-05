@@ -45,7 +45,7 @@ class Cursor:
     def first_enclosing_or_throw(self, type: Type[P]) -> P:
         result = self.first_enclosing(type)
         if result is None:
-            raise ValueError(f"Expected to find enclosing {T.__name__}")
+            raise ValueError(f"Expected to find enclosing {type.__name__}")
         return result
 
     def first_enclosing(self, type_: Type[P]) -> Optional[P]:

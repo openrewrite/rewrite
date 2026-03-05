@@ -1162,6 +1162,76 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/6833")
+    void doesNotAddToProjectNotUsingTypeWhenConfigurationIsExplicit() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("root",
+            buildGradle(
+              ""
+            ),
+            settingsGradle(
+              """
+                include "project1"
+                include "project2"
+                """
+            ),
+            mavenProject("project1",
+              srcMainJava(
+                java(usingGuavaIntMath)
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation "com.google.guava:guava:29.0-jre"
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              srcMainJava(
+                java(
+                  """
+                    public class B {
+                        String hello() { return "world"; }
+                    }
+                    """
+                )
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void addDynamicVersionDependency() {
         rewriteRun(
           spec -> spec

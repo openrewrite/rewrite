@@ -159,7 +159,7 @@ public class RecipeMarketplaceReader {
             String value = row[i];
             if (value != null) {
                 value = value.trim();
-                if (StringUtils.isBlank(value)) {
+                if (StringUtils.isBlank(value) || "null".equals(value)) {
                     value = null;
                 }
             }
