@@ -24,7 +24,8 @@ from rewrite.marketplace import Python
 from rewrite.recipe import option
 from rewrite.java import J
 from rewrite.java.support_types import JavaType
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, MethodDeclaration, MethodInvocation
+from rewrite.java.tree import FieldAccess, Identifier, Import, MethodDeclaration, MethodInvocation
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
@@ -159,10 +160,10 @@ class ChangeImport(Recipe):
                                 self.has_old_import = True
                                 self.old_alias = alias if alias != "" else None
                         if old_name and not self.has_direct_module_import:
-                            name = self._get_qualid_name(stmt.qualid)
+                            name = get_qualid_name(stmt.qualid)
                             if name == old_module:
                                 self.has_direct_module_import = True
-                                self.module_alias = self._get_alias_name(stmt)
+                                self.module_alias = get_alias_name(stmt)
                     elif isinstance(stmt, MultiImport):
                         if not self.has_old_import:
                             alias = self._check_for_old_import(stmt)
@@ -171,10 +172,10 @@ class ChangeImport(Recipe):
                                 self.old_alias = alias if alias != "" else None
                         if old_name and not self.has_direct_module_import and stmt.from_ is None:
                             for imp in stmt.names:
-                                name = self._get_qualid_name(imp.qualid)
+                                name = get_qualid_name(imp.qualid)
                                 if name == old_module:
                                     self.has_direct_module_import = True
-                                    self.module_alias = self._get_alias_name(imp)
+                                    self.module_alias = get_alias_name(imp)
                                     break
 
                 if not self.has_old_import and not self.has_direct_module_import:
@@ -351,9 +352,9 @@ class ChangeImport(Recipe):
                 """Check if a standalone J.Import matches the old import."""
                 if old_name:
                     return None
-                name = self._get_qualid_name(imp.qualid)
+                name = get_qualid_name(imp.qualid)
                 if name == old_module:
-                    return self._get_alias_name(imp) or ""
+                    return get_alias_name(imp) or ""
                 return None
 
             def _check_for_old_import(self, multi: MultiImport) -> Optional[str]:
@@ -368,21 +369,21 @@ class ChangeImport(Recipe):
                     # Looking for: from old_module import old_name [as alias]
                     if multi.from_ is None:
                         return None
-                    from_name = self._get_name_string(multi.from_)
+                    from_name = get_name_string(multi.from_)
                     if from_name != old_module:
                         return None
                     for imp in multi.names:
-                        name = self._get_qualid_name(imp.qualid)
+                        name = get_qualid_name(imp.qualid)
                         if name == old_name:
-                            return self._get_alias_name(imp) or ""
+                            return get_alias_name(imp) or ""
                 else:
                     # Looking for: import old_module [as alias]
                     if multi.from_ is not None:
                         return None
                     for imp in multi.names:
-                        name = self._get_qualid_name(imp.qualid)
+                        name = get_qualid_name(imp.qualid)
                         if name == old_module:
-                            return self._get_alias_name(imp) or ""
+                            return get_alias_name(imp) or ""
                 return None
 
             def _remove_name_from_import(self, multi: MultiImport, name_to_remove: str) -> Optional[J]:
@@ -393,7 +394,7 @@ class ChangeImport(Recipe):
                 existing_padded = multi.padding.names.padding.elements
                 new_padded = [
                     p for p in existing_padded
-                    if self._get_qualid_name(p.element.qualid) != name_to_remove
+                    if get_qualid_name(p.element.qualid) != name_to_remove
                 ]
 
                 if len(new_padded) == 0:
@@ -420,7 +421,7 @@ class ChangeImport(Recipe):
                 existing_padded = multi.padding.names.padding.elements
                 new_padded = [
                     p for p in existing_padded
-                    if self._get_qualid_name(p.element.qualid) != module_to_remove
+                    if get_qualid_name(p.element.qualid) != module_to_remove
                 ]
 
                 if len(new_padded) == 0:
@@ -437,39 +438,5 @@ class ChangeImport(Recipe):
                         )
                     )
                 return multi
-
-            def _get_qualid_name(self, qualid) -> str:
-                """Get the string representation of a qualified name."""
-                if isinstance(qualid, Identifier):
-                    return qualid.simple_name
-                elif isinstance(qualid, FieldAccess):
-                    target = self._get_name_string(qualid.target)
-                    name = qualid.name.simple_name
-                    if target:
-                        return f"{target}.{name}"
-                    return name
-                return ""
-
-            def _get_name_string(self, name) -> str:
-                """Get string from a NameTree."""
-                if isinstance(name, Identifier):
-                    return name.simple_name
-                elif isinstance(name, FieldAccess):
-                    target = self._get_name_string(name.target)
-                    if target:
-                        return f"{target}.{name.name.simple_name}"
-                    return name.name.simple_name
-                elif isinstance(name, Empty):
-                    return ""
-                return str(name) if name else ""
-
-            def _get_alias_name(self, imp: Import) -> Optional[str]:
-                """Get the alias name from an Import, or None if no alias."""
-                if imp.alias is None:
-                    return None
-                alias = imp.alias
-                if isinstance(alias, Identifier):
-                    return alias.simple_name
-                return None
 
         return ChangeImportVisitor()

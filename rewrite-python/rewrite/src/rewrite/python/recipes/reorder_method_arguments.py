@@ -18,7 +18,6 @@ ReorderMethodArguments recipe for Python that delegates to Java's ReorderMethodA
 This recipe reorders arguments in method invocations matching a pattern.
 """
 from dataclasses import field
-from importlib.metadata import metadata
 from typing import Any, List, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
