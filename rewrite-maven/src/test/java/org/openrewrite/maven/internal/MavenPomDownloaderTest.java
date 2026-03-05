@@ -1100,6 +1100,58 @@ class MavenPomDownloaderTest implements RewriteTest {
             // by downloading from the remote repository, not by local path resolution.
             assertDoesNotThrow(() -> downloader.download(gav, "", resolvedPom, singletonList(MAVEN_CENTRAL)));
         }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1950")
+        @Test
+        void emptyRelativePathSkipsPathBasedLookupWithPlaceholderVersion() {
+            // A local parent POM exists at ../pom.xml, but the child specifies <relativePath/>
+            // (empty string) and references the parent with a placeholder version ${my.version}.
+            // Without the fix, the path-based lookup (stage 3) would default relativePath to "..",
+            // find the parent, and accept it because "${" in the version relaxes the version check.
+            // With the fix, stage 3 is skipped entirely due to empty relativePath.
+            var gav = new GroupArtifactVersion("test", "parent", "${my.version}");
+
+            Path rootPomXml = Path.of("pom.xml");
+            Pom parentPom = Pom.builder()
+              .sourcePath(rootPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(null)
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test", "parent", "1.0.0", null))
+              .build();
+
+            Path childPomXml = Path.of("child/pom.xml");
+            Pom childPom = Pom.builder()
+              .sourcePath(childPomXml)
+              .repository(MAVEN_CENTRAL)
+              .parent(new Parent(gav, ""))
+              .gav(new ResolvedGroupArtifactVersion(
+                MAVEN_CENTRAL.getUri(), "test", "child", "1.0.0", null))
+              .build();
+
+            ResolvedPom resolvedPom = ResolvedPom.builder()
+              .requested(childPom)
+              .repositories(singletonList(MAVEN_CENTRAL))
+              .build();
+
+            Map<Path, Pom> pomsByPath = new HashMap<>();
+            pomsByPath.put(rootPomXml, parentPom);
+            pomsByPath.put(childPomXml, childPom);
+
+            String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
+            MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
+
+            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+
+            // With empty relativePath, the path-based lookup (stage 3) should be skipped.
+            // The placeholder ${my.version} can't be resolved via GAV iteration (stage 2)
+            // because the parent doesn't define my.version. Without the fix, stage 3 would
+            // find the parent at ../pom.xml and accept it (placeholder version relaxes the
+            // version check). With the fix, the download falls through to the remote repo
+            // and fails (IllegalArgumentException from the unresolved placeholder in the URI).
+            assertThrows(Exception.class,
+              () -> downloader.download(gav, "", resolvedPom, singletonList(nonexistentRepo)));
+        }
     }
 
     @Nested
