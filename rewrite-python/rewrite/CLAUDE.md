@@ -110,7 +110,6 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 
 - `from datetime import datetime` → `MultiImport` with `from_=Identifier("datetime")`, names contain `Import` with qualid `"datetime"`
 - `import datetime` → `MultiImport` with `from_=None`, names contain `Import` with qualid `"datetime"`
-- Use `maybe_add_import()` / `maybe_remove_import()` to schedule import changes (stored in `visitor._after_visit`)
 
 ### Padding and Whitespace
 
@@ -161,19 +160,6 @@ def test_my_recipe():
 
 ## RPC Communication
 
-The RPC bridge allows Python recipes to call Java transformations and vice versa:
+Sender/Receiver implementations (`python_sender.py`, `python_receiver.py`) must stay aligned with the Java equivalents. Any mismatch causes deadlocks or data corruption.
 
-1. Java `Sender` serializes the tree to a queue
-2. Python `Receiver` (`python_receiver.py`) reads from the queue and reconstructs the tree
-3. Python visitor processes the tree
-4. Python `Sender` (`python_sender.py`) serializes the result
-5. Java `Receiver` reconstructs and continues
-
-**Important**: Sender/Receiver implementations must stay aligned with the Java equivalents. Any mismatch causes deadlocks or data corruption.
-
-## Debugging Tips
-
-### Catching RPC Hangs
-1. Verify the Java classpath is generated: `./gradlew :rewrite-python:generateTestClasspath`
-2. Run a single test with verbose output: `pytest tests/rpc/test_something.py::test_case -v -s --timeout=120`
-3. If a test hangs, it usually indicates an RPC communication issue (deadlock, malformed response, printer bug)
+If an RPC test hangs, verify the Java classpath is generated (`./gradlew :rewrite-python:generateTestClasspath`) and run a single test with verbose output: `pytest tests/rpc/test_case.py -v -s --timeout=120`.

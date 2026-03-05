@@ -147,17 +147,6 @@ LST nodes have a `kind` property that must exactly match Java FQN strings:
 CompilationUnit: "org.openrewrite.javascript.tree.JS$CompilationUnit"
 ```
 
-### Package Self-Referencing
-
-The package is named `@openrewrite/rewrite` and uses `exports` in `package.json` for subpath resolution (e.g., `@openrewrite/rewrite/javascript`, `@openrewrite/rewrite/json`). However, **tests use relative imports**:
-
-```typescript
-// Actual test import pattern:
-import { RecipeSpec } from "../../../src/test";
-import { typescript } from "../../../src/javascript";
-import { OrderImports } from "../../../src/javascript/recipes/order-imports";
-```
-
 ## Recipe Pattern
 
 ```typescript
@@ -180,11 +169,9 @@ export class MyRecipe extends Recipe {
 }
 ```
 
-Existing recipes: `order-imports`, `add-dependency`, `change-import`, `auto-format`, `upgrade-dependency-version`, `async-callback-in-sync-array-method`.
-
-Cleanup recipes: `add-parse-int-radix`, `prefer-optional-chain`, `use-object-property-shorthand`.
-
 ## Test Pattern
+
+Tests use relative imports. Source spec factories (`typescript()`, `javascript()`, `jsx()`, `tsx()`, `packageJson()`) are in `src/javascript/assertions.ts`.
 
 ```typescript
 import { RecipeSpec } from "../../../src/test";
@@ -203,13 +190,6 @@ describe('OrderImports', () => {
 });
 ```
 
-Source spec factories (from `src/javascript/assertions.ts`):
-- `typescript(before, after)` — `.ts` file
-- `javascript(before, after)` — `.js` file
-- `jsx(before, after)` — `.jsx` file
-- `tsx(before, after)` — `.tsx` file
-- `packageJson(before, after)` — `package.json` file
-
 ## RPC Sender/Receiver
 
 Each language module has `rpc.ts` with a Sender (visit tree → serialize to queue) and Receiver (read queue → reconstruct tree). These must stay aligned with each other AND with the Java equivalents. Any mismatch causes deadlocks or corrupted trees.
@@ -223,14 +203,4 @@ Each language module has `rpc.ts` with a Sender (visit tree → serialize to que
 4. Check `src/rpc/queue.ts` for deadlock in read/write operations
 
 ### Type Checking
-Run `npm run typecheck` frequently to catch missing fields or incorrect method signatures.
-
-## Module Organization
-
-- **`tree.ts`** — AST node definitions (classes, Kind constants)
-- **`visitor.ts`** — Base visitor with overridable `visitXxx()` methods
-- **`print.ts`** — Converts tree back to source code
-- **`rpc.ts`** — Sender/Receiver for cross-language marshalling
-- **`recipes/`** — Built-in transformations
-- **`format/`** — Formatting and style visitors
-- **`cleanup/`**, **`migrate/`** — Domain-specific recipe groups
+Run `npm run typecheck` frequently to catch type mismatches early.
