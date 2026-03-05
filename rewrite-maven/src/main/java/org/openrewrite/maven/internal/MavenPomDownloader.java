@@ -214,7 +214,11 @@ public class MavenPomDownloader {
             return null;
         }
         String relativePath = parent.getRelativePath();
-        if (StringUtils.isBlank(relativePath)) {
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
+        if (relativePath != null && relativePath.isEmpty()) {
+            return null;
+        }
+        if (relativePath == null) {
             relativePath = "../pom.xml";
         }
         Path parentPath = projectPom.getSourcePath()
@@ -516,10 +520,12 @@ public class MavenPomDownloader {
             }
         }
 
-        if (containingPom != null && containingPom.getRequested().getSourcePath() != null) {
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
+        if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
+                !(relativePath != null && relativePath.isEmpty())) {
             // Maven POM §4.0.0 specifies that <relativePath> defaults to ".." when omitted.
             // See DefaultModelBuilder#readParentLocally in maven-model-builder.
-            String effectiveRelativePath = StringUtils.isBlank(relativePath) ? ".." : relativePath;
+            String effectiveRelativePath = relativePath == null ? ".." : relativePath;
             if (!effectiveRelativePath.contains(":")) {
                 Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
                 if (folderContainingPom != null) {
