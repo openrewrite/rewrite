@@ -77,7 +77,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Option(displayName = "Distribution type",
             description = "The distribution of Gradle to use. \"bin\" includes Gradle binaries. " +
                           "\"all\" includes Gradle binaries, source code, and documentation. " +
-                          "Defaults to \"bin\".",
+                          "Defaults to the distribution type of the existing wrapper properties file, " +
+                          "or \"bin\" if no wrapper properties file exists.",
             valid = {"bin", "all"},
             required = false
     )
