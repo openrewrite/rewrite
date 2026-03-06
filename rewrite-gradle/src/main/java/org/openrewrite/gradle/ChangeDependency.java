@@ -465,6 +465,14 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                if (sourceFile instanceof Properties.File) {
+                    return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
+                }
+                return sourceFile.getMarkers().findFirst(GradleProject.class).isPresent();
+            }
+
+            @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof Properties.File) {
                     Properties.File propsFile = (Properties.File) tree;
