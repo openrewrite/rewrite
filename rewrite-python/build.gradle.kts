@@ -213,11 +213,15 @@ tasks.withType<Test> {
 // Generate a PEP 440 compliant version for CI builds
 // Snapshots use .dev suffix: 8.71.0.dev20260112145318
 // Releases use clean version: 8.71.0
+// Read from version.txt on disk if it exists (second Gradle invocation), so the published pip
+// package version matches what was baked into the JAR by the first invocation.
+val pythonVersionTxt = file("src/main/resources/META-INF/rewrite-python-version.txt")
 val pythonVersion: String = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "-SNAPSHOT",
-        ".dev${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-    )
+    pythonVersionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+        ?: project.version.toString().replace(
+            "-SNAPSHOT",
+            ".dev${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+        )
 } else {
     project.version.toString().replace("-SNAPSHOT", ".dev0")
 }
