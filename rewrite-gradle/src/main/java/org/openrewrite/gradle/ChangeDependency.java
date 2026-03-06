@@ -180,8 +180,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return (sourceFile instanceof G.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle")) ||
-                        (sourceFile instanceof K.CompilationUnit && sourceFile.getSourcePath().toString().endsWith(".gradle.kts"));
+                return sourceFile.getMarkers().findFirst(GradleProject.class).isPresent();
             }
 
             @Override
@@ -467,7 +466,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 if (sourceFile instanceof Properties.File) {
-                    return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME) && !acc.versionVariableUpdates.isEmpty();
+                    return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
                 }
                 return sourceFile.getMarkers().findFirst(GradleProject.class).isPresent();
             }
