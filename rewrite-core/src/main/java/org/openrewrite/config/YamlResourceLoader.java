@@ -58,6 +58,8 @@ public class YamlResourceLoader implements ResourceLoader {
     private static final PropertyPlaceholderHelper propertyPlaceholderHelper =
             new PropertyPlaceholderHelper("${", "}", ":");
 
+    private static final String PRECONDITIONS_KEY = "preconditions";
+
     private final URI source;
     private final String yamlSource;
 
@@ -370,60 +372,151 @@ public class YamlResourceLoader implements ResourceLoader {
                         "Recipe class " + recipeName + " cannot be found");
             }
         } else if (recipeData instanceof Map) {
-            Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
-            String recipeName = nameAndConfig.getKey();
-            Object recipeArgs = nameAndConfig.getValue();
-            try {
-                if (recipeArgs instanceof Map) {
-                    try {
-                        addRecipe.accept(recipeLoader.apply(recipeName, (Map<String, Object>) recipeArgs));
-                    } catch (IllegalArgumentException e) {
-                        if (e.getCause() instanceof InvalidTypeIdException) {
-                            addInvalidRecipeValidation(
-                                    addValidation,
-                                    recipeName,
-                                    recipeArgs,
-                                    "Recipe class " + recipeName + " cannot be found");
-                        } else {
-                            addInvalidRecipeValidation(
-                                    addValidation,
-                                    recipeName,
-                                    recipeArgs,
-                                    "Unable to load Recipe: " + e);
-                        }
-                    } catch (RecipeNotFoundException e) {
-                        addInvalidRecipeValidation(
-                                addValidation,
-                                recipeName,
-                                recipeArgs,
-                                e.getMessage());
-                    } catch (NoClassDefFoundError e) {
-                        addInvalidRecipeValidation(
-                                addValidation,
-                                recipeName,
-                                recipeArgs,
-                                "Recipe class " + nameAndConfig.getKey() + " cannot be found");
-                    }
-                } else {
-                    addInvalidRecipeValidation(
-                            addValidation,
-                            recipeName,
-                            recipeArgs,
-                            "Declarative recipeList entries are expected to be strings or mappings");
-                }
-            } catch (Exception e) {
-                addInvalidRecipeValidation(
-                        addValidation,
-                        recipeName,
-                        recipeArgs,
-                        "Unexpected declarative recipe parsing exception " + e.getClass().getName() + ": " + e.getMessage());
-            }
+            loadRecipeFromMap(name, i, (Map<String, Object>) recipeData, addRecipe, addValidation);
         } else {
             addValidation.accept(invalid(
                     name + ".recipeList[" + i + "] (in " + source + ")",
                     recipeData,
                     "is an object type that isn't recognized as a recipe.",
                     null));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadRecipeFromMap(@Language("markdown") String name,
+                                   int i,
+                                   Map<String, Object> recipeMap,
+                                   Consumer<Recipe> addRecipe,
+                                   Consumer<Validated<Object>> addValidation) {
+        Map.Entry<String, Object> nameAndConfig = recipeMap.entrySet().iterator().next();
+        String recipeName = nameAndConfig.getKey();
+        Object recipeArgs = nameAndConfig.getValue();
+
+        // Extract inline preconditions from recipe args if present
+        List<Object> inlinePreconditions = null;
+        if (recipeArgs instanceof Map) {
+            Map<String, Object> argsMap = (Map<String, Object>) recipeArgs;
+            if (argsMap.containsKey(PRECONDITIONS_KEY)) {
+                inlinePreconditions = (List<Object>) argsMap.get(PRECONDITIONS_KEY);
+                Map<String, Object> cleanedArgs = new LinkedHashMap<>(argsMap);
+                cleanedArgs.remove(PRECONDITIONS_KEY);
+                recipeArgs = cleanedArgs.isEmpty() ? null : cleanedArgs;
+            }
+        }
+
+        Recipe loadedRecipe = loadSingleRecipe(name, i, recipeName, recipeArgs, addValidation);
+        if (loadedRecipe == null) {
+            return;
+        }
+
+        if (inlinePreconditions != null && !inlinePreconditions.isEmpty()) {
+            DeclarativeRecipe nestedRecipe = new DeclarativeRecipe(
+                    name + ".recipeList[" + i + "]",
+                    loadedRecipe.getDisplayName(),
+                    loadedRecipe.getDescription(),
+                    Collections.emptySet(),
+                    null,
+                    source,
+                    false,
+                    Collections.emptyList());
+            nestedRecipe.addUninitialized(loadedRecipe);
+
+            for (int j = 0; j < inlinePreconditions.size(); j++) {
+                loadRecipe(
+                        name + ".recipeList[" + i + "].preconditions",
+                        j,
+                        inlinePreconditions.get(j),
+                        nestedRecipe::addUninitializedPrecondition,
+                        nestedRecipe::addPrecondition,
+                        nestedRecipe::addValidation);
+            }
+
+            addRecipe.accept(nestedRecipe);
+        } else {
+            addRecipe.accept(loadedRecipe);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private @Nullable Recipe loadSingleRecipe(@Language("markdown") String name,
+                                              int i,
+                                              String recipeName,
+                                              @Nullable Object recipeArgs,
+                                              Consumer<Validated<Object>> addValidation) {
+        try {
+            if (recipeArgs instanceof Map) {
+                try {
+                    return recipeLoader.apply(recipeName, (Map<String, Object>) recipeArgs);
+                } catch (IllegalArgumentException e) {
+                    if (e.getCause() instanceof InvalidTypeIdException) {
+                        addInvalidRecipeValidation(
+                                addValidation,
+                                recipeName,
+                                recipeArgs,
+                                "Recipe class " + recipeName + " cannot be found");
+                    } else {
+                        addInvalidRecipeValidation(
+                                addValidation,
+                                recipeName,
+                                recipeArgs,
+                                "Unable to load Recipe: " + e);
+                    }
+                    return null;
+                } catch (RecipeNotFoundException e) {
+                    addInvalidRecipeValidation(
+                            addValidation,
+                            recipeName,
+                            recipeArgs,
+                            e.getMessage());
+                    return null;
+                } catch (NoClassDefFoundError e) {
+                    addInvalidRecipeValidation(
+                            addValidation,
+                            recipeName,
+                            recipeArgs,
+                            "Recipe class " + recipeName + " cannot be found");
+                    return null;
+                }
+            } else if (recipeArgs == null) {
+                try {
+                    return recipeLoader.apply(recipeName, null);
+                } catch (IllegalArgumentException e) {
+                    addInvalidRecipeValidation(
+                            addValidation,
+                            recipeName,
+                            null,
+                            "Unable to load Recipe: " + e);
+                    return null;
+                } catch (RecipeNotFoundException e) {
+                    addInvalidRecipeValidation(
+                            addValidation,
+                            recipeName,
+                            null,
+                            e.getMessage());
+                    return null;
+                } catch (NoClassDefFoundError e) {
+                    addInvalidRecipeValidation(
+                            addValidation,
+                            recipeName,
+                            null,
+                            "Recipe class " + recipeName + " cannot be found");
+                    return null;
+                }
+            } else {
+                addInvalidRecipeValidation(
+                        addValidation,
+                        recipeName,
+                        recipeArgs,
+                        "Declarative recipeList entries are expected to be strings or mappings");
+                return null;
+            }
+        } catch (Exception e) {
+            addInvalidRecipeValidation(
+                    addValidation,
+                    recipeName,
+                    recipeArgs,
+                    "Unexpected declarative recipe parsing exception " + e.getClass().getName() + ": " + e.getMessage());
+            return null;
         }
     }
 
