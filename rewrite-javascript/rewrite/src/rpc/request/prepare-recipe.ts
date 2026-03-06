@@ -22,7 +22,7 @@ import {RpcRecipe} from "../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics} from "./metrics";
-import {RecipeMarketplace} from "../../marketplace";
+import {RecipeConstructor, RecipeMarketplace} from "../../marketplace";
 
 export class PrepareRecipe {
     constructor(private readonly id: string, private readonly options?: any) {
@@ -33,6 +33,7 @@ export class PrepareRecipe {
                   preparedRecipes: Map<String, Recipe>,
                   metricsCsv?: string) {
         const snowflake = SnowflakeId();
+        const fallbackConstructors: Map<string, RecipeConstructor> = new Map();
         connection.onRequest(
             new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
             withMetrics<PrepareRecipe, PrepareRecipeResponse>(
@@ -41,14 +42,21 @@ export class PrepareRecipe {
                 (context) => async (request) => {
                     context.target = request.id;
                     const id = snowflake.generate();
+
+                    let recipe: Recipe;
                     const recipeCtor = marketplace.findRecipe(request.id);
-                    if (!recipeCtor) {
-                        throw new Error(`Could not find recipe with id ${request.id}`);
+                    if (recipeCtor && recipeCtor[1]) {
+                        recipe = new recipeCtor[1](request.options);
+                    } else {
+                        const fallbackCtor = fallbackConstructors.get(request.id);
+                        if (fallbackCtor) {
+                            recipe = new fallbackCtor(request.options);
+                        } else if (!recipeCtor) {
+                            throw new Error(`Could not find recipe with id ${request.id}`);
+                        } else {
+                            throw new Error(`Recipe ${request.id} was installed without a constructor`);
+                        }
                     }
-                    if (!recipeCtor[1]) {
-                        throw new Error(`Recipe ${request.id} was installed without a constructor`);
-                    }
-                    let recipe = new recipeCtor[1](request.options);
 
                     const editPreconditions: Precondition[] = [];
                     recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
@@ -67,10 +75,25 @@ export class PrepareRecipe {
                         scanPreconditions: scanPreconditions
                     };
 
+                    await this.registerSubRecipeConstructors(recipe, marketplace, fallbackConstructors);
+
                     return result;
                 }
             )
         );
+    }
+
+    private static async registerSubRecipeConstructors(
+        recipe: Recipe,
+        marketplace: RecipeMarketplace,
+        fallbackConstructors: Map<string, RecipeConstructor>
+    ) {
+        for (const subRecipe of await recipe.recipeList()) {
+            if (!marketplace.findRecipe(subRecipe.name) && !fallbackConstructors.has(subRecipe.name)) {
+                fallbackConstructors.set(subRecipe.name, subRecipe.constructor as RecipeConstructor);
+                await this.registerSubRecipeConstructors(subRecipe, marketplace, fallbackConstructors);
+            }
+        }
     }
 
     /**
