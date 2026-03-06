@@ -104,13 +104,6 @@ void myRecipeTest() {
 }
 ```
 
-### RPC-based Language Tests (Python, JavaScript)
-- **CRITICAL**: Tests for RPC-based languages can hang indefinitely when RPC communication fails
-- **ALWAYS** set explicit timeouts (e.g., `timeout: 60000` for individual tests, `timeout: 120000` for small test classes)
-- Run individual tests or small test classes rather than entire test suites
-- Hangs usually indicate RPC communication issues (deadlock, malformed response)
-- Common failure modes: printer bugs causing empty output, bidirectional RPC message interleaving issues
-
 ### Parser Extensions
 New language support requires:
 1. ANTLR grammar files (`.g4`) in `src/main/antlr/`
