@@ -17,8 +17,15 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainTextParser;
+
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -1060,5 +1067,19 @@ class ChangeDependencyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void isAcceptable() {
+        ChangeDependency recipe = new ChangeDependency(
+                "org.old", "artifact", "org.new", "artifact", null, null, null
+        );
+        @SuppressWarnings("unchecked")
+        TreeVisitor<?, ExecutionContext> visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
+                .findFirst().orElseThrow()
+                .withSourcePath(Path.of("not-a-gradle-file.txt"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
     }
 }
