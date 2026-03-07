@@ -34,6 +34,7 @@ public class RpcReceiveQueue {
     private final Supplier<List<RpcObjectData>> pull;
     private final @Nullable String sourceFileType;
     private final @Nullable PrintStream log;
+    private final List<Integer> newRefIds = new ArrayList<>();
 
     public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
                            @Nullable String sourceFileType, @Nullable PrintStream log) {
@@ -42,6 +43,13 @@ public class RpcReceiveQueue {
         this.log = log;
         this.batch = new ArrayDeque<>();
         this.pull = pull;
+    }
+
+    /**
+     * @return the ref IDs that were newly registered during this receive.
+     */
+    public List<Integer> getNewRefIds() {
+        return newRefIds;
     }
 
     public RpcObjectData take() {
@@ -123,6 +131,7 @@ public class RpcReceiveQueue {
                         // immutable updates because of its cyclic nature, the before instance will ultimately
                         // be the same as the after instance below.
                         refs.put(ref, before);
+                        newRefIds.add(ref);
                     }
                 }
                 // Intentional fall-through...

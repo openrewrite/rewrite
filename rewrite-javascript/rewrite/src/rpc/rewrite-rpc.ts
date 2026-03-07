@@ -140,17 +140,36 @@ export class RewriteRpc {
         let remoteObject: P;
         try {
             remoteObject = await q.receive<P>(before as P);
-        } catch (e) {
-            // Reset our tracking of the remote state so the next interaction
-            // forces a full object sync (ADD) instead of a delta (CHANGE).
-            this.remoteObjects.delete(id);
-            throw e;
-        }
 
-        const eof = (await q.take());
-        if (eof.state !== RpcObjectState.END_OF_OBJECT) {
-            RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
-            throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
+            const eof = (await q.take());
+            if (eof.state !== RpcObjectState.END_OF_OBJECT) {
+                RpcObjectData.logTrace(eof, this.traceGetObject.receive, this.logger);
+                throw new Error(`Expected END_OF_OBJECT but got: ${eof.state}`);
+            }
+        } catch (e) {
+            // Tell the handler to revert both remoteObjects and localObjects
+            // to the pre-transfer state
+            try {
+                await this.connection.sendRequest(
+                    new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
+                    new GetObject(id, sourceFileType, 'revert'),
+                );
+            } catch {
+                // Best-effort revert
+            }
+            // Revert our tracking to match the handler's reverted state.
+            // The handler restored remoteObjects[id] to the pre-transfer
+            // value, so the requester must do the same to stay in sync.
+            if (before !== undefined) {
+                this.remoteObjects.set(id, before);
+            } else {
+                this.remoteObjects.delete(id);
+            }
+            // Back out refs registered during this failed receive
+            for (const refId of q.newRefIds) {
+                this.remoteRefs.delete(refId);
+            }
+            throw e;
         }
 
         this.remoteObjects.set(id, remoteObject);

@@ -33,6 +33,7 @@ public class RpcSendQueue {
     private final IdentityHashMap<Object, Integer> refs;
     private final @Nullable String sourceFileType;
     private final boolean trace;
+    private final List<Object> newRefObjects = new ArrayList<>();
 
     private @Nullable Object before;
 
@@ -44,6 +45,13 @@ public class RpcSendQueue {
         this.refs = refs;
         this.sourceFileType = sourceFileType;
         this.trace = trace;
+    }
+
+    /**
+     * @return the objects that were newly registered as refs during this send.
+     */
+    public List<Object> getNewRefObjects() {
+        return newRefObjects;
     }
 
     public void put(RpcObjectData rpcObjectData) {
@@ -176,6 +184,7 @@ public class RpcSendQueue {
             }
             ref = refs.size() + 1;
             refs.put(afterVal, ref);
+            newRefObjects.add(afterVal);
         }
         RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
         put(new RpcObjectData(ADD, getValueType(afterVal),

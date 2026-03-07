@@ -112,12 +112,17 @@ export class RpcCodecs {
 
 export class RpcSendQueue {
     private q: RpcObjectData[] = [];
+    private readonly _newRefIds: number[] = [];
 
     private before?: any;
 
     constructor(private readonly refs: ReferenceMap,
                 private readonly sourceFileType: string | undefined,
                 private readonly trace: boolean) {
+    }
+
+    get newRefIds(): number[] {
+        return this._newRefIds;
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
@@ -233,6 +238,7 @@ export class RpcSendQueue {
                 return;
             }
             ref = this.refs.create(after);
+            this._newRefIds.push(ref);
         }
         let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
         this.put({
@@ -275,12 +281,17 @@ export class RpcSendQueue {
 
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
+    private readonly _newRefIds: number[] = [];
 
     constructor(private readonly refs: Map<number, any>,
                 private readonly sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
                 private readonly logger: rpc.Logger | undefined,
                 private readonly trace: boolean) {
+    }
+
+    get newRefIds(): number[] {
+        return this._newRefIds;
     }
 
     async take(): Promise<RpcObjectData> {
@@ -336,6 +347,7 @@ export class RpcReceiveQueue {
                             // immutable updates because of its cyclic nature, the before instance will ultimately
                             // be the same as the after instance below.
                             this.refs.set(ref, before);
+                            this._newRefIds.push(ref);
                         }
                     }
                 // Intentional fall-through...

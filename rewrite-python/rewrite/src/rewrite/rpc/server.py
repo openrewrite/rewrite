@@ -57,6 +57,8 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
+# Action baseline - stores pre-transfer remote_objects values for potential revert
+_action_baseline: Dict[str, Any] = {}
 
 # Request ID counter for outgoing requests
 _request_id_counter = 0
@@ -151,6 +153,8 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     # Track whether we've received the complete object
     received_end = False
 
+    before = remote_objects.get(obj_id)
+
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
 
@@ -161,7 +165,7 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         IMPORTANT: We filter out END_OF_OBJECT from the returned batch to prevent
         it from being accidentally consumed during nested operations (like receive_list
         expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
-        after receive() completes (line 474), and we do the same by tracking received_end.
+        after receive() completes, and we do the same by tracking received_end.
         """
         nonlocal received_end
 
@@ -169,10 +173,11 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
             return []
 
         # Request the next batch from Java
-        batch = send_request('GetObject', {
+        request = {
             'id': obj_id,
             'sourceFileType': source_file_type
-        })
+        }
+        batch = send_request('GetObject', request)
 
         if not batch:
             received_end = True
@@ -190,10 +195,6 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     q = RpcReceiveQueue(remote_refs, source_file_type, pull_batch, trace=_trace_rpc)
     receiver = PythonRpcReceiver()
 
-    # Get the "before" state - our understanding of what Java had
-    # This is used to apply diffs from the GetObject response
-    before = remote_objects.get(obj_id)
-
     # Receive and deserialize the object (applies diffs to before state)
     try:
         obj = receiver.receive(before, q)
@@ -207,9 +208,26 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         if not received_end:
             raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
     except Exception:
-        # Reset our tracking of the remote state so the next interaction
-        # forces a full object sync (ADD) instead of a delta (CHANGE).
-        remote_objects.pop(obj_id, None)
+        # Tell the handler to revert both remoteObjects and localObjects
+        # to the pre-transfer state
+        try:
+            send_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type,
+                'action': 'revert'
+            })
+        except Exception:
+            pass  # Best-effort revert
+        # Revert our tracking to match the handler's reverted state.
+        # The handler restored remoteObjects[id] to the pre-transfer
+        # value, so the requester must do the same to stay in sync.
+        if before is not None:
+            remote_objects[obj_id] = before
+        else:
+            remote_objects.pop(obj_id, None)
+        # Back out refs registered during this failed receive
+        for ref_id in q.new_ref_ids:
+            remote_refs.pop(ref_id, None)
         raise
 
     if obj is not None:
@@ -466,14 +484,28 @@ def handle_get_object(params: dict) -> List[dict]:
     This serializes an object for RPC transfer as RpcObjectData[].
     Returns list of RpcObjectData objects that Java can deserialize.
 
-    After sending, we update remote_objects to track that the remote (Java)
-    now has this version of the object. This is essential for the diff-based
-    RPC protocol to work correctly.
+    The remoteObjects update is optimistic — on failure, the receiver
+    sends action="revert" to roll back both remote and local state.
     """
     obj_id = params.get('id')
     source_file_type = params.get('sourceFileType')
+    action = params.get('action')
+
     if obj_id is None:
         return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
+
+    # Handle actions from the receiver
+    if action is not None:
+        if action == 'revert':
+            before = _action_baseline.pop(obj_id, None)
+            if before is not None:
+                remote_objects[obj_id] = before
+                local_objects[obj_id] = before
+            else:
+                remote_objects.pop(obj_id, None)
+                local_objects.pop(obj_id, None)
+        return []
+
     obj = local_objects.get(obj_id)
     logger.debug(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
 
@@ -489,10 +521,13 @@ def handle_get_object(params: dict) -> List[dict]:
         # Get the "before" state - what we previously sent to Java
         before = remote_objects.get(obj_id)
 
+        # Save baseline for potential revert
+        _action_baseline[obj_id] = before
+
         q = RpcSendQueue(source_file_type)
         result = q.generate(obj, before)
 
-        # Update remote_objects to track that Java now has this version
+        # Optimistically update — receiver sends action="revert" on failure
         remote_objects[obj_id] = obj
 
         return result
@@ -572,6 +607,7 @@ def handle_reset(params: dict) -> bool:
     local_objects.clear()
     remote_objects.clear()
     remote_refs.clear()
+    _action_baseline.clear()
     _prepared_recipes.clear()
     _execution_contexts.clear()
     _recipe_accumulators.clear()
