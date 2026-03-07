@@ -85,7 +85,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (isScanningRequired()) {
             return sourceSetEditor.apply(sourceSet, sourceFile ->
                     allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
-                        Recipe recipe = recipeStack.peek();
+                        Recipe recipe = recipeStack.get(recipeStack.size() - 1);
                         if (source == null) {
                             return null;
                         }
@@ -127,7 +127,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     public LSS generateSources(LSS sourceSet) {
         if (isScanningRequired()) {
             List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
-                Recipe recipe = recipeStack.peek();
+                Recipe recipe = recipeStack.get(recipeStack.size() - 1);
                 if (recipe instanceof ScanningRecipe) {
                     assert acc != null;
                     //noinspection unchecked
@@ -198,7 +198,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     protected @Nullable SourceFile editSource(LSS sourceSet, SourceFile sourceFile) {
         recipeRunStats.recordSourceVisited(sourceFile);
         return allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
-            Recipe recipe = recipeStack.peek();
+            Recipe recipe = recipeStack.get(recipeStack.size() - 1);
             if (source == null) {
                 return null;
             }
@@ -257,10 +257,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         }, sourceFile);
     }
 
-    protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
+    protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, List<Recipe> recipeStack, ExecutionContext ctx) {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
-        Recipe recipe = recipeStack.peek();
+        Recipe recipe = recipeStack.get(recipeStack.size() - 1);
         Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
                 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
 
