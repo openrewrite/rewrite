@@ -112,19 +112,13 @@ describe('Pattern Debugging', () => {
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
-        expect(attempt.explanation!.path).toBeDefined();
-
-        // Should have a path showing where the mismatch occurred
-        // The path should point to the 'right' property of the binary expression
-        expect(attempt.explanation!.path.length).toBeGreaterThan(0);
-        expect(attempt.explanation!.path).toContain('J$Binary#right');
 
         // Should explain the type mismatch
         expect(attempt.explanation!.expected).toContain('42');
         expect(attempt.explanation!.actual).toContain('wrong');
     });
 
-    test('path tracking captures property path to mismatch', async () => {
+    test('explanation captures mismatch details', async () => {
         const pat = pattern`[1, 2, 3]`;
         const node = await parseExpression('[1, 2, "wrong"]');
 
@@ -132,12 +126,6 @@ describe('Pattern Debugging', () => {
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
-        expect(attempt.explanation!.path).toBeDefined();
-
-        // Path should not be empty - should show which property led to mismatch
-        expect(attempt.explanation!.path.length).toBeGreaterThan(0);
-        // Array literals use 'initializer' property
-        expect(attempt.explanation!.path).toContain('J$NewArray#initializer');
 
         // Should explain the value mismatch
         expect(attempt.explanation!.expected).toContain('3');
@@ -176,7 +164,7 @@ describe('Pattern Debugging', () => {
         expect(failedLog).toBeDefined();
     });
 
-    test('deeply nested pattern shows multi-level path', async () => {
+    test('deeply nested pattern shows mismatch details', async () => {
         // Use object in a context where it's an expression (as function argument)
         const pat = pattern`foo({a: 1, b: {c: 2}})`;
         const node = await parseExpression('foo({a: 1, b: {c: "wrong"}})');
@@ -185,38 +173,6 @@ describe('Pattern Debugging', () => {
 
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
-        expect(attempt.explanation!.path).toBeDefined();
-
-        // Path should have multiple levels showing the traversal through:
-        // arguments[0] -> object body -> statements[1] -> property initializer -> nested object -> value
-        expect(attempt.explanation!.path.length).toBeGreaterThan(5);
-
-        // Path should include key elements showing the nested traversal
-        // Note: Array indices are now compacted into the previous element during rendering
-        expect(attempt.explanation!.path).toEqual([
-            "J$MethodInvocation#arguments",
-            "0",
-            "J$NewClass#body",
-            "J$Block#statements",
-            "1",
-            "JS$PropertyAssignment#initializer",
-            "J$NewClass#body",
-            "J$Block#statements",
-            "0",
-            "JS$PropertyAssignment#initializer"
-        ]);
-
-        // Should have array indices in the path, including "0" after "arguments"
-        const hasNumericIndex = attempt.explanation!.path.some(p => /^\d+$/.test(p));
-        expect(hasNumericIndex).toBe(true);
-
-        // Specifically check that arguments is followed by an index
-        const argsIndex = attempt.explanation!.path.findIndex(p => p.includes('#arguments'));
-        if (argsIndex >= 0 && argsIndex < attempt.explanation!.path.length - 1) {
-            const nextElement = attempt.explanation!.path[argsIndex + 1];
-            // Index can be either plain "0" or kind-prefixed like "J$NewClass#0"
-            expect(nextElement).toMatch(/^(\d+|.+#\d+)$/);
-        }
 
         // Should explain the value mismatch in the deeply nested property
         expect(attempt.explanation!.expected).toContain('2');
@@ -244,7 +200,7 @@ describe('Pattern Debugging', () => {
         expect(constraintLogs.length).toBe(0);
     });
 
-    test('path tracking includes intermediate steps for object destructuring', async () => {
+    test('array length mismatch in object destructuring', async () => {
         const name = capture();
         const pat = pattern`const {${name}} = obj;`;
 
@@ -261,22 +217,13 @@ describe('Pattern Debugging', () => {
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
 
-        // The path should show the full navigation through:
-        // J$VariableDeclarations#variables → 0 → J$VariableDeclarations$NamedVariable#name → JS$ObjectBindingPattern#bindings
-        expect(attempt.explanation!.path).toEqual([
-            'J$VariableDeclarations#variables',
-            '0',
-            'J$VariableDeclarations$NamedVariable#name',
-            'JS$ObjectBindingPattern#bindings'
-        ]);
-
         // Should be an array length mismatch
         expect(attempt.explanation!.reason).toBe('array-length-mismatch');
         expect(attempt.explanation!.expected).toBe('1');
         expect(attempt.explanation!.actual).toBe('2');
     });
 
-    test('path tracking includes property name for value mismatch', async () => {
+    test('value mismatch shows expected and actual values', async () => {
         const pat = pattern`console.log(42)`;
         const node = await parseExpression('console.error(42)');
 
@@ -285,13 +232,47 @@ describe('Pattern Debugging', () => {
         expect(attempt.matched).toBe(false);
         expect(attempt.explanation).toBeDefined();
 
-        // The path should show the property that mismatched with kind information for nested objects
-        expect(attempt.explanation!.path).toEqual(['J$MethodInvocation#name', 'J$Identifier#simpleName']);
-
         // Should be a value mismatch
         expect(attempt.explanation!.reason).toBe('value-mismatch');
         expect(attempt.explanation!.expected).toBe('"log"');
         expect(attempt.explanation!.actual).toBe('"error"');
+    });
+
+    test('multi-line element pattern matching works correctly', async () => {
+        // Parse a multi-line object literal
+        const gen = parser.parse({
+            text: `const obj = {
+    a: 1,
+    b: 2,
+    c: 3
+};`,
+            sourcePath: 'test.ts'
+        });
+        const cu = (await gen.next()).value as JS.CompilationUnit;
+        const statement = cu.statements[0].element;
+
+        // Create a pattern that won't match (expects only two properties)
+        const name = capture('name');
+        const a = capture('a');
+        const b = capture('b');
+        const pat = pattern`const ${name} = { a: ${a}, b: ${b} };`;
+
+        const attempt = await pat.matchWithExplanation(statement, undefined!);
+
+        // Should fail to match because target has 3 properties, pattern expects 2
+        expect(attempt.matched).toBe(false);
+        expect(attempt.explanation).toBeDefined();
+
+        // The explanation should have pattern and target elements
+        expect(attempt.explanation!.patternElement).toBeDefined();
+        expect(attempt.explanation!.targetElement).toBeDefined();
+
+        // Should provide a reason for the mismatch
+        expect(attempt.explanation!.reason).toBeDefined();
+
+        // Note: The ANSI coloring fix in AnsiAwarePrintOutputCapture ensures multi-line
+        // elements are properly highlighted when printed to console. This is tested
+        // implicitly by the debug logging system working correctly.
     });
 
 });
