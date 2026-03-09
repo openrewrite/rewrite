@@ -390,6 +390,9 @@ class GradleProjectTest {
           }
 
           dependencyManagement {
+              imports {
+                  mavenBom 'org.junit:junit-bom:5.11.4'
+              }
               dependencies {
                   dependency 'javax.validation:validation-api:2.0.1.Final'
               }
@@ -398,6 +401,7 @@ class GradleProjectTest {
           dependencies {
               implementation 'com.fasterxml.jackson.core:jackson-databind'
               implementation 'javax.validation:validation-api'
+              implementation 'com.google.guava:guava:33.0.0-jre'
           }
           """;
 
@@ -434,8 +438,22 @@ class GradleProjectTest {
         }
 
         @Test
+        void capturesManagedVersionsFromImportedBom() {
+            assertThat(gradleProject.getSpringManagedVersion("org.junit.jupiter", "junit-jupiter"))
+              .as("BOM imported via dependencyManagement imports should contribute managed versions")
+              .isEqualTo("5.11.4");
+        }
+
+        @Test
         void notManagedReturnsNull() {
             assertThat(gradleProject.getSpringManagedVersion("com.example", "does-not-exist"))
+              .isNull();
+        }
+
+        @Test
+        void projectDependencyNotManagedReturnsNull() {
+            assertThat(gradleProject.getSpringManagedVersion("com.google.guava", "guava"))
+              .as("Dependency declared in the project but not managed by the Spring plugin should return null")
               .isNull();
         }
 
