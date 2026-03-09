@@ -367,4 +367,134 @@ class GradleProjectTest {
               .anyMatch(dep -> dep.findAttribute(ProjectAttribute.class).isPresent() && "a".equals(dep.getGav().getArtifactId()));
         }
     }
+
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    @Nested
+    @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
+    class springDependencyManagement {
+        @TempDir
+        static Path dir;
+
+        static GradleProject gradleProject;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins {
+              id 'java'
+              id 'org.springframework.boot' version '3.4.3'
+              id 'io.spring.dependency-management' version '1.1.7'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencyManagement {
+              dependencies {
+                  dependency 'javax.validation:validation-api:2.0.1.Final'
+              }
+          }
+
+          dependencies {
+              implementation 'com.fasterxml.jackson.core:jackson-databind'
+              implementation 'javax.validation:validation-api'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            try (InputStream is = new ByteArrayInputStream(buildGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("build.gradle"), readAllBytes(is));
+            }
+            try (InputStream is = new ByteArrayInputStream(settingsGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("settings.gradle"), readAllBytes(is));
+            }
+
+            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
+            gradleProject = model.getGradleProject();
+        }
+
+        @Test
+        void capturesManagedVersionsFromBom() {
+            assertThat(gradleProject.getSpringDependencyManagementManagedVersions())
+              .as("Spring Boot BOM should contribute jackson-databind to managed versions")
+              .containsKey("com.fasterxml.jackson.core:jackson-databind");
+        }
+
+        @Test
+        void capturesManagedVersionsFromExplicitEntries() {
+            assertThat(gradleProject.getSpringManagedVersion("javax.validation", "validation-api"))
+              .as("Explicit dependencyManagement entry should be captured")
+              .isEqualTo("2.0.1.Final");
+        }
+
+        @Test
+        void notManagedReturnsNull() {
+            assertThat(gradleProject.getSpringManagedVersion("com.example", "does-not-exist"))
+              .isNull();
+        }
+
+        @Test
+        void serializable() throws IOException {
+            ObjectMapper m = new RecipeSerializer().getMapper();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            m.writeValue(baos, gradleProject);
+            ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+            GradleProject roundTripped = m.readValue(bais, GradleProject.class);
+            assertThat(roundTripped).isEqualTo(gradleProject);
+        }
+    }
+
+    @Nested
+    class noSpringPlugin {
+        @TempDir
+        static Path dir;
+
+        static GradleProject gradleProject;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins {
+              id 'java'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              implementation 'org.openrewrite:rewrite-java:8.56.0'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            try (InputStream is = new ByteArrayInputStream(buildGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("build.gradle"), readAllBytes(is));
+            }
+            try (InputStream is = new ByteArrayInputStream(settingsGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("settings.gradle"), readAllBytes(is));
+            }
+
+            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
+            gradleProject = model.getGradleProject();
+        }
+
+        @Test
+        void managedVersionsEmptyWithoutPlugin() {
+            assertThat(gradleProject.getSpringDependencyManagementManagedVersions())
+              .as("Without the Spring dependency-management plugin, managed versions should be empty")
+              .isEmpty();
+        }
+    }
 }
