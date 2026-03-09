@@ -16,56 +16,51 @@
 package org.openrewrite.gradle.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
-import lombok.experimental.NonFinal;
+import lombok.Builder;
+import lombok.Value;
+import lombok.With;
 import org.gradle.api.Project;
-import org.gradle.api.artifacts.Configuration;
-import org.gradle.api.plugins.ExtensionAware;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.gradle.attributes.Category;
-import org.openrewrite.gradle.attributes.ProjectAttribute;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenDownloadingExceptions;
-import org.openrewrite.maven.attributes.Attributed;
-import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.Semver;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.nio.file.Paths;
-import java.util.*;
-import java.util.function.Function;
-
-import static java.util.Collections.*;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toMap;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @SuppressWarnings("unused")
 @Value
 @With
-@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
-public class SpringDependencyManagement implements Serializable {
+public final class SpringDependencyManagement implements Serializable {
 
     /**
      * Whether dependency management should be overridden by versions declared on a
      * project's dependencies. The default is {@code true}.
      */
     @Builder.Default
+    private final
     boolean overriddenByDependencies = true;
 
     @Nullable
     @Builder.Default
+    private final
     DependencyManagement globalDependencyManagement = null;
 
     @Builder.Default
     @With
+    private final
     Map<String, DependencyManagement> configurationDependencyManagement = new HashMap<>();
+
+    @JsonCreator
+    public SpringDependencyManagement(boolean overriddenByDependencies, @Nullable DependencyManagement globalDependencyManagement, Map<String, DependencyManagement> configurationDependencyManagement) {
+        this.overriddenByDependencies = overriddenByDependencies;
+        this.globalDependencyManagement = globalDependencyManagement;
+        this.configurationDependencyManagement = configurationDependencyManagement;
+    }
 
     @Nullable
     public String getManagedVersion(@Nullable String configuration, String group, String name) {
@@ -85,20 +80,26 @@ public class SpringDependencyManagement implements Serializable {
 
     @Value
     @With
-    @AllArgsConstructor(onConstructor_ = {@JsonCreator})
     @Builder
-    static class DependencyManagement implements Serializable {
+    static final class DependencyManagement implements Serializable {
         /**
          * A map of the managed versions from imported boms. The key-value pairs in the map have the form {@code group:name = version}.
          */
-        Map<String, String> implicitVersions;
+        private final Map<String, String> implicitVersions;
 
         /**
          * A map of the managed versions from dependencies in the {@code dependencies} block. The key-value pairs in the map have the form {@code group:name = version}.
          */
-        Map<String, String> explicitVersions;
+        private final Map<String, String> explicitVersions;
 
-        List<GroupArtifactVersion> importedBoms;
+        private final List<GroupArtifactVersion> importedBoms;
+
+        @JsonCreator
+        public DependencyManagement(Map<String, String> implicitVersions, Map<String, String> explicitVersions, List<GroupArtifactVersion> importedBoms) {
+            this.implicitVersions = implicitVersions;
+            this.explicitVersions = explicitVersions;
+            this.importedBoms = importedBoms;
+        }
 
         String getManagedVersion(String key, boolean overriddenByDependencies) {
             if (!overriddenByDependencies) {
