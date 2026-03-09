@@ -171,27 +171,6 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     }
 
     /**
-     * When the Spring {@code io.spring.dependency-management} plugin is applied, this map contains the
-     * managed versions it provides. Keys are {@code "group:artifact"} and values are version strings.
-     * Null when the plugin is not applied or when deserializing older markers that predate this field.
-     */
-    @Nullable
-    Map<String, String> springDependencyManagementManagedVersions;
-
-    public Map<String, String> getSpringDependencyManagementManagedVersions() {
-        return springDependencyManagementManagedVersions != null ? springDependencyManagementManagedVersions : emptyMap();
-    }
-
-    /**
-     * Check if a dependency's version is managed by the Spring dependency-management plugin.
-     *
-     * @return the managed version, or null if not managed by the Spring plugin
-     */
-    public @Nullable String getSpringManagedVersion(String groupId, String artifactId) {
-        return getSpringDependencyManagementManagedVersions().get(groupId + ":" + artifactId);
-    }
-
-    /**
      * When the current list of directResolved dependencies may have been invalidated by a mutation this stores the
      * state required to lazily re-resolve the new direct dependencies upon request.
      */
@@ -374,7 +353,6 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         this.message = message;
         this.constraints = emptyList();
         this.attributes = emptyMap();
-        this.springDependencyManagementManagedVersions = null;
     }
 
     /**
@@ -763,8 +741,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 exceptionType,
                 message,
                 constraints,
-                attributes,
-                springDependencyManagementManagedVersions
+                attributes
         );
     }
 }

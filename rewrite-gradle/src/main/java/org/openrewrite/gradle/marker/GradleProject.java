@@ -89,6 +89,28 @@ public class GradleProject implements Marker, Serializable {
     @With
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
+    /**
+     * When the Spring {@code io.spring.dependency-management} plugin is applied, this map contains the
+     * managed versions it provides. Keys are {@code "group:artifact"} and values are version strings.
+     * Null when the plugin is not applied or when deserializing older markers that predate this field.
+     */
+    @With
+    @Nullable
+    Map<String, String> springDependencyManagementManagedVersions;
+
+    public Map<String, String> getSpringDependencyManagementManagedVersions() {
+        return springDependencyManagementManagedVersions != null ? springDependencyManagementManagedVersions : emptyMap();
+    }
+
+    /**
+     * Check if a dependency's version is managed by the Spring dependency-management plugin.
+     *
+     * @return the managed version, or null if not managed by the Spring plugin
+     */
+    public @Nullable String getSpringManagedVersion(String groupId, String artifactId) {
+        return getSpringDependencyManagementManagedVersions().get(groupId + ":" + artifactId);
+    }
+
     public GradleBuildscript getBuildscript() {
         // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
         //noinspection ConstantValue
@@ -203,7 +225,8 @@ public class GradleProject implements Marker, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 configurations,
-                buildscript
+                buildscript,
+                springDependencyManagementManagedVersions
         );
     }
 
@@ -308,7 +331,8 @@ public class GradleProject implements Marker, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 updateExtendsFrom(updatedConfigurations, untouchedConfigurations),
-                buildscript
+                buildscript,
+                springDependencyManagementManagedVersions
         );
 
         // All configurations extending from a mutated configuration must be marked as requiring re-resolution to propagate heritable changes

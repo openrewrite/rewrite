@@ -71,8 +71,6 @@ public final class GradleProjectBuilder {
             pluginRepositories.add(GRADLE_PLUGIN_PORTAL);
         }
 
-        Map<String, String> springManagedVersions = springDependencyManagementManagedVersions(project);
-
         return new GradleProject(randomId(),
                 project.getGroup().toString(),
                 project.getName(),
@@ -81,12 +79,13 @@ public final class GradleProjectBuilder {
                 GradleProjectBuilder.pluginDescriptors(project.getPluginManager()),
                 mapRepositories(repositories),
                 null,
-                GradleProjectBuilder.dependencyConfigurations(project.getConfigurations(), springManagedVersions),
+                GradleProjectBuilder.dependencyConfigurations(project.getConfigurations()),
                 new GradleBuildscript(
                         randomId(),
                         new ArrayList<>(pluginRepositories),
-                        GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations(), emptyMap())
-                ));
+                        GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations())
+                ),
+                springDependencyManagementManagedVersions(project));
     }
 
     static List<MavenRepository> mapRepositories(List<ArtifactRepository> repositories) {
@@ -216,11 +215,7 @@ public final class GradleProjectBuilder {
         return maybeUnspecified;
     }
 
-    static Map<String, GradleDependencyConfiguration> dependencyConfigurations(
-            ConfigurationContainer configurationContainer,
-            Map<String, String> springManagedVersions
-    ) {
-        Map<String, String> managedVersionsOrNull = springManagedVersions.isEmpty() ? null : springManagedVersions;
+    static Map<String, GradleDependencyConfiguration> dependencyConfigurations(ConfigurationContainer configurationContainer) {
         Map<String, GradleDependencyConfiguration> results = new HashMap<>();
         List<Configuration> configurations = new ArrayList<>(configurationContainer);
         for (Configuration conf : configurations) {
@@ -269,11 +264,11 @@ public final class GradleProjectBuilder {
                 }
 
                 GradleDependencyConfiguration dc = new GradleDependencyConfiguration(conf.getName(), conf.getDescription(),
-                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), requested, resolved, exceptionType, exceptionMessage, constraints(configurationContainer, conf), attributes(conf), managedVersionsOrNull);
+                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), requested, resolved, exceptionType, exceptionMessage, constraints(configurationContainer, conf), attributes(conf));
                 results.put(conf.getName(), dc);
             } catch (Exception e) {
                 GradleDependencyConfiguration dc = new GradleDependencyConfiguration(conf.getName(), conf.getDescription(),
-                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), emptyList(), emptyList(), e.getClass().getName(), e.getMessage(), constraints(configurationContainer, conf), attributes(conf), managedVersionsOrNull);
+                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), emptyList(), emptyList(), e.getClass().getName(), e.getMessage(), constraints(configurationContainer, conf), attributes(conf));
                 results.put(conf.getName(), dc);
             }
         }
