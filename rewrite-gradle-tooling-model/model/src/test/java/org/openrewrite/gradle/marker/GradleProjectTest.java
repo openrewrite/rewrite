@@ -400,8 +400,11 @@ class GradleProjectTest {
 
           dependencies {
               implementation 'com.fasterxml.jackson.core:jackson-databind'
+              implementation 'com.fasterxml.jackson.core:jackson-core:2.99.0'
               implementation 'javax.validation:validation-api'
               implementation 'com.google.guava:guava:33.0.0-jre'
+              implementation 'org.springframework.boot:spring-boot-starter-web'
+              implementation 'org.springframework.boot:spring-boot-starter-json:3.99.0'
           }
           """;
 
@@ -455,6 +458,28 @@ class GradleProjectTest {
             assertThat(gradleProject.getSpringManagedVersion("com.google.guava", "guava"))
               .as("Dependency declared in the project but not managed by the Spring plugin should return null")
               .isNull();
+        }
+
+        @Test
+        void managedVersionReturnedEvenWhenDeclaredVersionIsNewer() {
+            String managedVersion = gradleProject.getSpringManagedVersion("com.fasterxml.jackson.core", "jackson-core");
+            assertThat(managedVersion)
+              .as("Managed version should be the BOM version, not the declared 2.99.0")
+              .isNotNull()
+              .isNotEqualTo("2.99.0");
+        }
+
+        @Test
+        void springBootStarterManagedWithAndWithoutVersion() {
+            String withoutVersion = gradleProject.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-web");
+            String withVersion = gradleProject.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-json");
+            assertThat(withoutVersion)
+              .as("Spring Boot starter without version should be managed")
+              .isNotNull()
+              .isEqualTo("3.4.3");
+            assertThat(withVersion)
+              .as("Spring Boot starter with explicit version should still report the managed version")
+              .isEqualTo(withoutVersion);
         }
 
         @Test
