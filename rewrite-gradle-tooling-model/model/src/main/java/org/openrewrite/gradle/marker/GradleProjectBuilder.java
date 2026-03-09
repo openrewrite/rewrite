@@ -71,6 +71,8 @@ public final class GradleProjectBuilder {
             pluginRepositories.add(GRADLE_PLUGIN_PORTAL);
         }
 
+        Map<String, String> springManagedVersions = springDependencyManagementManagedVersions(project);
+
         return new GradleProject(randomId(),
                 project.getGroup().toString(),
                 project.getName(),
@@ -79,13 +81,12 @@ public final class GradleProjectBuilder {
                 GradleProjectBuilder.pluginDescriptors(project.getPluginManager()),
                 mapRepositories(repositories),
                 null,
-                GradleProjectBuilder.dependencyConfigurations(project.getConfigurations()),
+                GradleProjectBuilder.dependencyConfigurations(project.getConfigurations(), springManagedVersions),
                 new GradleBuildscript(
                         randomId(),
                         new ArrayList<>(pluginRepositories),
-                        GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations())
-                ),
-                springDependencyManagementManagedVersions(project));
+                        GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations(), null)
+                ));
     }
 
     static List<MavenRepository> mapRepositories(List<ArtifactRepository> repositories) {
@@ -215,7 +216,7 @@ public final class GradleProjectBuilder {
         return maybeUnspecified;
     }
 
-    static Map<String, GradleDependencyConfiguration> dependencyConfigurations(ConfigurationContainer configurationContainer) {
+    static Map<String, GradleDependencyConfiguration> dependencyConfigurations(ConfigurationContainer configurationContainer, @Nullable Map<String, String> springManagedVersions) {
         Map<String, GradleDependencyConfiguration> results = new HashMap<>();
         List<Configuration> configurations = new ArrayList<>(configurationContainer);
         for (Configuration conf : configurations) {
@@ -264,11 +265,11 @@ public final class GradleProjectBuilder {
                 }
 
                 GradleDependencyConfiguration dc = new GradleDependencyConfiguration(conf.getName(), conf.getDescription(),
-                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), requested, resolved, exceptionType, exceptionMessage, constraints(configurationContainer, conf), attributes(conf));
+                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), requested, resolved, exceptionType, exceptionMessage, constraints(configurationContainer, conf), attributes(conf), springManagedVersions);
                 results.put(conf.getName(), dc);
             } catch (Exception e) {
                 GradleDependencyConfiguration dc = new GradleDependencyConfiguration(conf.getName(), conf.getDescription(),
-                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), emptyList(), emptyList(), e.getClass().getName(), e.getMessage(), constraints(configurationContainer, conf), attributes(conf));
+                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), emptyList(), emptyList(), e.getClass().getName(), e.getMessage(), constraints(configurationContainer, conf), attributes(conf), springManagedVersions);
                 results.put(conf.getName(), dc);
             }
         }
@@ -539,21 +540,21 @@ public final class GradleProjectBuilder {
      * If the Spring {@code io.spring.dependency-management} plugin is applied, reflectively access its
      * {@code DependencyManagementExtension} to get the managed versions.
      *
-     * @return a map from "group:artifact" to version string, or an empty map if the plugin is not applied
+     * @return a map from "group:artifact" to version string, or null if the plugin is not applied
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, String> springDependencyManagementManagedVersions(Project project) {
+    private static @Nullable Map<String, String> springDependencyManagementManagedVersions(Project project) {
         try {
             Object extension = project.getExtensions().findByName("dependencyManagement");
             if (extension == null) {
-                return emptyMap();
+                return null;
             }
             Method getManagedVersions = extension.getClass().getMethod("getManagedVersions");
             Map<String, String> managedVersions = (Map<String, String>) getManagedVersions.invoke(extension);
-            return managedVersions != null ? new HashMap<>(managedVersions) : emptyMap();
+            return managedVersions != null && !managedVersions.isEmpty() ? new HashMap<>(managedVersions) : null;
         } catch (Exception e) {
-            // Plugin not on classpath or API changed -- silently fall back to empty
-            return emptyMap();
+            // Plugin not on classpath or API changed -- silently fall back
+            return null;
         }
     }
 

@@ -428,41 +428,53 @@ class GradleProjectTest {
 
         @Test
         void capturesManagedVersionsFromBom() {
-            assertThat(gradleProject.getSpringDependencyManagementManagedVersions())
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            assertThat(impl.getSpringDependencyManagementManagedVersions())
               .as("Spring Boot BOM should contribute jackson-databind to managed versions")
               .containsKey("com.fasterxml.jackson.core:jackson-databind");
         }
 
         @Test
         void capturesManagedVersionsFromExplicitEntries() {
-            assertThat(gradleProject.getSpringManagedVersion("javax.validation", "validation-api"))
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            assertThat(impl.getSpringManagedVersion("javax.validation", "validation-api"))
               .as("Explicit dependencyManagement entry should be captured")
               .isEqualTo("2.0.1.Final");
         }
 
         @Test
         void capturesManagedVersionsFromImportedBom() {
-            assertThat(gradleProject.getSpringManagedVersion("org.junit.jupiter", "junit-jupiter"))
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            assertThat(impl.getSpringManagedVersion("org.junit.jupiter", "junit-jupiter"))
               .as("BOM imported via dependencyManagement imports should contribute managed versions")
               .isEqualTo("5.11.4");
         }
 
         @Test
         void notManagedReturnsNull() {
-            assertThat(gradleProject.getSpringManagedVersion("com.example", "does-not-exist"))
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            assertThat(impl.getSpringManagedVersion("com.example", "does-not-exist"))
               .isNull();
         }
 
         @Test
         void projectDependencyNotManagedReturnsNull() {
-            assertThat(gradleProject.getSpringManagedVersion("com.google.guava", "guava"))
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            assertThat(impl.getSpringManagedVersion("com.google.guava", "guava"))
               .as("Dependency declared in the project but not managed by the Spring plugin should return null")
               .isNull();
         }
 
         @Test
         void managedVersionReturnedEvenWhenDeclaredVersionIsNewer() {
-            String managedVersion = gradleProject.getSpringManagedVersion("com.fasterxml.jackson.core", "jackson-core");
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            String managedVersion = impl.getSpringManagedVersion("com.fasterxml.jackson.core", "jackson-core");
             assertThat(managedVersion)
               .as("Managed version should be the BOM version, not the declared 2.99.0")
               .isNotNull()
@@ -471,8 +483,10 @@ class GradleProjectTest {
 
         @Test
         void springBootStarterManagedWithAndWithoutVersion() {
-            String withoutVersion = gradleProject.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-web");
-            String withVersion = gradleProject.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-json");
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            String withoutVersion = impl.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-web");
+            String withVersion = impl.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-json");
             assertThat(withoutVersion)
               .as("Spring Boot starter without version should be managed")
               .isNotNull()
@@ -535,7 +549,9 @@ class GradleProjectTest {
 
         @Test
         void managedVersionsEmptyWithoutPlugin() {
-            assertThat(gradleProject.getSpringDependencyManagementManagedVersions())
+            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
+            assertThat(impl).isNotNull();
+            assertThat(impl.getSpringDependencyManagementManagedVersions())
               .as("Without the Spring dependency-management plugin, managed versions should be empty")
               .isEmpty();
         }
