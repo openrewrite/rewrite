@@ -16,9 +16,10 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -28,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 class MarkupNullMarkersTest {
 
     @Test
-    void markupErrorShouldHandleNullMarkers() {
+    void findRecipeRunExceptionShouldHandleEmptyMarkers() {
         // Parse a valid YAML document
         Yaml.Documents yaml = (Yaml.Documents) new YamlParser().parse("key: value").findFirst().get();
         Yaml.Document doc = yaml.getDocuments().get(0);
@@ -36,53 +37,38 @@ class MarkupNullMarkersTest {
         Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
         Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
 
-        // Simulate a node with null markers (e.g., from RPC deserialization)
-        Yaml.Scalar corruptedScalar = new Yaml.Scalar(
-                scalar.getId(), scalar.getPrefix(), null, scalar.getStyle(),
+        // Simulate a node with Markers.EMPTY (as YamlReceiver now guarantees instead of null)
+        Yaml.Scalar nodeWithEmptyMarkers = new Yaml.Scalar(
+                scalar.getId(), scalar.getPrefix(), Markers.EMPTY, scalar.getStyle(),
                 scalar.getAnchor(), scalar.getTag(), scalar.getValue());
 
-        // Markup.error should not throw NPE when markers are null
-        Yaml.Scalar result = assertDoesNotThrow(
-                () -> Markup.error(corruptedScalar, new RuntimeException("test error")));
-        assertThat(result.getMarkers()).isNotNull();
-        assertThat(result.getMarkers().findFirst(Markup.Error.class)).isPresent();
-    }
+        // Build a tree that contains the node
+        Yaml.Mapping.Entry updatedEntry = entry.withValue(nodeWithEmptyMarkers);
+        Yaml.Mapping updatedMapping = mapping.withEntries(java.util.List.of(updatedEntry));
+        Yaml.Document updatedDoc = doc.withBlock(updatedMapping);
+        Yaml.Documents updatedYaml = yaml.withDocuments(java.util.List.of(updatedDoc));
 
-    @Test
-    void findRecipeRunExceptionShouldHandleNullMarkers() {
-        // Parse a valid YAML document
-        Yaml.Documents yaml = (Yaml.Documents) new YamlParser().parse("key: value").findFirst().get();
-        Yaml.Document doc = yaml.getDocuments().get(0);
-        Yaml.Mapping mapping = (Yaml.Mapping) doc.getBlock();
-        Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
-        Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
-
-        // Simulate a node with null markers (e.g., from RPC deserialization)
-        Yaml.Scalar corruptedScalar = new Yaml.Scalar(
-                scalar.getId(), scalar.getPrefix(), null, scalar.getStyle(),
-                scalar.getAnchor(), scalar.getTag(), scalar.getValue());
-
-        // Build a tree that contains the corrupted node
-        Yaml.Mapping.Entry corruptedEntry = entry.withValue(corruptedScalar);
-        Yaml.Mapping corruptedMapping = mapping.withEntries(java.util.List.of(corruptedEntry));
-        Yaml.Document corruptedDoc = doc.withBlock(corruptedMapping);
-        Yaml.Documents corruptedYaml = yaml.withDocuments(java.util.List.of(corruptedDoc));
-
-        // Create a RecipeRunException with a cursor pointing to the corrupted node
+        // Create a RecipeRunException with a cursor pointing to the node
         Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
-        Cursor docsCursor = new Cursor(rootCursor, corruptedYaml);
-        Cursor docCursor = new Cursor(docsCursor, corruptedDoc);
-        Cursor mappingCursor = new Cursor(docCursor, corruptedMapping);
-        Cursor entryCursor = new Cursor(mappingCursor, corruptedEntry);
-        Cursor scalarCursor = new Cursor(entryCursor, corruptedScalar);
+        Cursor docsCursor = new Cursor(rootCursor, updatedYaml);
+        Cursor docCursor = new Cursor(docsCursor, updatedDoc);
+        Cursor mappingCursor = new Cursor(docCursor, updatedMapping);
+        Cursor entryCursor = new Cursor(mappingCursor, updatedEntry);
+        Cursor scalarCursor = new Cursor(entryCursor, nodeWithEmptyMarkers);
 
         RecipeRunException rre = new RecipeRunException(
                 new RuntimeException("original error"), scalarCursor);
 
-        // FindRecipeRunException should not throw NPE when marking up a node with null markers
+        // FindRecipeRunException should mark the node with an error without NPE
         FindRecipeRunException visitor = new FindRecipeRunException(rre);
         Yaml.Documents result = assertDoesNotThrow(
-                () -> (Yaml.Documents) visitor.visitNonNull(corruptedYaml, 0));
+                () -> (Yaml.Documents) visitor.visitNonNull(updatedYaml, 0));
         assertThat(result).isNotNull();
+
+        // Verify the error marker was applied to the scalar node
+        Yaml.Document resultDoc = result.getDocuments().get(0);
+        Yaml.Mapping resultMapping = (Yaml.Mapping) resultDoc.getBlock();
+        Yaml.Scalar resultScalar = (Yaml.Scalar) resultMapping.getEntries().get(0).getValue();
+        assertThat(resultScalar.getMarkers().findFirst(Markup.Error.class)).isPresent();
     }
 }
