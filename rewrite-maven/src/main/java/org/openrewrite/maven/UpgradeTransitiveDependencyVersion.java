@@ -185,17 +185,19 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
                     return document;
                 }
 
-                // Skip transitive dependencies that a parent in the source set also has,
+                // Skip transitive dependencies that a project parent also has,
                 // since the parent will get the managed dependency and children will inherit it
-                MavenResolutionResult parentResult = getResolutionResult().getParent();
-                while (parentResult != null) {
+                MavenResolutionResult current = getResolutionResult();
+                while (current.parentPomIsProjectPom()) {
+                    MavenResolutionResult parentResult = current.getParent();
+                    assert parentResult != null;
                     List<ResolvedDependency> parentTransitiveDeps = parentResult.findDependencies(groupId, artifactId, null);
                     matchingDependencies.removeIf(dep ->
                             parentTransitiveDeps.stream().anyMatch(pd ->
                                     pd.isTransitive() &&
                                     pd.getGroupId().equals(dep.getGroupId()) &&
                                     pd.getArtifactId().equals(dep.getArtifactId())));
-                    parentResult = parentResult.getParent();
+                    current = parentResult;
                 }
 
                 if (matchingDependencies.isEmpty()) {
