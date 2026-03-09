@@ -89,6 +89,11 @@ public class GradleProject implements Marker, Serializable {
     @With
     GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
 
+    @Builder.Default
+    @With
+    @Nullable
+    SpringDependencyManagement springDependencyManagement = null;
+
     public GradleBuildscript getBuildscript() {
         // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
         //noinspection ConstantValue
@@ -203,7 +208,8 @@ public class GradleProject implements Marker, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 configurations,
-                buildscript
+                buildscript,
+                springDependencyManagement
         );
     }
 
@@ -308,7 +314,8 @@ public class GradleProject implements Marker, Serializable {
                 mavenRepositories,
                 mavenPluginRepositories,
                 updateExtendsFrom(updatedConfigurations, untouchedConfigurations),
-                buildscript
+                buildscript,
+                springDependencyManagement
         );
 
         // All configurations extending from a mutated configuration must be marked as requiring re-resolution to propagate heritable changes

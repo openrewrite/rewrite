@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleBuildscript;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.marker.SpringDependencyManagement;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.kotlin.tree.K;
@@ -179,7 +180,7 @@ public class Assertions {
                         // Construct a synthetic marker to apply to freestanding Gradle scripts to aid recipes in resolving dependencies
                         GradleProject freestandingScriptMarker = new GradleProject(
                                 randomId(), "", "", "", "", emptyList(), new ArrayList<>(allRepositories),
-                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()));
+                                emptyList(), emptyMap(), new GradleBuildscript(randomId(), new ArrayList<>(allBuildscriptRepositories), emptyMap()), null);
                         for (int i = 0; i < sourceFiles.size(); i++) {
                             SourceFile sourceFile = sourceFiles.get(i);
                             if ((sourceFile.getSourcePath().toString().endsWith(".gradle") || sourceFile.getSourcePath().toString().endsWith(".gradle.kts")) &&

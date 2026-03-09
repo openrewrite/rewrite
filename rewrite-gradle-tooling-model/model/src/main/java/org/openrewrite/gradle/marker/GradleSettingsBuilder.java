@@ -59,7 +59,7 @@ public final class GradleSettingsBuilder {
                 new GradleBuildscript(
                         randomId(),
                         new ArrayList<>(pluginRepositories),
-                        GradleProjectBuilder.dependencyConfigurations(settings.getBuildscript().getConfigurations(), null)
+                        GradleProjectBuilder.dependencyConfigurations(settings, settings.getBuildscript().getConfigurations())
                 )
         );
     }

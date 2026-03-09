@@ -25,6 +25,7 @@ import org.gradle.api.attributes.HasAttributes;
 import org.gradle.api.credentials.Credentials;
 import org.gradle.api.initialization.Settings;
 import org.gradle.api.internal.plugins.PluginManagerInternal;
+import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.plugins.PluginManager;
 import org.gradle.api.provider.Property;
 import org.gradle.internal.artifacts.repositories.AuthenticationSupportedInternal;
@@ -71,8 +72,6 @@ public final class GradleProjectBuilder {
             pluginRepositories.add(GRADLE_PLUGIN_PORTAL);
         }
 
-        Map<String, String> springManagedVersions = springDependencyManagementManagedVersions(project);
-
         return new GradleProject(randomId(),
                 project.getGroup().toString(),
                 project.getName(),
@@ -81,12 +80,14 @@ public final class GradleProjectBuilder {
                 GradleProjectBuilder.pluginDescriptors(project.getPluginManager()),
                 mapRepositories(repositories),
                 null,
-                GradleProjectBuilder.dependencyConfigurations(project.getConfigurations(), springManagedVersions),
+                GradleProjectBuilder.dependencyConfigurations(project, project.getConfigurations()),
                 new GradleBuildscript(
                         randomId(),
                         new ArrayList<>(pluginRepositories),
-                        GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations(), null)
-                ));
+                        GradleProjectBuilder.dependencyConfigurations(project, project.getBuildscript().getConfigurations())
+                ),
+                SpringDependencyManagement.springDependencyManagement(project)
+        );
     }
 
     static List<MavenRepository> mapRepositories(List<ArtifactRepository> repositories) {
@@ -216,7 +217,7 @@ public final class GradleProjectBuilder {
         return maybeUnspecified;
     }
 
-    static Map<String, GradleDependencyConfiguration> dependencyConfigurations(ConfigurationContainer configurationContainer, @Nullable Map<String, String> springManagedVersions) {
+    static Map<String, GradleDependencyConfiguration> dependencyConfigurations(ExtensionAware extensionAware, ConfigurationContainer configurationContainer) {
         Map<String, GradleDependencyConfiguration> results = new HashMap<>();
         List<Configuration> configurations = new ArrayList<>(configurationContainer);
         for (Configuration conf : configurations) {
@@ -265,11 +266,11 @@ public final class GradleProjectBuilder {
                 }
 
                 GradleDependencyConfiguration dc = new GradleDependencyConfiguration(conf.getName(), conf.getDescription(),
-                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), requested, resolved, exceptionType, exceptionMessage, constraints(configurationContainer, conf), attributes(conf), springManagedVersions);
+                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), requested, resolved, exceptionType, exceptionMessage, constraints(configurationContainer, conf), attributes(conf));
                 results.put(conf.getName(), dc);
             } catch (Exception e) {
                 GradleDependencyConfiguration dc = new GradleDependencyConfiguration(conf.getName(), conf.getDescription(),
-                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), emptyList(), emptyList(), e.getClass().getName(), e.getMessage(), constraints(configurationContainer, conf), attributes(conf), springManagedVersions);
+                        conf.isTransitive(), conf.isCanBeResolved(), conf.isCanBeConsumed(), isCanBeDeclared(conf), emptyList(), emptyList(), emptyList(), e.getClass().getName(), e.getMessage(), constraints(configurationContainer, conf), attributes(conf));
                 results.put(conf.getName(), dc);
             }
         }
@@ -534,28 +535,6 @@ public final class GradleProjectBuilder {
             });
         }
         return resolvedDependency;
-    }
-
-    /**
-     * If the Spring {@code io.spring.dependency-management} plugin is applied, reflectively access its
-     * {@code DependencyManagementExtension} to get the managed versions.
-     *
-     * @return a map from "group:artifact" to version string, or null if the plugin is not applied
-     */
-    @SuppressWarnings("unchecked")
-    private static @Nullable Map<String, String> springDependencyManagementManagedVersions(Project project) {
-        try {
-            Object extension = project.getExtensions().findByName("dependencyManagement");
-            if (extension == null) {
-                return null;
-            }
-            Method getManagedVersions = extension.getClass().getMethod("getManagedVersions");
-            Map<String, String> managedVersions = (Map<String, String>) getManagedVersions.invoke(extension);
-            return managedVersions != null && !managedVersions.isEmpty() ? new HashMap<>(managedVersions) : null;
-        } catch (Exception e) {
-            // Plugin not on classpath or API changed -- silently fall back
-            return null;
-        }
     }
 
     @SuppressWarnings("unused")

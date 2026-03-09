@@ -390,6 +390,7 @@ class GradleProjectTest {
           }
 
           dependencyManagement {
+              overriddenByDependencies = false
               imports {
                   mavenBom 'org.junit:junit-bom:5.11.4'
               }
@@ -428,72 +429,81 @@ class GradleProjectTest {
 
         @Test
         void capturesManagedVersionsFromBom() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            assertThat(impl.getSpringDependencyManagementManagedVersions())
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "com.fasterxml.jackson.core", "jackson-databind"))
               .as("Spring Boot BOM should contribute jackson-databind to managed versions")
-              .containsKey("com.fasterxml.jackson.core:jackson-databind");
+              .isNotNull();
         }
 
         @Test
         void capturesManagedVersionsFromExplicitEntries() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            assertThat(impl.getSpringManagedVersion("javax.validation", "validation-api"))
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "javax.validation", "validation-api"))
               .as("Explicit dependencyManagement entry should be captured")
               .isEqualTo("2.0.1.Final");
         }
 
         @Test
         void capturesManagedVersionsFromImportedBom() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            assertThat(impl.getSpringManagedVersion("org.junit.jupiter", "junit-jupiter"))
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "org.junit.jupiter", "junit-jupiter"))
               .as("BOM imported via dependencyManagement imports should contribute managed versions")
               .isEqualTo("5.11.4");
         }
 
         @Test
         void notManagedReturnsNull() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            assertThat(impl.getSpringManagedVersion("com.example", "does-not-exist"))
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "com.example", "does-not-exist"))
               .isNull();
         }
 
         @Test
         void projectDependencyNotManagedReturnsNull() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            assertThat(impl.getSpringManagedVersion("com.google.guava", "guava"))
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "com.google.guava", "guava"))
               .as("Dependency declared in the project but not managed by the Spring plugin should return null")
               .isNull();
         }
 
         @Test
         void managedVersionReturnedEvenWhenDeclaredVersionIsNewer() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            String managedVersion = impl.getSpringManagedVersion("com.fasterxml.jackson.core", "jackson-core");
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            String managedVersion = sdm.getManagedVersion(null, "com.fasterxml.jackson.core", "jackson-core");
             assertThat(managedVersion)
-              .as("Managed version should be the BOM version, not the declared 2.99.0")
+              .as("With overriddenByDependencies=false, managed version should be the BOM version, not the declared 2.99.0")
               .isNotNull()
               .isNotEqualTo("2.99.0");
         }
 
         @Test
         void springBootStarterManagedWithAndWithoutVersion() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            String withoutVersion = impl.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-web");
-            String withVersion = impl.getSpringManagedVersion("org.springframework.boot", "spring-boot-starter-json");
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            String withoutVersion = sdm.getManagedVersion(null, "org.springframework.boot", "spring-boot-starter-web");
+            String withVersion = sdm.getManagedVersion(null, "org.springframework.boot", "spring-boot-starter-json");
             assertThat(withoutVersion)
               .as("Spring Boot starter without version should be managed")
               .isNotNull()
               .isEqualTo("3.4.3");
             assertThat(withVersion)
-              .as("Spring Boot starter with explicit version should still report the managed version")
+              .as("With overriddenByDependencies=false, Spring Boot starter with explicit version should still report the managed version")
               .isEqualTo(withoutVersion);
+        }
+
+        @Test
+        void overriddenByDependenciesIsFalse() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.isOverriddenByDependencies())
+              .as("overriddenByDependencies should be false as configured")
+              .isFalse();
         }
 
         @Test
@@ -504,6 +514,106 @@ class GradleProjectTest {
             ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
             GradleProject roundTripped = m.readValue(bais, GradleProject.class);
             assertThat(roundTripped).isEqualTo(gradleProject);
+        }
+    }
+
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    @Nested
+    @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
+    class springDependencyManagementOverriddenByDependencies {
+        @TempDir
+        static Path dir;
+
+        static GradleProject gradleProject;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins {
+              id 'java'
+              id 'org.springframework.boot' version '3.4.3'
+              id 'io.spring.dependency-management' version '1.1.7'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencyManagement {
+              imports {
+                  mavenBom 'org.junit:junit-bom:5.11.4'
+              }
+              dependencies {
+                  dependency 'javax.validation:validation-api:2.0.1.Final'
+              }
+          }
+
+          dependencies {
+              implementation 'com.fasterxml.jackson.core:jackson-databind'
+              implementation 'com.fasterxml.jackson.core:jackson-core:2.99.0'
+              implementation 'javax.validation:validation-api'
+              implementation 'com.google.guava:guava:33.0.0-jre'
+              implementation 'org.springframework.boot:spring-boot-starter-web'
+              implementation 'org.springframework.boot:spring-boot-starter-json:3.99.0'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            try (InputStream is = new ByteArrayInputStream(buildGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("build.gradle"), readAllBytes(is));
+            }
+            try (InputStream is = new ByteArrayInputStream(settingsGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("settings.gradle"), readAllBytes(is));
+            }
+
+            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
+            gradleProject = model.getGradleProject();
+        }
+
+        @Test
+        void managedVersionWithoutExplicitVersionStillPresent() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "com.fasterxml.jackson.core", "jackson-databind"))
+              .as("Spring Boot BOM should contribute jackson-databind to managed versions")
+              .isNotNull();
+        }
+
+        @Test
+        void managedVersionReturnsBomVersionRegardlessOfDeclaredVersion() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "com.fasterxml.jackson.core", "jackson-core"))
+              .as("Managed version should be the BOM version, not the declared 2.99.0")
+              .isNotNull()
+              .isNotEqualTo("2.99.0");
+        }
+
+        @Test
+        void springBootStarterManagedVersionFromBom() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "org.springframework.boot", "spring-boot-starter-web"))
+              .as("Spring Boot starter without version should be managed by BOM")
+              .isNotNull()
+              .isEqualTo("3.4.3");
+            assertThat(sdm.getManagedVersion(null, "org.springframework.boot", "spring-boot-starter-json"))
+              .as("Spring Boot starter managed version should be the BOM version, not the declared 3.99.0")
+              .isEqualTo("3.4.3");
+        }
+
+        @Test
+        void overriddenByDependenciesIsTrue() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.isOverriddenByDependencies())
+              .as("Default overriddenByDependencies should be true")
+              .isTrue();
         }
     }
 
@@ -548,12 +658,11 @@ class GradleProjectTest {
         }
 
         @Test
-        void managedVersionsEmptyWithoutPlugin() {
-            GradleDependencyConfiguration impl = gradleProject.getConfiguration("implementation");
-            assertThat(impl).isNotNull();
-            assertThat(impl.getSpringDependencyManagementManagedVersions())
-              .as("Without the Spring dependency-management plugin, managed versions should be empty")
-              .isEmpty();
+        void managedVersionsNullWithoutPlugin() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm)
+              .as("Without the Spring dependency-management plugin, spring dependency management should be null")
+              .isNull();
         }
     }
 }
