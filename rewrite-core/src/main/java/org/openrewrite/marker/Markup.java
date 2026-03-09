@@ -84,7 +84,8 @@ public interface Markup extends Marker {
     }
 
     static <T extends Tree> T markup(T t, Markup markup) {
-        return t.withMarkers(t.getMarkers().compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
+        Markers markers = t.getMarkers() != null ? t.getMarkers() : Markers.EMPTY;
+        return t.withMarkers(markers.compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
     }
 
     @Value
