@@ -323,7 +323,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0.0</version>
-                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
@@ -342,7 +341,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>parent</artifactId>
                   <version>1.0.0</version>
-                  <packaging>pom</packaging>
                   <modules>
                       <module>child</module>
                   </modules>
