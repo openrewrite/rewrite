@@ -435,7 +435,7 @@ class PythonTypeMapping:
             module_name = descriptor.get('moduleName', '')
             return self._create_class_type(module_name)
 
-        elif kind in ('function', 'boundMethod'):
+        elif kind in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
             # Use structured return type if available
             return_type_id = descriptor.get('returnType')
             if return_type_id is not None:
@@ -502,7 +502,7 @@ class PythonTypeMapping:
                     if member_type_id is None:
                         continue
                     member_desc = self._type_registry.get(member_type_id)
-                    if member_desc and member_desc.get('kind') in ('function', 'boundMethod'):
+                    if member_desc and member_desc.get('kind') in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
                         method = self._create_method_from_descriptor(member_desc, class_type)
                         if method:
                             methods.append(method)
@@ -555,6 +555,25 @@ class PythonTypeMapping:
                 return self._create_class_type(name)
             return _UNKNOWN
 
+        elif kind == 'knownInstance':
+            class_name = descriptor.get('className', '')
+            if class_name:
+                return self._create_class_type(f"typing.{class_name}")
+            return _UNKNOWN
+
+        elif kind == 'typeAlias':
+            # Resolve through to the underlying value type when available
+            value_type_id = descriptor.get('valueType')
+            if value_type_id is not None:
+                result = self._resolve_type(value_type_id)
+                if result is not None:
+                    return result
+            # Fall back to creating a class from the alias name
+            name = descriptor.get('name', '')
+            if name:
+                return self._create_class_type(name)
+            return _UNKNOWN
+
         elif kind == 'typeVar':
             name = descriptor.get('name', '')
             if not name:
@@ -571,6 +590,17 @@ class PythonTypeMapping:
                 bound_type = self._resolve_type(upper_bound_id)
                 if bound_type is not None:
                     bounds = [bound_type]
+            # Use constraints as bounds if no upper bound
+            if bounds is None:
+                constraint_ids = descriptor.get('constraints', [])
+                if constraint_ids:
+                    resolved_constraints = []
+                    for c_id in constraint_ids:
+                        c_type = self._resolve_type(c_id)
+                        if c_type is not None:
+                            resolved_constraints.append(c_type)
+                    if resolved_constraints:
+                        bounds = resolved_constraints
             return JavaType.GenericTypeVariable(_name=name, _variance=variance, _bounds=bounds)
 
         else:
@@ -624,7 +654,7 @@ class PythonTypeMapping:
     def _is_variable_descriptor(self, descriptor: Dict[str, Any]) -> bool:
         """Check if a type descriptor represents a variable (not a function, class, or module)."""
         kind = descriptor.get('kind')
-        return kind not in ('function', 'boundMethod', 'module', 'classLiteral')
+        return kind not in ('function', 'boundMethod', 'callable', 'wrapperDescriptor', 'module', 'classLiteral')
 
     def name_type_info(self, node: ast.Name) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
         """Get expression type and variable type for a name reference.
@@ -685,7 +715,7 @@ class PythonTypeMapping:
         type_id = self._lookup_type_id(node)
         if type_id is not None:
             descriptor = self._type_registry.get(type_id)
-            if descriptor and descriptor.get('kind') in ('function', 'boundMethod'):
+            if descriptor and descriptor.get('kind') in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
                 # If the descriptor has parameters/returnType, use them directly
                 params = descriptor.get('parameters')
                 ret_id = descriptor.get('returnType')
@@ -906,7 +936,14 @@ class PythonTypeMapping:
                     kind = descriptor.get('kind')
                     if kind == 'module':
                         return self._create_class_type(descriptor.get('moduleName', ''))
-                    elif kind in ('function', 'boundMethod'):
+                    elif kind in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
+                        # boundMethod has className — use it for declaring type
+                        class_name = descriptor.get('className')
+                        if class_name:
+                            module_name = descriptor.get('moduleName')
+                            if module_name and module_name != 'builtins':
+                                return self._create_class_type(f"{module_name}.{class_name}")
+                            return self._create_class_type(class_name)
                         module_name = descriptor.get('moduleName')
                         if module_name and module_name != 'builtins':
                             return self._create_class_type(module_name)
@@ -1020,6 +1057,14 @@ class PythonTypeMapping:
         elif kind == 'classLiteral':
             class_name = descriptor.get('className', '')
             return self._create_class_type(class_name)
+
+        elif kind == 'boundMethod':
+            class_name = descriptor.get('className')
+            if class_name:
+                module_name = descriptor.get('moduleName')
+                if module_name and module_name != 'builtins':
+                    return self._create_class_type(f"{module_name}.{class_name}")
+                return self._create_class_type(class_name)
 
         return None
 
