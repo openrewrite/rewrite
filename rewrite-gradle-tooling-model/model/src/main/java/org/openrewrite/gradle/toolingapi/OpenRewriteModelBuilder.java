@@ -87,7 +87,7 @@ public class OpenRewriteModelBuilder {
         connector
                 // Uncomment to hit breakpoints inside OpenRewriteModelBuilder in unit tests
                 // Leaving commented out because the exact consequences of this internal API are unclear
-                 .embedded(true)
+                // .embedded(true)
                 .forProjectDirectory(projectDir);
         List<String> arguments = new ArrayList<>();
         if (buildFile != null && buildFile.exists()) {
