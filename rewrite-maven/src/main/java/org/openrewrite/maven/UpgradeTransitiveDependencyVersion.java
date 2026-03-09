@@ -190,7 +190,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
                 MavenResolutionResult current = getResolutionResult();
                 while (current.parentPomIsProjectPom()) {
                     MavenResolutionResult parentResult = current.getParent();
-                    assert parentResult != null;
                     List<ResolvedDependency> parentTransitiveDeps = parentResult.findDependencies(groupId, artifactId, null);
                     matchingDependencies.removeIf(dep ->
                             parentTransitiveDeps.stream().anyMatch(pd ->
