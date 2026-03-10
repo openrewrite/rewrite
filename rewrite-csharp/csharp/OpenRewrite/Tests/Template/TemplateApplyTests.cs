@@ -17,52 +17,93 @@ using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
-using CompilationUnit = OpenRewrite.CSharp.CompilationUnit;
+using OpenRewrite.Test;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Template;
 
-public class TemplateApplyTests
+public class TemplateApplyTests : RewriteTest
 {
-    private static Cursor RootCursor() => new();
+    // ===============================================================
+    // Pattern match → template apply
+    // ===============================================================
 
     [Fact]
     public void PatternMatchThenTemplateApply()
     {
-        // Pattern: Console.Write({expr}) → Template: Console.WriteLine({expr})
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"Console.Write({expr})");
-        var tmpl = CSharpTemplate.Create($"Console.WriteLine({expr})");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Console.Write({expr})",
+                $"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.Write(42); } }",
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
 
-        var parser = new CSharpParser();
-        var cu = parser.Parse("class C { void M() { Console.Write(42); } }");
-        var mi = FindFirst<MethodInvocation>(cu);
-        Assert.NotNull(mi);
+    [Fact]
+    public void NoChangeWhenPatternDoesNotMatch()
+    {
+        var expr = Capture.Of<Expression>("expr");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Console.Write({expr})",
+                $"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
 
-        var match = pat.Match(mi, RootCursor());
-        Assert.NotNull(match);
-
-        var result = tmpl.Apply(RootCursor(), values: match);
-        Assert.NotNull(result);
-        Assert.IsType<MethodInvocation>(result);
-
-        var resultMi = (MethodInvocation)result!;
-        Assert.Equal("WriteLine", resultMi.Name.SimpleName);
-
-        // The argument should be the captured literal 42
-        Assert.Single(resultMi.Arguments.Elements);
-        var arg = resultMi.Arguments.Elements[0].Element;
-        Assert.IsType<Literal>(arg);
-        Assert.Equal(42, ((Literal)arg).Value);
+    [Fact]
+    public void ReplacesMultipleOccurrences()
+    {
+        var expr = Capture.Of<Expression>("expr");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Console.Write({expr})",
+                $"Console.WriteLine({expr})")),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        Console.Write(1);
+                        Console.WriteLine(2);
+                        Console.Write(3);
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    void M()
+                    {
+                        Console.WriteLine(1);
+                        Console.WriteLine(2);
+                        Console.WriteLine(3);
+                    }
+                }
+                """
+            )
+        );
     }
 
     [Fact]
     public void TemplateWithoutCapturesProducesFixedAst()
     {
-        var tmpl = CSharpTemplate.Create("Console.WriteLine(\"hello\")");
-        var result = tmpl.Apply(RootCursor());
-        Assert.NotNull(result);
-        Assert.IsType<MethodInvocation>(result);
-        Assert.Equal("WriteLine", ((MethodInvocation)result!).Name.SimpleName);
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                "Console.Write(42)",
+                "Console.WriteLine(\"hello\")")),
+            CSharp(
+                "class C { void M() { Console.Write(42); } }",
+                "class C { void M() { Console.WriteLine(\"hello\"); } }"
+            )
+        );
     }
 
     [Fact]
@@ -70,51 +111,137 @@ public class TemplateApplyTests
     {
         var expr = Capture.Of<Expression>("expr");
         var methodName = "Info";
-        var tmpl = CSharpTemplate.Create($"logger.{Raw.Code(methodName)}({expr})");
-
-        // Create a simple match result with a literal
-        var parser = new CSharpParser();
-        var cu = parser.Parse("class C { void M() { logger.Debug(\"msg\"); } }");
-        var mi = FindFirst<MethodInvocation>(cu);
-        Assert.NotNull(mi);
-
-        // Match a pattern to get the argument
-        var debugExpr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"logger.Debug({debugExpr})");
-        var match = pat.Match(mi, RootCursor());
-        Assert.NotNull(match);
-
-        var result = tmpl.Apply(RootCursor(), values: match);
-        Assert.NotNull(result);
-        Assert.IsType<MethodInvocation>(result);
-        Assert.Equal("Info", ((MethodInvocation)result!).Name.SimpleName);
+        RewriteRun(
+            spec => spec.SetRecipe(new RawSpliceRecipe(expr, methodName)),
+            CSharp(
+                "class C { void M() { logger.Debug(\"msg\"); } }",
+                "class C { void M() { logger.Info(\"msg\"); } }"
+            )
+        );
     }
 
-    private static T? FindFirst<T>(CompilationUnit cu) where T : class, J
+    [Fact]
+    public void ReplacesBinaryExpression()
     {
-        var finder = new FindFirstVisitor<T>();
-        finder.Visit(cu, 0);
-        return finder.Found;
+        var lhs = Capture.Of<Expression>("lhs");
+        var rhs = Capture.Of<Expression>("rhs");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{lhs} + {rhs}",
+                $"{lhs} - {rhs}")),
+            CSharp(
+                "class C { void M() { var x = 1 + 2; } }",
+                "class C { void M() { var x = 1 - 2; } }"
+            )
+        );
     }
 
-    private class FindFirstVisitor<T> : CSharpVisitor<int> where T : class, J
+    [Fact]
+    public void ReplacesThrowStatement()
     {
-        public T? Found { get; private set; }
+        var msg = Capture.Of<Expression>("msg");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Throw>(
+                $"throw new Exception({msg})",
+                $"throw new ArgumentException({msg})")),
+            CSharp(
+                "class C { void M() { throw new Exception(\"oops\"); } }",
+                "class C { void M() { throw new ArgumentException(\"oops\"); } }"
+            )
+        );
+    }
 
-        public override J? PreVisit(J tree, int p)
+    [Fact]
+    public void ReplacesNewClassExpression()
+    {
+        var arg = Capture.Of<Expression>("arg");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<NewClass>(
+                $"new List({arg})",
+                $"new ArrayList({arg})")),
+            CSharp(
+                "class C { void M() { var x = new List(10); } }",
+                "class C { void M() { var x = new ArrayList(10); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void PreservesExpressionCapture()
+    {
+        var expr = Capture.Of<Expression>("expr");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Console.Write({expr})",
+                $"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.Write(1 + 2); } }",
+                "class C { void M() { Console.WriteLine(1 + 2); } }"
+            )
+        );
+    }
+
+    // ===============================================================
+    // Recipe factories
+    // ===============================================================
+
+    private static Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
+        where T : J =>
+        new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
+
+    private static Core.Recipe Replace<T>(string pattern, string template) where T : J =>
+        new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
+}
+
+/// <summary>
+/// Generic replacement recipe that matches nodes of type <typeparamref name="T"/>
+/// against a pattern and replaces them using a template.
+/// </summary>
+file class PatternReplaceRecipe<T>(CSharpPattern pat, CSharpTemplate tmpl) : Core.Recipe where T : J
+{
+    public override string DisplayName => $"Replace {typeof(T).Name}";
+    public override string Description => $"Replaces {typeof(T).Name} matching the pattern with the template.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new ReplaceVisitor(pat, tmpl);
+
+    private class ReplaceVisitor(CSharpPattern pat, CSharpTemplate tmpl) : CSharpVisitor<ExecutionContext>
+    {
+        public override J? PreVisit(J tree, ExecutionContext ctx)
         {
-            if (Found != null)
+            if (tree is T t && pat.Match(t, Cursor) is { } match)
             {
-                StopAfterPreVisit();
-                return tree;
-            }
-            if (tree is T t)
-            {
-                Found = t;
-                StopAfterPreVisit();
-                return tree;
+                return (J?)tmpl.Apply(Cursor, values: match);
             }
             return tree;
+        }
+    }
+}
+
+/// <summary>
+/// Recipe demonstrating Raw.Code splice — replaces logger.Debug({expr}) with logger.{level}({expr}).
+/// </summary>
+file class RawSpliceRecipe(Capture<Expression> expr, string level) : Core.Recipe
+{
+    public override string DisplayName => "Replace logger method";
+    public override string Description => "Replaces logger.Debug with logger.<level> using Raw.Code splice.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor()
+    {
+        var pat = CSharpPattern.Create($"logger.Debug({expr})");
+        var tmpl = CSharpTemplate.Create($"logger.{Raw.Code(level)}({expr})");
+        return new ReplaceVisitor(pat, tmpl);
+    }
+
+    private class ReplaceVisitor(CSharpPattern pat, CSharpTemplate tmpl) : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
+        {
+            mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
+            if (pat.Match(mi, Cursor) is { } match)
+            {
+                return (J)tmpl.Apply(Cursor, values: match)!;
+            }
+            return mi;
         }
     }
 }
