@@ -151,7 +151,10 @@ export abstract class TreeVisitor<T extends Tree, P> {
             if (result === undefined) {
                 return undefined;
             }
-            // Restore markers (use newMarkers since we visited them)
+            // If neither the recipe nor marker visiting changed anything, return the original object
+            if (result === withoutMarkers && newMarkers === before.markers) {
+                return before;
+            }
             return { ...result, markers: newMarkers } as T;
         }
 
