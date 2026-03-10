@@ -56,8 +56,13 @@ jobs:
         with:
           develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
-      - name: npm publish
+      - name: npm pack
         run: >
           ./gradlew ${{ env.GRADLE_SWITCHES }}
-          :rewrite-javascript:npmPublish
+          :rewrite-javascript:npmPack
           ${{ inputs.releasing && '-Preleasing' || '' }}
+
+      - name: npm publish
+        run: |
+          TARBALL=$(ls rewrite-javascript/build/distributions/*.tgz)
+          npm publish "$TARBALL" --provenance --access public ${{ inputs.releasing && ' ' || '--tag next' }}
