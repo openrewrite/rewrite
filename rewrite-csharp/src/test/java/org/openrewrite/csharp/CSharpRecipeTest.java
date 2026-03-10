@@ -57,7 +57,7 @@ class CSharpRecipeTest implements RewriteTest {
                 basePath.resolve("rewrite-csharp/csharp"),
         };
         for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite/OpenRewrite.csproj");
+            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
             if (csproj.toFile().exists()) {
                 CSharpRewriteRpc.setFactory(
                         CSharpRewriteRpc.builder()
