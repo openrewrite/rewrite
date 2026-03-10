@@ -44,3 +44,4 @@ jobs:
         21
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+      npm_token: ${{ secrets.NPM_TOKEN }}
