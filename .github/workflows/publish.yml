@@ -24,6 +24,16 @@ jobs:
       sonatype_token: ${{ secrets.SONATYPE_TOKEN}}
       ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
-      node_auth_token: ${{ secrets.NPM_TOKEN }}
       pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
+
+  npm-publish:
+    needs: release
+    uses: ./.github/workflows/npm-publish.yml
+    with:
+      java_version: |
+        25
+        21
+      releasing: true
+    secrets:
+      gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}

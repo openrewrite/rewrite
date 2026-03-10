@@ -14,10 +14,6 @@ on:
   schedule:
     - cron: 0 16 * * *
 
-permissions:
-  contents: read
-  id-token: write
-
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -38,3 +34,13 @@ jobs:
       OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
       pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
+
+  npm-publish:
+    needs: build
+    uses: ./.github/workflows/npm-publish.yml
+    with:
+      java_version: |
+        25
+        21
+    secrets:
+      gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}

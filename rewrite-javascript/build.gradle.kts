@@ -229,7 +229,12 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
 }
 
 tasks.named("publish") {
-    dependsOn(npmPublish)
+    // In CI, npm publishing is handled by a dedicated workflow (npm-publish.yml)
+    // for OIDC trusted publishing. Only include npmPublish in the main publish
+    // task for local development or when a token is explicitly provided.
+    if (System.getenv("CI") == null || project.hasProperty("nodeAuthToken")) {
+        dependsOn(npmPublish)
+    }
 }
 
 extensions.configure<LicenseExtension> {
