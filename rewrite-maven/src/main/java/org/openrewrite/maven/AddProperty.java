@@ -24,8 +24,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddProperty extends Recipe {
@@ -76,11 +74,7 @@ public class AddProperty extends Recipe {
                 }
 
                 // If there is a parent pom in the same project, update the property there instead
-                if (document.getRoot().getChild("parent")
-                        .flatMap(tag -> tag.getChild("relativePath"))
-                        .flatMap(Xml.Tag::getValue)
-                        .flatMap(v -> v.trim().isEmpty() ? Optional.empty() : Optional.of(v))
-                        .isPresent()) {
+                if (getResolutionResult().parentPomIsProjectPom()) {
                     if (Boolean.TRUE.equals(preserveExistingValue)) {
                         return document;
                     }
