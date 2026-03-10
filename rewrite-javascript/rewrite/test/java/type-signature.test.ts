@@ -22,10 +22,24 @@ describe('Type.signature', () => {
         const classA: Type.ShallowClass = {
             kind: Type.Kind.ShallowClass,
             fullyQualifiedName: "com.example.A",
+            flags: 0,
+            classKind: Type.Class.Kind.Class,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
         };
         const classB: Type.ShallowClass = {
             kind: Type.Kind.ShallowClass,
             fullyQualifiedName: "com.example.B",
+            flags: 0,
+            classKind: Type.Class.Kind.Class,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
         };
 
         // Shell-cache pattern: create with empty typeParameters first
@@ -55,10 +69,24 @@ describe('Type.signature', () => {
         const classA: Type.ShallowClass = {
             kind: Type.Kind.ShallowClass,
             fullyQualifiedName: "com.example.List",
+            flags: 0,
+            classKind: Type.Class.Kind.Class,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
         };
         const classB: Type.ShallowClass = {
             kind: Type.Kind.ShallowClass,
             fullyQualifiedName: "com.example.Map",
+            flags: 0,
+            classKind: Type.Class.Kind.Class,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
         };
 
         const inner: Type.Parameterized = {

@@ -53,7 +53,7 @@
     "test": "npm run typecheck && npm run build && bun run testhelper",
     "testhelper": "NODE_OPTIONS='--max-old-space-size=4096 --experimental-vm-modules' jest",
     "build:fixtures": "tsc --build fixtures/tsconfig.json",
-    "ci:test": "bun run testhelper",
+    "ci:test": "npm run typecheck && bun run testhelper",
     "start": "npm run build && node ./dist/rpc/server.js"
   },
   "dependencies": {
