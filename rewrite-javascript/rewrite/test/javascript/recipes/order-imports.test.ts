@@ -218,6 +218,21 @@ const x = 1;
 `))
     });
 
+    test("sorts inline type specifiers correctly within named imports", () => {
+        return spec.rewriteRun(
+            typescript(
+                `
+import { AuthService } from '$lib/services/auth.service';
+import { inject } from '@angular/core';
+import { RedirectCommand, Router, type CanActivateFn } from '@angular/router';
+`,
+                `
+import { inject } from '@angular/core';
+import { type CanActivateFn, RedirectCommand, Router } from '@angular/router';
+import { AuthService } from '$lib/services/auth.service';
+`))
+    });
+
     test("comprehensive: basic example from original test", () => {
         return spec.rewriteRun(
             typescript(
