@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "license": "Moderne Source Available License",
   "description": "OpenRewrite JavaScript.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openrewrite/rewrite",
+    "directory": "rewrite-javascript/rewrite"
+  },
   "homepage": "https://github.com/openrewrite/rewrite",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
