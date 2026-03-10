@@ -2943,7 +2943,67 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1968")
     @Test
-    void bomUpgradeHandlesUnavailableBomVersion() throws Exception {
+    void bomUpgradeHandlesUnavailableBomVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.4.2", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.13.4</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.13.4</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                          <version>2.13.4.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1968")
+    @Test
+    void bomUpgradeSkipsUnavailableBomPom() throws Exception {
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
@@ -2952,7 +3012,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     if (path == null) {
                         return new MockResponse().setResponseCode(404);
                     }
-                    // BOM metadata lists 1.0.0 and 1.0.1 but only 1.0.0 has an actual POM
                     if (path.contains("com/example/my-bom/maven-metadata.xml")) {
                         return new MockResponse().setResponseCode(200).setBody("""
                           <metadata>
@@ -2962,13 +3021,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                               <versions>
                                 <version>1.0.0</version>
                                 <version>1.0.1</version>
-                                <version>2.0.0</version>
                               </versions>
                             </versioning>
                           </metadata>
                           """);
                     }
-                    // BOM 1.0.0 manages my-lib at 1.0.0
                     if (path.contains("com/example/my-bom/1.0.0/my-bom-1.0.0.pom")) {
                         return new MockResponse().setResponseCode(200).setBody("""
                           <project>
@@ -2989,32 +3046,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           </project>
                           """);
                     }
-                    // BOM 1.0.1 does NOT exist — return 404
+                    // BOM 1.0.1 listed in metadata but POM not published
                     if (path.contains("com/example/my-bom/1.0.1/")) {
                         return new MockResponse().setResponseCode(404);
                     }
-                    // BOM 2.0.0 manages my-lib at 2.0.0
-                    if (path.contains("com/example/my-bom/2.0.0/my-bom-2.0.0.pom")) {
-                        return new MockResponse().setResponseCode(200).setBody("""
-                          <project>
-                            <modelVersion>4.0.0</modelVersion>
-                            <groupId>com.example</groupId>
-                            <artifactId>my-bom</artifactId>
-                            <version>2.0.0</version>
-                            <packaging>pom</packaging>
-                            <dependencyManagement>
-                              <dependencies>
-                                <dependency>
-                                  <groupId>com.example</groupId>
-                                  <artifactId>my-lib</artifactId>
-                                  <version>2.0.0</version>
-                                </dependency>
-                              </dependencies>
-                            </dependencyManagement>
-                          </project>
-                          """);
-                    }
-                    // Dependency metadata
                     if (path.contains("com/example/my-lib/maven-metadata.xml")) {
                         return new MockResponse().setResponseCode(200).setBody("""
                           <metadata>
@@ -3024,13 +3059,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                               <versions>
                                 <version>1.0.0</version>
                                 <version>1.0.1</version>
-                                <version>2.0.0</version>
                               </versions>
                             </versioning>
                           </metadata>
                           """);
                     }
-                    // Dependency POM for 1.0.0
                     if (path.contains("com/example/my-lib/1.0.0/my-lib-1.0.0.pom")) {
                         return new MockResponse().setResponseCode(200).setBody("""
                           <project>
@@ -3041,7 +3074,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           </project>
                           """);
                     }
-                    // Dependency POM for 1.0.1 (the CVE fix)
                     if (path.contains("com/example/my-lib/1.0.1/my-lib-1.0.1.pom")) {
                         return new MockResponse().setResponseCode(200).setBody("""
                           <project>
@@ -3049,17 +3081,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                             <groupId>com.example</groupId>
                             <artifactId>my-lib</artifactId>
                             <version>1.0.1</version>
-                          </project>
-                          """);
-                    }
-                    // Dependency POM for 2.0.0
-                    if (path.contains("com/example/my-lib/2.0.0/my-lib-2.0.0.pom")) {
-                        return new MockResponse().setResponseCode(200).setBody("""
-                          <project>
-                            <modelVersion>4.0.0</modelVersion>
-                            <groupId>com.example</groupId>
-                            <artifactId>my-lib</artifactId>
-                            <version>2.0.0</version>
                           </project>
                           """);
                     }
