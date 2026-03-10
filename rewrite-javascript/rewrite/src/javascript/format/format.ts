@@ -326,19 +326,10 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
         // when nothing actually changed, so no guard function is needed.
         return produce(ret, draft => {
             if (draft.importClause) {
-                // Space after 'import' keyword:
-                // - If there's a default import (name), space goes in importClause.prefix
-                // - If typeOnly (import type ...), space goes in importClause.prefix (before 'type')
-                // - If only namedBindings (no default, no type), the space can be in either
-                //   importClause.prefix or namedBindings.prefix — don't move it between them.
-                //   TODO: This is a parser normalization issue — the parser should place the space
-                //   in a canonical location.
-                const hasDefaultImport = !!draft.importClause.name;
-                if (hasDefaultImport || draft.importClause.typeOnly) {
-                    draft.importClause.prefix.whitespace = " ";
-                } else if (!draft.importClause.namedBindings || draft.importClause.prefix.whitespace !== " ") {
-                    draft.importClause.prefix.whitespace = "";
-                }
+                // Space after 'import' keyword always goes on importClause.prefix.
+                // The parser is consistent here: both ImportClause and NamedBindings share
+                // the same trivia span, but ImportClause consumes it first.
+                draft.importClause.prefix.whitespace = " ";
                 if (draft.importClause.name) {
                     // For import equals declarations (import X = Y), use assignment spacing
                     // For regular imports (import X from 'Y'), no space after name
@@ -347,10 +338,8 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         : "";
                 }
                 if (draft.importClause.namedBindings) {
-                    // Space before namedBindings:
-                    // - After default import or typeOnly, always " "
-                    // - If no default/typeOnly, the space may already be on importClause.prefix
-                    if (hasDefaultImport || draft.importClause.typeOnly || draft.importClause.prefix.whitespace !== " ") {
+                    const hasDefaultImport = !!draft.importClause.name;
+                    if (hasDefaultImport || draft.importClause.typeOnly) {
                         draft.importClause.namedBindings.prefix.whitespace = " ";
                     }
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
@@ -1139,7 +1128,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         }
     }
 
-    private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
+    private ensurePrefixHasNewLine(node: Draft<J>) {
         if (!node.prefix) return;
 
         // Check if newline already exists in the effective last whitespace
