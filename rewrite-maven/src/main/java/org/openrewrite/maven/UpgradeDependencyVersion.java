@@ -329,9 +329,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             // if a managed dependency is expressed as a property, change the property value
                             // do this only when a requested bom is absent, otherwise changing property has no effect
                             if (dm != null && isProperty(dm.getRequested().getVersion()) && dm.getRequestedBom() == null) {
-                                doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
-                                        dm.getRequested().getVersion().length() - 1),
-                                        newerVersion, overrideManagedVersion, false).getVisitor());
+                                String propertyName = dm.getRequested().getVersion().substring(2,
+                                        dm.getRequested().getVersion().length() - 1);
+                                doAfterVisit(new AddPropertyVisitor(propertyName, newerVersion, false));
                             } else if (dm != null && dm.getBomGav() == null) {
                                 // if the version is managed directly (not from a BOM) and comes from a local parent POM
                                 // (in the same repository), don't add an explicit version
