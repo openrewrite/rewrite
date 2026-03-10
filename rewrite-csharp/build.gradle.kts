@@ -118,17 +118,13 @@ tasks.withType<Test> {
 // NuGet Version & Version File
 // ============================================
 
-// Generate a NuGet-compatible version for CI builds
-// Snapshots use pre-release suffix: 8.73.0-snapshot.20260110143252
+// Generate a NuGet-compatible version
+// Snapshots use pre-release suffix with timestamp: 8.73.0-snapshot.20260110143252
 // Releases use clean version: 8.73.0
-val nugetVersion: String = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "-SNAPSHOT",
-        "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-    )
-} else {
-    project.version.toString().replace("-SNAPSHOT", "-dev")
-}
+val nugetVersion: String = project.version.toString().replace(
+    "-SNAPSHOT",
+    "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+)
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"
@@ -154,11 +150,11 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 // NuGet Publishing Tasks
 // ============================================
 
-// Task to pack the C# project as a NuGet tool package
-// Version is injected via /p:Version so the .csproj is never modified
+// Task to pack C# projects as NuGet packages
+// Packs both the SDK library and the tool; version is injected via /p:Version
 val csharpPack by tasks.registering(Exec::class) {
     group = "csharp"
-    description = "Pack C# project as NuGet package"
+    description = "Pack C# projects as NuGet packages"
 
     workingDir = csharpDir
     commandLine(
@@ -169,12 +165,13 @@ val csharpPack by tasks.registering(Exec::class) {
     )
 
     inputs.dir(csharpDir.resolve("OpenRewrite"))
+    inputs.dir(csharpDir.resolve("OpenRewrite.Tool"))
     inputs.property("version", nugetVersion)
     outputs.dir(csharpDir.resolve("dist"))
 
     doFirst {
         csharpDir.resolve("dist").deleteRecursively()
-        logger.lifecycle("Packing C# NuGet package (version: $nugetVersion)")
+        logger.lifecycle("Packing C# NuGet packages (version: $nugetVersion)")
     }
 }
 
@@ -198,6 +195,28 @@ val csharpPublish by tasks.registering(Exec::class) {
             throw GradleException("nugetApiKey property is required for NuGet publishing")
         }
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
+    }
+}
+
+// Task to publish the C# SDK library to a local NuGet feed for cross-repo development.
+// Usage: ./gradlew :rewrite-csharp:csharpPublishLocal
+val csharpPublishLocal by tasks.registering {
+    group = "csharp"
+    description = "Pack and publish C# SDK library to local NuGet feed (~/.nuget/local-feed/)"
+
+    dependsOn(csharpPack)
+
+    val localFeed = file("${System.getProperty("user.home")}/.nuget/local-feed")
+
+    doLast {
+        localFeed.mkdirs()
+        csharpDir.resolve("dist").listFiles()
+            ?.filter { it.name.endsWith(".nupkg") }
+            ?.forEach { nupkg ->
+                val target = localFeed.resolve(nupkg.name)
+                nupkg.copyTo(target, overwrite = true)
+                logger.lifecycle("Published ${nupkg.name} to ${localFeed.absolutePath}")
+            }
     }
 }
 
