@@ -26,7 +26,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
@@ -161,16 +160,12 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
     }
 
-    @JsonIgnore
-    private transient ThreadLocal<Accumulator> accumulator = new ThreadLocal<>();
-
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
         Accumulator acc = new Accumulator();
         for (Recipe precondition : preconditions) {
             registerNestedScanningRecipes(precondition, acc, ctx);
         }
-        accumulator.set(acc);
         return acc;
     }
 
@@ -212,6 +207,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Map<Recipe, Object> recipeToAccumulator = new HashMap<>();
     }
 
+    @FunctionalInterface
+    interface PreconditionResolver {
+        TreeVisitor<?, ExecutionContext> resolve(Cursor rootCursor, ExecutionContext ctx);
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     @RequiredArgsConstructor
@@ -222,7 +222,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         String description = "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
 
-        Supplier<TreeVisitor<?, ExecutionContext>> precondition;
+        PreconditionResolver precondition;
 
         @NonFinal
         transient boolean preconditionApplicable;
@@ -230,18 +230,26 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
-                final TreeVisitor<?, ExecutionContext> p = precondition.get();
+                @Nullable
+                TreeVisitor<?, ExecutionContext> p;
 
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                    return p.isAcceptable(sourceFile, ctx);
+                    return resolve(ctx).isAcceptable(sourceFile, ctx);
                 }
 
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    Tree t = p.visit(tree, ctx);
+                    Tree t = resolve(ctx).visit(tree, ctx);
                     preconditionApplicable = t != tree;
                     return tree;
+                }
+
+                private TreeVisitor<?, ExecutionContext> resolve(ExecutionContext ctx) {
+                    if (p == null) {
+                        p = precondition.resolve(getCursor(), ctx);
+                    }
+                    return p;
                 }
             };
         }
@@ -495,36 +503,37 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             return recipeList;
         }
 
-        List<Supplier<TreeVisitor<?, ExecutionContext>>> andPreconditions = new ArrayList<>();
-        for (Recipe precondition : preconditions) {
-            andPreconditions.add(() -> orVisitors(precondition));
-        }
+        List<Recipe> preconditionsCopy = new ArrayList<>(preconditions);
         //noinspection unchecked
-        PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
+        PreconditionBellwether bellwether = new PreconditionBellwether((rootCursor, ctx) -> {
+            TreeVisitor<?, ExecutionContext>[] visitors = new TreeVisitor[preconditionsCopy.size()];
+            for (int i = 0; i < preconditionsCopy.size(); i++) {
+                visitors[i] = orVisitors(preconditionsCopy.get(i), rootCursor, ctx);
+            }
+            return Preconditions.and(visitors);
+        });
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
         recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
         return recipeListWithBellwether;
     }
 
-    private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe, Cursor rootCursor, ExecutionContext ctx) {
         List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
         if (recipe instanceof ScanningRecipe) {
-            //noinspection rawtypes
             ScanningRecipe scanning = (ScanningRecipe) recipe;
-            //noinspection unchecked
-            Accumulator acc = accumulator.get();
+            Accumulator acc = getAccumulator(rootCursor, ctx);
             conditions.add(scanning.getVisitor(acc != null ? acc.recipeToAccumulator.get(scanning) : null));
         } else {
             conditions.add(recipe.getVisitor());
         }
         for (Recipe r : recipe.getRecipeList()) {
-            conditions.add(orVisitors(r));
+            conditions.add(orVisitors(r, rootCursor, ctx));
         }
         if (conditions.size() == 1) {
             return conditions.get(0);
         }
-        //noinspection unchecked
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
     }
 
@@ -608,15 +617,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     @Override
-    public void onComplete(ExecutionContext ctx) {
-        accumulator.remove();
-    }
-
-    @Override
     public DeclarativeRecipe clone() {
-        DeclarativeRecipe cloned = (DeclarativeRecipe) super.clone();
-        cloned.accumulator = new ThreadLocal<>();
-        return cloned;
+        return (DeclarativeRecipe) super.clone();
     }
 
     @Override
