@@ -32,6 +32,15 @@ jobs:
       ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
       OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
-      node_auth_token: ${{ secrets.NPM_TOKEN }}
       pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
       nuget_api_key: ${{ secrets.NUGET_API_KEY }}
+
+  npm-publish:
+    needs: build
+    uses: ./.github/workflows/npm-publish.yml
+    with:
+      java_version: |
+        25
+        21
+    secrets:
+      gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}

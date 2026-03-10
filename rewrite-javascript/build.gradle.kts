@@ -214,9 +214,13 @@ val setupNpmrc = tasks.register("setupNpmrc") {
 val npmPublish = tasks.register<NpmTask>("npmPublish") {
     inputs.files(npmPack)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    dependsOn(setupNpmrc)
+    // Use setupNpmrc only when a token is explicitly provided (local dev);
+    // in CI, npm trusted publishing (OIDC) handles authentication automatically.
+    if (project.hasProperty("nodeAuthToken")) {
+        dependsOn(setupNpmrc)
+    }
 
-    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
+    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath, "--provenance", "--access", "public") }
     if (!project.hasProperty("releasing")) {
         args.addAll("--tag", "next")
     }
@@ -225,7 +229,12 @@ val npmPublish = tasks.register<NpmTask>("npmPublish") {
 }
 
 tasks.named("publish") {
-    dependsOn(npmPublish)
+    // In CI, npm publishing is handled by a dedicated workflow (npm-publish.yml)
+    // for OIDC trusted publishing. Only include npmPublish in the main publish
+    // task for local development or when a token is explicitly provided.
+    if (System.getenv("CI") == null || project.hasProperty("nodeAuthToken")) {
+        dependsOn(npmPublish)
+    }
 }
 
 extensions.configure<LicenseExtension> {

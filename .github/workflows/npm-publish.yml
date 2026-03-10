@@ -1,0 +1,53 @@
+---
+name: npm-publish
+
+on:
+  workflow_call:
+    inputs:
+      java_version:
+        description: Java version for setup-java
+        type: string
+        required: false
+        default: 21
+      releasing:
+        description: Whether this is a release publish (uses tag version and latest npm tag)
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      gradle_enterprise_access_key:
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GRADLE_SWITCHES: --console=plain --info --stacktrace --warning-mode=all --no-daemon
+
+jobs:
+  npm-publish:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name != 'pull_request' &&
+      (github.repository_owner == 'openrewrite' || github.repository_owner == 'moderneinc')
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java_version }}
+
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          develocity-access-key: ${{ secrets.gradle_enterprise_access_key }}
+
+      - name: npm publish
+        run: >
+          ./gradlew ${{ env.GRADLE_SWITCHES }}
+          :rewrite-javascript:npmPublish
+          ${{ inputs.releasing && '-Preleasing' || '' }}
