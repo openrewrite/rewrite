@@ -505,6 +505,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 );
 
                 return metadata.getVersioning().getVersions().stream()
+                        .filter(version -> versionComparator.isValid(currentVersion, version))
                         .filter(version -> versionComparator.compare(null, currentVersion, version) < 0)
                         .sorted(versionComparator)
                         .collect(toList());

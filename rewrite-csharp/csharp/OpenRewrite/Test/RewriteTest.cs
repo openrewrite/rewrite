@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using Rewrite.Core;
@@ -38,11 +42,30 @@ public abstract class RewriteTest
         var parser = new CSharpParser();
         var printer = new CSharpPrinter<object>();
 
+        // Resolve metadata references if ReferenceAssemblies is configured
+        ImmutableArray<MetadataReference>? metadataReferences = recipeSpec.ReferenceAssemblies != null
+            ? recipeSpec.ReferenceAssemblies
+                .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
+                .GetAwaiter()
+                .GetResult()
+            : null;
+
         // 1. Parse all sources and validate round-trip
         var parsed = new List<(SourceSpec Spec, SourceFile Source)>();
         foreach (var spec in specs)
         {
-            var source = parser.Parse(spec.Before);
+            SemanticModel? semanticModel = null;
+            if (metadataReferences != null)
+            {
+                var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: "source.cs");
+                var compilation = CSharpCompilation.Create("TestCompilation")
+                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                    .AddReferences(metadataReferences)
+                    .AddSyntaxTrees(syntaxTree);
+                semanticModel = compilation.GetSemanticModel(syntaxTree);
+            }
+
+            var source = parser.Parse(spec.Before, semanticModel: semanticModel);
 
             // Verify round-trip: printed should match input
             var printed = printer.Print(source);
@@ -102,10 +125,45 @@ public record SourceSpec(string Before, string? After = null);
 public class RecipeSpec
 {
     public Recipe? Recipe { get; private set; }
+    public ReferenceAssemblies? ReferenceAssemblies { get; private set; }
 
     public RecipeSpec SetRecipe(Recipe recipe)
     {
         Recipe = recipe;
         return this;
+    }
+
+    public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies referenceAssemblies)
+    {
+        ReferenceAssemblies = referenceAssemblies;
+        return this;
+    }
+}
+
+/// <summary>
+/// Pre-configured reference assemblies for common .NET SDK targets.
+/// </summary>
+public static class Assemblies
+{
+    public static ReferenceAssemblies Net90 => Microsoft.CodeAnalysis.Testing.ReferenceAssemblies.Net.Net90;
+    public static ReferenceAssemblies Net100 => Microsoft.CodeAnalysis.Testing.ReferenceAssemblies.Net.Net100;
+
+    public static ReferenceAssemblies AspNet90 =>
+        Net90.AddPackage("Microsoft.AspNetCore.App.Ref");
+
+    public static ReferenceAssemblies AspNet100 =>
+        Net100.AddPackage("Microsoft.AspNetCore.App.Ref");
+
+    public static ReferenceAssemblies AddPackage(this ReferenceAssemblies referenceAssemblies, string package)
+    {
+        return referenceAssemblies.AddPackage(package,
+            referenceAssemblies.ReferenceAssemblyPackage?.Version
+            ?? throw new InvalidOperationException("ReferenceAssemblyPackage.Version is null"));
+    }
+
+    public static ReferenceAssemblies AddPackage(this ReferenceAssemblies referenceAssemblies, string package,
+        string version)
+    {
+        return referenceAssemblies.AddPackages([new PackageIdentity(package, version)]);
     }
 }

@@ -115,7 +115,7 @@ tasks.withType<Test> {
 }
 
 // ============================================
-// NuGet Publishing Tasks
+// NuGet Version & Version File
 // ============================================
 
 // Generate a NuGet-compatible version for CI builds
@@ -129,6 +129,30 @@ val nugetVersion: String = if (System.getenv("CI") != null) {
 } else {
     project.version.toString().replace("-SNAPSHOT", "-dev")
 }
+
+val generateVersionTxt by tasks.registering {
+    group = "csharp"
+    description = "Generate META-INF/rewrite-csharp-version.txt for RPC version pinning"
+
+    val versionTxt = file("src/main/resources/META-INF/rewrite-csharp-version.txt")
+    inputs.property("version", nugetVersion)
+    outputs.file(versionTxt)
+
+    doLast {
+        versionTxt.parentFile.mkdirs()
+        versionTxt.writeText(nugetVersion)
+    }
+}
+
+listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+    tasks.named(it) {
+        dependsOn(generateVersionTxt)
+    }
+}
+
+// ============================================
+// NuGet Publishing Tasks
+// ============================================
 
 // Task to pack the C# project as a NuGet tool package
 // Version is injected via /p:Version so the .csproj is never modified
