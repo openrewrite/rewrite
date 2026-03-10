@@ -29,11 +29,17 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
+import static java.nio.file.Files.*;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
@@ -97,24 +103,71 @@ public class ClasspathScanningLoader implements ResourceLoader {
     /**
      * Construct a ClasspathScanningLoader as used from `Environment.scanJar` for
      * `MavenRecipeBundleReader.marketplaceFromClasspathScan`.
+     * Supports both jar files and directories containing class files.
      */
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
-        String jarName = jar.toFile().getName();
 
         this.performScan = () -> {
-            scanClasses(new ClassGraph()
-                    .acceptJars(jarName)
-                    .ignoreParentClassLoaders()
-                    .overrideClassLoaders(classLoader), classLoader);
+            Path jarPath;
+            if (isDirectory(jar)) {
+                try {
+                    jarPath = createTempJarFromDirectory(jar);
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to create temporary jar from directory: " + jar, e);
+                }
+            } else {
+                jarPath = jar;
+            }
 
-            scanYaml(new ClassGraph()
+            String jarName = jarPath.toFile().getName();
+            ClassGraph classGraph = new ClassGraph()
+                    .overrideClasspath(jarPath.toString())
                     .acceptJars(jarName)
-                    .ignoreParentClassLoaders()
+                    .overrideClassLoaders(classLoader);
+
+            ClassGraph yamlGraph = new ClassGraph()
+                    .overrideClasspath(jarPath.toString())
+                    .acceptJars(jarName)
                     .overrideClassLoaders(classLoader)
-                    .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+                    .acceptPaths("META-INF/rewrite");
+
+            scanClasses(classGraph, classLoader);
+            scanYaml(yamlGraph, properties, dependencyResourceLoaders, classLoader);
         };
+    }
+
+    /**
+     * Creates a temporary jar file containing all files from the given directory.
+     */
+    private static Path createTempJarFromDirectory(Path directory) throws IOException {
+        Path tempJar = createTempFile("recipe-scan-", ".jar");
+        tempJar.toFile().deleteOnExit();
+
+        try (JarOutputStream jos = new JarOutputStream(newOutputStream(tempJar))) {
+            walkFileTree(directory, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String entryName = directory.relativize(file).toString().replace('\\', '/');
+                    jos.putNextEntry(new JarEntry(entryName));
+                    copy(file, jos);
+                    jos.closeEntry();
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(directory)) {
+                        String entryName = directory.relativize(dir).toString().replace('\\', '/') + "/";
+                        jos.putNextEntry(new JarEntry(entryName));
+                        jos.closeEntry();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+        return tempJar;
     }
 
     /**

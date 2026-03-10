@@ -22,6 +22,7 @@ import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
+
 class ThrowsTest implements RewriteTest {
 
     @Test
@@ -45,8 +46,8 @@ class ThrowsTest implements RewriteTest {
         );
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {
       "x from None",
       " x from None",

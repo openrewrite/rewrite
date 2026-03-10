@@ -762,6 +762,19 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
+    void anchorOnMappingInSequenceEntry() {
+        rewriteRun(
+          yaml(
+            """
+              - k: v
+              - &b
+                k2: v2
+              """
+          )
+        );
+    }
+
+    @Test
     void literalScalarTrailingNewlineInValue() {
         // Literal (|) and folded (>) scalars should keep trailing newlines in their value
         // The next entry's prefix should be just indentation, not include the newline

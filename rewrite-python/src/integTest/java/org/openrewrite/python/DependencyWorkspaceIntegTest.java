@@ -19,13 +19,16 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.Recipe;
 import org.openrewrite.java.search.FindMethods;
+import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.*;
 
 /**
@@ -82,6 +85,42 @@ class DependencyWorkspaceIntegTest implements RewriteTest {
                 version = "0.1.0"
                 dependencies = ["requests>=2.28.0"]
                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void pyprojectHasResolvedDependenciesFromUvLock() {
+        rewriteRun(
+          spec -> spec.recipe(Recipe.noop()),
+          uv(
+            tempDir,
+            pyproject(
+              """
+                [project]
+                name = "test-project"
+                version = "0.1.0"
+                requires-python = ">=3.10"
+                dependencies = ["requests>=2.28.0"]
+                """,
+              spec2 -> spec2.afterRecipe(doc -> {
+                  PythonResolutionResult marker = doc.getMarkers()
+                          .findFirst(PythonResolutionResult.class)
+                          .orElse(null);
+                  assertThat(marker).isNotNull();
+                  assertThat(marker.getName()).isEqualTo("test-project");
+                  assertThat(marker.getPackageManager())
+                          .isEqualTo(PythonResolutionResult.PackageManager.Uv);
+                  assertThat(marker.getResolvedDependencies()).isNotEmpty();
+                  assertThat(marker.getResolvedDependency("requests")).isNotNull();
+                  assertThat(marker.getResolvedDependency("requests").getVersion()).isNotEmpty();
+
+                  // The declared dependency should be linked to its resolved version
+                  assertThat(marker.getDependencies()).hasSize(1);
+                  assertThat(marker.getDependencies().get(0).getResolved()).isNotNull();
+                  assertThat(marker.getDependencies().get(0).getResolved().getVersion()).isNotEmpty();
+              })
             )
           )
         );

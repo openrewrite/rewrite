@@ -1039,6 +1039,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 type);
 
         List<KtParameter> ktParameters = accessor.getValueParameters();
+        // In K2, LPAR/RPAR moved inside VALUE_PARAMETER_LIST, so use the list node for prefix/suffix
+        PsiElement paramList = accessor.getLeftParenthesis() != null ? accessor.getLeftParenthesis().getParent() : null;
         if (!ktParameters.isEmpty()) {
             if (ktParameters.size() != 1) {
                 throw new UnsupportedOperationException("TODO");
@@ -1046,21 +1048,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             List<JRightPadded<Statement>> parameters = new ArrayList<>();
             for (KtParameter ktParameter : ktParameters) {
-                Statement stmt = convertToStatement(ktParameter.accept(this, data).withPrefix(prefix(ktParameter.getParent())));
+                Statement stmt = convertToStatement(ktParameter.accept(this, data).withPrefix(suffix(accessor.getLeftParenthesis())));
                 parameters.add(padRight(stmt, prefix(accessor.getRightParenthesis())));
             }
 
-            params = JContainer.build(prefix(accessor.getLeftParenthesis()), parameters, Markers.EMPTY);
+            params = JContainer.build(prefix(paramList), parameters, Markers.EMPTY);
         } else {
             params = JContainer.build(
-                    prefix(accessor.getLeftParenthesis()),
+                    prefix(paramList),
                     singletonList(padRight(new J.Empty(randomId(), prefix(accessor.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)),
                     Markers.EMPTY
             );
         }
 
         if (accessor.getReturnTypeReference() != null) {
-            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(accessor.getRightParenthesis())));
+            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(paramList)));
             returnTypeExpression = accessor.getReturnTypeReference().accept(this, data).withPrefix(prefix(accessor.getReturnTypeReference()));
         }
 

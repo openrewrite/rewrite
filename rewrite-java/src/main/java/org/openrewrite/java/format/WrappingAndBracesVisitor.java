@@ -452,8 +452,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (space.getComments().isEmpty()) {
             if (StringUtils.hasLineBreak(whitespace)) {
                 if (StringUtils.hasLineBreak(space.getWhitespace())) {
-                    //Keep existing amount of new lines
-                    return space.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1));
+                    // Preserve existing amount of new lines and their indents
+                    return space;
                 }
             }
             return space.withWhitespace(whitespace);
@@ -471,12 +471,15 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                     if (comment.isMultiline()) {
                         Object parent = getCursor().getParentTreeCursor().getValue();
                         if (!(parent instanceof J.Block || parent instanceof J.Case)) {
+                            if (StringUtils.hasLineBreak(comment.getSuffix())) {
+                                return comment;
+                            }
                             return comment.withSuffix(whitespace);
                         }
                     }
                     if (StringUtils.hasLineBreak(comment.getSuffix())) {
-                        //Keep existing amount of new lines
-                        return comment.withSuffix(comment.getSuffix().substring(0, comment.getSuffix().lastIndexOf("\n") + 1));
+                        // Preserve existing whitespace including indentation
+                        return comment;
                     }
                     //Reduce to single new line
                     return comment.withSuffix(whitespace);
@@ -646,7 +649,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         }
     }
 
-    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

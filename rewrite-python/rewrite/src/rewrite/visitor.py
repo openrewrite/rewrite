@@ -45,7 +45,7 @@ class Cursor:
     def first_enclosing_or_throw(self, type: Type[P]) -> P:
         result = self.first_enclosing(type)
         if result is None:
-            raise ValueError(f"Expected to find enclosing {T.__name__}")
+            raise ValueError(f"Expected to find enclosing {type.__name__}")
         return result
 
     def first_enclosing(self, type_: Type[P]) -> Optional[P]:
@@ -146,7 +146,7 @@ class TreeVisitor(ABC, Generic[T, P]):
                     if t is not None:
                         t = self.post_visit(t, p)
 
-            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter; ty#1379
+            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter (ty#628)
 
             if top_level:
                 if t is not None and self._after_visit is not None:
@@ -175,9 +175,10 @@ class TreeVisitor(ABC, Generic[T, P]):
     def visit_markers(self, markers: Markers, p: P) -> Markers:
         if markers is None or markers is Markers.EMPTY:
             return Markers.EMPTY
-        elif len(markers.markers) == 0:
+        ms = markers._markers  # bypass @property in hot path
+        if len(ms) == 0:
             return markers
-        return markers.replace(markers=list_map(lambda m: self.visit_marker(m, p), markers.markers))
+        return markers.replace(markers=list_map(lambda m: self.visit_marker(m, p), ms))
 
     def visit_marker(self, marker: Marker, p: P) -> Marker:
         return marker

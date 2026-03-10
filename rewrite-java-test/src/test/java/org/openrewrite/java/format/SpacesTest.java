@@ -5072,7 +5072,8 @@ class SpacesTest implements RewriteTest {
                     return o instanceof String;
                 }
             }
-            """)
+            """
+          )
         );
     }
 
@@ -5106,7 +5107,8 @@ class SpacesTest implements RewriteTest {
                     return false;
                 }
             }
-            """)
+            """
+          )
         );
     }
 
@@ -5136,7 +5138,8 @@ class SpacesTest implements RewriteTest {
                     else return false;
                 }
             }
-            """)
+            """
+          )
         );
     }
 
@@ -5168,7 +5171,8 @@ class SpacesTest implements RewriteTest {
                     return false;
                 }
             }
-            """)
+            """
+          )
         );
     }
 
@@ -5195,7 +5199,8 @@ class SpacesTest implements RewriteTest {
                     return false;
                 }
             }
-            """)
+            """
+          )
         );
     }
 

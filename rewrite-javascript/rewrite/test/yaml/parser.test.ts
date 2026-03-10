@@ -485,6 +485,17 @@ describe('Flow mappings without colons (OmitColon marker)', () => {
     });
 });
 
+describe('Anchors on sequence entries', () => {
+
+    test('anchor on mapping in sequence entry', async () => {
+        const yaml = `- k: v
+- &b
+  k2: v2`;
+        const result = await parseAndPrint(yaml);
+        expect(result).toBe(yaml);
+    });
+});
+
 describe('Single-brace template syntax', () => {
 
     test('quoted single-brace templates roundtrip', async () => {

@@ -2,6 +2,8 @@
 
 import com.github.gradle.node.NodeExtension
 import com.github.gradle.node.npm.task.NpmTask
+import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -53,25 +55,18 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-// Generate a timestamped version for CI builds, or use the regular version for local development
-val datedSnapshotVersion = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "SNAPSHOT",
-        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-    )
+// Read the version from the version.txt written on disk by a prior build, or generate a fresh
+// timestamped version. This ensures the second Gradle invocation (`snapshot publish`) publishes
+// the same version that the first invocation (`build`) baked into the JAR.
+val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
+val datedSnapshotVersion: String = if (System.getenv("CI") != null) {
+    versionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+        ?: project.version.toString().replace(
+            "SNAPSHOT",
+            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+        )
 } else {
     project.version.toString()
-}
-
-// Helper function to extract version from the JAR if it exists
-fun extractVersionFromJar(): String? {
-    val jarTask = tasks.named("jar", Jar::class).get()
-    val jarFile = jarTask.archiveFile.get().asFile
-    if (!jarFile.exists()) return null
-
-    return zipTree(jarFile).matching {
-        include("META-INF/version.txt")
-    }.singleFile.readText().trim()
 }
 
 val npmVersion = tasks.register<NpmTask>("npmVersion") {
@@ -87,9 +82,7 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
         }
     }
 
-    // Use version from JAR if available (second Gradle invocation), otherwise use generated version
-    val versionToUse = provider { extractVersionFromJar() ?: datedSnapshotVersion }
-    args = listOf("version", "--no-git-tag-version", versionToUse.get())
+    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
     workingDir = versionDir
 }
 
@@ -107,9 +100,12 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files("rewrite/build/test-results/jest/junit.xml")
+    outputs.cacheIf { true }
 
     args = listOf("run", "ci:test")
 }
+
+ImportJUnitXmlReports.register(tasks, npmTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(npmTest)
@@ -124,7 +120,7 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(file("rewrite/dist/"))
 
-    val versionTxt = file("src/main/resources/META-INF/version.txt")
+    val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
     outputs.file(versionTxt)
     doLast {
         versionTxt.writeText(datedSnapshotVersion)
@@ -133,7 +129,7 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
     args = listOf("run", "build")
 }
 
-// Because each of these sees version.txt as an input
+// Because each of these sees rewrite-javascript-version.txt as an input
 listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
     tasks.named(it) {
         dependsOn(npmBuild)
@@ -155,8 +151,7 @@ val npmPack = tasks.register<Tar>("npmPack") {
     }
 
     archiveBaseName = "openrewrite-rewrite"
-    // Use version from JAR if available (second Gradle invocation), otherwise use generated version
-    archiveVersion = provider { extractVersionFromJar() ?: datedSnapshotVersion }.get()
+    archiveVersion = datedSnapshotVersion
     compression = Compression.GZIP
     archiveExtension = "tgz"
     destinationDirectory = layout.buildDirectory.dir("distributions")
@@ -235,7 +230,7 @@ tasks.named("publish") {
 
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
-    exclude("**/version.txt")
+    exclude("**/rewrite-javascript-version.txt")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )

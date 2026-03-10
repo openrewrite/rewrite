@@ -319,7 +319,7 @@ public class Environment {
         }
 
         /**
-         * @param jar         A path to a jar file to scan.
+         * @param jar         A path to a jar file or directory containing class files to scan.
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
          * @return This builder.
          */

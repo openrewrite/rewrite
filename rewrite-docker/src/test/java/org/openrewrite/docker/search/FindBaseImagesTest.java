@@ -17,10 +17,11 @@ package org.openrewrite.docker.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.docker.Assertions;
 import org.openrewrite.docker.table.BaseImages;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.docker.Assertions.docker;
 
 class FindBaseImagesTest implements RewriteTest {
 
@@ -40,7 +41,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,,ubuntu,22.04,,
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               RUN apt-get update
@@ -64,7 +65,7 @@ class FindBaseImagesTest implements RewriteTest {
                 Dockerfile,,ubuntu,22.04,,
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               RUN apt-get update
@@ -81,7 +82,7 @@ class FindBaseImagesTest implements RewriteTest {
     void noMatchWithPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages("alpine*", null, null, null)),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               RUN apt-get update
@@ -100,7 +101,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,,ubuntu,,sha256:abc123,
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu@sha256:abc123
               RUN apt-get update
@@ -123,7 +124,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,,ubuntu,22.04,,linux/amd64
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM --platform=linux/amd64 ubuntu:22.04
               RUN apt-get update
@@ -146,7 +147,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,builder,golang,1.21,,
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
@@ -170,7 +171,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,,alpine,latest,,
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
@@ -200,7 +201,7 @@ class FindBaseImagesTest implements RewriteTest {
                 Dockerfile,,alpine,latest,,
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
@@ -229,7 +230,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,base,ubuntu,22.04,,linux/arm64
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM --platform=linux/arm64 ubuntu:22.04 AS base
               RUN apt-get update
@@ -252,7 +253,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,,ubuntu,,,
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu
               RUN apt-get update
@@ -275,7 +276,7 @@ class FindBaseImagesTest implements RewriteTest {
               Dockerfile,,"${BASE_IMAGE}","${BASE_TAG}",,
               """
           ),
-          Assertions.docker(
+          docker(
             """
               ARG BASE_IMAGE=ubuntu
               ARG BASE_TAG=22.04
@@ -303,7 +304,7 @@ class FindBaseImagesTest implements RewriteTest {
                 Dockerfile,,ubuntu,22.04,,
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               FROM ubuntu:20.04
@@ -329,7 +330,7 @@ class FindBaseImagesTest implements RewriteTest {
                 Dockerfile,,ubuntu,,sha256:abc123,
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu@sha256:abc123
               FROM alpine@sha256:def456
@@ -353,7 +354,7 @@ class FindBaseImagesTest implements RewriteTest {
                 Dockerfile,,ubuntu,22.04,,linux/arm64
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM --platform=linux/arm64 ubuntu:22.04
               FROM --platform=linux/amd64 alpine:latest
@@ -377,7 +378,7 @@ class FindBaseImagesTest implements RewriteTest {
                 Dockerfile,,ubuntu,22.04,,linux/amd64
                 """
             ),
-          Assertions.docker(
+          docker(
             """
               FROM --platform=linux/amd64 ubuntu:22.04
               FROM --platform=linux/arm64 ubuntu:22.04
@@ -398,7 +399,7 @@ class FindBaseImagesTest implements RewriteTest {
     void noMatchWithTagPattern() {
         rewriteRun(
           spec -> spec.recipe(new FindBaseImages(null, "18.*", null, null)),
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:22.04
               FROM ubuntu:20.04

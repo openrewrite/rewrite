@@ -57,8 +57,8 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         if (tree == null) {
             tree = cursor.getValue();
         }
-        List<NamedStyles> activeStyles = new ArrayList<>(styles);
-        activeStyles.addAll(cu.getMarkers().findAll(NamedStyles.class));
+        List<NamedStyles> activeStyles = new ArrayList<>(cu.getMarkers().findAll(NamedStyles.class));
+        activeStyles.addAll(styles);
 
         // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
         J t = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
@@ -69,7 +69,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
 
         // With the updated tree, overwrite the original space with the newly computed space
-        tree = new MergeSpacesVisitor(activeStyles).visit(tree, t, cursor.fork());
+        tree = new MergeSpacesVisitor(activeStyles).visitNonNull(tree, t, cursor.fork());
 
         // Then apply formatting that applies on line-endings / #lines / ...
         tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p, cursor.fork());
@@ -93,8 +93,8 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             if (!(cu instanceof J.CompilationUnit)) {
                 return cu;
             }
-            List<NamedStyles> activeStyles = new ArrayList<>(styles);
-            activeStyles.addAll(cu.getMarkers().findAll(NamedStyles.class));
+            List<NamedStyles> activeStyles = new ArrayList<>(cu.getMarkers().findAll(NamedStyles.class));
+            activeStyles.addAll(styles);
 
             // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
             JavaSourceFile t = (JavaSourceFile) new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p);
@@ -105,7 +105,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             t = (JavaSourceFile) new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
 
             // With the updated tree, overwrite the original space with the newly computed space
-            tree = new MergeSpacesVisitor(activeStyles).visit(tree, t);
+            tree = new MergeSpacesVisitor(activeStyles).visitNonNull(tree, t);
 
             // Then apply formatting that applies on line-endings / #lines / ...
             tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p);
@@ -116,10 +116,11 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 return addStyleMarker((JavaSourceFile) tree, styles);
             }
         }
+        //noinspection DataFlowIssue
         return (J) tree;
     }
 
-    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
     private static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
         if (!styles.isEmpty()) {
             Set<NamedStyles> newNamedStyles = new HashSet<>(styles);

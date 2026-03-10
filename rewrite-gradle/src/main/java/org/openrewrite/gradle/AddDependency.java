@@ -188,7 +188,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         // or when source files were scanned
         boolean hasExplicitConfiguration = !StringUtils.isBlank(configuration);
         return Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
-                Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+                Preconditions.check(new IsBuildGradle<>(true), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -202,11 +202,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (!maybeGp.isPresent()) {
                             return s;
                         }
-                        // When configuration needs to be inferred and onlyIfUsing is set, require JavaProject and source set info
-                        if (!hasExplicitConfiguration && onlyIfUsing != null) {
-                            if (!maybeJp.isPresent() ||
-                                    !acc.usingType.getOrDefault(maybeJp.get(), false) ||
-                                    !acc.configurationsByProject.containsKey(maybeJp.get())) {
+                        if (onlyIfUsing != null) {
+                            // When onlyIfUsing is set, skip projects that don't use the specified type
+                            if (!maybeJp.isPresent() || !acc.usingType.getOrDefault(maybeJp.get(), false)) {
+                                return s;
+                            }
+                            // When configuration needs to be inferred, also require source set info
+                            if (!hasExplicitConfiguration && !acc.configurationsByProject.containsKey(maybeJp.get())) {
                                 return s;
                             }
                         }

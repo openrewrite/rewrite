@@ -196,6 +196,19 @@ class SwitchTest implements RewriteTest {
     }
 
     @Test
+    void classNameWithNestedPattern() {
+        rewriteRun(
+          python(
+            """
+              match x:
+                case ClassName([1, 2]):
+                    pass
+              """
+          )
+        );
+    }
+
+    @Test
     void sequenceTarget() {
         rewriteRun(
           python(

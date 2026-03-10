@@ -27,15 +27,22 @@ import logging
 import os
 import select
 import sys
+import tempfile
+import time
 import traceback
 import threading
+
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from uuid import uuid4
 
+# Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
+# overflow the default recursion limit (1000) during RPC serialization.
+sys.setrecursionlimit(sys.getrecursionlimit() * 2)
+
 # Configure logging - log to file by default to avoid filling stderr buffer
 # (which can cause deadlock if parent process doesn't read stderr)
-_default_log_file = '/tmp/python-rpc.log'
+_default_log_file = os.path.join(tempfile.gettempdir(), 'python-rpc.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -188,12 +195,22 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     before = remote_objects.get(obj_id)
 
     # Receive and deserialize the object (applies diffs to before state)
-    obj = receiver.receive(before, q)
+    try:
+        obj = receiver.receive(before, q)
 
-    # Verify we received the complete object (END_OF_OBJECT was in the final batch)
-    # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
-    if not received_end:
-        raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
+        # After receive() completes, END_OF_OBJECT may still be pending in a
+        # separate batch (happens when data items are an exact multiple of the
+        # handler's batchSize). Drain it — analogous to Java's explicit
+        # q.take() after receive().
+        if not received_end:
+            pull_batch()
+        if not received_end:
+            raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
+    except Exception:
+        # Reset our tracking of the remote state so the next interaction
+        # forces a full object sync (ADD) instead of a delta (CHANGE).
+        remote_objects.pop(obj_id, None)
+        raise
 
     if obj is not None:
         # Update our understanding of what Java has
@@ -209,20 +226,28 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path)
+    return parse_python_source(source, path, relative_to, ty_client)
 
 
-def parse_python_source(source: str, path: str = "<unknown>") -> dict:
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
     - "2" or "2.7": Use parso-based Py2ParserVisitor for Python 2 code
     - "3" (default): Use ast-based ParserVisitor for Python 3 code
     """
+    # Compute the source_path that will be stored on the LST
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+
     try:
         from rewrite import Markers
 
@@ -233,7 +258,7 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
             try:
                 source_for_ast = source[1:] if source.startswith('\ufeff') else source
                 tree = ast.parse(source_for_ast, path)
-                cu = ParserVisitor(source, path).visit(tree)
+                cu = ParserVisitor(source, path, ty_client).visit(tree)
             except SyntaxError:
                 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
                 cu = Py2ParserVisitor(source, path, _python_version).parse()
@@ -248,29 +273,27 @@ def parse_python_source(source: str, path: str = "<unknown>") -> dict:
             tree = ast.parse(source_for_ast, path)
 
             # Convert to OpenRewrite LST
-            cu = ParserVisitor(source, path).visit(tree)
+            cu = ParserVisitor(source, path, ty_client).visit(tree)
 
-        cu = cu.replace(source_path=Path(path))
-        cu = cu.replace(markers=Markers.EMPTY)
+        cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
 
         # Store and return
         obj_id = str(cu.id)
         local_objects[obj_id] = cu
         return {
             'id': obj_id,
-            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit'
+            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit',
+            'sourcePath': str(source_path)
         }
     except ImportError as e:
-        logger.error(f"Failed to import parser: {e}")
-        traceback.print_exc()
-        return _create_parse_error(path, str(e), source)
+        logger.exception(f"Failed to import parser: {e}")
+        return _create_parse_error(str(source_path), str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
-        return _create_parse_error(path, str(e), source)
+        return _create_parse_error(str(source_path), str(e), source)
     except Exception as e:
-        logger.error(f"Error parsing {path}: {e}")
-        traceback.print_exc()
-        return _create_parse_error(path, str(e), source)
+        logger.exception(f"Error parsing {path}: {e}")
+        return _create_parse_error(str(source_path), str(e), source)
 
 
 def _create_parse_error(path: str, message: str, source: str = '') -> dict:
@@ -307,26 +330,95 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
 
     obj_id = str(parse_error.id)
     local_objects[obj_id] = parse_error
-    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
+    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
+
+
+def _infer_project_root(inputs: list) -> Optional[str]:
+    """Infer the project root from input paths.
+
+    When relativeTo is not provided, look at the input paths to find a
+    directory that contains a .venv or pyproject.toml — this is likely
+    the project root that ty-types should use.
+    """
+    for item in inputs:
+        path = None
+        if isinstance(item, str):
+            path = item
+        elif isinstance(item, dict):
+            path = item.get('sourcePath') or item.get('path')
+        if path and os.path.isabs(path):
+            parent = os.path.dirname(path)
+            # Walk up looking for a project root marker
+            for _ in range(10):
+                if os.path.isdir(os.path.join(parent, '.venv')) or \
+                   os.path.isfile(os.path.join(parent, 'pyproject.toml')):
+                    return parent
+                up = os.path.dirname(parent)
+                if up == parent:
+                    break
+                parent = up
+    return None
 
 
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
+    import tempfile
+    import shutil
+
     inputs = params.get('inputs', [])
+    relative_to = params.get('relativeTo')
     results = []
 
-    for input_item in inputs:
-        if 'path' in input_item:
-            # File input
-            result = parse_python_file(input_item['path'])
-        elif 'text' in input_item or 'source' in input_item:
-            # String input - Java sends 'text' and 'sourcePath'
-            source = input_item.get('text') or input_item.get('source')
-            path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-            result = parse_python_source(source, path)
+    # If no relativeTo provided, try to infer from absolute input paths
+    if not relative_to:
+        relative_to = _infer_project_root(inputs)
+
+    # Create a ty-types client for this parse batch
+    ty_client = None
+    tmpdir = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        if relative_to:
+            ty_client.initialize(relative_to)
         else:
-            continue
-        results.append(result['id'])
+            # For inline text inputs without a project root, create a temp directory
+            # so ty-types can still provide type attribution
+            tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
+            ty_client.initialize(tmpdir)
+    except (ImportError, RuntimeError):
+        ty_client = None  # ty-types not available
+
+    try:
+        for i, input_item in enumerate(inputs):
+            if isinstance(input_item, str):
+                result = parse_python_file(input_item, relative_to, ty_client)
+            elif 'path' in input_item:
+                result = parse_python_file(input_item['path'], relative_to, ty_client)
+            elif 'text' in input_item or 'source' in input_item:
+                source = input_item.get('text') or input_item.get('source')
+                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
+                # For relative paths, write the source under the project root
+                # (tmpdir or relative_to) so ty-types can resolve imports from
+                # the project's .venv and dependencies.
+                base_dir = tmpdir or relative_to
+                if base_dir and not os.path.isabs(path):
+                    disk_path = os.path.join(base_dir, path)
+                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                    with open(disk_path, 'w', encoding='utf-8') as f:
+                        f.write(source)
+                    result = parse_python_source(source, disk_path, base_dir, ty_client)
+                else:
+                    result = parse_python_source(source, path, relative_to, ty_client)
+            else:
+                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
+                continue
+            results.append(result['id'])
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
+        if tmpdir is not None:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
     return results
 
@@ -336,23 +428,34 @@ def handle_parse_project(params: dict) -> List[dict]:
     import fnmatch
 
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info'])
-    relative_to = params.get('relativeTo')
+    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
+    relative_to = params.get('relativeTo') or project_path
 
     results = []
 
-    for root, dirs, files in os.walk(project_path):
-        # Filter out excluded directories
-        dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+    ty_client = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        ty_client.initialize(project_path)
+    except (ImportError, RuntimeError):
+        pass
 
-        for file in files:
-            if file.endswith('.py'):
-                path = os.path.join(root, file)
-                try:
-                    result = parse_python_file(path)
-                    results.append(result)
-                except Exception as e:
-                    logger.error(f"Error parsing {path}: {e}")
+    try:
+        for root, dirs, files in os.walk(project_path):
+            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+
+            for file in files:
+                if file.endswith('.py'):
+                    path = os.path.join(root, file)
+                    try:
+                        result = parse_python_file(path, relative_to, ty_client)
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(f"Error parsing {path}: {e}")
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
 
     return results
 
@@ -372,7 +475,7 @@ def handle_get_object(params: dict) -> List[dict]:
     if obj_id is None:
         return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
     obj = local_objects.get(obj_id)
-    logger.info(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
+    logger.debug(f"handle_get_object: id={obj_id}, type={type(obj).__name__ if obj else 'None'}")
 
     if obj is None:
         return [
@@ -388,19 +491,15 @@ def handle_get_object(params: dict) -> List[dict]:
 
         q = RpcSendQueue(source_file_type)
         result = q.generate(obj, before)
-        logger.debug(f"GetObject result: {len(result)} items")
-        for i, item in enumerate(result[:10]):  # Log first 10 items
-            logger.debug(f"  [{i}] {item}")
 
         # Update remote_objects to track that Java now has this version
         remote_objects[obj_id] = obj
 
         return result
 
-    except Exception as e:
-        logger.error(f"Error serializing object: {e}")
-        import traceback as tb
-        tb.print_exc()
+    except BaseException as e:
+        source_path = getattr(obj, 'source_path', None)
+        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
 
 
@@ -435,7 +534,7 @@ def handle_print(params: dict) -> str:
     obj_id = params.get('treeId') or params.get('id')
     source_file_type = params.get('sourceFileType')
 
-    logger.info(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
+    logger.debug(f"handle_print: treeId={obj_id}, sourceFileType={source_file_type}")
 
     if obj_id is None:
         logger.warning("No treeId or id provided")
@@ -477,13 +576,6 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
-
-    # Reset TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -544,7 +636,7 @@ def handle_install_recipes(params: dict) -> dict:
         # For local paths, we look for the package name from setup.py/pyproject.toml
         package_name = _find_package_name(local_path)
         if package_name:
-            _import_and_activate_package(package_name, marketplace)
+            _import_and_activate_package(package_name, marketplace, local_path)
 
     elif isinstance(recipes, dict):
         # Package spec with name and optional version - package should already be installed
@@ -575,6 +667,43 @@ def handle_install_recipes(params: dict) -> dict:
         'recipesInstalled': recipes_installed,
         'version': installed_version
     }
+
+
+def _add_source_to_path(local_path: Path) -> None:
+    """Add the package source directory to sys.path so it can be imported.
+
+    Reads [tool.setuptools.packages.find] 'where' from pyproject.toml to
+    determine the source directory. Falls back to adding the local_path itself.
+    """
+    import sys
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ModuleNotFoundError:
+            src_dir = str(local_path)
+            if src_dir not in sys.path:
+                sys.path.insert(0, src_dir)
+            return
+
+    source_dir = local_path
+    pyproject_path = local_path / 'pyproject.toml'
+    if pyproject_path.exists():
+        try:
+            with open(pyproject_path, 'rb') as f:
+                data = tomllib.load(f)
+                where = (data.get('tool', {}).get('setuptools', {})
+                         .get('packages', {}).get('find', {}).get('where'))
+                if where and isinstance(where, list) and len(where) > 0:
+                    source_dir = local_path / where[0]
+        except Exception as e:
+            logger.warning(f"Failed to read source layout from pyproject.toml: {e}")
+
+    src_str = str(source_dir)
+    if src_str not in sys.path:
+        logger.info(f"Adding to sys.path: {src_str}")
+        sys.path.insert(0, src_str)
 
 
 def _find_package_name(local_path: Path) -> Optional[str]:
@@ -619,7 +748,7 @@ def _find_package_name(local_path: Path) -> Optional[str]:
     return None
 
 
-def _import_and_activate_package(package_name: str, marketplace):
+def _import_and_activate_package(package_name: str, marketplace, local_path: Optional[Path] = None):
     """Import a package and call its activate function using entry points.
 
     Uses importlib.metadata to discover entry points registered under
@@ -627,6 +756,10 @@ def _import_and_activate_package(package_name: str, marketplace):
     Since matching package names to entry points is unreliable (hyphens vs
     underscores, different naming conventions), we activate ALL entry points
     but the marketplace handles deduplication.
+
+    If entry points aren't found (e.g., package not pip-installed) and a
+    local_path is provided, the source directory is added to sys.path
+    as a fallback so the module can be imported directly.
     """
     from importlib.metadata import entry_points
 
@@ -670,6 +803,10 @@ def _import_and_activate_package(package_name: str, marketplace):
 
     if not activated:
         # Fallback: try direct module import (for packages without entry points)
+        # If a local path was provided, add its source directory to sys.path
+        if local_path is not None:
+            _add_source_to_path(local_path)
+
         import importlib
         module_name = package_name.replace('-', '_')
         try:
@@ -815,7 +952,7 @@ def handle_prepare_recipe(params: dict) -> dict:
         _data_table_output_dir = params['dataTableOutputDir']
         logger.info(f"Data table output directory set to: {_data_table_output_dir}")
 
-    logger.info(f"PrepareRecipe: id={recipe_name}, options={options}")
+    logger.debug(f"PrepareRecipe: id={recipe_name}, options={options}")
 
     marketplace = _get_marketplace()
 
@@ -854,7 +991,7 @@ def handle_prepare_recipe(params: dict) -> dict:
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
 
-    logger.info(f"PrepareRecipe response: {response}")
+    logger.debug(f"PrepareRecipe response: {response}")
     return response
 
 
@@ -892,7 +1029,7 @@ def handle_visit(params: dict) -> dict:
     if tree_id is None:
         raise ValueError("'treeId' is required")
 
-    logger.info(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
+    logger.debug(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
 
     # Get or create execution context
     if p_id and p_id in _execution_contexts:
@@ -909,10 +1046,9 @@ def handle_visit(params: dict) -> dict:
         if p_id:
             _execution_contexts[p_id] = ctx
 
-    # Get the tree - fetch from Java if we don't have it locally
-    tree = local_objects.get(tree_id)
-    if tree is None:
-        tree = get_object_from_java(tree_id, source_file_type)
+    # Always fetch the tree from Java to ensure we have the latest version.
+    # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
+    tree = get_object_from_java(tree_id, source_file_type)
 
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
@@ -943,7 +1079,7 @@ def handle_visit(params: dict) -> dict:
     else:
         modified = False
 
-    logger.info(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
+    logger.debug(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
     return {'modified': modified}
 
 
@@ -1025,7 +1161,7 @@ def handle_generate(params: dict) -> dict:
     if recipe_id is None:
         raise ValueError("'id' is required")
 
-    logger.info(f"Generate: id={recipe_id}, p={p_id}")
+    logger.debug(f"Generate: id={recipe_id}, p={p_id}")
 
     recipe = _prepared_recipes.get(recipe_id)
     if recipe is None:
@@ -1095,11 +1231,73 @@ def handle_request(method: str, params: dict) -> Any:
         raise ValueError(f"Unknown method: {method}")
 
 
+class _StdinBuffer:
+    """Buffered reader for raw stdin file descriptor.
+
+    Reads in chunks to reduce syscall overhead.  A single module-level
+    instance is shared by read_message() and read_message_with_timeout().
+    """
+
+    _CHUNK_SIZE = 8192
+
+    def __init__(self):
+        self._fd: Optional[int] = None
+        self._buf = bytearray()
+
+    def _get_fd(self) -> int:
+        fd = self._fd
+        if fd is None:
+            fd = sys.stdin.fileno()
+            self._fd = fd
+        return fd
+
+    def read_line(self, deadline: Optional[float] = None) -> Optional[bytes]:
+        """Read until ``\\n``.  Returns the line including the newline,
+        or ``None`` on EOF/timeout."""
+        while True:
+            idx = self._buf.find(b'\n')
+            if idx >= 0:
+                line = bytes(self._buf[:idx + 1])
+                del self._buf[:idx + 1]
+                return line
+            if not self._fill(deadline):
+                return None
+
+    def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
+        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout."""
+        while len(self._buf) < n:
+            if not self._fill(deadline):
+                return None
+        result = bytes(self._buf[:n])
+        del self._buf[:n]
+        return result
+
+    def _fill(self, deadline: Optional[float] = None) -> bool:
+        """Read more data into the internal buffer.
+
+        When *deadline* is set, uses ``select()`` to respect the timeout;
+        otherwise blocks in ``os.read()``.  Returns ``False`` on
+        EOF or timeout.
+        """
+        if deadline is not None:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return False
+            readable, _, _ = select.select([self._get_fd()], [], [], remaining)
+            if not readable:
+                return False
+        chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
+        if not chunk:
+            return False
+        self._buf += chunk
+        return True
+
+
+_stdin_buffer = _StdinBuffer()
+
+
 def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
     """Read a JSON-RPC message from stdin with timeout.
-
-    Uses select() on the raw file descriptor and unbuffered binary I/O
-    to avoid issues with Python's buffered TextIOWrapper.
 
     Args:
         timeout_seconds: Maximum time to wait for complete message
@@ -1107,54 +1305,11 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
     Returns:
         Parsed JSON message, or None on timeout/error
     """
-    import time
-    import os
-    start_time = time.time()
-    fd = sys.stdin.fileno()
-
-    def remaining_timeout() -> float:
-        elapsed = time.time() - start_time
-        return max(0, timeout_seconds - elapsed)
-
-    def read_bytes_with_timeout(n: int) -> Optional[bytes]:
-        """Read exactly n bytes from stdin fd with timeout."""
-        result = []
-        remaining = n
-        while remaining > 0:
-            timeout = remaining_timeout()
-            if timeout <= 0:
-                return None
-            readable, _, _ = select.select([fd], [], [], timeout)
-            if not readable:
-                return None
-            chunk = os.read(fd, remaining)
-            if not chunk:
-                return None  # EOF
-            result.append(chunk)
-            remaining -= len(chunk)
-        return b''.join(result)
-
-    def read_line_with_timeout() -> Optional[bytes]:
-        """Read a line (up to \n) from stdin fd with timeout."""
-        result = []
-        while True:
-            timeout = remaining_timeout()
-            if timeout <= 0:
-                return None
-            readable, _, _ = select.select([fd], [], [], timeout)
-            if not readable:
-                return None
-            byte = os.read(fd, 1)
-            if not byte:
-                return None  # EOF
-            result.append(byte)
-            if byte == b'\n':
-                break
-        return b''.join(result)
+    deadline = time.time() + timeout_seconds
 
     try:
         # Read Content-Length header
-        header_line = read_line_with_timeout()
+        header_line = _stdin_buffer.read_line(deadline)
         if not header_line:
             logger.warning(f"Timeout waiting for RPC response header after {timeout_seconds}s")
             return None
@@ -1167,13 +1322,13 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
         content_length = int(header_str.split(':')[1].strip())
 
         # Read empty line (separator)
-        separator = read_line_with_timeout()
+        separator = _stdin_buffer.read_line(deadline)
         if separator is None:
             logger.warning(f"Timeout waiting for header separator")
             return None
 
         # Read content
-        content_bytes = read_bytes_with_timeout(content_length)
+        content_bytes = _stdin_buffer.read_bytes(content_length, deadline)
         if content_bytes is None:
             logger.warning(f"Timeout waiting for message content")
             return None
@@ -1185,41 +1340,10 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
 
 
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin (blocking, no timeout).
-
-    Uses unbuffered binary I/O (os.read) to be consistent with
-    read_message_with_timeout() and avoid buffering conflicts.
-    """
-    import os
-    fd = sys.stdin.fileno()
-
-    def read_line() -> Optional[bytes]:
-        """Read a line (up to \n) from stdin fd."""
-        result = []
-        while True:
-            byte = os.read(fd, 1)
-            if not byte:
-                return None  # EOF
-            result.append(byte)
-            if byte == b'\n':
-                break
-        return b''.join(result)
-
-    def read_bytes(n: int) -> Optional[bytes]:
-        """Read exactly n bytes from stdin fd."""
-        result = []
-        remaining = n
-        while remaining > 0:
-            chunk = os.read(fd, remaining)
-            if not chunk:
-                return None  # EOF
-            result.append(chunk)
-            remaining -= len(chunk)
-        return b''.join(result)
-
+    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
     try:
         # Read Content-Length header
-        header_line = read_line()
+        header_line = _stdin_buffer.read_line()
         if not header_line:
             return None
 
@@ -1231,10 +1355,10 @@ def read_message() -> Optional[dict]:
         content_length = int(header_str.split(':')[1].strip())
 
         # Read empty line (separator)
-        read_line()
+        _stdin_buffer.read_line()
 
         # Read content
-        content_bytes = read_bytes(content_length)
+        content_bytes = _stdin_buffer.read_bytes(content_length)
         if not content_bytes:
             return None
         return json.loads(content_bytes.decode('utf-8'))
@@ -1244,14 +1368,15 @@ def read_message() -> Optional[dict]:
 
 
 def write_message(response: dict):
-    """Write a JSON-RPC message to stdout."""
-    content = json.dumps(response)
-    content_bytes = content.encode('utf-8')
+    """Write a JSON-RPC message to stdout.
 
-    sys.stdout.write(f"Content-Length: {len(content_bytes)}\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.write(content)
-    sys.stdout.flush()
+    Uses unbuffered binary I/O to avoid line-ending translation on Windows
+    that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
+    used by read_message() which uses os.read() on the read side.
+    """
+    content_bytes = json.dumps(response).encode('utf-8')
+    header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
+    os.write(sys.stdout.fileno(), header + content_bytes)
 
 
 def main():
@@ -1300,8 +1425,7 @@ def main():
                     'result': result
                 }
             except Exception as e:
-                logger.error(f"Error handling request: {e}")
-                traceback.print_exc()
+                logger.exception(f"Error handling request: {e}")
                 # Include full stack trace in error response for debugging
                 tb_str = traceback.format_exc()
                 response = {
@@ -1320,16 +1444,10 @@ def main():
             write_message(response)
 
         except Exception as e:
-            logger.error(f"Fatal error: {e}")
-            traceback.print_exc()
+            logger.exception(f"Fatal error: {e}")
             break
 
-    # Shutdown TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
+    # No ty-types cleanup needed here — clients are scoped per parse batch
 
     logger.info("Python RPC server shutting down...")
 

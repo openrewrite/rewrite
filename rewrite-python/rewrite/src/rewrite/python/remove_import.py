@@ -15,13 +15,12 @@
 """RemoveImport visitor for Python import handling."""
 
 from dataclasses import dataclass
-from typing import List, Optional, Set
-from uuid import uuid4
+from typing import Optional, Set
 
 from rewrite.java import J
 from rewrite.java.support_types import JContainer, JRightPadded
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Space
-from rewrite.markers import Markers
+from rewrite.java.tree import Identifier, Import, MethodDeclaration, Space
+from rewrite.python.import_utils import get_qualid_name, get_name_string
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -111,15 +110,29 @@ class RemoveImport(PythonVisitor):
                 super().__init__()
                 self.in_import = False
 
+            def visit_import(self, import_: Import, p) -> J:
+                # Don't collect identifiers from standalone import statements
+                self.in_import = True
+                try:
+                    return super().visit_import(import_, p)
+                finally:
+                    self.in_import = False
+
             def visit_multi_import(self, multi: MultiImport, p) -> J:
                 # Don't collect identifiers from import statements
                 self.in_import = True
-                result = super().visit_multi_import(multi, p)
-                self.in_import = False
-                return result
+                try:
+                    return super().visit_multi_import(multi, p)
+                finally:
+                    self.in_import = False
 
             def visit_identifier(self, ident: Identifier, p) -> J:
                 if not self.in_import:
+                    # Inside a function scope, identifiers with field_type are
+                    # local variables (shadowing the import), not actual uses.
+                    if self.cursor.first_enclosing(MethodDeclaration) is not None:
+                        if ident.field_type is not None:
+                            return ident
                     used.add(ident.simple_name)
                 return ident
 
@@ -135,6 +148,20 @@ class RemoveImport(PythonVisitor):
 
         for padded in cu.padding.statements:
             stmt = padded.element
+            if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
+                result = self._process_single_import(stmt)
+                if result is None:
+                    removed_prefix = stmt.prefix
+                    changed = True
+                else:
+                    if removed_prefix is not None:
+                        padded = JRightPadded(
+                            padded.element.replace(prefix=removed_prefix),
+                            padded.after, padded.markers
+                        )
+                        removed_prefix = None
+                    new_padded_stmts.append(padded)
+                continue
             if isinstance(stmt, MultiImport):
                 result = self._process_multi_import(stmt)
                 if result is None:
@@ -142,11 +169,17 @@ class RemoveImport(PythonVisitor):
                     # so the next statement can inherit it if needed
                     removed_prefix = stmt.prefix
                     changed = True
-                elif result is not stmt:
-                    # Statement was modified — preserve padding
-                    new_padded_stmts.append(JRightPadded(result, padded.after, padded.markers))
-                    changed = True
                 else:
+                    if result is not stmt:
+                        padded = JRightPadded(result, padded.after, padded.markers)
+                        changed = True
+                    # Transfer removed statement's prefix to this statement
+                    if removed_prefix is not None:
+                        padded = JRightPadded(
+                            padded.element.replace(prefix=removed_prefix),
+                            padded.after, padded.markers
+                        )
+                        removed_prefix = None
                     new_padded_stmts.append(padded)
             else:
                 # Transfer removed statement's prefix to the next statement
@@ -163,6 +196,15 @@ class RemoveImport(PythonVisitor):
             return cu.padding.replace(_statements=new_padded_stmts)
         return cu
 
+    def _process_single_import(self, imp: Import) -> Optional[Import]:
+        """Process a standalone J.Import. Return None to remove, or the original."""
+        if self.name is not None:
+            return imp
+        name = get_qualid_name(imp.qualid)
+        if name == self.module:
+            return None
+        return imp
+
     def _process_multi_import(self, multi: MultiImport) -> Optional[MultiImport]:
         """Process a MultiImport and return None to remove, modified, or original."""
         if self.name is None:
@@ -176,11 +218,11 @@ class RemoveImport(PythonVisitor):
         """Remove an entire module import (import X or from X import *)."""
         if multi.from_ is not None:
             # This is a "from X import Y" statement
-            from_name = self._get_name_string(multi.from_)
+            from_name = get_name_string(multi.from_)
             if from_name == self.module:
                 # Check if removing all names or just star import
                 if len(multi.names) == 1:
-                    name = self._get_qualid_name(multi.names[0].qualid)
+                    name = get_qualid_name(multi.names[0].qualid)
                     if name == '*':
                         return None  # Remove "from X import *"
                 # For "from X import a, b, c", only remove if we want to remove all
@@ -190,7 +232,7 @@ class RemoveImport(PythonVisitor):
             existing_padded = multi.padding.names.padding.elements
             new_padded = []
             for padded_imp in existing_padded:
-                name = self._get_qualid_name(padded_imp.element.qualid)
+                name = get_qualid_name(padded_imp.element.qualid)
                 if name != self.module:
                     new_padded.append(padded_imp)
 
@@ -222,7 +264,7 @@ class RemoveImport(PythonVisitor):
         if multi.from_ is None:
             return multi  # Not a "from" import
 
-        from_name = self._get_name_string(multi.from_)
+        from_name = get_name_string(multi.from_)
         if from_name != self.module:
             return multi  # Different module
 
@@ -230,7 +272,7 @@ class RemoveImport(PythonVisitor):
         existing_padded = multi.padding.names.padding.elements
         new_padded = []
         for padded_imp in existing_padded:
-            name = self._get_qualid_name(padded_imp.element.qualid)
+            name = get_qualid_name(padded_imp.element.qualid)
             if name != self.name:
                 new_padded.append(padded_imp)
 
@@ -258,40 +300,3 @@ class RemoveImport(PythonVisitor):
 
         return multi
 
-    def _get_qualid_name(self, qualid) -> str:
-        """Get the string representation of a qualified name."""
-        if isinstance(qualid, Identifier):
-            return qualid.simple_name
-        elif isinstance(qualid, FieldAccess):
-            target = self._get_name_string(qualid.target)
-            name = qualid.name.simple_name
-            if target:
-                return f"{target}.{name}"
-            return name
-        return ""
-
-    def _get_name_string(self, name) -> str:
-        """Get string from a NameTree."""
-        if isinstance(name, Identifier):
-            return name.simple_name
-        elif isinstance(name, FieldAccess):
-            target = self._get_name_string(name.target)
-            if target:
-                return f"{target}.{name.name.simple_name}"
-            return name.name.simple_name
-        elif isinstance(name, Empty):
-            return ""
-        return str(name) if name else ""
-
-    def _get_alias_name(self, imp: Import) -> Optional[str]:
-        """Get the alias name from an Import, or None if no alias."""
-        if imp.alias is None:
-            return None
-        alias = imp.alias
-        if isinstance(alias, Identifier):
-            return alias.simple_name
-        return None
-
-    def _pad_right(self, elem) -> JRightPadded:
-        """Wrap an element in a JRightPadded."""
-        return JRightPadded(elem, Space.EMPTY, Markers.EMPTY)

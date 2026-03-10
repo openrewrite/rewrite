@@ -18,10 +18,10 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
@@ -79,16 +79,9 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
-        assertThatExceptionOfType(AssertionError.class)
-          .isThrownBy(() -> rewriteRun(
-            spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
-              "javax.activation",
-              "javax.activation-api",
-              "javax.activation",
-              "javax.activation-api",
-              null
-            ))
-          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+        ChangeManagedDependencyGroupIdAndArtifactId recipe = new ChangeManagedDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", "javax.activation-api", null);
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("newGroupId OR newArtifactId must be different from before");
     }
 
     @Test
@@ -625,6 +618,89 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <artifactId>spring-cloud-starter-sleuth</artifactId>
                       </dependency>
                   </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void globArtifactIdRetainedWhenNewArtifactIdIsNull() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-*",
+            "io.swagger.core.v3",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <swagger.version>1.5.16</swagger.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.swagger</groupId>
+                              <artifactId>swagger-annotations</artifactId>
+                              <version>${swagger.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <swagger.version>1.5.16</swagger.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.swagger.core.v3</groupId>
+                              <artifactId>swagger-annotations</artifactId>
+                              <version>${swagger.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotChangeManagedDependencyWithImplicitlyDefinedVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+            "org.junit.jupiter", "junit-jupiter-api",
+            "org.junit.jupiter", "junit-jupiter-engine",
+            "5.x", null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>5.7.2</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>${project.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
               </project>
               """
           )

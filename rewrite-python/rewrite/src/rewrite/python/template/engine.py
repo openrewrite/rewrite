@@ -17,9 +17,11 @@
 from __future__ import annotations
 
 import ast
+import os
 import textwrap
+from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
@@ -39,8 +41,25 @@ WRAPPER_FUNCTION_NAME = "__WRAPPER__"
 
 @dataclass(frozen=True)
 class TemplateOptions:
-    """Configuration options for template parsing."""
+    """Configuration options for template parsing.
+
+    Attributes:
+        imports: Deprecated — use ``context`` instead.  Import statements
+            prepended to the template code for parsing.  Kept for backward
+            compatibility; new code should pass import strings via ``context``.
+        context: Arbitrary statements (imports, assignments, type aliases, …)
+            prepended to the template code before parsing.  This is the
+            preferred way to supply any setup code the template needs.
+        dependencies: PyPI ``(package, version)`` pairs (use explicit
+            operators like ``">=2.31.0"``; bare versions default to ``>=``).  When set, the
+            template is parsed inside a cached virtualenv that has these
+            packages installed, enabling type attribution.
+        context_sensitive: Whether the template requires cursor context
+            for correct parsing.
+    """
     imports: Tuple[str, ...] = ()
+    context: Tuple[str, ...] = ()
+    dependencies: Tuple[Tuple[str, str], ...] = ()
     context_sensitive: bool = False
 
 
@@ -49,15 +68,15 @@ class TemplateEngine:
     Core engine for parsing and processing templates.
 
     Handles:
-    - Placeholder substitution: {name} -> __placeholder_name__
+    - Placeholder substitution: {name} -> __plh_name__
     - Wrapper generation: def __WRAPPER__(): <template>
     - AST parsing via ParserVisitor
     - Tree extraction from wrapper
     - LRU caching for parsed templates
     """
 
-    # Global template cache (code -> parsed tree)
-    _cache: Dict[str, J] = {}
+    # Global template cache (code -> parsed tree), LRU eviction
+    _cache: OrderedDict[str, J] = OrderedDict()
     _cache_max_size: int = 100
 
     @classmethod
@@ -87,8 +106,9 @@ class TemplateEngine:
         # Create cache key
         cache_key = cls._make_cache_key(code, captures, options)
 
-        # Check cache
+        # Check cache (move to end for LRU)
         if cache_key in cls._cache:
+            cls._cache.move_to_end(cache_key)
             return cls._cache[cache_key]
 
         # Substitute placeholders
@@ -100,14 +120,15 @@ class TemplateEngine:
 
         # Generate wrapper and parse
         wrapper_code = cls._generate_wrapper(substituted_code, options)
-        compilation_unit = cls._parse_code(wrapper_code)
+        compilation_unit = cls._parse_code(wrapper_code, options)
 
         # Extract template content from wrapper
         extracted = cls._extract_from_wrapper(compilation_unit, is_expression)
 
-        # Cache and return
-        if len(cls._cache) < cls._cache_max_size:
-            cls._cache[cache_key] = extracted
+        # Cache with LRU eviction
+        cls._cache[cache_key] = extracted
+        if len(cls._cache) > cls._cache_max_size:
+            cls._cache.popitem(last=False)
 
         return extracted
 
@@ -115,9 +136,7 @@ class TemplateEngine:
     def apply_substitutions(
         cls,
         template_tree: J,
-        values: Dict[str, J],
-        cursor: 'Cursor',
-        coordinates: Optional[PythonCoordinates] = None
+        values: Dict[str, 'Union[J, list]'],
     ) -> Optional[J]:
         """
         Substitute placeholder identifiers with actual values.
@@ -125,8 +144,7 @@ class TemplateEngine:
         Args:
             template_tree: The parsed template AST.
             values: Dict mapping capture names to their AST values.
-            cursor: Current cursor position.
-            coordinates: Where/how to apply the template.
+                Variadic captures map to List[J].
 
         Returns:
             The template with placeholders replaced by actual values.
@@ -135,13 +153,7 @@ class TemplateEngine:
 
         # Replace placeholders with actual values
         visitor = PlaceholderReplacementVisitor(values)
-        result = visitor.visit(template_tree, None)
-
-        # Apply coordinates (wrap in statement if needed, etc.)
-        if coordinates and result is not None:
-            result = cls._apply_coordinates(result, cursor, coordinates)
-
-        return result
+        return visitor.visit(template_tree, None)
 
     @classmethod
     def _make_cache_key(
@@ -153,7 +165,11 @@ class TemplateEngine:
         """Generate a cache key from template components."""
         capture_names = ",".join(sorted(captures.keys()))
         imports_key = ",".join(sorted(options.imports))
-        return f"{code}::{capture_names}::{imports_key}"
+        context_key = ",".join(options.context)  # preserve order: context is order-dependent
+        deps_key = ",".join(
+            f"{pkg}=={ver}" for pkg, ver in sorted(options.dependencies)
+        )
+        return f"{code}::{capture_names}::{imports_key}::{context_key}::{deps_key}"
 
     @classmethod
     def _generate_wrapper(cls, code: str, options: TemplateOptions) -> str:
@@ -169,9 +185,13 @@ class TemplateEngine:
         """
         lines: List[str] = []
 
-        # Add imports
+        # Add imports (backward-compat shorthand)
         for imp in options.imports:
             lines.append(imp)
+
+        # Add context statements (general-purpose, may include imports or other code)
+        for ctx in options.context:
+            lines.append(ctx)
 
         # Dedent the code to handle indented template strings
         dedented = textwrap.dedent(code).strip()
@@ -204,12 +224,18 @@ class TemplateEngine:
             return False
 
     @classmethod
-    def _parse_code(cls, code: str) -> 'CompilationUnit':
+    def _parse_code(cls, code: str, options: Optional[TemplateOptions] = None) -> 'CompilationUnit':
         """
         Parse Python code into an LST CompilationUnit.
 
+        Always attempts type attribution via ``TyTypesClient``.  When
+        *options* specifies dependencies, a cached virtualenv workspace is
+        used; otherwise a temporary directory suffices (enough for stdlib
+        and already-installed packages).
+
         Args:
             code: Python source code.
+            options: Optional template options (for dependency-aware parsing).
 
         Returns:
             CompilationUnit LST node.
@@ -217,8 +243,50 @@ class TemplateEngine:
         from rewrite.python._parser_visitor import ParserVisitor
 
         tree = ast.parse(code)
-        visitor = ParserVisitor(code)
-        return visitor.visit(tree)
+
+        ty_client = None
+        tmp_file = None
+        owns_workspace = False
+        workspace = None
+        try:
+            try:
+                import tempfile as _tmpmod
+                from rewrite.python.ty_client import TyTypesClient
+
+                if options and options.dependencies:
+                    from .dependency_workspace import DependencyWorkspace
+                    workspace = DependencyWorkspace.get_or_create(options.dependencies)
+                else:
+                    workspace = _tmpmod.mkdtemp()
+                    owns_workspace = True
+
+                ty_client = TyTypesClient()
+                ty_client.initialize(workspace)
+
+                # ty needs a real file path for type resolution
+                fd, tmp_file = _tmpmod.mkstemp(suffix=".py", dir=workspace)
+                try:
+                    os.write(fd, code.encode())
+                finally:
+                    os.close(fd)
+            except (ImportError, RuntimeError):
+                # ty-types not available — parse without type attribution
+                ty_client = None
+                tmp_file = None
+
+            visitor = ParserVisitor(code, file_path=tmp_file, ty_client=ty_client)
+            return visitor.visit(tree)
+        finally:
+            if ty_client is not None:
+                ty_client.shutdown()
+            if tmp_file:
+                try:
+                    os.unlink(tmp_file)
+                except OSError:
+                    pass
+            if owns_workspace and workspace is not None:
+                import shutil
+                shutil.rmtree(workspace, ignore_errors=True)
 
     @classmethod
     def _extract_from_wrapper(cls, cu: 'CompilationUnit', is_expression: bool) -> J:
@@ -286,7 +354,7 @@ class TemplateEngine:
         return statements[0]
 
     @classmethod
-    def _apply_coordinates(
+    def apply_coordinates(
         cls,
         result: J,
         cursor: 'Cursor',
@@ -313,7 +381,7 @@ class TemplateEngine:
             original = coordinates.tree
             if hasattr(original, 'prefix') and hasattr(result, 'prefix'):
                 # Replace the prefix to match original
-                result = result.replace(prefix=original.prefix)  # ty: ignore[unresolved-attribute]
+                result = result.replace(prefix=original.prefix)
 
         # Check if we need to wrap expression in statement
         # This happens when inserting an expression where a statement is expected
@@ -324,6 +392,18 @@ class TemplateEngine:
                 random_id(),
                 result,
             )
+
+        # Auto-format the result
+        try:
+            from ..format import maybe_auto_format
+            original = coordinates.tree
+            result = maybe_auto_format(
+                original, result, None, None,
+                cursor.parent if cursor.parent is not None else None
+            )
+        except (ValueError, AttributeError):
+            # No CompilationUnit in cursor ancestry — skip formatting
+            pass
 
         return result
 

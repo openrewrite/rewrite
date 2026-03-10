@@ -21,9 +21,12 @@ from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
 from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
 
 
+@categorize(Python)
 class ChangeMethodName(Recipe):
     """
     Rename method invocations matching a pattern.
@@ -65,8 +68,8 @@ class ChangeMethodName(Recipe):
 
     def __init__(
         self,
-        method_pattern: str,
-        new_method_name: str,
+        method_pattern: str = "",
+        new_method_name: str = "",
         match_overrides: bool = False,
         ignore_definition: bool = False
     ):

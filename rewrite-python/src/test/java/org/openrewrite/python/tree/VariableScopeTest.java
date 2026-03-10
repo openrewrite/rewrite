@@ -38,8 +38,8 @@ class VariableScopeTest implements RewriteTest {
         );
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {"nonlocal"})
     void singleNameNonlocal(String kind) {
         rewriteRun(
@@ -65,8 +65,8 @@ class VariableScopeTest implements RewriteTest {
         );
     }
 
-    @Python3Only
     @ParameterizedTest
+    @Python3Only
     @ValueSource(strings = {"nonlocal"})
     void multipleNamesNonlocal(String kind) {
         rewriteRun(
@@ -85,10 +85,10 @@ class VariableScopeTest implements RewriteTest {
         rewriteRun(
           python(
             """
-            import pygenie
-            
-            pygenie.conf.DEFAULT_GENIE_URL = "http://genie:8080"
-            """
+              import pygenie
+              
+              pygenie.conf.DEFAULT_GENIE_URL = "http://genie:8080"
+              """
           )
         );
     }

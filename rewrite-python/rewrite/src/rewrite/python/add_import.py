@@ -23,6 +23,7 @@ from rewrite.java import J
 from rewrite.java.support_types import JContainer, JLeftPadded, JRightPadded
 from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, Space
 from rewrite.markers import Markers
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name, pad_right
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 
@@ -131,7 +132,10 @@ class AddImport(PythonVisitor):
     def _import_exists(self, cu: CompilationUnit) -> bool:
         """Check if the import already exists."""
         for stmt in cu.statements:
-            if isinstance(stmt, MultiImport):
+            if isinstance(stmt, Import) and not isinstance(stmt, MultiImport):
+                if self.name is None and self._import_name_matches(stmt, self.module, self.alias):
+                    return True
+            elif isinstance(stmt, MultiImport):
                 if self._multi_import_matches(stmt):
                     return True
         return False
@@ -149,7 +153,7 @@ class AddImport(PythonVisitor):
             # We want: from module import name [as alias]
             if multi.from_ is None:
                 return False  # This is not a "from" import
-            from_name = self._get_name_string(multi.from_)
+            from_name = get_name_string(multi.from_)
             if from_name != self.module:
                 return False
             for imp in multi.names:
@@ -159,8 +163,8 @@ class AddImport(PythonVisitor):
 
     def _import_name_matches(self, imp: Import, name: str, alias: Optional[str]) -> bool:
         """Check if an Import matches the given name and alias."""
-        import_name = self._get_qualid_name(imp.qualid)
-        import_alias = self._get_alias_name(imp)
+        import_name = get_qualid_name(imp.qualid)
+        import_alias = get_alias_name(imp)
 
         if import_name != name:
             return False
@@ -169,40 +173,6 @@ class AddImport(PythonVisitor):
         if alias is None and import_alias is not None:
             return False
         return True
-
-    def _get_qualid_name(self, qualid) -> str:
-        """Get the string representation of a qualified name."""
-        if isinstance(qualid, Identifier):
-            return qualid.simple_name
-        elif isinstance(qualid, FieldAccess):
-            target = self._get_name_string(qualid.target)
-            name = qualid.name.simple_name
-            if target:
-                return f"{target}.{name}"
-            return name
-        return ""
-
-    def _get_name_string(self, name) -> str:
-        """Get string from a NameTree."""
-        if isinstance(name, Identifier):
-            return name.simple_name
-        elif isinstance(name, FieldAccess):
-            target = self._get_name_string(name.target)
-            if target:
-                return f"{target}.{name.name.simple_name}"
-            return name.name.simple_name
-        elif isinstance(name, Empty):
-            return ""
-        return str(name) if name else ""
-
-    def _get_alias_name(self, imp: Import) -> Optional[str]:
-        """Get the alias name from an Import, or None if no alias."""
-        if imp.alias is None:
-            return None
-        alias = imp.alias
-        if isinstance(alias, Identifier):
-            return alias.simple_name
-        return None
 
     def _is_referenced(self, cu: CompilationUnit) -> bool:
         """Check if the identifier we're importing is actually used."""
@@ -234,7 +204,7 @@ class AddImport(PythonVisitor):
                 continue
             if stmt.from_ is None:
                 continue
-            from_name = self._get_name_string(stmt.from_)
+            from_name = get_name_string(stmt.from_)
             if from_name != self.module:
                 continue
 
@@ -284,7 +254,7 @@ class AddImport(PythonVisitor):
         insert_idx = 0
         padded_stmts = list(cu.padding.statements)
         for i, padded in enumerate(padded_stmts):
-            if isinstance(padded.element, MultiImport):
+            if isinstance(padded.element, (Import, MultiImport)):
                 insert_idx = i + 1
             elif insert_idx > 0:
                 break  # Stop after we've passed the import section
@@ -308,18 +278,10 @@ class AddImport(PythonVisitor):
                 )
             padded_stmts.insert(insert_idx, new_padded)
         else:
-            # Inserting after existing imports. The preceding import's last
-            # name typically has '\n' in its after-padding, so the new import
-            # doesn't need its own '\n' prefix.
-            new_padded = JRightPadded(new_import.replace(prefix=Space.EMPTY), Space.EMPTY, Markers.EMPTY)
-            # Ensure the following statement has a '\n' prefix as separator
-            if insert_idx < len(padded_stmts):
-                next_stmt = padded_stmts[insert_idx]
-                if not next_stmt.element.prefix.whitespace:
-                    padded_stmts[insert_idx] = JRightPadded(
-                        next_stmt.element.replace(prefix=Space([], '\n')),
-                        next_stmt.after, next_stmt.markers
-                    )
+            # Inserting after existing imports. The new import needs '\n' as
+            # its prefix since each statement's prefix carries the newline
+            # that separates it from the preceding statement.
+            new_padded = JRightPadded(new_import.replace(prefix=Space([], '\n')), Space.EMPTY, Markers.EMPTY)
             padded_stmts.insert(insert_idx, new_padded)
 
         return cu.padding.replace(_statements=padded_stmts)
@@ -337,7 +299,7 @@ class AddImport(PythonVisitor):
                 False,  # Not parenthesized
                 JContainer(
                     Space.SINGLE_SPACE,
-                    [self._pad_right(import_elem)],
+                    [pad_right(import_elem)],
                     Markers.EMPTY
                 )
             )
@@ -355,7 +317,7 @@ class AddImport(PythonVisitor):
                 False,  # Not parenthesized
                 JContainer(
                     Space.SINGLE_SPACE,
-                    [self._pad_right(import_elem)],
+                    [pad_right(import_elem)],
                     Markers.EMPTY
                 )
             )
@@ -454,6 +416,3 @@ class AddImport(PythonVisitor):
             )
         return result
 
-    def _pad_right(self, elem) -> JRightPadded:
-        """Wrap an element in a JRightPadded."""
-        return JRightPadded(elem, Space.EMPTY, Markers.EMPTY)

@@ -108,9 +108,29 @@ def activate(marketplace: RecipeMarketplace) -> None:
         marketplace: The RecipeMarketplace to install recipes into
     """
     from rewrite.decorators import get_recipe_category
-    from rewrite.python.recipes import RemovePass
+    from rewrite.python.recipes import (
+        RemovePass,
+        ChangeImport,
+        ChangeType,
+        ChangeMethodName,
+        ChangePackage,
+        DeleteMethodArgument,
+        ReorderMethodArguments,
+        AddLiteralMethodArgument,
+    )
 
-    # Install all Python recipes with their categories
-    category = get_recipe_category(RemovePass)
-    if category is not None:
-        marketplace.install(RemovePass, category)
+    for recipe_class in [
+        RemovePass,
+        ChangeImport,
+        ChangeType,
+        ChangeMethodName,
+        ChangePackage,
+        DeleteMethodArgument,
+        ReorderMethodArguments,
+        AddLiteralMethodArgument,
+    ]:
+        category = get_recipe_category(recipe_class)
+        if category is not None:
+            marketplace.install(recipe_class, category)
+        else:
+            marketplace.install(recipe_class, Python)

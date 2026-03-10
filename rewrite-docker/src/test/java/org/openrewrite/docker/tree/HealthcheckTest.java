@@ -33,7 +33,7 @@ class HealthcheckTest implements RewriteTest {
               HEALTHCHECK NONE
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Healthcheck healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(healthcheck.isNone()).isTrue();
                 assertThat(healthcheck.getCmd()).isNull();
             })
@@ -50,7 +50,7 @@ class HealthcheckTest implements RewriteTest {
               HEALTHCHECK CMD curl -f http://localhost/ || exit 1
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Healthcheck healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
+                var healthcheck = (Docker.Healthcheck) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(healthcheck.isNone()).isFalse();
                 assertThat(healthcheck.getCmd()).isNotNull();
                 var command = (Docker.ShellForm) healthcheck.getCmd().getCommand();

@@ -1162,6 +1162,76 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/6833")
+    void doesNotAddToProjectNotUsingTypeWhenConfigurationIsExplicit() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("root",
+            buildGradle(
+              ""
+            ),
+            settingsGradle(
+              """
+                include "project1"
+                include "project2"
+                """
+            ),
+            mavenProject("project1",
+              srcMainJava(
+                java(usingGuavaIntMath)
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation "com.google.guava:guava:29.0-jre"
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              srcMainJava(
+                java(
+                  """
+                    public class B {
+                        String hello() { return "world"; }
+                    }
+                    """
+                )
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void addDynamicVersionDependency() {
         rewriteRun(
           spec -> spec
@@ -1871,6 +1941,54 @@ class AddDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotAddDependencyToAppliedScripts() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, "implementation")),
+          mavenProject("project",
+            buildGradle(
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+    
+                repositories {
+                    mavenCentral()
+                }
+    
+                apply from: "dependencies.gradle"
+                """,
+              //language=groovy
+              """
+                plugins {
+                    id "java-library"
+                }
+    
+                repositories {
+                    mavenCentral()
+                }
+    
+                apply from: "dependencies.gradle"
+    
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            ),
+            buildGradle(
+              //language=groovy
+              """
+                dependencies {
+                }
+                """,
+              s -> s.path("dependencies.gradle")
+            )
+          )
+        );
+    }
+
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null);

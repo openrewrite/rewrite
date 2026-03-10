@@ -472,6 +472,31 @@ public class Autodetect extends NamedStyles {
         }
 
         @Override
+        public J.Literal visitLiteral(J.Literal literal, IndentStatistics stats) {
+            if (literal.getValueSource() != null && literal.getValueSource().startsWith("\"\"\"") && literal.getValueSource().endsWith("\"\"\"")) {
+                boolean onContinuationLine = literal.getPrefix().getWhitespace().contains("\n");
+                if (onContinuationLine) {
+                    countIndents(literal.getPrefix().getWhitespace(), true, stats);
+                    stats.incrementContinuationDepth();
+                }
+                // Count indentation of text block content lines as continuation indents
+                String[] lines = literal.getValueSource().split("\n", -1);
+                for (int i = 1; i < lines.length; i++) {
+                    String line = lines[i];
+                    int nonWs = StringUtils.indexOfNonWhitespace(line);
+                    if (!StringUtils.isBlank(line) && nonWs != -1) {
+                        countIndents("\n" + line.substring(0, nonWs), true, stats);
+                    }
+                }
+                if (onContinuationLine) {
+                    stats.decrementContinuationDepth();
+                }
+                return literal;
+            }
+            return super.visitLiteral(literal, stats);
+        }
+
+        @Override
         public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, IndentStatistics indentStatistics) {
             return super.visitRightPadded(right, loc, indentStatistics);
         }

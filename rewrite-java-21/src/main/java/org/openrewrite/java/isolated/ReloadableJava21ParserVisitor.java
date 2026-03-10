@@ -48,6 +48,8 @@ import org.openrewrite.style.NamedStyles;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -1506,6 +1508,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         JCArrayTypeTree arrayTypeTree = null;
         while (typeIdent instanceof JCAnnotatedType || typeIdent instanceof JCArrayTypeTree) {
             if (typeIdent instanceof JCAnnotatedType) {
+                if (count > 0) {
+                    mapAnnotations(((JCAnnotatedType) typeIdent).getAnnotations(), annotationPosTable);
+                }
                 typeIdent = ((JCAnnotatedType) typeIdent).getUnderlyingType();
             }
             if (typeIdent instanceof JCArrayTypeTree) {
@@ -1517,16 +1522,21 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
 
+        List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         Space prefix = whitespace();
         TypeTree elemType = convert(typeIdent);
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
         JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         assert arrayTypeTree != null;
-        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+        TypeTree result = new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
                 annotations,
                 dimension,
                 typeMapping.type(tree));
+        if (!leadingAnnotations.isEmpty()) {
+            result = new J.AnnotatedType(randomId(), EMPTY, Markers.EMPTY, leadingAnnotations, result);
+        }
+        return result;
     }
 
     private TypeTree mapDimensions(TypeTree baseType, Tree tree, Map<Integer, JCAnnotation> annotationPosTable) {
@@ -1741,8 +1751,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && node.declaredUsingVar()) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+        if (typeExpr == null && (node.declaredUsingVar() ||
+                ((node.sym.flags() & Flags.MATCH_BINDING) != 0 && source.startsWith("var", indexOfNextNonWhitespace(cursor, source))))) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym.type), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -1850,8 +1861,14 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
             String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
+            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+            reportJavaParsingException(ex);
+            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
             throw ex;

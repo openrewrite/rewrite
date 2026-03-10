@@ -77,6 +77,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         K.AnnotatedExpression ae = annotatedExpression;
         ae = ae.withMarkers(visitMarkers(ae.getMarkers(), newAnnotatedExpression.getMarkers()));
         ae = ae.withAnnotations(ListUtils.map(ae.getAnnotations(), (index, a) -> visitAndCast(a, newAnnotatedExpression.getAnnotations().get(index))));
+        ae = ae.withExpression(visitAndCast(ae.getExpression(), newAnnotatedExpression.getExpression()));
         Expression temp = (Expression) visitExpression(ae, newAnnotatedExpression);
         if (!(temp instanceof K.AnnotatedExpression)) {
             return temp;
@@ -2200,7 +2201,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return u.withMarkers(visitMarkers(u.getMarkers(), newErroneous.getMarkers()));
     }
 
-    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

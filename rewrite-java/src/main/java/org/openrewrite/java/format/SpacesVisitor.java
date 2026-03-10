@@ -966,7 +966,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         OPEN, CLOSE, BEFORE_SEPARATOR, AFTER_SEPARATOR, EMPTY
     }
 
-    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {
@@ -975,7 +975,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         return null;
     }
 
-    @ToBeRemoved(after = "2026-02-30", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

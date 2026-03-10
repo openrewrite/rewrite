@@ -67,7 +67,25 @@ from rewrite.python.tree import (
     VariableScope,
     YieldFrom,
 )
+from rewrite.python.support_types import PyComment  # ty: ignore[unresolved-import]
 from rewrite.python.visitor import PythonVisitor
+from rewrite.python.style import (
+    SpacesStyle,
+    TabsAndIndentsStyle,
+    BlankLinesStyle,
+    WrappingAndBracesStyle,
+    OtherStyle,
+    IntelliJ,
+)
+from rewrite.python.format import (
+    AutoFormat,
+    BlankLinesVisitor,
+    MinimumViableSpacingVisitor,
+    NormalizeFormatVisitor,
+    NormalizeTabsOrSpacesVisitor,
+    SpacesVisitor,
+    TabsAndIndentsVisitor,
+)
 from rewrite.python.add_import import AddImport, AddImportOptions, maybe_add_import
 from rewrite.python.remove_import import RemoveImport, RemoveImportOptions, maybe_remove_import
 from rewrite.python.method_matcher import MethodMatcher
@@ -137,8 +155,25 @@ __all__ = [
     "UnionType",
     "VariableScope",
     "YieldFrom",
+    # Support types
+    "PyComment",
     # Visitor
     "PythonVisitor",
+    # Style
+    "SpacesStyle",
+    "TabsAndIndentsStyle",
+    "BlankLinesStyle",
+    "WrappingAndBracesStyle",
+    "OtherStyle",
+    "IntelliJ",
+    # Format
+    "AutoFormat",
+    "BlankLinesVisitor",
+    "MinimumViableSpacingVisitor",
+    "NormalizeFormatVisitor",
+    "NormalizeTabsOrSpacesVisitor",
+    "SpacesVisitor",
+    "TabsAndIndentsVisitor",
     # Import handling
     "AddImport",
     "AddImportOptions",

@@ -246,14 +246,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (mappingStartEvent.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
                             anchors.put(mappingStartEvent.getAnchor(), anchor);
-
-                            // dashPrefixIndex could be 0 (if anchoring a sequence item) or greater than 0 (if anchoring entire list)
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
                             lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
-
-                            if (dashPrefixIndex > 0) {
-                                fmt = fmt.substring(0, dashPrefixIndex);
-                            }
                         }
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);

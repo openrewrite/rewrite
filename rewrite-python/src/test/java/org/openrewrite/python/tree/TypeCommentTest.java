@@ -28,11 +28,11 @@ class TypeCommentTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-        "->str",
-        "-> str",
-        " -> str",
-        "->  str",
-        "-> str ",
+      "->str",
+      "-> str",
+      " -> str",
+      "->  str",
+      "-> str ",
     })
     void functionReturnType(String type) {
         rewriteRun(

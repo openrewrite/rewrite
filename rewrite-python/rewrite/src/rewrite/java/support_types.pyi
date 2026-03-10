@@ -13,7 +13,7 @@ J2 = TypeVar('J2', bound=J)
 J3 = TypeVar('J3', bound=J)
 
 from abc import abstractmethod, ABC
-from enum import Enum, auto
+from enum import Enum
 from rewrite import Markers
 from rewrite import Tree, SourceFile, TreeVisitor
 from rewrite.utils import replace_if_changed
@@ -21,6 +21,7 @@ from rewrite.utils import replace_if_changed
 class J(Tree):
     @property
     def prefix(self) -> Space: ...
+    def replace(self, **kwargs: Any) -> Self: ...
     def is_acceptable(self, v: TreeVisitor[Any, P], p: P) -> bool: ...
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...
     def accept_java(self, v: 'JavaVisitor[P]', p: P) -> Optional['J']: ...
@@ -77,6 +78,8 @@ class JavaType(ABC):
         _members: Optional[List[JavaType.Variable]]
         _methods: Optional[List[JavaType.Method]]
 
+        @property
+        def fully_qualified_name(self) -> str: ...
 
     class ShallowClass(Class):
         pass
@@ -85,14 +88,48 @@ class JavaType(ABC):
         _type: JavaType.FullyQualified
         _type_parameters: Optional[List[JavaType]]
 
+        @property
+        def fully_qualified_name(self) -> str: ...
 
+        @property
+        def type(self) -> JavaType.FullyQualified: ...
+        @property
+        def type_parameters(self) -> Optional[List[JavaType]]: ...
+        @property
+        def fully_qualified_name(self) -> str: ...
+
+
+    @dataclass
     class GenericTypeVariable:
+        _name: str
+        _variance: GenericTypeVariable.Variance
+        _bounds: Optional[List[JavaType]]
+
         class Variance(Enum):
             Invariant: Variance
             Covariant: Variance
             Contravariant: Variance
 
+        @property
+        def name(self) -> str: ...
+        @property
+        def variance(self) -> GenericTypeVariable.Variance: ...
+        @property
+        def bounds(self) -> List[JavaType]: ...
 
+    @dataclass
+    class Union:
+        _bounds: Optional[List[JavaType]]
+
+        @property
+        def bounds(self) -> List[JavaType]: ...
+
+    @dataclass
+    class Intersection:
+        _bounds: Optional[List[JavaType]]
+
+        @property
+        def bounds(self) -> List[JavaType]: ...
 
     class Primitive(Enum):
         Boolean: Primitive
@@ -144,11 +181,34 @@ class JavaType(ABC):
         @property
         def declared_formal_type_names(self) -> Optional[List[str]]: ...
 
+    @dataclass
     class Variable:
-        pass
+        _flags_bit_map: int = ...
+        _name: str = ...
+        _owner: Optional[JavaType] = ...
+        _type: Optional[JavaType] = ...
+        _annotations: Optional[List[JavaType.FullyQualified]] = ...
 
+        @property
+        def flags_bit_map(self) -> int: ...
+        @property
+        def name(self) -> str: ...
+        @property
+        def owner(self) -> Optional[JavaType]: ...
+        @property
+        def type(self) -> Optional[JavaType]: ...
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]: ...
+
+    @dataclass
     class Array:
-        pass
+        _elem_type: Optional[JavaType] = ...
+        _annotations: Optional[List[JavaType.FullyQualified]] = ...
+
+        @property
+        def elem_type(self) -> Optional[JavaType]: ...
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]: ...
 
 
 @dataclass(frozen=True)

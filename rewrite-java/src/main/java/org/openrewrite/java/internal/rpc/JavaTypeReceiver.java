@@ -94,7 +94,7 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, RpcReceiveQueue q) {
         String name = q.receive(generic.getName());
         JavaType.GenericTypeVariable.Variance variance = q.receiveAndGet(generic.getVariance(),
-                v -> JavaType.GenericTypeVariable.Variance.valueOf(v.toString()));
+                v -> JavaType.GenericTypeVariable.Variance.valueOf(v.toString().toUpperCase()));
         List<JavaType> bounds = q.receiveList(generic.getBounds(), v -> visit(v, q));
         return generic.unsafeSet(name, variance, bounds);
     }

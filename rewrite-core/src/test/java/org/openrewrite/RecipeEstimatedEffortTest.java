@@ -39,7 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
@@ -132,12 +131,12 @@ class RecipeEstimatedEffortTest implements RewriteTest {
           ));
     }
 
-    @ParameterizedTest
     @CsvSource({
       "'foo is here', 'bar is here', 10",           // Only recipe1 applies
       "'baz is here', 'qux is here', 5",            // Only recipe2 applies
       "'foo and baz are here', 'bar and qux are here', 15" // Both recipes apply
     })
+    @ParameterizedTest
     void estimatedTimeSavingsForMultipleRecipes(String beforeContent, String afterContent, int expectedMinutes) {
         // Create composite recipe with 2 recipes that have different estimated efforts
         Recipe recipe1 = new CustomEstimatedEffortFindReplaceRecipe("foo", "bar", Duration.ofMinutes(10));
@@ -288,7 +287,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
             if (shouldCreate.get()) {
                 return PlainTextParser.builder().build().parse(fileContents)
                   .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Path.of(relativeFileName)))
-                  .collect(toList());
+                  .toList();
             }
             return emptyList();
         }
