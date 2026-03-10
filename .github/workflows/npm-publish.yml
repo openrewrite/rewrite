@@ -17,6 +17,13 @@ on:
     secrets:
       gradle_enterprise_access_key:
         required: false
+  workflow_dispatch:
+    inputs:
+      java_version:
+        description: Java version for setup-java
+        type: string
+        required: false
+        default: 21
 
 permissions:
   contents: read
@@ -48,7 +55,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v5
         with:
-          develocity-access-key: ${{ secrets.gradle_enterprise_access_key }}
+          develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
 
       - name: npm publish
         run: >
