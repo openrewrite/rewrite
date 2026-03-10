@@ -95,7 +95,7 @@ class CSharpRpcTest {
         };
 
         for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite/OpenRewrite.csproj");
+            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
             if (csproj.toFile().exists()) {
                 return csproj.toAbsolutePath().normalize();
             }

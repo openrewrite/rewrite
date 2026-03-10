@@ -152,7 +152,7 @@ public class NoWhitespaceAfter extends Recipe {
                 if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getAllowLineBreaks()) && f.getName().getPrefix().getWhitespace().contains("\n")) {
                     return f;
                 }
-                if (f.getName().getPrefix().getWhitespace().contains(" ")) {
+                if (f.getName().getPrefix().getWhitespace().contains(" ") && f.getName().getAnnotations().isEmpty()) {
                     f = f.withName(f.getName().withPrefix(
                             f.getName().getPrefix().withWhitespace("")
                     ));
