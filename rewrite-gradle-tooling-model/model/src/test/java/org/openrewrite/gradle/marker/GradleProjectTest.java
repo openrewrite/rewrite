@@ -617,6 +617,187 @@ class GradleProjectTest {
         }
     }
 
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    @Nested
+    @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
+    class springDependencyManagementConfigurationSpecific {
+        @TempDir
+        static Path dir;
+
+        static GradleProject gradleProject;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins {
+              id 'java'
+              id 'io.spring.dependency-management' version '1.1.7'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencyManagement {
+              implementation {
+                  dependencies {
+                      dependency 'javax.validation:validation-api:2.0.1.Final'
+                  }
+              }
+          }
+
+          dependencies {
+              implementation 'javax.validation:validation-api'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            try (InputStream is = new ByteArrayInputStream(buildGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("build.gradle"), readAllBytes(is));
+            }
+            try (InputStream is = new ByteArrayInputStream(settingsGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("settings.gradle"), readAllBytes(is));
+            }
+
+            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
+            gradleProject = model.getGradleProject();
+        }
+
+        @Test
+        void configurationSpecificManagedVersion() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion("implementation", "javax.validation", "validation-api"))
+              .as("Configuration-specific managed version should be retrievable by configuration name")
+              .isEqualTo("2.0.1.Final");
+        }
+
+        @Test
+        void otherConfigurationReturnsNull() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion("runtimeClasspath", "javax.validation", "validation-api"))
+              .as("Configuration not in the dependency management block should return null")
+              .isNull();
+        }
+
+        @Test
+        void globalReturnsNull() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "javax.validation", "validation-api"))
+              .as("Without global dependency management, querying with null configuration should return null")
+              .isNull();
+        }
+
+        @Test
+        void serializable() throws IOException {
+            ObjectMapper m = new RecipeSerializer().getMapper();
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            m.writeValue(baos, gradleProject);
+            ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+            GradleProject roundTripped = m.readValue(bais, GradleProject.class);
+            assertThat(roundTripped).isEqualTo(gradleProject);
+        }
+    }
+
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    @Nested
+    @DisabledIf("org.openrewrite.gradle.marker.GradleProjectTest#gradleOlderThan8")
+    class springDependencyManagementGlobalAndConfigurationSpecific {
+        @TempDir
+        static Path dir;
+
+        static GradleProject gradleProject;
+
+        //language=groovy
+        static String buildGradle = """
+          plugins {
+              id 'java'
+              id 'io.spring.dependency-management' version '1.1.7'
+          }
+
+          repositories {
+              mavenCentral()
+          }
+
+          dependencyManagement {
+              dependencies {
+                  dependency 'org.apache.commons:commons-lang3:3.14.0'
+              }
+              testImplementation {
+                  dependencies {
+                      dependency 'javax.validation:validation-api:2.0.1.Final'
+                  }
+              }
+          }
+
+          dependencies {
+              implementation 'org.apache.commons:commons-lang3'
+              testImplementation 'javax.validation:validation-api'
+          }
+          """;
+
+        //language=groovy
+        static String settingsGradle = """
+          rootProject.name = "sample"
+          """;
+
+        @BeforeAll
+        static void gradleProject() throws IOException {
+            try (InputStream is = new ByteArrayInputStream(buildGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("build.gradle"), readAllBytes(is));
+            }
+            try (InputStream is = new ByteArrayInputStream(settingsGradle.getBytes(StandardCharsets.UTF_8))) {
+                Files.write(dir.resolve("settings.gradle"), readAllBytes(is));
+            }
+
+            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(dir.toFile(), dir.resolve("build.gradle").toFile());
+            gradleProject = model.getGradleProject();
+        }
+
+        @Test
+        void globalManagedVersionAvailableWithNullConfiguration() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "org.apache.commons", "commons-lang3"))
+              .as("Global managed version should be available when querying with null configuration")
+              .isEqualTo("3.14.0");
+        }
+
+        @Test
+        void configurationSpecificManagedVersion() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion("testImplementation", "javax.validation", "validation-api"))
+              .as("Configuration-specific managed version should be retrievable")
+              .isEqualTo("2.0.1.Final");
+        }
+
+        @Test
+        void configurationSpecificNotAvailableGlobally() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion(null, "javax.validation", "validation-api"))
+              .as("Configuration-specific managed version should not be available via global lookup")
+              .isNull();
+        }
+
+        @Test
+        void globalFallbackWhenConfigurationNotSpecific() {
+            SpringDependencyManagement sdm = gradleProject.getSpringDependencyManagement();
+            assertThat(sdm).isNotNull();
+            assertThat(sdm.getManagedVersion("testImplementation", "org.apache.commons", "commons-lang3"))
+              .as("Global managed version should be returned as fallback when configuration has no specific entry")
+              .isEqualTo("3.14.0");
+        }
+    }
+
     @Nested
     class noSpringPlugin {
         @TempDir

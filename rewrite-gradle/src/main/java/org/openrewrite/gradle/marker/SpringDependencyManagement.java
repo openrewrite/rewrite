@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyMap;
+
 @SuppressWarnings("unused")
 @Value
 @With
@@ -53,7 +55,7 @@ public final class SpringDependencyManagement implements Serializable {
     @Builder.Default
     @With
     private final
-    Map<String, DependencyManagement> configurationDependencyManagement = new HashMap<>();
+    Map<String, DependencyManagement> configurationDependencyManagement = emptyMap();
 
     @JsonCreator
     public SpringDependencyManagement(boolean overriddenByDependencies, @Nullable DependencyManagement globalDependencyManagement, Map<String, DependencyManagement> configurationDependencyManagement) {
@@ -65,13 +67,17 @@ public final class SpringDependencyManagement implements Serializable {
     @Nullable
     public String getManagedVersion(@Nullable String configuration, String group, String name) {
         String key = createKey(group, name);
+        // Configuration-specific management takes precedence over global, with global as fallback
+        if (configuration != null && configurationDependencyManagement.containsKey(configuration)) {
+            String version = configurationDependencyManagement.get(configuration).getManagedVersion(key, overriddenByDependencies);
+            if (version != null) {
+                return version;
+            }
+        }
         if (globalDependencyManagement != null) {
             return globalDependencyManagement.getManagedVersion(key, overriddenByDependencies);
         }
-        if (!configurationDependencyManagement.containsKey(configuration)) {
-            return null;
-        }
-        return configurationDependencyManagement.get(configuration).getManagedVersion(key, overriddenByDependencies);
+        return null;
     }
 
     private String createKey(String group, String name) {
@@ -150,6 +156,8 @@ public final class SpringDependencyManagement implements Serializable {
             Field versionsField = null;
             Field explicitVersionsField = null;
             Field importedBomsField = null;
+
+            DependencyManagement globalDm = null;
             if (globalDependencyManagement != null) {
                 versionsField = globalDependencyManagement.getClass().getDeclaredField("versions");
                 versionsField.setAccessible(true);
@@ -157,24 +165,35 @@ public final class SpringDependencyManagement implements Serializable {
                 explicitVersionsField.setAccessible(true);
                 importedBomsField = globalDependencyManagement.getClass().getDeclaredField("importedBoms");
                 importedBomsField.setAccessible(true);
-                return new SpringDependencyManagement(overriddenByDependencies, getDependencyManagement(globalDependencyManagement, versionsField, explicitVersionsField, importedBomsField), new HashMap<>());
-            } else if (configurationDependencyManagement instanceof Map) {
-                Map<String, DependencyManagement> configurationDependencyManagementMap = new HashMap<>();
-                for (Map.Entry<String, Object> entry : ((Map<String, Object>) configurationDependencyManagement).entrySet()) {
+                globalDm = getDependencyManagement(globalDependencyManagement, versionsField, explicitVersionsField, importedBomsField);
+            }
+
+            Map<String, DependencyManagement> configDmMap = emptyMap();
+            if (configurationDependencyManagement instanceof Map && !((Map<?, ?>) configurationDependencyManagement).isEmpty()) {
+                configDmMap = new HashMap<>();
+                // The Spring plugin's configurationDependencyManagement map uses Configuration objects as keys,
+                // not Strings. We need to reflectively call getName() to get the configuration name.
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) configurationDependencyManagement).entrySet()) {
+                    Object configKey = entry.getKey();
+                    Method getNameMethod = configKey.getClass().getMethod("getName");
+                    String configName = (String) getNameMethod.invoke(configKey);
+                    Object value = entry.getValue();
                     if (versionsField == null) {
-                        versionsField = entry.getValue().getClass().getDeclaredField("versions");
+                        versionsField = value.getClass().getDeclaredField("versions");
                         versionsField.setAccessible(true);
-                        explicitVersionsField = entry.getValue().getClass().getDeclaredField("explicitVersions");
+                        explicitVersionsField = value.getClass().getDeclaredField("explicitVersions");
                         explicitVersionsField.setAccessible(true);
-                        importedBomsField = entry.getValue().getClass().getDeclaredField("importedBoms");
+                        importedBomsField = value.getClass().getDeclaredField("importedBoms");
                         importedBomsField.setAccessible(true);
                     }
-                    configurationDependencyManagementMap.put(entry.getKey(), getDependencyManagement(entry.getValue(), versionsField, explicitVersionsField, importedBomsField));
+                    configDmMap.put(configName, getDependencyManagement(value, versionsField, explicitVersionsField, importedBomsField));
                 }
-
-                return new SpringDependencyManagement(overriddenByDependencies, null, configurationDependencyManagementMap);
             }
-            return null;
+
+            if (globalDm == null && configDmMap.isEmpty()) {
+                return null;
+            }
+            return new SpringDependencyManagement(overriddenByDependencies, globalDm, configDmMap);
         } catch (Exception e) {
             // Plugin not on classpath or API changed -- silently fall back
             return null;
