@@ -72,6 +72,12 @@ class RpcReceiveQueue:
         self._source_file_type = source_file_type
         self._pull = pull
         self._trace = trace
+        self._new_ref_ids: List[int] = []
+
+    @property
+    def new_ref_ids(self) -> List[int]:
+        """Ref IDs that were newly registered during this receive."""
+        return self._new_ref_ids
 
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
@@ -161,6 +167,7 @@ class RpcReceiveQueue:
                 if ref is not None:
                     # Store for future references (handles cyclic graphs)
                     self._refs[ref] = before
+                    self._new_ref_ids.append(ref)
 
             # Fall through to CHANGE for field-by-field deserialization
             return self._do_change(before, on_change, message, ref)

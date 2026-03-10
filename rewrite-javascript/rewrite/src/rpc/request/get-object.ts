@@ -20,7 +20,8 @@ import {extractSourcePath, withMetrics} from "./metrics";
 
 export class GetObject {
     constructor(private readonly id: string,
-                private readonly sourceFileType?: string) {
+                private readonly sourceFileType?: string,
+                private readonly action?: string) {
     }
 
     static handle(
@@ -33,6 +34,8 @@ export class GetObject {
         metricsCsv?: string,
     ): void {
         const pendingData = new Map<string, RpcObjectData[]>();
+        const actionBaseline = new Map<string, any>();
+        const pendingNewRefs = new Map<string, number[]>();
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -41,6 +44,32 @@ export class GetObject {
                 metricsCsv,
                 (context) => async request => {
                     const objId = request.id;
+
+                    // Handle actions from the receiver
+                    if (request.action) {
+                        if (request.action === 'revert') {
+                            const before = actionBaseline.get(objId);
+                            actionBaseline.delete(objId);
+                            pendingData.delete(objId);
+                            if (before !== undefined) {
+                                remoteObjects.set(objId, before);
+                                localObjects.set(objId, before);
+                            } else {
+                                remoteObjects.delete(objId);
+                                localObjects.delete(objId);
+                            }
+                            const newRefs = pendingNewRefs.get(objId);
+                            if (newRefs) {
+                                for (const refId of newRefs) {
+                                    localRefs.deleteByRefId(refId);
+                                }
+                                pendingNewRefs.delete(objId);
+                            }
+                        }
+                        context.target = '';
+                        return [];
+                    }
+
                     if (!localObjects.has(objId)) {
                         context.target = '';
                         return [
@@ -63,10 +92,19 @@ export class GetObject {
                         const after = obj;
                         const before = remoteObjects.get(objId);
 
-                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
-                            .generate(after, before);
+                        // Save baseline for potential revert
+                        actionBaseline.set(objId, before);
+
+                        const sendQueue = new RpcSendQueue(localRefs, request.sourceFileType, trace());
+                        allData = await sendQueue.generate(after, before);
                         pendingData.set(objId, allData);
 
+                        // Track newly registered refs for potential revert
+                        if (sendQueue.newRefIds.length > 0) {
+                            pendingNewRefs.set(objId, sendQueue.newRefIds);
+                        }
+
+                        // Optimistic update — receiver sends action="revert" on failure
                         remoteObjects.set(objId, after);
                     }
 
@@ -75,6 +113,8 @@ export class GetObject {
                     // If we've sent all data, remove from pending
                     if (allData.length === 0) {
                         pendingData.delete(objId);
+                        // Transfer completed successfully — refs are committed
+                        pendingNewRefs.delete(objId);
                     }
 
                     return batch;
