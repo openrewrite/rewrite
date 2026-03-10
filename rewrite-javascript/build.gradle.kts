@@ -199,33 +199,18 @@ testing {
     }
 }
 
-// This task creates a `.npmrc` file with the given token, so that the `npm publish` succeeds
-// For local development the user would typically have a `~/.npmrc` file with the token in it
-val setupNpmrc = tasks.register("setupNpmrc") {
-    doLast {
-        if (project.hasProperty("nodeAuthToken")) {
-            val npmrcFile = file("rewrite/.npmrc")
-            npmrcFile.writeText("//registry.npmjs.org/:_authToken=${project.property("nodeAuthToken")}\n")
-        }
-    }
-}
-
-// Implicitly `--tag latest` if not specified
+// npm publishing is handled by a dedicated workflow (npm-publish.yml) using OIDC trusted publishing.
+// This task is invoked directly by that workflow, not wired into the main publish task.
 val npmPublish = tasks.register<NpmTask>("npmPublish") {
     inputs.files(npmPack)
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    dependsOn(setupNpmrc)
 
-    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath) }
+    args = provider { listOf("publish", npmPack.get().archiveFile.get().asFile.absolutePath, "--provenance", "--access", "public") }
     if (!project.hasProperty("releasing")) {
         args.addAll("--tag", "next")
     }
 
     workingDir.set(file("rewrite"))
-}
-
-tasks.named("publish") {
-    dependsOn(npmPublish)
 }
 
 extensions.configure<LicenseExtension> {
