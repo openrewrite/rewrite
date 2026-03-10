@@ -222,6 +222,52 @@ class AddPropertyTest implements RewriteTest {
     }
 
     @Test
+    void addsToParentIfMissing() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-app</module>
+                </modules>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-app</module>
+                </modules>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("my-app",
+            pomXml(
+        """
+               <project>
+                 <parent>
+                   <groupId>com.mycompany.app</groupId>
+                   <artifactId>my-parent</artifactId>
+                   <version>1</version>
+                 </parent>
+                 <artifactId>my-app</artifactId>
+                 <version>1</version>
+               </project>
+               """
+            )
+          )
+        );
+    }
+
+    @Test
     void trustParent() {
         rewriteRun(
           spec -> spec.recipe(new AddProperty("key", "value", null, true)),
