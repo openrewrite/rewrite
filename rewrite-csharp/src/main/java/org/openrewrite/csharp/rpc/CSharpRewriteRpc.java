@@ -292,7 +292,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 String rewriteSourcePath = System.getenv(REWRITE_SOURCE_PATH_ENV);
                 if (rewriteSourcePath != null && !rewriteSourcePath.isEmpty()) {
                     Path csproj = Paths.get(rewriteSourcePath)
-                            .resolve("rewrite-csharp/csharp/OpenRewrite/OpenRewrite.csproj");
+                            .resolve("rewrite-csharp/csharp/OpenRewrite.Tool/OpenRewrite.Tool.csproj");
                     if (!Files.exists(csproj)) {
                         throw new IllegalStateException(
                                 REWRITE_SOURCE_PATH_ENV + " is set to " + rewriteSourcePath +
