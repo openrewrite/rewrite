@@ -106,8 +106,11 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             Set<URL> seen = new LinkedHashSet<>();
             collectResources(callerClassLoader, DEFAULT_RESOURCE_PATH, seen);
+            // TO-BE-REMOVED(2025-10-31) In the future we only want to support the `.gz` extension
+            collectResources(callerClassLoader, DEFAULT_RESOURCE_PATH.replace(".gz", ".zip"), seen);
             if (contextClassLoader != null && contextClassLoader != callerClassLoader) {
                 collectResources(contextClassLoader, DEFAULT_RESOURCE_PATH, seen);
+                collectResources(contextClassLoader, DEFAULT_RESOURCE_PATH.replace(".gz", ".zip"), seen);
             }
 
             if (!seen.isEmpty()) {
