@@ -84,4 +84,19 @@ export class ReferenceMap {
         this.refs.set(ref, refId);
         this.refsById.set(refId, ref);
     }
+
+    snapshot(): number {
+        return this.refCount;
+    }
+
+    rollbackTo(savedRefCount: number): void {
+        for (let i = savedRefCount; i < this.refCount; i++) {
+            const obj = this.refsById.get(i);
+            if (obj) {
+                this.refs.delete(obj);
+                this.refsById.delete(i);
+            }
+        }
+        this.refCount = savedRefCount;
+    }
 }
