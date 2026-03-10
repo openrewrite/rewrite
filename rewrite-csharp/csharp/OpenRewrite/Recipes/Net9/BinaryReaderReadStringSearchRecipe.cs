@@ -55,9 +55,9 @@ class BinaryReaderReadStringSearchRecipe : Recipe
 
                 if (isMatch)
                 {
-                    return mi.WithPrefix(AddTodoComment(mi.Prefix,
+                    return AddWarnMarker(mi,
                         "BinaryReader.ReadString now returns \\uFFFD for malformed UTF-8 sequences in .NET 9. " +
-                        "Verify your code handles the replacement character correctly."));
+                        "Verify your code handles the replacement character correctly.");
                 }
             }
 

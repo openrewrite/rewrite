@@ -44,7 +44,7 @@ public class JsonDocumentNullableSearchRecipeTest : RewriteTest
                 {
                     void M(string json)
                     {
-                        var obj =/* todo: In .NET 9, nullable JsonDocument properties now deserialize to a JsonDocument with RootElement.ValueKind == JsonValueKind.Null instead of null. Null checks on deserialized JsonDocument properties may need updating. */ JsonSerializer.Deserialize<object>(json);
+                        var obj = /*~~(In .NET 9, nullable JsonDocument properties now deserialize to a JsonDocument with RootElement.ValueKind == JsonValueKind.Null instead of null. Null checks on deserialized JsonDocument properties may need updating.)~~>*/JsonSerializer.Deserialize<object>(json);
                     }
                 }
                 """

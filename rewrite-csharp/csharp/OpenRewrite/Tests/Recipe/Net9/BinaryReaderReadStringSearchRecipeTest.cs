@@ -44,7 +44,7 @@ public class BinaryReaderReadStringSearchRecipeTest : RewriteTest
                 {
                     void M(BinaryReader reader)
                     {
-                        var text =/* todo: BinaryReader.ReadString now returns \uFFFD for malformed UTF-8 sequences in .NET 9. Verify your code handles the replacement character correctly. */ reader.ReadString();
+                        var text = /*~~(BinaryReader.ReadString now returns \uFFFD for malformed UTF-8 sequences in .NET 9. Verify your code handles the replacement character correctly.)~~>*/reader.ReadString();
                     }
                 }
                 """

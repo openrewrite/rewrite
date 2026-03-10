@@ -40,7 +40,7 @@ public class BinaryFormatterSearchRecipeTest : RewriteTest
                 {
                     void M()
                     {
-                        var formatter =/* todo: BinaryFormatter always throws NotSupportedException in .NET 9. Migrate to System.Text.Json, XmlSerializer, or DataContractSerializer. */ new BinaryFormatter();
+                        var formatter = /*~~(BinaryFormatter always throws NotSupportedException in .NET 9. Migrate to System.Text.Json, XmlSerializer, or DataContractSerializer.)~~>*/new BinaryFormatter();
                     }
                 }
                 """
@@ -63,7 +63,7 @@ public class BinaryFormatterSearchRecipeTest : RewriteTest
                 """
                 class Test
                 {
-                    private/* todo: BinaryFormatter always throws NotSupportedException in .NET 9. Migrate to System.Text.Json, XmlSerializer, or DataContractSerializer. */ BinaryFormatter _formatter;
+                    private /*~~(BinaryFormatter always throws NotSupportedException in .NET 9. Migrate to System.Text.Json, XmlSerializer, or DataContractSerializer.)~~>*/BinaryFormatter _formatter;
                 }
                 """
             )

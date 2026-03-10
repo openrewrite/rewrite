@@ -43,7 +43,7 @@ public class InMemoryDirectoryInfoSearchRecipeTest : RewriteTest
                 {
                     void M()
                     {
-                        var info =/* todo: InMemoryDirectoryInfo now prepends rootDir to file paths in .NET 9. File paths that don't start with rootDir will be prefixed, which may change matching behavior. */ new InMemoryDirectoryInfo("/root", new[] { "/root/file.txt" });
+                        var info = /*~~(InMemoryDirectoryInfo now prepends rootDir to file paths in .NET 9. File paths that don't start with rootDir will be prefixed, which may change matching behavior.)~~>*/new InMemoryDirectoryInfo("/root", new[] { "/root/file.txt" });
                     }
                 }
                 """

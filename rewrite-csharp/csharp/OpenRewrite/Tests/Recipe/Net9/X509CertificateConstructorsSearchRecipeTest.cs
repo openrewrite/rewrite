@@ -44,7 +44,7 @@ public class X509CertificateConstructorsSearchRecipeTest : RewriteTest
                 {
                     void M(byte[] data)
                     {
-                        var cert =/* todo: X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead. */ new X509Certificate2(data);
+                        var cert = /*~~(X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead.)~~>*/new X509Certificate2(data);
                     }
                 }
                 """
@@ -76,7 +76,7 @@ public class X509CertificateConstructorsSearchRecipeTest : RewriteTest
                 {
                     void M()
                     {
-                        var cert =/* todo: X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead. */ new X509Certificate2("cert.pfx");
+                        var cert = /*~~(X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead.)~~>*/new X509Certificate2("cert.pfx");
                     }
                 }
                 """
@@ -108,7 +108,7 @@ public class X509CertificateConstructorsSearchRecipeTest : RewriteTest
                 {
                     void M(byte[] data)
                     {
-                        var cert =/* todo: X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead. */ new X509Certificate(data);
+                        var cert = /*~~(X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead.)~~>*/new X509Certificate(data);
                     }
                 }
                 """
@@ -140,7 +140,7 @@ public class X509CertificateConstructorsSearchRecipeTest : RewriteTest
                 {
                     void M(byte[] data)
                     {
-                        var cert =/* todo: X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead. */ new X509Certificate2(data, "password");
+                        var cert = /*~~(X509Certificate/X509Certificate2 constructors for binary and file content are obsolete in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead.)~~>*/new X509Certificate2(data, "password");
                     }
                 }
                 """

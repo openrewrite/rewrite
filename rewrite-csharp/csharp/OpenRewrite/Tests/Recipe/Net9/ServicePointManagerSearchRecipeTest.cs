@@ -44,7 +44,7 @@ public class ServicePointManagerSearchRecipeTest : RewriteTest
                 {
                     void M()
                     {
-                        /* todo: ServicePointManager is fully obsolete in .NET 9 (SYSLIB0014). Its settings don't affect SslStream or HttpClient. Configure TLS settings directly on HttpClientHandler or SslStream instead. */ServicePointManager.DefaultConnectionLimit = 100;
+                        /*~~(ServicePointManager is fully obsolete in .NET 9 (SYSLIB0014). Its settings don't affect SslStream or HttpClient. Configure TLS settings directly on HttpClientHandler or SslStream instead.)~~>*/ServicePointManager.DefaultConnectionLimit = 100;
                     }
                 }
                 """

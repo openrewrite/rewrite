@@ -62,9 +62,9 @@ class ThreadVolatileReadWriteSearchRecipe : Recipe
                 if (isMatch)
                 {
                     var replacement = mi.Name.SimpleName == "VolatileRead" ? "Volatile.Read" : "Volatile.Write";
-                    return mi.WithPrefix(AddTodoComment(mi.Prefix,
+                    return AddWarnMarker(mi,
                         $"Thread.{mi.Name.SimpleName} is obsolete in .NET 9 (SYSLIB0054). " +
-                        $"Use {replacement} instead."));
+                        $"Use {replacement} instead.");
                 }
             }
 

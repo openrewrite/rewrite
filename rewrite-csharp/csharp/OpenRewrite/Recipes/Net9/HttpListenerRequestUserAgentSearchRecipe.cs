@@ -48,9 +48,9 @@ class HttpListenerRequestUserAgentSearchRecipe : Recipe
                 var targetType = GetExpressionTypeFqn(fa.Target);
                 if (targetType == "System.Net.HttpListenerRequest")
                 {
-                    return fa.WithPrefix(AddTodoComment(fa.Prefix,
+                    return AddWarnMarker(fa,
                         "HttpListenerRequest.UserAgent is now nullable (string?) in .NET 9. " +
-                        "Add null checks before using this property."));
+                        "Add null checks before using this property.");
                 }
             }
 

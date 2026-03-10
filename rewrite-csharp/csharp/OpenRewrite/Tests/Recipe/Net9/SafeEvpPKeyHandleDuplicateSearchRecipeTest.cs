@@ -44,7 +44,7 @@ public class SafeEvpPKeyHandleDuplicateSearchRecipeTest : RewriteTest
                 {
                     void M(SafeEvpPKeyHandle handle)
                     {
-                        var dup =/* todo: SafeEvpPKeyHandle.DuplicateHandle now up-refs the handle in .NET 9 instead of deep copying. The original and duplicate now share the same underlying key. Disposing one may affect the other. */ handle.DuplicateHandle();
+                        var dup = /*~~(SafeEvpPKeyHandle.DuplicateHandle now up-refs the handle in .NET 9 instead of deep copying. The original and duplicate now share the same underlying key. Disposing one may affect the other.)~~>*/handle.DuplicateHandle();
                     }
                 }
                 """

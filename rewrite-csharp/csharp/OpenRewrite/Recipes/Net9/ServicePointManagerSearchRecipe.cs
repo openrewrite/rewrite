@@ -54,7 +54,7 @@ class ServicePointManagerSearchRecipe : Recipe
                 id.Type is JavaType.Class cls &&
                 cls.FullyQualifiedName == ServicePointManagerFqn)
             {
-                return fa.WithPrefix(AddTodoComment(fa.Prefix, TodoMessage));
+                return AddWarnMarker(fa, TodoMessage);
             }
 
             return fa;
@@ -66,7 +66,7 @@ class ServicePointManagerSearchRecipe : Recipe
 
             if (IsMethodCall(mi.MethodType, ServicePointManagerFqn, mi.Name.SimpleName))
             {
-                return mi.WithPrefix(AddTodoComment(mi.Prefix, TodoMessage));
+                return AddWarnMarker(mi, TodoMessage);
             }
 
             return mi;

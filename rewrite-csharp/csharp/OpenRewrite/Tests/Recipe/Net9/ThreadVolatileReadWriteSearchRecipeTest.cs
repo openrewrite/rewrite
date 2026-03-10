@@ -46,7 +46,7 @@ public class ThreadVolatileReadWriteSearchRecipeTest : RewriteTest
                     private int _value;
                     int M()
                     {
-                        return/* todo: Thread.VolatileRead is obsolete in .NET 9 (SYSLIB0054). Use Volatile.Read instead. */ Thread.VolatileRead(ref _value);
+                        return /*~~(Thread.VolatileRead is obsolete in .NET 9 (SYSLIB0054). Use Volatile.Read instead.)~~>*/Thread.VolatileRead(ref _value);
                     }
                 }
                 """
@@ -79,8 +79,8 @@ public class ThreadVolatileReadWriteSearchRecipeTest : RewriteTest
                 {
                     private int _value;
                     void M()
-                    {/* todo: Thread.VolatileWrite is obsolete in .NET 9 (SYSLIB0054). Use Volatile.Write instead. */
-                        Thread.VolatileWrite(ref _value, 42);
+                    {
+                        /*~~(Thread.VolatileWrite is obsolete in .NET 9 (SYSLIB0054). Use Volatile.Write instead.)~~>*/Thread.VolatileWrite(ref _value, 42);
                     }
                 }
                 """

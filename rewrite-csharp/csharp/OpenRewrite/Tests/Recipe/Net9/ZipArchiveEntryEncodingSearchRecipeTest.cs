@@ -44,7 +44,7 @@ public class ZipArchiveEntryEncodingSearchRecipeTest : RewriteTest
                 {
                     void M(ZipArchiveEntry entry)
                     {
-                        var name =/* todo: ZipArchiveEntry now respects the UTF-8 flag for Name, FullName, and Comment in .NET 9. Entry names and comments may be decoded differently if the ZIP uses non-UTF-8 encoding. */ entry.Name;
+                        var name = /*~~(ZipArchiveEntry now respects the UTF-8 flag for Name, FullName, and Comment in .NET 9. Entry names and comments may be decoded differently if the ZIP uses non-UTF-8 encoding.)~~>*/entry.Name;
                     }
                 }
                 """
@@ -76,7 +76,7 @@ public class ZipArchiveEntryEncodingSearchRecipeTest : RewriteTest
                 {
                     void M(ZipArchiveEntry entry)
                     {
-                        var fullName =/* todo: ZipArchiveEntry now respects the UTF-8 flag for Name, FullName, and Comment in .NET 9. Entry names and comments may be decoded differently if the ZIP uses non-UTF-8 encoding. */ entry.FullName;
+                        var fullName = /*~~(ZipArchiveEntry now respects the UTF-8 flag for Name, FullName, and Comment in .NET 9. Entry names and comments may be decoded differently if the ZIP uses non-UTF-8 encoding.)~~>*/entry.FullName;
                     }
                 }
                 """

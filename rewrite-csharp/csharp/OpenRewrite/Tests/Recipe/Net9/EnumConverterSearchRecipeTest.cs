@@ -44,7 +44,7 @@ public class EnumConverterSearchRecipeTest : RewriteTest
                 {
                     void M()
                     {
-                        var converter =/* todo: EnumConverter now validates that the type is an enum in .NET 9. Passing a non-enum type will throw ArgumentException. */ new EnumConverter(typeof(DayOfWeek));
+                        var converter = /*~~(EnumConverter now validates that the type is an enum in .NET 9. Passing a non-enum type will throw ArgumentException.)~~>*/new EnumConverter(typeof(DayOfWeek));
                     }
                 }
                 """

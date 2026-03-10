@@ -44,7 +44,7 @@ public class IncrementingPollingCounterSearchRecipeTest : RewriteTest
                 {
                     void M()
                     {
-                        var counter =/* todo: IncrementingPollingCounter initial callback is now asynchronous in .NET 9. Code that depends on the callback being invoked synchronously during construction may break. */ new IncrementingPollingCounter("test", this, () => 1.0);
+                        var counter = /*~~(IncrementingPollingCounter initial callback is now asynchronous in .NET 9. Code that depends on the callback being invoked synchronously during construction may break.)~~>*/new IncrementingPollingCounter("test", this, () => 1.0);
                     }
                 }
                 """

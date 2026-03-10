@@ -66,7 +66,7 @@ class BinaryFormatterSearchRecipe : Recipe
 
             if (isMatch)
             {
-                return newClass.WithPrefix(AddTodoComment(newClass.Prefix, TodoMessage));
+                return AddWarnMarker(newClass, TodoMessage);
             }
 
             return newClass;
@@ -93,7 +93,7 @@ class BinaryFormatterSearchRecipe : Recipe
 
             if (isMatch)
             {
-                return ident.WithPrefix(AddTodoComment(ident.Prefix, TodoMessage));
+                return AddWarnMarker(ident, TodoMessage);
             }
 
             return ident;

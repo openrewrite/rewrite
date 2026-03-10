@@ -64,14 +64,14 @@ class ZipArchiveEntryEncodingSearchRecipe : Recipe
                 id.Type is JavaType.Class cls &&
                 cls.FullyQualifiedName == ZipArchiveEntryFqn)
             {
-                return fa.WithPrefix(AddTodoComment(fa.Prefix, TodoMessage));
+                return AddWarnMarker(fa, TodoMessage);
             }
 
             // Also check via expression type for chained access
             var targetFqn = GetExpressionTypeFqn(fa.Target);
             if (targetFqn == ZipArchiveEntryFqn)
             {
-                return fa.WithPrefix(AddTodoComment(fa.Prefix, TodoMessage));
+                return AddWarnMarker(fa, TodoMessage);
             }
 
             return fa;

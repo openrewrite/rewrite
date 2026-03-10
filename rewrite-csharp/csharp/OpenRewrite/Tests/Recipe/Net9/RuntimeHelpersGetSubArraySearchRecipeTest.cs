@@ -44,7 +44,7 @@ public class RuntimeHelpersGetSubArraySearchRecipeTest : RewriteTest
                 {
                     void M(int[] arr)
                     {
-                        var sub =/* todo: RuntimeHelpers.GetSubArray may return a different array type in .NET 9. Code that checks the runtime type of the returned array or casts it may break. */ RuntimeHelpers.GetSubArray(arr, 1..3);
+                        var sub = /*~~(RuntimeHelpers.GetSubArray may return a different array type in .NET 9. Code that checks the runtime type of the returned array or casts it may break.)~~>*/RuntimeHelpers.GetSubArray(arr, 1..3);
                     }
                 }
                 """

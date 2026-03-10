@@ -54,9 +54,9 @@ class X509CertificateConstructorsSearchRecipe : Recipe
             if (newClass.ConstructorType?.DeclaringType is JavaType.Class cls &&
                 AffectedTypes.Contains(cls.FullyQualifiedName))
             {
-                return newClass.WithPrefix(AddTodoComment(newClass.Prefix,
+                return AddWarnMarker(newClass,
                     "X509Certificate/X509Certificate2 constructors for binary and file content are obsolete " +
-                    "in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead."));
+                    "in .NET 9 (SYSLIB0057). Use X509CertificateLoader methods instead.");
             }
 
             return newClass;

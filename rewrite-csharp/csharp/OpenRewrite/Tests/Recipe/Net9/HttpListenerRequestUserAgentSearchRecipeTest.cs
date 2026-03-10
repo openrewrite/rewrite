@@ -44,7 +44,7 @@ public class HttpListenerRequestUserAgentSearchRecipeTest : RewriteTest
                 {
                     void M(HttpListenerRequest request)
                     {
-                        var ua =/* todo: HttpListenerRequest.UserAgent is now nullable (string?) in .NET 9. Add null checks before using this property. */ request.UserAgent;
+                        var ua = /*~~(HttpListenerRequest.UserAgent is now nullable (string?) in .NET 9. Add null checks before using this property.)~~>*/request.UserAgent;
                     }
                 }
                 """

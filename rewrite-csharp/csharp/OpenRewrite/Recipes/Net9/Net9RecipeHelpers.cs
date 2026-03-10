@@ -15,7 +15,6 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Java;
-using static OpenRewrite.Java.J;
 
 namespace OpenRewrite.Recipes.Net9;
 
@@ -70,12 +69,12 @@ internal static class Net9RecipeHelpers
     }
 
     /// <summary>
-    /// Prepends a block comment to a tree node's prefix space.
+    /// Adds a Markup.Warn marker to a tree node.
     /// </summary>
-    internal static Space AddTodoComment(Space prefix, string message)
+    internal static T AddWarnMarker<T>(T tree, string message) where T : J
     {
-        var comment = new TextComment($" todo: {message} ", "", multiline: true);
-        var newComments = new List<Comment>(prefix.Comments) { comment };
-        return new Space(prefix.Whitespace, newComments);
+        var newMarkers = tree.Markers.Add(new Markup.Warn(Guid.NewGuid(), message, null));
+        var withMarkers = tree.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
+        return withMarkers != null ? (T)withMarkers.Invoke(tree, [newMarkers])! : tree;
     }
 }

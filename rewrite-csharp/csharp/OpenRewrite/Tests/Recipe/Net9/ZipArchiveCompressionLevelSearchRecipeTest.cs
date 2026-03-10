@@ -43,8 +43,8 @@ public class ZipArchiveCompressionLevelSearchRecipeTest : RewriteTest
                 class Test
                 {
                     void M(ZipArchive archive)
-                    {/* todo: In .NET 9, ZipArchive.CreateEntry with CompressionLevel now sets general-purpose bit flags in the ZIP central directory header. This may affect interoperability with other ZIP tools. */
-                        archive.CreateEntry("file.txt", CompressionLevel.Fastest);
+                    {
+                        /*~~(In .NET 9, ZipArchive.CreateEntry with CompressionLevel now sets general-purpose bit flags in the ZIP central directory header. This may affect interoperability with other ZIP tools.)~~>*/archive.CreateEntry("file.txt", CompressionLevel.Fastest);
                     }
                 }
                 """

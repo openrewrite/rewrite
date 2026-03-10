@@ -54,7 +54,7 @@ class AuthenticationManagerSearchRecipe : Recipe
                 id.Type is JavaType.Class cls &&
                 cls.FullyQualifiedName == AuthenticationManagerFqn)
             {
-                return fa.WithPrefix(AddTodoComment(fa.Prefix, TodoMessage));
+                return AddWarnMarker(fa, TodoMessage);
             }
 
             return fa;
@@ -66,7 +66,7 @@ class AuthenticationManagerSearchRecipe : Recipe
 
             if (IsMethodCall(mi.MethodType, AuthenticationManagerFqn, mi.Name.SimpleName))
             {
-                return mi.WithPrefix(AddTodoComment(mi.Prefix, TodoMessage));
+                return AddWarnMarker(mi, TodoMessage);
             }
 
             return mi;

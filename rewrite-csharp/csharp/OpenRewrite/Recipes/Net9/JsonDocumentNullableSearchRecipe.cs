@@ -73,7 +73,7 @@ class JsonDocumentNullableSearchRecipe : Recipe
 
             if (isMatch)
             {
-                return mi.WithPrefix(AddTodoComment(mi.Prefix, TodoMessage));
+                return AddWarnMarker(mi, TodoMessage);
             }
 
             return mi;

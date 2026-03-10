@@ -61,7 +61,7 @@ class EnumConverterSearchRecipe : Recipe
 
             if (isMatch)
             {
-                return newClass.WithPrefix(AddTodoComment(newClass.Prefix, TodoMessage));
+                return AddWarnMarker(newClass, TodoMessage);
             }
 
             return newClass;

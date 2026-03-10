@@ -44,7 +44,7 @@ public class AuthenticationManagerSearchRecipeTest : RewriteTest
                 {
                     void M()
                     {
-                        var modules =/* todo: AuthenticationManager is not supported in .NET 9 (SYSLIB0009). Methods will no-op or throw PlatformNotSupportedException. Use HttpClientHandler or CredentialCache for authentication. */ AuthenticationManager.RegisteredModules;
+                        var modules = /*~~(AuthenticationManager is not supported in .NET 9 (SYSLIB0009). Methods will no-op or throw PlatformNotSupportedException. Use HttpClientHandler or CredentialCache for authentication.)~~>*/AuthenticationManager.RegisteredModules;
                     }
                 }
                 """
