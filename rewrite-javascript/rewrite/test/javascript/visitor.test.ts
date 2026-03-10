@@ -21,10 +21,10 @@ import {autoFormat, maybeAutoFormat} from "../../src/javascript/format";
 import {fromVisitor, RecipeSpec} from "../../src/test";
 
 describe('JavaScript visitor formatting', () => {
-    test.each([
+    test.for([
         ['maybeAutoFormat', true],
         ['autoFormat', false]
-    ])('%s formats code after modification', async (formatMethod: string) => {
+    ] as const)('%s formats code after modification', async ([formatMethod]) => {
         // given
         class AddArgumentVisitor extends JavaScriptVisitor<ExecutionContext> {
             protected override async visitMethodInvocation(

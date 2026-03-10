@@ -163,7 +163,7 @@ function findWhitespaceViolations(rootNodes: OutputNode[]): string[] {
 }
 
 describe('whitespace should be attached to the outermost element', () => {
-    test.each([
+    test.for([
         "const c =  function(): number { return 116; };",
         "const x = new Date();",
         "async function m(): void { await Promise.resolve(); }",
