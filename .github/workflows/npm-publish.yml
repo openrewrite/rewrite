@@ -49,9 +49,8 @@ jobs:
           distribution: temurin
           java-version: ${{ inputs.java_version }}
 
-      - uses: actions/setup-node@v4
-        with:
-          registry-url: 'https://registry.npmjs.org'
+      - name: Configure npm registry for OIDC trusted publishing
+        run: echo "registry=https://registry.npmjs.org/" > ~/.npmrc
 
       - uses: gradle/actions/setup-gradle@v5
         with:
