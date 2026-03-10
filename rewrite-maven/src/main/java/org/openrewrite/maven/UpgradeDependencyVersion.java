@@ -322,7 +322,23 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                     if (newerVersion != null) {
                         if (t.getChild("version").isPresent()) {
-                            t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
+                            Xml.Tag versionTag = t.getChild("version").get();
+                            String versionValue = versionTag.getValue().orElse(null);
+                            if (isProperty(versionValue)) {
+                                ResolvedManagedDependency dm = findManagedDependency(t);
+                                if (dm != null && dm.getRequestedBom() != null &&
+                                    versionValue.equals(dm.getRequestedBom().getVersion())) {
+                                    // The dependency version property is shared with a BOM import;
+                                    // replace the property reference with the literal version to
+                                    // avoid changing the BOM version to one that may not exist
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag, newerVersion)
+                                            .visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                } else {
+                                    t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
+                                }
+                            } else {
+                                t = changeChildTagValue(t, "version", newerVersion, overrideManagedVersion, ctx);
+                            }
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
 

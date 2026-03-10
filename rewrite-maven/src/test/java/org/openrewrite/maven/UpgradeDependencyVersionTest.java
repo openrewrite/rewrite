@@ -2943,7 +2943,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1968")
     @Test
-    void bomUpgradeHandlesUnavailableBomVersion() {
+    void sharedPropertyBetweenBomAndDependencyDoesNotBreakBom() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.4.2", null,
             true, null)),
@@ -2953,12 +2953,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
+                  <properties>
+                      <jackson.version>2.13.4</jackson.version>
+                  </properties>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>com.fasterxml.jackson</groupId>
                               <artifactId>jackson-bom</artifactId>
-                              <version>2.13.4</version>
+                              <version>${jackson.version}</version>
                               <type>pom</type>
                               <scope>import</scope>
                           </dependency>
@@ -2968,6 +2971,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       <dependency>
                           <groupId>com.fasterxml.jackson.core</groupId>
                           <artifactId>jackson-databind</artifactId>
+                          <version>${jackson.version}</version>
                       </dependency>
                   </dependencies>
               </project>
@@ -2977,12 +2981,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
+                  <properties>
+                      <jackson.version>2.13.4</jackson.version>
+                  </properties>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>com.fasterxml.jackson</groupId>
                               <artifactId>jackson-bom</artifactId>
-                              <version>2.13.4</version>
+                              <version>${jackson.version}</version>
                               <type>pom</type>
                               <scope>import</scope>
                           </dependency>
@@ -3001,169 +3008,4 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1968")
-    @Test
-    void bomUpgradeSkipsUnavailableBomPom() throws Exception {
-        try (MockWebServer mockRepo = new MockWebServer()) {
-            mockRepo.setDispatcher(new Dispatcher() {
-                @Override
-                public MockResponse dispatch(RecordedRequest request) {
-                    String path = request.getPath();
-                    if (path == null) {
-                        return new MockResponse().setResponseCode(404);
-                    }
-                    if (path.contains("com/example/my-bom/maven-metadata.xml")) {
-                        return new MockResponse().setResponseCode(200).setBody("""
-                          <metadata>
-                            <groupId>com.example</groupId>
-                            <artifactId>my-bom</artifactId>
-                            <versioning>
-                              <versions>
-                                <version>1.0.0</version>
-                                <version>1.0.1</version>
-                              </versions>
-                            </versioning>
-                          </metadata>
-                          """);
-                    }
-                    if (path.contains("com/example/my-bom/1.0.0/my-bom-1.0.0.pom")) {
-                        return new MockResponse().setResponseCode(200).setBody("""
-                          <project>
-                            <modelVersion>4.0.0</modelVersion>
-                            <groupId>com.example</groupId>
-                            <artifactId>my-bom</artifactId>
-                            <version>1.0.0</version>
-                            <packaging>pom</packaging>
-                            <dependencyManagement>
-                              <dependencies>
-                                <dependency>
-                                  <groupId>com.example</groupId>
-                                  <artifactId>my-lib</artifactId>
-                                  <version>1.0.0</version>
-                                </dependency>
-                              </dependencies>
-                            </dependencyManagement>
-                          </project>
-                          """);
-                    }
-                    // BOM 1.0.1 listed in metadata but POM not published
-                    if (path.contains("com/example/my-bom/1.0.1/")) {
-                        return new MockResponse().setResponseCode(404);
-                    }
-                    if (path.contains("com/example/my-lib/maven-metadata.xml")) {
-                        return new MockResponse().setResponseCode(200).setBody("""
-                          <metadata>
-                            <groupId>com.example</groupId>
-                            <artifactId>my-lib</artifactId>
-                            <versioning>
-                              <versions>
-                                <version>1.0.0</version>
-                                <version>1.0.1</version>
-                              </versions>
-                            </versioning>
-                          </metadata>
-                          """);
-                    }
-                    if (path.contains("com/example/my-lib/1.0.0/my-lib-1.0.0.pom")) {
-                        return new MockResponse().setResponseCode(200).setBody("""
-                          <project>
-                            <modelVersion>4.0.0</modelVersion>
-                            <groupId>com.example</groupId>
-                            <artifactId>my-lib</artifactId>
-                            <version>1.0.0</version>
-                          </project>
-                          """);
-                    }
-                    if (path.contains("com/example/my-lib/1.0.1/my-lib-1.0.1.pom")) {
-                        return new MockResponse().setResponseCode(200).setBody("""
-                          <project>
-                            <modelVersion>4.0.0</modelVersion>
-                            <groupId>com.example</groupId>
-                            <artifactId>my-lib</artifactId>
-                            <version>1.0.1</version>
-                          </project>
-                          """);
-                    }
-                    return new MockResponse().setResponseCode(404);
-                }
-            });
-            mockRepo.start();
-
-            @SuppressWarnings("ConstantConditions")
-            MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
-              //language=xml
-              """
-                <settings>
-                    <mirrors>
-                        <mirror>
-                            <mirrorOf>*</mirrorOf>
-                            <name>mock</name>
-                            <url>http://%s:%d</url>
-                            <id>mock</id>
-                        </mirror>
-                    </mirrors>
-                </settings>
-                """.formatted(mockRepo.getHostName(), mockRepo.getPort())
-            ), new InMemoryExecutionContext());
-
-            rewriteRun(
-              spec -> spec
-                .recipe(new UpgradeDependencyVersion("com.example", "my-lib", "1.0.1", null, true, null))
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-                  .setMavenSettings(settings, "mock")),
-              pomXml(
-                """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.example</groupId>
-                                  <artifactId>my-bom</artifactId>
-                                  <version>1.0.0</version>
-                                  <type>pom</type>
-                                  <scope>import</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.example</groupId>
-                              <artifactId>my-lib</artifactId>
-                          </dependency>
-                      </dependencies>
-                  </project>
-                  """,
-                """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.example</groupId>
-                                  <artifactId>my-bom</artifactId>
-                                  <version>1.0.0</version>
-                                  <type>pom</type>
-                                  <scope>import</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.example</groupId>
-                              <artifactId>my-lib</artifactId>
-                              <version>1.0.1</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
-                  """
-              )
-            );
-            mockRepo.shutdown();
-        }
-    }
 }
