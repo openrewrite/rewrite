@@ -12,7 +12,6 @@ describe("rewrite test", () => {
     test("a recipe that makes no changes", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new ChangeText({text: "test"});
-        spec.allowEmptyDiff = true;
         await spec.rewriteRun(
             text("test")
         )

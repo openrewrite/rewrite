@@ -222,11 +222,9 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                 return stmt;
             });
 
-            draft.statements = newStatements;
-            // Filter out undefined (removed) statements only if there were removals
-            if (newStatements.length !== compilationUnit.statements.length || newStatements.some(s => s === undefined)) {
-                draft.statements = newStatements.filter(s => s !== undefined);
-            }
+            draft.statements = newStatements.some(s => s === undefined)
+                ? newStatements.filter(s => s !== undefined)
+                : newStatements;
             draft.eof = await this.visitSpace(compilationUnit.eof, p);
         });
     }

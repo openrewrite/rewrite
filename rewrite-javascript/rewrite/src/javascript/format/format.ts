@@ -843,7 +843,7 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
         // Object literals and type literals: always format empty ones as {} on single line
         if (parentKind === J.Kind.NewClass || parentKind === JS.Kind.TypeLiteral) {
-            if (isSimpleBlock && this.blockNeedsOneLine(b)) {
+            if (isSimpleBlock && this.blockIsMultiLine(b)) {
                 return produce(b, draft => {
                     this.formatBlockOnOneLine(draft);
                 });
@@ -859,7 +859,7 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
                 : this.style.keepWhenReformatting.simpleBlocksInOneLine;
 
             if (keepInOneLine) {
-                if (this.blockNeedsOneLine(b)) {
+                if (this.blockIsMultiLine(b)) {
                     return produce(b, draft => {
                         this.formatBlockOnOneLine(draft);
                     });
@@ -883,7 +883,7 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
         return b;
     }
 
-    private blockNeedsOneLine(b: J.Block): boolean {
+    private blockIsMultiLine(b: J.Block): boolean {
         if (b.end.whitespace.includes("\n")) return true;
         if (b.statements.length === 1) {
             if (b.statements[0].element.prefix.whitespace.includes("\n")) return true;

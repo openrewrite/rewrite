@@ -145,7 +145,8 @@ export abstract class TreeVisitor<T extends Tree, P> {
         const newMarkers = await this.visitMarkers(before.markers, p);
 
         if (recipe) {
-            // Remove markers before Mutative drafting to avoid cycles, then restore after
+            // Remove markers before Mutative drafting to avoid cycles, then restore after.
+            // The spread cost is paid unconditionally, but it enables the identity check below.
             const withoutMarkers = { ...before, markers: emptyMarkers };
             const result = await produceAsync(withoutMarkers, recipe);
             if (result === undefined) {
