@@ -473,13 +473,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 List<String> bomVersions = getAvailableBomVersions(bomGroupId, bomArtifactId, currentBomVersion, ctx);
 
                 for (String bomVersion : bomVersions) {
-                    String managedVersion = getDependencyVersionFromBom(
-                            bomGroupId, bomArtifactId, bomVersion,
-                            dependencyGroupId, dependencyArtifactId, ctx
-                    );
+                    try {
+                        String managedVersion = getDependencyVersionFromBom(
+                                bomGroupId, bomArtifactId, bomVersion,
+                                dependencyGroupId, dependencyArtifactId, ctx
+                        );
 
-                    if (targetDependencyVersion.equals(managedVersion)) {
-                        return bomVersion;
+                        if (targetDependencyVersion.equals(managedVersion)) {
+                            return bomVersion;
+                        }
+                    } catch (MavenDownloadingException ignored) {
+                        // BOM version listed in metadata but POM not available; skip and try next
                     }
                 }
 
