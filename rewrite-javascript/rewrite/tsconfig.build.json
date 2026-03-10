@@ -7,8 +7,7 @@
     "noEmitOnError": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "composite": true,
-    "types": ["vitest/globals"]
+    "composite": true
   },
   "include": [
     "src/**/*"

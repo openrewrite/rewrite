@@ -18,7 +18,6 @@ export default defineConfig({
                 suiteName: '{filename}',
             }],
         ],
-        pool: 'forks',
         maxWorkers: '50%',
     },
     resolve: {

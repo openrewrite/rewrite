@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {expect} from "vitest";
 import {Recipe} from "../recipe";
 import {ExecutionContext} from "../execution";
 import {noopVisitor, TreeVisitor} from "../visitor";

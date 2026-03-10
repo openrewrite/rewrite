@@ -22,9 +22,9 @@ import {fromVisitor, RecipeSpec} from "../../src/test";
 
 describe('JavaScript visitor formatting', () => {
     test.for([
-        ['maybeAutoFormat', true],
-        ['autoFormat', false]
-    ] as const)('%s formats code after modification', async ([formatMethod]) => {
+        'maybeAutoFormat',
+        'autoFormat',
+    ])('%s formats code after modification', async (formatMethod) => {
         // given
         class AddArgumentVisitor extends JavaScriptVisitor<ExecutionContext> {
             protected override async visitMethodInvocation(
