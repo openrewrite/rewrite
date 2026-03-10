@@ -38,12 +38,15 @@ import javax.tools.ToolProvider;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -830,6 +833,65 @@ class TypeTableTest implements RewriteTest {
             );
         }
 
+    }
+
+    @Nested
+    class ClassloaderResolutionTests {
+
+        /**
+         * Simulates the scenario from <a href="https://github.com/openrewrite/rewrite/issues/6885">#6885</a>:
+         * Recipe JARs are loaded via a custom URLClassLoader (e.g. in Quarkus), so their
+         * classpath.tsv.gz resources are not visible to the caller's classloader.
+         * TypeTable.fromClasspath() should also check the thread context classloader.
+         */
+        @Test
+        void findsResourcesFromThreadContextClassLoader() throws Exception {
+            // Create a simple class, compile it, jar it, and write a classpath.tsv.gz
+            //language=java
+            String source = """
+                package com.example;
+
+                public class SimpleClass {
+                    public static final String VALUE = "hello";
+                }
+                """;
+
+            Path classFile = compileToClassFile(source, "com.example.SimpleClass");
+            Path jarFile = createJarFromClasses("simple.jar", classFile);
+
+            // Create a classpath.tsv.gz in a separate directory that simulates a recipe JAR
+            Path recipeJarDir = tempDir.resolve("recipe-jar");
+            Path metaInfDir = recipeJarDir.resolve("META-INF/rewrite");
+            Files.createDirectories(metaInfDir);
+
+            Path tsvFile = metaInfDir.resolve("classpath.tsv.gz");
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsvFile))) {
+                writer.jar("com.example", "simple", "1.0").write(jarFile);
+            }
+
+            // Create a URLClassLoader that can see the recipe JAR's resources
+            // Use a parent that does NOT have access to any classpath.tsv.gz (the bootstrap classloader)
+            URLClassLoader isolatedLoader = new URLClassLoader(
+                    new URL[]{recipeJarDir.toUri().toURL()},
+                    ClassLoader.getPlatformClassLoader()
+            );
+
+            // Set the isolated classloader as the TCCL
+            ClassLoader originalTccl = Thread.currentThread().getContextClassLoader();
+            try {
+                Thread.currentThread().setContextClassLoader(isolatedLoader);
+
+                // TypeTable.fromClasspath should find the resource via TCCL
+                TypeTable typeTable = TypeTable.fromClasspath(ctx, Set.of("simple"));
+                assertThat(typeTable).isNotNull();
+
+                Path loaded = typeTable.load("simple");
+                assertThat(loaded).isNotNull();
+            } finally {
+                Thread.currentThread().setContextClassLoader(originalTccl);
+                isolatedLoader.close();
+            }
+        }
     }
 
     // Helper methods for integration tests

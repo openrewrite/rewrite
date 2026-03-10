@@ -322,14 +322,14 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
         const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
+        // Mutative detects same-value assignments and returns the original reference
+        // when nothing actually changed, so no guard function is needed.
         return produce(ret, draft => {
             if (draft.importClause) {
-                // Space after 'import' keyword:
-                // - If there's a default import (name), space goes in importClause.prefix
-                // - If typeOnly (import type ...), space goes in importClause.prefix (before 'type')
-                // - If only namedBindings (no default, no type), space goes in namedBindings.prefix (importClause.prefix is empty)
-                const hasDefaultImport = !!draft.importClause.name;
-                draft.importClause.prefix.whitespace = (hasDefaultImport || draft.importClause.typeOnly) ? " " : "";
+                // Space after 'import' keyword always goes on importClause.prefix.
+                // The parser is consistent here: both ImportClause and NamedBindings share
+                // the same trivia span, but ImportClause consumes it first.
+                draft.importClause.prefix.whitespace = " ";
                 if (draft.importClause.name) {
                     // For import equals declarations (import X = Y), use assignment spacing
                     // For regular imports (import X from 'Y'), no space after name
@@ -338,22 +338,22 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                         : "";
                 }
                 if (draft.importClause.namedBindings) {
-                    // Space before namedBindings - always needed
-                    draft.importClause.namedBindings.prefix.whitespace = " ";
+                    const hasDefaultImport = !!draft.importClause.name;
+                    if (hasDefaultImport || draft.importClause.typeOnly) {
+                        draft.importClause.namedBindings.prefix.whitespace = " ";
+                    }
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
-                        // Check if this is a multi-line import (any element's prefix has a newline)
                         const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
                         if (!isMultiLine) {
-                            // Single-line: adjust brace spacing
-                            ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
-                            ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                            const braceSpace = this.style.within.es6ImportExportBraces ? " " : "";
+                            ni.elements.elements[0].element.prefix.whitespace = braceSpace;
+                            ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = braceSpace;
                         } else {
                             // Multi-line: apply beforeComma rule to last element's after (for trailing commas)
-                            // If it has only spaces (no newline), it's the space before a trailing comma
-                            const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after.whitespace;
-                            if (!lastAfter.includes("\n") && lastAfter.trim() === "") {
-                                ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.other.beforeComma ? " " : "";
+                            const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after;
+                            if (!lastAfter.whitespace.includes("\n") && lastAfter.whitespace.trim() === "") {
+                                lastAfter.whitespace = this.style.other.beforeComma ? " " : "";
                             }
                         }
                     }
@@ -751,6 +751,9 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitVariableDeclarations(multiVariable: J.VariableDeclarations, p: P): Promise<J.VariableDeclarations> {
         const v = await super.visitVariableDeclarations(multiVariable, p) as J.VariableDeclarations;
+        if (v.leadingAnnotations.length === 0) {
+            return v;
+        }
         const parent = this.cursor.parentTree()?.value;
         if (parent?.kind === J.Kind.Block) {
             return produce(v, draft => {
@@ -769,6 +772,9 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitMethodDeclaration(method: J.MethodDeclaration, p: P): Promise<J.MethodDeclaration> {
         const m = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+        if (m.leadingAnnotations.length === 0) {
+            return m;
+        }
         return produce(m, draft => {
             draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
             if (draft.leadingAnnotations.length > 0) {
@@ -789,21 +795,29 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
         const e = await super.visitElse(elsePart, p) as J.If.Else;
         const hasBody = e.body.element.kind === J.Kind.Block || e.body.element.kind === J.Kind.If;
 
-        return produce(e, draft => {
-            if (hasBody) {
-                const shouldHaveNewline = this.style.ifStatement.elseOnNewLine;
-                const hasNewline = draft.prefix.whitespace.includes("\n");
+        if (!hasBody) {
+            return e;
+        }
+
+        const shouldHaveNewline = this.style.ifStatement.elseOnNewLine;
+        const hasNewline = e.prefix.whitespace.includes("\n");
+        if ((shouldHaveNewline && !hasNewline) || (!shouldHaveNewline && hasNewline)) {
+            return produce(e, draft => {
                 if (shouldHaveNewline && !hasNewline) {
                     draft.prefix.whitespace = "\n" + draft.prefix.whitespace;
-                } else if (!shouldHaveNewline && hasNewline) {
+                } else {
                     draft.prefix.whitespace = "";
                 }
-            }
-        });
+            });
+        }
+        return e;
     }
 
     protected async visitClassDeclaration(classDecl: J.ClassDeclaration, p: P): Promise<J.ClassDeclaration> {
         const j = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+        if (j.leadingAnnotations.length === 0) {
+            return j;
+        }
         return produce(j, draft => {
             draft.leadingAnnotations = this.withNewlines(draft.leadingAnnotations);
             if (draft.leadingAnnotations.length > 0) {
@@ -821,61 +835,75 @@ export class WrappingAndBracesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitBlock(block: J.Block, p: P): Promise<J.Block> {
         const b = await super.visitBlock(block, p) as J.Block;
-        return produce(b, draft => {
-            const parentKind = this.cursor.parent?.value.kind;
+        const parentKind = this.cursor.parent?.value.kind;
 
-            // Check if this is a "simple" block (empty or contains only a single J.Empty)
-            const isSimpleBlock = draft.statements.length === 0 ||
-                (draft.statements.length === 1 && draft.statements[0].element.kind === J.Kind.Empty);
+        // Check if this is a "simple" block (empty or contains only a single J.Empty)
+        const isSimpleBlock = b.statements.length === 0 ||
+            (b.statements.length === 1 && b.statements[0].element.kind === J.Kind.Empty);
 
-            // Helper to format block on one line
-            const formatOnOneLine = () => {
-                // Format as {} - remove any newlines from end whitespace
-                if (draft.end.whitespace.includes("\n")) {
-                    draft.end.whitespace = draft.end.whitespace.replace(/\n\s*/g, "");
-                }
-                // Also remove newlines from statement padding if there's a J.Empty
-                if (draft.statements.length === 1) {
-                    if (draft.statements[0].element.prefix.whitespace.includes("\n")) {
-                        draft.statements[0].element.prefix.whitespace = "";
-                    }
-                    if (draft.statements[0].after.whitespace.includes("\n")) {
-                        draft.statements[0].after.whitespace = "";
-                    }
-                }
-            };
-
-            // Object literals and type literals: always format empty ones as {} on single line
-            if (parentKind === J.Kind.NewClass || parentKind === JS.Kind.TypeLiteral) {
-                if (isSimpleBlock) {
-                    formatOnOneLine();
-                }
-                return;
+        // Object literals and type literals: always format empty ones as {} on single line
+        if (parentKind === J.Kind.NewClass || parentKind === JS.Kind.TypeLiteral) {
+            if (isSimpleBlock && this.blockIsMultiLine(b)) {
+                return produce(b, draft => {
+                    this.formatBlockOnOneLine(draft);
+                });
             }
+            return b;
+        }
 
-            if (isSimpleBlock) {
-                // Determine which style option applies based on parent
-                const isMethodOrFunctionBody = parentKind === J.Kind.Lambda ||
-                    parentKind === J.Kind.MethodDeclaration;
-                const keepInOneLine = isMethodOrFunctionBody
-                    ? this.style.keepWhenReformatting.simpleMethodsInOneLine
-                    : this.style.keepWhenReformatting.simpleBlocksInOneLine;
+        if (isSimpleBlock) {
+            const isMethodOrFunctionBody = parentKind === J.Kind.Lambda ||
+                parentKind === J.Kind.MethodDeclaration;
+            const keepInOneLine = isMethodOrFunctionBody
+                ? this.style.keepWhenReformatting.simpleMethodsInOneLine
+                : this.style.keepWhenReformatting.simpleBlocksInOneLine;
 
-                if (keepInOneLine) {
-                    formatOnOneLine();
-                } else {
-                    // Format with newline between { and }
-                    if (!draft.end.whitespace.includes("\n")) {
-                        draft.end = this.withNewlineSpace(draft.end);
-                    }
+            if (keepInOneLine) {
+                if (this.blockIsMultiLine(b)) {
+                    return produce(b, draft => {
+                        this.formatBlockOnOneLine(draft);
+                    });
                 }
             } else {
-                // Non-simple blocks: ensure closing brace is on its own line
-                if (!draft.end.whitespace.includes("\n") && !draft.statements[draft.statements.length - 1].after.whitespace.includes("\n")) {
-                    draft.end = this.withNewlineSpace(draft.end);
+                if (!b.end.whitespace.includes("\n")) {
+                    return produce(b, draft => {
+                        draft.end = this.withNewlineSpace(draft.end);
+                    });
                 }
             }
-        });
+        } else {
+            // Non-simple blocks: ensure closing brace is on its own line
+            if (!b.end.whitespace.includes("\n") && !b.statements[b.statements.length - 1].after.whitespace.includes("\n")) {
+                return produce(b, draft => {
+                    draft.end = this.withNewlineSpace(draft.end);
+                });
+            }
+        }
+
+        return b;
+    }
+
+    private blockIsMultiLine(b: J.Block): boolean {
+        if (b.end.whitespace.includes("\n")) return true;
+        if (b.statements.length === 1) {
+            if (b.statements[0].element.prefix.whitespace.includes("\n")) return true;
+            if (b.statements[0].after.whitespace.includes("\n")) return true;
+        }
+        return false;
+    }
+
+    private formatBlockOnOneLine(draft: Draft<J.Block>): void {
+        if (draft.end.whitespace.includes("\n")) {
+            draft.end.whitespace = draft.end.whitespace.replace(/\n\s*/g, "");
+        }
+        if (draft.statements.length === 1) {
+            if (draft.statements[0].element.prefix.whitespace.includes("\n")) {
+                draft.statements[0].element.prefix.whitespace = "";
+            }
+            if (draft.statements[0].after.whitespace.includes("\n")) {
+                draft.statements[0].after.whitespace = "";
+            }
+        }
     }
 
     protected async visitSwitch(aSwitch: J.Switch, p: P): Promise<J | undefined> {
@@ -1100,7 +1128,7 @@ export class BlankLinesVisitor<P> extends JavaScriptVisitor<P> {
         }
     }
 
-    private ensurePrefixHasNewLine<T extends J>(node: Draft<J>) {
+    private ensurePrefixHasNewLine(node: Draft<J>) {
         if (!node.prefix) return;
 
         // Check if newline already exists in the effective last whitespace

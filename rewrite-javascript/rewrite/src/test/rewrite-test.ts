@@ -40,6 +40,7 @@ export interface SourceSpec<T extends SourceFile> {
 
 export class RecipeSpec {
     checkParsePrintIdempotence: boolean = true
+    allowEmptyDiff: boolean = false
 
     recipe: Recipe = new NoopRecipe()
 
@@ -162,9 +163,21 @@ export class RecipeSpec {
 
             if (!spec.after) {
                 if (after && after !== result?.before) {
-                    expect(await TreePrinters.print(after)).toEqual(dedent(spec.before!));
-                    // TODO: Consider throwing an error, as there should typically have been no change to the LST
-                    // fail("Expected after to be undefined.");
+                    const actual = await TreePrinters.print(after);
+                    const expected = dedent(spec.before!);
+                    if (actual === expected) {
+                        if (!this.allowEmptyDiff) {
+                            throw new Error(
+                                "An empty diff was generated. The recipe incorrectly " +
+                                "changed the AST without changing the printed output."
+                            );
+                        }
+                    } else {
+                        throw new Error(
+                            "Expected no change but recipe modified the file.\n" +
+                            `Expected:\n${expected}\n\nActual:\n${actual}`
+                        );
+                    }
                 }
                 if (spec.afterRecipe) {
                     await spec.afterRecipe(matchingSpec![1]);

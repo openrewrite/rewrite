@@ -160,4 +160,95 @@ class ExtraPropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findsExtSubscriptAccess() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext['jackson.version'] = "2.13.3"
+              """,
+            """
+              /*~~>*/ext['jackson.version'] = "2.13.3"
+              """
+          )
+        );
+    }
+
+    @Test
+    void updatesExtSubscriptAccess() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new ExtraProperty.Matcher()
+            .propertyName("jackson.version")
+            .matchVariableDeclarations(false)
+            .asVisitor((prop, ctx) -> prop.withValue("2.15.0").getTree()))),
+          buildGradle(
+            """
+              ext['jackson.version'] = "2.13.3"
+              """,
+            """
+              ext['jackson.version'] = "2.15.0"
+              """
+          )
+        );
+    }
+
+    @Test
+    void findsSetMethodInsideExtBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              ext {
+                  set('jackson.version', "2.13.3")
+              }
+              """,
+            """
+              ext {
+                  /*~~>*/set('jackson.version', "2.13.3")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updatesSetMethodInsideExtBlock() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new ExtraProperty.Matcher()
+            .propertyName("jackson.version")
+            .matchVariableDeclarations(false)
+            .asVisitor((prop, ctx) -> prop.withValue("2.15.0").getTree()))),
+          buildGradle(
+            """
+              ext {
+                  set('jackson.version', "2.13.3")
+              }
+              """,
+            """
+              ext {
+                  set('jackson.version', "2.15.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesSpecificSubscriptProperty() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new ExtraProperty.Matcher()
+            .propertyName("jackson.version")
+            .asVisitor(prop -> SearchResult.found(prop.getTree())))),
+          buildGradle(
+            """
+              ext['jackson.version'] = "2.13.3"
+              ext['guava.version'] = "30.0-jre"
+              """,
+            """
+              /*~~>*/ext['jackson.version'] = "2.13.3"
+              ext['guava.version'] = "30.0-jre"
+              """
+          )
+        );
+    }
 }

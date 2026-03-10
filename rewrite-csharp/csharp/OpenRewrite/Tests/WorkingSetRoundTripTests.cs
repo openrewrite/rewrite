@@ -48,11 +48,16 @@ public class WorkingSetRoundTripTests
     }
 
     [Trait("Category", "WorkingSet")]
-    [Theory]
-    [MemberData(nameof(AllProjects))]
-    public async Task ParseAndPrintRoundTrip(string displayName, string projectFile, string projectDir)
+    [Fact]
+    public async Task ParseAndPrintRoundTrip()
     {
-        await RunRoundTrip(displayName, projectFile, projectDir);
+        var projects = AllProjects().ToList();
+        if (projects.Count == 0) return; // No WORKING_SET_ROOT configured
+
+        foreach (var data in projects)
+        {
+            await RunRoundTrip((string)data[0], (string)data[1], (string)data[2]);
+        }
     }
 
     #endregion

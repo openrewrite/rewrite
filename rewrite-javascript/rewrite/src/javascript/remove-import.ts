@@ -1,7 +1,7 @@
 import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {JS, JSX} from "./tree";
-import {mapAsync} from "../util";
+import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
 
 /**
@@ -146,7 +146,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         return this.produceJavaScript(compilationUnit, p, async draft => {
             const formatter = new ElementRemovalFormatter<J>(true); // Preserve file headers from first import
 
-            draft.statements = await mapAsync(compilationUnit.statements, async (stmt) => {
+            const newStatements = await mapAsync(compilationUnit.statements, async (stmt) => {
                 const statement = stmt.element;
 
                 // Handle ES6 imports
@@ -159,7 +159,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     }
 
                     const finalResult = formatter.processKept(result) as JS.Import;
-                    return {...stmt, element: finalResult};
+                    return updateIfChanged(stmt, {element: finalResult});
                 }
 
                 // Handle CommonJS require statements
@@ -174,7 +174,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                     }
 
                     const finalResult = formatter.processKept(result) as J.VariableDeclarations;
-                    return {...stmt, element: finalResult};
+                    return updateIfChanged(stmt, {element: finalResult});
                 }
 
                 // Handle JS.ScopedVariableDeclarations (multi-variable var/let/const)
@@ -194,7 +194,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                                 varFormatter.markRemoved(varDecl);
                             } else {
                                 const formattedVarDecl = varFormatter.processKept(result as J.VariableDeclarations);
-                                filteredVariables.push({...v, element: formattedVarDecl});
+                                filteredVariables.push(updateIfChanged(v, {element: formattedVarDecl}));
                             }
                         } else {
                             filteredVariables.push(v);
@@ -210,20 +210,21 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
                         ? formatter.processKept({...scopedVarDecl, variables: filteredVariables})
                         : formatter.processKept(statement);
 
-                    return {...stmt, element: finalElement};
+                    return updateIfChanged(stmt, {element: finalElement});
                 }
 
                 // For any other statement type, apply prefix from removed elements
                 if (statement) {
                     const finalStatement = formatter.processKept(statement);
-                    return {...stmt, element: finalStatement};
+                    return updateIfChanged(stmt, {element: finalStatement});
                 }
 
                 return stmt;
             });
 
-            // Filter out undefined (removed) statements
-            draft.statements = draft.statements.filter(s => s !== undefined);
+            draft.statements = newStatements.some(s => s === undefined)
+                ? newStatements.filter(s => s !== undefined)
+                : newStatements;
             draft.eof = await this.visitSpace(compilationUnit.eof, p);
         });
     }
