@@ -151,7 +151,8 @@ export abstract class TreeVisitor<T extends Tree, P> {
             if (result === undefined) {
                 return undefined;
             }
-            // If neither the recipe nor marker visiting changed anything, return the original object
+            // Mutative's produceAsync returns the same reference when no draft mutations occurred
+            // (structural sharing), so reference equality is a reliable no-change check.
             if (result === withoutMarkers && newMarkers === before.markers) {
                 return before;
             }

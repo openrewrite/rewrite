@@ -9,9 +9,8 @@ import {PlainText, PlainTextVisitor} from "../../src/text";
 import {randomId} from "../../src/uuid";
 
 describe("rewrite test", () => {
-    const spec = new RecipeSpec();
-
     test("a recipe that makes no changes", async () => {
+        const spec = new RecipeSpec();
         spec.recipe = new ChangeText({text: "test"});
         spec.allowEmptyDiff = true;
         await spec.rewriteRun(
@@ -33,7 +32,7 @@ describe("rewrite test", () => {
         expect(count).toEqual(1)
     });
 
-    test("customize the path of a source spec", () => spec.rewriteRun(
+    test("customize the path of a source spec", () => new RecipeSpec().rewriteRun(
         {
             ...json(
                 `{"type": "object"}`,

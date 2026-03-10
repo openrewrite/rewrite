@@ -322,21 +322,21 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
 
     protected async visitImportDeclaration(jsImport: JS.Import, p: P): Promise<J | undefined> {
         const ret = await super.visitImportDeclaration(jsImport, p) as JS.Import;
-        if (!this.importNeedsSpaceChanges(ret)) {
-            return ret;
-        }
+        // Mutative detects same-value assignments and returns the original reference
+        // when nothing actually changed, so no guard function is needed.
         return produce(ret, draft => {
             if (draft.importClause) {
                 // Space after 'import' keyword:
                 // - If there's a default import (name), space goes in importClause.prefix
                 // - If typeOnly (import type ...), space goes in importClause.prefix (before 'type')
                 // - If only namedBindings (no default, no type), the space can be in either
-                //   importClause.prefix or namedBindings.prefix — don't move it between them
+                //   importClause.prefix or namedBindings.prefix — don't move it between them.
+                //   TODO: This is a parser normalization issue — the parser should place the space
+                //   in a canonical location.
                 const hasDefaultImport = !!draft.importClause.name;
                 if (hasDefaultImport || draft.importClause.typeOnly) {
                     draft.importClause.prefix.whitespace = " ";
                 } else if (!draft.importClause.namedBindings || draft.importClause.prefix.whitespace !== " ") {
-                    // Only clear if not already a space (parser may place space here instead of namedBindings.prefix)
                     draft.importClause.prefix.whitespace = "";
                 }
                 if (draft.importClause.name) {
@@ -355,18 +355,16 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                     }
                     if (draft.importClause.namedBindings.kind == JS.Kind.NamedImports) {
                         const ni = draft.importClause.namedBindings as Draft<JS.NamedImports>;
-                        // Check if this is a multi-line import (any element's prefix has a newline)
                         const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
                         if (!isMultiLine) {
-                            // Single-line: adjust brace spacing
-                            ni.elements.elements[0].element.prefix.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
-                            ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.within.es6ImportExportBraces ? " " : "";
+                            const braceSpace = this.style.within.es6ImportExportBraces ? " " : "";
+                            ni.elements.elements[0].element.prefix.whitespace = braceSpace;
+                            ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = braceSpace;
                         } else {
                             // Multi-line: apply beforeComma rule to last element's after (for trailing commas)
-                            // If it has only spaces (no newline), it's the space before a trailing comma
-                            const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after.whitespace;
-                            if (!lastAfter.includes("\n") && lastAfter.trim() === "") {
-                                ni.elements.elements[ni.elements.elements.length - 1].after.whitespace = this.style.other.beforeComma ? " " : "";
+                            const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after;
+                            if (!lastAfter.whitespace.includes("\n") && lastAfter.whitespace.trim() === "") {
+                                lastAfter.whitespace = this.style.other.beforeComma ? " " : "";
                             }
                         }
                     }
@@ -377,54 +375,6 @@ export class SpacesVisitor<P> extends JavaScriptVisitor<P> {
                 draft.moduleSpecifier.element.prefix.whitespace = draft.importClause ? " " : "";
             }
         })
-    }
-
-    private importNeedsSpaceChanges(imp: JS.Import): boolean {
-        if (imp.importClause) {
-            const hasDefaultImport = !!imp.importClause.name;
-
-            if (hasDefaultImport || imp.importClause.typeOnly) {
-                if (imp.importClause.prefix.whitespace !== " ") return true;
-            } else {
-                // When no default/typeOnly, accept space on either importClause.prefix or namedBindings.prefix
-                if (imp.importClause.prefix.whitespace !== "" && imp.importClause.prefix.whitespace !== " ") return true;
-            }
-
-            if (imp.importClause.name) {
-                const expectedNameAfter = imp.initializer
-                    ? (this.style.aroundOperators.assignment ? " " : "")
-                    : "";
-                if (imp.importClause.name.after.whitespace !== expectedNameAfter) return true;
-            }
-
-            if (imp.importClause.namedBindings) {
-                // Space check depends on where the parser placed the import-keyword space
-                if (hasDefaultImport || imp.importClause.typeOnly || imp.importClause.prefix.whitespace !== " ") {
-                    if (imp.importClause.namedBindings.prefix.whitespace !== " ") return true;
-                }
-                if (imp.importClause.namedBindings.kind === JS.Kind.NamedImports) {
-                    const ni = imp.importClause.namedBindings as JS.NamedImports;
-                    const isMultiLine = ni.elements.elements.some(e => e.element.prefix.whitespace.includes("\n"));
-                    if (!isMultiLine) {
-                        const braceSpace = this.style.within.es6ImportExportBraces ? " " : "";
-                        if (ni.elements.elements[0].element.prefix.whitespace !== braceSpace) return true;
-                        if (ni.elements.elements[ni.elements.elements.length - 1].after.whitespace !== braceSpace) return true;
-                    } else {
-                        const lastAfter = ni.elements.elements[ni.elements.elements.length - 1].after.whitespace;
-                        if (!lastAfter.includes("\n") && lastAfter.trim() === "") {
-                            const expected = this.style.other.beforeComma ? " " : "";
-                            if (lastAfter !== expected) return true;
-                        }
-                    }
-                }
-            }
-        }
-        if (imp.moduleSpecifier) {
-            if (imp.moduleSpecifier.before.whitespace !== " ") return true;
-            const expectedElementPrefix = imp.importClause ? " " : "";
-            if (imp.moduleSpecifier.element.prefix.whitespace !== expectedElementPrefix) return true;
-        }
-        return false;
     }
 
     protected async visitIndexSignatureDeclaration(indexSignatureDeclaration: JS.IndexSignatureDeclaration, p: P): Promise<J | undefined> {

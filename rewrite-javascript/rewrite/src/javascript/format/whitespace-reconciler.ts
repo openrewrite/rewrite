@@ -305,6 +305,8 @@ export class WhitespaceReconciler {
 
     /**
      * Structurally compare two Space objects for equality.
+     * Currently only TextComment has additional properties (text, multiline);
+     * if new comment types are added, extend the comparison here.
      */
     private spacesEqual(a: J.Space, b: J.Space): boolean {
         if (a.whitespace !== b.whitespace) return false;
@@ -312,7 +314,6 @@ export class WhitespaceReconciler {
         for (let i = 0; i < a.comments.length; i++) {
             const ca = a.comments[i], cb = b.comments[i];
             if (ca.kind !== cb.kind || ca.suffix !== cb.suffix) return false;
-            // Compare text content for TextComment
             if (ca.kind === J.Kind.TextComment) {
                 const ta = ca as TextComment, tb = cb as TextComment;
                 if (ta.text !== tb.text || ta.multiline !== tb.multiline) return false;
