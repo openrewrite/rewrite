@@ -17,8 +17,6 @@ on:
     secrets:
       gradle_enterprise_access_key:
         required: false
-      npm_token:
-        required: false
   workflow_dispatch:
     inputs:
       java_version:
@@ -69,5 +67,3 @@ jobs:
         run: |
           TARBALL=$(ls rewrite-javascript/build/distributions/*.tgz)
           npm publish "$TARBALL" --provenance --access public ${{ inputs.releasing && ' ' || '--tag next' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.npm_token || secrets.NPM_TOKEN }}
