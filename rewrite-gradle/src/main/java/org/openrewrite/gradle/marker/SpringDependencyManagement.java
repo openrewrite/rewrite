@@ -44,21 +44,16 @@ public final class SpringDependencyManagement implements Serializable {
      * project's dependencies. The default is {@code true}.
      */
     @Builder.Default
-    private final
     boolean overriddenByDependencies = true;
 
-    @Nullable
-    @Builder.Default
-    private final
-    DependencyManagement globalDependencyManagement = null;
+    DependencyManagement globalDependencyManagement;
 
     @Builder.Default
     @With
-    private final
     Map<String, DependencyManagement> configurationDependencyManagement = emptyMap();
 
     @JsonCreator
-    public SpringDependencyManagement(boolean overriddenByDependencies, @Nullable DependencyManagement globalDependencyManagement, Map<String, DependencyManagement> configurationDependencyManagement) {
+    public SpringDependencyManagement(boolean overriddenByDependencies, DependencyManagement globalDependencyManagement, Map<String, DependencyManagement> configurationDependencyManagement) {
         this.overriddenByDependencies = overriddenByDependencies;
         this.globalDependencyManagement = globalDependencyManagement;
         this.configurationDependencyManagement = configurationDependencyManagement;
@@ -87,18 +82,18 @@ public final class SpringDependencyManagement implements Serializable {
     @Value
     @With
     @Builder
-    static final class DependencyManagement implements Serializable {
+    public static class DependencyManagement implements Serializable {
         /**
          * A map of the managed versions from imported boms. The key-value pairs in the map have the form {@code group:name = version}.
          */
-        private final Map<String, String> implicitVersions;
+        Map<String, String> implicitVersions;
 
         /**
          * A map of the managed versions from dependencies in the {@code dependencies} block. The key-value pairs in the map have the form {@code group:name = version}.
          */
-        private final Map<String, String> explicitVersions;
+        Map<String, String> explicitVersions;
 
-        private final List<GroupArtifactVersion> importedBoms;
+        List<GroupArtifactVersion> importedBoms;
 
         @JsonCreator
         public DependencyManagement(Map<String, String> implicitVersions, Map<String, String> explicitVersions, List<GroupArtifactVersion> importedBoms) {
@@ -107,6 +102,7 @@ public final class SpringDependencyManagement implements Serializable {
             this.importedBoms = importedBoms;
         }
 
+        @Nullable
         String getManagedVersion(String key, boolean overriddenByDependencies) {
             if (!overriddenByDependencies) {
                 return implicitVersions.containsKey(key) ? implicitVersions.get(key) : explicitVersions.get(key);
