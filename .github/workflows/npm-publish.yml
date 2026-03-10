@@ -42,6 +42,10 @@ jobs:
           distribution: temurin
           java-version: ${{ inputs.java_version }}
 
+      - uses: actions/setup-node@v4
+        with:
+          registry-url: 'https://registry.npmjs.org'
+
       - uses: gradle/actions/setup-gradle@v5
         with:
           develocity-access-key: ${{ secrets.gradle_enterprise_access_key }}
