@@ -100,10 +100,6 @@ export class MinimumViableSpacingVisitor<P> extends JavaScriptVisitor<P> {
             });
         }
 
-        c = produce(c, draft => {
-            draft.body.prefix.whitespace = "";
-        });
-
         return c;
     }
 

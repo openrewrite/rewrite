@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {isIdentifier, isLiteral, isSpace, J, Type} from '../../java';
+import {isIdentifier, isLiteral, isSpace, J, TextComment, Type} from '../../java';
 import {JS} from "../tree";
 
 /**
@@ -163,7 +163,9 @@ export class WhitespaceReconciler {
 
         // Space nodes - copy when reconciling, don't recurse
         if (isSpace(original)) {
-            return this.shouldReconcile() ? formatted : original;
+            if (!this.shouldReconcile()) return original;
+            if (isSpace(formatted) && this.spacesEqual(original, formatted as J.Space)) return original;
+            return formatted;
         }
 
         // Track entering target subtree (using referential equality)
@@ -247,6 +249,10 @@ export class WhitespaceReconciler {
             // Space values and markers: copy from formatted when reconciling
             if ((isSpace(originalValue)) || key === 'markers') {
                 if (this.shouldReconcile() && formattedValue !== originalValue) {
+                    // For spaces, check structural equality to avoid unnecessary new objects
+                    if (isSpace(originalValue) && isSpace(formattedValue) && this.spacesEqual(originalValue, formattedValue as J.Space)) {
+                        continue;
+                    }
                     result = { ...result, [key]: formattedValue } as VisitableNode;
                 }
                 continue;
@@ -295,6 +301,24 @@ export class WhitespaceReconciler {
      */
     private shouldReconcile(): boolean {
         return this.reconcileState === 'reconciling';
+    }
+
+    /**
+     * Structurally compare two Space objects for equality.
+     */
+    private spacesEqual(a: J.Space, b: J.Space): boolean {
+        if (a.whitespace !== b.whitespace) return false;
+        if (a.comments.length !== b.comments.length) return false;
+        for (let i = 0; i < a.comments.length; i++) {
+            const ca = a.comments[i], cb = b.comments[i];
+            if (ca.kind !== cb.kind || ca.suffix !== cb.suffix) return false;
+            // Compare text content for TextComment
+            if (ca.kind === J.Kind.TextComment) {
+                const ta = ca as TextComment, tb = cb as TextComment;
+                if (ta.text !== tb.text || ta.multiline !== tb.multiline) return false;
+            }
+        }
+        return true;
     }
 
     /**
