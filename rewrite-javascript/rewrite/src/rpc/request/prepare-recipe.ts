@@ -110,22 +110,22 @@ export class PrepareRecipe {
                         }
                 )
             }
-            this.visitorTypePrecondition(preconditions, visitor.v);
+            await this.visitorTypePrecondition(preconditions, visitor.v);
         } else {
-            this.visitorTypePrecondition(preconditions, visitor!);
+            await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
     }
 
-    private static visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Precondition[] {
+    private static async visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Promise<Precondition[]> {
         let treeType: string | undefined;
 
-        // Use CommonJS require to defer loading and avoid circular dependencies
-        const {JsonVisitor} = require("../../json");
-        const {JavaScriptVisitor} = require("../../javascript");
-        const {JavaVisitor} = require("../../java");
-        const {PlainTextVisitor} = require("../../text");
-        const {YamlVisitor} = require("../../yaml");
+        // Use dynamic import to defer loading and avoid circular dependencies
+        const {JsonVisitor} = await import("../../json/index.js");
+        const {JavaScriptVisitor} = await import("../../javascript/index.js");
+        const {JavaVisitor} = await import("../../java/index.js");
+        const {PlainTextVisitor} = await import("../../text/index.js");
+        const {YamlVisitor} = await import("../../yaml/index.js");
 
         if (v instanceof JsonVisitor) {
             treeType = "org.openrewrite.json.tree.Json";

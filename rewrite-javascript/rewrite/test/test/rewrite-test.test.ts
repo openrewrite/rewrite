@@ -1,4 +1,3 @@
-import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../src/test";
 import {text} from "../../src/text";
 import {json} from "../../src/json";
