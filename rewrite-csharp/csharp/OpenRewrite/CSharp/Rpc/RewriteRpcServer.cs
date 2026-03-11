@@ -927,11 +927,17 @@ public class RecipeDescriptorDto
 {
     public string Name { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    public string InstanceName { get; set; } = "";
     public string Description { get; set; } = "";
-    public HashSet<string>? Tags { get; set; }
+    public HashSet<string> Tags { get; set; } = [];
     public string? EstimatedEffortPerOccurrence { get; set; }
-    public List<OptionDescriptorDto>? Options { get; set; }
-    public List<RecipeDescriptorDto>? RecipeList { get; set; }
+    public List<OptionDescriptorDto> Options { get; set; } = [];
+    public List<RecipeDescriptorDto> Preconditions { get; set; } = [];
+    public List<RecipeDescriptorDto> RecipeList { get; set; } = [];
+    public List<object> DataTables { get; set; } = [];
+    public List<object> Maintainers { get; set; } = [];
+    public List<object> Contributors { get; set; } = [];
+    public List<object> Examples { get; set; } = [];
 
     public static RecipeDescriptorDto FromDescriptor(RecipeDescriptor d)
     {
@@ -939,15 +945,14 @@ public class RecipeDescriptorDto
         {
             Name = d.Name,
             DisplayName = d.DisplayName,
+            InstanceName = d.Name,
             Description = d.Description,
-            Tags = d.Tags.Count > 0 ? new HashSet<string>(d.Tags) : null,
-            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence?.ToString(),
-            Options = d.Options.Count > 0
-                ? d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList()
+            Tags = new HashSet<string>(d.Tags),
+            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence is { } ts
+                ? System.Xml.XmlConvert.ToString(ts) // ISO-8601 duration (e.g. "PT5M")
                 : null,
-            RecipeList = d.RecipeList.Count > 0
-                ? d.RecipeList.Select(FromDescriptor).ToList()
-                : null
+            Options = d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
+            RecipeList = d.RecipeList.Select(FromDescriptor).ToList()
         };
     }
 }
@@ -1001,7 +1006,9 @@ public class PrepareRecipeResponse
     public string Id { get; set; } = "";
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public string EditVisitor { get; set; } = "";
+    public List<object> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
+    public List<object> ScanPreconditions { get; set; } = [];
 }
 
 public class VisitRequest

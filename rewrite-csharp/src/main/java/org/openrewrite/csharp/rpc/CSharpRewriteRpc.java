@@ -182,7 +182,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<CSharpRewriteRpc> {
         private static final String TOOL_COMMAND = "rewrite-csharp";
-        private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp";
+        private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp.Tool";
         private static final String REWRITE_SOURCE_PATH_ENV = "REWRITE_SOURCE_PATH";
 
         private RecipeMarketplace marketplace = new RecipeMarketplace();
