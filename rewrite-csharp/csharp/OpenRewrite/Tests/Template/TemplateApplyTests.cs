@@ -181,6 +181,68 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void SubstitutesMethodNameCapture()
+    {
+        var method = Capture.Of<Identifier>("method");
+        var args = Capture.Of<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Console.{method}({args})",
+                $"Trace.{method}({args})")),
+            CSharp(
+                "class C { void M() { Console.Write(42); } }",
+                "class C { void M() { Trace.Write(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesVariadicArgs()
+    {
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Foo({args})",
+                $"Bar({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { Bar(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesMethodNameAndVariadicArgs()
+    {
+        var method = Capture.Of<Identifier>("method");
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"new Random().{method}({args})",
+                $"Random.Shared.{method}({args})")),
+            CSharp(
+                "class C { void M() { new Random().Next(10); } }",
+                "class C { void M() { Random.Shared.Next(10); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesFieldNameCapture()
+    {
+        var field = Capture.Of<Identifier>("field");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<FieldAccess>(
+                $"DateTime.{field}",
+                $"DateTimeOffset.{field}")),
+            CSharp(
+                "class C { void M() { var x = DateTime.Now; } }",
+                "class C { void M() { var x = DateTimeOffset.Now; } }"
+            )
+        );
+    }
+
     // ===============================================================
     // Recipe factories
     // ===============================================================

@@ -236,4 +236,93 @@ internal class SubstitutionVisitor : JavaVisitor<int>
         }
         return base.VisitIdentifier(identifier, p);
     }
+
+    public override J VisitMethodInvocation(MethodInvocation mi, int p)
+    {
+        mi = (MethodInvocation)base.VisitMethodInvocation(mi, p);
+
+        // Substitute placeholder in method name position
+        var namePlaceholder = Placeholder.FromPlaceholder(mi.Name.SimpleName);
+        if (namePlaceholder != null && _values.Has(namePlaceholder))
+        {
+            var captured = _values.Get<Identifier>(namePlaceholder);
+            if (captured != null)
+            {
+                mi = mi.WithName(captured.WithPrefix(mi.Name.Prefix));
+            }
+        }
+
+        // Substitute variadic placeholder in arguments
+        mi = ExpandVariadicArgs(mi);
+
+        return mi;
+    }
+
+    public override J VisitFieldAccess(FieldAccess fieldAccess, int p)
+    {
+        fieldAccess = (FieldAccess)base.VisitFieldAccess(fieldAccess, p);
+
+        // Substitute placeholder in field name position
+        var nameIdent = fieldAccess.Name.Element;
+        var namePlaceholder = Placeholder.FromPlaceholder(nameIdent.SimpleName);
+        if (namePlaceholder != null && _values.Has(namePlaceholder))
+        {
+            var captured = _values.Get<Identifier>(namePlaceholder);
+            if (captured != null)
+            {
+                fieldAccess = fieldAccess.WithName(
+                    fieldAccess.Name.WithElement(captured.WithPrefix(nameIdent.Prefix)));
+            }
+        }
+
+        return fieldAccess;
+    }
+
+    /// <summary>
+    /// If any argument is a placeholder identifier bound to a variadic capture (list),
+    /// expand it into the argument list.
+    /// </summary>
+    private MethodInvocation ExpandVariadicArgs(MethodInvocation mi)
+    {
+        var elements = mi.Arguments.Elements;
+        List<JRightPadded<Expression>>? expanded = null;
+
+        for (int i = 0; i < elements.Count; i++)
+        {
+            var arg = elements[i].Element;
+            if (arg is Identifier ident)
+            {
+                var captureName = Placeholder.FromPlaceholder(ident.SimpleName);
+                if (captureName != null && _values.Has(captureName))
+                {
+                    var capturedList = _values.GetList<Expression>(captureName);
+                    if (expanded == null)
+                    {
+                        expanded = new List<JRightPadded<Expression>>();
+                        for (int k = 0; k < i; k++)
+                            expanded.Add(elements[k]);
+                    }
+                    // Expand captured args (may be empty, removing the placeholder)
+                    for (int j = 0; j < capturedList.Count; j++)
+                    {
+                        var capturedArg = capturedList[j];
+                        // First element inherits the placeholder's prefix
+                        if (j == 0)
+                            capturedArg = (Expression)TreeHelper.SetPrefix(capturedArg, ident.Prefix);
+                        expanded.Add(new JRightPadded<Expression>(
+                            capturedArg, Space.Empty, Markers.Empty));
+                    }
+                    continue;
+                }
+            }
+            expanded?.Add(elements[i]);
+        }
+
+        if (expanded != null)
+        {
+            mi = mi.WithArguments(mi.Arguments.WithElements(expanded));
+        }
+
+        return mi;
+    }
 }
