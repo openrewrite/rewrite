@@ -21,7 +21,7 @@ import org.openrewrite.Validated;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.lang.Integer.parseInt;
+import static java.lang.Long.parseLong;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.semver.Semver.isVersion;
 
@@ -82,30 +82,26 @@ public class CaretRange extends LatestRelease {
             lower = major + "." + minor + "." + patch + "." + micro;
         }
 
-        try {
-            if (minor == null) {
-                upper = Integer.toString(parseInt(major) + 1);
-            } else if (patch == null) {
-                if ("0".equals(major)) {
-                    upper = "0." + (parseInt(minor) + 1);
-                } else {
-                    upper = (parseInt(major) + 1) + ".0";
-                }
-            } else if (micro == null) {
-                if ("0".equals(major)) {
-                    upper = "0." + (parseInt(minor) + 1) + ".0";
-                } else {
-                    upper = (parseInt(major) + 1) + ".0.0";
-                }
+        if (minor == null) {
+            upper = Long.toString(parseLong(major) + 1);
+        } else if (patch == null) {
+            if ("0".equals(major)) {
+                upper = "0." + (parseLong(minor) + 1);
             } else {
-                if ("0".equals(major)) {
-                    upper = "0." + (parseInt(minor) + 1) + ".0.0";
-                } else {
-                    upper = (parseInt(major) + 1) + ".0.0.0";
-                }
+                upper = (parseLong(major) + 1) + ".0";
             }
-        } catch (NumberFormatException e) {
-            return Validated.invalid("caretRange", pattern, "not a valid caret range: " + e.getMessage());
+        } else if (micro == null) {
+            if ("0".equals(major)) {
+                upper = "0." + (parseLong(minor) + 1) + ".0";
+            } else {
+                upper = (parseLong(major) + 1) + ".0.0";
+            }
+        } else {
+            if ("0".equals(major)) {
+                upper = "0." + (parseLong(minor) + 1) + ".0.0";
+            } else {
+                upper = (parseLong(major) + 1) + ".0.0.0";
+            }
         }
 
         return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));
