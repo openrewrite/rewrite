@@ -2446,6 +2446,65 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1968")
+    @Test
+    void upgradeBomWhenBomVersioningDiffersFromDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.4.2", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.13.4</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.13.4.20221013</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5965")
     @Test
     void upgradeVersionForEjbTypeDependency() {
@@ -2940,4 +2999,5 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             mockRepo.shutdown();
         }
     }
+
 }
