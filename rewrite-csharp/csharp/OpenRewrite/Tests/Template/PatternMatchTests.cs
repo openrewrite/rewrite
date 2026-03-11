@@ -798,6 +798,59 @@ public class PatternMatchTests : RewriteTest
     // ===============================================================
 
     [Fact]
+    public void VariadicCaptureMatchesZeroArguments()
+    {
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(); } }",
+                "class C { void M() { /*~~>*/Foo(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicCaptureInNonTrailingPosition()
+    {
+        var args = Capture.Variadic<Expression>("args");
+        var last = Capture.Of<Expression>("last");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args}, {last})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { /*~~>*/Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicCaptureWithMinBoundRejectsFewerArgs()
+    {
+        var args = Capture.Variadic<Expression>("args", min: 2);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // Only 1 arg — min is 2, should NOT match
+                "class C { void M() { Foo(1); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicCaptureWithMaxBoundRejectsMoreArgs()
+    {
+        var args = Capture.Variadic<Expression>("args", max: 1);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // 3 args — max is 1, should NOT match
+                "class C { void M() { Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
     public void ConsistentCaptureBindingMatchesWhenSame()
     {
         var expr = Capture.Of<Expression>("expr");

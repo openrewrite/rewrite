@@ -229,6 +229,38 @@ public class TemplateApplyTests : RewriteTest
     }
 
     [Fact]
+    public void SubstitutesMethodNameAndVariadicArgsWithZeroArgs()
+    {
+        var method = Capture.Of<Identifier>("method");
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"new Random().{method}({args})",
+                $"Random.Shared.{method}({args})")),
+            CSharp(
+                "class C { void M() { new Random().NextDouble(); } }",
+                "class C { void M() { Random.Shared.NextDouble(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesVariadicArgsInNonTrailingPosition()
+    {
+        var args = Capture.Variadic<Expression>("args");
+        var last = Capture.Of<Expression>("last");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Foo({args}, {last})",
+                $"Bar({last}, {args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { Bar(3, 1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
     public void SubstitutesFieldNameCapture()
     {
         var field = Capture.Of<Identifier>("field");
