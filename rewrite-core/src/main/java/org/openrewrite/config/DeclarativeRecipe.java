@@ -230,26 +230,30 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
+                // Safe to cache: each getVisitor() call creates a new instance, and each
+                // instance is only used by a single thread (RecipeRunCycle processes files
+                // sequentially). Resolved lazily because getCursor() requires the framework
+                // to set the rootCursor first (via setCursor) before isAcceptable/visit.
                 @Nullable
-                TreeVisitor<?, ExecutionContext> p;
+                TreeVisitor<?, ExecutionContext> resolved;
+
+                private TreeVisitor<?, ExecutionContext> resolved(ExecutionContext ctx) {
+                    if (resolved == null) {
+                        resolved = precondition.resolve(getCursor(), ctx);
+                    }
+                    return resolved;
+                }
 
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                    return resolve(ctx).isAcceptable(sourceFile, ctx);
+                    return resolved(ctx).isAcceptable(sourceFile, ctx);
                 }
 
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    Tree t = resolve(ctx).visit(tree, ctx);
+                    Tree t = resolved(ctx).visit(tree, ctx);
                     preconditionApplicable = t != tree;
                     return tree;
-                }
-
-                private TreeVisitor<?, ExecutionContext> resolve(ExecutionContext ctx) {
-                    if (p == null) {
-                        p = precondition.resolve(getCursor(), ctx);
-                    }
-                    return p;
                 }
             };
         }
