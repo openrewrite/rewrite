@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Linq;
 using OpenRewrite.Java;
 
 namespace OpenRewrite.CSharp.Template;
@@ -43,10 +44,18 @@ public sealed class MatchResult
 
     /// <summary>
     /// Get a variadic capture result as a list.
+    /// Handles both IReadOnlyList&lt;T&gt; and IReadOnlyList&lt;object&gt; (from pattern matcher).
     /// </summary>
     public IReadOnlyList<T> GetList<T>(string name) where T : class, J
-        => _captures.TryGetValue(name, out var value) && value is IReadOnlyList<T> list
-            ? list : [];
+    {
+        if (!_captures.TryGetValue(name, out var value))
+            return [];
+        if (value is IReadOnlyList<T> typedList)
+            return typedList;
+        if (value is IReadOnlyList<object> objectList)
+            return objectList.Cast<T>().ToList();
+        return [];
+    }
 
     /// <summary>
     /// Check if a capture with the given name was bound.
