@@ -181,6 +181,173 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void SubstitutesMethodNameCapture()
+    {
+        var method = Capture.Of<Identifier>("method");
+        var args = Capture.Of<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Console.{method}({args})",
+                $"Trace.{method}({args})")),
+            CSharp(
+                "class C { void M() { Console.Write(42); } }",
+                "class C { void M() { Trace.Write(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesVariadicArgs()
+    {
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Foo({args})",
+                $"Bar({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { Bar(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesMethodNameAndVariadicArgs()
+    {
+        var method = Capture.Of<Identifier>("method");
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"new Random().{method}({args})",
+                $"Random.Shared.{method}({args})")),
+            CSharp(
+                "class C { void M() { new Random().Next(10); } }",
+                "class C { void M() { Random.Shared.Next(10); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesMethodNameAndVariadicArgsWithZeroArgs()
+    {
+        var method = Capture.Of<Identifier>("method");
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"new Random().{method}({args})",
+                $"Random.Shared.{method}({args})")),
+            CSharp(
+                "class C { void M() { new Random().NextDouble(); } }",
+                "class C { void M() { Random.Shared.NextDouble(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesVariadicArgsInNonTrailingPosition()
+    {
+        var args = Capture.Variadic<Expression>("args");
+        var last = Capture.Of<Expression>("last");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<MethodInvocation>(
+                $"Foo({args}, {last})",
+                $"Bar({last}, {args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { Bar(3, 1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesFieldNameCapture()
+    {
+        var field = Capture.Of<Identifier>("field");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<FieldAccess>(
+                $"DateTime.{field}",
+                $"DateTimeOffset.{field}")),
+            CSharp(
+                "class C { void M() { var x = DateTime.Now; } }",
+                "class C { void M() { var x = DateTimeOffset.Now; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ReplacesAssignmentWithCompoundAssignment()
+    {
+        var x = Capture.Of<Expression>("x");
+        var y = Capture.Of<Expression>("y");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Assignment>(
+                $"{x} = {x} + {y}",
+                $"{x} += {y}")),
+            CSharp(
+                "class C { int x; void M() { x = x + 2; } }",
+                "class C { int x; void M() { x += 2; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void RemovesStatementByReturningNull()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new RemoveEmptyStatementRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        ;
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    void M()
+                    {
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ReplacesThrowExWithBareThrow()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new UseRethrowRecipe()),
+            CSharp(
+                """
+                using System;
+                class C
+                {
+                    void M()
+                    {
+                        try { } catch (Exception ex) { throw ex; }
+                    }
+                }
+                """,
+                """
+                using System;
+                class C
+                {
+                    void M()
+                    {
+                        try { } catch (Exception ex) { throw; }
+                    }
+                }
+                """
+            )
+        );
+    }
+
     // ===============================================================
     // Recipe factories
     // ===============================================================
@@ -242,6 +409,67 @@ file class RawSpliceRecipe(Capture<Expression> expr, string level) : Core.Recipe
                 return (J)tmpl.Apply(Cursor, values: match)!;
             }
             return mi;
+        }
+    }
+}
+
+/// <summary>
+/// Recipe that removes empty statements (standalone semicolons) from blocks.
+/// Tests that VisitBlock properly handles null returns (statement deletion).
+/// </summary>
+file class RemoveEmptyStatementRecipe : Core.Recipe
+{
+    public override string DisplayName => "Remove empty statements";
+    public override string Description => "Remove standalone semicolons.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitEmpty(Empty empty, ExecutionContext ctx)
+        {
+            if (Cursor.Parent?.Value is Block)
+                return null!;
+            return empty;
+        }
+    }
+}
+
+file class UseRethrowRecipe : Core.Recipe
+{
+    public override string DisplayName => "Use rethrow";
+    public override string Description => "Replace throw ex with throw.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitThrow(Throw throwStmt, ExecutionContext ctx)
+        {
+            throwStmt = (Throw)base.VisitThrow(throwStmt, ctx);
+
+            if (throwStmt.Exception is not Identifier thrownId)
+                return throwStmt;
+
+            var cursor = Cursor;
+            while (cursor.Parent != null)
+            {
+                cursor = cursor.Parent;
+                if (cursor.Value is Try.Catch catchClause)
+                {
+                    var catchParam = catchClause.Parameter.Tree.Element;
+                    if (catchParam is VariableDeclarations vd &&
+                        vd.Variables.Count > 0 &&
+                        vd.Variables[0].Element.Name.SimpleName == thrownId.SimpleName)
+                    {
+                        return throwStmt.WithException(
+                            new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty));
+                    }
+                    break;
+                }
+            }
+
+            return throwStmt;
         }
     }
 }

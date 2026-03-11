@@ -147,45 +147,90 @@ internal class PatternMatchingComparator
 
     /// <summary>
     /// Compare two lists of (potentially padded) elements with variadic support.
+    /// Uses recursive backtracking so variadic captures can appear at any position.
     /// </summary>
     private bool MatchPaddedList(IList<object> patternElements, IList<object> candidateElements, Cursor cursor)
     {
-        int pi = 0, ci = 0;
-        while (pi < patternElements.Count && ci < candidateElements.Count)
-        {
-            var patternEl = patternElements[pi];
-            var innerPattern = TreeHelper.UnwrapPadded(patternEl) ?? patternEl;
+        return MatchPaddedListRecursive(patternElements, candidateElements, 0, 0, cursor);
+    }
 
-            // Check if this is a variadic capture placeholder
-            if (innerPattern is Identifier patternId)
+    /// <summary>
+    /// Recursive sequence matcher with backtracking for variadic captures.
+    /// Tries greedy consumption (max to min) and backtracks on failure.
+    /// </summary>
+    private bool MatchPaddedListRecursive(
+        IList<object> patternElements, IList<object> candidateElements,
+        int pi, int ci, Cursor cursor)
+    {
+        // All pattern elements matched; ensure no unconsumed candidates remain
+        if (pi >= patternElements.Count)
+            return ci >= candidateElements.Count;
+
+        var patternEl = patternElements[pi];
+        var innerPattern = TreeHelper.UnwrapPadded(patternEl) ?? patternEl;
+
+        // Check if this is a variadic capture placeholder
+        if (innerPattern is Identifier patternId)
+        {
+            var captureName = Placeholder.FromPlaceholder(patternId.SimpleName);
+            if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
+                && IsVariadic(captureObj))
             {
-                var captureName = Placeholder.FromPlaceholder(patternId.SimpleName);
-                if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
-                    && IsVariadic(captureObj))
+                var (min, max) = GetVariadicBounds(captureObj);
+
+                // Count non-variadic patterns remaining after this one
+                var nonVariadicRemaining = 0;
+                for (var i = pi + 1; i < patternElements.Count; i++)
                 {
-                    // Variadic: consume remaining elements
-                    var captured = new List<object>();
-                    while (ci < candidateElements.Count)
+                    var inner = TreeHelper.UnwrapPadded(patternElements[i]) ?? patternElements[i];
+                    if (inner is Identifier id)
                     {
-                        var candidateEl = candidateElements[ci];
+                        var name = Placeholder.FromPlaceholder(id.SimpleName);
+                        if (name != null && _captures.TryGetValue(name, out var cap) && IsVariadic(cap))
+                            continue;
+                    }
+                    nonVariadicRemaining++;
+                }
+
+                var remaining = candidateElements.Count - ci;
+                var maxPossible = Math.Min(remaining - nonVariadicRemaining, max);
+
+                // Greedy: try from max to min
+                for (var consume = maxPossible; consume >= min; consume--)
+                {
+                    var captured = new List<object>();
+                    for (var k = 0; k < consume; k++)
+                    {
+                        var candidateEl = candidateElements[ci + k];
                         var innerCandidate = TreeHelper.UnwrapPadded(candidateEl) ?? candidateEl;
                         captured.Add(innerCandidate);
-                        ci++;
                     }
-                    _bindings[captureName] = captured.AsReadOnly();
-                    pi++;
-                    continue;
-                }
-            }
 
-            // Non-variadic: match one-to-one
-            if (!MatchValue(patternEl, candidateElements[ci], cursor))
+                    // Save bindings for backtracking
+                    var savedBindings = new Dictionary<string, object>(_bindings);
+                    _bindings[captureName] = captured.AsReadOnly();
+
+                    if (MatchPaddedListRecursive(patternElements, candidateElements, pi + 1, ci + consume, cursor))
+                        return true;
+
+                    // Backtrack
+                    _bindings.Clear();
+                    foreach (var kvp in savedBindings)
+                        _bindings[kvp.Key] = kvp.Value;
+                }
+
                 return false;
-            pi++;
-            ci++;
+            }
         }
 
-        return pi == patternElements.Count && ci == candidateElements.Count;
+        // Non-variadic: need a candidate element to match against
+        if (ci >= candidateElements.Count)
+            return false;
+
+        if (!MatchValue(patternEl, candidateElements[ci], cursor))
+            return false;
+
+        return MatchPaddedListRecursive(patternElements, candidateElements, pi + 1, ci + 1, cursor);
     }
 
     /// <summary>
@@ -208,6 +253,16 @@ internal class PatternMatchingComparator
     {
         var prop = captureObj.GetType().GetProperty("IsVariadic");
         return prop != null && (bool)(prop.GetValue(captureObj) ?? false);
+    }
+
+    private static (int min, int max) GetVariadicBounds(object captureObj)
+    {
+        var type = captureObj.GetType();
+        var minProp = type.GetProperty("MinCount");
+        var maxProp = type.GetProperty("MaxCount");
+        var min = minProp?.GetValue(captureObj) as int? ?? 0;
+        var max = maxProp?.GetValue(captureObj) as int? ?? int.MaxValue;
+        return (min, max);
     }
 
     private static bool IsRightPadded(object value)

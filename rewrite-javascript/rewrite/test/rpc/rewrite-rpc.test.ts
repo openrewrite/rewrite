@@ -253,6 +253,16 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("runRecipeWithCrossModuleRecipeList", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.cross-module-recipe-list");
+        await spec.rewriteRun(
+            text(
+                "hi",
+                "cross-module"
+            )
+        );
+    });
+
     test("runRecipeUpdatingAllTrees", async () => {
         spec.recipe = await client.prepareRecipe("org.openrewrite.example.javascript.replace-id");
         await spec.rewriteRun(

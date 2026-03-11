@@ -627,7 +627,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         return whileLoop.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithCondition((ControlParentheses<Expression>)condition!).WithBody(body!);
     }
 
-    public J VisitCatch(Try.Catch tryCatch, RpcReceiveQueue q)
+    public override J VisitCatch(Try.Catch tryCatch, RpcReceiveQueue q)
     {
         var parameter = q.Receive((J)tryCatch.Parameter, el => (J)VisitNonNull(el, q));
         var body = q.Receive((J)tryCatch.Body, el => (J)VisitNonNull(el, q));
