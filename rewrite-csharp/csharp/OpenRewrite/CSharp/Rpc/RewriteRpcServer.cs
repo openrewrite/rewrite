@@ -404,7 +404,9 @@ public class RewriteRpcServer
         {
             // Local assembly path
             var absolutePath = Path.GetFullPath(path);
-            var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(absolutePath);
+            var context = new PluginLoadContext(absolutePath);
+            var assembly = context.LoadFromAssemblyPath(absolutePath);
+            CheckVersionCompatibility(assembly);
             ActivateAssembly(assembly);
         }
         else if (request.Recipes is JObject packageObj)
@@ -415,7 +417,10 @@ public class RewriteRpcServer
 
             if (File.Exists(packageName))
             {
-                var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(Path.GetFullPath(packageName));
+                var absolutePath = Path.GetFullPath(packageName);
+                var context = new PluginLoadContext(absolutePath);
+                var assembly = context.LoadFromAssemblyPath(absolutePath);
+                CheckVersionCompatibility(assembly);
                 ActivateAssembly(assembly);
             }
             else
@@ -429,9 +434,10 @@ public class RewriteRpcServer
 
                 version = ResolveVersionFromCsproj(csprojPath, packageName);
 
-                var assemblies = LoadPackageWithDependencies(csprojPath, packageName, version);
+                var assemblies = PublishAndLoadPlugin(csprojPath, packageName);
                 foreach (var assembly in assemblies)
                 {
+                    CheckVersionCompatibility(assembly);
                     ActivateAssembly(assembly);
                 }
             }
@@ -451,7 +457,22 @@ public class RewriteRpcServer
 
     private void ActivateAssembly(Assembly assembly)
     {
-        foreach (var type in assembly.GetExportedTypes())
+        Type[] exportedTypes;
+        try
+        {
+            exportedTypes = assembly.GetExportedTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            Log.Warning("Could not load all types from {Assembly}: {Errors}",
+                assembly.GetName().Name,
+                string.Join("; ", ex.LoaderExceptions
+                    .Where(e => e != null)
+                    .Select(e => e!.Message)));
+            exportedTypes = ex.Types.Where(t => t != null).ToArray()!;
+        }
+
+        foreach (var type in exportedTypes)
         {
             if (typeof(IRecipeActivator).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface)
             {
@@ -478,6 +499,7 @@ public class RewriteRpcServer
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
+                <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
               </PropertyGroup>
             </Project>
             """);
@@ -523,131 +545,112 @@ public class RewriteRpcServer
                    $"Could not find resolved version for {packageName} in {csprojPath}");
     }
 
-    private static string GetNuGetPackagesPath()
-    {
-        var envPath = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
-        if (!string.IsNullOrEmpty(envPath))
-            return envPath;
-
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".nuget", "packages");
-    }
-
     /// <summary>
-    /// Find DLL paths for a package in the NuGet global packages cache.
+    /// Publish the temp recipes project to produce a flat output directory with all transitive
+    /// dependencies and a .deps.json, then load plugin assemblies in an isolated
+    /// <see cref="PluginLoadContext"/>. Because the NuGet package name may not match the assembly
+    /// name, we scan all non-host DLLs in the publish output for <see cref="IRecipeActivator"/>
+    /// implementations.
     /// </summary>
-    private static List<string> FindPackageAssemblies(string packageName, string version)
+    private List<Assembly> PublishAndLoadPlugin(string csprojPath, string packageName)
     {
-        var packagesPath = GetNuGetPackagesPath();
-        var packageDir = Path.Combine(packagesPath, packageName.ToLowerInvariant(), version, "lib");
+        var projectDir = Path.GetDirectoryName(csprojPath)!;
+        var publishDir = Path.Combine(projectDir, "publish");
 
-        if (!Directory.Exists(packageDir))
-            return [];
+        RunDotnet($"publish \"{csprojPath}\" -c Release -o \"{publishDir}\"");
 
-        // Prefer TFMs in order of compatibility
-        string[] tfmPreference = ["net10.0", "net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0"];
-
-        foreach (var tfm in tfmPreference)
+        // Use the Recipes.deps.json (from the temp project) for the dependency resolver
+        var depsJson = Path.Combine(publishDir, "Recipes.deps.json");
+        if (!File.Exists(depsJson))
         {
-            var tfmDir = Path.Combine(packageDir, tfm);
-            if (Directory.Exists(tfmDir))
-            {
-                return Directory.GetFiles(tfmDir, "*.dll").ToList();
-            }
+            Log.Warning("No .deps.json found in publish output at {PublishDir}", publishDir);
         }
 
-        // If no preferred TFM found, try any available net* folder
-        var availableTfms = Directory.GetDirectories(packageDir);
-        foreach (var tfmDir in availableTfms)
+        // The temp project's main DLL is the anchor for AssemblyDependencyResolver
+        var anchorDll = Path.Combine(publishDir, "Recipes.dll");
+        if (!File.Exists(anchorDll))
         {
-            var dlls = Directory.GetFiles(tfmDir, "*.dll");
-            if (dlls.Length > 0)
-                return dlls.ToList();
+            // Fallback: pick any DLL that has a matching .deps.json
+            anchorDll = Directory.GetFiles(publishDir, "*.dll").FirstOrDefault()
+                        ?? throw new InvalidOperationException(
+                            $"No DLLs found in publish output at {publishDir}");
         }
 
-        return [];
-    }
+        var context = new PluginLoadContext(anchorDll);
 
-    /// <summary>
-    /// Load a NuGet package and its transitive dependencies from the NuGet cache.
-    /// Parses obj/project.assets.json to discover all packages in the dependency graph.
-    /// Skips assemblies that are already loaded in the current AppDomain.
-    /// </summary>
-    private static List<Assembly> LoadPackageWithDependencies(string csprojPath, string packageName, string version)
-    {
-        var loadedAssemblyNames = new HashSet<string>(
-            AppDomain.CurrentDomain.GetAssemblies()
+        // Only load DLLs that are not already loaded in the host and not well-known
+        // framework/SDK assemblies. The PluginLoadContext handles lazy resolution of
+        // transitive dependencies via AssemblyDependencyResolver.
+        var hostAssemblyNames = new HashSet<string>(
+            AssemblyLoadContext.Default.Assemblies
                 .Select(a => a.GetName().Name!)
                 .Where(n => n != null),
             StringComparer.OrdinalIgnoreCase);
 
-        var projectDir = Path.GetDirectoryName(csprojPath)!;
-        var assetsPath = Path.Combine(projectDir, "obj", "project.assets.json");
         var loadedAssemblies = new List<Assembly>();
-
-        if (File.Exists(assetsPath))
+        foreach (var dll in Directory.GetFiles(publishDir, "*.dll"))
         {
-            // Parse project.assets.json to find all packages and their DLL paths
-            var assetsJson = JObject.Parse(File.ReadAllText(assetsPath));
-            var libraries = assetsJson["libraries"] as JObject;
+            var assemblyFileName = Path.GetFileNameWithoutExtension(dll);
 
-            if (libraries != null)
+            // Skip assemblies already loaded in the host
+            if (hostAssemblyNames.Contains(assemblyFileName))
+                continue;
+
+            // Skip well-known framework/SDK assemblies that don't contain recipes
+            if (IsFrameworkAssembly(assemblyFileName))
+                continue;
+
+            try
             {
-                foreach (var (key, _) in libraries)
-                {
-                    // key format: "PackageName/Version"
-                    var parts = key.Split('/', 2);
-                    if (parts.Length != 2) continue;
-
-                    var depName = parts[0];
-                    var depVersion = parts[1];
-
-                    var dlls = FindPackageAssemblies(depName, depVersion);
-                    foreach (var dll in dlls)
-                    {
-                        var assemblyName = Path.GetFileNameWithoutExtension(dll);
-                        if (loadedAssemblyNames.Contains(assemblyName))
-                            continue;
-
-                        try
-                        {
-                            var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(dll);
-                            loadedAssemblies.Add(assembly);
-                            loadedAssemblyNames.Add(assemblyName);
-                        }
-                        catch (Exception)
-                        {
-                            // Skip assemblies that can't be loaded (e.g., platform-specific)
-                        }
-                    }
-                }
+                var assembly = context.LoadFromAssemblyPath(dll);
+                loadedAssemblies.Add(assembly);
+                Log.Debug("Plugin context loaded {Assembly} from {Path}", assemblyFileName, dll);
             }
-        }
-        else
-        {
-            // Fallback: just load the requested package directly from cache
-            var dlls = FindPackageAssemblies(packageName, version);
-            foreach (var dll in dlls)
+            catch (Exception ex)
             {
-                var assemblyName = Path.GetFileNameWithoutExtension(dll);
-                if (loadedAssemblyNames.Contains(assemblyName))
-                    continue;
-
-                try
-                {
-                    var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(dll);
-                    loadedAssemblies.Add(assembly);
-                    loadedAssemblyNames.Add(assemblyName);
-                }
-                catch (Exception)
-                {
-                    // Skip assemblies that can't be loaded
-                }
+                Log.Warning("Failed to load {Assembly} from plugin publish output: {Error}",
+                    assemblyFileName, ex.Message);
             }
         }
 
         return loadedAssemblies;
+    }
+
+    private static bool IsFrameworkAssembly(string assemblyName)
+    {
+        return assemblyName.StartsWith("System.", StringComparison.OrdinalIgnoreCase) ||
+               assemblyName.StartsWith("Microsoft.", StringComparison.OrdinalIgnoreCase) ||
+               assemblyName.StartsWith("NuGet.", StringComparison.OrdinalIgnoreCase) ||
+               assemblyName.StartsWith("xunit", StringComparison.OrdinalIgnoreCase) ||
+               assemblyName.StartsWith("testhost", StringComparison.OrdinalIgnoreCase) ||
+               assemblyName.StartsWith("coverlet", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Verify that the plugin's OpenRewrite.CSharp dependency version is compatible with the host.
+    /// Logs a warning if the plugin was compiled against a newer version than the host.
+    /// </summary>
+    private static void CheckVersionCompatibility(Assembly pluginAssembly)
+    {
+        var hostAssembly = typeof(RewriteRpcServer).Assembly;
+        var hostVersion = hostAssembly.GetName().Version;
+
+        var openRewriteRef = pluginAssembly.GetReferencedAssemblies()
+            .FirstOrDefault(a => string.Equals(a.Name, "OpenRewrite.CSharp",
+                StringComparison.OrdinalIgnoreCase));
+
+        if (openRewriteRef?.Version == null || hostVersion == null)
+            return;
+
+        var pluginRefVersion = openRewriteRef.Version;
+        if (pluginRefVersion.Major != hostVersion.Major ||
+            pluginRefVersion.Minor > hostVersion.Minor)
+        {
+            Log.Warning(
+                "Plugin {Plugin} references OpenRewrite.CSharp {PluginVersion} " +
+                "but host is {HostVersion}. This may cause runtime errors",
+                pluginAssembly.GetName().Name, pluginRefVersion, hostVersion);
+        }
     }
 
     [JsonRpcMethod("PrepareRecipe", UseSingleObjectParameterDeserialization = true)]
