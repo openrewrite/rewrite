@@ -82,26 +82,30 @@ public class CaretRange extends LatestRelease {
             lower = major + "." + minor + "." + patch + "." + micro;
         }
 
-        if (minor == null) {
-            upper = Integer.toString(parseInt(major) + 1);
-        } else if (patch == null) {
-            if ("0".equals(major)) {
-                upper = "0." + (parseInt(minor) + 1);
+        try {
+            if (minor == null) {
+                upper = Integer.toString(parseInt(major) + 1);
+            } else if (patch == null) {
+                if ("0".equals(major)) {
+                    upper = "0." + (parseInt(minor) + 1);
+                } else {
+                    upper = (parseInt(major) + 1) + ".0";
+                }
+            } else if (micro == null) {
+                if ("0".equals(major)) {
+                    upper = "0." + (parseInt(minor) + 1) + ".0";
+                } else {
+                    upper = (parseInt(major) + 1) + ".0.0";
+                }
             } else {
-                upper = (parseInt(major) + 1) + ".0";
+                if ("0".equals(major)) {
+                    upper = "0." + (parseInt(minor) + 1) + ".0.0";
+                } else {
+                    upper = (parseInt(major) + 1) + ".0.0.0";
+                }
             }
-        } else if (micro == null) {
-            if ("0".equals(major)) {
-                upper = "0." + (parseInt(minor) + 1) + ".0";
-            } else {
-                upper = (parseInt(major) + 1) + ".0.0";
-            }
-        } else {
-            if ("0".equals(major)) {
-                upper = "0." + (parseInt(minor) + 1) + ".0.0";
-            } else {
-                upper = (parseInt(major) + 1) + ".0.0.0";
-            }
+        } catch (NumberFormatException e) {
+            return Validated.invalid("caretRange", pattern, "not a valid caret range: " + e.getMessage());
         }
 
         return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));

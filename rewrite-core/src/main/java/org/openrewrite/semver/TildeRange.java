@@ -67,18 +67,22 @@ public class TildeRange extends LatestRelease {
         String lower;
         String upper;
 
-        if (minor == null) {
-            lower = major;
-            upper = Integer.toString(parseInt(major) + 1);
-        } else if (patch == null) {
-            lower = major + "." + minor;
-            upper = major + "." + (parseInt(minor) + 1);
-        } else if (micro == null) {
-            lower = major + "." + minor + "." + patch;
-            upper = major + "." + (parseInt(minor) + 1);
-        } else {
-            lower = major + "." + minor + "." + patch + "." + micro;
-            upper = major + "." + minor + "." + (parseInt(patch) + 1);
+        try {
+            if (minor == null) {
+                lower = major;
+                upper = Integer.toString(parseInt(major) + 1);
+            } else if (patch == null) {
+                lower = major + "." + minor;
+                upper = major + "." + (parseInt(minor) + 1);
+            } else if (micro == null) {
+                lower = major + "." + minor + "." + patch;
+                upper = major + "." + (parseInt(minor) + 1);
+            } else {
+                lower = major + "." + minor + "." + patch + "." + micro;
+                upper = major + "." + minor + "." + (parseInt(patch) + 1);
+            }
+        } catch (NumberFormatException e) {
+            return Validated.invalid("tildeRange", pattern, "not a valid tilde range: " + e.getMessage());
         }
 
         return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern, requireRelease));

@@ -108,6 +108,14 @@ class CaretRangeTest {
     }
 
     @Test
+    void overflowingVersionSegment() {
+        // Version numbers that exceed Integer.MAX_VALUE should not throw NumberFormatException
+        assertThat(CaretRange.build("^202302104298", null).isValid()).isFalse();
+        assertThat(CaretRange.build("^0.202302104298", null).isValid()).isFalse();
+        assertThat(CaretRange.build("^0.202302104298.3", null).isValid()).isFalse();
+    }
+
+    @Test
     void compare() {
         CaretRange caretRange = CaretRange.build("^1.0", null).getValue();
 
