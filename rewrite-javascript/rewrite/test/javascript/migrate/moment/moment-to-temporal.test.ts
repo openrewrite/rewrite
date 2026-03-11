@@ -200,7 +200,7 @@ describe("moment-to-temporal", () => {
             //language=typescript
             typescript(
                 `import moment from 'moment';\nconst d = moment(date).startOf('month');`,
-                `const d = Temporal.PlainDateTime.from(date).with({day: 1});`
+                `const d = Temporal.PlainDateTime.from(date).with({day: 1}).toPlainDate().toPlainDateTime();`
             )
         );
     }, 60000);
@@ -210,7 +210,17 @@ describe("moment-to-temporal", () => {
             //language=typescript
             typescript(
                 `import moment from 'moment';\nconst d = moment(date).startOf('year');`,
-                `const d = Temporal.PlainDateTime.from(date).with({month: 1, day: 1});`
+                `const d = Temporal.PlainDateTime.from(date).with({month: 1, day: 1}).toPlainDate().toPlainDateTime();`
+            )
+        );
+    }, 60000);
+
+    test(".add(n, 'ms') milliseconds", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `import moment from 'moment';\nconst d = moment(date).add(100, 'ms');`,
+                `const d = Temporal.PlainDateTime.from(date).add({milliseconds: 100});`
             )
         );
     }, 60000);
