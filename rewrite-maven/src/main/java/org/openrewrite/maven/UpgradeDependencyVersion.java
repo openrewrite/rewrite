@@ -505,9 +505,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         getResolutionResult().getPom().getRepositories()
                 );
 
-                // Use LatestRelease to filter BOM versions instead of the dependency's versionComparator,
-                // because BOM versioning schemes can differ from dependency versioning schemes
-                // (e.g., jackson-bom uses 2.13.4.20221013 while jackson-databind uses 2.13.4.2)
                 VersionComparator bomVersionComparator = new LatestRelease(null);
                 return metadata.getVersioning().getVersions().stream()
                         .filter(version -> bomVersionComparator.isValid(currentVersion, version))
