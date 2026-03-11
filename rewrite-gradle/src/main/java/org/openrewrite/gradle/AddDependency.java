@@ -26,6 +26,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.IsLikelyTest;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -150,6 +151,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Nullable
             UsesType<ExecutionContext> usesType = null;
+            final TreeVisitor<?, ExecutionContext> isLikelyTest = new IsLikelyTest().getVisitor();
 
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
                 if (onlyIfUsing == null) {
@@ -173,8 +175,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (configuration != null && onlyIfUsing != null &&
                         configuration.startsWith("test") && configuration.length() > 4 &&
                         Character.isUpperCase(configuration.charAt(4))) {
-                    JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
-                    if (javaSourceSet != null && !"test".equals(javaSourceSet.getName())) {
+                    if (sourceFile == isLikelyTest.visit(sourceFile, ctx)) {
                         return tree;
                     }
                 }

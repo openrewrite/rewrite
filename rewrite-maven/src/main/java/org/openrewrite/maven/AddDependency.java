@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.IsLikelyTest;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -171,6 +172,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final TreeVisitor<?, ExecutionContext> isLikelyTest = new IsLikelyTest().getVisitor();
+
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
@@ -179,8 +182,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     // only scan test source files to avoid adding test dependencies
                     // to modules that only use the type in production code
                     if ("test".equals(scope) && onlyIfUsing != null) {
-                        JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
-                        if (javaSourceSet != null && !"test".equals(javaSourceSet.getName())) {
+                        if (sourceFile == isLikelyTest.visit(sourceFile, ctx)) {
                             return sourceFile;
                         }
                     }
