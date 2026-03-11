@@ -931,7 +931,7 @@ public class RecipeDescriptorDto
     public HashSet<string>? Tags { get; set; }
     public string? EstimatedEffortPerOccurrence { get; set; }
     public List<OptionDescriptorDto>? Options { get; set; }
-    public List<RecipeDescriptorDto>? RecipeList { get; set; }
+    public List<RecipeDescriptorDto> RecipeList { get; set; } = new();
 
     public static RecipeDescriptorDto FromDescriptor(RecipeDescriptor d)
     {
@@ -941,13 +941,13 @@ public class RecipeDescriptorDto
             DisplayName = d.DisplayName,
             Description = d.Description,
             Tags = d.Tags.Count > 0 ? new HashSet<string>(d.Tags) : null,
-            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence?.ToString(),
+            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence is { } effort
+                ? System.Xml.XmlConvert.ToString(effort)
+                : null,
             Options = d.Options.Count > 0
                 ? d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList()
                 : null,
-            RecipeList = d.RecipeList.Count > 0
-                ? d.RecipeList.Select(FromDescriptor).ToList()
-                : null
+            RecipeList = d.RecipeList.Select(FromDescriptor).ToList()
         };
     }
 }
