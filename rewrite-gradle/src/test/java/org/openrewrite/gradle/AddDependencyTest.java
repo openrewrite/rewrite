@@ -901,7 +901,7 @@ class AddDependencyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject("project",
-            srcMainJava(
+            srcTestJava(
               java(usingGuavaIntMath)
             ),
             buildGradle(
