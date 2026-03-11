@@ -121,10 +121,21 @@ tasks.withType<Test> {
 // Generate a NuGet-compatible version
 // Snapshots use pre-release suffix with timestamp: 8.73.0-snapshot.20260110143252
 // Releases use clean version: 8.73.0
-val nugetVersion: String = project.version.toString().replace(
-    "-SNAPSHOT",
-    "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-)
+// Read from version.txt first (written by a prior `build` invocation) to ensure the
+// version published to NuGet matches what's baked into the JAR.
+val nugetVersionTxt = file("src/main/resources/META-INF/rewrite-csharp-version.txt")
+val nugetVersion: String = if (System.getenv("CI") != null) {
+    nugetVersionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+        ?: project.version.toString().replace(
+            "-SNAPSHOT",
+            "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+        )
+} else {
+    project.version.toString().replace(
+        "-SNAPSHOT",
+        "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+    )
+}
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"

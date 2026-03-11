@@ -42,6 +42,7 @@ jobs:
       java_version: |
         25
         21
+      npm_version: ${{ needs.build.outputs.npm_version }}
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       npm_token: ${{ secrets.NPM_TOKEN }}
