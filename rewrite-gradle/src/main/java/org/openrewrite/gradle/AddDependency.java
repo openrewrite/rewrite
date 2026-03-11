@@ -169,9 +169,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                // When configuration explicitly targets a test source set and onlyIfUsing is set,
-                // only scan test source files to avoid adding test dependencies
-                // to modules that only use the type in production code
                 if (configuration != null && onlyIfUsing != null &&
                         configuration.startsWith("test") && configuration.length() > 4 &&
                         Character.isUpperCase(configuration.charAt(4))) {

@@ -178,9 +178,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (tree instanceof JavaSourceFile) {
-                    // When scope is explicitly "test" and onlyIfUsing is set,
-                    // only scan test source files to avoid adding test dependencies
-                    // to modules that only use the type in production code
                     if ("test".equals(scope) && onlyIfUsing != null) {
                         if (sourceFile == isLikelyTest.visit(sourceFile, ctx)) {
                             return sourceFile;
