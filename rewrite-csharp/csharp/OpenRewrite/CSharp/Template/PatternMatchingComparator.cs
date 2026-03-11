@@ -147,6 +147,8 @@ internal class PatternMatchingComparator
 
     /// <summary>
     /// Compare two lists of (potentially padded) elements with variadic support.
+    /// A variadic capture greedily consumes all remaining candidate elements,
+    /// so it must be the last element in the pattern list.
     /// </summary>
     private bool MatchPaddedList(IList<object> patternElements, IList<object> candidateElements, Cursor cursor)
     {
@@ -188,6 +190,7 @@ internal class PatternMatchingComparator
             ci++;
         }
 
+        // All pattern elements matched; ensure no unconsumed candidates remain
         return ci == candidateElements.Count;
     }
 
