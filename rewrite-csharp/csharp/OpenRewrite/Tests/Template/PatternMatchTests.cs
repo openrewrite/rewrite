@@ -798,6 +798,19 @@ public class PatternMatchTests : RewriteTest
     // ===============================================================
 
     [Fact]
+    public void VariadicCaptureMatchesZeroArguments()
+    {
+        var args = Capture.Variadic<Expression>("args");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(); } }",
+                "class C { void M() { /*~~>*/Foo(); } }"
+            )
+        );
+    }
+
+    [Fact]
     public void ConsistentCaptureBindingMatchesWhenSame()
     {
         var expr = Capture.Of<Expression>("expr");

@@ -151,7 +151,7 @@ internal class PatternMatchingComparator
     private bool MatchPaddedList(IList<object> patternElements, IList<object> candidateElements, Cursor cursor)
     {
         int pi = 0, ci = 0;
-        while (pi < patternElements.Count && ci < candidateElements.Count)
+        while (pi < patternElements.Count)
         {
             var patternEl = patternElements[pi];
             var innerPattern = TreeHelper.UnwrapPadded(patternEl) ?? patternEl;
@@ -163,7 +163,7 @@ internal class PatternMatchingComparator
                 if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
                     && IsVariadic(captureObj))
                 {
-                    // Variadic: consume remaining elements
+                    // Variadic: consume remaining elements (may be zero)
                     var captured = new List<object>();
                     while (ci < candidateElements.Count)
                     {
@@ -178,14 +178,17 @@ internal class PatternMatchingComparator
                 }
             }
 
-            // Non-variadic: match one-to-one
+            // Non-variadic: need a candidate element to match against
+            if (ci >= candidateElements.Count)
+                return false;
+
             if (!MatchValue(patternEl, candidateElements[ci], cursor))
                 return false;
             pi++;
             ci++;
         }
 
-        return pi == patternElements.Count && ci == candidateElements.Count;
+        return ci == candidateElements.Count;
     }
 
     /// <summary>
