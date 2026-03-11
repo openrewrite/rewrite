@@ -482,8 +482,9 @@ public class RewriteRpc {
             remoteObjects.remove(id);
             throw e;
         }
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
+        RpcObjectData endMarker = q.take();
+        if (endMarker.getState() != END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + endMarker);
         }
 
         //noinspection ConstantValue

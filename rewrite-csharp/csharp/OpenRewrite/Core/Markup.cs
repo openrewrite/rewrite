@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core.Rpc;
+using OpenRewrite.Java;
 
 namespace OpenRewrite.Core;
 
@@ -29,6 +30,37 @@ public abstract class Markup(Guid id, string message, string? detail) : Marker, 
     public bool Equals(Markup? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as Markup);
     public override int GetHashCode() => Id.GetHashCode();
+
+    private static T AddMarker<T>(T tree, Markup marker) where T : J
+    {
+        var newMarkers = tree.Markers.Add(marker);
+        var withMarkers = tree.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
+        return withMarkers != null ? (T)withMarkers.Invoke(tree, [newMarkers])! : tree;
+    }
+
+    /// <summary>
+    /// Adds an Error markup marker to the given tree node.
+    /// </summary>
+    public static T CreateError<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Error(Guid.NewGuid(), message, detail));
+
+    /// <summary>
+    /// Adds a Warn markup marker to the given tree node.
+    /// </summary>
+    public static T CreateWarn<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Warn(Guid.NewGuid(), message, detail));
+
+    /// <summary>
+    /// Adds an Info markup marker to the given tree node.
+    /// </summary>
+    public static T CreateInfo<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Info(Guid.NewGuid(), message, detail));
+
+    /// <summary>
+    /// Adds a Debug markup marker to the given tree node.
+    /// </summary>
+    public static T CreateDebug<T>(T tree, string message, string? detail = null) where T : J
+        => AddMarker(tree, new Debug(Guid.NewGuid(), message, detail));
 
     public sealed class Error(Guid id, string message, string? detail) : Markup(id, message, detail), IRpcCodec<Error>
     {
