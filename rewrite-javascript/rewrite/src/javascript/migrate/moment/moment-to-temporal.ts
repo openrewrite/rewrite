@@ -30,12 +30,14 @@ const UNIT_MAP: Record<string, string> = {
     'hours': 'hours', 'h': 'hours',
     'minutes': 'minutes', 'm': 'minutes',
     'seconds': 'seconds', 's': 'seconds',
+    'milliseconds': 'milliseconds', 'ms': 'milliseconds',
 };
 
+// Moment's startOf() zeroes time components; round-trip through PlainDate to achieve this
 const STARTOF_MAP: Record<string, string> = {
     'day': '.toPlainDate().toPlainDateTime()',
-    'month': '.with({day: 1})',
-    'year': '.with({month: 1, day: 1})',
+    'month': '.with({day: 1}).toPlainDate().toPlainDateTime()',
+    'year': '.with({month: 1, day: 1}).toPlainDate().toPlainDateTime()',
 };
 
 export class MomentToTemporal extends Recipe {
@@ -127,6 +129,8 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
                         .apply(method, this.cursor);
                 }
                 if (effectiveArgs.length === 1) {
+                    // Note: Temporal.Instant.from() requires an ISO 8601 string with offset/timezone;
+                    // moment.utc(x) accepts more formats, so this may need manual adjustment
                     const arg = capture('arg');
                     return await Template.builder()
                         .code('Temporal.Instant.from(')
