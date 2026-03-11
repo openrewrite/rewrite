@@ -167,7 +167,7 @@ describe("date-fns-to-temporal", () => {
             //language=typescript
             typescript(
                 `import { startOfMonth } from 'date-fns';\nconst result = startOfMonth(date);`,
-                `const result = Temporal.PlainDate.from(date).with({day: 1});`
+                `const result = Temporal.PlainDate.from(date).with({day: 1}).toPlainDateTime();`
             )
         );
     }, 60000);
@@ -177,7 +177,7 @@ describe("date-fns-to-temporal", () => {
             //language=typescript
             typescript(
                 `import { startOfYear } from 'date-fns';\nconst result = startOfYear(date);`,
-                `const result = Temporal.PlainDate.from(date).with({month: 1, day: 1});`
+                `const result = Temporal.PlainDate.from(date).with({month: 1, day: 1}).toPlainDateTime();`
             )
         );
     }, 60000);
@@ -209,7 +209,7 @@ describe("date-fns-to-temporal", () => {
             //language=typescript
             typescript(
                 `import { endOfYear } from 'date-fns';\nconst result = endOfYear(date);`,
-                `const result = Temporal.PlainDate.from(date).with({month: 12, day: 31});`
+                `const result = Temporal.PlainDate.from(date).with({month: 12, day: 31}).toPlainDateTime({hour: 23, minute: 59, second: 59, millisecond: 999});`
             )
         );
     }, 60000);
@@ -233,6 +233,18 @@ describe("date-fns-to-temporal", () => {
             typescript(
                 `import { addDays, subMonths } from 'date-fns';\nconst a = addDays(d, 1);\nconst b = subMonths(d, 2);`,
                 `const a = Temporal.PlainDate.from(d).add({days: 1});\nconst b = Temporal.PlainDate.from(d).subtract({months: 2});`
+            )
+        );
+    }, 60000);
+
+    // --- Aliased imports ---
+
+    test("aliased import: addDays as plusDays", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `import { addDays as plusDays } from 'date-fns';\nconst result = plusDays(date, 5);`,
+                `const result = Temporal.PlainDate.from(date).add({days: 5});`
             )
         );
     }, 60000);
