@@ -55,11 +55,14 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-// Read the version from the version.txt written on disk by a prior build, or generate a fresh
-// timestamped version. This ensures the second Gradle invocation (`snapshot publish`) publishes
-// the same version that the first invocation (`build`) baked into the JAR.
+// Determine the npm package version. Priority:
+// 1. Gradle property `npmVersion` (set by CI workflows to pass the version across jobs)
+// 2. version.txt on disk (written by a prior `build` invocation in the same job)
+// 3. Generate a fresh timestamped version from project.version
 val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
-val datedSnapshotVersion: String = if (System.getenv("CI") != null) {
+val datedSnapshotVersion: String = if (project.hasProperty("npmVersion")) {
+    project.property("npmVersion").toString()
+} else if (System.getenv("CI") != null) {
     versionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
         ?: project.version.toString().replace(
             "SNAPSHOT",

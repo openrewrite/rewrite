@@ -14,6 +14,11 @@ on:
         type: boolean
         required: false
         default: false
+      npm_version:
+        description: Exact npm package version to publish (passed from build/release job)
+        type: string
+        required: false
+        default: ''
     secrets:
       gradle_enterprise_access_key:
         required: false
@@ -64,6 +69,7 @@ jobs:
           ./gradlew ${{ env.GRADLE_SWITCHES }}
           :rewrite-javascript:npmPack
           ${{ inputs.releasing && '-Preleasing' || '' }}
+          ${{ inputs.npm_version && format('-PnpmVersion={0}', inputs.npm_version) || '' }}
 
       - name: npm publish
         run: |
