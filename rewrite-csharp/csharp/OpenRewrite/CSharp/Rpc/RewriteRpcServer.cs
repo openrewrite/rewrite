@@ -50,6 +50,8 @@ public class RewriteRpcServer
 
     private readonly RecipeMarketplace _marketplace;
     private readonly Dictionary<string, Recipe> _preparedRecipes = new();
+    private readonly Dictionary<string, object?> _recipeAccumulators = new();
+    private readonly Dictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
 
@@ -423,6 +425,55 @@ public class RewriteRpcServer
         }
     }
 
+    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
+
+    [JsonRpcMethod("GetLanguages")]
+    public Task<string[]> GetLanguages()
+    {
+        return Task.FromResult(Languages);
+    }
+
+    [JsonRpcMethod("Generate", UseSingleObjectParameterDeserialization = true)]
+    public Task<GenerateResponse> Generate(GenerateRequest request)
+    {
+        if (!_preparedRecipes.TryGetValue(request.Id, out var recipe))
+        {
+            throw new InvalidOperationException($"Prepared recipe not found: {request.Id}");
+        }
+
+        var response = new GenerateResponse();
+
+        var scanningBase = GetScanningRecipeBase(recipe.GetType());
+        if (scanningBase != null)
+        {
+            var ctx = GetOrCreateExecutionContext(request.P);
+            var acc = GetOrCreateAccumulator(request.Id, recipe, scanningBase, ctx);
+
+            var generateMethod = scanningBase.GetMethod("Generate")
+                ?? throw new InvalidOperationException(
+                    $"Could not find Generate method on {scanningBase.Name}");
+            var generated = (IEnumerable<SourceFile>)generateMethod.Invoke(recipe, [acc, ctx])!;
+
+            foreach (var g in generated)
+            {
+                var id = g.Id.ToString();
+                _localObjects[id] = g;
+                response.Ids.Add(id);
+
+                var javaTypeName = RpcSendQueue.ToJavaTypeName(g.GetType());
+                if (javaTypeName == null)
+                {
+                    Log.Warning("Generate: No Java type mapping for {CSharpType}, using fallback",
+                        g.GetType().FullName);
+                    javaTypeName = "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+                }
+                response.SourceFileTypes.Add(javaTypeName);
+            }
+        }
+
+        return Task.FromResult(response);
+    }
+
     [JsonRpcMethod("InstallRecipes", UseSingleObjectParameterDeserialization = true)]
     public Task<InstallRecipesResponse> InstallRecipes(InstallRecipesRequest request)
     {
@@ -711,7 +762,7 @@ public class RewriteRpcServer
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
-            ScanVisitor = recipe is ScanningRecipe<object> ? $"scan:{id}" : null
+            ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
         });
     }
 
@@ -753,8 +804,39 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Tree not found: {request.TreeId}");
         }
 
-        var ctx = new ExecutionContext();
-        var visitor = recipe.GetVisitor();
+        if (phase != "scan" && phase != "edit")
+        {
+            throw new ArgumentException($"Unknown visitor phase: {phase}");
+        }
+
+        var ctx = GetOrCreateExecutionContext(request.PId);
+        JavaVisitor<ExecutionContext> visitor;
+
+        var scanningBase = GetScanningRecipeBase(recipe.GetType());
+        if (scanningBase != null)
+        {
+            var acc = GetOrCreateAccumulator(recipeId, recipe, scanningBase, ctx);
+            if (phase == "scan")
+            {
+                var getScannerMethod = scanningBase.GetMethod("GetScanner")
+                    ?? throw new InvalidOperationException(
+                        $"Could not find GetScanner method on {scanningBase.Name}");
+                visitor = (JavaVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
+            }
+            else
+            {
+                var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
+                    [scanningBase.GetGenericArguments()[0]])
+                    ?? throw new InvalidOperationException(
+                        $"Could not find GetVisitor(T) method on {scanningBase.Name}");
+                visitor = (JavaVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
+            }
+        }
+        else
+        {
+            visitor = recipe.GetVisitor();
+        }
+
         var result = visitor.Visit(tree, ctx);
 
         var modified = !ReferenceEquals(tree, result);
@@ -851,6 +933,51 @@ public class RewriteRpcServer
     /// Stores a tree in the local object cache so Java can fetch it via GetObject.
     /// </summary>
     internal void StoreLocalObject(string id, object obj) => _localObjects[id] = obj;
+
+    /// <summary>
+    /// Finds the closed generic ScanningRecipe&lt;T&gt; base type, or null if the recipe is not a scanning recipe.
+    /// </summary>
+    private static Type? GetScanningRecipeBase(Type recipeType)
+    {
+        var type = recipeType;
+        while (type != null)
+        {
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ScanningRecipe<>))
+                return type;
+            type = type.BaseType;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Gets or creates an ExecutionContext by ID, caching it for reuse across phases.
+    /// </summary>
+    private ExecutionContext GetOrCreateExecutionContext(string? pId)
+    {
+        if (pId != null && _executionContexts.TryGetValue(pId, out var existing))
+            return existing;
+
+        var ctx = new ExecutionContext();
+        if (pId != null)
+            _executionContexts[pId] = ctx;
+        return ctx;
+    }
+
+    /// <summary>
+    /// Gets or creates the accumulator for a scanning recipe, storing it for reuse across scan/generate/edit phases.
+    /// </summary>
+    private object? GetOrCreateAccumulator(string recipeId, Recipe recipe, Type scanningBase, ExecutionContext ctx)
+    {
+        if (_recipeAccumulators.TryGetValue(recipeId, out var acc))
+            return acc;
+
+        var getInitialValue = scanningBase.GetMethod("GetInitialValue")
+            ?? throw new InvalidOperationException(
+                $"Could not find GetInitialValue method on {scanningBase.Name}");
+        acc = getInitialValue.Invoke(recipe, [ctx]);
+        _recipeAccumulators[recipeId] = acc;
+        return acc;
+    }
 
     private class TreeCodec : IRpcCodec
     {
@@ -1002,6 +1129,19 @@ public class PrepareRecipeResponse
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public string EditVisitor { get; set; } = "";
     public string? ScanVisitor { get; set; }
+}
+
+public class GenerateRequest
+{
+    public string Id { get; set; } = "";
+    [JsonProperty("p")]
+    public string? P { get; set; }
+}
+
+public class GenerateResponse
+{
+    public List<string> Ids { get; set; } = [];
+    public List<string> SourceFileTypes { get; set; } = [];
 }
 
 public class VisitRequest
