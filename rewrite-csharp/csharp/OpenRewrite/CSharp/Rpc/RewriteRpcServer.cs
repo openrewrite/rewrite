@@ -927,11 +927,17 @@ public class RecipeDescriptorDto
 {
     public string Name { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    public string InstanceName { get; set; } = "";
     public string Description { get; set; } = "";
-    public HashSet<string>? Tags { get; set; }
+    public HashSet<string> Tags { get; set; } = new();
     public string? EstimatedEffortPerOccurrence { get; set; }
-    public List<OptionDescriptorDto>? Options { get; set; }
+    public List<OptionDescriptorDto> Options { get; set; } = new();
+    public List<RecipeDescriptorDto> Preconditions { get; set; } = new();
     public List<RecipeDescriptorDto> RecipeList { get; set; } = new();
+    public List<object> DataTables { get; set; } = new();
+    public List<object> Maintainers { get; set; } = new();
+    public List<object> Contributors { get; set; } = new();
+    public List<object> Examples { get; set; } = new();
 
     public static RecipeDescriptorDto FromDescriptor(RecipeDescriptor d)
     {
@@ -939,14 +945,13 @@ public class RecipeDescriptorDto
         {
             Name = d.Name,
             DisplayName = d.DisplayName,
+            InstanceName = d.DisplayName,
             Description = d.Description,
-            Tags = d.Tags.Count > 0 ? new HashSet<string>(d.Tags) : null,
+            Tags = new HashSet<string>(d.Tags),
             EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence is { } effort
                 ? System.Xml.XmlConvert.ToString(effort)
                 : null,
-            Options = d.Options.Count > 0
-                ? d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList()
-                : null,
+            Options = d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
             RecipeList = d.RecipeList.Select(FromDescriptor).ToList()
         };
     }
