@@ -25,7 +25,23 @@ namespace OpenRewrite.CSharp.Template;
 /// intercepts it and registers the capture automatically.
 /// </summary>
 /// <typeparam name="T">The type of AST node this capture matches.</typeparam>
-public sealed class Capture<T> where T : J
+/// <summary>
+/// Non-generic interface for accessing capture metadata without reflection.
+/// </summary>
+internal interface ICaptureMetadata
+{
+    string Name { get; }
+    bool IsVariadic { get; }
+
+    /// <summary>
+    /// Evaluate the constraint against a candidate node.
+    /// Returns true if no constraint is set or if the candidate satisfies the constraint.
+    /// Returns false if the candidate's type is incompatible or the constraint rejects it.
+    /// </summary>
+    bool EvaluateConstraint(J candidate, Cursor cursor);
+}
+
+public sealed class Capture<T> : ICaptureMetadata where T : J
 {
     public string Name { get; }
     public bool IsVariadic { get; }
@@ -42,6 +58,15 @@ public sealed class Capture<T> where T : J
         MinCount = minCount;
         MaxCount = maxCount;
         Constraint = constraint;
+    }
+
+    bool ICaptureMetadata.EvaluateConstraint(J candidate, Cursor cursor)
+    {
+        if (Constraint == null)
+            return true;
+        if (candidate is not T typed)
+            return false;
+        return Constraint(typed, cursor);
     }
 
     /// <summary>

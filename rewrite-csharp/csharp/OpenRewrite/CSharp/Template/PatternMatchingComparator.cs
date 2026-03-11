@@ -52,7 +52,7 @@ internal class PatternMatchingComparator
         if (pattern is Identifier patternId)
         {
             var captureName = Placeholder.FromPlaceholder(patternId.SimpleName);
-            if (captureName != null && _captures.ContainsKey(captureName))
+            if (captureName != null && _captures.TryGetValue(captureName, out var captureObj))
             {
                 // This is a capture placeholder — bind the candidate
                 if (_bindings.TryGetValue(captureName, out var existing))
@@ -60,6 +60,11 @@ internal class PatternMatchingComparator
                     // Already bound — check consistency
                     return MatchValue(existing, candidate, cursor);
                 }
+
+                // Evaluate constraint if present
+                if (captureObj is ICaptureMetadata meta && !meta.EvaluateConstraint(candidate, cursor))
+                    return false;
+
                 _bindings[captureName] = candidate;
                 return true;
             }
@@ -161,14 +166,16 @@ internal class PatternMatchingComparator
             {
                 var captureName = Placeholder.FromPlaceholder(patternId.SimpleName);
                 if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
-                    && IsVariadic(captureObj))
+                    && captureObj is ICaptureMetadata meta && meta.IsVariadic)
                 {
-                    // Variadic: consume remaining elements
+                    // Variadic: consume remaining elements, checking per-element constraints
                     var captured = new List<object>();
                     while (ci < candidateElements.Count)
                     {
                         var candidateEl = candidateElements[ci];
                         var innerCandidate = TreeHelper.UnwrapPadded(candidateEl) ?? candidateEl;
+                        if (innerCandidate is J candidateJ && !meta.EvaluateConstraint(candidateJ, cursor))
+                            return false;
                         captured.Add(innerCandidate);
                         ci++;
                     }
@@ -202,12 +209,6 @@ internal class PatternMatchingComparator
                 return false;
         }
         return true;
-    }
-
-    private static bool IsVariadic(object captureObj)
-    {
-        var prop = captureObj.GetType().GetProperty("IsVariadic");
-        return prop != null && (bool)(prop.GetValue(captureObj) ?? false);
     }
 
     private static bool IsRightPadded(object value)

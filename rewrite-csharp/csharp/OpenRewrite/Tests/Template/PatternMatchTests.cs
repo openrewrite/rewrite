@@ -848,6 +848,68 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Capture constraints
+    // ===============================================================
+
+    [Fact]
+    public void ConstraintFiltersCaptureBinding()
+    {
+        var expr = Capture.WithConstraint<Expression>("expr",
+            (node, _) => node is Literal lit && lit.ValueSource == "42");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            ),
+            CSharp(
+                "class C { void M() { Console.WriteLine(99); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintMatchesIdentifierByName()
+    {
+        var target = Capture.WithConstraint<Expression>("target",
+            (node, _) => node is Identifier id && id.SimpleName.StartsWith("x"));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"{target}.ToString()")),
+            CSharp(
+                """
+                class C {
+                    void M() {
+                        var x1 = xFoo.ToString();
+                        var x2 = yBar.ToString();
+                    }
+                }
+                """,
+                """
+                class C {
+                    void M() {
+                        var x1 = /*~~>*/xFoo.ToString();
+                        var x2 = yBar.ToString();
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void UnconstrainedCaptureStillWorks()
+    {
+        var expr = Capture.Of<Expression>("expr");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(99); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(99); } }"
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
