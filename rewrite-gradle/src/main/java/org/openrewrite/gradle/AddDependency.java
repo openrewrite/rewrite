@@ -169,7 +169,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (configuration != null && onlyIfUsing != null &&
+                if (sourceFile instanceof JavaSourceFile &&
+                        configuration != null && onlyIfUsing != null &&
                         configuration.startsWith("test") && configuration.length() > 4 &&
                         Character.isUpperCase(configuration.charAt(4)) &&
                         sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
