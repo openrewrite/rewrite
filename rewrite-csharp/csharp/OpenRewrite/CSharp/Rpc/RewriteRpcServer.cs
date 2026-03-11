@@ -41,6 +41,13 @@ public class RewriteRpcServer
     /// </summary>
     public static RewriteRpcServer? Current => _current;
 
+    /// <summary>
+    /// Sets the current RPC server instance. Used by test infrastructure to wire up
+    /// an RPC connection to a Java process without going through RunAsync().
+    /// Matches the JavaScript pattern: RewriteRpc.set(value) / RewriteRpc.get().
+    /// </summary>
+    public static void SetCurrent(RewriteRpcServer? server) => _current = server;
+
     private readonly RecipeMarketplace _marketplace;
     private readonly Dictionary<string, Recipe> _preparedRecipes = new();
     private string? _recipesProjectDir;
@@ -65,6 +72,17 @@ public class RewriteRpcServer
     /// Refs received from the remote process (Java) for deduplication.
     /// </summary>
     private readonly Dictionary<int, object> _remoteRefs = new();
+
+    /// <summary>
+    /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
+    /// to wire up an RPC connection to a Java process.
+    /// </summary>
+    public void Connect(JsonRpc jsonRpc)
+    {
+        _jsonRpc = jsonRpc;
+        jsonRpc.AddLocalRpcTarget(this);
+        jsonRpc.StartListening();
+    }
 
     public RewriteRpcServer(RecipeMarketplace marketplace)
     {
@@ -243,6 +261,17 @@ public class RewriteRpcServer
             return Task.FromResult(new List<RpcObjectData>
             {
                 new() { State = DELETE },
+                new() { State = END_OF_OBJECT }
+            });
+        }
+
+        // ExecutionContext is sent as a typed shell with no data,
+        // matching the JavaScript pattern (empty codec).
+        if (after is ExecutionContext)
+        {
+            return Task.FromResult(new List<RpcObjectData>
+            {
+                new() { State = ADD, ValueType = "org.openrewrite.InMemoryExecutionContext" },
                 new() { State = END_OF_OBJECT }
             });
         }
@@ -799,12 +828,16 @@ public class RewriteRpcServer
     /// so Java can fetch it via the GetObject callback.
     /// Returns the (possibly modified) tree.
     /// </summary>
-    public Tree VisitOnRemote(string visitorName, string treeId, string? sourceFileType)
+    public Tree VisitOnRemote(string visitorName, string treeId, string? sourceFileType,
+        string? pId = null)
     {
         var response = _jsonRpc!.InvokeWithParameterObjectAsync<VisitResponse>(
             "Visit",
-            new VisitRequest { VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType }
+            new VisitRequest { VisitorName = visitorName, TreeId = treeId, SourceFileType = sourceFileType, PId = pId }
         ).GetAwaiter().GetResult();
+
+        Log.Debug("RPC VisitOnRemote: {VisitorName} on {TreeId} => modified={Modified}",
+            visitorName, treeId, response.Modified);
 
         if (response.Modified)
         {
@@ -895,7 +928,7 @@ public class RecipeDescriptorDto
     public string Name { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string Description { get; set; } = "";
-    public IReadOnlySet<string>? Tags { get; set; }
+    public HashSet<string>? Tags { get; set; }
     public string? EstimatedEffortPerOccurrence { get; set; }
     public List<OptionDescriptorDto>? Options { get; set; }
     public List<RecipeDescriptorDto>? RecipeList { get; set; }
@@ -907,7 +940,7 @@ public class RecipeDescriptorDto
             Name = d.Name,
             DisplayName = d.DisplayName,
             Description = d.Description,
-            Tags = d.Tags.Count > 0 ? d.Tags : null,
+            Tags = d.Tags.Count > 0 ? new HashSet<string>(d.Tags) : null,
             EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence?.ToString(),
             Options = d.Options.Count > 0
                 ? d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList()
@@ -973,10 +1006,13 @@ public class PrepareRecipeResponse
 
 public class VisitRequest
 {
+    [JsonProperty("visitor")]
     public string VisitorName { get; set; } = "";
     public string? SourceFileType { get; set; }
     public string TreeId { get; set; } = "";
+    [JsonProperty("p")]
     public string? PId { get; set; }
+    [JsonProperty("cursor")]
     public List<string>? CursorIds { get; set; }
 }
 
