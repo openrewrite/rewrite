@@ -1006,7 +1006,15 @@ public class PrepareRecipeResponse
     public string Id { get; set; } = "";
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public string EditVisitor { get; set; } = "";
+    public List<Precondition> EditPreconditions { get; set; } = new();
     public string? ScanVisitor { get; set; }
+    public List<Precondition> ScanPreconditions { get; set; } = new();
+}
+
+public class Precondition
+{
+    public string VisitorName { get; set; } = "";
+    public Dictionary<string, object> VisitorOptions { get; set; } = new();
 }
 
 public class VisitRequest
