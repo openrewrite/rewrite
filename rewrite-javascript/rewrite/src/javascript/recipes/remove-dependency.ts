@@ -290,7 +290,7 @@ function removeDependencyFromJson(
         const member = rp.element as Json.Member;
         const keyName = getMemberKeyName(member);
 
-        if (!targetScopes.has(keyName) || !isObject(member.value)) {
+        if (!keyName || !targetScopes.has(keyName) || !isObject(member.value)) {
             result.push(rp);
             continue;
         }
