@@ -18,7 +18,7 @@ import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
 import {Tree} from "../../tree";
-import {getMemberKeyName, isJson, isObject, Json, JsonVisitor, space} from "../../json";
+import {getMemberKeyName, isJson, isObject, Json, JsonVisitor} from "../../json";
 import {isDocuments, isYaml, Yaml} from "../../yaml";
 import {isPlainText, PlainText} from "../../text";
 import {
@@ -193,11 +193,11 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
                         );
                     }
 
-                    const visitor = new RemoveDependencyVisitor(
+                    const modifiedDoc = removeDependencyFromJson(
+                        doc,
                         recipe.packageName,
                         updateInfo.dependencyScopes
                     );
-                    const modifiedDoc = await visitor.visit(doc, undefined) as Json.Document;
 
                     return updateNodeResolutionMarker(modifiedDoc, updateInfo, acc);
                 }
@@ -272,99 +272,74 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
     }
 }
 
-class RemoveDependencyVisitor extends JsonVisitor<void> {
-    private readonly packageName: string;
-    private readonly targetScopes: Set<string>;
-
-    constructor(packageName: string, targetScopes: DependencyScope[]) {
-        super();
-        this.packageName = packageName;
-        this.targetScopes = new Set(targetScopes);
+function removeDependencyFromJson(
+    doc: Json.Document,
+    packageName: string,
+    scopes: DependencyScope[]
+): Json.Document {
+    if (!isObject(doc.value)) {
+        return doc;
     }
 
-    protected async visitDocument(doc: Json.Document, p: void): Promise<Json | undefined> {
-        if (!isObject(doc.value)) {
-            return doc;
+    const targetScopes = new Set<string>(scopes);
+    const rootObj = doc.value;
+    let changed = false;
+    const result: Json.RightPadded<Json>[] = [];
+
+    for (const rp of rootObj.members) {
+        const member = rp.element as Json.Member;
+        const keyName = getMemberKeyName(member);
+
+        if (!targetScopes.has(keyName) || !isObject(member.value)) {
+            result.push(rp);
+            continue;
         }
-        const rootObj = doc.value;
-        const updatedRootMembers = this.processMembers(rootObj.members);
-        if (updatedRootMembers === rootObj.members) {
-            return doc;
+
+        const scopeObj = member.value;
+        const filtered = scopeObj.members.filter(depRp =>
+            getMemberKeyName(depRp.element as Json.Member) !== packageName
+        );
+
+        if (filtered.length === scopeObj.members.length) {
+            result.push(rp);
+            continue;
         }
-        return {
-            ...doc,
-            value: {
-                ...rootObj,
-                members: updatedRootMembers
-            } as Json.Object
+
+        changed = true;
+
+        if (filtered.length === 0) {
+            continue;
+        }
+
+        const lastOriginalAfter = scopeObj.members[scopeObj.members.length - 1].after;
+        filtered[filtered.length - 1] = {
+            ...filtered[filtered.length - 1],
+            after: lastOriginalAfter
+        };
+
+        result.push({
+            ...rp,
+            element: {
+                ...member,
+                value: {...scopeObj, members: filtered} as Json.Object
+            }
+        } as Json.RightPadded<Json>);
+    }
+
+    if (!changed) {
+        return doc;
+    }
+
+    if (result.length > 0 && result.length < rootObj.members.length) {
+        const originalLastAfter = rootObj.members[rootObj.members.length - 1].after;
+        result[result.length - 1] = {
+            ...result[result.length - 1],
+            after: originalLastAfter
         };
     }
 
-    private processMembers(members: Json.RightPadded<Json>[]): Json.RightPadded<Json>[] {
-        let changed = false;
-        const result: Json.RightPadded<Json>[] = [];
-
-        for (const rp of members) {
-            const member = rp.element as Json.Member;
-            const keyName = getMemberKeyName(member);
-
-            if (this.targetScopes.has(keyName)) {
-                if (!isObject(member.value)) {
-                    result.push(rp);
-                    continue;
-                }
-
-                const scopeObj = member.value;
-                const filtered = scopeObj.members.filter(depRp => {
-                    const depMember = depRp.element as Json.Member;
-                    return getMemberKeyName(depMember) !== this.packageName;
-                });
-
-                if (filtered.length === scopeObj.members.length) {
-                    result.push(rp);
-                    continue;
-                }
-
-                changed = true;
-
-                if (filtered.length === 0) {
-                    continue;
-                }
-
-                const lastOriginalAfter = scopeObj.members[scopeObj.members.length - 1].after;
-                const updatedDeps = [...filtered];
-                updatedDeps[updatedDeps.length - 1] = {
-                    ...updatedDeps[updatedDeps.length - 1],
-                    after: lastOriginalAfter
-                };
-
-                result.push({
-                    ...rp,
-                    element: {
-                        ...member,
-                        value: {
-                            ...scopeObj,
-                            members: updatedDeps
-                        } as Json.Object
-                    }
-                } as Json.RightPadded<Json>);
-            } else {
-                result.push(rp);
-            }
-        }
-
-        if (!changed) {
-            return members;
-        }
-
-        if (result.length > 0 && result.length < members.length) {
-            const originalLastAfter = members[members.length - 1].after;
-            result[result.length - 1] = {
-                ...result[result.length - 1],
-                after: originalLastAfter
-            };
-        }
-
-        return result;
-    }
+    return {
+        ...doc,
+        value: {...rootObj, members: result} as Json.Object
+    };
 }
