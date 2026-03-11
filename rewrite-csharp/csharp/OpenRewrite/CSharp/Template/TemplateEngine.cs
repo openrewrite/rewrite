@@ -213,7 +213,7 @@ internal static class TemplateEngine
 /// <summary>
 /// Visitor that replaces placeholder identifiers with captured AST nodes.
 /// </summary>
-internal class SubstitutionVisitor : JavaVisitor<int>
+internal class SubstitutionVisitor : CSharpVisitor<int>
 {
     private readonly MatchResult _values;
 
