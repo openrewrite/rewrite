@@ -43,9 +43,11 @@ export class DateFnsToTemporal extends Recipe {
 
 class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
     private importedDateFnsFunctions = new Set<string>();
+    private aliasToOriginal = new Map<string, string>();
 
     protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
         this.importedDateFnsFunctions = new Set();
+        this.aliasToOriginal = new Map();
 
         for (const stmt of cu.statements) {
             const s = stmt.element ?? stmt;
@@ -61,7 +63,8 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         const result = await super.visitJsCompilationUnit(cu, ctx);
 
         for (const fn of this.importedDateFnsFunctions) {
-            maybeRemoveImport(this, 'date-fns', fn);
+            const originalName = this.aliasToOriginal.get(fn) ?? fn;
+            maybeRemoveImport(this, 'date-fns', originalName);
         }
 
         return result;
@@ -83,8 +86,22 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         for (const elem of namedImports.elements.elements) {
             const specifier = elem.element;
             const specifierNode = specifier.specifier;
+
+            // Simple import: import { addDays } from 'date-fns'
             if (isIdentifier(specifierNode) && DATE_FNS_FUNCTIONS.has(specifierNode.simpleName)) {
                 this.importedDateFnsFunctions.add(specifierNode.simpleName);
+                continue;
+            }
+
+            // Aliased import: import { addDays as plusDays } from 'date-fns'
+            if (specifierNode.kind === JS.Kind.Alias) {
+                const alias = specifierNode as JS.Alias;
+                const imported = alias.propertyName.element;
+                const local = alias.alias;
+                if (isIdentifier(imported) && isIdentifier(local) && DATE_FNS_FUNCTIONS.has(imported.simpleName)) {
+                    this.importedDateFnsFunctions.add(local.simpleName);
+                    this.aliasToOriginal.set(local.simpleName, imported.simpleName);
+                }
             }
         }
     }
@@ -96,7 +113,8 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         const name = (method.name as J.Identifier)?.simpleName;
         if (!name || !this.importedDateFnsFunctions.has(name)) return method;
 
-        const rule = this.getRuleForFunction(name);
+        const originalName = this.aliasToOriginal.get(name) ?? name;
+        const rule = this.getRuleForFunction(name, originalName);
         if (!rule) return method;
 
         return await rule.tryOn(this.cursor, method) || method;
@@ -112,7 +130,8 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         const name = fn.simpleName;
         if (!this.importedDateFnsFunctions.has(name)) return functionCall;
 
-        const rule = this.getRuleForFunction(name);
+        const originalName = this.aliasToOriginal.get(name) ?? name;
+        const rule = this.getRuleForFunction(name, originalName);
         if (!rule) return functionCall;
 
         return await rule.tryOn(this.cursor, functionCall) || functionCall;
@@ -120,36 +139,36 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private _ruleCache = new Map<string, RewriteRule>();
 
-    private getRuleForFunction(name: string): RewriteRule | undefined {
-        if (this._ruleCache.has(name)) return this._ruleCache.get(name)!;
-        const rule = this.buildRule(name);
-        if (rule) this._ruleCache.set(name, rule);
+    private getRuleForFunction(localName: string, originalName: string): RewriteRule | undefined {
+        if (this._ruleCache.has(localName)) return this._ruleCache.get(localName)!;
+        const rule = this.buildRule(localName, originalName);
+        if (rule) this._ruleCache.set(localName, rule);
         return rule;
     }
 
-    private buildRule(name: string): RewriteRule | undefined {
-        switch (name) {
-            case 'addDays': return this.addSubRule('addDays', 'days', 'add');
-            case 'addMonths': return this.addSubRule('addMonths', 'months', 'add');
-            case 'addYears': return this.addSubRule('addYears', 'years', 'add');
-            case 'subDays': return this.addSubRule('subDays', 'days', 'subtract');
-            case 'subMonths': return this.addSubRule('subMonths', 'months', 'subtract');
-            case 'subYears': return this.addSubRule('subYears', 'years', 'subtract');
+    private buildRule(localName: string, originalName: string): RewriteRule | undefined {
+        switch (originalName) {
+            case 'addDays': return this.addSubRule(localName, 'days', 'add');
+            case 'addMonths': return this.addSubRule(localName, 'months', 'add');
+            case 'addYears': return this.addSubRule(localName, 'years', 'add');
+            case 'subDays': return this.addSubRule(localName, 'days', 'subtract');
+            case 'subMonths': return this.addSubRule(localName, 'months', 'subtract');
+            case 'subYears': return this.addSubRule(localName, 'years', 'subtract');
 
-            case 'isAfter': return this.compareRule('isAfter', '> 0');
-            case 'isBefore': return this.compareRule('isBefore', '< 0');
-            case 'isEqual': return this.compareRule('isEqual', '=== 0');
+            case 'isAfter': return this.compareRule(localName, '> 0');
+            case 'isBefore': return this.compareRule(localName, '< 0');
+            case 'isEqual': return this.compareRule(localName, '=== 0');
 
-            case 'differenceInDays': return this.differenceRule('differenceInDays', 'day', 'days');
-            case 'differenceInHours': return this.differenceRule('differenceInHours', 'hour', 'hours');
-            case 'differenceInMinutes': return this.differenceRule('differenceInMinutes', 'minute', 'minutes');
+            case 'differenceInDays': return this.differenceRule(localName, 'day', 'days');
+            case 'differenceInHours': return this.differenceRule(localName, 'hour', 'hours');
+            case 'differenceInMinutes': return this.differenceRule(localName, 'minute', 'minutes');
 
-            case 'startOfDay': return this.singleArgRule('startOfDay', 'Temporal.PlainDate.from(', ').toPlainDateTime()');
-            case 'startOfMonth': return this.singleArgRule('startOfMonth', 'Temporal.PlainDate.from(', ').with({ day: 1 })');
-            case 'startOfYear': return this.singleArgRule('startOfYear', 'Temporal.PlainDate.from(', ').with({ month: 1, day: 1 })');
-            case 'endOfDay': return this.singleArgRule('endOfDay', 'Temporal.PlainDate.from(', ').toPlainDateTime({hour: 23, minute: 59, second: 59, millisecond: 999})');
-            case 'endOfMonth': return this.endOfMonthRule();
-            case 'endOfYear': return this.singleArgRule('endOfYear', 'Temporal.PlainDate.from(', ').with({ month: 12, day: 31 })');
+            case 'startOfDay': return this.singleArgRule(localName, 'Temporal.PlainDate.from(', ').toPlainDateTime()');
+            case 'startOfMonth': return this.singleArgRule(localName, 'Temporal.PlainDate.from(', ').with({day: 1}).toPlainDateTime()');
+            case 'startOfYear': return this.singleArgRule(localName, 'Temporal.PlainDate.from(', ').with({month: 1, day: 1}).toPlainDateTime()');
+            case 'endOfDay': return this.singleArgRule(localName, 'Temporal.PlainDate.from(', ').toPlainDateTime({hour: 23, minute: 59, second: 59, millisecond: 999})');
+            case 'endOfMonth': return this.endOfMonthRule(localName);
+            case 'endOfYear': return this.singleArgRule(localName, 'Temporal.PlainDate.from(', ').with({month: 12, day: 31}).toPlainDateTime({hour: 23, minute: 59, second: 59, millisecond: 999})');
 
             default: return undefined;
         }
@@ -242,11 +261,11 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         return rewrite(() => ({ before: pat, after: tmpl }));
     }
 
-    private endOfMonthRule(): RewriteRule {
+    private endOfMonthRule(fnName: string = 'endOfMonth'): RewriteRule {
         const date = capture('date');
 
         const pat = Pattern.builder()
-            .code('endOfMonth(')
+            .code(`${fnName}(`)
             .capture(date)
             .code(')')
             .build();

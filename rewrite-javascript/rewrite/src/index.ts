@@ -81,6 +81,12 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ModernizeOctalEscapeSequences, MigrateES6);
     await marketplace.install(ModernizeOctalLiterals, MigrateES6);
     await marketplace.install(RemoveDuplicateObjectKeys, MigrateES6);
+
+    const {DateFnsToTemporal, MigrateDateFns} = await import("./javascript/migrate/date-fns/index.js");
+    await marketplace.install(DateFnsToTemporal, MigrateDateFns);
+
+    const {MomentToTemporal, MigrateMoment} = await import("./javascript/migrate/moment/index.js");
+    await marketplace.install(MomentToTemporal, MigrateMoment);
 }
 
 RpcCodecs.registerCodec(MarkersKind.ParseExceptionResult, {
