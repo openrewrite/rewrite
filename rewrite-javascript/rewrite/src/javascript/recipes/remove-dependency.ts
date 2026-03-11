@@ -47,7 +47,7 @@ import * as path from "path";
 interface ProjectUpdateInfo {
     packageJsonPath: string;
     originalPackageJson: string;
-    dependencyScope: DependencyScope;
+    dependencyScopes: DependencyScope[];
     packageManager: PackageManager;
     configFiles?: Record<string, string>;
 }
@@ -70,7 +70,7 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
 
     @Option({
         displayName: "Scope",
-        description: "The dependency scope to remove from. If not specified, the dependency is removed from whichever scope it is found in.",
+        description: "The dependency scope to remove from. If not specified, the dependency is removed from all scopes where it is found.",
         example: "dependencies",
         required: false
     })
@@ -119,17 +119,16 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
                 }
 
                 const scopesToCheck = recipe.scope ? [recipe.scope] : allDependencyScopes;
-                let foundScope: DependencyScope | undefined;
+                const foundScopes: DependencyScope[] = [];
 
                 for (const scope of scopesToCheck) {
                     const deps = marker[scope];
                     if (deps?.some(d => d.name === recipe.packageName)) {
-                        foundScope = scope;
-                        break;
+                        foundScopes.push(scope);
                     }
                 }
 
-                if (!foundScope) {
+                if (foundScopes.length === 0) {
                     return doc;
                 }
 
@@ -144,7 +143,7 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
                 acc.projectsToUpdate.set(doc.sourcePath, {
                     packageJsonPath: doc.sourcePath,
                     originalPackageJson: await TreePrinters.print(doc),
-                    dependencyScope: foundScope,
+                    dependencyScopes: foundScopes,
                     packageManager: pm,
                     configFiles: Object.keys(configFiles).length > 0 ? configFiles : undefined
                 });
@@ -196,7 +195,7 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
 
                     const visitor = new RemoveDependencyVisitor(
                         recipe.packageName,
-                        updateInfo.dependencyScope
+                        updateInfo.dependencyScopes
                     );
                     const modifiedDoc = await visitor.visit(doc, undefined) as Json.Document;
 
@@ -230,7 +229,7 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
     ): Promise<void> {
         const modifiedPackageJson = this.createModifiedPackageJson(
             updateInfo.originalPackageJson,
-            updateInfo.dependencyScope
+            updateInfo.dependencyScopes
         );
 
         const lockFileName = getLockFileName(updateInfo.packageManager);
@@ -255,15 +254,17 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
 
     private createModifiedPackageJson(
         originalContent: string,
-        scope: DependencyScope
+        scopes: DependencyScope[]
     ): string {
         const packageJson = JSON.parse(originalContent);
 
-        if (packageJson[scope] && packageJson[scope][this.packageName]) {
-            delete packageJson[scope][this.packageName];
+        for (const scope of scopes) {
+            if (packageJson[scope] && packageJson[scope][this.packageName]) {
+                delete packageJson[scope][this.packageName];
 
-            if (Object.keys(packageJson[scope]).length === 0) {
-                delete packageJson[scope];
+                if (Object.keys(packageJson[scope]).length === 0) {
+                    delete packageJson[scope];
+                }
             }
         }
 
@@ -273,12 +274,12 @@ export class RemoveDependency extends ScanningRecipe<Accumulator> {
 
 class RemoveDependencyVisitor extends JsonVisitor<void> {
     private readonly packageName: string;
-    private readonly targetScope: DependencyScope;
+    private readonly targetScopes: Set<string>;
 
-    constructor(packageName: string, targetScope: DependencyScope) {
+    constructor(packageName: string, targetScopes: DependencyScope[]) {
         super();
         this.packageName = packageName;
-        this.targetScope = targetScope;
+        this.targetScopes = new Set(targetScopes);
     }
 
     protected async visitDocument(doc: Json.Document, p: void): Promise<Json | undefined> {
@@ -307,7 +308,7 @@ class RemoveDependencyVisitor extends JsonVisitor<void> {
             const member = rp.element as Json.Member;
             const keyName = getMemberKeyName(member);
 
-            if (keyName === this.targetScope) {
+            if (this.targetScopes.has(keyName)) {
                 if (!isObject(member.value)) {
                     result.push(rp);
                     continue;

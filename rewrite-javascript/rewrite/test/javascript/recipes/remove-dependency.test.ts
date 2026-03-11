@@ -228,6 +228,43 @@ describe("RemoveDependency", () => {
         }, {unsafeCleanup: true});
     });
 
+    test("removes from all scopes when no scope specified", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new RemoveDependency({
+            packageName: "uuid"
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "uuid": "^9.0.0",
+                                "lodash": "^4.17.21"
+                            },
+                            "devDependencies": {
+                                "uuid": "^9.0.0"
+                            }
+                        }
+                    `, `
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }
+                    `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
     test("updates package-lock.json when removing dependency", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new RemoveDependency({
