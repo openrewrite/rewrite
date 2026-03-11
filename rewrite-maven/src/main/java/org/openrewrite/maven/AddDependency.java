@@ -178,10 +178,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (tree instanceof JavaSourceFile) {
-                    if ("test".equals(scope) && onlyIfUsing != null) {
-                        if (sourceFile == isLikelyTest.visit(sourceFile, ctx)) {
-                            return sourceFile;
-                        }
+                    if ("test".equals(scope) && onlyIfUsing != null && sourceFile == isLikelyTest.visit(sourceFile, ctx)) {
+                        return sourceFile;
                     }
                     if (onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
                         acc.usingType = true;

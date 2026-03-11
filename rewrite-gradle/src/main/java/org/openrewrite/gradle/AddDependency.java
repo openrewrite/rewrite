@@ -171,10 +171,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 SourceFile sourceFile = (SourceFile) tree;
                 if (configuration != null && onlyIfUsing != null &&
                         configuration.startsWith("test") && configuration.length() > 4 &&
-                        Character.isUpperCase(configuration.charAt(4))) {
-                    if (sourceFile == isLikelyTest.visit(sourceFile, ctx)) {
-                        return tree;
-                    }
+                        Character.isUpperCase(configuration.charAt(4)) &&
+                        sourceFile == isLikelyTest.visit(sourceFile, ctx)) {
+                    return tree;
                 }
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
                     boolean uses = usesType(sourceFile, ctx);
