@@ -195,19 +195,21 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         q.Receive<object?>(null);
         // Externs: empty list
         q.ReceiveList<JRightPadded<Statement>>([], rp => _delegate.VisitRightPadded(rp, q));
+        // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
+        var existingMembers = cu.Members ?? [];
         // Usings
         var usings = q.ReceiveList(
-            cu.Members.Where(m => m is UsingDirective)
+            existingMembers.Where(m => m is UsingDirective)
                 .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
                 .ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         // AttributeLists
         var attrLists = q.ReceiveList(
-            cu.Members.OfType<AttributeList>().ToList(),
+            existingMembers.OfType<AttributeList>().ToList(),
             t => (AttributeList)VisitNonNull(t, q));
         // Members (non-using, non-attributelist)
         var members = q.ReceiveList(
-            cu.Members.Where(m => m is not UsingDirective && m is not AttributeList)
+            existingMembers.Where(m => m is not UsingDirective && m is not AttributeList)
                 .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
                 .ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
@@ -461,13 +463,15 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var name = q.Receive(ns.Name, rp => _delegate.VisitRightPadded(rp, q));
         // Externs
         q.ReceiveList<JRightPadded<Statement>>([], rp => _delegate.VisitRightPadded(rp, q));
+        // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
+        var existingNsMembers = ns.Members ?? [];
         // Usings
         var usings = q.ReceiveList(
-            ns.Members.Where(m => m.Element is UsingDirective).ToList(),
+            existingNsMembers.Where(m => m.Element is UsingDirective).ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         // Members
         var members = q.ReceiveList(
-            ns.Members.Where(m => m.Element is not UsingDirective).ToList(),
+            existingNsMembers.Where(m => m.Element is not UsingDirective).ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         var end = q.Receive(ns.End, space => VisitSpace(space, q));
 
@@ -496,12 +500,13 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- ConditionalDirective ----
     public override J VisitConditionalDirective(ConditionalDirective cd, RpcReceiveQueue q)
     {
-        // Receive DirectiveLines
-        var count = q.Receive<int>(cd.DirectiveLines.Count);
+        // Receive DirectiveLines (may be null for brand-new trees)
+        var existingDirectiveLines = cd.DirectiveLines ?? [];
+        var count = q.Receive<int>(existingDirectiveLines.Count);
         var directiveLines = new List<DirectiveLine>();
         for (int i = 0; i < count; i++)
         {
-            var existing = i < cd.DirectiveLines.Count ? cd.DirectiveLines[i] : null;
+            var existing = i < existingDirectiveLines.Count ? existingDirectiveLines[i] : null;
             var lineNumber = q.Receive<int>(existing?.LineNumber ?? 0);
             var text = q.Receive<string>(existing?.Text ?? "")!;
             var kind = (PreprocessorDirectiveKind)q.Receive<int>((int)(existing?.Kind ?? 0));

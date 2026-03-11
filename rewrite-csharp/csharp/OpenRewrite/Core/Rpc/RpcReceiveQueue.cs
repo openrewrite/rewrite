@@ -226,6 +226,10 @@ public class RpcReceiveQueue
         if (typeof(T) == typeof(bool) && value is IConvertible bc)
             return (T)(object)bc.ToBoolean(null);
 
+        // Enum values arrive as strings from Java (via StringEnumConverter)
+        if (typeof(T).IsEnum && value is string enumStr)
+            return (T)Enum.Parse(typeof(T), enumStr);
+
         return (T)value;
     }
 
@@ -248,6 +252,9 @@ public class RpcReceiveQueue
             return (T)(object)je.GetInt64();
         if (underlyingType == typeof(double))
             return (T)(object)je.GetDouble();
+
+        if (underlyingType.IsEnum && je.ValueKind == JsonValueKind.String)
+            return (T)Enum.Parse(underlyingType, je.GetString()!);
 
         if (je.ValueKind == JsonValueKind.String)
             return (T)(object)je.GetString()!;
@@ -348,9 +355,7 @@ public class RpcReceiveQueue
 
     private static bool IsTreeType(object obj)
     {
-        var type = obj.GetType();
-        var ns = type.Namespace;
-        return ns != null && (ns.StartsWith("OpenRewrite.Java") || ns.StartsWith("OpenRewrite.CSharp"));
+        return obj is Tree;
     }
 
     /// <summary>
@@ -478,7 +483,8 @@ public class RpcReceiveQueue
 
     private static Type? FindType(string ns, string name)
     {
-        var fullName = $"{ns}.{name}";
+        // Java uses '$' for nested types, .NET uses '+'
+        var fullName = $"{ns}.{name.Replace('$', '+')}";
         // Search in all loaded assemblies
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
