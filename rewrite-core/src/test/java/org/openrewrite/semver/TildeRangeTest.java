@@ -96,6 +96,15 @@ class TildeRangeTest {
     }
 
     @Test
+    void overflowingVersionSegment() {
+        // Version numbers that exceed Integer.MAX_VALUE should not throw NumberFormatException
+        assertThat(TildeRange.build("~202302104298", null).isValid()).isFalse();
+        assertThat(TildeRange.build("~1.202302104298", null).isValid()).isFalse();
+        assertThat(TildeRange.build("~1.2.202302104298", null).isValid()).isFalse();
+        assertThat(TildeRange.build("~1.2.3.202302104298", null).isValid()).isFalse();
+    }
+
+    @Test
     void compare() {
         TildeRange tildeRange = TildeRange.build("~1.0", null).getValue();
 
