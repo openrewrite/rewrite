@@ -106,18 +106,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
         );
     }
 
-    /**
-     * Resets the cached state of the current C# RPC instance.
-     * This clears all parsed objects and references on both the Java and C# sides,
-     * preventing memory accumulation across multiple parse operations.
-     * <p>
-     * Call this between tests or after batch operations that don't need to share state.
-     */
     public static void resetCurrent() {
-        CSharpRewriteRpc current = MANAGER.get();
-        if (current != null) {
-            current.reset();
-        }
+        MANAGER.reset();
     }
 
     /**
