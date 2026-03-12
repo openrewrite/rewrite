@@ -74,7 +74,7 @@ public sealed class Space(string whitespace, IList<Comment> comments)
                             prefix.Length > 0 ? prefix.ToString(0, prefix.Length - 1) : "", true));
                         prefix.Clear();
                         comment.Clear();
-                        last = c;
+                        last = '\0'; // reset to prevent next '/' from being misinterpreted
                         continue;
                     }
                     else if (inMultiLineComment)
@@ -115,9 +115,13 @@ public sealed class Space(string whitespace, IList<Comment> comments)
                         inMultiLineComment = true;
                         comment.Clear();
                     }
-                    else
+                    else if (inMultiLineComment)
                     {
                         comment.Append(c);
+                    }
+                    else
+                    {
+                        prefix.Append(c);
                     }
                     break;
                 default:
@@ -134,15 +138,18 @@ public sealed class Space(string whitespace, IList<Comment> comments)
             last = c;
         }
 
-        // Unterminated single-line comment at end of input
+        // Unterminated comment at end of input
         if (comment.Length > 0 || inSingleLineComment)
         {
-            comments.Add(new TextComment(comment.ToString(), prefix.ToString(), false));
+            comments.Add(new TextComment(comment.ToString(), prefix.ToString(), inMultiLineComment));
             prefix.Clear();
         }
 
-        // Shift whitespace: each comment's "prefix" collected so far becomes the suffix of the
-        // previous comment, and the very first comment's prefix becomes the Space's whitespace.
+        // During parsing above, whitespace before each comment is stored in its Suffix field.
+        // OpenRewrite's Space model stores whitespace *after* each comment as Comment.Suffix,
+        // and the Space.Whitespace is the whitespace *before* the first comment.
+        // Rotate: move each comment's collected "prefix" to be the preceding comment's suffix,
+        // and the first comment's prefix becomes the Space's leading whitespace.
         string ws = prefix.ToString();
         if (comments.Count > 0)
         {

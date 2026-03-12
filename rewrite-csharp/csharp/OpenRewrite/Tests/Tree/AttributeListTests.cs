@@ -121,4 +121,30 @@ public class AttributeListTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void AttributeOnStruct()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [Serializable]
+                struct Foo { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeOnEnum()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [Flags]
+                enum Permissions { Read = 1, Write = 2 }
+                """
+            )
+        );
+    }
 }

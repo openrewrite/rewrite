@@ -2115,6 +2115,15 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(ed, p);
 
+        // Print attribute lists
+        if (ed.AttributeLists != null)
+        {
+            foreach (var attrList in ed.AttributeLists)
+            {
+                Visit(attrList, p);
+            }
+        }
+
         // Print modifiers
         foreach (var mod in ed.Modifiers)
         {
