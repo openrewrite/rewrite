@@ -925,6 +925,14 @@ _recipe_phases: Dict[str, str] = {}
 _data_table_output_dir: Optional[str] = None
 
 
+def _install_sub_recipes(recipe, marketplace) -> None:
+    """Ensure sub-recipes from recipe_list() are registered in the marketplace."""
+    for sub_recipe in recipe.recipe_list():
+        if not marketplace.find_recipe(sub_recipe.name):
+            marketplace.install(type(sub_recipe), [])
+            _install_sub_recipes(sub_recipe, marketplace)
+
+
 def handle_prepare_recipe(params: dict) -> dict:
     """Handle a PrepareRecipe RPC request.
 
@@ -974,6 +982,8 @@ def handle_prepare_recipe(params: dict) -> dict:
     # Generate a unique ID for this prepared recipe
     prepared_id = generate_id()
     _prepared_recipes[prepared_id] = recipe
+
+    _install_sub_recipes(recipe, marketplace)
 
     # Build the response
     descriptor = recipe.descriptor()
