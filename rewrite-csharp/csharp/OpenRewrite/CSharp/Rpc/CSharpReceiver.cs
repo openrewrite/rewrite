@@ -348,9 +348,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- FixedStatement ----
     public override J VisitFixedStatement(FixedStatement fixedStatement, RpcReceiveQueue q)
     {
-        var declarations = q.Receive((J)fixedStatement.Declarations, el => (J)VisitNonNull(el, q));
+        var declarations = q.Receive(fixedStatement.Declarations, el => (ControlParentheses<VariableDeclarations>)VisitNonNull(el, q));
         var block = q.Receive((J)fixedStatement.Block, el => (J)VisitNonNull(el, q));
-        return fixedStatement.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDeclarations((ControlParentheses<VariableDeclarations>)declarations!).WithBlock((Block)block!);
+        return fixedStatement.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDeclarations(declarations!).WithBlock((Block)block!);
     }
 
     // ---- DefaultExpression ----
@@ -804,8 +804,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitCheckedExpression(CheckedExpression che, RpcReceiveQueue q)
     {
         var keyword = q.Receive((J)che.CheckedOrUncheckedKeyword, el => (J)VisitNonNull(el, q));
-        var exprValue = q.Receive((J)che.ExpressionValue, el => (J)VisitNonNull(el, q));
-        return che.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCheckedOrUncheckedKeyword((Keyword)keyword!).WithExpressionValue((ControlParentheses<Expression>)exprValue!);
+        var exprValue = q.Receive(che.ExpressionValue, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
+        return che.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCheckedOrUncheckedKeyword((Keyword)keyword!).WithExpressionValue(exprValue!);
     }
 
     public override J VisitCheckedStatement(CheckedStatement chs, RpcReceiveQueue q)
