@@ -658,6 +658,62 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void downloadMetadataFromFileRepoWithNonAsciiPath(@TempDir Path repoPath) throws Exception {
+            // Reproduce "Bad escape" error when file:// repo path contains non-ASCII chars
+            // like German umlauts (e.g. a username like "müller")
+            Path repoWithUmlaut = repoPath.resolve("m\u00fcller/.m2/repository");
+            Path artifactDir = repoWithUmlaut.resolve("com/example/my-lib");
+            for (String version : List.of("1.0.0", "2.0.0")) {
+                Path versionPath = artifactDir.resolve(version);
+                Files.createDirectories(versionPath);
+                Files.writeString(versionPath.resolve("my-lib-" + version + ".pom"),
+                  """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.example</groupId>
+                      <artifactId>my-lib</artifactId>
+                      <version>%s</version>
+                    </project>
+                    """.formatted(version));
+            }
+            Files.writeString(artifactDir.resolve("maven-metadata-local.xml"),
+              """
+                <metadata>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-lib</artifactId>
+                  <versioning>
+                    <versions>
+                      <version>1.0.0</version>
+                      <version>2.0.0</version>
+                    </versions>
+                  </versioning>
+                </metadata>
+                """);
+
+            // Use a URI with properly encoded umlauts (as Path.toUri() produces)
+            MavenRepository repository = MavenRepository.builder()
+              .id("local")
+              .uri(repoWithUmlaut.toUri().toString())
+              .knownToExist(true)
+              .build();
+            MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
+              .downloadMetadata(new GroupArtifact("com.example", "my-lib"), null, List.of(repository));
+            assertThat(metaData.getVersioning().getVersions()).containsExactly("1.0.0", "2.0.0");
+
+            // Also test with raw (unencoded) umlauts in the URI, which is what happens
+            // when the repo URL comes from Maven settings XML with non-ASCII path chars
+            String rawUri = "file://" + repoWithUmlaut.toAbsolutePath() + "/";
+            MavenRepository rawRepo = MavenRepository.builder()
+              .id("local-raw")
+              .uri(rawUri)
+              .knownToExist(true)
+              .build();
+            MavenMetadata rawMetaData = new MavenPomDownloader(emptyMap(), ctx)
+              .downloadMetadata(new GroupArtifact("com.example", "my-lib"), null, List.of(rawRepo));
+            assertThat(rawMetaData.getVersioning().getVersions()).containsExactly("1.0.0", "2.0.0");
+        }
+
+        @Test
         void deriveMetaDataFromHtmlBasedRepository() {
             MavenRepository repository = MavenRepository.builder()
               .id("html-based")

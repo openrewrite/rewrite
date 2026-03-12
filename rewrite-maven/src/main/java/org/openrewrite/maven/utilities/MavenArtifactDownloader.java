@@ -107,7 +107,7 @@ public class MavenArtifactDownloader {
             if (uri.startsWith("~")) {
                 bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
             } else if ("file".equals(URI.create(uri).getScheme())) {
-                bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
+                bodyStream = Files.newInputStream(Paths.get(URI.create(uri).getPath()));
             } else {
                 HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
