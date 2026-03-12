@@ -68,14 +68,13 @@ public class AddSettingsPluginRepository extends Recipe {
         return Preconditions.check(new IsSettingsGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
-                    if (tree == new FindRepository(type, url, FindRepository.Purpose.Plugin).getVisitor().visit(tree, ctx)) {
-                        if (tree instanceof G.CompilationUnit) {
-                            return visitCompilationUnit((G.CompilationUnit) tree, ctx);
-                        }
-                        if (tree instanceof K.CompilationUnit) {
-                            return visitCompilationUnit((K.CompilationUnit) tree, ctx);
-                        }
+                if (tree instanceof JavaSourceFile &&
+                        tree == new FindRepository(type, url, FindRepository.Purpose.Plugin).getVisitor().visit(tree, ctx)) {
+                    if (tree instanceof G.CompilationUnit) {
+                        return visitCompilationUnit((G.CompilationUnit) tree, ctx);
+                    }
+                    if (tree instanceof K.CompilationUnit) {
+                        return visitCompilationUnit((K.CompilationUnit) tree, ctx);
                     }
                 }
                 return super.visit(tree, ctx);
@@ -119,9 +118,16 @@ public class AddSettingsPluginRepository extends Recipe {
 
             private List<Statement> addPluginManagementRepos(List<Statement> statements, J pluginManagement) {
                 Statement statement = statements.get(0);
+                J.MethodInvocation existingPluginManagement = null;
                 if (statement instanceof J.MethodInvocation &&
                         "pluginManagement".equals(((J.MethodInvocation) statement).getSimpleName())) {
-                    J.MethodInvocation m = (J.MethodInvocation) statement;
+                    existingPluginManagement = (J.MethodInvocation) statement;
+                } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
+                        "pluginManagement".equals(((J.MethodInvocation) ((J.Return) statement).getExpression()).getSimpleName())) {
+                    existingPluginManagement = (J.MethodInvocation) ((J.Return) statement).getExpression();
+                }
+                if (existingPluginManagement != null) {
+                    J.MethodInvocation m = existingPluginManagement;
                     m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                         if (arg instanceof J.Lambda && ((J.Lambda) arg).getBody() instanceof J.Block) {
                             J.Lambda lambda = (J.Lambda) arg;
@@ -149,7 +155,11 @@ public class AddSettingsPluginRepository extends Recipe {
                         }
                         return arg;
                     }));
-                    statements.set(0, m);
+                    if (statement instanceof J.Return) {
+                        statements.set(0, ((J.Return) statement).withExpression(m));
+                    } else {
+                        statements.set(0, m);
+                    }
                 } else {
                     Statement pluginManagementStatement = pluginManagement instanceof J.Block ?
                             ((J.Block) pluginManagement).getStatements().get(0) :
