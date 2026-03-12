@@ -349,6 +349,43 @@ public class TemplateApplyTests : RewriteTest
     }
 
     // ===============================================================
+    // Auto-formatting
+    // ===============================================================
+
+    [Fact]
+    public void AutoFormatsTemplateResultIndentation()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceWithIfBlockRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        Console.Write(42);
+                    }
+                }
+                """,
+                // Auto-format should fix the internal indentation of the if-block
+                // to match the surrounding context (8 spaces for braces, 12 for body)
+                """
+                class C
+                {
+                    void M()
+                    {
+                        if (true)
+                        {
+                            Console.WriteLine(42);
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
@@ -431,6 +468,37 @@ file class RemoveEmptyStatementRecipe : Core.Recipe
             if (Cursor.Parent?.Value is Block)
                 return null!;
             return empty;
+        }
+    }
+}
+
+/// <summary>
+/// Replaces Console.Write(expr) statement with an if-block containing Console.WriteLine(42).
+/// The template produces a single-line if statement that auto-format should expand to multi-line
+/// with correct indentation.
+/// </summary>
+file class ReplaceWithIfBlockRecipe : Core.Recipe
+{
+    public override string DisplayName => "Replace Console.Write with if block";
+    public override string Description => "Wraps Console.Write in an if block.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitExpressionStatement(ExpressionStatement es, ExecutionContext ctx)
+        {
+            es = (ExpressionStatement)base.VisitExpressionStatement(es, ctx);
+            if (es.Expression is MethodInvocation mi &&
+                mi.Select?.Element is Identifier { SimpleName: "Console" } &&
+                mi.Name.SimpleName == "Write")
+            {
+                // Multi-line template with 0-based indentation.
+                // Auto-format should fix internal indentation to match the target context.
+                var tmpl = CSharpTemplate.Create("if (true)\n{\n    Console.WriteLine(42);\n}");
+                return (J)tmpl.Apply(Cursor)!;
+            }
+            return es;
         }
     }
 }

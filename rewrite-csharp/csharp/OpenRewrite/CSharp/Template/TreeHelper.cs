@@ -27,6 +27,7 @@ namespace OpenRewrite.CSharp.Template;
 internal static class TreeHelper
 {
     private static readonly ConcurrentDictionary<Type, MethodInfo?> WithPrefixCache = new();
+    private static readonly ConcurrentDictionary<Type, MethodInfo?> WithIdCache = new();
 
     /// <summary>
     /// Property names to always skip when comparing tree nodes structurally.
@@ -56,6 +57,21 @@ internal static class TreeHelper
 
         if (method != null)
             return (J)method.Invoke(node, [prefix])!;
+
+        return node;
+    }
+
+    /// <summary>
+    /// Call WithId on any J node via cached reflection.
+    /// Returns the original node unchanged if the type doesn't have WithId.
+    /// </summary>
+    internal static J SetId(J node, Guid id)
+    {
+        var method = WithIdCache.GetOrAdd(node.GetType(), type =>
+            type.GetMethod("WithId", [typeof(Guid)]));
+
+        if (method != null)
+            return (J)method.Invoke(node, [id])!;
 
         return node;
     }

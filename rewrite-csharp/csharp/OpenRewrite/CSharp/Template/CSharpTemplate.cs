@@ -114,6 +114,9 @@ public sealed class CSharpTemplate
                 CSharpCoordinates.Replace(cursorValue));
         }
 
+        // Phase 3: auto-format within the enclosing compilation unit
+        tree = TemplateEngine.AutoFormat(tree, cursor);
+
         return tree;
     }
 }
