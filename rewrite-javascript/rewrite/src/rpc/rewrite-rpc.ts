@@ -106,6 +106,19 @@ export class RewriteRpc {
             }
         )
 
+        this.connection.onRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+            async () => {
+                this.localObjects.clear();
+                this.localObjectIds.clear();
+                this.remoteObjects.clear();
+                this.remoteRefs.clear();
+                this.localRefs.clear();
+                preparedRecipes.clear();
+                return true;
+            }
+        )
+
         RewriteRpc.set(this);
         this.connection.listen();
     }
@@ -311,5 +324,10 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
+    }
+
+    clear(): void {
+        this.objectMap = new WeakMap<any, string>();
+        this.primitiveMap.clear();
     }
 }
