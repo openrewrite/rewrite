@@ -32,7 +32,7 @@ class AddTest implements RewriteTest {
               ADD app.tar.gz /app/
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Add add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
+                var add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(add.getShellForm()).isNotNull();
                 assertThat(add.getShellForm().getSources()).hasSize(1);
                 assertThat(((Docker.Literal) add.getShellForm().getSources().getFirst().getContents().getFirst()).getText()).isEqualTo("app.tar.gz");
@@ -52,7 +52,7 @@ class AddTest implements RewriteTest {
               ADD file1.txt file2.txt file3.tar.gz /data/
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Add add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
+                var add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(add.getShellForm()).isNotNull();
                 assertThat(add.getExecForm()).isNull();
                 assertThat(add.getHeredoc()).isNull();
@@ -88,7 +88,7 @@ class AddTest implements RewriteTest {
                 var instructions = doc.getStages().getFirst().getInstructions();
 
                 // First ADD with * wildcard
-                Docker.Add add1 = (Docker.Add) instructions.getFirst();
+                var add1 = (Docker.Add) instructions.getFirst();
                 assertThat(add1.getShellForm()).isNotNull();
                 assertThat(add1.getShellForm().getSources()).hasSize(1);
                 assertThat(((Docker.Literal) add1.getShellForm().getSources().getFirst().getContents().getFirst()).getText())
@@ -97,7 +97,7 @@ class AddTest implements RewriteTest {
                     .isEqualTo("/docs/");
 
                 // Second ADD with ? wildcard
-                Docker.Add add2 = (Docker.Add) instructions.getLast();
+                var add2 = (Docker.Add) instructions.getLast();
                 assertThat(add2.getShellForm()).isNotNull();
                 assertThat(add2.getShellForm().getSources()).hasSize(1);
                 assertThat(((Docker.Literal) add2.getShellForm().getSources().getFirst().getContents().getFirst()).getText())
@@ -124,7 +124,7 @@ class AddTest implements RewriteTest {
                 var instructions = doc.getStages().getFirst().getInstructions();
 
                 // First ADD with --chown
-                Docker.Add add1 = (Docker.Add) instructions.getFirst();
+                var add1 = (Docker.Add) instructions.getFirst();
                 assertThat(add1.getFlags()).hasSize(1);
                 assertThat(add1.getFlags().getFirst().getName()).isEqualTo("chown");
                 assertThat(((Docker.Literal) add1.getFlags().getFirst().getValue().getContents().getFirst()).getText())
@@ -134,7 +134,7 @@ class AddTest implements RewriteTest {
                     .isEqualTo("archive.tar.gz");
 
                 // Second ADD with --chmod
-                Docker.Add add2 = (Docker.Add) instructions.get(1);
+                var add2 = (Docker.Add) instructions.get(1);
                 assertThat(add2.getFlags()).hasSize(1);
                 assertThat(add2.getFlags().getFirst().getName()).isEqualTo("chmod");
                 assertThat(((Docker.Literal) add2.getFlags().getFirst().getValue().getContents().getFirst()).getText())
@@ -144,7 +144,7 @@ class AddTest implements RewriteTest {
                     .isEqualTo("script.sh");
 
                 // Third ADD with both --chown and --chmod
-                Docker.Add add3 = (Docker.Add) instructions.getLast();
+                var add3 = (Docker.Add) instructions.getLast();
                 assertThat(add3.getFlags()).hasSize(2);
                 assertThat(add3.getFlags().getFirst().getName()).isEqualTo("chown");
                 assertThat(((Docker.Literal) add3.getFlags().getFirst().getValue().getContents().getFirst()).getText())
@@ -167,7 +167,7 @@ class AddTest implements RewriteTest {
               ADD ["source file.txt", "another file.txt", "/dest dir/"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Add add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
+                var add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
 
                 // Verify exec form is used
                 assertThat(add.getExecForm()).isNotNull();
@@ -204,7 +204,7 @@ class AddTest implements RewriteTest {
               ADD --chown=app:app ["config.json", "/app/config/"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Add add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
+                var add = (Docker.Add) doc.getStages().getFirst().getInstructions().getLast();
 
                 // Verify flags
                 assertThat(add.getFlags()).hasSize(1);

@@ -57,11 +57,11 @@ class TreeTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
         "true, '\uFEFFHello World'",
         "false, 'Hello World'"
     })
+    @ParameterizedTest
     void printBomHandling(boolean charsetBomMarked, String expected) {
         PlainText sourceFile = new PlainText(
             Tree.randomId(),

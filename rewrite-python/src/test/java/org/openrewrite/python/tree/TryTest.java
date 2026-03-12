@@ -48,7 +48,6 @@ class TryTest implements RewriteTest {
         ));
     }
 
-    @Python3Only
     @CsvSource(textBlock = """
         "" ,       "* TypeError"
         "" ,       "*  TypeError"
@@ -57,6 +56,7 @@ class TryTest implements RewriteTest {
         "" ,       "*TypeError"
       """, quoteCharacter = '"')
     @ParameterizedTest
+    @Python3Only
     void tryStarExcept(String afterTry, String afterExcept) {
         rewriteRun(python(
           """

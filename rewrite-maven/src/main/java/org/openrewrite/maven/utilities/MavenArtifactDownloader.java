@@ -107,7 +107,7 @@ public class MavenArtifactDownloader {
             if (uri.startsWith("~")) {
                 bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
             } else if ("file".equals(URI.create(uri).getScheme())) {
-                bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
+                bodyStream = Files.newInputStream(Paths.get(URI.create(uri).getPath()));
             } else {
                 HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
@@ -130,6 +130,7 @@ public class MavenArtifactDownloader {
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
+        String username, password;
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
             if (authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
@@ -137,9 +138,15 @@ public class MavenArtifactDownloader {
                     request.withHeader(header.getName(), header.getValue());
                 }
             }
-            return request.withBasicAuthentication(authInfo.getUsername(), authInfo.getPassword());
-        } else if (repository.getUsername() != null && repository.getPassword() != null) {
-            return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
+            username = authInfo.getUsername();
+            password = authInfo.getPassword();
+        } else {
+            username = repository.getUsername();
+            password = repository.getPassword();
+        }
+        if (username != null && !username.contains("${") &&
+                password != null && !password.contains("${")) {
+            return request.withBasicAuthentication(username, password);
         }
         return request;
     }

@@ -32,7 +32,7 @@ class ArgTest implements RewriteTest {
               ARG VERSION=1.0.0
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                var arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(arg.getName().getText()).isEqualTo("VERSION");
                 assertThat(arg.getValue()).isNotNull();
                 assertThat(((Docker.Literal) arg.getValue().getContents().getFirst()).getText()).isEqualTo("1.0.0");
@@ -50,7 +50,7 @@ class ArgTest implements RewriteTest {
               ARG VERSION
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Arg arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
+                var arg = (Docker.Arg) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(arg.getName().getText()).isEqualTo("VERSION");
                 assertThat(arg.getValue()).isNull();
             })

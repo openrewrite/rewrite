@@ -28,7 +28,7 @@ class SpacesVisitor(PythonVisitor):
                 implements=space_before_container(c.padding.implements, self._style.before_parentheses.method_call)
             )
 
-            param_size = len(c.padding.implements.elements)
+            param_size = len(c.padding.implements.elements)  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
             use_space = self._style.within.method_call_parentheses
 
             def _process_argument(index, arg, args_size):
@@ -46,9 +46,9 @@ class SpacesVisitor(PythonVisitor):
 
             if c.implements:
                 c = c.padding.replace(
-                    implements=c.padding.implements.padding.replace(
+                    implements=c.padding.implements.padding.replace(  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                         elements=list_map(lambda arg, index: _process_argument(index, arg, param_size),
-                                          c.padding.implements.padding.elements)))
+                                          c.padding.implements.padding.elements)))  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
         return c
 
     def visit_method_declaration(self, method: MethodDeclaration, p: P) -> J:
@@ -350,12 +350,12 @@ class SpacesVisitor(PythonVisitor):
             return arg
 
         pt = pt.padding.replace(
-            type_parameters=pt.padding.type_parameters.padding.replace(
+            type_parameters=pt.padding.type_parameters.padding.replace(  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                 elements=list_map(
                     lambda arg, idx: _process_element(idx, arg,
-                                                      last=idx == len(pt.padding.type_parameters.padding.elements) - 1,
+                                                      last=idx == len(pt.padding.type_parameters.padding.elements) - 1,  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                                                       use_space=self._style.within.brackets),
-                    pt.padding.type_parameters.padding.elements
+                    pt.padding.type_parameters.padding.elements  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                 )
             )
         )
@@ -526,9 +526,9 @@ def space_before(j: J2, add_space: bool) -> J2:
         return j
 
     if add_space and not_single_space(prefix.whitespace):
-        return j.replace(prefix=prefix.replace(whitespace=" "))  # ty: ignore[unresolved-attribute]
+        return j.replace(prefix=prefix.replace(whitespace=" "))
     elif not add_space and only_spaces_and_not_empty(prefix.whitespace):
-        return j.replace(prefix=prefix.replace(whitespace=""))  # ty: ignore[unresolved-attribute]
+        return j.replace(prefix=prefix.replace(whitespace=""))
 
     return j
 
@@ -580,7 +580,7 @@ def space_before_left_padded(j: JLeftPadded[J2], add_space) -> JLeftPadded[J2]:
 
 
 def space_after(j: J2, add_space: bool) -> J2:
-    space: Space = cast(Space, j.after)
+    space: Space = cast(Space, j.after)  # ty: ignore[unresolved-attribute]  # J2 is JRightPadded at call site
     if space.comments or '\\' in space.whitespace:
         return j
 

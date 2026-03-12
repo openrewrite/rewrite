@@ -28,7 +28,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -46,7 +45,7 @@ class WrappingAndBracesTest implements RewriteTest {
         autoFormat(
           spaces -> spaces,
           wrapping -> wrapping
-            .withChainedMethodCalls(wrapping.getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(Arrays.asList("builder", "newBuilder")))
+            .withChainedMethodCalls(wrapping.getChainedMethodCalls().withWrap(WrapAlways).withBuilderMethods(List.of("builder", "newBuilder")))
             .withMethodDeclarationParameters(wrapping.getMethodDeclarationParameters().withWrap(WrapAlways))).accept(spec);
     }
 
@@ -625,7 +624,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-
+              
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
@@ -667,18 +666,18 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   int field;
-
+              
                   @Foo
                   @Foo
                   void method(@Foo @Foo int param) {
                       @Foo @Foo int localVar;
                   }
               }
-
+              
               enum MyEnum {
                   @Foo @Foo VALUE
               }
-
+              
               record someRecord(@Foo @Foo String name) {
               }
               """
@@ -723,7 +722,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-
+              
                   @Foo
                   @Foo
                   public void method(@Foo @Foo final int param) {
@@ -758,7 +757,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-                  
+              
                   @Foo
                   @Foo
                   public void method(@Foo @Foo final int param) {
@@ -812,13 +811,13 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-
+              
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-
+              
                   @Foo
                   @Foo
                   T method(@Foo @Foo T param) {
@@ -854,13 +853,13 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Foo
                   @Foo
                   private int field;
-
+              
                   @Foo
                   @Foo
                   Test(int field) {
                       this.field = field;
                   }
-
+              
                   @Foo
                   @Foo
                   T method(@Foo @Foo T param) {
@@ -895,20 +894,20 @@ class WrappingAndBracesTest implements RewriteTest {
                   String method1() {
                       return "test";
                   }
-
+              
                   @Foo /* comment
                   on multiple
                   lines */
                   String method2() {
                       return "test";
                   }
-
+              
                   @Foo
                   //comment
                   String method3() {
                       return "test";
                   }
-
+              
                   @Foo
                   /* comment
                   on multiple
@@ -944,19 +943,19 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method1() {
                       return "test";
                   }
-
+              
                   @Foo /* comment
                   on multiple
                   lines */ final String method2() {
                       return "test";
                   }
-
+              
                   @Foo
                   //comment
                   final String method3() {
                       return "test";
                   }
-
+              
                   @Foo
                   /* comment
                   on multiple
@@ -972,10 +971,10 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void annotationWrappingWithNulls() {
         rewriteRun(spec ->
-          autoFormat(
-            spaces -> spaces,
-            wrapping -> wrapping.withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways))
-          ),
+            autoFormat(
+              spaces -> spaces,
+              wrapping -> wrapping.withMethodDeclarationParameters(IntelliJ.wrappingAndBraces().getMethodDeclarationParameters().withWrap(WrapAlways))
+            ),
           java(
             """
               import java.lang.annotation.Repeatable;
@@ -995,19 +994,19 @@ class WrappingAndBracesTest implements RewriteTest {
                   final String method1() {
                       return "test";
                   }
-                  
+              
                   @Foo /* comment
                   on multiple
                   lines */ final String method2() {
                       return "test";
                   }
-                  
+              
                   @Foo
                   //comment
                   final String method3() {
                       return "test";
                   }
-                  
+              
                   @Foo
                   /* comment
                   on multiple
@@ -1135,18 +1134,20 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void doNotWrapImplementsList() {
         rewriteRun(
-          java("""
-            public class Interfaces {
-                public interface I1 {
-                }
-
-                public interface I2 {
-                }
-
-                public interface I3 {
-                }
-            }
-            """),
+          java(
+            """
+              public class Interfaces {
+                  public interface I1 {
+                  }
+              
+                  public interface I2 {
+                  }
+              
+                  public interface I3 {
+                  }
+              }
+              """
+          ),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
@@ -1163,16 +1164,18 @@ class WrappingAndBracesTest implements RewriteTest {
             spaces -> spaces,
             wrapping -> wrapping.withExtendsImplementsPermitsList(wrapping.getExtendsImplementsPermitsList().withWrap(WrapAlways))
           ),
-          java("""
-            public class Interfaces {
-                public interface I1 {
-                }
-                public interface I2 {
-                }
-                public interface I3 {
-                }
-            }
-            """, SourceSpec::skip),
+          java(
+            """
+              public class Interfaces {
+                  public interface I1 {
+                  }
+                  public interface I2 {
+                  }
+                  public interface I3 {
+                  }
+              }
+              """,
+            SourceSpec::skip),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
@@ -1195,16 +1198,18 @@ class WrappingAndBracesTest implements RewriteTest {
             spaces -> spaces,
             wrapping -> wrapping.withExtendsImplementsPermitsList(wrapping.getExtendsImplementsPermitsList().withWrap(WrapAlways).withAlignWhenMultiline(true))
           ),
-          java("""
-            public class Interfaces {
-                public interface I1 {
-                }
-                public interface I2 {
-                }
-                public interface I3 {
-                }
-            }
-            """, SourceSpec::skip),
+          java(
+            """
+              public class Interfaces {
+                  public interface I1 {
+                  }
+                  public interface I2 {
+                  }
+                  public interface I3 {
+                  }
+              }
+              """,
+            SourceSpec::skip),
           java(
             """
               public class Test implements Interfaces.I1, Interfaces.I2, Interfaces.I3 {
@@ -1290,7 +1295,7 @@ class WrappingAndBracesTest implements RewriteTest {
           autoFormat(
             spaces -> spaces,
             wrap -> wrap.withForStatement(wrap.getForStatement().withWrap(WrapAlways).withOpenNewLine(true).withCloseNewLine(true))
-            ),
+          ),
           java(
             """
               class Test {
@@ -1791,7 +1796,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.io.*;
-
+              
               class Test {
                   void test() throws FileNotFoundException {
                       FileReader fr = new FileReader("input.txt");
@@ -1800,7 +1805,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               import java.io.*;
-
+              
               class Test {
                   void test()
                   throws FileNotFoundException {
@@ -1822,7 +1827,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.io.*;
-
+              
               class Test {
                   void test() throws FileNotFoundException, IOException, RuntimeException {
                       FileReader fr = new FileReader("input.txt");
@@ -1831,7 +1836,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               import java.io.*;
-
+              
               class Test {
                   void test() throws
                           FileNotFoundException,
@@ -1855,7 +1860,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.io.*;
-
+              
               class Test {
                   void test() throws FileNotFoundException, IOException, RuntimeException {
                       FileReader fr = new FileReader("input.txt");
@@ -1864,7 +1869,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               import java.io.*;
-
+              
               class Test {
                   void test() throws
                               FileNotFoundException,
@@ -1890,7 +1895,7 @@ class WrappingAndBracesTest implements RewriteTest {
           java(
             """
               import java.io.*;
-
+              
               class Test {
                   void test() throws FileNotFoundException, IOException, RuntimeException {
                       FileReader fr = new FileReader("input.txt");
@@ -1899,7 +1904,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               import java.io.*;
-
+              
               class Test {
                   void test()
                           throws
@@ -2067,9 +2072,9 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               enum Status {
                   NOT_STARTED("Not Started"), STARTED("Started"), COMPLETED("Completed");
-
+              
                   private final String displayName;
-
+              
                   Status(String displayName) {
                       this.displayName = displayName;
                   }
@@ -2080,9 +2085,9 @@ class WrappingAndBracesTest implements RewriteTest {
                   NOT_STARTED("Not Started"),
                   STARTED("Started"),
                   COMPLETED("Completed");
-
+              
                   private final String displayName;
-
+              
                   Status(String displayName) {
                       this.displayName = displayName;
                   }
@@ -2196,7 +2201,7 @@ class WrappingAndBracesTest implements RewriteTest {
               class Test {
                   public static final
                   int CONSTANT = 1;
-
+              
                   public static
                   void method() {
                   }
@@ -2217,7 +2222,7 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               public final class Test {
                   public static final int CONSTANT = 1;
-
+              
                   public static void method() {
                   }
               }
@@ -2689,6 +2694,59 @@ class WrappingAndBracesTest implements RewriteTest {
             """
               @SuppressWarnings(value = "all", justification = "test")
               class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void standaloneWrappingAndBracesPreservesIndentation() {
+        rewriteRun(
+          spec -> spec.recipe(new WrappingAndBraces()),
+          java(
+            """
+              class Test {
+                  void method() {
+                      System.out.println("hello");
+                      int x = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void standaloneWrappingAndBracesPreservesIndentationWithLineComments() {
+        rewriteRun(
+          spec -> spec.recipe(new WrappingAndBraces()),
+          java(
+            """
+              class Test {
+                  // a comment
+                  void method() {
+                      // another comment
+                      System.out.println("hello");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void standaloneWrappingAndBracesPreservesIndentationWithMultilineComments() {
+        rewriteRun(
+          spec -> spec.recipe(new WrappingAndBraces()),
+          java(
+            """
+              class Test {
+                  /* a multiline
+                     comment */
+                  void method() {
+                      System.out.println("hello");
+                  }
               }
               """
           )

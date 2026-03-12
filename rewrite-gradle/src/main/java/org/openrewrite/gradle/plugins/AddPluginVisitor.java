@@ -188,7 +188,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         AtomicInteger doubleQuote = new AtomicInteger();
         AtomicBoolean pluginAlreadyApplied = new AtomicBoolean();
         new JavaIsoVisitor<Integer>() {
-            final MethodMatcher pluginIdMatcher = new MethodMatcher("PluginSpec id(..)");
+            final MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
@@ -231,7 +231,7 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                 .map(parsed -> parsed.getStatements().get(0))
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
-        if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
+        if (FindMethods.find(cu, "org.gradle.api.Project plugins(..)", true).isEmpty() && FindMethods.find(cu, "org.gradle.api.initialization.Settings plugins(..)", true).isEmpty()) {
             int insertAtIdx = 0;
 
             if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))) {
@@ -269,8 +269,8 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
                 return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), insertAtIdx));
             }
         } else {
-            MethodMatcher buildPluginsMatcher = new MethodMatcher("RewriteGradleProject plugins(groovy.lang.Closure)");
-            MethodMatcher settingsPluginsMatcher = new MethodMatcher("RewriteSettings plugins(groovy.lang.Closure)");
+            MethodMatcher buildPluginsMatcher = new MethodMatcher("org.gradle.api.Project plugins(groovy.lang.Closure)", true);
+            MethodMatcher settingsPluginsMatcher = new MethodMatcher("org.gradle.api.initialization.Settings plugins(groovy.lang.Closure)", true);
             J.MethodInvocation pluginDef = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) ((J.MethodInvocation) autoFormat(statement, ctx, getCursor())).getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
             return cu.withStatements(ListUtils.map(cu.getStatements(), stat -> {
                 if (stat instanceof J.MethodInvocation) {
@@ -299,8 +299,9 @@ public class AddPluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     }
 
     private K.CompilationUnit addPluginToKotlinCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-        MethodMatcher pluginsMatcher = new MethodMatcher("*..* plugins(..)");
-        MethodMatcher pluginIdMatcher = new MethodMatcher("*..* id(..)");
+        // Wildcard type because KTS extension functions have a file-level declaring type, not Project/Settings
+        MethodMatcher pluginsMatcher = new MethodMatcher("* plugins(..)", false);
+        MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
         AtomicBoolean hasPlugin = new JavaIsoVisitor<AtomicBoolean>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {

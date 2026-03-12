@@ -29,9 +29,11 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.max;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
@@ -41,7 +43,8 @@ import static org.openrewrite.maven.utilities.MavenDependencyPropertyUsageOverla
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
+public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeDependencyGroupIdAndArtifactId.Accumulator> {
+    @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old groupId",
@@ -120,7 +123,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     String description = "Change a Maven dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before. " +
                 "Matching `<dependencyManagement>` coordinates are also updated if a `newVersion` or `versionPattern` is provided. " +
-                "Exclusions that reference the old dependency coordinates will also be updated to match the new coordinates.";
+                "Exclusions that reference the old dependency coordinates are preserved, and a sibling exclusion for the new coordinates is added alongside them.";
 
     @Override
     public Validated<Object> validate() {
@@ -142,7 +145,110 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        if (newVersion == null) {
+            return TreeVisitor.noop();
+        }
+        final VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+        if (versionComparator == null) {
+            return TreeVisitor.noop();
+        }
+        return new MavenIsoVisitor<ExecutionContext>() {
+            final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;
+
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (!isDependencyTag(oldGroupId, oldArtifactId) &&
+                        !isPluginDependencyTag(oldGroupId, oldArtifactId) &&
+                        !isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
+                    return super.visitTag(tag, ctx);
+                }
+                String currentVersion = tag.getChildValue("version").orElse(null);
+                if (!isProperty(currentVersion)) {
+                    return super.visitTag(tag, ctx);
+                }
+                String propertyName = currentVersion.substring(2, currentVersion.length() - 1);
+                if (getResolutionResult().getPom().getRequested().getProperties().containsKey(propertyName)) {
+                    return super.visitTag(tag, ctx);
+                }
+                // Property is inherited from a parent POM; check if it is safe to change
+                Set<String> safeProperties = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
+                if (!safeProperties.contains(currentVersion)) {
+                    return super.visitTag(tag, ctx);
+                }
+                try {
+                    String groupId = Optional.ofNullable(newGroupId).orElse(tag.getChildValue("groupId").orElse(oldGroupId));
+                    String artifactId = Optional.ofNullable(newArtifactId).orElse(tag.getChildValue("artifactId").orElse(oldArtifactId));
+                    String resolvedVersion = resolveSemverVersion(ctx, groupId, artifactId, currentVersion);
+                    storeParentPomProperty(getResolutionResult().getParent(), propertyName, resolvedVersion, acc);
+                } catch (MavenDownloadingException e) {
+                    return e.warn(tag);
+                }
+                return super.visitTag(tag, ctx);
+            }
+
+            private Set<String> getSafeVersionPlaceholdersToChange(String groupId, String artifactId, ExecutionContext ctx) {
+                MavenResolutionResult result = getResolutionResult();
+                ResolvedPom resolvedPom = result.getPom();
+                Pom requestedPom = resolvedPom.getRequested();
+                Set<String> relevantProperties = requestedPom.getDependencies().stream()
+                        .filter(d -> isProperty(d.getVersion()) &&
+                                matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
+                                matchesGlob(resolvedPom.getValue(d.getArtifactId()), artifactId))
+                        .map(Dependency::getVersion)
+                        .collect(toSet());
+                relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, configuredToChangeManagedDependency);
+                relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency);
+                relevantProperties = filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                // Also check sibling modules for overlapping property usage
+                MavenResolutionResult current = result;
+                while (current.parentPomIsProjectPom()) {
+                    current = requireNonNull(current.getParent());
+                    relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, current, configuredToChangeManagedDependency);
+                }
+                return relevantProperties;
+            }
+
+            @SuppressWarnings("ConstantConditions")
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId, @Nullable String currentVersion) throws MavenDownloadingException {
+                if (versionComparator == null) {
+                    return newVersion;
+                }
+                String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
+                List<String> availableVersions = new ArrayList<>();
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+                for (String v : mavenMetadata.getVersioning().getVersions()) {
+                    if (versionComparator.isValid(finalCurrentVersion, v)) {
+                        availableVersions.add(v);
+                    }
+                }
+                return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
+            }
+
+            private void storeParentPomProperty(@Nullable MavenResolutionResult parent, String propertyName, String newValue, Accumulator acc) {
+                if (parent == null) {
+                    return;
+                }
+                Pom pom = parent.getPom().getRequested();
+                if (pom.getSourcePath() == null) {
+                    return;
+                }
+                if (pom.getProperties().containsKey(propertyName)) {
+                    acc.getPomProperties().add(new PomProperty(pom.getSourcePath(), propertyName, newValue));
+                    return;
+                }
+                storeParentPomProperty(parent.getParent(), propertyName, newValue, acc);
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new MavenVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
@@ -160,15 +266,42 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 if (configuredToChangeManagedDependency) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
-                            Optional.ofNullable(newGroupId).orElse(oldGroupId),
-                            Optional.ofNullable(newArtifactId).orElse(oldArtifactId),
+                            newGroupId,
+                            newArtifactId,
                             newVersion, versionPattern).getVisitor());
                 }
-                // Update any exclusions that reference the old coordinates
+                // Add sibling exclusions for the new coordinates alongside existing old exclusions
                 if (newGroupId != null || newArtifactId != null) {
-                    doAfterVisit(new ChangeExclusion(
-                            oldGroupId, oldArtifactId,
-                            newGroupId, newArtifactId).getVisitor());
+                    String effectiveNewGroupId = newGroupId != null ? newGroupId : oldGroupId;
+                    String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldArtifactId;
+                    doAfterVisit(new MavenVisitor<ExecutionContext>() {
+                        @Override
+                        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                            Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                            if (!"exclusions".equals(t.getName())) {
+                                return t;
+                            }
+                            boolean hasOldExclusion = t.getChildren("exclusion").stream()
+                                    .anyMatch(e -> matchesGlob(e.getChildValue("groupId").orElse(null), oldGroupId) &&
+                                                   matchesGlob(e.getChildValue("artifactId").orElse(null), oldArtifactId));
+                            if (!hasOldExclusion) {
+                                return t;
+                            }
+                            boolean hasNewExclusion = t.getChildren("exclusion").stream()
+                                    .anyMatch(e -> effectiveNewGroupId.equals(e.getChildValue("groupId").orElse(null)) &&
+                                                   effectiveNewArtifactId.equals(e.getChildValue("artifactId").orElse(null)));
+                            if (!hasNewExclusion) {
+                                t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build(
+                                        "<exclusion>\n" +
+                                                "<groupId>" + effectiveNewGroupId + "</groupId>\n" +
+                                                "<artifactId>" + effectiveNewArtifactId + "</artifactId>\n" +
+                                                "</exclusion>"))
+                                        .visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                maybeUpdateModel();
+                            }
+                            return t;
+                        }
+                    });
                 }
                 return super.visitDocument(document, ctx);
             }
@@ -176,6 +309,24 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+
+                // Update version properties in parent POMs based on scanner results
+                if (isPropertyTag()) {
+                    Path pomSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
+                    for (PomProperty prop : acc.getPomProperties()) {
+                        if (!prop.getPomFilePath().equals(pomSourcePath) || !prop.getPropertyName().equals(tag.getName())) {
+                            continue;
+                        }
+                        Optional<String> value = tag.getValue();
+                        if (!value.isPresent() || !value.get().equals(prop.getNewValue())) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(tag, prop.getNewValue()));
+                            maybeUpdateModel();
+                        }
+                        break;
+                    }
+                    return t;
+                }
+
                 boolean isOldDependencyTag = isDependencyTag(oldGroupId, oldArtifactId);
                 if (isOldDependencyTag && isNewDependencyPresent) {
                     doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
@@ -303,7 +454,14 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                         .collect(toSet());
                 relevantProperties = filterPropertiesWithOverlapInDependencies(relevantProperties, groupId, artifactId, requestedPom, resolvedPom, configuredToChangeManagedDependency);
                 relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency);
-                return filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                relevantProperties = filterPropertiesWithOverlapInParents(relevantProperties, groupId, artifactId, result, configuredToChangeManagedDependency, ctx);
+                // Also check sibling modules for overlapping property usage
+                MavenResolutionResult current = result;
+                while (current.parentPomIsProjectPom()) {
+                    current = requireNonNull(current.getParent());
+                    relevantProperties = filterPropertiesWithOverlapInChildren(relevantProperties, groupId, artifactId, current, configuredToChangeManagedDependency);
+                }
+                return relevantProperties;
             }
 
 
@@ -326,5 +484,17 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 return availableVersions.isEmpty() ? newVersion : max(availableVersions, versionComparator);
             }
         };
+    }
+
+    @Value
+    public static class Accumulator {
+        Set<PomProperty> pomProperties = new HashSet<>();
+    }
+
+    @Value
+    public static class PomProperty {
+        Path pomFilePath;
+        String propertyName;
+        String newValue;
     }
 }

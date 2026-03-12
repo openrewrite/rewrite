@@ -31,7 +31,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -127,7 +126,7 @@ class TabsAndIndentsTest implements RewriteTest {
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "Test", "Test", emptySet(),
-              Arrays.asList(
+              List.of(
                 with.apply(IntelliJ.tabsAndIndents()),
                 wrap.apply(IntelliJ.wrappingAndBraces())
               )

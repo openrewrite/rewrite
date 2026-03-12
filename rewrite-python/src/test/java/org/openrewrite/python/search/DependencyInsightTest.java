@@ -23,8 +23,8 @@ import org.openrewrite.test.RewriteTest;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.python.Assertions.pyproject;
-import static org.openrewrite.python.Assertions.uv;
+import static org.openrewrite.python.Assertions.*;
+
 
 class DependencyInsightTest implements RewriteTest {
 
@@ -313,6 +313,18 @@ class DependencyInsightTest implements RewriteTest {
     }
 
     @Test
+    void noMatchInRequirementsTxtReturnsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("nonexistent", null, null)),
+          requirementsTxt(
+            """
+              requests>=2.28.0
+              """
+          )
+        );
+    }
+
+    @Test
     void onlyDirectSkipsTransitive() {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("certifi", null, true)),
@@ -324,6 +336,24 @@ class DependencyInsightTest implements RewriteTest {
               dependencies = [
                   "requests>=2.28.0",
               ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void noMatchInSetupCfgReturnsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("nonexistent", null, null)),
+          setupCfg(
+            """
+              [metadata]
+              name = myapp
+              version = 1.0.0
+
+              [options]
+              install_requires =
+                  requests>=2.28.0
               """
           )
         );

@@ -98,9 +98,9 @@ public class ChangePlugin extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)");
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)");
-        MethodMatcher applyMatcher = new MethodMatcher("RewriteGradleProject apply(..)");
+        MethodMatcher pluginMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
+        MethodMatcher versionMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
+        MethodMatcher applyMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
         return Preconditions.check(
                 Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
                 new GroovyIsoVisitor<ExecutionContext>() {

@@ -166,6 +166,19 @@ public class RewriteRpc {
             return new RecipeLoader(null).load(id, opts);
         }));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
+        jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
+            @Override
+            protected Boolean handle(Void noParams) {
+                remoteObjects.clear();
+                localObjects.clear();
+                localObjectIds.clear();
+                remoteRefs.clear();
+                localRefs.clear();
+                preparedRecipes.getInstantiated().clear();
+                preparedRecipes.getRecipeCursors().clear();
+                return true;
+            }
+        });
 
         jsonRpc.bind();
     }
@@ -461,8 +474,11 @@ public class RewriteRpc {
 
     @VisibleForTesting
     public <T> T getObject(String id, @Nullable String sourceFileType) {
-        // Check if we have a cached version of this object
-        Object localObject = localObjects.get(id);
+        // Use the last synced state as the baseline for receiving diffs.
+        // This must match what the remote used as its baseline when computing the diff.
+        // Using localObjects here would be wrong if Java modified the tree locally
+        // (e.g., via a Java-side recipe) since the remote doesn't know about those changes.
+        Object before = remoteObjects.get(id);
 
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
@@ -470,9 +486,18 @@ public class RewriteRpc {
                 sourceFileType,
                 log.get()
         );
-        Object remoteObject = q.receive(localObject, null);
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
+        Object remoteObject;
+        try {
+            remoteObject = q.receive(before, null);
+        } catch (Exception e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            remoteObjects.remove(id);
+            throw e;
+        }
+        RpcObjectData endMarker = q.take();
+        if (endMarker.getState() != END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + endMarker);
         }
 
         //noinspection ConstantValue

@@ -24,8 +24,8 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeExclusionTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2933")
     @DocumentExample
+    @Issue("https://github.com/openrewrite/rewrite/issues/2933")
     @Test
     void changeExclusionsWithGlob() {
         rewriteRun(

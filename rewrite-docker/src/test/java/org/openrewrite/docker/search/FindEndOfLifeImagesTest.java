@@ -17,10 +17,11 @@ package org.openrewrite.docker.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.docker.Assertions;
 import org.openrewrite.docker.table.EolDockerImages;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.docker.Assertions.docker;
 
 class FindEndOfLifeImagesTest implements RewriteTest {
 
@@ -40,7 +41,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               Dockerfile,,debian,buster,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM debian:buster
               RUN apt-get update
@@ -63,7 +64,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               Dockerfile,,debian,buster-slim,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM debian:buster-slim
               RUN apt-get update
@@ -79,7 +80,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectDebianStretch() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM debian:stretch
               RUN apt-get update
@@ -95,7 +96,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectUbuntuXenial() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:16.04
               RUN apt-get update
@@ -111,7 +112,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectUbuntuBionic() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:bionic
               RUN apt-get update
@@ -127,7 +128,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectAlpine3_14() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM alpine:3.14
               RUN apk update
@@ -143,7 +144,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectPython37() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM python:3.7
               RUN pip install flask
@@ -159,7 +160,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectPython37Alpine() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM python:3.7-alpine
               RUN pip install flask
@@ -175,7 +176,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectNode14() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM node:14-slim
               RUN npm install
@@ -191,7 +192,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectNode16() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM node:16
               RUN npm install
@@ -207,7 +208,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void currentDebianNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM debian:bookworm
               RUN apt-get update
@@ -219,7 +220,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void currentUbuntuNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM ubuntu:24.04
               RUN apt-get update
@@ -231,7 +232,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void currentAlpineNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM alpine:3.21
               RUN apk update
@@ -243,7 +244,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void currentPythonNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM python:3.12
               RUN pip install flask
@@ -255,7 +256,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void currentNodeNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM node:22
               RUN npm install
@@ -267,7 +268,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void scratchImageNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM scratch
               COPY app /app
@@ -279,7 +280,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void imageWithoutTagNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM debian
               RUN apt-get update
@@ -299,7 +300,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               Dockerfile,,debian,buster,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM node:14 AS builder
               RUN npm run build
@@ -328,7 +329,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
               Dockerfile,,debian,buster,2024-06-30,"trixie (13) or bookworm (12)"
               """
           ),
-          Assertions.docker(
+          docker(
             """
               FROM golang:1.21 AS builder
               RUN go build -o app .
@@ -350,7 +351,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void unknownImageNotFlagged() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM mycompany/custom-image:1.0
               RUN echo hello
@@ -362,7 +363,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     @Test
     void detectDebianByVersionNumber() {
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               FROM debian:10
               RUN apt-get update
@@ -379,7 +380,7 @@ class FindEndOfLifeImagesTest implements RewriteTest {
     void envVarTagNotFlagged() {
         // Cannot determine if EOL when tag contains environment variable
         rewriteRun(
-          Assertions.docker(
+          docker(
             """
               ARG DEBIAN_VERSION=buster
               FROM debian:${DEBIAN_VERSION}

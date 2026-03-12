@@ -368,3 +368,23 @@ examples:
       class Test {
       }
     language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.kotlin.replace.ReplaceKotlinMethod
+examples:
+- description: '`ReplaceKotlinMethodTest#replaceCharToIntWithCode`'
+  parameters:
+  - kotlin.Char toInt()
+  - code
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      fun test(c: Char): Int {
+          return c.toInt()
+      }
+    after: |
+      fun test(c: Char): Int {
+          return c.code
+      }
+    language: kotlin

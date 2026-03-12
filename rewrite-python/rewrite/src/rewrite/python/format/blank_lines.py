@@ -22,7 +22,7 @@ class BlankLinesVisitor(PythonVisitor):
         return super().visit_compilation_unit(cu, p)
 
     def visit_statement(self, stmt: Statement, p: P) -> J:
-        stmt = super().visit_statement(stmt, p)
+        stmt = super().visit_statement(stmt, p)  # ty: ignore[invalid-assignment]  # visitor covariance
 
         parent_cursor = self.cursor.parent_tree_cursor()
         top_level = isinstance(parent_cursor.value, CompilationUnit)
@@ -41,7 +41,7 @@ class BlankLinesVisitor(PythonVisitor):
             else:
                 min_lines = max(self._style.minimum.around_top_level_classes_functions if isinstance(stmt, (ClassDeclaration, MethodDeclaration)) else 0,
                                 self._style.minimum.after_top_level_imports if prev_import else 0)
-                stmt = _adjusted_lines_for_tree(stmt, min_lines, self._style.keep_maximum.in_declarations)
+                stmt = _adjusted_lines_for_tree(stmt, min_lines, self._style.keep_maximum.in_declarations)  # ty: ignore[invalid-assignment]  # visitor covariance
         else:
             in_block = isinstance(parent_cursor.value, Block)
             in_class = in_block and isinstance(parent_cursor.parent_tree_cursor().value, ClassDeclaration)
@@ -63,7 +63,7 @@ class BlankLinesVisitor(PythonVisitor):
             if prev_import:
                 min_lines = max(min_lines, self._style.minimum.after_local_imports)
 
-            stmt = _adjusted_lines_for_tree(stmt, min_lines, max_lines)
+            stmt = _adjusted_lines_for_tree(stmt, min_lines, max_lines)  # ty: ignore[invalid-assignment]  # visitor covariance
         return stmt
 
     def post_visit(self, tree: T, p: P) -> Optional[T]:

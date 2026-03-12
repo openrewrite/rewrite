@@ -278,6 +278,6 @@ public class MergeYaml extends Recipe {
 
     static Yaml parse(@Language("yml") String yaml) {
         return maybeParse(yaml)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"));
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML:\n" + yaml));
     }
 }

@@ -119,6 +119,65 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void bareVersionNormalizedInConstraint(@TempDir Path tempDir) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", "2024.1.1")),
+          uv(tempDir,
+            pyproject(
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                ]
+
+                [tool.uv]
+                constraint-dependencies = []
+                """,
+              """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = [
+                    "requests>=2.28.0",
+                ]
+
+                [tool.uv]
+                constraint-dependencies = ["certifi>=2024.1.1"]
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void bareVersionNormalizedInFallback() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", "2024.1.1")),
+          pyproject(
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+              ]
+              """,
+            """
+              [project]
+              name = "myapp"
+              version = "1.0.0"
+              dependencies = [
+                  "requests>=2.28.0",
+                  "certifi>=2024.1.1",
+              ]
+              """
+          )
+        );
+    }
+
+    @Test
     void skipWhenNotInResolvedTree() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("nonexistent", ">=1.0")),

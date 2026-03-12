@@ -32,7 +32,7 @@ class ShellTest implements RewriteTest {
               SHELL ["/bin/bash", "-c"]
               """,
             spec -> spec.afterRecipe(doc -> {
-                Docker.Shell shell = (Docker.Shell) doc.getStages().getFirst().getInstructions().getLast();
+                var shell = (Docker.Shell) doc.getStages().getFirst().getInstructions().getLast();
                 assertThat(shell.getArguments()).hasSize(2);
             })
           )

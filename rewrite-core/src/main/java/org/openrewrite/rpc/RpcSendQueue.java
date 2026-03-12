@@ -199,19 +199,50 @@ public class RpcSendQueue {
         }
     }
 
+    private static final String JAVA_TYPE_PACKAGE = "org.openrewrite.java.tree";
+    private static final String JAVA_TYPE_NAME = JAVA_TYPE_PACKAGE + ".JavaType";
+
+    private static final ClassValue<@Nullable String> VALUE_TYPE_CACHE = new ClassValue<String>() {
+        private @Nullable Class<?> javaTypeClass;
+        private boolean javaTypeResolved;
+
+        private @Nullable Class<?> getJavaTypeClass(Class<?> from) {
+            if (!javaTypeResolved) {
+                try {
+                    javaTypeClass = Class.forName(JAVA_TYPE_NAME, false, from.getClassLoader());
+                } catch (ClassNotFoundException ignored) {
+                }
+                javaTypeResolved = true;
+            }
+            return javaTypeClass;
+        }
+
+        @Override
+        protected @Nullable String computeValue(Class<?> afterType) {
+            Package pkg = afterType.getPackage();
+            if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
+                afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType)) {
+                return null;
+            } else if (Enum.class.isAssignableFrom(afterType) && !JAVA_TYPE_NAME.concat("$Primitive").equals(afterType.getName())) {
+                // FIXME special case for `JavaType.Primitive` here
+                return null;
+            }
+
+            // If the class is a subtype of JavaType but in a different package,
+            // return the superclass name instead
+            Class<?> jt = getJavaTypeClass(afterType);
+            if (jt != null && pkg != null && !pkg.getName().equals(JAVA_TYPE_PACKAGE) && jt.isAssignableFrom(afterType)) {
+                Class<?> superclass = afterType.getSuperclass();
+                if (superclass != null && !Object.class.equals(superclass)) {
+                    return superclass.getName();
+                }
+            }
+
+            return afterType.getName();
+        }
+    };
+
     private static @Nullable String getValueType(@Nullable Object after) {
-        if (after == null) {
-            return null;
-        }
-        Class<?> afterType = after.getClass();
-        Package pkg = afterType.getPackage();
-        if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
-            afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType)) {
-            return null;
-        } else if (Enum.class.isAssignableFrom(afterType) && !"org.openrewrite.java.tree.JavaType$Primitive".equals(afterType.getName())) {
-            // FIXME special case for `JavaType.Primitive` here
-            return null;
-        }
-        return afterType.getName();
+        return after == null ? null : VALUE_TYPE_CACHE.get(after.getClass());
     }
 }

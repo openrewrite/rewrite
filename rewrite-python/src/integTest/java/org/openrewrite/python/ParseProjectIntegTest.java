@@ -24,6 +24,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.tree.Toml;
 
 import java.io.IOException;
@@ -112,6 +113,10 @@ class ParseProjectIntegTest {
                 .collect(Collectors.toList());
 
         assertThat(sources).hasSize(2);
+        // Source paths must be relative to the project directory
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().toString())
+                .containsExactlyInAnyOrder("top.py", "subpackage/nested.py");
     }
 
     @Test
@@ -191,6 +196,63 @@ class ParseProjectIntegTest {
         assertThat(pyproject).isInstanceOf(Toml.Document.class);
         assertThat(pyproject.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
     }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesRequirementsTxt() throws IOException {
+        Path projectDir = tempDir.resolve("with_requirements");
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("requirements.txt"), """
+                requests>=2.28.0
+                click>=8.0
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(Collectors.toList());
+
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .contains("main.py", "requirements.txt");
+
+        SourceFile reqsTxt = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("requirements.txt"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(reqsTxt).isInstanceOf(PlainText.class);
+        assertThat(reqsTxt.getMarkers().findFirst(PythonResolutionResult.class)).isPresent();
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void pyprojectTomlTakesPriorityOverRequirementsTxt() throws IOException {
+        Path projectDir = tempDir.resolve("both_manifests");
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                dependencies = ["requests>=2.28.0"]
+                """);
+        Files.writeString(projectDir.resolve("requirements.txt"), """
+                requests>=2.28.0
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(Collectors.toList());
+
+        // pyproject.toml should be included but not requirements.txt
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .contains("pyproject.toml")
+                .doesNotContain("requirements.txt");
+    }
+
 
     private PythonRewriteRpc client() {
         return PythonRewriteRpc.getOrStart();

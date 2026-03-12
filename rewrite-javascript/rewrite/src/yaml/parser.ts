@@ -635,7 +635,9 @@ class YamlCstReader {
             const valueResult = this.convertTokenWithTrailing(item.value);
             value = valueResult.node as Yaml.Block;
             valueTrailing = valueResult.trailing;
-            value = {...value, prefix: afterColonSpace + value.prefix} as Yaml.Block;
+            if (afterColonSpace) {
+                value = this.prependWhitespaceToValue(value, afterColonSpace);
+            }
         } else {
             value = this.createEmptyScalar(afterColonSpace);
         }

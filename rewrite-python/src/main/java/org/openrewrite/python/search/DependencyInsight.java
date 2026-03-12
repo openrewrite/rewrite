@@ -20,11 +20,15 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.python.RequirementsTxtParser;
+import org.openrewrite.python.SetupCfgParser;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.tree.Py;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.python.table.PythonDependenciesInUse;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
 
@@ -35,8 +39,9 @@ import static java.util.Arrays.asList;
 
 /**
  * Find direct and transitive Python dependencies matching a package name pattern.
- * Searches pyproject.toml files that have a {@link PythonResolutionResult} marker attached.
- * Search result markers are placed on the dependency string literals in pyproject.toml.
+ * Searches pyproject.toml and requirements.txt files that have a {@link PythonResolutionResult} marker attached.
+ * Search result markers are placed on dependency string literals in pyproject.toml, or on the
+ * PlainText source file for requirements.txt.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -91,16 +96,43 @@ public class DependencyInsight extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         Pattern packageNameMatcher = compileGlobPattern(packageNamePattern);
 
-        return new TomlIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             private @Nullable PythonResolutionResult resolution;
             private final Map<String, MatchInfo> matchedPackages = new HashMap<>();
 
             @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                if (!document.getSourcePath().toString().endsWith("pyproject.toml")) {
-                    return document;
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                if (!sourceFile.getMarkers().findFirst(PythonResolutionResult.class).isPresent()) {
+                    return false;
                 }
+                if (sourceFile instanceof Toml.Document) {
+                    return sourceFile.getSourcePath().toString().endsWith("pyproject.toml");
+                }
+                if (sourceFile instanceof PlainText) {
+                    return new RequirementsTxtParser().accept(sourceFile.getSourcePath()) ||
+                            new SetupCfgParser().accept(sourceFile.getSourcePath());
+                }
+                if (sourceFile instanceof Py.CompilationUnit) {
+                    return "setup.py".equals(sourceFile.getSourcePath().getFileName().toString());
+                }
+                return false;
+            }
 
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof Toml.Document) {
+                    return visitPyprojectToml((Toml.Document) tree, ctx);
+                }
+                if (tree instanceof PlainText) {
+                    return visitPlainText((PlainText) tree, ctx);
+                }
+                if (tree instanceof Py.CompilationUnit) {
+                    return visitSetupPy((Py.CompilationUnit) tree, ctx);
+                }
+                return tree;
+            }
+
+            private Toml.Document visitPyprojectToml(Toml.Document document, ExecutionContext ctx) {
                 Optional<PythonResolutionResult> pyResolution = document.getMarkers()
                         .findFirst(PythonResolutionResult.class);
 
@@ -110,53 +142,86 @@ public class DependencyInsight extends Recipe {
 
                 resolution = pyResolution.get();
                 matchedPackages.clear();
-
-                // Collect matching dependencies from the marker
                 collectMatches(packageNameMatcher);
 
                 // Visit the document to mark matching dependency literals
-                Toml.Document result = super.visitDocument(document, ctx);
+                Toml.Document result = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Toml.Literal visitLiteral(Toml.Literal literal, ExecutionContext ctx) {
+                        Toml.Literal l = super.visitLiteral(literal, ctx);
+                        Object val = l.getValue();
+                        if (!(val instanceof String)) {
+                            return l;
+                        }
+                        String depName = PyProjectHelper.extractPackageName((String) val);
+                        if (depName != null) {
+                            String normalized = PythonResolutionResult.normalizeName(depName);
+                            if (matchedPackages.containsKey(normalized)) {
+                                return SearchResult.found(l);
+                            }
+                        }
+                        return l;
+                    }
+                }.visit(document, ctx);
 
-                // Insert data table rows
+                emitDataTableRows(ctx);
+                return result != null ? result : document;
+            }
+
+            private PlainText visitPlainText(PlainText text, ExecutionContext ctx) {
+                Optional<PythonResolutionResult> pyResolution = text.getMarkers()
+                        .findFirst(PythonResolutionResult.class);
+
+                if (!pyResolution.isPresent()) {
+                    return text;
+                }
+
+                resolution = pyResolution.get();
+                matchedPackages.clear();
+                collectMatches(packageNameMatcher);
+
+                if (matchedPackages.isEmpty()) {
+                    return text;
+                }
+
+                emitDataTableRows(ctx);
+                return SearchResult.found(text);
+            }
+
+            private Py.CompilationUnit visitSetupPy(Py.CompilationUnit cu, ExecutionContext ctx) {
+                Optional<PythonResolutionResult> pyResolution = cu.getMarkers()
+                        .findFirst(PythonResolutionResult.class);
+
+                if (!pyResolution.isPresent()) {
+                    return cu;
+                }
+
+                resolution = pyResolution.get();
+                matchedPackages.clear();
+                collectMatches(packageNameMatcher);
+
+                if (matchedPackages.isEmpty()) {
+                    return cu;
+                }
+
+                emitDataTableRows(ctx);
+                return SearchResult.found(cu);
+            }
+
+            private void emitDataTableRows(ExecutionContext ctx) {
                 for (MatchInfo match : matchedPackages.values()) {
                     dependenciesInUse.insertRow(ctx, new PythonDependenciesInUse.Row(
-                            resolution.getName(),
-                            resolution.getPath(),
+                            resolution != null ? resolution.getName() : null,
+                            resolution != null ? resolution.getPath() : null,
                             match.packageName,
                             match.version,
                             match.versionConstraint,
                             match.scope,
                             match.direct,
                             match.count,
-                            resolution.getLicense()
+                            resolution != null ? resolution.getLicense() : null
                     ));
                 }
-
-                return result;
-            }
-
-            @Override
-            public Toml.Literal visitLiteral(Toml.Literal literal, ExecutionContext ctx) {
-                Toml.Literal l = super.visitLiteral(literal, ctx);
-                if (resolution == null) {
-                    return l;
-                }
-
-                Object val = l.getValue();
-                if (!(val instanceof String)) {
-                    return l;
-                }
-
-                String spec = (String) val;
-                String depName = PyProjectHelper.extractPackageName(spec);
-                if (depName != null) {
-                    String normalized = PythonResolutionResult.normalizeName(depName);
-                    if (matchedPackages.containsKey(normalized)) {
-                        return SearchResult.found(l);
-                    }
-                }
-
-                return l;
             }
 
             private void collectMatches(Pattern matcher) {

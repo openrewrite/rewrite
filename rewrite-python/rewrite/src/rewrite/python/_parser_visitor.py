@@ -1,4 +1,5 @@
 import ast
+import dataclasses
 import sys
 import token
 from argparse import ArgumentError
@@ -14,7 +15,7 @@ from rewrite.java import tree as j
 from rewrite.java.support_types import TextComment
 from . import tree as py
 from .markers import KeywordArguments, KeywordOnlyArguments, Quoted
-from .type_mapping import PythonTypeMapping
+from .type_mapping import PythonTypeMapping, compute_source_line_data
 
 T = TypeVar('T')
 J2 = TypeVar('J2', bound=J)
@@ -62,7 +63,7 @@ class ParserVisitor(ast.NodeVisitor):
     # UTF-8 BOM character
     _BOM = '\ufeff'
 
-    def __init__(self, source: str, file_path: Optional[str] = None):
+    def __init__(self, source: str, file_path: Optional[str] = None, ty_client=None):
         super().__init__()
         # Detect and strip UTF-8 BOM if present
         if source.startswith(self._BOM):
@@ -73,10 +74,12 @@ class ParserVisitor(ast.NodeVisitor):
 
         self._source = source
         self._parentheses_stack = []
-        self._type_mapping = PythonTypeMapping(source, file_path)
 
-        # Pre-compute byte-to-char mappings for lines with multi-byte characters
-        self._byte_to_char = self._build_byte_to_char_mapping(source)
+        # Single pass: compute lines, byte offsets, and byte-to-char mapping together
+        source_lines, line_byte_offsets, self._byte_to_char = compute_source_line_data(source)
+        self._type_mapping = PythonTypeMapping(source, file_path, ty_client,
+                                               source_lines=source_lines,
+                                               line_byte_offsets=line_byte_offsets)
 
         # Normalize line endings for the tokenizer (it rejects mixed \r\n and \n),
         # but keep the original source for whitespace extraction
@@ -85,29 +88,6 @@ class ParserVisitor(ast.NodeVisitor):
             tokenize(BytesIO(tokenizer_source.encode('utf-8')).readline)
         )
         self._token_idx = 1  # Skip ENCODING token
-
-    @staticmethod
-    def _build_byte_to_char_mapping(source: str) -> Optional[Dict[int, List[int]]]:
-        """Build byte-to-char offset mappings for lines with multi-byte characters.
-
-        Python 3.8+ AST uses byte offsets for col_offset/end_col_offset,
-        but the tokenizer uses character offsets. This mapping enables
-        conversion for correct position comparisons.
-
-        Returns None for pure ASCII files (no multi-byte characters).
-        Only stores mappings for lines that actually have multi-byte characters,
-        since ASCII-only lines have identical byte and character offsets.
-        """
-        result: Dict[int, List[int]] = {}
-        for lineno, line in enumerate(source.splitlines(keepends=True), start=1):
-            line_bytes = line.encode('utf-8')
-            if len(line_bytes) != len(line):  # Line has multi-byte characters
-                mapping = []
-                for char_idx, char in enumerate(line):
-                    for _ in range(len(char.encode('utf-8'))):
-                        mapping.append(char_idx)
-                result[lineno] = mapping
-        return result if result else None  # Return None for pure ASCII files
 
     def _byte_offset_to_char_offset(self, lineno: int, byte_offset: int) -> int:
         """Convert a byte offset to a character offset for a given line."""
@@ -358,7 +338,8 @@ class ParserVisitor(ast.NodeVisitor):
     def map_arg(self, node, default=None, vararg=False, kwarg=False):
         prefix = self.__source_before('**') if kwarg else self.__whitespace()
         vararg_prefix = self.__source_before('*') if vararg else None
-        name = self.__convert_name(node.arg, self._type_mapping.type(node))
+        expr_type, field_type = self._type_mapping.param_type_info(node)
+        name = self.__convert_name(node.arg, expr_type, field_type)
         after_name = self.__source_before(':') if node.annotation else Space.EMPTY
         type_expression = self.__convert_type(node.annotation) if node.annotation else None
         initializer = self.__pad_left(self.__source_before('='), self.__convert(default)) if default else None
@@ -379,7 +360,7 @@ class ParserVisitor(ast.NodeVisitor):
                 cast(j.Identifier, name),
                 [],
                 initializer,
-                self._type_mapping.type(node)
+                field_type
             ), after_name)],
         )
 
@@ -793,7 +774,7 @@ class ParserVisitor(ast.NodeVisitor):
             prefix = self.__source_before('import')
             imp = self.__convert(node.names[0])
             assert imp is not None
-            return imp.replace(prefix=prefix, qualid=imp.qualid.replace(prefix=imp.prefix))
+            return imp.replace(prefix=prefix, qualid=imp.qualid.replace(prefix=imp.prefix))  # ty: ignore[unresolved-attribute]  # imp is Import at runtime
 
         prefix = self.__source_before('import')
         names_prefix = self.__whitespace()
@@ -1050,13 +1031,24 @@ class ParserVisitor(ast.NodeVisitor):
         raise NotImplementedError("Implement visit_TypeIgnore!")
 
     def visit_Attribute(self, node):
+        prefix = self.__whitespace()
+        target = self.__convert(node.value)
+        receiver_type = getattr(target, 'type', None) if hasattr(target, 'type') else None
+        dot_space = self.__source_before('.')
+        name_ident = self.__convert_name(node.attr)
+
+        expr_type, field_type = self._type_mapping.attribute_type_info(node, receiver_type)
+
+        if isinstance(name_ident, j.Identifier):
+            name_ident = dataclasses.replace(name_ident, _type=expr_type, _field_type=field_type)
+
         return j.FieldAccess(
             random_id(),
-            self.__whitespace(),
+            prefix,
             Markers.EMPTY,
-            self.__convert(node.value),
-            self.__pad_left(self.__source_before('.'), self.__convert_name(node.attr)),
-            self._type_mapping.type(node),
+            target,
+            self.__pad_left(dot_space, name_ident),
+            expr_type,
         )
 
     def visit_Del(self, node):
@@ -1205,7 +1197,7 @@ class ParserVisitor(ast.NodeVisitor):
                             py.MatchCase.Pattern.Kind.GROUP,
                             JContainer(
                                 prefix,
-                                [JRightPadded(inner.replace(prefix=inner_prefix) if hasattr(inner, 'replace') else inner, Space.EMPTY, Markers.EMPTY)],  # ty: ignore[call-non-callable]
+                                [JRightPadded(inner.replace(prefix=inner_prefix) if hasattr(inner, 'replace') else inner, Space.EMPTY, Markers.EMPTY)],
                                 Markers.EMPTY
                             ),
                             None
@@ -2191,7 +2183,7 @@ class ParserVisitor(ast.NodeVisitor):
             None,
             body,
             None,
-            self._type_mapping.type(node),
+            self._type_mapping.method_declaration_type(node),
         )
 
     def __map_decorator(self, decorator) -> j.Annotation:
@@ -2251,7 +2243,7 @@ class ParserVisitor(ast.NodeVisitor):
             name = name.replace(prefix=extra_parens[-1][1])  # ty: ignore[unresolved-attribute]  # recursive call returns unknown
 
             # Wrap in extra parentheses (innermost to outermost)
-            wrapped: Expression = name
+            wrapped: Expression = name  # ty: ignore[invalid-assignment]
             for i in range(len(extra_parens) - 1, -1, -1):
                 paren_prefix, _ = extra_parens[i]
                 suffix = self.__whitespace()
@@ -2548,14 +2540,15 @@ class ParserVisitor(ast.NodeVisitor):
 
     def visit_Name(self, node):
         space, actual_name = self.__consume_identifier(node.id)
+        expr_type, field_type = self._type_mapping.name_type_info(node)
         return j.Identifier(
             random_id(),
             space,
             Markers.EMPTY,
             [],
             actual_name,
-            self._type_mapping.type(node),
-            None
+            expr_type,
+            field_type
         )
 
     def visit_NamedExpr(self, node):
@@ -2698,6 +2691,25 @@ class ParserVisitor(ast.NodeVisitor):
                         close_line == second_elt.lineno and close_col < second_elt_char_col
                     ):
                         maybe_parens = False
+                elif close_paren_idx is not None and len(node.elts) == 1:
+                    # For single-element tuples like `("a"),`, check if the '('
+                    # wraps just the element (grouping parens) vs the tuple.
+                    # If the token after ')' is ',' AND there is no ',' inside
+                    # the parens, then '(' is a grouping paren and the trailing
+                    # ',' outside creates the tuple.
+                    # Compare with `("a",),` where ',' is inside the parens
+                    # (making a proper tuple) and the outer ',' belongs to an
+                    # enclosing context.
+                    next_idx = close_paren_idx + 1
+                    while next_idx < len(self._tokens) and self._tokens[next_idx].type in _SKIP_TOKEN_TYPES:
+                        next_idx += 1
+                    if next_idx < len(self._tokens) and self._tokens[next_idx].string == ',':
+                        # Check if there's a comma inside the parens
+                        prev_idx = close_paren_idx - 1
+                        while prev_idx > self._token_idx and self._tokens[prev_idx].type in _SKIP_TOKEN_TYPES:
+                            prev_idx -= 1
+                        if prev_idx > self._token_idx and self._tokens[prev_idx].string != ',':
+                            maybe_parens = False
 
         if maybe_parens:
             self._token_idx += 1  # consume '('
@@ -2776,7 +2788,7 @@ class ParserVisitor(ast.NodeVisitor):
         prefix = self.__whitespace()
         converted_type = self.__convert_internal(node, self.__convert_type, self.__convert_type_mapper)
         if isinstance(converted_type, TypeTree):
-            return converted_type.replace(prefix=prefix)  # ty: ignore[unresolved-attribute]  # TypeTree base class doesn't have replace
+            return converted_type.replace(prefix=prefix)  # TypeTree base class doesn't have replace
         else:
             return py.ExpressionTypeTree(
                 random_id(),
@@ -2879,7 +2891,7 @@ class ParserVisitor(ast.NodeVisitor):
                      enumerate(slices)],
                     Markers.EMPTY
                 ),
-                None
+                self._type_mapping.type(node)
             )
         elif isinstance(node, ast.BinOp):
             # Type unions using `|` was added in Python 3.10
@@ -3025,12 +3037,35 @@ class ParserVisitor(ast.NodeVisitor):
         # If not in paren map, scope check already passed
         return True
 
-    def __convert_name(self, name: str, name_type: Optional[JavaType] = None) -> NameTree:
+    @staticmethod
+    def __as_variable_type(t: Optional[JavaType]) -> Optional[JavaType]:
+        """Filter a type for use in NamedVariable._variable_type.
+
+        Returns None if the type is not a JavaType.Variable, preventing
+        ClassCastExceptions on the Java side during RPC deserialization.
+        """
+        if t is None or isinstance(t, JavaType.Variable):
+            return t
+        return None
+
+    @staticmethod
+    def __as_method_type(t: Optional[JavaType]) -> Optional[JavaType]:
+        """Filter a type for use in MethodDeclaration._method_type.
+
+        Returns None if the type is not a JavaType.Method, preventing
+        ClassCastExceptions on the Java side during RPC deserialization.
+        """
+        if t is None or isinstance(t, JavaType.Method):
+            return t
+        return None
+
+    def __convert_name(self, name: str, name_type: Optional[JavaType] = None,
+                        field_type: Optional[JavaType.Variable] = None) -> NameTree:
         def ident_or_field(parts: List[str]) -> NameTree:
             if len(parts) == 1:
                 space, actual_name = self.__consume_identifier(parts[-1])
                 return j.Identifier(random_id(), space, Markers.EMPTY, [], actual_name,
-                                    name_type, None)
+                                    name_type, field_type)
             else:
                 return j.FieldAccess(
                     random_id(),
@@ -3041,7 +3076,7 @@ class ParserVisitor(ast.NodeVisitor):
                         self.__source_before('.'),
                         (lambda s, n: j.Identifier(random_id(), s, Markers.EMPTY, [], n,
                                      name_type,
-                                     None))(*self.__consume_identifier(parts[-1])),
+                                     field_type))(*self.__consume_identifier(parts[-1])),
                     ),
                     name_type
                 )
@@ -3049,14 +3084,14 @@ class ParserVisitor(ast.NodeVisitor):
         return ident_or_field(name.split('.'))
 
     def __convert_all(self, trees: Sequence) -> List[J2]:
-        return [c for tree in trees if (c := self.__convert(tree)) is not None]  # ty: ignore[invalid-return-type]
+        return [c for tree in trees if (c := self.__convert(tree)) is not None]  # ty: ignore[invalid-return-type]  # J list, J2 is bound to J
 
     def __convert_block(self, statements: Sequence[Statement], delim: str = ':') -> j.Block:
         prefix = self.__source_before(delim)
         if statements:
-            statements = [self.__pad_statement(cast(ast.stmt, s)) for s in statements]  # ty: ignore[invalid-assignment]
+            statements = [self.__pad_statement(cast(ast.stmt, s)) for s in statements]  # ty: ignore[invalid-assignment]  # padded statement list type
         else:
-            statements = [self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)]  # ty: ignore[invalid-assignment]
+            statements = [self.__pad_right(j.Empty(random_id(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)]  # ty: ignore[invalid-assignment]  # padded statement list type
         return j.Block(
             random_id(),
             prefix,
@@ -3079,7 +3114,7 @@ class ParserVisitor(ast.NodeVisitor):
             self._token_idx = save_idx
             padding = Space.EMPTY
             markers = Markers.EMPTY
-        return JRightPadded(statement, padding, markers)  # ty: ignore[invalid-return-type]  # statement is J|None from __convert_statement
+        return JRightPadded(statement, padding, markers)  # ty: ignore[invalid-return-type]  # statement is J from __convert_statement
 
     def __pad_list_element(self, element: J2, last: bool = False, pad_last: bool = True, delim: str = ',',
                            end_delim: Optional[str] = None) -> JRightPadded[J2]:

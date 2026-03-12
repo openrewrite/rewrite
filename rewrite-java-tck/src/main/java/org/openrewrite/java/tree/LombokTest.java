@@ -434,8 +434,8 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @MinimumJava11
     @Issue("https://github.com/openrewrite/rewrite/issues/5490")
+    @MinimumJava11
     @Test
     void generatedAnnotationOnMethodWithDollarBraceInJavadoc() {
         rewriteRun(
