@@ -50,6 +50,8 @@ public class RewriteRpcServer
 
     private readonly RecipeMarketplace _marketplace;
     private readonly Dictionary<string, Recipe> _preparedRecipes = new();
+    private readonly Dictionary<string, object?> _recipeAccumulators = new();
+    private readonly Dictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
 
@@ -368,8 +370,24 @@ public class RewriteRpcServer
             throw new InvalidOperationException(
                 $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }
-        if (q.Take().State != END_OF_OBJECT)
-            throw new InvalidOperationException("Expected END_OF_OBJECT");
+        var endMarker = q.Take();
+        if (endMarker.State != END_OF_OBJECT)
+        {
+            // Collect remaining items for debugging
+            var remaining = new System.Text.StringBuilder();
+            remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
+            for (int i = 1; i < 20; i++)
+            {
+                try
+                {
+                    var next = q.Take();
+                    remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
+                    if (next.State == END_OF_OBJECT) break;
+                }
+                catch { break; }
+            }
+            throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+        }
 
         if (remoteObject != null)
         {
@@ -682,6 +700,55 @@ public class RewriteRpcServer
         }
     }
 
+    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
+
+    [JsonRpcMethod("GetLanguages")]
+    public Task<string[]> GetLanguages()
+    {
+        return Task.FromResult(Languages);
+    }
+
+    [JsonRpcMethod("Generate", UseSingleObjectParameterDeserialization = true)]
+    public Task<GenerateResponse> Generate(GenerateRequest request)
+    {
+        if (!_preparedRecipes.TryGetValue(request.Id, out var recipe))
+        {
+            throw new InvalidOperationException($"Prepared recipe not found: {request.Id}");
+        }
+
+        var response = new GenerateResponse();
+
+        var scanningBase = GetScanningRecipeBase(recipe.GetType());
+        if (scanningBase != null)
+        {
+            var ctx = GetOrCreateExecutionContext(request.P);
+            var acc = GetOrCreateAccumulator(request.Id, recipe, scanningBase, ctx);
+
+            var generateMethod = scanningBase.GetMethod("Generate")
+                ?? throw new InvalidOperationException(
+                    $"Could not find Generate method on {scanningBase.Name}");
+            var generated = (IEnumerable<SourceFile>)generateMethod.Invoke(recipe, [acc, ctx])!;
+
+            foreach (var g in generated)
+            {
+                var id = g.Id.ToString();
+                _localObjects[id] = g;
+                response.Ids.Add(id);
+
+                var javaTypeName = RpcSendQueue.ToJavaTypeName(g.GetType());
+                if (javaTypeName == null)
+                {
+                    Log.Warning("Generate: No Java type mapping for {CSharpType}, using fallback",
+                        g.GetType().FullName);
+                    javaTypeName = "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+                }
+                response.SourceFileTypes.Add(javaTypeName);
+            }
+        }
+
+        return Task.FromResult(response);
+    }
+
     [JsonRpcMethod("PrepareRecipe", UseSingleObjectParameterDeserialization = true)]
     public Task<PrepareRecipeResponse> PrepareRecipe(PrepareRecipeRequest request)
     {
@@ -711,7 +778,7 @@ public class RewriteRpcServer
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
-            ScanVisitor = recipe is ScanningRecipe<object> ? $"scan:{id}" : null
+            ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
         });
     }
 
@@ -731,7 +798,7 @@ public class RewriteRpcServer
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
-    public Task<VisitResponse> Visit(VisitRequest request)
+    public async Task<VisitResponse> Visit(VisitRequest request)
     {
         // Parse visitor name: "edit:<recipeId>" or "scan:<recipeId>"
         var parts = request.VisitorName.Split(':', 2);
@@ -748,13 +815,50 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
         }
 
-        if (!_localObjects.TryGetValue(request.TreeId, out var obj) || obj is not Tree tree)
+        // Fetch tree from local cache or from the remote (Java) process
+        Tree tree;
+        if (_localObjects.TryGetValue(request.TreeId, out var obj) && obj is Tree localTree)
         {
-            throw new InvalidOperationException($"Tree not found: {request.TreeId}");
+            tree = localTree;
+        }
+        else
+        {
+            tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         }
 
-        var ctx = new ExecutionContext();
-        var visitor = recipe.GetVisitor();
+        if (phase != "scan" && phase != "edit")
+        {
+            throw new ArgumentException($"Unknown visitor phase: {phase}");
+        }
+
+        var ctx = GetOrCreateExecutionContext(request.PId);
+        JavaVisitor<ExecutionContext> visitor;
+
+        var scanningBase = GetScanningRecipeBase(recipe.GetType());
+        if (scanningBase != null)
+        {
+            var acc = GetOrCreateAccumulator(recipeId, recipe, scanningBase, ctx);
+            if (phase == "scan")
+            {
+                var getScannerMethod = scanningBase.GetMethod("GetScanner")
+                    ?? throw new InvalidOperationException(
+                        $"Could not find GetScanner method on {scanningBase.Name}");
+                visitor = (JavaVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
+            }
+            else
+            {
+                var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
+                    [scanningBase.GetGenericArguments()[0]])
+                    ?? throw new InvalidOperationException(
+                        $"Could not find GetVisitor(T) method on {scanningBase.Name}");
+                visitor = (JavaVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
+            }
+        }
+        else
+        {
+            visitor = recipe.GetVisitor();
+        }
+
         var result = visitor.Visit(tree, ctx);
 
         var modified = !ReferenceEquals(tree, result);
@@ -763,7 +867,7 @@ public class RewriteRpcServer
             _localObjects[request.TreeId] = result;
         }
 
-        return Task.FromResult(new VisitResponse { Modified = modified });
+        return new VisitResponse { Modified = modified };
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
@@ -852,6 +956,51 @@ public class RewriteRpcServer
     /// </summary>
     internal void StoreLocalObject(string id, object obj) => _localObjects[id] = obj;
 
+    /// <summary>
+    /// Finds the closed generic ScanningRecipe&lt;T&gt; base type, or null if the recipe is not a scanning recipe.
+    /// </summary>
+    private static Type? GetScanningRecipeBase(Type recipeType)
+    {
+        var type = recipeType;
+        while (type != null)
+        {
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ScanningRecipe<>))
+                return type;
+            type = type.BaseType;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Gets or creates an ExecutionContext by ID, caching it for reuse across phases.
+    /// </summary>
+    private ExecutionContext GetOrCreateExecutionContext(string? pId)
+    {
+        if (pId != null && _executionContexts.TryGetValue(pId, out var existing))
+            return existing;
+
+        var ctx = new ExecutionContext();
+        if (pId != null)
+            _executionContexts[pId] = ctx;
+        return ctx;
+    }
+
+    /// <summary>
+    /// Gets or creates the accumulator for a scanning recipe, storing it for reuse across scan/generate/edit phases.
+    /// </summary>
+    private object? GetOrCreateAccumulator(string recipeId, Recipe recipe, Type scanningBase, ExecutionContext ctx)
+    {
+        if (_recipeAccumulators.TryGetValue(recipeId, out var acc))
+            return acc;
+
+        var getInitialValue = scanningBase.GetMethod("GetInitialValue")
+            ?? throw new InvalidOperationException(
+                $"Could not find GetInitialValue method on {scanningBase.Name}");
+        acc = getInitialValue.Invoke(recipe, [ctx]);
+        _recipeAccumulators[recipeId] = acc;
+        return acc;
+    }
+
     private class TreeCodec : IRpcCodec
     {
         public static readonly TreeCodec Instance = new();
@@ -929,15 +1078,15 @@ public class RecipeDescriptorDto
     public string DisplayName { get; set; } = "";
     public string InstanceName { get; set; } = "";
     public string Description { get; set; } = "";
-    public HashSet<string> Tags { get; set; } = new();
+    public HashSet<string> Tags { get; set; } = [];
     public string? EstimatedEffortPerOccurrence { get; set; }
-    public List<OptionDescriptorDto> Options { get; set; } = new();
-    public List<RecipeDescriptorDto> Preconditions { get; set; } = new();
-    public List<RecipeDescriptorDto> RecipeList { get; set; } = new();
-    public List<object> DataTables { get; set; } = new();
-    public List<object> Maintainers { get; set; } = new();
-    public List<object> Contributors { get; set; } = new();
-    public List<object> Examples { get; set; } = new();
+    public List<OptionDescriptorDto> Options { get; set; } = [];
+    public List<RecipeDescriptorDto> Preconditions { get; set; } = [];
+    public List<RecipeDescriptorDto> RecipeList { get; set; } = [];
+    public List<object> DataTables { get; set; } = [];
+    public List<object> Maintainers { get; set; } = [];
+    public List<object> Contributors { get; set; } = [];
+    public List<object> Examples { get; set; } = [];
 
     public static RecipeDescriptorDto FromDescriptor(RecipeDescriptor d)
     {
@@ -948,8 +1097,8 @@ public class RecipeDescriptorDto
             InstanceName = d.DisplayName,
             Description = d.Description,
             Tags = new HashSet<string>(d.Tags),
-            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence is { } effort
-                ? System.Xml.XmlConvert.ToString(effort)
+            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence is { } ts
+                ? System.Xml.XmlConvert.ToString(ts) // ISO-8601 duration (e.g. "PT5M")
                 : null,
             Options = d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
             RecipeList = d.RecipeList.Select(FromDescriptor).ToList()
@@ -1006,15 +1155,28 @@ public class PrepareRecipeResponse
     public string Id { get; set; } = "";
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public string EditVisitor { get; set; } = "";
-    public List<Precondition> EditPreconditions { get; set; } = new();
+    public List<Precondition> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
-    public List<Precondition> ScanPreconditions { get; set; } = new();
+    public List<Precondition> ScanPreconditions { get; set; } = [];
 }
 
 public class Precondition
 {
     public string VisitorName { get; set; } = "";
-    public Dictionary<string, object> VisitorOptions { get; set; } = new();
+    public Dictionary<string, object> VisitorOptions { get; set; } = [];
+}
+
+public class GenerateRequest
+{
+    public string Id { get; set; } = "";
+    [JsonProperty("p")]
+    public string? P { get; set; }
+}
+
+public class GenerateResponse
+{
+    public List<string> Ids { get; set; } = [];
+    public List<string> SourceFileTypes { get; set; } = [];
 }
 
 public class VisitRequest

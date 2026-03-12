@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {beforeEach, describe, expect, test} from '@jest/globals';
 import {capture, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
 import {J} from '../../../src/java';
 

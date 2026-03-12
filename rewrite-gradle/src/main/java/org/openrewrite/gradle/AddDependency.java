@@ -26,6 +26,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -150,6 +151,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Nullable
             UsesType<ExecutionContext> usesType = null;
+            final TreeVisitor<?, ExecutionContext> hasTestSourceSet = new HasSourceSet("test").getVisitor();
 
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
                 if (onlyIfUsing == null) {
@@ -167,6 +169,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
+                if (sourceFile instanceof JavaSourceFile &&
+                        configuration != null && onlyIfUsing != null &&
+                        configuration.startsWith("test") && configuration.length() > 4 &&
+                        Character.isUpperCase(configuration.charAt(4)) &&
+                        sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
+                    return tree;
+                }
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
                     boolean uses = usesType(sourceFile, ctx);
                     acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);

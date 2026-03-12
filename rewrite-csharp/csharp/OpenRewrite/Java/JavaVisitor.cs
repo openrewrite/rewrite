@@ -40,6 +40,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             ForLoop fl => VisitForLoop(fl, p),
             ForEachLoop fel => VisitForEachLoop(fel, p),
             Try tr => VisitTry(tr, p),
+            Try.Catch cat => VisitCatch(cat, p),
             Throw thr => VisitThrow(thr, p),
             Break brk => VisitBreak(brk, p),
             Continue cont => VisitContinue(cont, p),
@@ -136,6 +137,11 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             {
                 if (!ReferenceEquals(s, stmt.Element)) changed = true;
                 statements.Add(stmt.WithElement(s));
+            }
+            else
+            {
+                // Statement was removed (visitor returned null)
+                changed = true;
             }
         }
         return changed ? block.WithStatements(statements) : block;
@@ -468,32 +474,11 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         bool catchesChanged = false;
         foreach (var c in tr.Catches)
         {
-            bool catchChanged = false;
-
-            ControlParentheses<VariableDeclarations> newParam = c.Parameter;
-            var visitedParam = Visit(c.Parameter.Tree.Element, p);
-            if (visitedParam is VariableDeclarations pvd && !ReferenceEquals(pvd, c.Parameter.Tree.Element))
+            var visited = Visit(c, p);
+            if (visited is Try.Catch vc)
             {
-                newParam = c.Parameter.WithTree(c.Parameter.Tree.WithElement(pvd));
-                catchChanged = true;
-            }
-
-            Block newCatchBody = c.Body;
-            var visitedCatchBody = Visit(c.Body, p);
-            if (visitedCatchBody is Block cb && !ReferenceEquals(cb, c.Body))
-            {
-                newCatchBody = cb;
-                catchChanged = true;
-            }
-
-            if (catchChanged)
-            {
-                catchesChanged = true;
-                newCatches.Add(c.WithParameter(newParam).WithBody(newCatchBody));
-            }
-            else
-            {
-                newCatches.Add(c);
+                if (!ReferenceEquals(vc, c)) catchesChanged = true;
+                newCatches.Add(vc);
             }
         }
         if (catchesChanged) changed = true;
@@ -512,6 +497,29 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         return changed
             ? tr.WithBody(newBody).WithCatches(catchesChanged ? newCatches : tr.Catches).WithFinally(newFinally)
             : tr;
+    }
+
+    public virtual J VisitCatch(Try.Catch cat, P p)
+    {
+        var changed = false;
+
+        ControlParentheses<VariableDeclarations> newParam = cat.Parameter;
+        var visitedParam = Visit(cat.Parameter.Tree.Element, p);
+        if (visitedParam is VariableDeclarations pvd && !ReferenceEquals(pvd, cat.Parameter.Tree.Element))
+        {
+            newParam = cat.Parameter.WithTree(cat.Parameter.Tree.WithElement(pvd));
+            changed = true;
+        }
+
+        Block newBody = cat.Body;
+        var visitedBody = Visit(cat.Body, p);
+        if (visitedBody is Block cb && !ReferenceEquals(cb, cat.Body))
+        {
+            newBody = cb;
+            changed = true;
+        }
+
+        return changed ? cat.WithParameter(newParam).WithBody(newBody) : cat;
     }
 
     public virtual J VisitThrow(Throw thr, P p)

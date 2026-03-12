@@ -85,7 +85,7 @@ rewrite-javascript/rewrite/
 │   │   └── request/                     # Request types (parse, visit, get-object, etc.)
 │   └── test/                            # Testing infrastructure
 │       └── rewrite-test.ts              # RecipeSpec class, rewriteRun()
-├── test/                                # Jest tests (mirrors src/ structure)
+├── test/                                # Vitest tests (mirrors src/ structure)
 │   ├── javascript/                      # JS/TS tests
 │   │   ├── recipes/                     # Recipe tests
 │   │   ├── fixtures/                    # Test npm projects
@@ -95,7 +95,7 @@ rewrite-javascript/rewrite/
 │   ├── json/, yaml/                     # JSON/YAML tests
 │   └── rpc/                             # RPC integration tests
 ├── tsconfig.json
-├── jest.config.js
+├── vitest.config.mts
 └── package.json                         # name: @openrewrite/rewrite
 ```
 
@@ -199,7 +199,7 @@ Each language module has `rpc.ts` with a Sender (visit tree → serialize to que
 ### RPC Hangs
 1. Check that both Java and TypeScript RPC methods are implemented
 2. Verify Kind constants match between Java and TypeScript
-3. Run with `--detectOpenHandles` to find unclosed promises: `npm run testhelper -- --detectOpenHandles`
+3. Use `vitest run --reporter=hanging-process` or `--test-timeout` to detect hanging tests
 4. Check `src/rpc/queue.ts` for deadlock in read/write operations
 
 ### Type Checking
