@@ -52,9 +52,25 @@ public class PlainTextPrinter<P> extends PlainTextVisitor<PrintOutputCapture<P>>
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
         }
-        p.append(text);
+        // Emit afterSyntax markers before the trailing line ending so that
+        // fenced markers (e.g. {{uuid}}) don't create a phantom unterminated
+        // line that causes jgit to produce "\ No newline at end of file".
+        String lineEnding = null;
+        if (!text.isEmpty() && text.endsWith("\n")) {
+            int cut = text.length() - 1;
+            if (cut > 0 && text.charAt(cut - 1) == '\r') {
+                cut--;
+            }
+            lineEnding = text.substring(cut);
+            p.append(text.substring(0, cut));
+        } else {
+            p.append(text);
+        }
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+        }
+        if (lineEnding != null) {
+            p.append(lineEnding);
         }
     }
 }
