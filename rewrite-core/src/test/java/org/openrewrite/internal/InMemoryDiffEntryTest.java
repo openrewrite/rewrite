@@ -445,6 +445,7 @@ class InMemoryDiffEntryTest {
             String diff = entry.getDiff();
             String expectedMarker = "{{" + searchResult.getId() + "}}";
             assertThat(diff).contains(expectedMarker);
+            assertThat(diff).contains("No newline at end of file");
         }
     }
 
