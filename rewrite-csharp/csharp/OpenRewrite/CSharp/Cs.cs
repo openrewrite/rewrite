@@ -1354,6 +1354,8 @@ public sealed class RegionDirective(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, HashSpacing);
     public RegionDirective WithName(string? name) =>
         string.Equals(name, Name, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, name, HashSpacing);
+    public RegionDirective WithHashSpacing(string hashSpacing) =>
+        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Name, hashSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1388,6 +1390,8 @@ public sealed class EndRegionDirective(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, HashSpacing);
     public EndRegionDirective WithName(string? name) =>
         string.Equals(name, Name, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, name, HashSpacing);
+    public EndRegionDirective WithHashSpacing(string hashSpacing) =>
+        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Name, hashSpacing);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
