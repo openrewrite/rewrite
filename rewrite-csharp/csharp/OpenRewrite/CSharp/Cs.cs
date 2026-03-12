@@ -1320,6 +1320,10 @@ public sealed class NullableDirective(
         setting == Setting ? this : new(Id, Prefix, Markers, setting, Target, HashSpacing, TrailingComment);
     public NullableDirective WithTarget(NullableTarget? target) =>
         target == Target ? this : new(Id, Prefix, Markers, Setting, target, HashSpacing, TrailingComment);
+    public NullableDirective WithHashSpacing(string hashSpacing) =>
+        string.Equals(hashSpacing, HashSpacing, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, hashSpacing, TrailingComment);
+    public NullableDirective WithTrailingComment(string trailingComment) =>
+        string.Equals(trailingComment, TrailingComment, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Setting, Target, HashSpacing, trailingComment);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

@@ -531,11 +531,19 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitNullableDirective(NullableDirective nd, RpcReceiveQueue q)
     {
         var setting = q.ReceiveAndGet(nd.Setting, RpcReceiveQueue.ToEnum<NullableSetting>());
-        var target = q.ReceiveAndGet<NullableTarget, object>(
-            nd.Target ?? default, RpcReceiveQueue.ToEnum<NullableTarget>());
-        var hashSpacing = q.Receive(nd.HashSpacing);
-        var trailingComment = q.Receive(nd.TrailingComment);
-        return nd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSetting(setting).WithTarget(target);
+        // Target is a nullable enum — receive as object and convert
+        var targetObj = q.Receive<object?>(nd.Target != null ? nd.Target.Value.ToString() : null);
+        NullableTarget? target = targetObj switch
+        {
+            string s => Enum.Parse<NullableTarget>(s, true),
+            null => null,
+            _ => (NullableTarget)targetObj
+        };
+        var hashSpacing = q.Receive(nd.HashSpacing)!;
+        var trailingComment = q.Receive(nd.TrailingComment)!;
+        return nd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
+            .WithSetting(setting).WithTarget(target)
+            .WithHashSpacing(hashSpacing).WithTrailingComment(trailingComment);
     }
 
     // ---- RegionDirective ----
