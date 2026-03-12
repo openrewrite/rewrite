@@ -24,6 +24,8 @@ import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import java.util.List;
+
 import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.Reference.getValueNonNull;
 
@@ -165,6 +167,60 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(endRegionDirective, Cs.EndRegionDirective::getName);
         q.getAndSend(endRegionDirective, Cs.EndRegionDirective::getHashSpacing);
         return endRegionDirective;
+    }
+
+    @Override
+    public J visitConditionalDirective(Cs.ConditionalDirective conditionalDirective, RpcSendQueue q) {
+        List<Cs.DirectiveLine> directiveLines = conditionalDirective.getDirectiveLines();
+        q.getAndSend(conditionalDirective, c -> directiveLines.size());
+        for (Cs.DirectiveLine dl : directiveLines) {
+            q.getAndSend(conditionalDirective, c -> dl.getLineNumber());
+            q.getAndSend(conditionalDirective, c -> dl.getText());
+            q.getAndSend(conditionalDirective, c -> dl.getKind().ordinal());
+            q.getAndSend(conditionalDirective, c -> dl.getGroupId());
+            q.getAndSend(conditionalDirective, c -> dl.getActiveBranchIndex());
+        }
+        q.getAndSendList(conditionalDirective, c -> c.getPadding().getBranches(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
+        return conditionalDirective;
+    }
+
+    @Override
+    public J visitPragmaWarningDirective(Cs.PragmaWarningDirective pragmaWarningDirective, RpcSendQueue q) {
+        q.getAndSend(pragmaWarningDirective, Cs.PragmaWarningDirective::getAction);
+        q.getAndSendList(pragmaWarningDirective, p -> p.getPadding().getWarningCodes(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
+        return pragmaWarningDirective;
+    }
+
+    @Override
+    public J visitDefineDirective(Cs.DefineDirective defineDirective, RpcSendQueue q) {
+        q.getAndSend(defineDirective, Cs.DefineDirective::getSymbol, el -> visit(el, q));
+        return defineDirective;
+    }
+
+    @Override
+    public J visitUndefDirective(Cs.UndefDirective undefDirective, RpcSendQueue q) {
+        q.getAndSend(undefDirective, Cs.UndefDirective::getSymbol, el -> visit(el, q));
+        return undefDirective;
+    }
+
+    @Override
+    public J visitErrorDirective(Cs.ErrorDirective errorDirective, RpcSendQueue q) {
+        q.getAndSend(errorDirective, Cs.ErrorDirective::getMessage);
+        return errorDirective;
+    }
+
+    @Override
+    public J visitWarningDirective(Cs.WarningDirective warningDirective, RpcSendQueue q) {
+        q.getAndSend(warningDirective, Cs.WarningDirective::getMessage);
+        return warningDirective;
+    }
+
+    @Override
+    public J visitLineDirective(Cs.LineDirective lineDirective, RpcSendQueue q) {
+        q.getAndSend(lineDirective, Cs.LineDirective::getKind);
+        q.getAndSend(lineDirective, Cs.LineDirective::getLine, el -> visit(el, q));
+        q.getAndSend(lineDirective, Cs.LineDirective::getFile, el -> visit(el, q));
+        return lineDirective;
     }
 
     @Override

@@ -438,8 +438,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var tpReceived = q.Receive(tpBefore, tp => (TypeParameters)VisitNonNull(tp, q));
         var typeParameters = tpReceived?.ToContainer();
         var returnTypeExpression = q.Receive((J?)method.ReturnTypeExpression, el => (J)VisitNonNull(el!, q));
-        var nameAnnotations = q.ReceiveList(method.Name.Annotations, el => (Annotation)VisitNonNull(el, q));
-        var name = q.Receive((J)method.Name, el => (J)VisitNonNull(el, q));
+        var nameAnnotations = q.ReceiveList(method.Name?.Annotations ?? [], el => (Annotation)VisitNonNull(el, q));
+        var name = q.Receive((J?)method.Name ?? new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "", null, null), el => (J)VisitNonNull(el, q));
         var parameters = q.Receive(method.Parameters, c => VisitContainer(c, q));
         var throws_ = q.Receive(method.Throws, c => VisitContainer(c, q));
         var body = q.Receive((J?)method.Body, el => (J)VisitNonNull(el!, q));
