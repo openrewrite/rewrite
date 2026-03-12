@@ -441,55 +441,6 @@ public class RewriteRpcServer
         }
     }
 
-    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
-
-    [JsonRpcMethod("GetLanguages")]
-    public Task<string[]> GetLanguages()
-    {
-        return Task.FromResult(Languages);
-    }
-
-    [JsonRpcMethod("Generate", UseSingleObjectParameterDeserialization = true)]
-    public Task<GenerateResponse> Generate(GenerateRequest request)
-    {
-        if (!_preparedRecipes.TryGetValue(request.Id, out var recipe))
-        {
-            throw new InvalidOperationException($"Prepared recipe not found: {request.Id}");
-        }
-
-        var response = new GenerateResponse();
-
-        var scanningBase = GetScanningRecipeBase(recipe.GetType());
-        if (scanningBase != null)
-        {
-            var ctx = GetOrCreateExecutionContext(request.P);
-            var acc = GetOrCreateAccumulator(request.Id, recipe, scanningBase, ctx);
-
-            var generateMethod = scanningBase.GetMethod("Generate")
-                ?? throw new InvalidOperationException(
-                    $"Could not find Generate method on {scanningBase.Name}");
-            var generated = (IEnumerable<SourceFile>)generateMethod.Invoke(recipe, [acc, ctx])!;
-
-            foreach (var g in generated)
-            {
-                var id = g.Id.ToString();
-                _localObjects[id] = g;
-                response.Ids.Add(id);
-
-                var javaTypeName = RpcSendQueue.ToJavaTypeName(g.GetType());
-                if (javaTypeName == null)
-                {
-                    Log.Warning("Generate: No Java type mapping for {CSharpType}, using fallback",
-                        g.GetType().FullName);
-                    javaTypeName = "org.openrewrite.csharp.tree.Cs$CompilationUnit";
-                }
-                response.SourceFileTypes.Add(javaTypeName);
-            }
-        }
-
-        return Task.FromResult(response);
-    }
-
     [JsonRpcMethod("InstallRecipes", UseSingleObjectParameterDeserialization = true)]
     public Task<InstallRecipesResponse> InstallRecipes(InstallRecipesRequest request)
     {
@@ -749,17 +700,53 @@ public class RewriteRpcServer
         }
     }
 
+    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
+
     [JsonRpcMethod("GetLanguages")]
     public Task<string[]> GetLanguages()
     {
-        return Task.FromResult(new[] { "org.openrewrite.csharp.tree.Cs$CompilationUnit" });
+        return Task.FromResult(Languages);
     }
 
     [JsonRpcMethod("Generate", UseSingleObjectParameterDeserialization = true)]
     public Task<GenerateResponse> Generate(GenerateRequest request)
     {
-        // None of the current C# recipes are ScanningRecipes that generate new files
-        return Task.FromResult(new GenerateResponse());
+        if (!_preparedRecipes.TryGetValue(request.Id, out var recipe))
+        {
+            throw new InvalidOperationException($"Prepared recipe not found: {request.Id}");
+        }
+
+        var response = new GenerateResponse();
+
+        var scanningBase = GetScanningRecipeBase(recipe.GetType());
+        if (scanningBase != null)
+        {
+            var ctx = GetOrCreateExecutionContext(request.P);
+            var acc = GetOrCreateAccumulator(request.Id, recipe, scanningBase, ctx);
+
+            var generateMethod = scanningBase.GetMethod("Generate")
+                ?? throw new InvalidOperationException(
+                    $"Could not find Generate method on {scanningBase.Name}");
+            var generated = (IEnumerable<SourceFile>)generateMethod.Invoke(recipe, [acc, ctx])!;
+
+            foreach (var g in generated)
+            {
+                var id = g.Id.ToString();
+                _localObjects[id] = g;
+                response.Ids.Add(id);
+
+                var javaTypeName = RpcSendQueue.ToJavaTypeName(g.GetType());
+                if (javaTypeName == null)
+                {
+                    Log.Warning("Generate: No Java type mapping for {CSharpType}, using fallback",
+                        g.GetType().FullName);
+                    javaTypeName = "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+                }
+                response.SourceFileTypes.Add(javaTypeName);
+            }
+        }
+
+        return Task.FromResult(response);
     }
 
     [JsonRpcMethod("PrepareRecipe", UseSingleObjectParameterDeserialization = true)]
@@ -1155,18 +1142,6 @@ public class InstallRecipesResponse
 {
     public int RecipesInstalled { get; set; }
     public string? Version { get; set; }
-}
-
-public class GenerateRequest
-{
-    public string Id { get; set; } = "";
-    public string P { get; set; } = "";
-}
-
-public class GenerateResponse
-{
-    public List<string> Ids { get; set; } = [];
-    public List<string> SourceFileTypes { get; set; } = [];
 }
 
 public class PrepareRecipeRequest
