@@ -482,7 +482,7 @@ class InMemoryDiffEntryTest {
         try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
             String diff = entry.getDiff();
             // Before has 3 lines, after should also have 3 lines (not 4)
-            assertThat(diff).doesNotContain("+1,4");
+            assertThat(diff).contains("@@ -1,3 +1,3 @@");
         }
     }
 }
