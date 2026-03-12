@@ -244,26 +244,26 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- PropertyDeclaration ----
     public override J VisitPropertyDeclaration(PropertyDeclaration pd, RpcReceiveQueue q)
     {
-        q.ReceiveList<AttributeList>([], t => (AttributeList)VisitNonNull(t, q));
+        var attributeLists = q.ReceiveList(pd.AttributeLists, t => (AttributeList)VisitNonNull(t, q));
         var modifiers = q.ReceiveList(pd.Modifiers, m => (Modifier)VisitNonNull(m, q));
         var typeExpression = q.Receive((J)pd.TypeExpression, el => (J)VisitNonNull(el, q));
-        q.Receive<object?>(null); // InterfaceSpecifier
+        var interfaceSpecifier = q.Receive(pd.InterfaceSpecifier, rp => _delegate.VisitRightPadded(rp!, q));
         var name = q.Receive((J)pd.Name, el => (J)VisitNonNull(el, q));
         var accessors = q.Receive((J?)pd.Accessors, el => (J)VisitNonNull(el!, q));
         var expressionBody = q.Receive(pd.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
-        q.Receive<object?>(null); // Initializer
-        return pd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithTypeExpression((TypeTree)typeExpression!).WithName((Identifier)name!).WithAccessors((Block?)accessors).WithExpressionBody(expressionBody);
+        var initializer = q.Receive(pd.Initializer, lp => _delegate.VisitLeftPadded(lp!, q));
+        return pd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attributeLists!).WithModifiers(modifiers!).WithTypeExpression((TypeTree)typeExpression!).WithInterfaceSpecifier(interfaceSpecifier).WithName((Identifier)name!).WithAccessors((Block?)accessors).WithExpressionBody(expressionBody).WithInitializer(initializer);
     }
 
     // ---- AccessorDeclaration ----
     public override J VisitAccessorDeclaration(AccessorDeclaration ad, RpcReceiveQueue q)
     {
-        q.ReceiveList<AttributeList>([], t => (AttributeList)VisitNonNull(t, q));
+        var attributeLists = q.ReceiveList(ad.AttributeLists, t => (AttributeList)VisitNonNull(t, q));
         var modifiers = q.ReceiveList(ad.Modifiers, m => (Modifier)VisitNonNull(m, q));
         var kind = q.Receive(ad.Kind, lp => _delegate.VisitLeftPadded(lp, q));
         var expressionBody = q.Receive(ad.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J?)ad.Body, el => (J)VisitNonNull(el!, q));
-        return ad.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithExpressionBody(expressionBody).WithBody((Block?)body);
+        return ad.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithAttributeLists(attributeLists!).WithModifiers(modifiers!).WithKind(kind!).WithExpressionBody(expressionBody).WithBody((Block?)body);
     }
 
     // ---- AttributeList ----
@@ -445,8 +445,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitAwaitExpression(AwaitExpression ae, RpcReceiveQueue q)
     {
         var expression = q.Receive((J)ae.Expression, el => (J)VisitNonNull(el, q));
-        q.Receive<object?>(null); // type attribution
-        return ae.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!);
+        var type = q.Receive(ae.Type, t => VisitType(t, q)!);
+        return ae.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithExpression((Expression)expression!).WithType(type);
     }
 
     // ---- Yield ----
@@ -486,8 +486,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitTupleType(TupleType tt, RpcReceiveQueue q)
     {
         var elements = q.Receive(tt.Elements, c => _delegate.VisitContainer(c, q));
-        q.Receive<object?>(null); // type attribution
-        return tt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElements(elements!);
+        var type = q.Receive(tt.Type, t => VisitType(t, q)!);
+        return tt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithElements(elements!).WithType(type);
     }
 
     // ---- TupleExpression ----

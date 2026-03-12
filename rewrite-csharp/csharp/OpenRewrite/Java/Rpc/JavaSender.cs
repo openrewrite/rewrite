@@ -21,8 +21,6 @@ namespace OpenRewrite.Java.Rpc;
 
 public class JavaSender : JavaVisitor<RpcSendQueue>
 {
-    private static readonly IList<Annotation> EmptyAnnotationList = Array.Empty<Annotation>();
-
     public override J? Visit(Tree? tree, RpcSendQueue q)
     {
         if (tree == null) return null;
@@ -354,12 +352,10 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitIdentifier(Identifier identifier, RpcSendQueue q)
     {
-        // C# model does not have Annotations on Identifier; send empty list for protocol compatibility
-        q.GetAndSendList(identifier, _ => EmptyAnnotationList, a => a.Id, a => Visit(a, q));
+        q.GetAndSendList(identifier, i => i.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(identifier, i => i.SimpleName);
         q.GetAndSend(identifier, i => AsRef(i.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
-        // C# model does not have FieldType; send null for protocol compatibility
-        q.GetAndSend(identifier, _ => (object?)null);
+        q.GetAndSend(identifier, i => AsRef(i.FieldType), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return identifier;
     }
 
@@ -408,8 +404,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             m => m.TypeParameters != null ? TypeParameters.FromContainer(m.TypeParameters) : null,
             tp => Visit(tp, q));
         q.GetAndSend(method, m => m.ReturnTypeExpression, type => Visit(type, q));
-        // C# model does not have name annotations; send empty list for protocol compatibility
-        q.GetAndSendList(method, _ => EmptyAnnotationList, a => a.Id, a => Visit(a, q));
+        q.GetAndSendList(method, m => m.Name.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(method, m => (J)m.Name, name => Visit(name, q));
         q.GetAndSend(method, m => m.Parameters, @params => VisitContainer(@params, q));
         q.GetAndSend(method, m => m.Throws, thr => VisitContainer(thr, q));

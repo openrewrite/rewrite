@@ -384,13 +384,11 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitIdentifier(Identifier identifier, RpcReceiveQueue q)
     {
-        // C# model does not have Annotations on Identifier; consume and discard
-        q.ReceiveList<Annotation>([], el => (Annotation)VisitNonNull(el, q));
+        var annotations = q.ReceiveList(identifier.Annotations, el => (Annotation)VisitNonNull(el, q));
         var simpleName = q.Receive(identifier.SimpleName);
         var type = q.Receive(identifier.Type, t => VisitType(t, q)!);
-        // C# model does not have FieldType; consume and discard
-        q.Receive<object?>(null);
-        return identifier.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithSimpleName(simpleName!).WithType(type);
+        var fieldType = q.Receive(identifier.FieldType, t => VisitType(t, q)!);
+        return identifier.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithAnnotations(annotations!).WithSimpleName(simpleName!).WithType(type).WithFieldType(fieldType);
     }
 
     public override J VisitIf(If iff, RpcReceiveQueue q)
@@ -440,15 +438,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var tpReceived = q.Receive(tpBefore, tp => (TypeParameters)VisitNonNull(tp, q));
         var typeParameters = tpReceived?.ToContainer();
         var returnTypeExpression = q.Receive((J?)method.ReturnTypeExpression, el => (J)VisitNonNull(el!, q));
-        // C# model does not have name annotations; consume and discard
-        q.ReceiveList<Annotation>([], el => (Annotation)VisitNonNull(el, q));
+        var nameAnnotations = q.ReceiveList(method.Name.Annotations, el => (Annotation)VisitNonNull(el, q));
         var name = q.Receive((J)method.Name, el => (J)VisitNonNull(el, q));
         var parameters = q.Receive(method.Parameters, c => VisitContainer(c, q));
         var throws_ = q.Receive(method.Throws, c => VisitContainer(c, q));
         var body = q.Receive((J?)method.Body, el => (J)VisitNonNull(el!, q));
         var defaultValue = q.Receive(method.DefaultValue, lp => VisitLeftPadded(lp, q));
         var methodType = q.Receive(method.MethodType, t => (JavaType.Method)VisitType(t, q)!);
-        return method.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithTypeParameters(typeParameters).WithReturnTypeExpression((TypeTree?)returnTypeExpression).WithName((Identifier)name!).WithParameters(parameters!).WithThrows(throws_).WithBody((Block?)body).WithDefaultValue(defaultValue).WithMethodType(methodType);
+        return method.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithTypeParameters(typeParameters).WithReturnTypeExpression((TypeTree?)returnTypeExpression).WithName(((Identifier)name!).WithAnnotations(nameAnnotations!)).WithParameters(parameters!).WithThrows(throws_).WithBody((Block?)body).WithDefaultValue(defaultValue).WithMethodType(methodType);
     }
 
     public override J VisitMethodInvocation(MethodInvocation methodInvocation, RpcReceiveQueue q)
@@ -632,7 +629,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitVariableDeclarations(VariableDeclarations variableDeclarations, RpcReceiveQueue q)
     {
-        var leadingAnnotations = q.ReceiveList(variableDeclarations.LeadingAnnotations, m => (Modifier)VisitNonNull(m, q));
+        var leadingAnnotations = q.ReceiveList(variableDeclarations.LeadingAnnotations, a => (Annotation)VisitNonNull(a, q));
         var modifiers = q.ReceiveList(variableDeclarations.Modifiers, m => (Modifier)VisitNonNull(m, q));
         var typeExpression = q.Receive((J?)variableDeclarations.TypeExpression, el => (J)VisitNonNull(el!, q));
         var varargs = q.Receive(variableDeclarations.Varargs, space => VisitSpace(space, q));

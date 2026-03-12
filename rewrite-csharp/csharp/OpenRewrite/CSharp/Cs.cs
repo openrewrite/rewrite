@@ -102,38 +102,50 @@ public sealed class PropertyDeclaration(
     Guid id,
     Space prefix,
     Markers markers,
+    IList<AttributeList> attributeLists,
     IList<Modifier> modifiers,
     TypeTree typeExpression,
+    JRightPadded<TypeTree>? interfaceSpecifier,
     Identifier name,
     Block? accessors,
-    JLeftPadded<Expression>? expressionBody
+    JLeftPadded<Expression>? expressionBody,
+    JLeftPadded<Expression>? initializer
 ) : Cs, Statement, IEquatable<PropertyDeclaration>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+    public IList<AttributeList> AttributeLists { get; } = attributeLists;
     public IList<Modifier> Modifiers { get; } = modifiers;
     public TypeTree TypeExpression { get; } = typeExpression;
+    public JRightPadded<TypeTree>? InterfaceSpecifier { get; } = interfaceSpecifier;
     public Identifier Name { get; } = name;
     public Block? Accessors { get; } = accessors;
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
+    public JLeftPadded<Expression>? Initializer { get; } = initializer;
 
     public PropertyDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, TypeExpression, Name, Accessors, ExpressionBody);
+        id == Id ? this : new(id, Prefix, Markers, AttributeLists, Modifiers, TypeExpression, InterfaceSpecifier, Name, Accessors, ExpressionBody, Initializer);
     public PropertyDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, TypeExpression, Name, Accessors, ExpressionBody);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, AttributeLists, Modifiers, TypeExpression, InterfaceSpecifier, Name, Accessors, ExpressionBody, Initializer);
     public PropertyDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, TypeExpression, Name, Accessors, ExpressionBody);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, AttributeLists, Modifiers, TypeExpression, InterfaceSpecifier, Name, Accessors, ExpressionBody, Initializer);
+    public PropertyDeclaration WithAttributeLists(IList<AttributeList> attributeLists) =>
+        ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, attributeLists, Modifiers, TypeExpression, InterfaceSpecifier, Name, Accessors, ExpressionBody, Initializer);
     public PropertyDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, TypeExpression, Name, Accessors, ExpressionBody);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, AttributeLists, modifiers, TypeExpression, InterfaceSpecifier, Name, Accessors, ExpressionBody, Initializer);
     public PropertyDeclaration WithTypeExpression(TypeTree typeExpression) =>
-        ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, Modifiers, typeExpression, Name, Accessors, ExpressionBody);
+        ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, typeExpression, InterfaceSpecifier, Name, Accessors, ExpressionBody, Initializer);
+    public PropertyDeclaration WithInterfaceSpecifier(JRightPadded<TypeTree>? interfaceSpecifier) =>
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, TypeExpression, interfaceSpecifier, Name, Accessors, ExpressionBody, Initializer);
     public PropertyDeclaration WithName(Identifier name) =>
-        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Modifiers, TypeExpression, name, Accessors, ExpressionBody);
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, TypeExpression, InterfaceSpecifier, name, Accessors, ExpressionBody, Initializer);
     public PropertyDeclaration WithAccessors(Block? accessors) =>
-        ReferenceEquals(accessors, Accessors) ? this : new(Id, Prefix, Markers, Modifiers, TypeExpression, Name, accessors, ExpressionBody);
+        ReferenceEquals(accessors, Accessors) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, TypeExpression, InterfaceSpecifier, Name, accessors, ExpressionBody, Initializer);
     public PropertyDeclaration WithExpressionBody(JLeftPadded<Expression>? expressionBody) =>
-        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, TypeExpression, Name, Accessors, expressionBody);
+        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, TypeExpression, InterfaceSpecifier, Name, Accessors, expressionBody, Initializer);
+    public PropertyDeclaration WithInitializer(JLeftPadded<Expression>? initializer) =>
+        ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, TypeExpression, InterfaceSpecifier, Name, Accessors, ExpressionBody, initializer);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -167,6 +179,7 @@ public sealed class AccessorDeclaration(
     Guid id,
     Space prefix,
     Markers markers,
+    IList<AttributeList> attributeLists,
     IList<Modifier> modifiers,
     JLeftPadded<AccessorKind> kind,
     Block? body,
@@ -176,25 +189,28 @@ public sealed class AccessorDeclaration(
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+    public IList<AttributeList> AttributeLists { get; } = attributeLists;
     public IList<Modifier> Modifiers { get; } = modifiers;
     public JLeftPadded<AccessorKind> Kind { get; } = kind;
     public Block? Body { get; } = body;
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
 
     public AccessorDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, Body, ExpressionBody);
+        id == Id ? this : new(id, Prefix, Markers, AttributeLists, Modifiers, Kind, Body, ExpressionBody);
     public AccessorDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, Body, ExpressionBody);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, AttributeLists, Modifiers, Kind, Body, ExpressionBody);
     public AccessorDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, Body, ExpressionBody);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, AttributeLists, Modifiers, Kind, Body, ExpressionBody);
+    public AccessorDeclaration WithAttributeLists(IList<AttributeList> attributeLists) =>
+        ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, attributeLists, Modifiers, Kind, Body, ExpressionBody);
     public AccessorDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, Body, ExpressionBody);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, AttributeLists, modifiers, Kind, Body, ExpressionBody);
     public AccessorDeclaration WithKind(JLeftPadded<AccessorKind> kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, Body, ExpressionBody);
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, kind, Body, ExpressionBody);
     public AccessorDeclaration WithBody(Block? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, body, ExpressionBody);
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, Kind, body, ExpressionBody);
     public AccessorDeclaration WithExpressionBody(JLeftPadded<Expression>? expressionBody) =>
-        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, Body, expressionBody);
+        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, Kind, Body, expressionBody);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1686,22 +1702,26 @@ public sealed class AwaitExpression(
     Guid id,
     Space prefix,
     Markers markers,
-    Expression expression
+    Expression expression,
+    JavaType? type
 ) : Cs, Expression, Statement, IEquatable<AwaitExpression>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
-    public Markers Markers { get; } = markers; 
+    public Markers Markers { get; } = markers;
     public Expression Expression { get; } = expression;
+    public JavaType? Type { get; } = type;
 
     public AwaitExpression WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Expression);
+        id == Id ? this : new(id, Prefix, Markers, Expression, Type);
     public AwaitExpression WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Type);
     public AwaitExpression WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Type);
     public AwaitExpression WithExpression(Expression expression) =>
-        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression);
+        ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Type);
+    public AwaitExpression WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Expression, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1807,22 +1827,26 @@ public sealed class TupleType(
     Guid id,
     Space prefix,
     Markers markers,
-    JContainer<TupleElement> elements
+    JContainer<TupleElement> elements,
+    JavaType? type
 ) : Cs, TypeTree, Expression, IEquatable<TupleType>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public JContainer<TupleElement> Elements { get; } = elements;
+    public JavaType? Type { get; } = type;
 
     public TupleType WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Elements);
+        id == Id ? this : new(id, Prefix, Markers, Elements, Type);
     public TupleType WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Elements);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Elements, Type);
     public TupleType WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Elements);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Elements, Type);
     public TupleType WithElements(JContainer<TupleElement> elements) =>
-        ReferenceEquals(elements, Elements) ? this : new(Id, Prefix, Markers, elements);
+        ReferenceEquals(elements, Elements) ? this : new(Id, Prefix, Markers, elements, Type);
+    public TupleType WithType(JavaType? type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Elements, type);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

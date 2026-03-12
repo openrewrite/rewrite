@@ -32,9 +32,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     private static readonly IList<JRightPadded<Statement>> EmptyPaddedStatements =
         Array.Empty<JRightPadded<Statement>>();
 
-    private static readonly IList<AttributeList> EmptyAttributeLists =
-        Array.Empty<AttributeList>();
-
     public CSharpSender()
     {
         _delegate = new CSharpSenderDelegate(this);
@@ -246,27 +243,23 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- PropertyDeclaration ----
     public override J VisitPropertyDeclaration(PropertyDeclaration pd, RpcSendQueue q)
     {
-        // Java model has AttributeLists; nagoya does not
-        q.GetAndSendList(pd, _ => EmptyAttributeLists,
+        q.GetAndSendList(pd, p => p.AttributeLists,
             t => (object)t.Id, t => Visit(t, q));
         q.GetAndSendList(pd, p => p.Modifiers,
             m => (object)m.Id, m => Visit(m, q));
         q.GetAndSend(pd, p => (J)p.TypeExpression, el => Visit(el, q));
-        // InterfaceSpecifier: nagoya doesn't model this
-        q.GetAndSend(pd, _ => (object?)null);
+        q.GetAndSend(pd, p => p.InterfaceSpecifier, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(pd, p => (J)p.Name, el => Visit(el, q));
         q.GetAndSend(pd, p => (J?)p.Accessors, el => Visit(el!, q));
         q.GetAndSend(pd, p => p.ExpressionBody, lp => VisitLeftPadded(lp!, q));
-        // Initializer: nagoya doesn't model this
-        q.GetAndSend(pd, _ => (object?)null);
+        q.GetAndSend(pd, p => p.Initializer, lp => VisitLeftPadded(lp!, q));
         return pd;
     }
 
     // ---- AccessorDeclaration ----
     public override J VisitAccessorDeclaration(AccessorDeclaration ad, RpcSendQueue q)
     {
-        // Java model has Attributes (list); nagoya does not
-        q.GetAndSendList(ad, _ => EmptyAttributeLists,
+        q.GetAndSendList(ad, a => a.AttributeLists,
             t => (object)t.Id, t => Visit(t, q));
         q.GetAndSendList(ad, a => a.Modifiers,
             m => (object)m.Id, m => Visit(m, q));
@@ -456,8 +449,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitAwaitExpression(AwaitExpression ae, RpcSendQueue q)
     {
         q.GetAndSend(ae, a => (J)a.Expression, el => Visit(el, q));
-        // Java has type attribution; nagoya doesn't
-        q.GetAndSend(ae, _ => (object?)null);
+        q.GetAndSend(ae, a => AsRef(a.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
         return ae;
     }
 
@@ -496,8 +488,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitTupleType(TupleType tt, RpcSendQueue q)
     {
         q.GetAndSend(tt, t => t.Elements, c => VisitContainer(c, q));
-        // Java has type attribution; nagoya doesn't
-        q.GetAndSend(tt, _ => (object?)null);
+        q.GetAndSend(tt, t => AsRef(t.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
         return tt;
     }
 

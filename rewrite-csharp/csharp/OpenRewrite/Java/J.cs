@@ -1204,26 +1204,34 @@ public sealed class Identifier(
     Guid id,
     Space prefix,
     Markers markers,
+    IList<Annotation> annotations,
     string simpleName,
-    JavaType? type
+    JavaType? type,
+    JavaType? fieldType
 ) : J, Expression, TypeTree, IEquatable<Identifier>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+    public IList<Annotation> Annotations { get; } = annotations;
     public string SimpleName { get; } = simpleName;
     public JavaType? Type { get; } = type;
+    public JavaType? FieldType { get; } = fieldType;
 
     public Identifier WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, SimpleName, Type);
+        id == Id ? this : new(id, Prefix, Markers, Annotations, SimpleName, Type, FieldType);
     public Identifier WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SimpleName, Type);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Annotations, SimpleName, Type, FieldType);
     public Identifier WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SimpleName, Type);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Annotations, SimpleName, Type, FieldType);
+    public Identifier WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, SimpleName, Type, FieldType);
     public Identifier WithSimpleName(string simpleName) =>
-        string.Equals(simpleName, SimpleName, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, simpleName, Type);
+        string.Equals(simpleName, SimpleName, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Annotations, simpleName, Type, FieldType);
     public Identifier WithType(JavaType? type) =>
-        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, SimpleName, type);
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Annotations, SimpleName, type, FieldType);
+    public Identifier WithFieldType(JavaType? fieldType) =>
+        ReferenceEquals(fieldType, FieldType) ? this : new(Id, Prefix, Markers, Annotations, SimpleName, Type, fieldType);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1747,7 +1755,7 @@ public sealed class VariableDeclarations(
     Guid id,
     Space prefix,
     Markers markers,
-    IList<Modifier> leadingAnnotations,
+    IList<Annotation> leadingAnnotations,
     IList<Modifier> modifiers,
     TypeTree? typeExpression,
     Space? varargs,
@@ -1758,7 +1766,7 @@ public sealed class VariableDeclarations(
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public IList<Modifier> LeadingAnnotations { get; } = leadingAnnotations;
+    public IList<Annotation> LeadingAnnotations { get; } = leadingAnnotations;
     public IList<Modifier> Modifiers { get; } = modifiers;
     public TypeTree? TypeExpression { get; } = typeExpression;
     public Space? Varargs { get; } = varargs;
@@ -1771,7 +1779,7 @@ public sealed class VariableDeclarations(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
     public VariableDeclarations WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
-    public VariableDeclarations WithLeadingAnnotations(IList<Modifier> leadingAnnotations) =>
+    public VariableDeclarations WithLeadingAnnotations(IList<Annotation> leadingAnnotations) =>
         ReferenceEquals(leadingAnnotations, LeadingAnnotations) ? this : new(Id, Prefix, Markers, leadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
     public VariableDeclarations WithModifiers(IList<Modifier> modifiers) =>
         ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, LeadingAnnotations, modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
