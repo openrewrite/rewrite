@@ -21,27 +21,22 @@ using OpenRewrite.Java;
 namespace OpenRewrite.CSharp;
 
 /// <summary>
-/// Scans a parsed tree for ghost comments (//DIRECTIVE:N) embedded in Space whitespace strings
+/// Scans a parsed tree for ghost comments (//DIRECTIVE:N) in Space.Comments
 /// and attaches <see cref="DirectiveBoundaryMarker"/> to the owning nodes.
 /// <para>
 /// Ghost comments are emitted by <see cref="PreprocessorSourceTransformer.Transform"/> in place
-/// of directive lines (e.g. #if, #else, #endif). Because the C# parser does not yet extract
-/// comments from trivia, these appear as raw text in Space.Whitespace rather than as TextComment
-/// entries in Space.Comments.
-/// </para>
-/// <para>
-/// Ghost comments are intentionally left in the whitespace strings so the printer can use them
-/// as sentinels for section-based assembly. The markers provide structured metadata for recipes.
+/// of directive lines (e.g. #if, #else, #endif). The parser creates structured TextComment
+/// entries from these, which this injector scans to extract directive indices.
 /// </para>
 /// </summary>
 public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
 {
-    [GeneratedRegex(@"//DIRECTIVE:(\d+)")]
+    [GeneratedRegex(@"^DIRECTIVE:(\d+)$")]
     private static partial Regex GhostPattern();
 
     /// <summary>
     /// Inject directive boundary markers into the given tree by scanning for ghost comments.
-    /// Ghost comments remain in the whitespace for printer use as sentinels.
+    /// Ghost comments remain as TextComment entries for printer use as sentinels.
     /// </summary>
     public static J Inject(J tree)
     {
@@ -50,14 +45,14 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
 
     public override J? PostVisit(J tree, int p)
     {
-        return AddMarkerIfNeeded(tree, tree.Prefix.Whitespace);
+        return AddMarkerIfNeeded(tree, tree.Prefix);
     }
 
     public override J VisitBlock(Block block, int p)
     {
         block = (Block)base.VisitBlock(block, p);
 
-        var indices = FindDirectiveIndices(block.End.Whitespace);
+        var indices = FindDirectiveIndices(block.End);
         if (indices.Count > 0)
         {
             var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
@@ -71,7 +66,7 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
     {
         compilationUnit = (CompilationUnit)base.VisitCompilationUnit(compilationUnit, p);
 
-        var indices = FindDirectiveIndices(compilationUnit.Eof.Whitespace);
+        var indices = FindDirectiveIndices(compilationUnit.Eof);
         if (indices.Count > 0)
         {
             var marker = new DirectiveBoundaryMarker(Guid.NewGuid(), indices);
@@ -81,9 +76,9 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         return compilationUnit;
     }
 
-    private J AddMarkerIfNeeded(J node, string whitespace)
+    private J AddMarkerIfNeeded(J node, Space space)
     {
-        var indices = FindDirectiveIndices(whitespace);
+        var indices = FindDirectiveIndices(space);
         if (indices.Count == 0)
             return node;
 
@@ -92,13 +87,19 @@ public partial class DirectiveBoundaryInjector : CSharpVisitor<int>
         return SetMarkers(node, newMarkers);
     }
 
-    private static List<int> FindDirectiveIndices(string whitespace)
+    private static List<int> FindDirectiveIndices(Space space)
     {
         var indices = new List<int>();
-        var matches = GhostPattern().Matches(whitespace);
-        foreach (Match match in matches)
+        foreach (var comment in space.Comments)
         {
-            indices.Add(int.Parse(match.Groups[1].Value));
+            if (!comment.Multiline)
+            {
+                var match = GhostPattern().Match(comment.Text);
+                if (match.Success)
+                {
+                    indices.Add(int.Parse(match.Groups[1].Value));
+                }
+            }
         }
         return indices;
     }

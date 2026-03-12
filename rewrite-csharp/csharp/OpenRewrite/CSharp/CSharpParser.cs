@@ -1107,12 +1107,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             // preserve it as a J.Empty element so it round-trips correctly
             if (args.Count == 0 && !closeParenSpace.IsEmpty)
             {
-                // Re-parse the space with comment awareness so /* */ and // comments
-                // are stored as structured Comment entries rather than raw whitespace
-                var structuredSpace = Space.FormatWithComments(closeParenSpace.Whitespace);
                 args.Add(new JRightPadded<Expression>(
                     new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty),
-                    structuredSpace,
+                    closeParenSpace,
                     Markers.Empty
                 ));
             }
@@ -9039,7 +9036,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var whitespace = _source[_cursor..start];
         _cursor = start;
-        return Space.Format(whitespace);
+        return Space.FormatWithComments(whitespace);
     }
 
     private static Binary.OperatorType MapBinaryOperator(SyntaxKind kind)
@@ -9090,8 +9087,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var whitespace = _source[_cursor..start];
         _cursor = start;
 
-        // TODO: Parse comments from trivia
-        return Space.Format(whitespace);
+        return Space.FormatWithComments(whitespace);
     }
 
     private Space ExtractRemaining()
@@ -9103,7 +9099,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var remaining = _source[_cursor..];
         _cursor = _source.Length;
-        return Space.Format(remaining);
+        return Space.FormatWithComments(remaining);
     }
 
     private void SkipTo(int position)

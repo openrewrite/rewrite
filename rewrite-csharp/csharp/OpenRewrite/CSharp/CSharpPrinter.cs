@@ -2779,6 +2779,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
     protected void VisitSpace(Space space, PrintOutputCapture<P> p)
     {
+        p.Append(space.Whitespace);
         foreach (var comment in space.Comments)
         {
             if (comment.Multiline)
@@ -2791,7 +2792,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
             p.Append(comment.Suffix);
         }
-        p.Append(space.Whitespace);
     }
 
     #region Preprocessor Directives
