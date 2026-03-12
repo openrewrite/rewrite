@@ -15,6 +15,7 @@
  */
 using System.Collections.Concurrent;
 using OpenRewrite.Core;
+using OpenRewrite.CSharp.Format;
 using OpenRewrite.Java;
 
 namespace OpenRewrite.CSharp.Template;
@@ -190,6 +191,51 @@ internal static class TemplateEngine
         return TreeHelper.SetPrefix(replacement, original.Prefix);
     }
 
+    /// <summary>
+    /// Auto-format the template result in a scratch copy of the enclosing compilation unit.
+    /// Inserts the template result into a local copy of the CU (replacing the original node),
+    /// formats with Roslyn, and extracts the formatted result.
+    /// </summary>
+    internal static J AutoFormat(J tree, Cursor cursor)
+    {
+        var cu = cursor.FirstEnclosing<CompilationUnit>();
+        if (cu == null)
+            return tree;
+
+        // The cursor's value is the original node being replaced
+        if (cursor.Value is not J original)
+            return tree;
+
+        // Assign a fresh ID so FindById targets exactly this instance,
+        // not a stale node from a prior application of the same template
+        tree = TreeHelper.SetId(tree, Guid.NewGuid());
+
+        // Replace the original node with the template result in the CU
+        var replacer = new NodeReplacer(original.Id, tree);
+        replacer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var modifiedCu = replacer.VisitNonNull(cu, 0) as CompilationUnit;
+        if (modifiedCu == null || ReferenceEquals(modifiedCu, cu))
+            return tree;
+
+        // Format the modified CU, scoped to the new subtree
+        var formattedCu = RoslynFormatter.Format(modifiedCu, targetSubtree: tree, stopAfter: null);
+
+        // If formatting didn't change anything, return as-is
+        if (ReferenceEquals(formattedCu, modifiedCu))
+            return tree;
+
+        // Find the formatted tree node by ID
+        return FindById(formattedCu, tree.Id) ?? tree;
+    }
+
+    private static J? FindById(J root, Guid targetId)
+    {
+        var finder = new IdFinder(targetId);
+        finder.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        finder.Visit(root, 0);
+        return finder.Result;
+    }
+
     private static string BuildCacheKey(string code, IReadOnlyList<string> usings,
         IReadOnlyList<string> context)
     {
@@ -207,6 +253,48 @@ internal static class TemplateEngine
             sb.Append(string.Join(",", context));
         }
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Visitor that replaces a node by ID with a replacement node.
+    /// Short-circuits after the replacement is made to avoid visiting remaining subtrees.
+    /// </summary>
+    private class NodeReplacer(Guid targetId, J replacement) : CSharpVisitor<int>
+    {
+        private bool _found;
+
+        protected override J? Accept(J tree, int p)
+        {
+            if (_found)
+                return tree;
+            if (tree.Id == targetId)
+            {
+                _found = true;
+                return replacement;
+            }
+            return base.Accept(tree, p);
+        }
+    }
+
+    /// <summary>
+    /// Visitor that finds a node by ID in a tree.
+    /// Short-circuits after the target is found to avoid visiting remaining subtrees.
+    /// </summary>
+    private class IdFinder(Guid targetId) : CSharpVisitor<int>
+    {
+        internal J? Result { get; private set; }
+
+        protected override J? Accept(J tree, int p)
+        {
+            if (Result != null)
+                return tree;
+            if (tree.Id == targetId)
+            {
+                Result = tree;
+                return tree;
+            }
+            return base.Accept(tree, p);
+        }
     }
 }
 
