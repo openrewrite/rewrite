@@ -13,6 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
+using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
@@ -71,6 +74,49 @@ public class AttributeListTests : RewriteTest
                 [Serializable, Obsolete("msg")]
                 class Foo {
                 }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeWithEmptyArgsAndComment()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [Serializable(/*bar*/)]
+                class Test { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeWithEmptyArgsAndCommentIsStructured()
+    {
+        var parser = new CSharpParser();
+        var cu = (CompilationUnit)parser.Parse("[Serializable(/*bar*/)]\nclass Test { }");
+        var annotated = (AnnotatedStatement)cu.Members[0];
+        var annotation = annotated.AttributeLists[0].Attributes[0].Element;
+        Assert.NotNull(annotation.Arguments);
+        // The empty arg list should contain a J.Empty element
+        Assert.Single(annotation.Arguments.Elements);
+        // The comment should be structured in the After space, not raw whitespace
+        var afterSpace = annotation.Arguments.Elements[0].After;
+        Assert.Single(afterSpace.Comments);
+        Assert.True(afterSpace.Comments[0].Multiline);
+        Assert.Equal("bar", afterSpace.Comments[0].Text);
+    }
+
+    [Fact]
+    public void AttributeOnPublicClass()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [Obsolete("msg")]
+                public class Test { }
                 """
             )
         );

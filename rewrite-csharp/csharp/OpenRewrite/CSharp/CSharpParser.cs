@@ -550,33 +550,53 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public override J VisitStructDeclaration(StructDeclarationSyntax node)
     {
-        var classDecl = (ClassDeclaration)VisitTypeDeclaration(node);
-        // Add Struct marker to distinguish from regular class
-        return classDecl.WithMarkers(classDecl.Markers.Add(new Struct(Guid.NewGuid())));
+        return AddClassDeclMarker(VisitTypeDeclaration(node), new Struct(Guid.NewGuid()));
     }
 
     public override J VisitRecordDeclaration(RecordDeclarationSyntax node)
     {
-        var classDecl = (ClassDeclaration)VisitTypeDeclaration(node);
+        var result = VisitTypeDeclaration(node);
 
         // For record struct, add Struct marker (KindType is already Record)
         if (node.ClassOrStructKeyword.IsKind(SyntaxKind.StructKeyword))
         {
-            return classDecl.WithMarkers(classDecl.Markers.Add(new Struct(Guid.NewGuid())));
+            return AddClassDeclMarker(result, new Struct(Guid.NewGuid()));
         }
 
         // For "record class" (explicit class keyword), add RecordClass marker
         if (node.ClassOrStructKeyword.IsKind(SyntaxKind.ClassKeyword))
         {
-            return classDecl.WithMarkers(classDecl.Markers.Add(new RecordClass(Guid.NewGuid())));
+            return AddClassDeclMarker(result, new RecordClass(Guid.NewGuid()));
         }
 
-        return classDecl;
+        return result;
+    }
+
+    /// <summary>
+    /// Adds a marker to the ClassDeclaration, handling the case where it may be
+    /// wrapped in an AnnotatedStatement (when the type has attribute lists).
+    /// </summary>
+    private static J AddClassDeclMarker(J result, Marker marker)
+    {
+        if (result is AnnotatedStatement annotated)
+        {
+            var classDecl = (ClassDeclaration)annotated.Statement;
+            return annotated.WithStatement(classDecl.WithMarkers(classDecl.Markers.Add(marker)));
+        }
+        var cd = (ClassDeclaration)result;
+        return cd.WithMarkers(cd.Markers.Add(marker));
     }
 
     public override J VisitEnumDeclaration(EnumDeclarationSyntax node)
     {
         var prefix = ExtractPrefix(node);
+
+        // Parse attribute lists
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -671,7 +691,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            null,
+            attributeLists.Count > 0 ? attributeLists : null,
             modifiers,
             new JLeftPadded<Identifier>(enumPrefix, name),
             baseType,
@@ -728,6 +748,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     private J VisitTypeDeclaration(TypeDeclarationSyntax node)
     {
         var prefix = ExtractPrefix(node);
+
+        // Parse attribute lists
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -904,9 +931,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             body = body.WithStatements(bodyStatements);
         }
 
-        return new ClassDeclaration(
+        var classDecl = new ClassDeclaration(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             classMarkers,
             [],
             modifiers,
@@ -920,6 +947,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             body,
             _typeMapping?.ClassType(node)
         );
+
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                classDecl
+            );
+        }
+
+        return classDecl;
     }
 
     private Block VisitClassBody(TypeDeclarationSyntax node)
@@ -1002,19 +1042,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var attr = node.Attributes[i];
             var annotation = VisitAttribute(attr);
 
-            Space afterSpace = Space.Empty;
+            Space afterSpace;
             if (i < node.Attributes.Count - 1)
             {
                 var sep = node.Attributes.GetSeparator(i);
                 afterSpace = ExtractSpaceBefore(sep);
                 _cursor = sep.Span.End;
             }
+            else
+            {
+                // Last attribute: capture space before closing bracket
+                afterSpace = ExtractSpaceBefore(node.CloseBracketToken);
+            }
 
             attributes.Add(new JRightPadded<Annotation>(annotation, afterSpace, Markers.Empty));
         }
-
-        // Skip close bracket
-        SkipTo(node.CloseBracketToken.SpanStart);
         _cursor = node.CloseBracketToken.Span.End;
 
         return new AttributeList(
@@ -1060,6 +1102,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             var closeParenSpace = ExtractSpaceBefore(node.ArgumentList.CloseParenToken);
             _cursor = node.ArgumentList.CloseParenToken.Span.End;
+
+            // When the argument list is empty but has content between parens (e.g. comments),
+            // preserve it as a J.Empty element so it round-trips correctly
+            if (args.Count == 0 && !closeParenSpace.IsEmpty)
+            {
+                // Re-parse the space with comment awareness so /* */ and // comments
+                // are stored as structured Comment entries rather than raw whitespace
+                var structuredSpace = Space.FormatWithComments(closeParenSpace.Whitespace);
+                args.Add(new JRightPadded<Expression>(
+                    new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty),
+                    structuredSpace,
+                    Markers.Empty
+                ));
+            }
 
             arguments = new JContainer<Expression>(openParenSpace, args, Markers.Empty);
         }

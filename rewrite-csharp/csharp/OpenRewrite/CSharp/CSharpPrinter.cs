@@ -1076,6 +1076,20 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         };
     }
 
+    public override J VisitAnnotatedStatement(AnnotatedStatement annotatedStatement, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(annotatedStatement, p);
+
+        foreach (var attrList in annotatedStatement.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
+
+        Visit(annotatedStatement.Statement, p);
+        AfterSyntax(annotatedStatement, p);
+        return annotatedStatement;
+    }
+
     public override J VisitAttributeList(AttributeList attrList, PrintOutputCapture<P> p)
     {
         BeforeSyntax(attrList, p);
@@ -1094,9 +1108,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             var paddedAttr = attrList.Attributes[i];
             Visit(paddedAttr.Element, p);
+            VisitSpace(paddedAttr.After, p);
             if (i < attrList.Attributes.Count - 1)
             {
-                VisitSpace(paddedAttr.After, p);
                 p.Append(',');
             }
         }

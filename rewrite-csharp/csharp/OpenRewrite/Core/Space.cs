@@ -31,6 +31,133 @@ public sealed class Space(string whitespace, IList<Comment> comments)
     public static Space Format(string whitespace) =>
         string.IsNullOrEmpty(whitespace) ? Empty : new Space(whitespace, []);
 
+    /// <summary>
+    /// Parses a formatting string that may contain C-style comments (/* ... */ and // ...)
+    /// into structured whitespace and Comment entries.
+    /// Use this instead of Format() when the text is known to come from real source code
+    /// (not ghost/directive markers).
+    /// </summary>
+    public static Space FormatWithComments(string formatting)
+    {
+        if (string.IsNullOrEmpty(formatting))
+            return Empty;
+
+        var prefix = new System.Text.StringBuilder();
+        var comment = new System.Text.StringBuilder();
+        var comments = new List<Comment>();
+
+        bool inSingleLineComment = false;
+        bool inMultiLineComment = false;
+        char last = '\0';
+
+        for (int i = 0; i < formatting.Length; i++)
+        {
+            char c = formatting[i];
+            switch (c)
+            {
+                case '/':
+                    if (inSingleLineComment)
+                    {
+                        comment.Append(c);
+                    }
+                    else if (last == '/' && !inMultiLineComment)
+                    {
+                        inSingleLineComment = true;
+                        comment.Clear();
+                        prefix.Length -= 1;
+                    }
+                    else if (last == '*' && inMultiLineComment && comment.Length > 0)
+                    {
+                        inMultiLineComment = false;
+                        comment.Length -= 1; // trim the last '*'
+                        comments.Add(new TextComment(comment.ToString(),
+                            prefix.Length > 0 ? prefix.ToString(0, prefix.Length - 1) : "", true));
+                        prefix.Clear();
+                        comment.Clear();
+                        last = c;
+                        continue;
+                    }
+                    else if (inMultiLineComment)
+                    {
+                        comment.Append(c);
+                    }
+                    else
+                    {
+                        prefix.Append(c);
+                    }
+                    break;
+                case '\r':
+                case '\n':
+                    if (inSingleLineComment)
+                    {
+                        inSingleLineComment = false;
+                        comments.Add(new TextComment(comment.ToString(), prefix.ToString(), false));
+                        prefix.Clear();
+                        comment.Clear();
+                        prefix.Append(c);
+                    }
+                    else if (!inMultiLineComment)
+                    {
+                        prefix.Append(c);
+                    }
+                    else
+                    {
+                        comment.Append(c);
+                    }
+                    break;
+                case '*':
+                    if (inSingleLineComment)
+                    {
+                        comment.Append(c);
+                    }
+                    else if (last == '/' && !inMultiLineComment)
+                    {
+                        inMultiLineComment = true;
+                        comment.Clear();
+                    }
+                    else
+                    {
+                        comment.Append(c);
+                    }
+                    break;
+                default:
+                    if (inSingleLineComment || inMultiLineComment)
+                    {
+                        comment.Append(c);
+                    }
+                    else
+                    {
+                        prefix.Append(c);
+                    }
+                    break;
+            }
+            last = c;
+        }
+
+        // Unterminated single-line comment at end of input
+        if (comment.Length > 0 || inSingleLineComment)
+        {
+            comments.Add(new TextComment(comment.ToString(), prefix.ToString(), false));
+            prefix.Clear();
+        }
+
+        // Shift whitespace: each comment's "prefix" collected so far becomes the suffix of the
+        // previous comment, and the very first comment's prefix becomes the Space's whitespace.
+        string ws = prefix.ToString();
+        if (comments.Count > 0)
+        {
+            for (int i = comments.Count - 1; i >= 0; i--)
+            {
+                var cmt = comments[i];
+                string next = cmt.Suffix;
+                comments[i] = new TextComment(cmt.Text, ws, cmt.Multiline);
+                ws = next;
+            }
+        }
+
+        return comments.Count > 0 ? new Space(ws, comments) : Format(formatting);
+    }
+
     public bool IsEmpty => string.IsNullOrEmpty(Whitespace) && Comments.Count == 0;
 
     public Space WithWhitespace(string whitespace) =>
