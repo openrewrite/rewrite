@@ -307,6 +307,39 @@ class FindAnnotationsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1988")
+    @Test
+    void findJUnitTestAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAnnotations("@org.junit.jupiter.api.Test", null))
+            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
+          java(
+            """
+              import org.junit.jupiter.api.Test;
+
+              class MyTests {
+                  @Test
+                  void shouldWork() {}
+
+                  @Test
+                  void shouldAlsoWork() {}
+              }
+              """,
+            """
+              import org.junit.jupiter.api.Test;
+
+              class MyTests {
+                  /*~~>*/@Test
+                  void shouldWork() {}
+
+                  /*~~>*/@Test
+                  void shouldAlsoWork() {}
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void enumArgument() {
         rewriteRun(

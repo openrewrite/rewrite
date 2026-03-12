@@ -69,6 +69,17 @@ public class FindAnnotations extends Recipe {
                                 return SearchResult.found(cu);
                             }
                         }
+                        for (J.Import anImport : cu.getImports()) {
+                            JavaType.FullyQualified type;
+                            if (anImport.isStatic()) {
+                                type = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
+                            } else {
+                                type = TypeUtils.asFullyQualified(anImport.getQualid().getType());
+                            }
+                            if (annotationMatcher.matchesAnnotationOrMetaAnnotation(type)) {
+                                return SearchResult.found(cu);
+                            }
+                        }
                         return tree;
                     }
                 },
