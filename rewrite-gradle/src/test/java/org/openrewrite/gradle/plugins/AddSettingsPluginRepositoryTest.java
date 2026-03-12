@@ -311,4 +311,436 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void skipWhenExistsGradlePluginPortal() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsGradlePluginPortalKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsMavenLocal() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("mavenLocal", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsMavenLocalKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("mavenLocal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noDuplicatePluginManagementBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void noDuplicatePluginManagementBlockKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsGradlePluginPortalWithOtherRepos() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsGradlePluginPortalWithOtherReposKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsWithPluginsBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id "com.example.plugin" version "1.0"
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsWithPluginsBlockKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id("com.example.plugin") version "1.0"
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void addGradlePluginPortalToExistingPluginManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addGradlePluginPortalToExistingPluginManagementKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addGradlePluginPortalToEmptyFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradle(
+            "",
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addGradlePluginPortalToEmptyFileKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            "",
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void idempotentAfterAddingGradlePluginPortal() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
+            .expectedCyclesThatMakeChanges(1).cycles(3),
+          settingsGradle(
+            "",
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void idempotentAfterAddingGradlePluginPortalKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
+            .expectedCyclesThatMakeChanges(1).cycles(3),
+          settingsGradleKts(
+            "",
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void idempotentAfterAddingGradlePluginPortalWithExistingContent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
+            .expectedCyclesThatMakeChanges(1).cycles(3),
+          settingsGradle(
+            """
+              rootProject.name = "demo"
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void idempotentAfterAddingGradlePluginPortalWithExistingContentKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
+            .expectedCyclesThatMakeChanges(1).cycles(3),
+          settingsGradleKts(
+            """
+              rootProject.name = "demo"
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsComplexSettingsKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id("com.gradle.develocity") version "latest.release"
+              }
+
+              rootProject.name = "my-project"
+
+              include("module-a")
+              include("module-b")
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsWithMavenRepoAndPluginsBlockKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/releases")
+                      }
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id("com.gradle.develocity") version "latest.release"
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
+    void addToExistingPluginManagementWithPluginsBlockKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
+            .expectedCyclesThatMakeChanges(1).cycles(3),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/releases")
+                      }
+                  }
+              }
+
+              plugins {
+                  id("com.gradle.develocity") version "latest.release"
+              }
+
+              rootProject.name = "demo"
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/releases")
+                      }
+                      gradlePluginPortal()
+                  }
+              }
+
+              plugins {
+                  id("com.gradle.develocity") version "latest.release"
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
 }
