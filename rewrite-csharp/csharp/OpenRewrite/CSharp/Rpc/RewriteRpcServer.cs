@@ -952,6 +952,45 @@ public class RewriteRpcServer
     }
 
     /// <summary>
+    /// JSON-RPC handler and public API for resetting all cached state.
+    /// When called via JSON-RPC from the remote process, clears local caches.
+    /// When called directly (e.g., from test infrastructure), also sends Reset
+    /// to the remote process to clear its caches.
+    /// </summary>
+    [JsonRpcMethod("Reset")]
+    public Task<bool> Reset()
+    {
+        ClearLocalState();
+        return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Resets all cached state in both the local and remote RPC processes.
+    /// Call between operations that don't share state (e.g., between tests)
+    /// to prevent unbounded memory growth from accumulated objects.
+    /// </summary>
+    [JsonRpcIgnore]
+    public void ResetAll()
+    {
+        // Send reset to remote process (which clears its caches)
+        _jsonRpc!.InvokeWithParameterObjectAsync<bool>("Reset", new { }).GetAwaiter().GetResult();
+
+        // Clear local caches
+        ClearLocalState();
+    }
+
+    private void ClearLocalState()
+    {
+        _localObjects.Clear();
+        _remoteObjects.Clear();
+        _localRefs.Clear();
+        _remoteRefs.Clear();
+        _preparedRecipes.Clear();
+        _recipeAccumulators.Clear();
+        _executionContexts.Clear();
+    }
+
+    /// <summary>
     /// Stores a tree in the local object cache so Java can fetch it via GetObject.
     /// </summary>
     internal void StoreLocalObject(string id, object obj) => _localObjects[id] = obj;
