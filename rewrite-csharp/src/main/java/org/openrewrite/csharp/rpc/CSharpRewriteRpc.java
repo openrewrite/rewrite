@@ -22,6 +22,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
@@ -54,8 +56,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
-    CSharpRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, String command, Map<String, String> commandEnv) {
-        super(process.getRpcClient(), marketplace);
+    CSharpRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace, resolvers);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
@@ -104,18 +106,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
         );
     }
 
-    /**
-     * Resets the cached state of the current C# RPC instance.
-     * This clears all parsed objects and references on both the Java and C# sides,
-     * preventing memory accumulation across multiple parse operations.
-     * <p>
-     * Call this between tests or after batch operations that don't need to share state.
-     */
     public static void resetCurrent() {
-        CSharpRewriteRpc current = MANAGER.get();
-        if (current != null) {
-            current.reset();
-        }
+        MANAGER.reset();
     }
 
     /**
@@ -180,7 +172,12 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
     @RequiredArgsConstructor
     public static class Builder implements Supplier<CSharpRewriteRpc> {
+        private static final String TOOL_COMMAND = "rewrite-csharp";
+        private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp.Tool";
+        private static final String REWRITE_SOURCE_PATH_ENV = "REWRITE_SOURCE_PATH";
+
         private RecipeMarketplace marketplace = new RecipeMarketplace();
+        private List<RecipeBundleResolver> resolvers = new ArrayList<>();
         private final Map<String, String> environment = new HashMap<>();
         private Path dotnetPath = Paths.get("dotnet");
         private @Nullable Path csharpServerEntry;
@@ -196,6 +193,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
+         * A mutable list of resolvers that will be used by the RPC's PrepareRecipe handler.
+         * Since the list is captured by reference, resolvers added after construction will
+         * be visible to the handler.
+         */
+        public Builder resolvers(List<RecipeBundleResolver> resolvers) {
+            this.resolvers = resolvers;
+            return this;
+        }
+
+        /**
          * Path to the dotnet executable.
          *
          * @param dotnetPath The path to the dotnet executable (e.g., "dotnet", "/usr/local/share/dotnet/dotnet")
@@ -207,13 +214,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Entry point that launches the C# RPC server. When the path has a {@code .csproj}
-         * extension, the server is launched from source via {@code dotnet run --project}.
-         * Otherwise the path is treated as a published executable (DLL) and launched
-         * via {@code dotnet <path>}.
-         *
-         * @param csharpServerEntry Path to either a {@code .csproj} file or a published DLL
-         * @return This builder
+         * Explicit entry point for the C# RPC server, primarily for tests.
+         * When set, the server is launched via {@code dotnet run --project <path>}
+         * (for {@code .csproj}) or {@code dotnet <path>} (for DLLs), bypassing
+         * both {@code REWRITE_SOURCE_PATH} and global tool auto-install.
          */
         public Builder csharpServerEntry(Path csharpServerEntry) {
             this.csharpServerEntry = csharpServerEntry;
@@ -271,26 +275,44 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         @Override
         public CSharpRewriteRpc get() {
-            Path entry = findCSharpServerEntry();
             Stream<@Nullable String> cmd;
-            if (entry.toString().endsWith(".csproj")) {
-                cmd = Stream.of(
-                        dotnetPath.toString(),
-                        "run",
-                        "--project", entry.toAbsolutePath().normalize().toString(),
-                        "--framework", "net10.0",
-                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        traceRpcMessages ? "--trace-rpc-messages" : null
-                );
+
+            if (csharpServerEntry != null) {
+                // Explicit override (used by tests)
+                if (csharpServerEntry.toString().endsWith(".csproj")) {
+                    cmd = buildCsprojCommand(csharpServerEntry);
+                } else {
+                    cmd = Stream.of(
+                            dotnetPath.toString(),
+                            csharpServerEntry.toAbsolutePath().normalize().toString(),
+                            log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                            traceRpcMessages ? "--trace-rpc-messages" : null
+                    );
+                }
             } else {
-                cmd = Stream.of(
-                        dotnetPath.toString(),
-                        entry.toAbsolutePath().normalize().toString(),
-                        log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
-                        traceRpcMessages ? "--trace-rpc-messages" : null
-                );
+                // If REWRITE_SOURCE_PATH is set, launch from source via dotnet run
+                String rewriteSourcePath = System.getenv(REWRITE_SOURCE_PATH_ENV);
+                if (rewriteSourcePath != null && !rewriteSourcePath.isEmpty()) {
+                    Path csproj = Paths.get(rewriteSourcePath)
+                            .resolve("rewrite-csharp/csharp/OpenRewrite.Tool/OpenRewrite.Tool.csproj");
+                    if (!Files.exists(csproj)) {
+                        throw new IllegalStateException(
+                                REWRITE_SOURCE_PATH_ENV + " is set to " + rewriteSourcePath +
+                                " but " + csproj + " does not exist");
+                    }
+                    cmd = buildCsprojCommand(csproj);
+                } else {
+                    // Run via dotnet tool exec with the pinned version from the build
+                    String version = StringUtils.readFully(
+                            CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                    cmd = buildToolExecCommand(version);
+                }
             }
 
+            return startProcess(cmd);
+        }
+
+        private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
             RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
 
@@ -306,7 +328,6 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 env.put("DOTNET_EventPipeOutputPath", profileOutputPath.toAbsolutePath().normalize().toString());
                 env.put("DOTNET_EventPipeOutputStreaming", "1");
                 env.put("DOTNET_EventPipeCircularMB", "256");
-                // CPU sampling + GC events + sampled allocations (low rate) + type loading + runtime counters
                 env.put("DOTNET_EventPipeConfig",
                         "Microsoft-DotNETCore-SampleProfiler:0:5;" +
                         "Microsoft-Windows-DotNETRuntime:2088009:4;" +
@@ -316,7 +337,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             process.start();
 
             try {
-                return (CSharpRewriteRpc) new CSharpRewriteRpc(process, marketplace,
+                return (CSharpRewriteRpc) new CSharpRewriteRpc(process, marketplace, resolvers,
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
@@ -326,51 +347,28 @@ public class CSharpRewriteRpc extends RewriteRpc {
             }
         }
 
-        private Path findCSharpServerEntry() {
-            if (csharpServerEntry != null) {
-                return csharpServerEntry;
-            }
+        private Stream<@Nullable String> buildCsprojCommand(Path csproj) {
+            return Stream.of(
+                    dotnetPath.toString(),
+                    "run",
+                    "--project", csproj.toAbsolutePath().normalize().toString(),
+                    "--framework", "net10.0",
+                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    traceRpcMessages ? "--trace-rpc-messages" : null
+            );
+        }
 
-            // Check for globally installed dotnet tool
-            Path toolStore = Paths.get(System.getProperty("user.home"), ".dotnet", "tools", ".store", "openrewrite.csharp");
-            if (Files.isDirectory(toolStore)) {
-                try (Stream<Path> versions = Files.list(toolStore)) {
-                    Optional<Path> dll = versions
-                            .sorted(Comparator.reverseOrder())
-                            .flatMap(versionDir -> {
-                                try {
-                                    return Files.walk(versionDir)
-                                            .filter(p -> p.getFileName().toString().equals("OpenRewrite.dll"));
-                                } catch (IOException e) {
-                                    return Stream.empty();
-                                }
-                            })
-                            .findFirst();
-                    if (dll.isPresent()) {
-                        return dll.get().toAbsolutePath().normalize();
-                    }
-                } catch (IOException ignored) {
-                }
-            }
-
-            // Fall back to development paths relative to working directory
-            Path basePath = workingDirectory != null ? workingDirectory : Paths.get(System.getProperty("user.dir"));
-            Path[] searchPaths = {
-                    basePath.resolve("csharp"),
-                    basePath.resolve("rewrite-csharp/csharp"),
-            };
-
-            for (Path searchPath : searchPaths) {
-                Path csproj = searchPath.resolve("OpenRewrite/OpenRewrite.csproj");
-                if (Files.exists(csproj)) {
-                    return csproj.toAbsolutePath().normalize();
-                }
-            }
-
-            throw new IllegalStateException(
-                    "Could not find C# Rewrite project. Please set csharpServerEntry() on the builder. " +
-                    "Expected to find OpenRewrite.dll in ~/.dotnet/tools/.store/openrewrite.csharp/ " +
-                    "or OpenRewrite/OpenRewrite.csproj in the project directory.");
+        private Stream<@Nullable String> buildToolExecCommand(String version) {
+            return Stream.of(
+                    dotnetPath.toString(),
+                    "tool", "exec",
+                    NUGET_PACKAGE_ID + "@" + version,
+                    "-y",
+                    "--allow-roll-forward",
+                    "--",
+                    log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    traceRpcMessages ? "--trace-rpc-messages" : null
+            );
         }
     }
 }

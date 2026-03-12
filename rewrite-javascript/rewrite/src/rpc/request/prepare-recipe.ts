@@ -58,6 +58,8 @@ export class PrepareRecipe {
 
                     preparedRecipes.set(id, recipe);
 
+                    await this.installSubRecipes(recipe, marketplace);
+
                     const result = {
                         id: id,
                         descriptor: await recipe.descriptor(),
@@ -71,6 +73,15 @@ export class PrepareRecipe {
                 }
             )
         );
+    }
+
+    private static async installSubRecipes(recipe: Recipe, marketplace: RecipeMarketplace) {
+        for (const subRecipe of await recipe.recipeList()) {
+            if (!marketplace.findRecipe(subRecipe.name)) {
+                await marketplace.install(subRecipe.constructor as any, []);
+                await this.installSubRecipes(subRecipe, marketplace);
+            }
+        }
     }
 
     /**

@@ -44,7 +44,12 @@ public class RpcVisitor : JavaVisitor<ExecutionContext>
         var treeId = sf.Id.ToString();
         _rpc.StoreLocalObject(treeId, sf);
 
-        var result = _rpc.VisitOnRemote(_visitorName, treeId, "Cs");
+        // Store the execution context so Java can retrieve it via GetObject
+        var ctxId = Guid.NewGuid().ToString();
+        _rpc.StoreLocalObject(ctxId, ctx);
+
+        var result = _rpc.VisitOnRemote(_visitorName, treeId,
+            "org.openrewrite.csharp.tree.Cs$CompilationUnit", ctxId);
         return result as J;
     }
 }

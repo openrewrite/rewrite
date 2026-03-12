@@ -43,6 +43,15 @@ internal class CSharpTypeMapping
         {
             return MapType(typeInfo.Type);
         }
+
+        // For type references (e.g., in `new X()` or type constraints),
+        // GetTypeInfo may return null. Fall back to GetSymbolInfo.
+        var symbolInfo = _model.GetSymbolInfo(node);
+        if (symbolInfo.Symbol is INamedTypeSymbol namedType)
+        {
+            return MapType(namedType);
+        }
+
         return null;
     }
 

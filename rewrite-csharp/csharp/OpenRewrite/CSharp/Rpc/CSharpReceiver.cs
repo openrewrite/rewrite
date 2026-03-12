@@ -195,19 +195,21 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         q.Receive<object?>(null);
         // Externs: empty list
         q.ReceiveList<JRightPadded<Statement>>([], rp => _delegate.VisitRightPadded(rp, q));
+        // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
+        var existingMembers = cu.Members ?? [];
         // Usings
         var usings = q.ReceiveList(
-            cu.Members.Where(m => m is UsingDirective)
+            existingMembers.Where(m => m is UsingDirective)
                 .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
                 .ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         // AttributeLists
         var attrLists = q.ReceiveList(
-            cu.Members.OfType<AttributeList>().ToList(),
+            existingMembers.OfType<AttributeList>().ToList(),
             t => (AttributeList)VisitNonNull(t, q));
         // Members (non-using, non-attributelist)
         var members = q.ReceiveList(
-            cu.Members.Where(m => m is not UsingDirective && m is not AttributeList)
+            existingMembers.Where(m => m is not UsingDirective && m is not AttributeList)
                 .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
                 .ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
@@ -283,9 +285,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- RefExpression ----
     public override J VisitRefExpression(RefExpression re, RpcReceiveQueue q)
     {
-        var kind = q.Receive<object>(re.Kind);
+        var kind = q.Receive(re.Kind);
         var expression = q.Receive((J)re.Expression, el => (J)VisitNonNull(el, q));
-        return re.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((RefKind)kind!).WithExpression((Expression)expression!);
+        return re.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind(kind).WithExpression((Expression)expression!);
     }
 
     // ---- DeclarationExpression ----
@@ -346,9 +348,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- FixedStatement ----
     public override J VisitFixedStatement(FixedStatement fixedStatement, RpcReceiveQueue q)
     {
-        var declarations = q.Receive((J)fixedStatement.Declarations, el => (J)VisitNonNull(el, q));
+        var declarations = q.Receive(fixedStatement.Declarations, el => (ControlParentheses<VariableDeclarations>)VisitNonNull(el, q));
         var block = q.Receive((J)fixedStatement.Block, el => (J)VisitNonNull(el, q));
-        return fixedStatement.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDeclarations((ControlParentheses<VariableDeclarations>)declarations!).WithBlock((Block)block!);
+        return fixedStatement.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDeclarations(declarations!).WithBlock((Block)block!);
     }
 
     // ---- DefaultExpression ----
@@ -461,13 +463,15 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var name = q.Receive(ns.Name, rp => _delegate.VisitRightPadded(rp, q));
         // Externs
         q.ReceiveList<JRightPadded<Statement>>([], rp => _delegate.VisitRightPadded(rp, q));
+        // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
+        var existingNsMembers = ns.Members ?? [];
         // Usings
         var usings = q.ReceiveList(
-            ns.Members.Where(m => m.Element is UsingDirective).ToList(),
+            existingNsMembers.Where(m => m.Element is UsingDirective).ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         // Members
         var members = q.ReceiveList(
-            ns.Members.Where(m => m.Element is not UsingDirective).ToList(),
+            existingNsMembers.Where(m => m.Element is not UsingDirective).ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         var end = q.Receive(ns.End, space => VisitSpace(space, q));
 
@@ -496,12 +500,13 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- ConditionalDirective ----
     public override J VisitConditionalDirective(ConditionalDirective cd, RpcReceiveQueue q)
     {
-        // Receive DirectiveLines
-        var count = q.Receive<int>(cd.DirectiveLines.Count);
+        // Receive DirectiveLines (may be null for brand-new trees)
+        var existingDirectiveLines = cd.DirectiveLines ?? [];
+        var count = q.Receive<int>(existingDirectiveLines.Count);
         var directiveLines = new List<DirectiveLine>();
         for (int i = 0; i < count; i++)
         {
-            var existing = i < cd.DirectiveLines.Count ? cd.DirectiveLines[i] : null;
+            var existing = i < existingDirectiveLines.Count ? existingDirectiveLines[i] : null;
             var lineNumber = q.Receive<int>(existing?.LineNumber ?? 0);
             var text = q.Receive<string>(existing?.Text ?? "")!;
             var kind = (PreprocessorDirectiveKind)q.Receive<int>((int)(existing?.Kind ?? 0));
@@ -799,8 +804,8 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitCheckedExpression(CheckedExpression che, RpcReceiveQueue q)
     {
         var keyword = q.Receive((J)che.CheckedOrUncheckedKeyword, el => (J)VisitNonNull(el, q));
-        var exprValue = q.Receive((J)che.ExpressionValue, el => (J)VisitNonNull(el, q));
-        return che.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCheckedOrUncheckedKeyword((Keyword)keyword!).WithExpressionValue((ControlParentheses<Expression>)exprValue!);
+        var exprValue = q.Receive(che.ExpressionValue, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
+        return che.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCheckedOrUncheckedKeyword((Keyword)keyword!).WithExpressionValue(exprValue!);
     }
 
     public override J VisitCheckedStatement(CheckedStatement chs, RpcReceiveQueue q)

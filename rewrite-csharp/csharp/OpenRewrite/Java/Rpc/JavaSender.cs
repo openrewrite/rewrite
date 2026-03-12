@@ -589,7 +589,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         return whileLoop;
     }
 
-    public J VisitCatch(Try.Catch tryCatch, RpcSendQueue q)
+    public override J VisitCatch(Try.Catch tryCatch, RpcSendQueue q)
     {
         q.GetAndSend(tryCatch, c => (J)c.Parameter, param => Visit(param, q));
         q.GetAndSend(tryCatch, c => (J)c.Body, body => Visit(body, q));

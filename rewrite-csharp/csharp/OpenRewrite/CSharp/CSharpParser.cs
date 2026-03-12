@@ -6925,7 +6925,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     }
                 }
             }
-            if (!merged) break; // Stop processing further where clauses — remaining text will be in body prefix
+            if (!merged)
+            {
+                _cursor = cursorBeforeClause; // Rewind so unmatched clause text is captured in body prefix
+                break;
+            }
             whereOrder++;
         }
 

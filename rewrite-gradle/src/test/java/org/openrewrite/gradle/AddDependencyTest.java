@@ -901,7 +901,7 @@ class AddDependencyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject("project",
-            srcMainJava(
+            srcTestJava(
               java(usingGuavaIntMath)
             ),
             buildGradle(
@@ -1013,7 +1013,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"api", "compileOnly", "testRuntimeOnly"})
+    @ValueSource(strings = {"api", "compileOnly"})
     void addDependencyToConfiguration(String configuration) {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*", configuration)),
@@ -1050,6 +1050,77 @@ class AddDependencyTest implements RewriteTest {
                     %s "com.fasterxml.jackson.core:jackson-core:2.12.0"
                 }
                 """.formatted(configuration)
+            )
+          )
+        );
+    }
+
+    @Test
+    void testConfigurationDependencyNotAddedWhenTypeOnlyInMainSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*", "testRuntimeOnly")),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void testConfigurationDependencyAddedWhenTypeInTestSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*", "testImplementation")),
+          mavenProject("project",
+            srcTestJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.fasterxml.jackson.core:jackson-core:2.12.0"
+                }
+                """
             )
           )
         );

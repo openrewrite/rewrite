@@ -34,3 +34,4 @@ jobs:
       OPS_GITHUB_ACTIONS_WEBHOOK: ${{ secrets.OPS_GITHUB_ACTIONS_WEBHOOK }}
       node_auth_token: ${{ secrets.NPM_TOKEN }}
       pypi_token: ${{ secrets.PYPI_OPENREWRITE_PUBLISH }}
+      nuget_api_key: ${{ secrets.NUGET_API_KEY }}

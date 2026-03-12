@@ -17,6 +17,7 @@
 export * from "./add-dependency";
 export * from "./async-callback-in-sync-array-method";
 export * from "./auto-format";
+export * from "./remove-dependency";
 export * from "./upgrade-dependency-version";
 export * from "./upgrade-transitive-dependency-version";
 export * from "./order-imports";

@@ -166,6 +166,19 @@ public class RewriteRpc {
             return new RecipeLoader(null).load(id, opts);
         }));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
+        jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
+            @Override
+            protected Boolean handle(Void noParams) {
+                remoteObjects.clear();
+                localObjects.clear();
+                localObjectIds.clear();
+                remoteRefs.clear();
+                localRefs.clear();
+                preparedRecipes.getInstantiated().clear();
+                preparedRecipes.getRecipeCursors().clear();
+                return true;
+            }
+        });
 
         jsonRpc.bind();
     }
@@ -482,8 +495,9 @@ public class RewriteRpc {
             remoteObjects.remove(id);
             throw e;
         }
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
+        RpcObjectData endMarker = q.take();
+        if (endMarker.getState() != END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + endMarker);
         }
 
         //noinspection ConstantValue

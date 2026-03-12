@@ -1,16 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <GenerateProgramFile>false</GenerateProgramFile>
 
     <!-- NuGet package metadata (IsPackable overrides Microsoft.NET.Test.Sdk default) -->
     <IsPackable>true</IsPackable>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>rewrite-csharp</ToolCommandName>
     <PackageId>OpenRewrite.CSharp</PackageId>
     <Version>0.0.0</Version>
     <Authors>Moderne</Authors>
@@ -33,6 +29,7 @@
     <PackageReference Include="Serilog" Version="4.2.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />

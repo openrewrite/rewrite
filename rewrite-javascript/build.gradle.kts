@@ -55,18 +55,25 @@ extensions.configure<NodeExtension> {
     nodeProjectDir.set(projectDir.resolve("rewrite"))
 }
 
-// Read the version from the version.txt written on disk by a prior build, or generate a fresh
-// timestamped version. This ensures the second Gradle invocation (`snapshot publish`) publishes
-// the same version that the first invocation (`build`) baked into the JAR.
-val versionTxt = file("src/main/resources/META-INF/rewrite-javascript-version.txt")
-val datedSnapshotVersion: String = if (System.getenv("CI") != null) {
-    versionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
-        ?: project.version.toString().replace(
-            "SNAPSHOT",
-            LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-        )
+// Generate a timestamped version for CI builds, or use the regular version for local development
+val datedSnapshotVersion = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "SNAPSHOT",
+        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+    )
 } else {
     project.version.toString()
+}
+
+// Helper function to extract version from the JAR if it exists
+fun extractVersionFromJar(): String? {
+    val jarTask = tasks.named("jar", Jar::class).get()
+    val jarFile = jarTask.archiveFile.get().asFile
+    if (!jarFile.exists()) return null
+
+    return zipTree(jarFile).matching {
+        include("META-INF/rewrite-javascript-version.txt")
+    }.singleFile.readText().trim()
 }
 
 val npmVersion = tasks.register<NpmTask>("npmVersion") {
@@ -82,7 +89,9 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
         }
     }
 
-    args = listOf("version", "--no-git-tag-version", datedSnapshotVersion)
+    // Use version from JAR if available (second Gradle invocation), otherwise use generated version
+    val versionToUse = provider { extractVersionFromJar() ?: datedSnapshotVersion }
+    args = listOf("version", "--no-git-tag-version", versionToUse.get())
     workingDir = versionDir
 }
 
@@ -151,7 +160,8 @@ val npmPack = tasks.register<Tar>("npmPack") {
     }
 
     archiveBaseName = "openrewrite-rewrite"
-    archiveVersion = datedSnapshotVersion
+    // Use version from JAR if available (second Gradle invocation), otherwise use generated version
+    archiveVersion = provider { extractVersionFromJar() ?: datedSnapshotVersion }.get()
     compression = Compression.GZIP
     archiveExtension = "tgz"
     destinationDirectory = layout.buildDirectory.dir("distributions")

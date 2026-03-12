@@ -82,7 +82,7 @@ def _next_request_id() -> int:
         return _request_id_counter
 
 
-def send_request(method: str, params: dict, timeout_seconds: float = 10.0) -> Any:
+def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
     """Send a JSON-RPC request to Java and wait for the response.
 
     This enables bidirectional communication - Python can request
@@ -91,7 +91,7 @@ def send_request(method: str, params: dict, timeout_seconds: float = 10.0) -> An
     Args:
         method: The RPC method name
         params: The request parameters
-        timeout_seconds: Maximum time to wait for response (default 10s)
+        timeout_seconds: Maximum time to wait for response (default 30s)
 
     Returns:
         The result from the RPC response
@@ -1275,18 +1275,38 @@ class _StdinBuffer:
     def _fill(self, deadline: Optional[float] = None) -> bool:
         """Read more data into the internal buffer.
 
-        When *deadline* is set, uses ``select()`` to respect the timeout;
-        otherwise blocks in ``os.read()``.  Returns ``False`` on
-        EOF or timeout.
+        When *deadline* is set, uses ``select()`` to respect the timeout
+        on Unix, or a background-thread read on Windows (where ``select()``
+        does not work on pipes).  Returns ``False`` on EOF or timeout.
         """
         if deadline is not None:
             remaining = deadline - time.time()
             if remaining <= 0:
                 return False
-            readable, _, _ = select.select([self._get_fd()], [], [], remaining)
-            if not readable:
-                return False
-        chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
+            if os.name == 'nt':
+                # Windows: select() doesn't support pipes, use a thread
+                result: list = []
+
+                def _read():
+                    try:
+                        data = os.read(self._get_fd(), self._CHUNK_SIZE)
+                        result.append(data)
+                    except OSError:
+                        result.append(b'')
+
+                t = threading.Thread(target=_read, daemon=True)
+                t.start()
+                t.join(timeout=remaining)
+                if not result:
+                    return False
+                chunk = result[0]
+            else:
+                readable, _, _ = select.select([self._get_fd()], [], [], remaining)
+                if not readable:
+                    return False
+                chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
+        else:
+            chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
         if not chunk:
             return False
         self._buf += chunk
