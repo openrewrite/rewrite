@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
+
 namespace OpenRewrite.Core;
 
 /// <summary>
@@ -28,8 +30,29 @@ public sealed class Space(string whitespace, IList<Comment> comments)
     public static readonly Space SingleSpace = new(" ", []);
     public static readonly Space Newline = new("\n", []);
 
+    private const int MaxFlyweightLength = 50;
+    private static readonly ConcurrentDictionary<string, Space> Flyweights = new();
+
+    static Space()
+    {
+        Flyweights[" "] = SingleSpace;
+        Flyweights["\n"] = Newline;
+    }
+
+    private static Space Build(string whitespace, IList<Comment> comments)
+    {
+        if (comments.Count == 0)
+        {
+            if (string.IsNullOrEmpty(whitespace))
+                return Empty;
+            if (whitespace.Length <= MaxFlyweightLength)
+                return Flyweights.GetOrAdd(whitespace, static ws => new Space(ws, []));
+        }
+        return new Space(whitespace, comments);
+    }
+
     public static Space Format(string whitespace) =>
-        string.IsNullOrEmpty(whitespace) ? Empty : new Space(whitespace, []);
+        string.IsNullOrEmpty(whitespace) ? Empty : Build(whitespace, []);
 
     /// <summary>
     /// Parses a formatting string that may contain C-style comments (/* ... */ and // ...)
@@ -162,16 +185,16 @@ public sealed class Space(string whitespace, IList<Comment> comments)
             }
         }
 
-        return comments.Count > 0 ? new Space(ws, comments) : Format(formatting);
+        return comments.Count > 0 ? new Space(ws, comments) : Build(formatting, []);
     }
 
     public bool IsEmpty => string.IsNullOrEmpty(Whitespace) && Comments.Count == 0;
 
     public Space WithWhitespace(string whitespace) =>
-        string.Equals(whitespace, Whitespace, StringComparison.Ordinal) ? this : new(whitespace, Comments);
+        string.Equals(whitespace, Whitespace, StringComparison.Ordinal) ? this : Build(whitespace, Comments);
 
     public Space WithComments(IList<Comment> comments) =>
-        ReferenceEquals(comments, Comments) ? this : new(Whitespace, comments);
+        ReferenceEquals(comments, Comments) ? this : Build(Whitespace, comments);
 }
 
 /// <summary>
