@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
+using OpenRewrite.CSharp.Format;
 using OpenRewrite.Java;
 
 namespace OpenRewrite.CSharp;
@@ -1612,5 +1614,30 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     public virtual J VisitFunctionPointerType(FunctionPointerType functionPointerType, P p)
     {
         return functionPointerType;
+    }
+
+    /// <summary>
+    /// Auto-formats the given tree node using Roslyn within the enclosing compilation unit.
+    /// </summary>
+    protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
+    {
+        return tree.AutoFormat(cursor);
+    }
+
+    /// <summary>
+    /// Auto-formats the given tree node if it differs from the original (before).
+    /// </summary>
+    protected T MaybeAutoFormat<T>(T before, T after, P p, Cursor cursor) where T : class, J
+    {
+        return ReferenceEquals(before, after) ? after : AutoFormat(after, p, cursor);
+    }
+
+    /// <summary>
+    /// Auto-formats the given tree node if it differs from the original (before),
+    /// stopping after the specified node.
+    /// </summary>
+    protected T MaybeAutoFormat<T>(T before, T after, J? stopAfter, P p, Cursor cursor) where T : class, J
+    {
+        return ReferenceEquals(before, after) ? after : after.AutoFormat(cursor, stopAfter);
     }
 }
