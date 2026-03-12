@@ -234,6 +234,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     private int _cursor;
     private readonly SemanticModel? _semanticModel;
     private readonly CSharpTypeMapping? _typeMapping;
+    private readonly Dictionary<string, Space> _spaceCache = new();
 
     /// <summary>
     /// Space before a statement-terminating semicolon, set by statement visitors and
@@ -9036,7 +9037,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var whitespace = _source[_cursor..start];
         _cursor = start;
-        return Space.FormatWithComments(whitespace);
+        return CachedFormat(whitespace);
     }
 
     private static Binary.OperatorType MapBinaryOperator(SyntaxKind kind)
@@ -9087,7 +9088,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var whitespace = _source[_cursor..start];
         _cursor = start;
 
-        return Space.FormatWithComments(whitespace);
+        return CachedFormat(whitespace);
     }
 
     private Space ExtractRemaining()
@@ -9099,7 +9100,18 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var remaining = _source[_cursor..];
         _cursor = _source.Length;
-        return Space.FormatWithComments(remaining);
+        return CachedFormat(remaining);
+    }
+
+    private Space CachedFormat(string whitespace)
+    {
+        if (_spaceCache.TryGetValue(whitespace, out var cached))
+            return cached;
+
+        var space = Space.FormatWithComments(whitespace);
+        if (space.Comments.Count == 0)
+            _spaceCache[whitespace] = space;
+        return space;
     }
 
     private void SkipTo(int position)
