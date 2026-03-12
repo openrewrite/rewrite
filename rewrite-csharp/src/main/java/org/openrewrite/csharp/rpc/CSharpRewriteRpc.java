@@ -23,6 +23,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
@@ -55,8 +56,8 @@ public class CSharpRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
-    CSharpRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, String command, Map<String, String> commandEnv) {
-        super(process.getRpcClient(), marketplace);
+    CSharpRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
+        super(process.getRpcClient(), marketplace, resolvers);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
@@ -186,6 +187,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private static final String REWRITE_SOURCE_PATH_ENV = "REWRITE_SOURCE_PATH";
 
         private RecipeMarketplace marketplace = new RecipeMarketplace();
+        private List<RecipeBundleResolver> resolvers = new ArrayList<>();
         private final Map<String, String> environment = new HashMap<>();
         private Path dotnetPath = Paths.get("dotnet");
         private @Nullable Path csharpServerEntry;
@@ -197,6 +199,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         public Builder marketplace(RecipeMarketplace marketplace) {
             this.marketplace = marketplace;
+            return this;
+        }
+
+        /**
+         * A mutable list of resolvers that will be used by the RPC's PrepareRecipe handler.
+         * Since the list is captured by reference, resolvers added after construction will
+         * be visible to the handler.
+         */
+        public Builder resolvers(List<RecipeBundleResolver> resolvers) {
+            this.resolvers = resolvers;
             return this;
         }
 
@@ -335,7 +347,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             process.start();
 
             try {
-                return (CSharpRewriteRpc) new CSharpRewriteRpc(process, marketplace,
+                return (CSharpRewriteRpc) new CSharpRewriteRpc(process, marketplace, resolvers,
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)

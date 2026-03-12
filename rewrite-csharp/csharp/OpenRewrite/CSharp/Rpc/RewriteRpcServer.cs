@@ -368,8 +368,24 @@ public class RewriteRpcServer
             throw new InvalidOperationException(
                 $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }
-        if (q.Take().State != END_OF_OBJECT)
-            throw new InvalidOperationException("Expected END_OF_OBJECT");
+        var endMarker = q.Take();
+        if (endMarker.State != END_OF_OBJECT)
+        {
+            // Collect remaining items for debugging
+            var remaining = new System.Text.StringBuilder();
+            remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
+            for (int i = 1; i < 20; i++)
+            {
+                try
+                {
+                    var next = q.Take();
+                    remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
+                    if (next.State == END_OF_OBJECT) break;
+                }
+                catch { break; }
+            }
+            throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+        }
 
         if (remoteObject != null)
         {
@@ -682,6 +698,19 @@ public class RewriteRpcServer
         }
     }
 
+    [JsonRpcMethod("GetLanguages")]
+    public Task<string[]> GetLanguages()
+    {
+        return Task.FromResult(new[] { "org.openrewrite.csharp.tree.Cs$CompilationUnit" });
+    }
+
+    [JsonRpcMethod("Generate", UseSingleObjectParameterDeserialization = true)]
+    public Task<GenerateResponse> Generate(GenerateRequest request)
+    {
+        // None of the current C# recipes are ScanningRecipes that generate new files
+        return Task.FromResult(new GenerateResponse());
+    }
+
     [JsonRpcMethod("PrepareRecipe", UseSingleObjectParameterDeserialization = true)]
     public Task<PrepareRecipeResponse> PrepareRecipe(PrepareRecipeRequest request)
     {
@@ -731,7 +760,7 @@ public class RewriteRpcServer
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
-    public Task<VisitResponse> Visit(VisitRequest request)
+    public async Task<VisitResponse> Visit(VisitRequest request)
     {
         // Parse visitor name: "edit:<recipeId>" or "scan:<recipeId>"
         var parts = request.VisitorName.Split(':', 2);
@@ -748,9 +777,15 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
         }
 
-        if (!_localObjects.TryGetValue(request.TreeId, out var obj) || obj is not Tree tree)
+        // Fetch tree from local cache or from the remote (Java) process
+        Tree tree;
+        if (_localObjects.TryGetValue(request.TreeId, out var obj) && obj is Tree localTree)
         {
-            throw new InvalidOperationException($"Tree not found: {request.TreeId}");
+            tree = localTree;
+        }
+        else
+        {
+            tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         }
 
         var ctx = new ExecutionContext();
@@ -763,7 +798,7 @@ public class RewriteRpcServer
             _localObjects[request.TreeId] = result;
         }
 
-        return Task.FromResult(new VisitResponse { Modified = modified });
+        return new VisitResponse { Modified = modified };
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
@@ -993,6 +1028,18 @@ public class InstallRecipesResponse
 {
     public int RecipesInstalled { get; set; }
     public string? Version { get; set; }
+}
+
+public class GenerateRequest
+{
+    public string Id { get; set; } = "";
+    public string P { get; set; } = "";
+}
+
+public class GenerateResponse
+{
+    public List<string> Ids { get; set; } = [];
+    public List<string> SourceFileTypes { get; set; } = [];
 }
 
 public class PrepareRecipeRequest
