@@ -102,13 +102,13 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
         include("*.json")
-        include("jest.config.js")
+        include("vitest.config.mts")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/src"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.files("rewrite/build/test-results/jest/junit.xml")
+    outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
     args = listOf("run", "ci:test")
