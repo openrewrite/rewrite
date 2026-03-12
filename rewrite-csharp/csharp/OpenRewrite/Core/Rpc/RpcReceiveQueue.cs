@@ -370,8 +370,9 @@ public class RpcReceiveQueue
                     field.SetValue(obj, Space.Empty);
                 else if (ft == typeof(Markers))
                     field.SetValue(obj, Markers.Empty);
-                else if (ft == typeof(string))
-                    field.SetValue(obj, "");
+                // Note: do NOT initialize string fields to "" here.
+                // Nullable strings (like SearchResult.Description) must stay null
+                // so that NO_CHANGE messages preserve the null value correctly.
                 else if (ft.IsGenericType)
                 {
                     var gtd = ft.GetGenericTypeDefinition();
