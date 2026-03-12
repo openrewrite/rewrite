@@ -313,7 +313,7 @@ public class RpcSendQueue
     /// Maps a C# type to its equivalent Java type name for RPC protocol compatibility.
     /// Uses namespace-based conventions to derive the Java class name.
     /// </summary>
-    private static string? ToJavaTypeName(Type type)
+    internal static string? ToJavaTypeName(Type type)
     {
         // Check explicit overrides first
         if (JavaTypeNameOverrides.TryGetValue(type, out var overrideName))
