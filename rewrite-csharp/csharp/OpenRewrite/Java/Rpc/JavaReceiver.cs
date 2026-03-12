@@ -81,9 +81,11 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             AssignmentOperation asnOp => VisitAssignmentOperation(asnOp, q),
             Unary un => VisitUnary(un, q),
             Parentheses<Expression> paren => VisitParentheses(paren, q),
+            Parentheses<J> parenj => VisitParenthesesUntyped(parenj, q),
             ControlParentheses<Expression> cp => VisitControlParentheses(cp, q),
             ControlParentheses<TypeTree> cptt => VisitControlParentheses(cptt, q),
             ControlParentheses<VariableDeclarations> cpvd => VisitControlParentheses(cpvd, q),
+            ControlParentheses<J> cpj => VisitControlParenthesesUntyped(cpj, q),
             ExpressionStatement es => VisitExpressionStatement(es, q),
             VariableDeclarations vd => VisitVariableDeclarations(vd, q),
             NamedVariable nv => VisitVariable(nv, q),
@@ -122,8 +124,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     protected void ConsumePreVisit(J j, RpcReceiveQueue q)
     {
         var id = q.ReceiveAndGet<Guid, string>(j.Id, Guid.Parse);
-        var prefix = q.Receive(j.Prefix, space => VisitSpace(space, q))!;
-        var markers = q.Receive(j.Markers)!;
+        // Use safe defaults for shells created by GetUninitializedObject where
+        // delegating properties (e.g. ExpressionStatement.Prefix) may throw
+        Space beforePrefix;
+        Markers beforeMarkers;
+        try { beforePrefix = j.Prefix; } catch { beforePrefix = Space.Empty; }
+        try { beforeMarkers = j.Markers; } catch { beforeMarkers = Markers.Empty; }
+        var prefix = q.Receive(beforePrefix, space => VisitSpace(space, q))!;
+        var markers = q.Receive(beforeMarkers)!;
         _pvStack.Push((id, prefix, markers));
     }
 
@@ -277,6 +285,39 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         return controlParens.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithTree(tree!);
     }
 
+    /// <summary>
+    /// Handles ControlParentheses&lt;J&gt; shells created during ADD-based tree reconstruction.
+    /// Receives the fields and creates a properly-typed ControlParentheses based on the
+    /// actual inner tree element type (Expression, TypeTree, or VariableDeclarations).
+    /// </summary>
+    private J VisitControlParenthesesUntyped(ControlParentheses<J> shell, RpcReceiveQueue q)
+    {
+        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
+        var id = _pvId;
+        var prefix = _pvPrefix;
+        var markers = _pvMarkers;
+
+        // Determine the actual element type from the received tree and create the right closed generic
+        var element = tree?.Element;
+        if (element is Expression)
+        {
+            var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
+            return new ControlParentheses<Expression>(id, prefix, markers, rp);
+        }
+        if (element is TypeTree)
+        {
+            var rp = new JRightPadded<TypeTree>((TypeTree)tree!.Element, tree.After, tree.Markers);
+            return new ControlParentheses<TypeTree>(id, prefix, markers, rp);
+        }
+        if (element is VariableDeclarations)
+        {
+            var rp = new JRightPadded<VariableDeclarations>((VariableDeclarations)tree!.Element, tree.After, tree.Markers);
+            return new ControlParentheses<VariableDeclarations>(id, prefix, markers, rp);
+        }
+        // Fallback: use J as type parameter
+        return new ControlParentheses<J>(id, prefix, markers, tree!);
+    }
+
     public override J VisitDeconstructionPattern(DeconstructionPattern deconstructionPattern, RpcReceiveQueue q)
     {
         var deconstructor = q.Receive((J)deconstructionPattern.Deconstructor, el => (J)VisitNonNull(el, q));
@@ -414,7 +455,10 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var value = q.Receive(literal.Value);
         var valueSource = q.Receive(literal.ValueSource);
-        var unicodeEscapes = q.ReceiveList(literal.UnicodeEscapes, _ => _);
+        var unicodeEscapes = q.ReceiveList(literal.UnicodeEscapes, ue => new Literal.UnicodeEscape(
+            q.Receive(ue?.ValueSourceIndex ?? 0),
+            q.Receive(ue?.CodePoint)
+        ));
         var type = q.Receive(literal.Type, t => (JavaType.Primitive)VisitType(t, q)!);
         return literal.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithValue(value).WithValueSource(valueSource).WithUnicodeEscapes(unicodeEscapes).WithType(type);
     }
@@ -497,15 +541,25 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitPackage(Package pkg, RpcReceiveQueue q)
     {
-        var expression = q.Receive((J)pkg.Expression.Element, el => (J)VisitNonNull(el, q));
+        var expression = q.Receive(pkg.Expression?.Element as J, el => (J)VisitNonNull(el, q));
         var annotations = q.ReceiveList(pkg.Annotations, a => (Annotation)VisitNonNull(a, q));
-        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression(pkg.Expression.WithElement((Expression)expression!)).WithAnnotations(annotations!);
+        var expr = pkg.Expression != null
+            ? pkg.Expression.WithElement((Expression)expression!)
+            : JRightPadded<Expression>.Build((Expression)expression!);
+        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression(expr).WithAnnotations(annotations!);
     }
 
     public J VisitParentheses<T>(Parentheses<T> parentheses, RpcReceiveQueue q) where T : J
     {
         var tree = q.Receive(parentheses.Tree, rp => VisitRightPadded(rp, q));
         return parentheses.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithTree(tree!);
+    }
+
+    private J VisitParenthesesUntyped(Parentheses<J> shell, RpcReceiveQueue q)
+    {
+        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
+        var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
+        return new Parentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
     }
 
     public override J VisitPrimitive(Primitive primitive, RpcReceiveQueue q)
@@ -573,7 +627,16 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var clazz = q.Receive((J)typeCast.Clazz, el => (J)VisitNonNull(el, q));
         var expression = q.Receive((J)typeCast.Expression, el => (J)VisitNonNull(el, q));
-        return typeCast.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithClazz((ControlParentheses<TypeTree>)clazz!).WithExpression((Expression)expression!);
+        // During ADD-based reconstruction, ControlParentheses<Expression> may be returned
+        // instead of ControlParentheses<TypeTree> because the shell was created with a
+        // generic fallback type. Convert if needed.
+        var typedClazz = clazz is ControlParentheses<TypeTree> cpt
+            ? cpt
+            : clazz is ControlParentheses<Expression> cpe
+                ? new ControlParentheses<TypeTree>(cpe.Id, cpe.Prefix, cpe.Markers,
+                    new JRightPadded<TypeTree>((TypeTree)cpe.Tree.Element, cpe.Tree.After, cpe.Tree.Markers))
+                : (ControlParentheses<TypeTree>)clazz!;
+        return typeCast.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithClazz(typedClazz).WithExpression((Expression)expression!);
     }
 
     public virtual J VisitTypeParameters(TypeParameters typeParams, RpcReceiveQueue q)
@@ -631,7 +694,15 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var parameter = q.Receive((J)tryCatch.Parameter, el => (J)VisitNonNull(el, q));
         var body = q.Receive((J)tryCatch.Body, el => (J)VisitNonNull(el, q));
-        return tryCatch.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithParameter((ControlParentheses<VariableDeclarations>)parameter!).WithBody((Block)body!);
+        ControlParentheses<VariableDeclarations> typedParam;
+        if (parameter is ControlParentheses<VariableDeclarations> cpv)
+            typedParam = cpv;
+        else if (parameter is ControlParentheses<Expression> cpe && cpe.Tree.Element is J vdj && vdj is VariableDeclarations vd)
+            typedParam = new ControlParentheses<VariableDeclarations>(cpe.Id, cpe.Prefix, cpe.Markers,
+                new JRightPadded<VariableDeclarations>(vd, cpe.Tree.After, cpe.Tree.Markers));
+        else
+            typedParam = (ControlParentheses<VariableDeclarations>)parameter!;
+        return tryCatch.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithParameter(typedParam).WithBody((Block)body!);
     }
 
     // Helper methods

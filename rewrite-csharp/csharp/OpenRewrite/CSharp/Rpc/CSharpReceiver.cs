@@ -285,9 +285,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- RefExpression ----
     public override J VisitRefExpression(RefExpression re, RpcReceiveQueue q)
     {
-        var kind = q.Receive<object>(re.Kind);
+        var kind = q.Receive(re.Kind);
         var expression = q.Receive((J)re.Expression, el => (J)VisitNonNull(el, q));
-        return re.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind((RefKind)kind!).WithExpression((Expression)expression!);
+        return re.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithKind(kind).WithExpression((Expression)expression!);
     }
 
     // ---- DeclarationExpression ----

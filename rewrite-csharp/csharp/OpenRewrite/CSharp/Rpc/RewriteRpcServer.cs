@@ -368,8 +368,24 @@ public class RewriteRpcServer
             throw new InvalidOperationException(
                 $"Failed to receive object {id} (type: {sourceFileType}): {ex.Message}\n{ex.StackTrace}", ex);
         }
-        if (q.Take().State != END_OF_OBJECT)
-            throw new InvalidOperationException("Expected END_OF_OBJECT");
+        var endMarker = q.Take();
+        if (endMarker.State != END_OF_OBJECT)
+        {
+            // Collect remaining items for debugging
+            var remaining = new System.Text.StringBuilder();
+            remaining.Append($"[0] State={endMarker.State}, Value={endMarker.Value}, ValueType={endMarker.ValueType}");
+            for (int i = 1; i < 20; i++)
+            {
+                try
+                {
+                    var next = q.Take();
+                    remaining.Append($" | [{i}] State={next.State}, Value={next.Value}, ValueType={next.ValueType}");
+                    if (next.State == END_OF_OBJECT) break;
+                }
+                catch { break; }
+            }
+            throw new InvalidOperationException($"Expected END_OF_OBJECT. Remaining: {remaining}");
+        }
 
         if (remoteObject != null)
         {
@@ -682,6 +698,19 @@ public class RewriteRpcServer
         }
     }
 
+    [JsonRpcMethod("GetLanguages")]
+    public Task<string[]> GetLanguages()
+    {
+        return Task.FromResult(new[] { "org.openrewrite.csharp.tree.Cs$CompilationUnit" });
+    }
+
+    [JsonRpcMethod("Generate", UseSingleObjectParameterDeserialization = true)]
+    public Task<GenerateResponse> Generate(GenerateRequest request)
+    {
+        // None of the current C# recipes are ScanningRecipes that generate new files
+        return Task.FromResult(new GenerateResponse());
+    }
+
     [JsonRpcMethod("PrepareRecipe", UseSingleObjectParameterDeserialization = true)]
     public Task<PrepareRecipeResponse> PrepareRecipe(PrepareRecipeRequest request)
     {
@@ -731,7 +760,7 @@ public class RewriteRpcServer
     }
 
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
-    public Task<VisitResponse> Visit(VisitRequest request)
+    public async Task<VisitResponse> Visit(VisitRequest request)
     {
         // Parse visitor name: "edit:<recipeId>" or "scan:<recipeId>"
         var parts = request.VisitorName.Split(':', 2);
@@ -748,9 +777,15 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
         }
 
-        if (!_localObjects.TryGetValue(request.TreeId, out var obj) || obj is not Tree tree)
+        // Fetch tree from local cache or from the remote (Java) process
+        Tree tree;
+        if (_localObjects.TryGetValue(request.TreeId, out var obj) && obj is Tree localTree)
         {
-            throw new InvalidOperationException($"Tree not found: {request.TreeId}");
+            tree = localTree;
+        }
+        else
+        {
+            tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         }
 
         var ctx = new ExecutionContext();
@@ -763,7 +798,7 @@ public class RewriteRpcServer
             _localObjects[request.TreeId] = result;
         }
 
-        return Task.FromResult(new VisitResponse { Modified = modified });
+        return new VisitResponse { Modified = modified };
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
@@ -927,11 +962,17 @@ public class RecipeDescriptorDto
 {
     public string Name { get; set; } = "";
     public string DisplayName { get; set; } = "";
+    public string InstanceName { get; set; } = "";
     public string Description { get; set; } = "";
-    public HashSet<string>? Tags { get; set; }
+    public HashSet<string> Tags { get; set; } = [];
     public string? EstimatedEffortPerOccurrence { get; set; }
-    public List<OptionDescriptorDto>? Options { get; set; }
-    public List<RecipeDescriptorDto>? RecipeList { get; set; }
+    public List<OptionDescriptorDto> Options { get; set; } = [];
+    public List<RecipeDescriptorDto> Preconditions { get; set; } = [];
+    public List<RecipeDescriptorDto> RecipeList { get; set; } = [];
+    public List<object> DataTables { get; set; } = [];
+    public List<object> Maintainers { get; set; } = [];
+    public List<object> Contributors { get; set; } = [];
+    public List<object> Examples { get; set; } = [];
 
     public static RecipeDescriptorDto FromDescriptor(RecipeDescriptor d)
     {
@@ -939,15 +980,14 @@ public class RecipeDescriptorDto
         {
             Name = d.Name,
             DisplayName = d.DisplayName,
+            InstanceName = d.Name,
             Description = d.Description,
-            Tags = d.Tags.Count > 0 ? new HashSet<string>(d.Tags) : null,
-            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence?.ToString(),
-            Options = d.Options.Count > 0
-                ? d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList()
+            Tags = new HashSet<string>(d.Tags),
+            EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence is { } ts
+                ? System.Xml.XmlConvert.ToString(ts) // ISO-8601 duration (e.g. "PT5M")
                 : null,
-            RecipeList = d.RecipeList.Count > 0
-                ? d.RecipeList.Select(FromDescriptor).ToList()
-                : null
+            Options = d.Options.Select(OptionDescriptorDto.FromDescriptor).ToList(),
+            RecipeList = d.RecipeList.Select(FromDescriptor).ToList()
         };
     }
 }
@@ -990,6 +1030,18 @@ public class InstallRecipesResponse
     public string? Version { get; set; }
 }
 
+public class GenerateRequest
+{
+    public string Id { get; set; } = "";
+    public string P { get; set; } = "";
+}
+
+public class GenerateResponse
+{
+    public List<string> Ids { get; set; } = [];
+    public List<string> SourceFileTypes { get; set; } = [];
+}
+
 public class PrepareRecipeRequest
 {
     public string Id { get; set; } = "";
@@ -1001,7 +1053,9 @@ public class PrepareRecipeResponse
     public string Id { get; set; } = "";
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public string EditVisitor { get; set; } = "";
+    public List<object> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
+    public List<object> ScanPreconditions { get; set; } = [];
 }
 
 public class VisitRequest
