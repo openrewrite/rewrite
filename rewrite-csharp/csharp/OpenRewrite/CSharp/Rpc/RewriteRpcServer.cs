@@ -1094,7 +1094,7 @@ public class RecipeDescriptorDto
         {
             Name = d.Name,
             DisplayName = d.DisplayName,
-            InstanceName = d.Name,
+            InstanceName = d.DisplayName,
             Description = d.Description,
             Tags = new HashSet<string>(d.Tags),
             EstimatedEffortPerOccurrence = d.EstimatedEffortPerOccurrence is { } ts
@@ -1155,9 +1155,15 @@ public class PrepareRecipeResponse
     public string Id { get; set; } = "";
     public RecipeDescriptorDto Descriptor { get; set; } = null!;
     public string EditVisitor { get; set; } = "";
-    public List<object> EditPreconditions { get; set; } = [];
+    public List<Precondition> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
-    public List<object> ScanPreconditions { get; set; } = [];
+    public List<Precondition> ScanPreconditions { get; set; } = [];
+}
+
+public class Precondition
+{
+    public string VisitorName { get; set; } = "";
+    public Dictionary<string, object> VisitorOptions { get; set; } = [];
 }
 
 public class GenerateRequest
