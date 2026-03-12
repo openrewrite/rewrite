@@ -710,11 +710,6 @@ export interface DebugLogEntry {
     scope: 'matching' | 'comparison' | 'constraint';
 
     /**
-     * Path in the AST where this log entry was generated.
-     */
-    path: string[];
-
-    /**
      * Human-readable message.
      */
     message: string;
@@ -736,11 +731,6 @@ export interface MatchExplanation {
     reason: 'structural-mismatch' | 'constraint-failed' | 'type-mismatch' | 'kind-mismatch' | 'value-mismatch' | 'array-length-mismatch';
 
     /**
-     * Path in the AST where the failure occurred (e.g., ['select', 'name']).
-     */
-    path: string[];
-
-    /**
      * Human-readable description of what was expected.
      */
     expected: string;
@@ -749,6 +739,18 @@ export interface MatchExplanation {
      * Human-readable description of what was actually found.
      */
     actual: string;
+
+    /**
+     * The actual pattern element that failed to match.
+     * Used for debug visualization - attach markers to this element.
+     */
+    patternElement?: any;
+
+    /**
+     * The actual target element that failed to match.
+     * Used for debug visualization - attach markers to this element.
+     */
+    targetElement?: any;
 
     /**
      * For constraint failures, details about which constraints failed.
@@ -814,4 +816,17 @@ export interface MatchAttemptResult {
      * Debug log entries collected during matching (if debug was enabled).
      */
     debugLog?: DebugLogEntry[];
+
+    /**
+     * Cursors from the comparator (for debug visualization).
+     * @internal
+     */
+    patternCursor?: Cursor;
+    targetCursor?: Cursor;
+
+    /**
+     * The actual pattern AST that was used during matching (for debug visualization).
+     * @internal
+     */
+    patternAst?: any;
 }

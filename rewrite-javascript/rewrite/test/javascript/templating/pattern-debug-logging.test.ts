@@ -49,7 +49,8 @@ describe('Pattern Debug Logging', () => {
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
         expect(calls.some(c => c.includes('✅ SUCCESS matching against'))).toBe(true);
-        expect(calls.some(c => c.includes("Captured 'value'"))).toBe(true);
+        expect(calls.some(c => c.includes("Captures:"))).toBe(true);
+        expect(calls.some(c => c.includes("= 🪝value"))).toBe(true);
     });
 
     test('pattern-level debug: pattern({ debug: true })', async () => {
@@ -140,8 +141,8 @@ describe('Pattern Debug Logging', () => {
         await pat.match(node, undefined!);
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        // First line should show pattern source with ID
-        expect(calls.some(c => c.match(/\[Pattern #\d+\] foo\(\$\{x\}, \$\{y\}\)/))).toBe(true);
+        // First line should show pattern source with ID (captures prefixed with 🪝)
+        expect(calls.some(c => c.match(/\[Pattern #\d+\] foo\(\$\{🪝x\}, \$\{🪝y\}\)/))).toBe(true);
     });
 
     test('variadic captures show array format', async () => {
@@ -154,12 +155,11 @@ describe('Pattern Debug Logging', () => {
         expect(match).toBeDefined();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        const capturedLine = calls.find(c => c.includes("Captured"));
-        expect(capturedLine).toContain('[');
-        expect(capturedLine).toContain(']');
+        // With the new format, variadic captures are shown in the legend
+        expect(calls.some(c => c.includes("Captures:"))).toBe(true);
     });
 
-    test('shows path for nested mismatch', async () => {
+    test('shows matched tree with mismatch highlighted', async () => {
         const x = capture('x');
         const y = capture('y');
         const pat = pattern({ debug: true })`${x} + ${y}`;
@@ -174,8 +174,10 @@ describe('Pattern Debug Logging', () => {
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
         calls.forEach((call, i) => console.log(`${i}: ${call}`));
 
-        // Should show path and operator mismatch
-        expect(calls.some(c => c.includes('At path:'))).toBe(true);
+        // Should show matched tree and mismatch reason
+        expect(calls.some(c => c.includes('Matched tree'))).toBe(true);
         expect(calls.some(c => c.includes('Reason:'))).toBe(true);
+        expect(calls.some(c => c.includes('Expected:'))).toBe(true);
+        expect(calls.some(c => c.includes('Actual:'))).toBe(true);
     });
 });
