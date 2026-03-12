@@ -18,7 +18,8 @@
 import {describe} from "@jest/globals";
 import {RecipeSpec} from "../../../../src/test";
 import {MomentToTemporal} from "../../../../src/javascript/migrate/moment/moment-to-temporal";
-import {typescript} from "../../../../src/javascript";
+import {npm, packageJson, typescript} from "../../../../src/javascript";
+import {withDir} from "tmp-promise";
 
 describe("moment-to-temporal", () => {
     const spec = new RecipeSpec();
@@ -236,4 +237,32 @@ describe("moment-to-temporal", () => {
             )
         );
     }, 60000);
+});
+
+describe("moment-to-temporal (with type attribution)", () => {
+    const spec = new RecipeSpec();
+    spec.recipe = new MomentToTemporal();
+
+    test(".add(n, 'days') with npm dependencies", async () => {
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    //language=typescript
+                    typescript(
+                        `import moment from 'moment';\nconst d = moment(date).add(5, 'days');`,
+                        `const d = Temporal.PlainDateTime.from(date).add({days: 5});`
+                    ),
+                    //language=json
+                    packageJson(`{
+                        "name": "test",
+                        "version": "1.0.0",
+                        "dependencies": {
+                            "moment": "^2.30.0"
+                        }
+                    }`)
+                )
+            );
+        }, {unsafeCleanup: true});
+    }, 120000);
 });

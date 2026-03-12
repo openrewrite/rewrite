@@ -184,14 +184,16 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     private addSubtractRule(methodName: 'add' | 'subtract'): RewriteRule {
         return rewrite(() => {
-            const obj = capture('obj');
+            const obj = capture({name: 'obj', type: 'Temporal.PlainDateTime'});
             const amount = capture('amount');
             const unit = capture({
                 name: 'unit',
                 constraint: (n: any) => isLiteral(n) && typeof n.value === 'string' && UNIT_MAP[n.value] !== undefined
             });
             return {
-                before: pattern`${obj}.${raw(methodName)}(${amount}, ${unit})`,
+                before: pattern`${obj}.${raw(methodName)}(${amount}, ${unit})`.configure({
+                    lenientTypeMatching: false
+                }),
                 after: (match) => {
                     const unitStr = (match.get('unit') as J.Literal).value as string;
                     return template`${obj}.${raw(methodName)}({${raw(UNIT_MAP[unitStr])}: ${amount}})`;
