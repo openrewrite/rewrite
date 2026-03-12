@@ -1730,7 +1730,7 @@ public class GroovyParserVisitor {
                 for (int i = 0; i < tupleExpressions.size(); i++) {
                     VariableExpression varExpr = (VariableExpression) tupleExpressions.get(i);
                     TypeTree innerType = visitVariableExpressionType(varExpr);
-                    J.Identifier name = visit(varExpr);
+                    J.Identifier name = doVisit(varExpr);
                     J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
                             randomId(),
                             name.getPrefix(),
@@ -1759,7 +1759,7 @@ public class GroovyParserVisitor {
 
                 if (!(expression.getRightExpression() instanceof EmptyExpression)) {
                     Space beforeAssign = sourceBefore("=");
-                    Expression initializer = visit(expression.getRightExpression());
+                    Expression initializer = doVisit(expression.getRightExpression());
                     namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
                 }
 
