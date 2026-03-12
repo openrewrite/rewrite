@@ -68,21 +68,16 @@ public class AddSettingsPluginRepository extends Recipe {
         return Preconditions.check(new IsSettingsGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
-                    if (!repositoryExists(tree, ctx)) {
-                        if (tree instanceof G.CompilationUnit) {
-                            return visitCompilationUnit((G.CompilationUnit) tree, ctx);
-                        }
-                        if (tree instanceof K.CompilationUnit) {
-                            return visitCompilationUnit((K.CompilationUnit) tree, ctx);
-                        }
+                if (tree instanceof JavaSourceFile &&
+                        tree == new FindRepository(type, url, FindRepository.Purpose.Plugin).getVisitor().visit(tree, ctx)) {
+                    if (tree instanceof G.CompilationUnit) {
+                        return visitCompilationUnit((G.CompilationUnit) tree, ctx);
+                    }
+                    if (tree instanceof K.CompilationUnit) {
+                        return visitCompilationUnit((K.CompilationUnit) tree, ctx);
                     }
                 }
                 return super.visit(tree, ctx);
-            }
-
-            private boolean repositoryExists(Tree tree, ExecutionContext ctx) {
-                return tree != new FindRepository(type, url, FindRepository.Purpose.Plugin).getVisitor().visit(tree, ctx);
             }
 
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit g, ExecutionContext ctx) {
