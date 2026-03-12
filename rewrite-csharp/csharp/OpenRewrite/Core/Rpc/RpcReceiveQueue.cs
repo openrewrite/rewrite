@@ -370,6 +370,9 @@ public class RpcReceiveQueue
                     field.SetValue(obj, Space.Empty);
                 else if (ft == typeof(Markers))
                     field.SetValue(obj, Markers.Empty);
+                // Note: do NOT initialize string fields to "" here.
+                // Nullable strings (like SearchResult.Description) must stay null
+                // so that NO_CHANGE messages preserve the null value correctly.
                 else if (ft.IsGenericType)
                 {
                     var gtd = ft.GetGenericTypeDefinition();
@@ -441,6 +444,8 @@ public class RpcReceiveQueue
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
+            "org.openrewrite.Checksum" => typeof(Checksum),
+            "org.openrewrite.FileAttributes" => typeof(FileAttributes),
 
             // Special C# type name overrides (reverse of RpcSendQueue.RegisterJavaTypeName)
             "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration" =>

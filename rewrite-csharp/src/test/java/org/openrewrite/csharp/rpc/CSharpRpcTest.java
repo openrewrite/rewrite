@@ -221,8 +221,8 @@ class CSharpRpcTest {
 
         Cs.CompilationUnit cu = (Cs.CompilationUnit) parsed;
 
-        // Verify usings were parsed
-        assertThat(cu.getUsings()).hasSize(3);
+        // Verify usings were parsed (usings are in the flat members list)
+        assertThat(cu.getMembers().stream().filter(m -> m instanceof Cs.UsingDirective).count()).isEqualTo(3);
 
         // Verify print roundtrip
         String printed = rpc.print(parsed);
@@ -775,8 +775,11 @@ class CSharpRpcTest {
         Cs.CompilationUnit cu = (Cs.CompilationUnit) parsed;
         assertThat(cu.getMembers()).isNotEmpty();
 
-        // Find the namespace declaration
-        Statement namespaceMember = cu.getMembers().getFirst();
+        // Find the namespace declaration (skip usings in flat members list)
+        Statement namespaceMember = cu.getMembers().stream()
+                .filter(m -> !(m instanceof Cs.UsingDirective))
+                .findFirst()
+                .orElseThrow();
 
         // Find the class declaration within the namespace
         J.ClassDeclaration classDecl = findFirst(namespaceMember, J.ClassDeclaration.class);
