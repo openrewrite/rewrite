@@ -17,7 +17,7 @@ import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
 import type {Pattern} from "./pattern";
 import type {Template} from "./template";
-import type {CaptureValue, RawCode} from "./capture";
+import type {CaptureValue, DerivedCapture, RawCode} from "./capture";
 
 /**
  * Options for variadic captures that match zero or more nodes in a sequence.
@@ -420,6 +420,7 @@ export interface MatchOptions {
 export type TemplateParameter =
     Capture
     | CaptureValue
+    | DerivedCapture
     | TemplateParam
     | RawCode
     | Tree

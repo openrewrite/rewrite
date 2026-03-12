@@ -26,7 +26,7 @@ import {
     MatchResult as IMatchResult,
     PatternOptions
 } from './types';
-import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
+import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, DerivedCapture, DERIVED_CAPTURE_SYMBOL, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
 import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {TemplateEngine} from './engine';
@@ -1090,6 +1090,14 @@ function createPattern(
     captures: (Capture | Any<any> | RawCode | string)[],
     options: PatternOptions
 ): Pattern {
+    // Validate that no DerivedCapture is used in a pattern
+    for (const c of captures) {
+        if (c instanceof DerivedCapture ||
+            (c && typeof c === 'object' && (c as any)[DERIVED_CAPTURE_SYMBOL])) {
+            throw new Error('DerivedCapture cannot be used in patterns. Derived captures are only valid in templates.');
+        }
+    }
+
     const capturesByName = captures.reduce((map, c) => {
         // Skip raw code - it's not a capture
         if (c instanceof RawCode || (typeof c === 'object' && c && (c as any)[RAW_CODE_SYMBOL])) {
