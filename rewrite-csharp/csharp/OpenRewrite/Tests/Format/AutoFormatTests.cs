@@ -127,6 +127,41 @@ public class AutoFormatTests
     }
 
     [Fact]
+    public void WellFormattedCodeReturnsReferentiallyIdenticalTree()
+    {
+        const string source = """
+            using System;
+
+            namespace Test
+            {
+                public class Foo
+                {
+                    private int _x;
+
+                    public int Add(int a, int b)
+                    {
+                        var result = a + b;
+                        _x = result;
+                        return result;
+                    }
+
+                    public void DoNothing()
+                    {
+                    }
+                }
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+        var formatted = RoslynFormatter.Format(cu);
+
+        // When source is already well-formatted, the formatter should short-circuit
+        // and return the exact same object — no parse, no reconcile, no allocation
+        Assert.True(ReferenceEquals(cu, formatted),
+            "Expected the same object reference when formatting already well-formatted code");
+    }
+
+    [Fact]
     public void FormatStyleDetectsSpaces()
     {
         const string source = """
