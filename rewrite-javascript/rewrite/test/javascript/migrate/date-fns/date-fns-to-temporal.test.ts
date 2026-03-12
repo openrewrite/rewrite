@@ -199,7 +199,7 @@ describe("date-fns-to-temporal", () => {
             //language=typescript
             typescript(
                 `import { endOfMonth } from 'date-fns';\nconst result = endOfMonth(date);`,
-                `const result = ((d) => d.with({day: d.daysInMonth}))(Temporal.PlainDate.from(date));`
+                `const result = ((d) => d.with({day: d.daysInMonth}).toPlainDateTime({hour: 23, minute: 59, second: 59, millisecond: 999}))(Temporal.PlainDate.from(date));`
             )
         );
     }, 60000);

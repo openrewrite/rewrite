@@ -23,14 +23,14 @@ import {capture, Template} from "../../templating/index";
 import {maybeRemoveImport} from "../../remove-import";
 
 const UNIT_MAP: Record<string, string> = {
-    'years': 'years', 'y': 'years',
-    'months': 'months', 'M': 'months',
-    'weeks': 'weeks', 'w': 'weeks',
-    'days': 'days', 'd': 'days',
-    'hours': 'hours', 'h': 'hours',
-    'minutes': 'minutes', 'm': 'minutes',
-    'seconds': 'seconds', 's': 'seconds',
-    'milliseconds': 'milliseconds', 'ms': 'milliseconds',
+    'years': 'years', 'year': 'years', 'y': 'years',
+    'months': 'months', 'month': 'months', 'M': 'months',
+    'weeks': 'weeks', 'week': 'weeks', 'w': 'weeks',
+    'days': 'days', 'day': 'days', 'd': 'days',
+    'hours': 'hours', 'hour': 'hours', 'h': 'hours',
+    'minutes': 'minutes', 'minute': 'minutes', 'm': 'minutes',
+    'seconds': 'seconds', 'second': 'seconds', 's': 'seconds',
+    'milliseconds': 'milliseconds', 'millisecond': 'milliseconds', 'ms': 'milliseconds',
 };
 
 // Moment's startOf() zeroes time components; round-trip through PlainDate to achieve this

@@ -119,6 +119,16 @@ describe("moment-to-temporal", () => {
         );
     }, 60000);
 
+    test(".add(n, 'day') singular", () => {
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `import moment from 'moment';\nconst d = moment(date).add(1, 'day');`,
+                `const d = Temporal.PlainDateTime.from(date).add({days: 1});`
+            )
+        );
+    }, 60000);
+
     test(".subtract(n, 'hours')", () => {
         return spec.rewriteRun(
             //language=typescript

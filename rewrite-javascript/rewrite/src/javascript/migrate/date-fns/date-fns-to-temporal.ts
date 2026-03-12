@@ -272,7 +272,7 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
 
         // Use IIFE to avoid referencing .daysInMonth on the unconverted input
         const tmpl = Template.builder()
-            .code('((d) => d.with({day: d.daysInMonth}))(Temporal.PlainDate.from(')
+            .code('((d) => d.with({day: d.daysInMonth}).toPlainDateTime({hour: 23, minute: 59, second: 59, millisecond: 999}))(Temporal.PlainDate.from(')
             .param(date)
             .code('))')
             .build();
