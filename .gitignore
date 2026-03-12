@@ -35,3 +35,5 @@ dist/
 .venv/
 .context/
 CLAUDE.local.md
+
+/.claude/settings.local.json

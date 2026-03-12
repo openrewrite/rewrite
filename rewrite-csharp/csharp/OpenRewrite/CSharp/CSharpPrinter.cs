@@ -2463,6 +2463,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             AssignmentOperation.OperatorType.RightShift => ">>=",
             AssignmentOperation.OperatorType.UnsignedRightShift => ">>>=",
             AssignmentOperation.OperatorType.Coalesce => "??=",
+            AssignmentOperation.OperatorType.NullCoalescing => "??=",
             _ => throw new InvalidOperationException($"Unknown assignment operator: {op}")
         };
     }

@@ -202,13 +202,84 @@ val csharpPublish by tasks.registering(Exec::class) {
 // Usage: ./gradlew :rewrite-csharp:csharpPublishLocal
 val csharpPublishLocal by tasks.registering {
     group = "csharp"
-    description = "Pack and publish C# SDK library to local NuGet feed (~/.nuget/local-feed/)"
+    description = "Pack and install C# NuGet packages into local NuGet cache"
 
     dependsOn(csharpPack)
 
-    val localFeed = file("${System.getProperty("user.home")}/.nuget/local-feed")
-
     doLast {
+        val dotnet = findDotnet()
+        val distDir = csharpDir.resolve("dist").absolutePath
+
+        fun run(vararg args: String, dir: File? = null, ignoreExitCode: Boolean = false): String {
+            val pb = ProcessBuilder(*args)
+                .redirectErrorStream(true)
+            if (dir != null) pb.directory(dir)
+            val proc = pb.start()
+            val output = proc.inputStream.bufferedReader().readText()
+            val exitCode = proc.waitFor()
+            if (exitCode != 0 && !ignoreExitCode) {
+                throw GradleException("Command failed (exit $exitCode): ${args.joinToString(" ")}\n$output")
+            }
+            return output
+        }
+
+        // Find NuGet global-packages cache path
+        val localsOutput = run(dotnet, "nuget", "locals", "global-packages", "--list")
+        val cachePath = localsOutput.trim().substringAfter("global-packages: ")
+
+        // Install each nupkg into the NuGet cache
+        csharpDir.resolve("dist").listFiles()
+            ?.filter { it.name.endsWith(".nupkg") }
+            ?.forEach { nupkg ->
+                // Extract package ID and version from filename (e.g. OpenRewrite.CSharp.8.76.0-snapshot.20260311.nupkg)
+                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
+                // NuGet package filenames are PackageId.Version.nupkg
+                // Find the version part by matching the nugetVersion suffix
+                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
+
+                // Clear the specific version from cache
+                val packageCacheDir = file("$cachePath/${packageId.lowercase()}/$nugetVersion")
+                if (packageCacheDir.exists()) {
+                    logger.lifecycle("Clearing cached: ${packageCacheDir.absolutePath}")
+                    packageCacheDir.deleteRecursively()
+                }
+            }
+
+        // Create a temp project and add packages to populate the NuGet cache
+        val tempDir = temporaryDir
+        tempDir.deleteRecursively()
+        tempDir.mkdirs()
+
+        val tempCsproj = tempDir.resolve("Temp.csproj")
+        tempCsproj.writeText("""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+        """.trimIndent())
+
+        csharpDir.resolve("dist").listFiles()
+            ?.filter { it.name.endsWith(".nupkg") }
+            ?.forEach { nupkg ->
+                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
+                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
+
+                logger.lifecycle("Installing $packageId@$nugetVersion into NuGet cache from $distDir")
+                // Tool packages (DotnetTool type) fail restore with NU1212 but still get
+                // installed into the NuGet cache, which is all we need for dotnet tool exec.
+                val addOutput = run(
+                    dotnet, "add", "package", packageId,
+                    "--version", nugetVersion,
+                    "--source", distDir,
+                    dir = tempDir,
+                    ignoreExitCode = true
+                )
+                logger.lifecycle(addOutput)
+            }
+
+        // Also copy to local-feed for cross-repo consumption
+        val localFeed = file("${System.getProperty("user.home")}/.nuget/local-feed")
         localFeed.mkdirs()
         csharpDir.resolve("dist").listFiles()
             ?.filter { it.name.endsWith(".nupkg") }
@@ -218,6 +289,11 @@ val csharpPublishLocal by tasks.registering {
                 logger.lifecycle("Published ${nupkg.name} to ${localFeed.absolutePath}")
             }
     }
+}
+
+// Wire publishToMavenLocal to also publish the NuGet packages locally
+tasks.named("publishToMavenLocal") {
+    dependsOn(csharpPublishLocal)
 }
 
 // Wire into the main publish task only when the NuGet API key is available

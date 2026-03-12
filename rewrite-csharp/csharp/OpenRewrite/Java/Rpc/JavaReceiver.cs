@@ -81,6 +81,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             AssignmentOperation asnOp => VisitAssignmentOperation(asnOp, q),
             Unary un => VisitUnary(un, q),
             Parentheses<Expression> paren => VisitParentheses(paren, q),
+            Parentheses<J> parenj => VisitParenthesesUntyped(parenj, q),
             ControlParentheses<Expression> cp => VisitControlParentheses(cp, q),
             ControlParentheses<TypeTree> cptt => VisitControlParentheses(cptt, q),
             ControlParentheses<VariableDeclarations> cpvd => VisitControlParentheses(cpvd, q),
@@ -122,8 +123,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     protected void ConsumePreVisit(J j, RpcReceiveQueue q)
     {
         var id = q.ReceiveAndGet<Guid, string>(j.Id, Guid.Parse);
-        var prefix = q.Receive(j.Prefix, space => VisitSpace(space, q))!;
-        var markers = q.Receive(j.Markers)!;
+        // Use safe defaults for shells created by GetUninitializedObject where
+        // delegating properties (e.g. ExpressionStatement.Prefix) may throw
+        Space beforePrefix;
+        Markers beforeMarkers;
+        try { beforePrefix = j.Prefix; } catch { beforePrefix = Space.Empty; }
+        try { beforeMarkers = j.Markers; } catch { beforeMarkers = Markers.Empty; }
+        var prefix = q.Receive(beforePrefix, space => VisitSpace(space, q))!;
+        var markers = q.Receive(beforeMarkers)!;
         _pvStack.Push((id, prefix, markers));
     }
 
@@ -388,10 +395,10 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitIf(If iff, RpcReceiveQueue q)
     {
-        var condition = q.Receive((J)iff.Condition, el => (J)VisitNonNull(el, q));
+        var condition = q.Receive(iff.Condition, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
         var thenPart = q.Receive(iff.ThenPart, rp => VisitRightPadded(rp, q));
         var elsePart = q.Receive((J?)iff.ElsePart, el => (J)VisitNonNull(el!, q));
-        return iff.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithCondition((ControlParentheses<Expression>)condition!).WithThenPart(thenPart!).WithElsePart((If.Else?)elsePart);
+        return iff.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithCondition(condition!).WithThenPart(thenPart!).WithElsePart((If.Else?)elsePart);
     }
 
     public override J VisitLambda(Lambda lambda, RpcReceiveQueue q)
@@ -414,7 +421,10 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var value = q.Receive(literal.Value);
         var valueSource = q.Receive(literal.ValueSource);
-        var unicodeEscapes = q.ReceiveList(literal.UnicodeEscapes, _ => _);
+        var unicodeEscapes = q.ReceiveList(literal.UnicodeEscapes, ue => new Literal.UnicodeEscape(
+            q.Receive(ue?.ValueSourceIndex ?? 0),
+            q.Receive(ue?.CodePoint)
+        ));
         var type = q.Receive(literal.Type, t => (JavaType.Primitive)VisitType(t, q)!);
         return literal.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithValue(value).WithValueSource(valueSource).WithUnicodeEscapes(unicodeEscapes).WithType(type);
     }
@@ -497,15 +507,25 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitPackage(Package pkg, RpcReceiveQueue q)
     {
-        var expression = q.Receive((J)pkg.Expression.Element, el => (J)VisitNonNull(el, q));
+        var expression = q.Receive(pkg.Expression?.Element as J, el => (J)VisitNonNull(el, q));
         var annotations = q.ReceiveList(pkg.Annotations, a => (Annotation)VisitNonNull(a, q));
-        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression(pkg.Expression.WithElement((Expression)expression!)).WithAnnotations(annotations!);
+        var expr = pkg.Expression != null
+            ? pkg.Expression.WithElement((Expression)expression!)
+            : JRightPadded<Expression>.Build((Expression)expression!);
+        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression(expr).WithAnnotations(annotations!);
     }
 
     public J VisitParentheses<T>(Parentheses<T> parentheses, RpcReceiveQueue q) where T : J
     {
         var tree = q.Receive(parentheses.Tree, rp => VisitRightPadded(rp, q));
         return parentheses.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithTree(tree!);
+    }
+
+    private J VisitParenthesesUntyped(Parentheses<J> shell, RpcReceiveQueue q)
+    {
+        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
+        var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
+        return new Parentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
     }
 
     public override J VisitPrimitive(Primitive primitive, RpcReceiveQueue q)
@@ -525,24 +545,24 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitSwitch(Switch switchStmt, RpcReceiveQueue q)
     {
-        var selector = q.Receive((J)switchStmt.Selector, el => (J)VisitNonNull(el, q));
+        var selector = q.Receive(switchStmt.Selector, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
         var cases = q.Receive((J)switchStmt.Cases, el => (J)VisitNonNull(el, q));
-        return switchStmt.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithSelector((ControlParentheses<Expression>)selector!).WithCases((Block)cases!);
+        return switchStmt.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithSelector(selector!).WithCases((Block)cases!);
     }
 
     public override J VisitSwitchExpression(SwitchExpression switchExpression, RpcReceiveQueue q)
     {
-        var selector = q.Receive((J)switchExpression.Selector, el => (J)VisitNonNull(el, q));
+        var selector = q.Receive(switchExpression.Selector, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
         var cases = q.Receive((J)switchExpression.Cases, el => (J)VisitNonNull(el, q));
         var type = q.Receive(switchExpression.Type, t => VisitType(t, q)!);
-        return switchExpression.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithSelector((ControlParentheses<Expression>)selector!).WithCases((Block)cases!).WithType(type);
+        return switchExpression.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithSelector(selector!).WithCases((Block)cases!).WithType(type);
     }
 
     public override J VisitSynchronized(Synchronized synch, RpcReceiveQueue q)
     {
-        var @lock = q.Receive((J)synch.Lock, el => (J)VisitNonNull(el, q));
+        var @lock = q.Receive(synch.Lock, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
         var body = q.Receive((J)synch.Body, el => (J)VisitNonNull(el, q));
-        return synch.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLock((ControlParentheses<Expression>)@lock!).WithBody((Block)body!);
+        return synch.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLock(@lock!).WithBody((Block)body!);
     }
 
     public override J VisitTernary(Ternary ternary, RpcReceiveQueue q)
@@ -571,9 +591,9 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitTypeCast(TypeCast typeCast, RpcReceiveQueue q)
     {
-        var clazz = q.Receive((J)typeCast.Clazz, el => (J)VisitNonNull(el, q));
+        var clazz = q.Receive(typeCast.Clazz, el => (ControlParentheses<TypeTree>)VisitNonNull(el, q));
         var expression = q.Receive((J)typeCast.Expression, el => (J)VisitNonNull(el, q));
-        return typeCast.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithClazz((ControlParentheses<TypeTree>)clazz!).WithExpression((Expression)expression!);
+        return typeCast.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithClazz(clazz!).WithExpression((Expression)expression!);
     }
 
     public virtual J VisitTypeParameters(TypeParameters typeParams, RpcReceiveQueue q)
@@ -622,16 +642,16 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
     public override J VisitWhileLoop(WhileLoop whileLoop, RpcReceiveQueue q)
     {
-        var condition = q.Receive((J)whileLoop.Condition, el => (J)VisitNonNull(el, q));
+        var condition = q.Receive(whileLoop.Condition, el => (ControlParentheses<Expression>)VisitNonNull(el, q));
         var body = q.Receive(whileLoop.Body, rp => VisitRightPadded(rp, q));
-        return whileLoop.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithCondition((ControlParentheses<Expression>)condition!).WithBody(body!);
+        return whileLoop.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithCondition(condition!).WithBody(body!);
     }
 
     public override J VisitCatch(Try.Catch tryCatch, RpcReceiveQueue q)
     {
-        var parameter = q.Receive((J)tryCatch.Parameter, el => (J)VisitNonNull(el, q));
+        var parameter = q.Receive(tryCatch.Parameter, el => (ControlParentheses<VariableDeclarations>)VisitNonNull(el, q));
         var body = q.Receive((J)tryCatch.Body, el => (J)VisitNonNull(el, q));
-        return tryCatch.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithParameter((ControlParentheses<VariableDeclarations>)parameter!).WithBody((Block)body!);
+        return tryCatch.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithParameter(parameter!).WithBody((Block)body!);
     }
 
     // Helper methods
@@ -641,7 +661,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var before = q.Receive(left.Before, space => VisitSpace(space, q));
         T element;
         if (left.Element is J)
-            element = (T)(object)q.Receive((J)(object)left.Element!, el => (J)VisitNonNull(el, q))!;
+            element = q.Receive(left.Element!, el => (T)(object)VisitNonNull((J)(object)el!, q))!;
         else if (left.Element is Space)
             element = (T)(object)q.Receive((Space)(object)left.Element!, space => VisitSpace(space, q))!;
         else
@@ -655,7 +675,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         T element;
         if (right.Element is J)
-            element = (T)(object)q.Receive((J)(object)right.Element!, el => (J)VisitNonNull(el, q))!;
+            element = q.Receive(right.Element!, el => (T)(object)VisitNonNull((J)(object)el!, q))!;
         else if (right.Element is Space)
             element = (T)(object)q.Receive((Space)(object)right.Element!, space => VisitSpace(space, q))!;
         else
@@ -754,7 +774,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
                 break;
 
             case JavaType.Primitive prim:
-                q.Receive(GetPrimitiveKeyword(prim.Kind));
+                var keyword = q.Receive(GetPrimitiveKeyword(prim.Kind));
+                javaType = new JavaType.Primitive(KeywordToPrimitiveKind(keyword!));
                 break;
 
             case JavaType.Method method:
@@ -808,6 +829,23 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         JavaType.PrimitiveKind.Null => "null",
         JavaType.PrimitiveKind.None => "none",
         _ => throw new ArgumentException($"Unknown primitive kind: {kind}")
+    };
+
+    private static JavaType.PrimitiveKind KeywordToPrimitiveKind(string keyword) => keyword switch
+    {
+        "boolean" => JavaType.PrimitiveKind.Boolean,
+        "byte" => JavaType.PrimitiveKind.Byte,
+        "char" => JavaType.PrimitiveKind.Char,
+        "double" => JavaType.PrimitiveKind.Double,
+        "float" => JavaType.PrimitiveKind.Float,
+        "int" => JavaType.PrimitiveKind.Int,
+        "long" => JavaType.PrimitiveKind.Long,
+        "short" => JavaType.PrimitiveKind.Short,
+        "void" => JavaType.PrimitiveKind.Void,
+        "String" => JavaType.PrimitiveKind.String,
+        "null" => JavaType.PrimitiveKind.Null,
+        "none" => JavaType.PrimitiveKind.None,
+        _ => throw new ArgumentException($"Unknown primitive keyword: {keyword}")
     };
 
     private static string GetModifierKeyword(Modifier.ModifierType type) => type switch

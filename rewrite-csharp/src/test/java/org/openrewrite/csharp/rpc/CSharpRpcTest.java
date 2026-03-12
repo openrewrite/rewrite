@@ -28,13 +28,16 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -2370,6 +2373,73 @@ class CSharpRpcTest {
         assertThat(sourceFiles).hasSize(1);
         SourceFile parsed = sourceFiles.getFirst();
         assertThat(parsed).isNotInstanceOf(ParseError.class);
+
+        String printed = rpc.print(parsed);
+        assertThat(printed).isEqualTo(source);
+    }
+
+    @Test
+    void parseControlParenthesesVariants(@TempDir Path tempDir) throws Exception {
+        String source = """
+                using System;
+
+                namespace ControlFlow
+                {
+                    public class Handler
+                    {
+                        public void Process(object input)
+                        {
+                            if (input == null)
+                            {
+                                return;
+                            }
+
+                            while (input != null)
+                            {
+                                break;
+                            }
+
+                            switch (input)
+                            {
+                                case string s:
+                                    Console.WriteLine(s);
+                                    break;
+                                default:
+                                    break;
+                            }
+
+                            try
+                            {
+                                var text = (string)input;
+                            }
+                            catch (InvalidCastException ex)
+                            {
+                                Console.WriteLine(ex.Message);
+                            }
+                        }
+                    }
+                }
+                """;
+
+        Path sourceFile = tempDir.resolve("Handler.cs");
+        Files.writeString(sourceFile, source);
+
+        List<SourceFile> sourceFiles = parseSolution(tempDir);
+
+        assertThat(sourceFiles).hasSize(1);
+        SourceFile parsed = sourceFiles.getFirst();
+        assertThat(parsed).isNotInstanceOf(ParseError.class);
+        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
+
+        // Clear Java's remoteObjects to force the ADD path when printing.
+        // After parseSolution, Java received the tree FROM C# but never sent it
+        // TO C#. Clearing remoteObjects forces Java's GetObject.Handler to send
+        // the full tree via ADD (instead of NO_CHANGE), exercising the C# receiver's
+        // ADD-based reconstruction of generic types like ControlParentheses<Expression>,
+        // ControlParentheses<TypeTree>, and ControlParentheses<VariableDeclarations>.
+        Field remoteObjectsField = RewriteRpc.class.getDeclaredField("remoteObjects");
+        remoteObjectsField.setAccessible(true);
+        ((Map<?, ?>) remoteObjectsField.get(rpc)).clear();
 
         String printed = rpc.print(parsed);
         assertThat(printed).isEqualTo(source);
