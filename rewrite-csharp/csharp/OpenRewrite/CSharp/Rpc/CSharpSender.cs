@@ -195,29 +195,12 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitCompilationUnit(CompilationUnit cu, RpcSendQueue q)
     {
         q.GetAndSend(cu, c => c.SourcePath);
-        // Nagoya doesn't model charset/bom/checksum/fileAttributes; send defaults
-        q.GetAndSend(cu, _ => "UTF-8");
-        q.GetAndSend(cu, _ => false);
-        q.GetAndSend(cu, _ => (object?)null);
-        q.GetAndSend(cu, _ => (object?)null);
-        // Externs: nagoya doesn't model externs
-        q.GetAndSendList(cu, _ => EmptyPaddedStatements,
-            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
-        // Usings: extract from Members
+        q.GetAndSend(cu, c => c.Charset);
+        q.GetAndSend(cu, c => (object)c.CharsetBomMarked);
+        q.GetAndSend(cu, c => c.Checksum);
+        q.GetAndSend(cu, c => c.FileAttributes);
         q.GetAndSendList(cu,
             c => (IList<JRightPadded<Statement>>)c.Members
-                .Where(m => m is UsingDirective)
-                .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
-                .ToList(),
-            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
-        // AttributeLists: extract from Members
-        q.GetAndSendList(cu,
-            c => (IList<AttributeList>)c.Members.OfType<AttributeList>().ToList(),
-            t => (object)t.Id, t => Visit(t, q));
-        // Members: remaining (non-using, non-attributelist)
-        q.GetAndSendList(cu,
-            c => (IList<JRightPadded<Statement>>)c.Members
-                .Where(m => m is not UsingDirective && m is not AttributeList)
                 .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
                 .ToList(),
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));

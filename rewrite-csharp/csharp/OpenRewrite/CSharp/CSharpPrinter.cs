@@ -2907,7 +2907,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             p.Append(' ');
             p.Append(nullableDirective.Target.Value.ToString().ToLower());
         }
-        if (nullableDirective.TrailingComment.Length > 0)
+        if (nullableDirective.TrailingComment?.Length > 0)
         {
             p.Append(nullableDirective.TrailingComment);
         }

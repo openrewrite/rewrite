@@ -61,9 +61,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(cu, Cs.CompilationUnit::isCharsetBomMarked);
         q.getAndSend(cu, Cs.CompilationUnit::getChecksum);
         q.getAndSend(cu, Cs.CompilationUnit::getFileAttributes);
-        q.getAndSendList(cu, c -> c.getPadding().getExterns(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSendList(cu, c -> c.getPadding().getUsings(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSendList(cu, Cs.CompilationUnit::getAttributeLists, Tree::getId, el -> visit(el, q));
         q.getAndSendList(cu, c -> c.getPadding().getMembers(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         q.getAndSend(cu, Cs.CompilationUnit::getEof, space -> visitSpace(space, q));
         return cu;

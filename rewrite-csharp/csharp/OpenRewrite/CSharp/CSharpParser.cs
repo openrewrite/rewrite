@@ -122,6 +122,10 @@ public class CSharpParser
             Space.Empty,
             Markers.Empty,
             primaryCu.SourcePath,
+            "UTF-8",
+            false,
+            null,
+            null,
             new List<Statement> { directive },
             Space.Empty
         );
@@ -211,6 +215,10 @@ public class CSharpParser
             Space.Empty,
             Markers.Empty,
             primaryCu.SourcePath,
+            "UTF-8",
+            false,
+            null,
+            null,
             new List<Statement> { directive },
             Space.Empty
         );
@@ -329,6 +337,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             prefix,
             Markers.Empty,
             node.SyntaxTree.FilePath ?? "source.cs",
+            "UTF-8",
+            false,
+            null,
+            null,
             members,
             eof
         );

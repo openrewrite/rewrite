@@ -1575,6 +1575,10 @@ public sealed class CompilationUnit(
     Space prefix,
     Markers markers,
     string sourcePath,
+    string charset,
+    bool charsetBomMarked,
+    Checksum? checksum,
+    Core.FileAttributes? fileAttributes,
     IList<Statement> members,
     Space eof
 ) : Cs, SourceFile, IEquatable<CompilationUnit>
@@ -1583,21 +1587,33 @@ public sealed class CompilationUnit(
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public string SourcePath { get; } = sourcePath;
+    public string Charset { get; } = charset;
+    public bool CharsetBomMarked { get; } = charsetBomMarked;
+    public Checksum? Checksum { get; } = checksum;
+    public Core.FileAttributes? FileAttributes { get; } = fileAttributes;
     public IList<Statement> Members { get; } = members;
     public Space Eof { get; } = eof;
 
     public CompilationUnit WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, SourcePath, Members, Eof);
+        id == Id ? this : new(id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Members, Eof);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Members, Eof);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithSourcePath(string sourcePath) =>
-        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Members, Eof);
+        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+    public CompilationUnit WithCharset(string charset) =>
+        string.Equals(charset, Charset, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, SourcePath, charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+    public CompilationUnit WithCharsetBomMarked(bool charsetBomMarked) =>
+        charsetBomMarked == CharsetBomMarked ? this : new(Id, Prefix, Markers, SourcePath, Charset, charsetBomMarked, Checksum, FileAttributes, Members, Eof);
+    public CompilationUnit WithChecksum(Checksum? checksum) =>
+        ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Members, Eof);
+    public CompilationUnit WithFileAttributes(Core.FileAttributes? fileAttributes) =>
+        ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Members, Eof);
     public CompilationUnit WithMembers(IList<Statement> members) =>
-        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, members, Eof);
+        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, members, Eof);
     public CompilationUnit WithEof(Space eof) =>
-        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Members, eof);
+        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, eof);
 
     Tree Tree.WithId(Guid id) => WithId(id);
     SourceFile SourceFile.WithSourcePath(string sourcePath) => WithSourcePath(sourcePath);

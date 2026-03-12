@@ -188,44 +188,21 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitCompilationUnit(CompilationUnit cu, RpcReceiveQueue q)
     {
         var sourcePath = q.ReceiveAndGet<string, string>(cu.SourcePath, s => s);
-        // Consume charset, bom, checksum, fileAttributes
-        q.Receive<string>("UTF-8");
-        q.Receive<bool>(false);
-        q.Receive<object?>(null);
-        q.Receive<object?>(null);
-        // Externs: empty list
-        q.ReceiveList<JRightPadded<Statement>>([], rp => _delegate.VisitRightPadded(rp, q));
-        // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
-        var existingMembers = cu.Members ?? [];
-        // Usings
-        var usings = q.ReceiveList(
-            existingMembers.Where(m => m is UsingDirective)
-                .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
-                .ToList(),
-            rp => _delegate.VisitRightPadded(rp, q));
-        // AttributeLists
-        var attrLists = q.ReceiveList(
-            existingMembers.OfType<AttributeList>().ToList(),
-            t => (AttributeList)VisitNonNull(t, q));
-        // Members (non-using, non-attributelist)
+        var charset = q.ReceiveAndGet(cu.Charset ?? "UTF-8", (string s) => s);
+        var charsetBomMarked = q.Receive(cu.CharsetBomMarked);
+        var checksum = q.Receive<Checksum?>(cu.Checksum);
+        var fileAttributes = q.Receive<Core.FileAttributes?>(cu.FileAttributes);
         var members = q.ReceiveList(
-            existingMembers.Where(m => m is not UsingDirective && m is not AttributeList)
+            (cu.Members ?? [])
                 .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
                 .ToList(),
             rp => _delegate.VisitRightPadded(rp, q));
         var eof = q.Receive(cu.Eof, space => VisitSpace(space, q));
 
-        // Reconstruct members
-        var allMembers = new List<Statement>();
-        if (usings != null)
-        {
-            foreach (var rp in usings)
-                allMembers.Add(rp.Element);
-        }
-        if (attrLists != null) allMembers.AddRange(attrLists);
-        if (members != null) allMembers.AddRange(members.Select(rp => rp.Element));
-
-        return cu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithSourcePath(sourcePath!).WithMembers(allMembers).WithEof(eof!);
+        return cu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
+            .WithSourcePath(sourcePath!).WithCharset(charset!).WithCharsetBomMarked(charsetBomMarked)
+            .WithChecksum(checksum).WithFileAttributes(fileAttributes)
+            .WithMembers(members?.Select(rp => rp.Element).ToList() ?? []).WithEof(eof!);
     }
 
     // ---- UsingDirective ----
