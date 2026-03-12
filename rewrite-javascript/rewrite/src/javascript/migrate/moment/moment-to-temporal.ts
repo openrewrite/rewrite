@@ -18,8 +18,8 @@ import {Recipe} from "../../../recipe";
 import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor, JS} from "../../index";
-import {J, isIdentifier, Expression} from "../../../java";
-import {capture, Template} from "../../templating/index";
+import {J, isIdentifier, isLiteral} from "../../../java";
+import {capture, pattern, template, raw, rewrite, RewriteRule} from "../../templating/index";
 import {maybeRemoveImport} from "../../remove-import";
 
 const UNIT_MAP: Record<string, string> = {
@@ -52,9 +52,11 @@ export class MomentToTemporal extends Recipe {
 
 class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
     private momentImportName: string | undefined;
+    private rules: RewriteRule | undefined;
 
     protected override async visitJsCompilationUnit(cu: JS.CompilationUnit, ctx: ExecutionContext): Promise<J | undefined> {
         this.momentImportName = undefined;
+        this.rules = undefined;
 
         for (const stmt of cu.statements) {
             const s = stmt.element ?? stmt;
@@ -66,6 +68,8 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         if (!this.momentImportName) {
             return cu;
         }
+
+        this.rules = this.buildRules();
 
         const result = await super.visitJsCompilationUnit(cu, ctx);
 
@@ -93,192 +97,115 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
 
     protected override async visitFunctionCall(functionCall: JS.FunctionCall, ctx: ExecutionContext): Promise<J | undefined> {
         functionCall = await super.visitFunctionCall(functionCall, ctx) as JS.FunctionCall;
-        if (!this.momentImportName) return functionCall;
-
-        const fn = functionCall.function?.element;
-        if (!fn || !isIdentifier(fn)) return functionCall;
-        if (fn.simpleName !== this.momentImportName) return functionCall;
-
-        return this.transformMomentCreation(functionCall.arguments.elements, functionCall);
+        if (!this.momentImportName || !this.rules) return functionCall;
+        return await this.rules.tryOn(this.cursor, functionCall) || functionCall;
     }
 
     protected override async visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): Promise<J | undefined> {
         method = await super.visitMethodInvocation(method, ctx) as J.MethodInvocation;
-        if (!this.momentImportName) return method;
+        if (!this.momentImportName || !this.rules) return method;
+        return await this.rules.tryOn(this.cursor, method) || method;
+    }
 
-        const methodName = (method.name as J.Identifier)?.simpleName;
-        if (!methodName) return method;
+    private buildRules(): RewriteRule {
+        return this.createNoArgRule()
+            .orElse(this.createOneArgRule())
+            .orElse(this.utcNoArgRule())
+            .orElse(this.utcOneArgRule())
+            .orElse(this.addSubtractRule('add'))
+            .orElse(this.addSubtractRule('subtract'))
+            .orElse(this.comparisonRule('isBefore', '< 0'))
+            .orElse(this.comparisonRule('isAfter', '> 0'))
+            .orElse(this.comparisonRule('isSame', '=== 0'))
+            .orElse(this.cloneRule())
+            .orElse(this.startOfRule());
+    }
 
-        // moment() / moment(x) — parsed as MethodInvocation with no select
-        if (!method.select && methodName === this.momentImportName) {
-            const args = method.arguments.elements;
-            const effectiveArgs = args.filter(a => a.element.kind !== J.Kind.Empty);
-            return this.transformMomentCreation(effectiveArgs, method);
-        }
+    // moment() -> Temporal.Now.plainDateTimeISO()
+    private createNoArgRule(): RewriteRule {
+        return rewrite(() => ({
+            before: pattern`${raw(this.momentImportName!)}()`,
+            after: template`Temporal.Now.plainDateTimeISO()`
+        }));
+    }
 
-        // moment.utc() / moment.utc(x)
-        if (methodName === 'utc' && method.select) {
-            const select = method.select.element;
-            if (isIdentifier(select) && select.simpleName === this.momentImportName) {
-                const args = method.arguments.elements;
-                const effectiveArgs = args.filter(a => a.element.kind !== J.Kind.Empty);
-                if (effectiveArgs.length === 0) {
-                    return await Template.builder()
-                        .code('Temporal.Now.instant()')
-                        .build()
-                        .apply(method, this.cursor);
+    // moment(x) -> Temporal.PlainDateTime.from(x)
+    private createOneArgRule(): RewriteRule {
+        const arg = capture();
+        return rewrite(() => ({
+            before: pattern`${raw(this.momentImportName!)}(${arg})`,
+            after: template`Temporal.PlainDateTime.from(${arg})`
+        }));
+    }
+
+    // moment.utc() -> Temporal.Now.instant()
+    private utcNoArgRule(): RewriteRule {
+        return rewrite(() => ({
+            before: pattern`${raw(this.momentImportName!)}.utc()`,
+            after: template`Temporal.Now.instant()`
+        }));
+    }
+
+    // moment.utc(x) -> Temporal.Instant.from(x)
+    private utcOneArgRule(): RewriteRule {
+        const arg = capture();
+        return rewrite(() => ({
+            before: pattern`${raw(this.momentImportName!)}.utc(${arg})`,
+            after: template`Temporal.Instant.from(${arg})`
+        }));
+    }
+
+    // .add(amount, unit) / .subtract(amount, unit)
+    private addSubtractRule(methodName: 'add' | 'subtract'): RewriteRule {
+        return rewrite(() => {
+            const obj = capture();
+            const amount = capture();
+            const unit = capture({
+                constraint: (n: any) => isLiteral(n) && typeof n.value === 'string' && UNIT_MAP[n.value] !== undefined
+            });
+            return {
+                before: pattern`${obj}.${raw(methodName)}(${amount}, ${unit})`,
+                after: (match) => {
+                    const unitStr = (match.get(unit) as J.Literal).value as string;
+                    return template`${obj}.${raw(methodName)}({${raw(UNIT_MAP[unitStr])}: ${amount}})`;
                 }
-                if (effectiveArgs.length === 1) {
-                    // Note: Temporal.Instant.from() requires an ISO 8601 string with offset/timezone;
-                    // moment.utc(x) accepts more formats, so this may need manual adjustment
-                    const arg = capture('arg');
-                    return await Template.builder()
-                        .code('Temporal.Instant.from(')
-                        .param(arg)
-                        .code(')')
-                        .build()
-                        .apply(method, this.cursor, {values: new Map([[arg, effectiveArgs[0].element]])});
+            };
+        });
+    }
+
+    // .isBefore(other) / .isAfter(other) / .isSame(other)
+    private comparisonRule(methodName: string, operator: string): RewriteRule {
+        const a = capture();
+        const b = capture();
+        return rewrite(() => ({
+            before: pattern`${a}.${raw(methodName)}(${b})`,
+            after: template`Temporal.PlainDateTime.compare(${a}, ${b}) ${raw(operator)}`
+        }));
+    }
+
+    // .clone() — Temporal is immutable, just return the receiver
+    private cloneRule(): RewriteRule {
+        const obj = capture();
+        return rewrite(() => ({
+            before: pattern`${obj}.clone()`,
+            after: template`${obj}`
+        }));
+    }
+
+    // .startOf(unit) — needs dynamic after for STARTOF_MAP lookup
+    private startOfRule(): RewriteRule {
+        return rewrite(() => {
+            const obj = capture();
+            const unit = capture({
+                constraint: (n: any) => isLiteral(n) && typeof n.value === 'string' && STARTOF_MAP[n.value] !== undefined
+            });
+            return {
+                before: pattern`${obj}.startOf(${unit})`,
+                after: (match) => {
+                    const unitStr = (match.get(unit) as J.Literal).value as string;
+                    return template`${obj}${raw(STARTOF_MAP[unitStr])}`;
                 }
-            }
-        }
-
-        // .add(amount, unit) / .subtract(amount, unit)
-        if ((methodName === 'add' || methodName === 'subtract') && method.select) {
-            return this.transformAddSubtract(method, methodName);
-        }
-
-        // .isBefore(other) / .isAfter(other) / .isSame(other)
-        if ((methodName === 'isBefore' || methodName === 'isAfter' || methodName === 'isSame') && method.select) {
-            return this.transformComparison(method, methodName);
-        }
-
-        // .clone() — Temporal is immutable, just return the receiver
-        if (methodName === 'clone' && method.select) {
-            const cloneArgs = method.arguments.elements.filter(a => a.element.kind !== J.Kind.Empty);
-            if (cloneArgs.length === 0) {
-                const obj = capture('obj');
-                return await Template.builder()
-                    .param(obj)
-                    .build()
-                    .apply(method, this.cursor, {
-                        values: new Map([[obj, method.select.element]])
-                    });
-            }
-        }
-
-        // .startOf(unit)
-        if (methodName === 'startOf' && method.select) {
-            return this.transformStartOf(method);
-        }
-
-        return method;
-    }
-
-    private async transformMomentCreation(
-        args: J.RightPadded<Expression>[],
-        node: J
-    ): Promise<J | undefined> {
-        if (args.length === 0) {
-            return await Template.builder()
-                .code('Temporal.Now.plainDateTimeISO()')
-                .build()
-                .apply(node, this.cursor);
-        }
-
-        if (args.length === 1) {
-            const arg = capture('arg');
-            return await Template.builder()
-                .code('Temporal.PlainDateTime.from(')
-                .param(arg)
-                .code(')')
-                .build()
-                .apply(node, this.cursor, {values: new Map([[arg, args[0].element]])});
-        }
-
-        return node;
-    }
-
-    private async transformAddSubtract(
-        method: J.MethodInvocation,
-        methodName: 'add' | 'subtract'
-    ): Promise<J | undefined> {
-        const args = method.arguments.elements;
-        if (args.length !== 2) return method;
-
-        const unitArg = args[1].element;
-        if (unitArg.kind !== J.Kind.Literal) return method;
-        const unitStr = (unitArg as J.Literal).value;
-        if (typeof unitStr !== 'string') return method;
-
-        const temporalUnit = UNIT_MAP[unitStr];
-        if (!temporalUnit) return method;
-
-        const obj = capture('obj');
-        const amount = capture('amount');
-
-        return await Template.builder()
-            .param(obj)
-            .code(`.${methodName}({${temporalUnit}: `)
-            .param(amount)
-            .code('})')
-            .build()
-            .apply(method, this.cursor, {
-                values: new Map([
-                    [obj, method.select!.element],
-                    [amount, args[0].element]
-                ])
-            });
-    }
-
-    private async transformComparison(
-        method: J.MethodInvocation,
-        methodName: 'isBefore' | 'isAfter' | 'isSame'
-    ): Promise<J | undefined> {
-        const args = method.arguments.elements;
-        if (args.length !== 1) return method;
-
-        const operator = methodName === 'isBefore' ? '< 0'
-            : methodName === 'isAfter' ? '> 0'
-            : '=== 0';
-
-        const a = capture('a');
-        const b = capture('b');
-
-        return await Template.builder()
-            .code('Temporal.PlainDateTime.compare(')
-            .param(a)
-            .code(', ')
-            .param(b)
-            .code(`) ${operator}`)
-            .build()
-            .apply(method, this.cursor, {
-                values: new Map([
-                    [a, method.select!.element],
-                    [b, args[0].element]
-                ])
-            });
-    }
-
-    private async transformStartOf(method: J.MethodInvocation): Promise<J | undefined> {
-        const args = method.arguments.elements;
-        if (args.length !== 1) return method;
-
-        const unitArg = args[0].element;
-        if (unitArg.kind !== J.Kind.Literal) return method;
-        const unitStr = (unitArg as J.Literal).value;
-        if (typeof unitStr !== 'string') return method;
-
-        const suffix = STARTOF_MAP[unitStr];
-        if (!suffix) return method;
-
-        const obj = capture('obj');
-
-        return await Template.builder()
-            .param(obj)
-            .code(suffix)
-            .build()
-            .apply(method, this.cursor, {
-                values: new Map([[obj, method.select!.element]])
-            });
+            };
+        });
     }
 }
