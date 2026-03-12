@@ -19,7 +19,7 @@ import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor, JS} from "../../index";
 import {J, isIdentifier, Expression} from "../../../java";
-import {capture, Template} from "../../templating/index";
+import {capture, template, raw} from "../../templating/index";
 import {maybeRemoveImport} from "../../remove-import";
 
 const UNIT_MAP: Record<string, string> = {
@@ -123,21 +123,15 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
                 const args = method.arguments.elements;
                 const effectiveArgs = args.filter(a => a.element.kind !== J.Kind.Empty);
                 if (effectiveArgs.length === 0) {
-                    return await Template.builder()
-                        .code('Temporal.Now.instant()')
-                        .build()
+                    return await template`Temporal.Now.instant()`
                         .apply(method, this.cursor);
                 }
                 if (effectiveArgs.length === 1) {
                     // Note: Temporal.Instant.from() requires an ISO 8601 string with offset/timezone;
                     // moment.utc(x) accepts more formats, so this may need manual adjustment
                     const arg = capture('arg');
-                    return await Template.builder()
-                        .code('Temporal.Instant.from(')
-                        .param(arg)
-                        .code(')')
-                        .build()
-                        .apply(method, this.cursor, {values: new Map([[arg, effectiveArgs[0].element]])});
+                    return await template`Temporal.Instant.from(${arg})`
+                        .apply(method, this.cursor, {values: {arg: effectiveArgs[0].element}});
                 }
             }
         }
@@ -157,12 +151,8 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
             const cloneArgs = method.arguments.elements.filter(a => a.element.kind !== J.Kind.Empty);
             if (cloneArgs.length === 0) {
                 const obj = capture('obj');
-                return await Template.builder()
-                    .param(obj)
-                    .build()
-                    .apply(method, this.cursor, {
-                        values: new Map([[obj, method.select.element]])
-                    });
+                return await template`${obj}`
+                    .apply(method, this.cursor, {values: {obj: method.select.element}});
             }
         }
 
@@ -179,20 +169,14 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         node: J
     ): Promise<J | undefined> {
         if (args.length === 0) {
-            return await Template.builder()
-                .code('Temporal.Now.plainDateTimeISO()')
-                .build()
+            return await template`Temporal.Now.plainDateTimeISO()`
                 .apply(node, this.cursor);
         }
 
         if (args.length === 1) {
             const arg = capture('arg');
-            return await Template.builder()
-                .code('Temporal.PlainDateTime.from(')
-                .param(arg)
-                .code(')')
-                .build()
-                .apply(node, this.cursor, {values: new Map([[arg, args[0].element]])});
+            return await template`Temporal.PlainDateTime.from(${arg})`
+                .apply(node, this.cursor, {values: {arg: args[0].element}});
         }
 
         return node;
@@ -216,18 +200,8 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         const obj = capture('obj');
         const amount = capture('amount');
 
-        return await Template.builder()
-            .param(obj)
-            .code(`.${methodName}({${temporalUnit}: `)
-            .param(amount)
-            .code('})')
-            .build()
-            .apply(method, this.cursor, {
-                values: new Map([
-                    [obj, method.select!.element],
-                    [amount, args[0].element]
-                ])
-            });
+        return await template`${obj}.${raw(methodName)}({${raw(temporalUnit)}: ${amount}})`
+            .apply(method, this.cursor, {values: {obj: method.select!.element, amount: args[0].element}});
     }
 
     private async transformComparison(
@@ -244,19 +218,8 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
         const a = capture('a');
         const b = capture('b');
 
-        return await Template.builder()
-            .code('Temporal.PlainDateTime.compare(')
-            .param(a)
-            .code(', ')
-            .param(b)
-            .code(`) ${operator}`)
-            .build()
-            .apply(method, this.cursor, {
-                values: new Map([
-                    [a, method.select!.element],
-                    [b, args[0].element]
-                ])
-            });
+        return await template`Temporal.PlainDateTime.compare(${a}, ${b}) ${raw(operator)}`
+            .apply(method, this.cursor, {values: {a: method.select!.element, b: args[0].element}});
     }
 
     private async transformStartOf(method: J.MethodInvocation): Promise<J | undefined> {
@@ -273,12 +236,7 @@ class MomentToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
 
         const obj = capture('obj');
 
-        return await Template.builder()
-            .param(obj)
-            .code(suffix)
-            .build()
-            .apply(method, this.cursor, {
-                values: new Map([[obj, method.select!.element]])
-            });
+        return await template`${obj}${raw(suffix)}`
+            .apply(method, this.cursor, {values: {obj: method.select!.element}});
     }
 }

@@ -19,7 +19,7 @@ import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor, JS} from "../../index";
 import {J, isIdentifier} from "../../../java";
-import {capture, Pattern, Template, rewrite, RewriteRule} from "../../templating/index";
+import {capture, pattern, template, raw, rewrite, RewriteRule} from "../../templating/index";
 import {maybeRemoveImport} from "../../remove-import";
 
 const DATE_FNS_FUNCTIONS = new Set([
@@ -177,106 +177,45 @@ class DateFnsToTemporalVisitor extends JavaScriptVisitor<ExecutionContext> {
     private addSubRule(fnName: string, unit: string, method: 'add' | 'subtract'): RewriteRule {
         const date = capture('date');
         const amount = capture('amount');
-
-        const pat = Pattern.builder()
-            .code(`${fnName}(`)
-            .capture(date)
-            .code(', ')
-            .capture(amount)
-            .code(')')
-            .build();
-
-        const tmpl = Template.builder()
-            .code(`Temporal.PlainDate.from(`)
-            .param(date)
-            .code(`).${method}({ ${unit}: `)
-            .param(amount)
-            .code(' })')
-            .build();
-
-        return rewrite(() => ({ before: pat, after: tmpl }));
+        return rewrite(() => ({
+            before: pattern`${raw(fnName)}(${date}, ${amount})`,
+            after: template`Temporal.PlainDate.from(${date}).${raw(method)}({${raw(unit)}: ${amount}})`
+        }));
     }
 
     private compareRule(fnName: string, operator: string): RewriteRule {
         const a = capture('a');
         const b = capture('b');
-
-        const pat = Pattern.builder()
-            .code(`${fnName}(`)
-            .capture(a)
-            .code(', ')
-            .capture(b)
-            .code(')')
-            .build();
-
-        const tmpl = Template.builder()
-            .code('Temporal.PlainDateTime.compare(')
-            .param(a)
-            .code(', ')
-            .param(b)
-            .code(`) ${operator}`)
-            .build();
-
-        return rewrite(() => ({ before: pat, after: tmpl }));
+        return rewrite(() => ({
+            before: pattern`${raw(fnName)}(${a}, ${b})`,
+            after: template`Temporal.PlainDateTime.compare(${a}, ${b}) ${raw(operator)}`
+        }));
     }
 
     private differenceRule(fnName: string, largestUnit: string, field: string): RewriteRule {
         const a = capture('a');
         const b = capture('b');
-
-        const pat = Pattern.builder()
-            .code(`${fnName}(`)
-            .capture(a)
-            .code(', ')
-            .capture(b)
-            .code(')')
-            .build();
-
         // date-fns differenceIn*(a, b) computes a - b, so use a.since(b)
-        const tmpl = Template.builder()
-            .param(a)
-            .code(`.since(`)
-            .param(b)
-            .code(`, {largestUnit: "${largestUnit}"}).${field}`)
-            .build();
-
-        return rewrite(() => ({ before: pat, after: tmpl }));
+        return rewrite(() => ({
+            before: pattern`${raw(fnName)}(${a}, ${b})`,
+            after: template`${a}.since(${b}, {largestUnit: "${raw(largestUnit)}"}).${raw(field)}`
+        }));
     }
 
     private singleArgRule(fnName: string, prefix: string, suffix: string): RewriteRule {
         const date = capture('date');
-
-        const pat = Pattern.builder()
-            .code(`${fnName}(`)
-            .capture(date)
-            .code(')')
-            .build();
-
-        const tmpl = Template.builder()
-            .code(prefix)
-            .param(date)
-            .code(suffix)
-            .build();
-
-        return rewrite(() => ({ before: pat, after: tmpl }));
+        return rewrite(() => ({
+            before: pattern`${raw(fnName)}(${date})`,
+            after: template`${raw(prefix)}${date}${raw(suffix)}`
+        }));
     }
 
     private endOfMonthRule(fnName: string = 'endOfMonth'): RewriteRule {
         const date = capture('date');
-
-        const pat = Pattern.builder()
-            .code(`${fnName}(`)
-            .capture(date)
-            .code(')')
-            .build();
-
         // Use IIFE to avoid referencing .daysInMonth on the unconverted input
-        const tmpl = Template.builder()
-            .code('((d) => d.with({day: d.daysInMonth}))(Temporal.PlainDate.from(')
-            .param(date)
-            .code('))')
-            .build();
-
-        return rewrite(() => ({ before: pat, after: tmpl }));
+        return rewrite(() => ({
+            before: pattern`${raw(fnName)}(${date})`,
+            after: template`((d) => d.with({day: d.daysInMonth}))(Temporal.PlainDate.from(${date}))`
+        }));
     }
 }
