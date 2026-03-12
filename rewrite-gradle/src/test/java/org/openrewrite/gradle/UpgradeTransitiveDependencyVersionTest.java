@@ -82,6 +82,44 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void addConstraintWithApplyFrom() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+
+              dependencies {
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addConstraintForDependenciesDeclaredInMultipleConfigurationsThatExtendFromDifferentResolvableConfigurations() {
         rewriteRun(
           buildGradle(
@@ -692,8 +730,52 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/382")
     @Test
-    void removeOtherVersionConstraint() {
+    void updateStrictlyVersionConstraint() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.0') {
+                          version {
+                              strictly('2.12.0')
+                          }
+                          because 'security'
+                      }
+                  }
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+
+                  constraints {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                          version {
+                              strictly('2.12.5')
+                          }
+                          because 'CVE-2024-BAD'
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/382")
+    @Test
+    void updateStrictlyVersionConstraintWithoutVersionInString() {
         rewriteRun(
           buildGradle(
             """
@@ -723,6 +805,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   constraints {
                       implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
+                          version {
+                              strictly('2.12.5')
+                          }
                       }
                   }
               }
@@ -942,6 +1027,46 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies {
 
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void useResolutionStrategyWithApplyFromWhenSpringDependencyManagementPluginIsPresent() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              apply from: 'dependencies.gradle'
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                          details.useVersion('2.12.5')
+                          details.because('CVE-2024-BAD')
+                      }
+                  }
               }
               """
           )

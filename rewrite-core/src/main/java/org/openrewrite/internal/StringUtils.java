@@ -131,6 +131,10 @@ public class StringUtils {
      * @return The minimum count of white space characters preceding each line of content.
      */
     public static int minCommonIndentLevel(String text) {
+        return minCommonIndentLevel(text, 1);
+    }
+
+    public static int minCommonIndentLevel(String text, int tabSize) {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
         boolean contentEncountered = false;
@@ -146,7 +150,11 @@ public class StringUtils {
                 whiteSpaceCount = 0;
                 contentEncountered = false;
             } else if (!contentEncountered && Character.isWhitespace(c)) {
-                whiteSpaceCount++;
+                if (c == '\t') {
+                    whiteSpaceCount += tabSize;
+                } else {
+                    whiteSpaceCount++;
+                }
             } else {
                 contentEncountered = true;
             }

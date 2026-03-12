@@ -1327,7 +1327,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JCArrayTypeTree arrayTypeTree = null;
         while (typeIdent instanceof JCAnnotatedType || typeIdent instanceof JCArrayTypeTree) {
             if (typeIdent instanceof JCAnnotatedType) {
-                mapAnnotations(((JCAnnotatedType) typeIdent).getAnnotations(), annotationPosTable);
+                if (count > 0) {
+                    mapAnnotations(((JCAnnotatedType) typeIdent).getAnnotations(), annotationPosTable);
+                }
                 typeIdent = ((JCAnnotatedType) typeIdent).getUnderlyingType();
             }
             if (typeIdent instanceof JCArrayTypeTree) {
@@ -1339,6 +1341,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
 
+        List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         Space prefix = whitespace();
         TypeTree elemType = convert(typeIdent);
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
@@ -1357,11 +1360,15 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         assert arrayTypeTree != null;
-        return new J.ArrayType(randomId(), prefix, markers,
+        TypeTree result = new J.ArrayType(randomId(), prefix, markers,
                 count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
                 annotations,
                 dimension,
                 typeMapping.type(tree));
+        if (!leadingAnnotations.isEmpty()) {
+            result = new J.AnnotatedType(randomId(), EMPTY, Markers.EMPTY, leadingAnnotations, result);
+        }
+        return result;
     }
 
     private TypeTree mapDimensions(TypeTree baseType, Tree tree, Map<Integer, JCAnnotation> annotationPosTable) {
@@ -1552,7 +1559,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         TypeTree typeExpr;
         if (vartype == null || endPos(vartype) < 0 || vartype instanceof JCErroneous) {
             typeExpr = null; // this is a lambda parameter with an inferred type expression
-        } else if (isLombokGenerated(node)) {
+        } else if (hasLombokGeneratedSymbol(node)) {
             Space space = whitespace();
             boolean lombokVal = source.startsWith("val", cursor);
             cursor += 3; // skip `val` or `var`
@@ -1937,7 +1944,39 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
      * --------------
      */
 
-    private static boolean isLombokGenerated(Tree t) {
+    private boolean isLombokGenerated(Tree t) {
+        if (!hasLombokGeneratedSymbol(t)) {
+            return false;
+        }
+        // If the lombok annotation is actually present in the source, the user wrote it themselves
+        if (t instanceof JCAnnotation) {
+            int pos = ((JCAnnotation) t).pos;
+            return !(pos >= 0 && pos < source.length() &&
+                    (source.startsWith("@Generated", pos) || source.startsWith("@lombok.Generated", pos)));
+        }
+        List<JCAnnotation> annotations;
+        if (t instanceof JCMethodDecl) {
+            annotations = ((JCMethodDecl) t).getModifiers().getAnnotations();
+        } else if (t instanceof JCClassDecl) {
+            annotations = ((JCClassDecl) t).getModifiers().getAnnotations();
+        } else if (t instanceof JCVariableDecl) {
+            annotations = ((JCVariableDecl) t).getModifiers().getAnnotations();
+        } else {
+            return true;
+        }
+        for (JCAnnotation ann : annotations) {
+            if (hasLombokGeneratedSymbol(ann)) {
+                int pos = ann.pos;
+                if (pos >= 0 && pos < source.length() &&
+                        (source.startsWith("@Generated", pos) || source.startsWith("@lombok.Generated", pos))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static boolean hasLombokGeneratedSymbol(Tree t) {
         Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
         Symbol sym = extractSymbol(tree);
@@ -2151,7 +2190,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
-                if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
+                if (isLombokGenerated(jcAnnotation)) {
                     continue;
                 }
                 J.Annotation annotation = convert(jcAnnotation);
@@ -2176,7 +2215,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
@@ -2203,6 +2242,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             currentAnnotations = new ArrayList<>();
                             word.set("");
                             afterLastModifierPosition = cursor;
+                            i = cursor - 1;
                         }
                     }
                 } else {
@@ -2300,7 +2340,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
             if (inMultilineComment && c == '/' && i > 0 && source.charAt(i - 1) == '*') {
                 inMultilineComment = false;
-            } else if (inComment && c == '\n' || c == '\r') {
+            } else if (inComment && (c == '\n' || c == '\r')) {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
                 if (!Character.isWhitespace(c)) {

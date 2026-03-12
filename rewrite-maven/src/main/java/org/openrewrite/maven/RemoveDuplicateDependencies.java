@@ -41,10 +41,7 @@ public class RemoveDuplicateDependencies extends Recipe {
 
     String description = "Removes duplicated dependencies in the `<dependencies>` and `<dependencyManagement>` sections of the `pom.xml`.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

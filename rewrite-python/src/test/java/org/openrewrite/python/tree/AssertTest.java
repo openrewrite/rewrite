@@ -26,12 +26,12 @@ class AssertTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "assert x",
-            "assert  x",
-            "assert x, y",
-            "assert  x, y",
-            "assert x , y",
-            "assert x,  y",
+      "assert x",
+      "assert  x",
+      "assert x, y",
+      "assert  x, y",
+      "assert x , y",
+      "assert x,  y",
     })
     void assert_(@Language("py") String arg) {
         rewriteRun(python(arg));

@@ -36,10 +36,7 @@ public class ChangeText extends Recipe {
             example = "Some text.")
     String toText;
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("plain text");
-    }
+    Set<String> tags = singleton("plain text");
 
     String displayName = "Change text";
 

@@ -15,14 +15,15 @@
  */
 package org.openrewrite.python.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.python.Python3Only;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.python.Assertions.python;
 
+@Python3Only
 class SwitchTest implements RewriteTest {
 
     @Test
@@ -129,7 +130,6 @@ class SwitchTest implements RewriteTest {
         );
     }
 
-    @Disabled("When parsing and printing the source code back to text without modifications, the printed source didn't match the original source code.")
     @Test
     void mapping() {
         rewriteRun(
@@ -189,6 +189,19 @@ class SwitchTest implements RewriteTest {
             """
               match x:
                 case (value.pattern):
+                    pass
+              """
+          )
+        );
+    }
+
+    @Test
+    void classNameWithNestedPattern() {
+        rewriteRun(
+          python(
+            """
+              match x:
+                case ClassName([1, 2]):
                     pass
               """
           )

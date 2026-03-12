@@ -28,6 +28,7 @@ import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestIntegration;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -146,6 +147,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        ArrayList<String> properties = new ArrayList<>();
         Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
@@ -154,6 +156,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 if (d != document) {
                     d = (Xml.Document) new RemoveEmptyDependenciesTags().visitNonNull(d, ctx);
                     d = (Xml.Document) new RemoveEmptyPluginsTags().visitNonNull(d, ctx);
+                    if (!properties.isEmpty() && "jar".equals(getResolutionResult().getPom().getPackaging())) {
+                        RemoveUnusedProperties removeUnusedProperties = new RemoveUnusedProperties("(" + String.join("|", properties) + ")");
+                        RemoveUnusedProperties.Accumulator acc = removeUnusedProperties.getInitialValue(ctx);
+                        removeUnusedProperties.getScanner(acc).visit(d, ctx);
+                        d = (Xml.Document) removeUnusedProperties.getVisitor(acc).visitNonNull(d, ctx);
+                    }
                     if (comparator != Comparator.EQ) {
                         maybeUpdateModel();
                     }
@@ -171,7 +179,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             matchesVersion(d) &&
                             isNotExcepted(d.getGroupId(), d.getArtifactId())) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
-                        return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                        return tag.withContent(withoutVersion(tag, version));
                     }
                 } else if (isManagedDependencyTag()) {
                     ResolvedManagedDependency managed = findManagedDependency(tag);
@@ -200,17 +208,30 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 return null;
                             }
                             // some other element is also declared (executions, configuration, dependencies…), so just remove the version
-                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                            return tag.withContent(withoutVersion(tag, version));
                         }
                     } else {
                         Plugin p = findPlugin(tag);
                         if (p != null && matchesGroup(p) && matchesArtifact(p) && matchesVersion(p)) {
                             Xml.Tag version = tag.getChild("version").orElse(null);
-                            return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
+                            return tag.withContent(withoutVersion(tag, version));
                         }
                     }
                 }
                 return super.visitTag(tag, ctx);
+            }
+
+            private @Nullable List<? extends Content> withoutVersion(Xml.Tag tag, Xml.@Nullable Tag version) {
+                return ListUtils.map(tag.getContent(), c -> {
+                    if (c == version) {
+                        Optional<String> value = ((Xml.Tag) c).getValue();
+                        if (value.isPresent() && isProperty(value.get())) {
+                            properties.addAll(ResolvedPom.placeholderHelper.getPlaceholders(value.get()));
+                        }
+                        return null;
+                    }
+                    return c;
+                });
             }
 
             private boolean matchesGroup(ResolvedManagedDependency d) {

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import org.apache.commons.lang3.StringUtils;
+import org.openrewrite.internal.StringUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -87,5 +87,12 @@ public class MavenRecipeBundleResolver implements RecipeBundleResolver {
                 .findFirst()
                 .flatMap(sf -> sf.getMarkers().findFirst(MavenResolutionResult.class))
                 .filter(mrr -> !mrr.getDependencies().isEmpty());
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (reader != null) {
+            reader.close();
+        }
     }
 }

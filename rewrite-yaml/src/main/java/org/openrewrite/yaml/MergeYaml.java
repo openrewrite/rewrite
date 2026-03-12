@@ -142,7 +142,7 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                if ("$".equals(key)) {
+                if ("$".equals(key) || "$.".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
                             new MergeYamlVisitor<>(document.getBlock(), incoming, accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
@@ -278,6 +278,6 @@ public class MergeYaml extends Recipe {
 
     static Yaml parse(@Language("yml") String yaml) {
         return maybeParse(yaml)
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"));
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML:\n" + yaml));
     }
 }

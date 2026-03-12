@@ -49,7 +49,6 @@ dependencies {
     }
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api")
-    compileOnly("org.assertj:assertj-core:latest.release")
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
@@ -94,7 +93,7 @@ tasks.withType<Javadoc>().configureEach {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java")
+    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java", "**/ImportLayoutStyle**")
 }
 
 tasks.named<ShadowJar>("shadowJar").configure {

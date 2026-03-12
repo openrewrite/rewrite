@@ -38,10 +38,8 @@ public class RemoveLambdaArgumentParentheses extends Recipe {
     @Getter
     final String description = "For example, convert `1.let({ it + 1 })` to `1.let { it + 1 }`.";
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(1);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(1);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

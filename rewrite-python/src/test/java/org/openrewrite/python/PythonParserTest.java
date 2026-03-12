@@ -19,9 +19,13 @@ import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.python.tree.Py;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.python.Assertions.python;
 
 @DisabledIfEnvironmentVariable(named = "CI", matches = "true", disabledReason = "No remote client/server available")
@@ -40,6 +44,49 @@ class PythonParserTest implements RewriteTest {
                   softly.assertThat(cu.getMarkers().getMarkers()).isEmpty();
               })
             )
+          )
+        );
+    }
+
+    @Test
+    void parseAndPrint() {
+        rewriteRun(
+          python(
+            """
+              import sys # comment
+              print(sys.path)
+              """,
+            spec -> spec.afterRecipe(cu -> SoftAssertions.assertSoftly(softly -> {
+                  softly.assertThat(cu).isInstanceOf(Py.CompilationUnit.class);
+                  softly.assertThat(cu.getMarkers().getMarkers()).isEmpty();
+                  softly.assertThat(((SourceFile) new TreeVisitor<J, Integer>() {
+                      @Override
+                      public J preVisit(J tree, Integer integer) {
+                          return tree.withId(Tree.randomId());
+                      }
+                  }.visitNonNull(cu, 0)).printAll()).isEqualTo("import sys # comment\nprint(sys.path)");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void unicodeEscapes() {
+        rewriteRun(
+          python(
+            """
+              s = "\\uD83D\\uDE00"
+              print(s)
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var s = (J.Assignment) cu.getStatements().get(0);
+                var str = (J.Literal) s.getAssignment();
+                assertThat(str.getUnicodeEscapes()).satisfiesExactly(
+                  esc -> assertThat(esc.getCodePoint()).isEqualTo("D83D"),
+                  esc -> assertThat(esc.getCodePoint()).isEqualTo("DE00")
+                );
+            })
           )
         );
     }

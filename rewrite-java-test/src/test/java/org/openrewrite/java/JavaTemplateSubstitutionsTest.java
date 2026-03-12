@@ -551,4 +551,51 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             return m;
         }
     }
+
+    @Test
+    void changeVarargsToList() {
+        rewriteRun(
+          // Mimics what a Refaster template would generate for varargs
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation elem, ExecutionContext ctx) {
+                  JavaTemplate.Matcher matcher;
+                  JavaTemplate before = JavaTemplate.builder("java.util.stream.Stream.of(#{value:anyArray(T)}).toList()")
+                    .bindType("java.util.List<T>")
+                    .genericTypes("T").build();
+                  if ((matcher = before.matcher(getCursor())).find()) {
+                      maybeRemoveImport("java.util.stream.Stream");
+                      return JavaTemplate.builder("java.util.Arrays.asList(#{value:anyArray(T)})")
+                        .bindType("java.util.List<T>")
+                        .genericTypes("T")
+                        .build()
+                        .apply(getCursor(), elem.getCoordinates().replace(), matcher.parameter(0));
+                  }
+                  return super.visitMethodInvocation(elem, ctx);
+              }
+          })),
+          //language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Stream;
+              
+              class Example {
+                  List<String> test() {
+                      return Stream.of("a", "b", "c").toList();
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              class Example {
+                  List<String> test() {
+                      return java.util.Arrays.asList("a", "b", "c");
+                  }
+              }
+              """
+          )
+        );
+    }
 }

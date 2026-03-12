@@ -18,11 +18,24 @@ package org.openrewrite.python.marker;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class KeywordOnlyArguments implements Marker {
+public class KeywordOnlyArguments implements Marker, RpcCodec<KeywordOnlyArguments> {
     UUID id;
+
+    @Override
+    public void rpcSend(KeywordOnlyArguments after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+    }
+
+    @Override
+    public KeywordOnlyArguments rpcReceive(KeywordOnlyArguments before, RpcReceiveQueue q) {
+        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    }
 }

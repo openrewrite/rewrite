@@ -72,8 +72,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
               </project>
               """,
             spec -> spec.after(xml -> {
-                assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:");
-                return xml;
+                return assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:").actual();
             }
           ))
         );

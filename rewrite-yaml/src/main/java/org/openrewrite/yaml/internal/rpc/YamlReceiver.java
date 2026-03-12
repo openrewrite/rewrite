@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml.internal.rpc;
 
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
@@ -31,7 +32,8 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
     public Yaml preVisit(Yaml y, RpcReceiveQueue q) {
         y = y.withId(q.receiveAndGet(y.getId(), UUID::fromString));
         y = y.withPrefix(q.receive(y.getPrefix()));
-        return y.withMarkers(q.receive(y.getMarkers()));
+        Markers markers = q.receive(y.getMarkers());
+        return y.withMarkers(markers != null ? markers : Markers.EMPTY);
     }
 
     @Override
@@ -49,9 +51,17 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
     @Override
     public Yaml visitDocument(Yaml.Document document, RpcReceiveQueue q) {
         return document
+                .withDirectives(q.receiveList(document.getDirectives(), dir -> (Yaml.Directive) visitNonNull(dir, q)))
                 .withExplicit(q.receive(document.isExplicit()))
                 .withBlock(q.receive(document.getBlock(), b -> (Yaml.Block) visitNonNull(b, q)))
                 .withEnd(q.receive(document.getEnd(), e -> (Yaml.Document.End) visitNonNull(e, q)));
+    }
+
+    @Override
+    public Yaml visitDirective(Yaml.Directive directive, RpcReceiveQueue q) {
+        return directive
+                .withValue(q.receive(directive.getValue()))
+                .withSuffix(q.receive(directive.getSuffix()));
     }
 
     @Override

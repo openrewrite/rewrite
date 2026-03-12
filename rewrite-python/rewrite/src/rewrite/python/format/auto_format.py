@@ -1,0 +1,69 @@
+from typing import Optional
+
+from .blank_lines import BlankLinesVisitor
+from .minimum_viable_spacing import MinimumViableSpacingVisitor
+from .normalize_format import NormalizeFormatVisitor
+from .normalize_line_breaks_visitor import NormalizeLineBreaksVisitor
+from .normalize_tabs_or_spaces import NormalizeTabsOrSpacesVisitor
+from .remove_trailing_whitespace_visitor import RemoveTrailingWhitespaceVisitor
+from .spaces_visitor import SpacesVisitor
+from .tabs_and_indents_visitor import TabsAndIndentsVisitor
+from .. import TabsAndIndentsStyle, SpacesStyle, OtherStyle
+from ..style import BlankLinesStyle, IntelliJ
+from ..visitor import PythonVisitor
+from ... import Recipe, Tree, Cursor
+from ...java import JavaSourceFile
+from ...style import GeneralFormatStyle
+from ...visitor import P, T
+
+
+class AutoFormat(Recipe):
+    @property
+    def name(self) -> str:
+        return "org.openrewrite.python.format.AutoFormat"
+
+    @property
+    def display_name(self) -> str:
+        return "Auto-format Python code"
+
+    @property
+    def description(self) -> str:
+        return "Applies standard formatting to Python source code."
+
+    def editor(self):
+        return AutoFormatVisitor()
+
+
+class AutoFormatVisitor(PythonVisitor[P]):
+    def __init__(self, stop_after: Optional[Tree] = None):
+        self._stop_after = stop_after
+
+    def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
+        self._cursor = parent if parent is not None else Cursor(None, Cursor.ROOT_VALUE)
+        cu = tree if isinstance(tree, JavaSourceFile) else self._cursor.first_enclosing_or_throw(JavaSourceFile)
+
+        tree = NormalizeFormatVisitor(self._stop_after).visit(tree, p, self._cursor.fork())
+
+        tree = MinimumViableSpacingVisitor(self._stop_after).visit(tree, p, self._cursor.fork())
+
+        tree = BlankLinesVisitor(cu.get_style(BlankLinesStyle) or IntelliJ.blank_lines(), self._stop_after).visit(tree, p, self._cursor.fork())
+
+        tree = SpacesVisitor(cu.get_style(SpacesStyle) or IntelliJ.spaces(), self._stop_after).visit(tree, p, self._cursor.fork())
+
+        tree = NormalizeTabsOrSpacesVisitor(
+            cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
+            self._stop_after
+        ).visit(tree, p, self._cursor.fork())
+
+        tree = TabsAndIndentsVisitor(
+            cu.get_style(TabsAndIndentsStyle) or IntelliJ.tabs_and_indents(),
+            cu.get_style(OtherStyle) or IntelliJ.other(),
+            self._stop_after
+        ).visit(tree, p, self._cursor.fork())
+
+        tree = NormalizeLineBreaksVisitor(cu.get_style(GeneralFormatStyle) or GeneralFormatStyle(False),
+                                          self._stop_after).visit(tree, p, self._cursor.fork())
+
+        tree = RemoveTrailingWhitespaceVisitor(self._stop_after).visit(tree, self._cursor.fork())
+
+        return tree

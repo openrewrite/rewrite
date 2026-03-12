@@ -20,6 +20,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Simplified from Spring's PropertyPlaceholderHelper.
@@ -29,6 +33,7 @@ import java.util.function.Function;
  */
 public class PropertyPlaceholderHelper {
     private static final Map<String, String> wellKnownSimplePrefixes = new HashMap<>(4);
+    private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     static {
         wellKnownSimplePrefixes.put("}", "{");
@@ -66,12 +71,44 @@ public class PropertyPlaceholderHelper {
         return startIndex > -1 && value.indexOf(placeholderSuffix, startIndex) > startIndex;
     }
 
+    public List<String> getPlaceholders(@Nullable String value) {
+        if (value == null) {
+            return emptyList();
+        }
+
+        List<String> placeholders = new ArrayList<>();
+        Matcher matcher = PROPERTY_PATTERN.matcher(value);
+        while (matcher.find()) {
+            placeholders.add(matcher.group(1));
+        }
+        return placeholders;
+    }
+
+    /**
+     * Replace placeholders in the given value, resolving each against the supplied properties.
+     * A backslash before the placeholder prefix (e.g. {@code \${...}}) escapes it as a literal.
+     */
     public String replacePlaceholders(String value, final Properties properties) {
         return replacePlaceholders(value, properties::getProperty);
     }
 
+    /**
+     * Replace placeholders in the given value, resolving each via {@code placeholderResolver}.
+     * A backslash before the placeholder prefix (e.g. {@code \${...}}) escapes it as a literal.
+     */
     public String replacePlaceholders(String value, Function<String, @Nullable String> placeholderResolver) {
-        return parseStringValue(value, placeholderResolver, null);
+        // Support escaping: a backslash before the placeholder prefix produces a literal
+        // prefix. E.g., for prefix "${", writing "\${" produces literal "${".
+        String escapePrefix = "\\" + placeholderPrefix;
+        boolean hasEscaped = value.contains(escapePrefix);
+        if (hasEscaped) {
+            value = value.replace(escapePrefix, "\u0000\u0001\u0002");
+        }
+        String result = parseStringValue(value, placeholderResolver, null);
+        if (hasEscaped) {
+            result = result.replace("\u0000\u0001\u0002", placeholderPrefix);
+        }
+        return result;
     }
 
     protected String parseStringValue(String value, Function<String, @Nullable String> placeholderResolver,

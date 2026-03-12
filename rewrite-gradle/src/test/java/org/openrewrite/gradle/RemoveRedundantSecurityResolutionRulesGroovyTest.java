@@ -171,8 +171,8 @@ class RemoveRedundantSecurityResolutionRulesGroovyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled("Gradle tooling API seems to return an empty marker")
+    @Test
     void removeMultipleRulesFromElseIfChain() {
         rewriteRun(
           buildGradle(

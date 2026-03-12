@@ -1069,7 +1069,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2255")
     @ParameterizedTest
-    @ValueSource(strings = {"provided", "runtime", "test"})
+    @ValueSource(strings = {"provided", "runtime"})
     void addScopedDependency(String scope) {
         rewriteRun(
           spec -> spec.recipe(addDependency(
@@ -1111,6 +1111,85 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """.formatted(scope)
+            )
+          )
+        );
+    }
+
+    @Test
+    void testScopedDependencyNotAddedWhenTypeOnlyInMainSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency(
+            "com.fasterxml.jackson.core:jackson-core:2.12.0",
+            "com.fasterxml.jackson.core.*",
+            "test"
+          )),
+          mavenProject(
+            "project",
+            srcMainJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void testScopedDependencyAddedWhenTypeInTestSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency(
+            "com.fasterxml.jackson.core:jackson-core:2.12.0",
+            "com.fasterxml.jackson.core.*",
+            "test"
+          )),
+          mavenProject(
+            "project",
+            srcTestJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.fasterxml.jackson.core</groupId>
+                            <artifactId>jackson-core</artifactId>
+                            <version>2.12.0</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
             )
           )
         );
@@ -2070,6 +2149,66 @@ class AddDependencyTest implements RewriteTest {
                             <groupId>com.google.guava</groupId>
                             <artifactId>guava</artifactId>
                             <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doesNotClobberManagedLatestWithExplicitVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>latest</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doesNotClobberLatestWithExplicitVersion() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+          mavenProject("project",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>latest</version>
                         </dependency>
                     </dependencies>
                 </project>

@@ -1,0 +1,429 @@
+#
+# Copyright 2026 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Data sources:
+# - Debian: https://wiki.debian.org/DebianReleases
+# - Ubuntu: https://wiki.ubuntu.com/Releases
+# - Alpine: https://alpinelinux.org/releases/
+# - Python: https://devguide.python.org/versions/
+# - Node.js: https://nodejs.org/en/about/releases/
+# - Java: https://endoflife.date/eclipse-temurin, https://endoflife.date/amazon-corretto, https://endoflife.date/azul-zulu
+# - General: https://endoflife.date/
+#
+- imageName: debian
+  tagPatterns: [jessie, "jessie-*", "8", "8.*"]
+  eolDate: "2020-06-30"
+  suggestedReplacement: trixie (13) or bookworm (12)
+
+- imageName: debian
+  tagPatterns: [stretch, "stretch-*", "9", "9.*"]
+  eolDate: "2022-07-01"
+  suggestedReplacement: trixie (13) or bookworm (12)
+
+- imageName: debian
+  tagPatterns: [buster, "buster-*", "10", "10.*"]
+  eolDate: "2024-06-30"
+  suggestedReplacement: trixie (13) or bookworm (12)
+
+- imageName: debian
+  tagPatterns: [bullseye, "bullseye-*", "11", "11.*"]
+  eolDate: "2024-08-14"
+  suggestedReplacement: trixie (13) or bookworm (12)
+
+- imageName: ubuntu
+  tagPatterns: [trusty, "trusty-*", "14.04", "14.04.*"]
+  eolDate: "2019-04-25"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [xenial, "xenial-*", "16.04", "16.04.*"]
+  eolDate: "2021-04-30"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [bionic, "bionic-*", "18.04", "18.04.*"]
+  eolDate: "2023-05-31"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [focal, "focal-*", "20.04", "20.04.*"]
+  eolDate: "2025-04-30"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [jammy, "jammy-*", "22.04", "22.04.*"]
+  eolDate: "2024-09-30"
+  suggestedReplacement: noble (24.04)
+
+
+- imageName: alpine
+  tagPatterns: ["3.14", "3.14.*"]
+  eolDate: "2023-05-01"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.15", "3.15.*"]
+  eolDate: "2023-11-01"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.16", "3.16.*"]
+  eolDate: "2024-05-23"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.17", "3.17.*"]
+  eolDate: "2024-11-22"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.18", "3.18.*"]
+  eolDate: "2025-05-09"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.19", "3.19.*"]
+  eolDate: "2025-11-01"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: python
+  tagPatterns: ["3.7", "3.7.*", "3.7-*"]
+  eolDate: "2023-06-27"
+  suggestedReplacement: 3.14 or 3.13
+
+- imageName: python
+  tagPatterns: ["3.8", "3.8.*", "3.8-*"]
+  eolDate: "2024-10-31"
+  suggestedReplacement: 3.14 or 3.13
+
+- imageName: python
+  tagPatterns: ["3.9", "3.9.*", "3.9-*"]
+  eolDate: "2025-10-31"
+  suggestedReplacement: 3.14 or 3.13
+
+- imageName: node
+  tagPatterns: ["14", "14.*", "14-*"]
+  eolDate: "2023-04-30"
+  suggestedReplacement: 22 or 20
+
+- imageName: node
+  tagPatterns: ["16", "16.*", "16-*"]
+  eolDate: "2024-04-30"
+  suggestedReplacement: 24 or 22
+
+- imageName: node
+  tagPatterns: ["18", "18.*", "18-*"]
+  eolDate: "2025-04-30"
+  suggestedReplacement: 24 or 22
+
+- imageName: node
+  tagPatterns: ["20", "20.*", "20-*"]
+  eolDate: "2026-04-30"
+  suggestedReplacement: 24 or 22
+
+# Official OpenJDK image (deprecated in 2022, recommends eclipse-temurin)
+- imageName: openjdk
+  tagPatterns: ["7", "7-*", "7u*"]
+  eolDate: "2019-07-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["8", "8-*", "8u*"]
+  eolDate: "2022-07-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["9", "9-*", "9.*"]
+  eolDate: "2018-03-20"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["10", "10-*", "10.*"]
+  eolDate: "2018-09-25"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["11", "11-*", "11.*"]
+  eolDate: "2022-07-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["12", "12-*", "12.*"]
+  eolDate: "2019-09-17"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["13", "13-*", "13.*"]
+  eolDate: "2020-03-17"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["14", "14-*", "14.*"]
+  eolDate: "2020-09-15"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["15", "15-*", "15.*"]
+  eolDate: "2021-03-16"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["16", "16-*", "16.*"]
+  eolDate: "2021-09-14"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["17", "17-*", "17.*"]
+  eolDate: "2022-07-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["18", "18-*", "18.*"]
+  eolDate: "2022-09-20"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["19", "19-*", "19.*"]
+  eolDate: "2023-03-21"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["20", "20-*", "20.*"]
+  eolDate: "2023-09-19"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: openjdk
+  tagPatterns: ["21", "21-*", "21.*"]
+  eolDate: "2022-07-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+# AdoptOpenJDK (deprecated in 2021, superseded by eclipse-temurin)
+- imageName: adoptopenjdk
+  tagPatterns: ["8", "8-*", "8u*"]
+  eolDate: "2021-08-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["9", "9-*", "9.*"]
+  eolDate: "2018-03-20"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["10", "10-*", "10.*"]
+  eolDate: "2018-09-25"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["11", "11-*", "11.*"]
+  eolDate: "2021-08-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["12", "12-*", "12.*"]
+  eolDate: "2019-09-17"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["13", "13-*", "13.*"]
+  eolDate: "2020-03-17"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["14", "14-*", "14.*"]
+  eolDate: "2020-09-15"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["15", "15-*", "15.*"]
+  eolDate: "2021-03-16"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+- imageName: adoptopenjdk
+  tagPatterns: ["16", "16-*", "16.*"]
+  eolDate: "2021-08-01"
+  suggestedReplacement: eclipse-temurin:21 or eclipse-temurin:17 (LTS)
+
+# Eclipse Temurin (formerly AdoptOpenJDK) - most common OpenJDK distribution
+- imageName: eclipse-temurin
+  tagPatterns: ["9", "9-*", "9.*"]
+  eolDate: "2018-03-20"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["10", "10-*", "10.*"]
+  eolDate: "2018-09-25"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["12", "12-*", "12.*"]
+  eolDate: "2019-09-17"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["13", "13-*", "13.*"]
+  eolDate: "2020-03-17"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["14", "14-*", "14.*"]
+  eolDate: "2020-09-15"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["15", "15-*", "15.*"]
+  eolDate: "2021-03-16"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["16", "16-*", "16.*"]
+  eolDate: "2021-09-14"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["18", "18-*", "18.*"]
+  eolDate: "2022-09-20"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["19", "19-*", "19.*"]
+  eolDate: "2023-03-21"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["20", "20-*", "20.*"]
+  eolDate: "2023-09-19"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["22", "22-*", "22.*"]
+  eolDate: "2024-09-17"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["23", "23-*", "23.*"]
+  eolDate: "2025-03-18"
+  suggestedReplacement: 25 or 21 (LTS)
+
+- imageName: eclipse-temurin
+  tagPatterns: ["24", "24-*", "24.*"]
+  eolDate: "2025-09-16"
+  suggestedReplacement: 25 or 21 (LTS)
+
+# Amazon Corretto
+- imageName: amazoncorretto
+  tagPatterns: ["15", "15-*", "15.*"]
+  eolDate: "2021-03-16"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: amazoncorretto
+  tagPatterns: ["16", "16-*", "16.*"]
+  eolDate: "2021-09-14"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: amazoncorretto
+  tagPatterns: ["18", "18-*", "18.*"]
+  eolDate: "2022-09-20"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: amazoncorretto
+  tagPatterns: ["19", "19-*", "19.*"]
+  eolDate: "2023-03-21"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: amazoncorretto
+  tagPatterns: ["20", "20-*", "20.*"]
+  eolDate: "2023-09-19"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: amazoncorretto
+  tagPatterns: ["22", "22-*", "22.*"]
+  eolDate: "2024-09-17"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: amazoncorretto
+  tagPatterns: ["23", "23-*", "23.*"]
+  eolDate: "2025-03-18"
+  suggestedReplacement: 25 or 21 (LTS)
+
+- imageName: amazoncorretto
+  tagPatterns: ["24", "24-*", "24.*"]
+  eolDate: "2025-09-16"
+  suggestedReplacement: 25 or 21 (LTS)
+
+# Azul Zulu OpenJDK
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["9", "9-*", "9.*"]
+  eolDate: "2018-03-20"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["10", "10-*", "10.*"]
+  eolDate: "2018-09-25"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["12", "12-*", "12.*"]
+  eolDate: "2019-09-17"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["13", "13-*", "13.*"]
+  eolDate: "2020-03-17"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["14", "14-*", "14.*"]
+  eolDate: "2020-09-15"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["15", "15-*", "15.*"]
+  eolDate: "2021-03-16"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["16", "16-*", "16.*"]
+  eolDate: "2021-09-14"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["18", "18-*", "18.*"]
+  eolDate: "2022-09-20"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["19", "19-*", "19.*"]
+  eolDate: "2023-03-21"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["20", "20-*", "20.*"]
+  eolDate: "2023-09-19"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["22", "22-*", "22.*"]
+  eolDate: "2024-09-17"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["23", "23-*", "23.*"]
+  eolDate: "2025-03-18"
+  suggestedReplacement: 25 or 21 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["24", "24-*", "24.*"]
+  eolDate: "2025-09-16"
+  suggestedReplacement: 25 or 21 (LTS)

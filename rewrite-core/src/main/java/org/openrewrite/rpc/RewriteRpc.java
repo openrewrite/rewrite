@@ -27,6 +27,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
@@ -103,6 +104,18 @@ public class RewriteRpc {
      *                    the host process has available for its use in composite recipes.
      */
     public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace) {
+        this(jsonRpc, marketplace, emptyList());
+    }
+
+    /**
+     * Creates a new RPC interface that can be used to communicate with a remote.
+     *
+     * @param marketplace The marketplace of recipes that this peer makes available.
+     *                    Even if this peer is the host process, configuring this
+     *                    marketplace allows the remote peer to discover what recipes
+     *                    the host process has available for its use in composite recipes.
+     */
+    public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
@@ -114,7 +127,7 @@ public class RewriteRpc {
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return GetMarketplaceResponse.fromMarketplace(marketplace);
+                return GetMarketplaceResponse.fromMarketplace(marketplace, resolvers);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
@@ -147,12 +160,25 @@ public class RewriteRpc {
         jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
             RecipeListing listing = marketplace.findRecipe(id);
             if (listing != null) {
-                return listing.prepare(opts);
+                return listing.prepare(resolvers, opts);
             }
             // Fall back to loading by class name if not found in marketplace
             return new RecipeLoader(null).load(id, opts);
         }));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
+        jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
+            @Override
+            protected Boolean handle(Void noParams) {
+                remoteObjects.clear();
+                localObjects.clear();
+                localObjectIds.clear();
+                remoteRefs.clear();
+                localRefs.clear();
+                preparedRecipes.getInstantiated().clear();
+                preparedRecipes.getRecipeCursors().clear();
+                return true;
+            }
+        });
 
         jsonRpc.bind();
     }
@@ -448,8 +474,11 @@ public class RewriteRpc {
 
     @VisibleForTesting
     public <T> T getObject(String id, @Nullable String sourceFileType) {
-        // Check if we have a cached version of this object
-        Object localObject = localObjects.get(id);
+        // Use the last synced state as the baseline for receiving diffs.
+        // This must match what the remote used as its baseline when computing the diff.
+        // Using localObjects here would be wrong if Java modified the tree locally
+        // (e.g., via a Java-side recipe) since the remote doesn't know about those changes.
+        Object before = remoteObjects.get(id);
 
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
@@ -457,9 +486,18 @@ public class RewriteRpc {
                 sourceFileType,
                 log.get()
         );
-        Object remoteObject = q.receive(localObject, null);
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
+        Object remoteObject;
+        try {
+            remoteObject = q.receive(before, null);
+        } catch (Exception e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            remoteObjects.remove(id);
+            throw e;
+        }
+        RpcObjectData endMarker = q.take();
+        if (endMarker.getState() != END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + endMarker);
         }
 
         //noinspection ConstantValue

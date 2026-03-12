@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import traceback
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any
 from uuid import UUID
 
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from .parser import Parser
     from .visitor import Cursor
 
-from .utils import random_id, list_map
+from .utils import random_id, list_map, replace_if_changed
 
 
 class Marker(ABC):
@@ -20,18 +20,8 @@ class Marker(ABC):
         ...
 
     def replace(self, **kwargs) -> 'Marker':
-        """Replace fields on this marker using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this marker, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
         return ''
@@ -63,18 +53,8 @@ class Markers:
         return self._markers
 
     def replace(self, **kwargs) -> 'Markers':
-        """Replace fields on this Markers instance using dataclasses.replace."""
-        mapped_kwargs = {}
-        for key, value in kwargs.items():
-            if not key.startswith('_'):
-                private_key = f'_{key}'
-                if hasattr(self, private_key):
-                    mapped_kwargs[private_key] = value
-                else:
-                    mapped_kwargs[key] = value
-            else:
-                mapped_kwargs[key] = value
-        return replace(self, **mapped_kwargs)
+        """Replace fields on this Markers instance, returning self if nothing changed."""
+        return replace_if_changed(self, **kwargs)
 
     def find_first(self, cls: Type[M]) -> Optional[M]:
         for marker in self.markers:
@@ -127,6 +107,136 @@ class SearchResult(Marker):
     def description(self) -> Optional[str]:
         return self._description
 
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
+        desc = self._description or ""
+        return comment_wrapper(f"({desc})" if desc else "")
+
+
+class Markup(Marker, ABC):
+    """
+    Base class for markup markers that provide visual indicators (warnings, errors, info, debug).
+
+    Markup markers are used to annotate code with messages that can be displayed
+    in various ways depending on the tooling.
+    """
+
+    @property
+    @abstractmethod
+    def message(self) -> str:
+        """The primary message to display."""
+        ...
+
+    @property
+    @abstractmethod
+    def detail(self) -> Optional[str]:
+        """Additional detail, shown in verbose mode."""
+        ...
+
+    def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
+        if verbose and self.detail:
+            return comment_wrapper(f"({self.detail})")
+        return comment_wrapper(f"({self.message})")
+
+    @staticmethod
+    def warn(message: str, detail: Optional[str] = None) -> 'MarkupWarn':
+        """Create a warning markup marker."""
+        return MarkupWarn(random_id(), message, detail)
+
+    @staticmethod
+    def error(message: str, detail: Optional[str] = None) -> 'MarkupError':
+        """Create an error markup marker."""
+        return MarkupError(random_id(), message, detail)
+
+    @staticmethod
+    def info(message: str, detail: Optional[str] = None) -> 'MarkupInfo':
+        """Create an info markup marker."""
+        return MarkupInfo(random_id(), message, detail)
+
+    @staticmethod
+    def debug(message: str, detail: Optional[str] = None) -> 'MarkupDebug':
+        """Create a debug markup marker."""
+        return MarkupDebug(random_id(), message, detail)
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupWarn(Markup):
+    """Warning markup marker for deprecations and other warnings."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupError(Markup):
+    """Error markup marker for errors and issues."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupInfo(Markup):
+    """Info markup marker for informational messages."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
+
+@dataclass(frozen=True, eq=False)
+class MarkupDebug(Markup):
+    """Debug markup marker for debugging information."""
+    _id: UUID
+    _message: str
+    _detail: Optional[str] = None
+
+    @property
+    def id(self) -> UUID:
+        return self._id
+
+    @property
+    def message(self) -> str:
+        return self._message
+
+    @property
+    def detail(self) -> Optional[str]:
+        return self._detail
+
 
 @dataclass(frozen=True, eq=False)
 class UnknownJavaMarker(Marker):
@@ -174,3 +284,9 @@ class ParseExceptionResult(Marker):
     @property
     def message(self) -> str:
         return self._message
+
+    _tree_type: Optional[str] = None
+
+    @property
+    def tree_type(self) -> Optional[str]:
+        return self._tree_type

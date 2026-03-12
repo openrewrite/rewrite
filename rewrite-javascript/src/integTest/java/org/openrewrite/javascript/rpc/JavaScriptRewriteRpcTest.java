@@ -35,6 +35,7 @@ import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.File;
 import java.io.IOException;
@@ -211,6 +212,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         Recipe recipe = client().prepareRecipe("org.openrewrite.example.npm.change-version",
           Map.of("version", "1.0.0"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
+        assertThat(recipe.getDescriptor().getOptions().size()).isEqualTo(1);
     }
 
     @SuppressWarnings("JSUnusedLocalSymbols")
@@ -429,6 +431,39 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         assertThat(paths)
           .containsExactlyInAnyOrder("package.json", "index.js")
           .noneMatch(p -> p.contains("vendor"));
+    }
+
+    @Test
+    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        // Reproduces the pattern from GitHub Actions workflow files like:
+        //   on: { push: {}, pull_request: {} }
+        // where nested flow mappings caused "Yaml.Mapping may not have a non-empty prefix"
+        // during RPC deserialization on the Java side.
+        Files.createDirectories(projectDir.resolve(".github/workflows"));
+        Files.writeString(projectDir.resolve(".github/workflows/ci.yml"), """
+          name: CI
+          on: { push: {}, pull_request: {} }
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile yamlFile = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith("ci.yml"))
+          .findFirst().orElseThrow();
+
+        assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
+        assertThat(yamlFile).isNotInstanceOf(ParseError.class);
+        assertThat(client().print(yamlFile)).isNotEmpty();
     }
 
     /**

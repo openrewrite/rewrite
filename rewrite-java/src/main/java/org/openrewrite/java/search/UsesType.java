@@ -161,8 +161,16 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         @Override
         public boolean test(JavaType type) {
             if (type instanceof JavaType.FullyQualified) {
-                String packageName = ((JavaType.FullyQualified) type).getPackageName();
-                return packageName.equals(prefix) || packageName.startsWith(subPackagePrefix);
+                String fqn = ((JavaType.FullyQualified) type).getFullyQualifiedName();
+                if (!fqn.startsWith(prefix)) {
+                    return false;
+                }
+                int lastDot = fqn.lastIndexOf('.');
+                // packageName.equals(prefix): true when lastDot is exactly at prefix.length()
+                // packageName.startsWith(subPackagePrefix): true when lastDot > prefix.length()
+                //   and the char at prefix.length() is '.' (completing the subPackagePrefix match)
+                return lastDot == prefix.length() ||
+                       (lastDot > prefix.length() && fqn.charAt(prefix.length()) == '.');
             }
             return false;
         }

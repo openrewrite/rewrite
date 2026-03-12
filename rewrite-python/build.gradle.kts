@@ -1,5 +1,8 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
+import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -13,11 +16,13 @@ plugins {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    api(project(":rewrite-toml"))
 
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
 
     implementation("io.moderne:jsonrpc:latest.integration")
+    implementation(project(":rewrite-maven"))
 
     compileOnly(project(":rewrite-test"))
 
@@ -96,11 +101,10 @@ val pythonInstall by tasks.registering(Exec::class) {
     dependsOn(pythonUpgradePip)
 
     workingDir = pythonDir
-    commandLine(pipExe.absolutePath, "install", "-e", ".")
+    commandLine(pipExe.absolutePath, "install", "-e", ".[dev]")
 
     // Re-run if pyproject.toml changes
     inputs.file(pythonDir.resolve("pyproject.toml"))
-    outputs.file(venvDir.resolve("pyvenv.cfg"))
 
     doFirst {
         logger.lifecycle("Installing Python package with pip")
@@ -121,7 +125,64 @@ testing {
                 runtimeOnly("org.junit.platform:junit-platform-suite-engine")
             }
         }
+
+        register<JvmTestSuite>("py2CompatibilityTest") {
+            useJUnitJupiter()
+
+            dependencies {
+                implementation(project())
+                implementation(project(":rewrite-test"))
+                implementation(project(":rewrite-java-21"))
+                implementation("org.assertj:assertj-core:latest.release")
+                implementation("io.moderne:jsonrpc:latest.integration")
+            }
+
+            targets {
+                all {
+                    testTask.configure {
+                        // Include the main test classes so common tests run with the Python 2 parser
+                        testClassesDirs += sourceSets["test"].output.classesDirs
+                        classpath += sourceSets["test"].runtimeClasspath
+
+                        systemProperty("rewrite.python.version", "2")
+
+                        useJUnitPlatform {
+                            excludeTags("python3")
+                        }
+
+                        shouldRunAfter(tasks.named("test"))
+                    }
+                }
+            }
+        }
     }
+}
+
+val pytestTest by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Run Python pytest tests"
+
+    dependsOn(pythonInstall)
+
+    workingDir = pythonDir
+    commandLine(pythonExe.absolutePath, "-m", "pytest", "tests/", "-v",
+        "--junitxml=build/test-results/pytest/junit.xml")
+
+    inputs.dir(pythonDir.resolve("src"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.dir(pythonDir.resolve("tests"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(pythonDir.resolve("pyproject.toml"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(pythonDir.resolve("build/test-results/pytest/junit.xml"))
+    outputs.cacheIf { true }
+}
+
+ImportJUnitXmlReports.register(tasks, pytestTest, JUnitXmlDialect.GENERIC)
+
+tasks.named("check") {
+    dependsOn(testing.suites.named("py2CompatibilityTest"))
+    dependsOn(pytestTest)
 }
 
 // Run tests serially to avoid issues with concurrent Python RPC processes
@@ -146,20 +207,49 @@ tasks.withType<Test> {
 // This is separate from Gradle because IntelliJ's Gradle integration doesn't support Python source roots.
 
 // ============================================
-// Python Publishing Tasks (PyPI)
+// Version Resource (for RPC version pinning)
 // ============================================
 
 // Generate a PEP 440 compliant version for CI builds
 // Snapshots use .dev suffix: 8.71.0.dev20260112145318
 // Releases use clean version: 8.71.0
+// Read from version.txt on disk if it exists (second Gradle invocation), so the published pip
+// package version matches what was baked into the JAR by the first invocation.
+val pythonVersionTxt = file("src/main/resources/META-INF/rewrite-python-version.txt")
 val pythonVersion: String = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "-SNAPSHOT",
-        ".dev${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-    )
+    pythonVersionTxt.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+        ?: project.version.toString().replace(
+            "-SNAPSHOT",
+            ".dev${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+        )
 } else {
     project.version.toString().replace("-SNAPSHOT", ".dev0")
 }
+
+// Write rewrite-python-version.txt resource so PythonRewriteRpc can pin the pip package version
+val generateVersionTxt by tasks.registering {
+    group = "python"
+    description = "Generate META-INF/rewrite-python-version.txt for RPC version pinning"
+
+    val versionTxt = file("src/main/resources/META-INF/rewrite-python-version.txt")
+    inputs.property("version", pythonVersion)
+    outputs.file(versionTxt)
+
+    doLast {
+        versionTxt.parentFile.mkdirs()
+        versionTxt.writeText(pythonVersion)
+    }
+}
+
+listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
+    tasks.named(it) {
+        dependsOn(generateVersionTxt)
+    }
+}
+
+// ============================================
+// Python Publishing Tasks (PyPI)
+// ============================================
 
 // Task to update version in pyproject.toml
 val pythonUpdateVersion by tasks.registering {
@@ -262,3 +352,59 @@ val pythonPublish by tasks.registering(Exec::class) {
 tasks.named("publish") {
     dependsOn(pythonPublish)
 }
+
+// ============================================
+// Python Test Support Tasks
+// ============================================
+
+// Task to generate classpath file for Java RPC server testing
+val generateTestClasspath by tasks.registering {
+    group = "python"
+    description = "Generate classpath file for Java RPC server (used by Python tests)"
+
+    val outputFile = pythonDir.resolve("test-classpath.txt")
+    outputs.file(outputFile)
+
+    // Depend on jar tasks to ensure jars exist
+    dependsOn(tasks.named("testClasses"))
+    dependsOn(tasks.named("jar"))
+
+    doLast {
+        // Combine compile and test runtime classpaths to get all dependencies
+        val classpath = (
+            configurations.getByName("runtimeClasspath").files +
+            configurations.getByName("testRuntimeClasspath").files +
+            tasks.named("compileJava").get().outputs.files +
+            tasks.named("processResources").get().outputs.files
+        ).distinctBy { it.absolutePath }
+         .joinToString(File.pathSeparator) { it.absolutePath }
+        outputFile.writeText(classpath)
+        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+
+
+    }
+}
+
+// Task to print test classpath to stdout (useful for setting env vars)
+val printTestClasspath by tasks.registering {
+    group = "python"
+    description = "Print the test classpath (for use with REWRITE_PYTHON_CLASSPATH env var)"
+
+    dependsOn(tasks.named("testClasses"))
+
+    doLast {
+        val classpath = (
+            configurations.getByName("runtimeClasspath").files +
+            configurations.getByName("testRuntimeClasspath").files +
+            tasks.named("compileJava").get().outputs.files +
+            tasks.named("processResources").get().outputs.files
+        ).distinctBy { it.absolutePath }
+         .joinToString(File.pathSeparator) { it.absolutePath }
+        println(classpath)
+    }
+}
+
+extensions.configure<LicenseExtension> {
+    exclude("**/rewrite-python-version.txt")
+}
+

@@ -8,7 +8,6 @@ This produces the same JSON format that Java expects:
   {"state": "END_OF_OBJECT"}
 ]
 """
-from dataclasses import is_dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable, TypeVar
@@ -28,65 +27,12 @@ ADDED_LIST_ITEM = -1
 T = TypeVar('T')
 
 
-def to_java_type_name(py_type: type) -> Optional[str]:
-    """Convert Python type name to Java type name.
-
-    Returns None for Python built-in types that don't have Java equivalents.
-    """
-    module = py_type.__module__
-
-    # Skip Python built-in types - they don't have Java equivalents
-    if module == 'builtins':
-        return None
-
-    # Use __qualname__ to get full nested class path (e.g., "If.Else" instead of just "Else")
-    qualname = py_type.__qualname__
-    # Convert dots to $ for Java nested class naming (If.Else -> If$Else)
-    java_name = qualname.replace('.', '$')
-
-    # Handle rewrite.python.tree types
-    if module.startswith('rewrite.python.tree'):
-        return f"org.openrewrite.python.tree.Py${java_name}"
-    elif module.startswith('rewrite.python.support_types'):
-        # PyComment is in support_types but maps to tree package
-        return f"org.openrewrite.python.tree.{java_name}"
-    elif module.startswith('rewrite.python.markers'):
-        return f"org.openrewrite.python.marker.{java_name}"
-    elif module.startswith('rewrite.java.tree'):
-        return f"org.openrewrite.java.tree.J${java_name}"
-    elif module.startswith('rewrite.java.support_types'):
-        if qualname == 'JavaType':
-            return 'org.openrewrite.java.tree.JavaType'
-        return f"org.openrewrite.java.tree.{java_name}"
-    elif module.startswith('rewrite.java.markers'):
-        return f"org.openrewrite.java.marker.{java_name}"
-    elif module.startswith('rewrite.markers'):
-        return f"org.openrewrite.marker.{java_name}"
-    elif qualname == 'Markers':
-        return 'org.openrewrite.marker.Markers'
-    elif qualname == 'Space':
-        return 'org.openrewrite.java.tree.Space'
-    elif qualname == 'Comment':
-        return 'org.openrewrite.java.tree.Comment'
-    elif qualname == 'TextComment':
-        return 'org.openrewrite.java.tree.Comment$TextComment'
-    elif qualname == 'JRightPadded':
-        return 'org.openrewrite.java.tree.JRightPadded'
-    elif qualname == 'JLeftPadded':
-        return 'org.openrewrite.java.tree.JLeftPadded'
-    elif qualname == 'JContainer':
-        return 'org.openrewrite.java.tree.JContainer'
-
-    # Default handling
-    return f"{module}.{java_name}"
-
-
 class RpcSendQueue:
     """Queue for generating RpcObjectData array from Python LST using visitor pattern."""
 
     def __init__(self, source_file_type: Optional[str] = None):
         self.q: List[Dict[str, Any]] = []
-        self.refs: Dict[int, int] = {}  # id(obj) -> ref number
+        self.refs: Dict[int, tuple] = {}  # id(obj) -> (obj, ref_number) — verified with `is`
         self.next_ref: int = 0
         self.source_file_type = source_file_type
         self._before: Any = None
@@ -117,6 +63,14 @@ class RpcSendQueue:
         wrapped = None if on_change is None or after is None else (lambda: on_change(after))
         self.send(after, before, wrapped)
 
+    def get_and_send_as_ref(self, parent: T, getter: Callable[[T], Any],
+                            on_change: Optional[Callable[[Any], None]] = None) -> None:
+        """Get a value from parent and send it as a ref-tracked object."""
+        after = getter(parent)
+        before = getter(self._before) if self._before is not None else None
+        wrapped = None if on_change is None or after is None else (lambda: on_change(after))
+        self._send_as_ref(after, before, wrapped)
+
     def get_and_send_list(self, parent: T, getter: Callable[[T], Optional[List[Any]]],
                           id_getter: Callable[[Any], Any],
                           on_change: Optional[Callable[[Any], None]] = None) -> None:
@@ -124,6 +78,14 @@ class RpcSendQueue:
         after = getter(parent)
         before = getter(self._before) if self._before is not None else None
         self.send_list(after, before, id_getter, on_change)
+
+    def get_and_send_list_as_ref(self, parent: T, getter: Callable[[T], Optional[List[Any]]],
+                                  id_getter: Callable[[Any], Any],
+                                  on_change: Optional[Callable[[Any], None]] = None) -> None:
+        """Get a list from parent and send it with ref tracking for each item."""
+        after = getter(parent)
+        before = getter(self._before) if self._before is not None else None
+        self.send_list(after, before, id_getter, on_change, as_ref=True)
 
     def send(self, after: Any, before: Any = None,
              on_change: Optional[Callable[[], None]] = None) -> None:
@@ -148,12 +110,43 @@ class RpcSendQueue:
         self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
         self._do_change(after, before, on_change, codec)
 
+    def _send_as_ref(self, after: Any, before: Any = None,
+                     on_change: Optional[Callable[[], None]] = None) -> None:
+        """Send a value as a ref-tracked object. If already sent, emit just the ref number."""
+        if before is after:
+            self.put({'state': RpcObjectState.NO_CHANGE})
+            return
+
+        if before is None or (after is not None and type(after) != type(before)):
+            self._add_as_ref(after, on_change)
+            return
+
+        if after is None:
+            self.put({'state': RpcObjectState.DELETE})
+            return
+
+        # Changed value — update ref tracking so `after` is recognized if seen again
+        before_id = id(before)
+        entry = self.refs.get(before_id)
+        if entry is not None and entry[0] is before:
+            ref_num = entry[1]
+            del self.refs[before_id]
+            self.refs[id(after)] = (after, ref_num)
+
+        value_type = self._get_value_type(after)
+        codec = self._get_rpc_codec(after)
+        value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
+        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
+        self._do_change(after, before, on_change, codec)
+
     def send_list(self, after: Optional[List], before: Optional[List],
                   id_getter: Callable[[Any], Any],
-                  on_change: Optional[Callable[[Any], None]] = None) -> None:
+                  on_change: Optional[Callable[[Any], None]] = None,
+                  as_ref: bool = False) -> None:
         """Send a list with proper list protocol.
 
         on_change is a callback that takes a single list item and processes it.
+        If as_ref is True, list items are ref-tracked to avoid resending duplicates.
         """
         if before is after:
             self.put({'state': RpcObjectState.NO_CHANGE})
@@ -162,6 +155,8 @@ class RpcSendQueue:
         if after is None:
             self.put({'state': RpcObjectState.DELETE})
             return
+
+        add_fn = self._add_as_ref if as_ref else self._add
 
         def list_change():
             assert after is not None
@@ -189,13 +184,13 @@ class RpcSendQueue:
                 wrapped = (lambda i=item: on_change(i)) if on_change else None
 
                 if before_pos is None:
-                    self._add(item, wrapped)
+                    add_fn(item, wrapped)
                 else:
                     a_before = before[before_pos] if before else None
                     if a_before is item:
                         self.put({'state': RpcObjectState.NO_CHANGE})
                     elif a_before is None or type(item) != type(a_before):
-                        self._add(item, wrapped)
+                        add_fn(item, wrapped)
                     else:
                         self.put({'state': RpcObjectState.CHANGE, 'valueType': self._get_value_type(item)})
                         self._do_change(item, a_before, wrapped)
@@ -221,6 +216,29 @@ class RpcSendQueue:
         self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value})
         self._do_change(obj, None, on_change, codec)
 
+    def _add_as_ref(self, obj: Any, on_change: Optional[Callable[[], None]] = None) -> None:
+        """Add an object with ref tracking. If already sent, emit just the ref number."""
+        if obj is None:
+            self.put({'state': RpcObjectState.DELETE})
+            return
+
+        obj_id = id(obj)
+        entry = self.refs.get(obj_id)
+        if entry is not None and entry[0] is obj:
+            # Already sent — emit ref number only, no onChange
+            self.put({'state': RpcObjectState.ADD, 'ref': entry[1]})
+            return
+
+        # First time — assign ref number and serialize fully
+        self.next_ref += 1
+        self.refs[obj_id] = (obj, self.next_ref)
+
+        value_type = self._get_value_type(obj)
+        codec = self._get_rpc_codec(obj)
+        value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
+        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': self.next_ref})
+        self._do_change(obj, None, on_change, codec)
+
     def _do_change(self, after: Any, before: Any,
                    on_change: Optional[Callable[[], None]] = None,
                    codec: Optional[Callable[[Any, 'RpcSendQueue'], None]] = None) -> None:
@@ -240,42 +258,17 @@ class RpcSendQueue:
 
     def _get_rpc_codec(self, obj: Any) -> Optional[Callable[[Any, 'RpcSendQueue'], None]]:
         """Get the RpcCodec serialization function for an object."""
-        from rewrite import Markers
-        from rewrite.java.markers import OmitParentheses, Semicolon, TrailingComma
-        if isinstance(obj, Markers):
-            return self._rpc_send_markers
-        if isinstance(obj, OmitParentheses):
-            return self._rpc_send_omit_parens
-        if isinstance(obj, Semicolon):
-            return self._rpc_send_semicolon
-        if isinstance(obj, TrailingComma):
-            return self._rpc_send_trailing_comma
-        return None
-
-    def _rpc_send_omit_parens(self, marker: 'OmitParentheses', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for OmitParentheses."""
-        q.get_and_send(marker, lambda x: x.id)
-
-    def _rpc_send_semicolon(self, marker: 'Semicolon', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for Semicolon."""
-        q.get_and_send(marker, lambda x: x.id)
-
-    def _rpc_send_trailing_comma(self, marker: 'TrailingComma', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for TrailingComma."""
-        from rewrite.rpc.python_sender import PythonRpcSender
-        sender = PythonRpcSender()
-        q.get_and_send(marker, lambda x: x.id)
-        q.get_and_send(marker, lambda x: x.suffix, lambda s: sender._visit_space(s, q))
-
-    def _rpc_send_markers(self, markers: 'Markers', q: 'RpcSendQueue') -> None:
-        """RpcCodec implementation for Markers."""
-        q.get_and_send(markers, lambda x: x.id)
-        # Send markers list as ref (simplified - no ref tracking for now)
-        q.get_and_send_list(markers, lambda x: x.markers,
-                           lambda m: m.id, None)
+        # Import python_receiver to ensure codecs are registered
+        from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
+        from rewrite.rpc.receive_queue import get_send_codec
+        return get_send_codec(obj)
 
     def _get_value_type(self, obj: Any) -> Optional[str]:
         """Get the Java type name for an object, or None for primitives."""
+        # Import python_receiver to ensure codecs are registered before get_java_type_name
+        from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
+        from rewrite.rpc.receive_queue import get_java_type_name
+
         if obj is None:
             return None
 
@@ -296,16 +289,25 @@ class RpcSendQueue:
         from rewrite.java.support_types import JavaType
         if isinstance(obj, JavaType.Primitive):
             return 'org.openrewrite.java.tree.JavaType$Primitive'
+        if isinstance(obj, JavaType.Method):
+            return 'org.openrewrite.java.tree.JavaType$Method'
+        if isinstance(obj, JavaType.Parameterized):
+            return 'org.openrewrite.java.tree.JavaType$Parameterized'
+        if isinstance(obj, JavaType.Class):
+            return 'org.openrewrite.java.tree.JavaType$Class'
+        if isinstance(obj, JavaType.GenericTypeVariable):
+            return 'org.openrewrite.java.tree.JavaType$GenericTypeVariable'
+        if isinstance(obj, JavaType.Union):
+            return 'org.openrewrite.java.tree.JavaType$MultiCatch'
+        if isinstance(obj, JavaType.Intersection):
+            return 'org.openrewrite.java.tree.JavaType$Intersection'
 
         # Other enums don't need type info (they're serialized by name)
         if isinstance(obj, Enum):
             return None
 
-        # Dataclasses need their Java type name
-        if is_dataclass(obj) and not isinstance(obj, type):
-            return to_java_type_name(obj_type)
-
-        return None
+        # Look up Java type name from codec registry
+        return get_java_type_name(obj_type)
 
     def _get_primitive_value(self, obj: Any) -> Any:
         """Get the primitive value representation for serialization."""
@@ -314,7 +316,14 @@ class RpcSendQueue:
             return None
         if isinstance(obj, bool):
             return obj
-        if isinstance(obj, (int, str)):
+        if isinstance(obj, int):
+            # Integers exceeding Java's long range cannot be serialized as
+            # JSON numbers (Jackson's StreamReadConstraints rejects them).
+            # Convert to string — the original source is preserved in valueSource.
+            if obj > 9223372036854775807 or obj < -9223372036854775808:
+                return str(obj)
+            return obj
+        if isinstance(obj, str):
             return obj
         if isinstance(obj, float):
             # Special float values (inf, nan) are not valid JSON

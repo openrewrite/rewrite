@@ -74,11 +74,11 @@ public class PythonParser implements Parser {
                 try {
                     validator.visit(source, 0);
                     return source;
-                } catch (Exception e) {
+                } catch (Throwable t) {
                     Optional<Input> input = smallFiles.stream()
                             .filter(i -> i.getRelativePath(relativeTo).equals(source.getSourcePath()))
                             .findFirst();
-                    return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, e);
+                    return ParseError.build(this, input.orElseThrow(NoSuchElementException::new), relativeTo, ctx, t);
                 }
             });
         }

@@ -175,6 +175,112 @@ class ChangePluginConfigurationTest implements RewriteTest {
     }
 
     @Test
+    void addConfigurationWithMavenPropertyFromYaml() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            type: specs.openrewrite.org/v1beta/recipe
+            name: com.yourorg.ChangePluginConfigurationExample
+            displayName: Change Maven plugin configuration example
+            description: Add targetJdk configuration with Maven property reference.
+            recipeList:
+              - org.openrewrite.maven.ChangePluginConfiguration:
+                  groupId: org.openrewrite.maven
+                  artifactId: rewrite-maven-plugin
+                  configuration: "<targetJdk>\\${java.version}</targetJdk>"
+            """,
+            "com.yourorg.ChangePluginConfigurationExample"),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <configuration>
+                                  <targetJdk>${java.version}</targetJdk>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void addConfigurationWithMavenProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePluginConfiguration(
+            "org.openrewrite.maven",
+            "rewrite-maven-plugin",
+            "<targetJdk>${java.version}</targetJdk>")),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <configuration>
+                                  <targetJdk>${java.version}</targetJdk>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void transformConfigurationNoOpWhenConfigurationMissing() {
         rewriteRun(
           spec -> spec.recipe(new ChangePluginConfiguration(

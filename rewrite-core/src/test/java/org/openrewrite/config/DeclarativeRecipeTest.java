@@ -20,7 +20,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
+import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.Find;
@@ -29,7 +36,8 @@ import org.openrewrite.text.PlainTextVisitor;
 
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.List;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -39,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("NullableProblems")
 class DeclarativeRecipeTest implements RewriteTest {
 
     @DocumentExample
@@ -97,11 +106,30 @@ class DeclarativeRecipeTest implements RewriteTest {
         );
         dr.initialize(List.of());
         assertThat(dr.getDescriptor().getRecipeList())
-          .hasSize(3) // precondition + 2 recipes with options
+          .hasSize(2)
           .flatExtracting(RecipeDescriptor::getOptions)
           .hasSize(2)
           .extracting(OptionDescriptor::getName)
           .containsOnly("toText");
+    }
+
+    @Test
+    void preconditionDescriptorsIncludedInDescriptor() {
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
+        dr.addPrecondition(new Find("precondition-marker", null, null, null, null, null, null, null));
+        dr.addUninitialized(new ChangeText("2"));
+        dr.initialize(List.of());
+
+        RecipeDescriptor descriptor = dr.getDescriptor();
+        assertThat(descriptor.getPreconditions())
+          .hasSize(1)
+          .first()
+          .satisfies(p -> assertThat(p.getName()).isEqualTo("org.openrewrite.text.Find"));
+        assertThat(descriptor.getRecipeList())
+          .hasSize(1)
+          .first()
+          .satisfies(r -> assertThat(r.getName()).isEqualTo("org.openrewrite.text.ChangeText"));
     }
 
     @Test
@@ -254,7 +282,6 @@ class DeclarativeRecipeTest implements RewriteTest {
               """, "org.openrewrite.PreconditionTest")
             .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).anySatisfy(
               s -> {
-                  //noinspection DataFlowIssue
                   assertThat(s.getAfter()).isNotNull();
                   assertThat(s.getAfter().getSourcePath()).isEqualTo(Path.of("test.txt"));
               }
@@ -485,6 +512,188 @@ class DeclarativeRecipeTest implements RewriteTest {
             .hasMessageContaining("RecipeB");
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void nestedScanningRecipeInOrPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.AddJacksonAnnotations
+              description: Test.
+              preconditions:
+                - org.sample.ProjectUsesJackson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.ProjectUsesJackson
+              description: OR precondition - matches if ANY condition is true
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson-config.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson.properties"
+              """,
+            "org.sample.AddJacksonAnnotations"
+          ),
+          // jackson-config.json triggers the precondition, so all files get changed
+          text("config", "changed", spec -> spec.path("jackson-config.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void nestedScanningRecipeInOrPreconditionNotMet() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.AddJacksonAnnotations
+              description: Test.
+              preconditions:
+                - org.sample.ProjectUsesJackson
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.ProjectUsesJackson
+              description: OR precondition - matches if ANY condition is true
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson-config.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/jackson.properties"
+              """,
+            "org.sample.AddJacksonAnnotations"
+          ),
+          text("config", spec -> spec.path("some-other-file.txt")),
+          text("original")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void sameScanningRecipeWithDifferentParametersInOrPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.MultiFileCheck
+              description: Test.
+              preconditions:
+                - org.sample.HasAnyConfigFile
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.HasAnyConfigFile
+              description: OR precondition with same recipe type but different params
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-a.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-b.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/config-c.json"
+              """,
+            "org.sample.MultiFileCheck"
+          ),
+          // Only config-b.json exists, so should still match due to OR logic
+          // When matched, all files are changed
+          text("config b", "changed", spec -> spec.path("config-b.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void deeplyNestedOrPreconditionsWithScanningRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.TopLevel
+              description: Test.
+              preconditions:
+                - org.sample.MiddleLevel
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.MiddleLevel
+              description: Middle level precondition
+              recipeList:
+                - org.sample.BottomLevel
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/middle.json"
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BottomLevel
+              description: Bottom level with scanning recipes
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/bottom-a.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/bottom-b.json"
+              """,
+            "org.sample.TopLevel"
+          ),
+          // Only bottom-b.json exists, which should match through the nested OR chain
+          // When matched, all files are changed
+          text("bottom b config", "changed", spec -> spec.path("bottom-b.json")),
+          text("original", "changed")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6698")
+    @Test
+    void multipleNestedOrPreconditionsWithSameScanningRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.TopLevel
+              description: Test.
+              preconditions:
+                - org.sample.BranchA
+                - org.sample.BranchB
+              recipeList:
+                - org.openrewrite.text.ChangeText:
+                   toText: changed
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BranchA
+              description: First branch
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/branch-a-1.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/shared.json"
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.sample.BranchB
+              description: Second branch
+              recipeList:
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/branch-b-1.json"
+                - org.openrewrite.search.RepositoryContainsFile:
+                    filePattern: "**/shared.json"
+              """,
+            "org.sample.TopLevel"
+          ),
+          // shared.json exists, which should satisfy both branches (AND of two ORs)
+          // When matched, all files are changed
+          text("shared config", "changed", spec -> spec.path("shared.json")),
+          text("original", "changed")
+        );
+    }
+
     @Test
     void deeperCyclicReferencesDetectedAsCycle() {
         // Test that deeper cyclic references (A -> B -> C -> A) are detected as a cycle
@@ -538,5 +747,96 @@ class DeclarativeRecipeTest implements RewriteTest {
             .hasMessageContaining("RecipeA")
             .hasMessageContaining("RecipeB")
             .hasMessageContaining("RecipeC");
+    }
+
+    // Uses separate RecipeRunCycles for scan and edit to verify that the accumulator
+    // survives when getRecipeList() is called again from a fresh RecipeStack.
+    // This can't be tested via rewriteRun() which uses a single RecipeRunCycle per cycle.
+    @Test
+    void scanningRecipeAccumulatorSurvivesAcrossRecipeRunCycles() {
+        DeclarativeRecipe recipe = new DeclarativeRecipe(
+                "test.WithPrecondition", "With precondition", "Test with precondition.",
+                emptySet(), null, URI.create("test"), true, emptyList()
+        );
+        recipe.addPrecondition(new Singleton());
+        recipe.addUninitialized(new CountingRecipe());
+        recipe.initialize(List.of());
+
+        List<SourceFile> sources = List.of(
+                PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file1.txt")).text("hello").build(),
+                PlainText.builder().id(Tree.randomId()).sourcePath(Paths.get("file2.txt")).text("world").build()
+        );
+
+        Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+        WatchableExecutionContext ctx = new WatchableExecutionContext(new InMemoryExecutionContext());
+        Recipe noop = Recipe.noop();
+
+        // Cycle 1: scan (simulates first yield batch on the platform)
+        RecipeRunCycle<LargeSourceSet> scanCycle = new RecipeRunCycle<>(
+                recipe, 1, rootCursor, ctx,
+                new RecipeRunStats(noop), new SearchResults(noop),
+                new SourcesFileResults(noop), new SourcesFileErrors(noop),
+                LargeSourceSet::edit
+        );
+        ctx.putCycle(scanCycle);
+        scanCycle.scanSources(new InMemoryLargeSourceSet(sources));
+
+        // Cycle 2: edit (simulates new RecipeRunCycle after worker yield — new RecipeStack, fresh getRecipeList() calls)
+        RecipeRunCycle<LargeSourceSet> editCycle = new RecipeRunCycle<>(
+                recipe, 1, rootCursor, ctx,
+                new RecipeRunStats(noop), new SearchResults(noop),
+                new SourcesFileResults(noop), new SourcesFileErrors(noop),
+                LargeSourceSet::edit
+        );
+        ctx.putCycle(editCycle);
+        LargeSourceSet edited = editCycle.editSources(new InMemoryLargeSourceSet(sources));
+
+        List<SourceFile> results = edited.getChangeset().getAllResults().stream()
+                .map(Result::getAfter)
+                .filter(Objects::nonNull)
+                .toList();
+
+        assertThat(results).anyMatch(sf -> ((PlainText) sf).getText().contains("[scanned:"));
+    }
+
+    static class CountingRecipe extends ScanningRecipe<List<String>> {
+        @Override
+        public String getDisplayName() {
+            return "Counting recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Counts files during scan, appends count during edit.";
+        }
+
+        @Override
+        public List<String> getInitialValue(ExecutionContext ctx) {
+            return new ArrayList<>();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(List<String> acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    acc.add(text.getText());
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(List<String> acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if (!acc.isEmpty()) {
+                        return text.withText(text.getText() + " [scanned:" + acc.size() + "]");
+                    }
+                    return text;
+                }
+            };
+        }
     }
 }

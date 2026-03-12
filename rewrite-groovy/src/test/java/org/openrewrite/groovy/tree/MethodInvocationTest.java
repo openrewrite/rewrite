@@ -212,11 +212,33 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void staticMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              Integer.&parseInt
+              """
+          )
+        );
+    }
+
+    @Test
     void staticMethodReference() {
         rewriteRun(
           groovy(
             """
               Integer::parseInt
+              """
+          )
+        );
+    }
+
+    @Test
+    void instanceMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              ["a", "b", "c"].forEach(System.out.&println)
               """
           )
         );
@@ -234,11 +256,33 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void constructorMethodPointer() {
+        rewriteRun(
+          groovy(
+            """
+              ArrayList.&new
+              """
+          )
+        );
+    }
+
+    @Test
     void constructorMethodReference() {
         rewriteRun(
           groovy(
             """
               ArrayList::new
+              """
+          )
+        );
+    }
+
+    @Test
+    void arrayConstructorMethodReference() {
+        rewriteRun(
+          groovy(
+            """
+              [1, 2, 3].stream().toArray(Integer[]::new)
               """
           )
         );

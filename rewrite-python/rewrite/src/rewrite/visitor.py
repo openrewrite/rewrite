@@ -18,19 +18,21 @@ P = TypeVar('P')
 
 @dataclass(frozen=True)
 class Cursor:
-    ROOT_VALUE: ClassVar[str] = "root"
-
     parent: Optional[Cursor]
     value: object
     messages: Optional[Dict[str, object]] = None
+
+    ROOT_VALUE: ClassVar[str] = "root"
 
     def get_message(self, key: str, default_value: O) -> O:
         return default_value if self.messages is None else cast(O, self.messages.get(key))
 
     def put_message(self, key: str, value: object) -> None:
-        if self.messages is None:
-            object.__setattr__(self, 'messages', {})
-        self.messages[key] = value  # type: ignore
+        messages = self.messages
+        if messages is None:
+            messages = {}
+            object.__setattr__(self, 'messages', messages)
+        messages[key] = value
 
     def parent_tree_cursor(self) -> Cursor:
         c = self.parent
@@ -43,7 +45,7 @@ class Cursor:
     def first_enclosing_or_throw(self, type: Type[P]) -> P:
         result = self.first_enclosing(type)
         if result is None:
-            raise ValueError(f"Expected to find enclosing {T.__name__}")
+            raise ValueError(f"Expected to find enclosing {type.__name__}")
         return result
 
     def first_enclosing(self, type_: Type[P]) -> Optional[P]:
@@ -108,6 +110,9 @@ class TreeVisitor(ABC, Generic[T, P]):
     def cursor(self, cursor: Cursor) -> None:
         self._cursor = cursor
 
+    def set_cursor(self, cursor: Cursor) -> None:
+        self._cursor = cursor
+
     def pre_visit(self, tree: T, p: P) -> Optional[T]:
         return cast(Optional[T], self.default_value(tree, p))
 
@@ -141,7 +146,7 @@ class TreeVisitor(ABC, Generic[T, P]):
                     if t is not None:
                         t = self.post_visit(t, p)
 
-            self.cursor = self._cursor.parent  # type: ignore
+            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter (ty#628)
 
             if top_level:
                 if t is not None and self._after_visit is not None:
@@ -161,8 +166,8 @@ class TreeVisitor(ABC, Generic[T, P]):
 
         return t if is_acceptable else cast(Optional[T], tree)
 
-    def visit_and_cast(self, tree: Optional[Tree], t_type: Type[T2], p: P) -> T2:
-        return cast(T2, self.visit(tree, p))
+    def visit_and_cast(self, tree: Optional[Tree], t_type: Type[T2], p: P) -> Optional[T2]:
+        return cast(Optional[T2], self.visit(tree, p))
 
     def default_value(self, tree: Optional[Tree], p: P) -> Optional[Tree]:
         return tree
@@ -170,12 +175,37 @@ class TreeVisitor(ABC, Generic[T, P]):
     def visit_markers(self, markers: Markers, p: P) -> Markers:
         if markers is None or markers is Markers.EMPTY:
             return Markers.EMPTY
-        elif len(markers.markers) == 0:
+        ms = markers._markers  # bypass @property in hot path
+        if len(ms) == 0:
             return markers
-        return markers.replace(markers=list_map(lambda m: self.visit_marker(m, p), markers.markers))
+        return markers.replace(markers=list_map(lambda m: self.visit_marker(m, p), ms))
 
     def visit_marker(self, marker: Marker, p: P) -> Marker:
         return marker
+
+    def stop_after_pre_visit(self) -> None:
+        """
+        Stop visiting after pre_visit returns, preventing accept() and post_visit() from being called.
+        Call this in pre_visit when you only want to process at a high level without traversing children.
+        """
+        self._cursor.put_message("STOP_AFTER_PRE_VISIT", True)
+
+    def is_adaptable_to(self, adapt_to: Type['TreeVisitor[Any, Any]']) -> bool:
+        """
+        Check if this visitor can be adapted to the given visitor type.
+
+        A visitor is adaptable if:
+        1. It is already an instance of the target type, OR
+        2. It is a base TreeVisitor (not a language-specific visitor)
+
+        This is a simplified implementation. Full adaptation support
+        would check tree type hierarchies like Java does.
+        """
+        if isinstance(self, adapt_to):
+            return True
+        # Base TreeVisitor is adaptable to any visitor type
+        # (its tree type is Tree, which is a supertype of all tree types)
+        return type(self).__mro__[1] == TreeVisitor or type(self) == TreeVisitor
 
     def adapt(self, tree_type, visitor_type: Type[TV]) -> TV:
         # FIXME implement the visitor adapting
@@ -184,4 +214,4 @@ class TreeVisitor(ABC, Generic[T, P]):
 
 class NoopVisitor(TreeVisitor[Tree, P]):
     def visit(self, tree: Optional[Tree], p: P, parent: Optional[Cursor] = None) -> Optional[T]:
-        return cast(T, tree) if tree else tree
+        return cast(T, tree) if tree else None

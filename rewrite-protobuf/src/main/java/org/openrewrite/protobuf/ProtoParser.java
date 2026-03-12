@@ -52,8 +52,14 @@ public class ProtoParser implements Parser {
                         parser.removeErrorListeners();
                         parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
-                        if (sourceStr.contains("proto3")) {
-                            // Pending Proto3 support, the best we can do is plain text & not skip files
+                        Protobuf2Parser.ProtoContext protoCtx = parser.proto();
+                        Protobuf2Parser.SyntaxContext syntaxCtx = protoCtx.syntax();
+                        if (syntaxCtx != null &&
+                            (syntaxCtx.stringLiteral() == null ||
+                             syntaxCtx.stringLiteral().StringLiteral() == null ||
+                             syntaxCtx.stringLiteral().StringLiteral().getText().contains("proto3"))) {
+                            // Pending Proto3 support, the best we can do is plain text & not skip files;
+                            // also fall back to plain text when the syntax declaration can't be parsed
                             return PlainText.builder()
                                     .sourcePath(path)
                                     .charsetName(is.getCharset().name())
@@ -69,7 +75,7 @@ public class ProtoParser implements Parser {
                                 sourceStr,
                                 is.getCharset(),
                                 is.isCharsetBomMarked()
-                        ).visitProto(parser.proto());
+                        ).visitProto(protoCtx);
                         parsingListener.parsed(input, document);
                         return requirePrintEqualsInput(document, input, relativeTo, ctx);
                     } catch (Throwable t) {

@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
@@ -445,15 +446,12 @@ public class MavenSettings {
         ServerConfiguration configuration;
     }
 
-    @SuppressWarnings("DefaultAnnotationParam")
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @EqualsAndHashCode
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @ToString
     @With
     @JsonIgnoreProperties("httpHeaders")
     public static class ServerConfiguration {
-        @JacksonXmlProperty(localName = "property")
-        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
-        // wrapping is disabled by default on MavenXmlMapper
         @Nullable
         List<HttpHeader> httpHeaders;
 
@@ -462,6 +460,26 @@ public class MavenSettings {
          */
         @Nullable
         Long timeout;
+
+        @JsonCreator
+        public ServerConfiguration() {
+        }
+
+        public ServerConfiguration(@Nullable List<HttpHeader> httpHeaders, @Nullable Long timeout) {
+            this.httpHeaders = httpHeaders;
+            this.timeout = timeout;
+        }
+
+        @JacksonXmlProperty(localName = "property")
+        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
+        public @Nullable List<HttpHeader> getHttpHeaders() {
+            return this.httpHeaders;
+        }
+
+        @JacksonXmlProperty(localName = "timeout")
+        public @Nullable Long getTimeout() {
+            return this.timeout;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

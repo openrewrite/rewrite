@@ -126,7 +126,7 @@ public class DependencyInsight extends Recipe {
                         .map(JavaSourceSet::getName)
                         .orElse("main");
 
-                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByScope = new HashMap<>();
+                Map<String, Map<ResolvedGroupArtifactVersion, DependencyGraph>> dependencyPathsByScope = new LinkedHashMap<>();
                 DependencyTreeWalker.Matches<Scope> matches = new DependencyTreeWalker.Matches<>();
                 collectMatchingDependencies(getResolutionResult(), dependencyPathsByScope, requestedScope, matches);
 
@@ -181,7 +181,7 @@ public class DependencyInsight extends Recipe {
                     for (ResolvedDependency dependency : entry.getValue()) {
                         matches.collect(scope, dependency, dependencyMatcher,
                                 (matched, path) -> {
-                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new HashMap<>())
+                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new LinkedHashMap<>())
                                             .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(scope.name().toLowerCase(), path);
                                 });
                     }
@@ -200,6 +200,11 @@ public class DependencyInsight extends Recipe {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
+
+            if (isParentTag()) {
+                return markParentTag(t, ctx);
+            }
+
             if (!isDependencyTag()) {
                 return t;
             }
@@ -236,6 +241,53 @@ public class DependencyInsight extends Recipe {
                 }
             }
             return t;
+        }
+
+        private Xml.Tag markParentTag(Xml.Tag t, ExecutionContext ctx) {
+            // Collect all target dependencies and track which are covered by declared dependencies.
+            // A target is "covered" if it's reachable through ANY declared dependency.
+            // Only mark parent with targets that aren't covered by any declared dependency.
+            Set<String> coveredTargets = new HashSet<>();
+            Set<String> allTargets = new HashSet<>();
+
+            for (Map.Entry<Scope, Set<GroupArtifactVersion>> entry : scopeToDirectDependency.entrySet()) {
+                for (GroupArtifactVersion directGav : entry.getValue()) {
+                    Set<GroupArtifactVersion> targets = directDependencyToTargetDependency.get(directGav);
+                    if (targets != null) {
+                        boolean isDeclared = isDeclaredInCurrentPom(directGav);
+                        for (GroupArtifactVersion target : targets) {
+                            if (!Boolean.TRUE.equals(onlyDirect) || directGav.equals(target)) {
+                                String targetStr = target.getGroupId() + ":" + target.getArtifactId() + ":" + target.getVersion();
+                                allTargets.add(targetStr);
+                                if (isDeclared) {
+                                    coveredTargets.add(targetStr);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Only mark with targets that aren't covered by declared dependencies
+            Set<String> inheritedTargets = new TreeSet<>(allTargets);
+            inheritedTargets.removeAll(coveredTargets);
+
+            if (!inheritedTargets.isEmpty()) {
+                return SearchResult.found(t, String.join(",", inheritedTargets));
+            }
+            return t;
+        }
+
+        private boolean isDeclaredInCurrentPom(GroupArtifactVersion gav) {
+            ResolvedPom pom = getResolutionResult().getPom();
+            for (Dependency dep : pom.getRequested().getDependencies()) {
+                String groupId = pom.getValue(dep.getGroupId());
+                String artifactId = pom.getValue(dep.getArtifactId());
+                if (gav.getGroupId().equals(groupId) && gav.getArtifactId().equals(artifactId)) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

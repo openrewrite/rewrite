@@ -93,8 +93,4 @@ __all__ = [
     'Wildcard',
     'Yield',
     'Unknown',
-
-    # Templating
-    'CoordinateBuilder',
-    'JavaCoordinates',
 ]

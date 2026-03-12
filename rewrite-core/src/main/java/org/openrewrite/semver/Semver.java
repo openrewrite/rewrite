@@ -115,18 +115,18 @@ public class Semver {
             return version1.compareTo(version2) >= 0 ? version1 : version2;
         }
         try {
-            int maj1 = Integer.parseInt(major1);
-            int maj2 = Integer.parseInt(major2);
+            long maj1 = Long.parseLong(major1);
+            long maj2 = Long.parseLong(major2);
             if (maj1 != maj2) return maj1 > maj2 ? version1 : version2;
 
-            int min1 = Integer.parseInt(minor1);
-            int min2 = Integer.parseInt(minor2);
+            long min1 = Long.parseLong(minor1);
+            long min2 = Long.parseLong(minor2);
             if (min1 != min2) return min1 > min2 ? version1 : version2;
 
             String[] parts1 = version1.split("[.-]");
             String[] parts2 = version2.split("[.-]");
-            int patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Integer.parseInt(parts1[2]) : 0;
-            int patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Integer.parseInt(parts2[2]) : 0;
+            long patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Long.parseLong(parts1[2]) : 0;
+            long patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Long.parseLong(parts2[2]) : 0;
             if (patch1 != patch2) return patch1 > patch2 ? version1 : version2;
 
             String label1 = parts1.length > 3 ? parts1[3].toLowerCase() : "";

@@ -44,7 +44,7 @@ import static java.util.Collections.emptyList;
 
 @RequiredArgsConstructor
 public class GradleDependencies implements Trait<J.MethodInvocation> {
-    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
 
     @Getter
     private final Cursor cursor;

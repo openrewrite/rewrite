@@ -26,11 +26,12 @@ import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
@@ -40,8 +41,13 @@ public class JsonParser implements Parser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(input -> {
             parsingListener.startedParsing(input);
-            try (InputStream sourceStream = input.getSource(ctx)) {
-                JSON5Lexer lexer = new JSON5Lexer(CharStreams.fromStream(sourceStream));
+            try {
+                EncodingDetectingInputStream is = input.getSource(ctx);
+                String sourceStr = is.readFully();
+                Charset charset = is.getCharset();
+                boolean charsetBomMarked = is.isCharsetBomMarked();
+
+                JSON5Lexer lexer = new JSON5Lexer(CharStreams.fromString(sourceStr));
                 lexer.removeErrorListeners();
                 lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
@@ -52,7 +58,9 @@ public class JsonParser implements Parser {
                 Json.Document document = new JsonParserVisitor(
                         input.getRelativePath(relativeTo),
                         input.getFileAttributes(),
-                        input.getSource(ctx)
+                        sourceStr,
+                        charset,
+                        charsetBomMarked
                 ).visitJson5(parser.json5());
                 parsingListener.parsed(input, document);
                 return requirePrintEqualsInput(document, input, relativeTo, ctx);

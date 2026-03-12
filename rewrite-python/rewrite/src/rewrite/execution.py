@@ -36,7 +36,8 @@ class DelegatingExecutionContext(ExecutionContext):
 
 
 class InMemoryExecutionContext(ExecutionContext):
-    _messages: dict[str, Any] = {}
+    def __init__(self):
+        self._messages: dict[str, Any] = {}
 
     def get_message(self, key: str, default_value=None) -> Any:
         return self._messages[key] if key in self._messages else default_value
@@ -61,9 +62,11 @@ class RecipeRunException(Exception):
 
 
 class LargeSourceSet(ABC):
+    @abstractmethod
     def edit(self, map: Callable[[SourceFile], Optional[SourceFile]]) -> LargeSourceSet:
         ...
 
+    @abstractmethod
     def get_changeset(self) -> List[Result]:
         ...
 
@@ -73,7 +76,7 @@ class InMemoryLargeSourceSet(LargeSourceSet):
     _sources: List[SourceFile]
     _deletions: List[SourceFile]
 
-    def __init__(self, sources: List[SourceFile], deletions: List[SourceFile] = None, initial_state: InMemoryLargeSourceSet = None):
+    def __init__(self, sources: List[SourceFile], deletions: Optional[List[SourceFile]] = None, initial_state: Optional[InMemoryLargeSourceSet] = None):
         self._initial_state = initial_state
         self._sources = sources
         self._deletions = deletions or []

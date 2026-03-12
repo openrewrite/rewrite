@@ -26,8 +26,6 @@ import org.openrewrite.config.RecipeDescriptor;
 import java.time.Duration;
 import java.util.*;
 
-import static java.util.Collections.singleton;
-
 @Getter
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -35,7 +33,6 @@ public class RecipeListing implements Comparable<RecipeListing> {
     /**
      * The marketplace that this listing belongs to.
      */
-    @With
     private final @Nullable RecipeMarketplace marketplace;
 
     private final @EqualsAndHashCode.Include String name;
@@ -63,26 +60,45 @@ public class RecipeListing implements Comparable<RecipeListing> {
 
     private final Map<String, Object> metadata = new LinkedHashMap<>();
 
-    @With(AccessLevel.PACKAGE)
     private final RecipeBundle bundle;
 
-    public RecipeBundleReader resolve() {
-        if (marketplace != null) {
-            for (RecipeBundleResolver resolver : marketplace.getResolvers()) {
-                if (resolver.getEcosystem().equals(bundle.getPackageEcosystem())) {
-                    return resolver.resolve(bundle);
-                }
+    public RecipeListing withMarketplace(@Nullable RecipeMarketplace marketplace) {
+        if (this.marketplace == marketplace) {
+            return this;
+        }
+        RecipeListing copy = new RecipeListing(marketplace, name, displayName, description,
+                estimatedEffortPerOccurrence, options, dataTables, recipeCount, bundle);
+        copy.metadata.putAll(this.metadata);
+        return copy;
+    }
+
+    RecipeListing withBundle(RecipeBundle bundle) {
+        if (this.bundle == bundle) {
+            return this;
+        }
+        RecipeListing copy = new RecipeListing(marketplace, name, displayName, description,
+                estimatedEffortPerOccurrence, options, dataTables, recipeCount, bundle);
+        copy.metadata.putAll(this.metadata);
+        return copy;
+    }
+
+    private RecipeBundleReader resolve(Collection<RecipeBundleResolver> resolvers) {
+        for (RecipeBundleResolver resolver : resolvers) {
+            if (resolver.getEcosystem().equals(bundle.getPackageEcosystem())) {
+                return resolver.resolve(bundle);
             }
         }
-        throw new IllegalStateException("This listing has not been configured with a resolver.");
+        throw new IllegalStateException(String.format("No available resolver for '%s' ecosystem", bundle.getPackageEcosystem()));
     }
 
-    public RecipeDescriptor describe() {
-        return resolve().describe(this);
+    public RecipeDescriptor describe(Collection<RecipeBundleResolver> resolvers) {
+        // noinspection resource
+        return resolve(resolvers).describe(this);
     }
 
-    public Recipe prepare(Map<String, Object> options) {
-        return resolve().prepare(this, options);
+    public Recipe prepare(Collection<RecipeBundleResolver> resolvers, Map<String, Object> options) {
+        // noinspection resource
+        return resolve(resolvers).prepare(this, options);
     }
 
     @Override
@@ -92,10 +108,9 @@ public class RecipeListing implements Comparable<RecipeListing> {
 
     public static RecipeListing fromDescriptor(RecipeDescriptor descriptor, RecipeBundle bundle) {
         int recipeCount = 1;
-        RecipeDescriptor d = descriptor;
-        for (Queue<RecipeDescriptor> queue = new LinkedList<>(singleton(descriptor)); !queue.isEmpty();
-             d = queue.poll()) {
-            recipeCount += d.getRecipeList().size();
+        for (Queue<RecipeDescriptor> queue = new LinkedList<>(descriptor.getRecipeList()); !queue.isEmpty(); ) {
+            RecipeDescriptor d = queue.poll();
+            recipeCount++;
             queue.addAll(d.getRecipeList());
         }
 

@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.search.FindProperty;
 import org.openrewrite.yaml.tree.Yaml;
@@ -92,6 +91,30 @@ public class ChangePropertyKey extends Recipe {
     }
 
     private class ChangePropertyKeyVisitor<P> extends YamlIsoVisitor<P> {
+        private final NameCaseConvention.Compiled oldKeyMatcher;
+        private final NameCaseConvention.Compiled oldKeyWildcardMatcher;
+        private final NameCaseConvention.Compiled newKeyMatcher;
+        private final NameCaseConvention.Compiled newKeyWildcardMatcher;
+        private final List<NameCaseConvention.Compiled> exceptMatchers;
+        private final List<NameCaseConvention.Compiled> exceptWildcardMatchers;
+
+        ChangePropertyKeyVisitor() {
+            NameCaseConvention convention = !Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.LOWER_CAMEL :
+                    NameCaseConvention.EXACT;
+            this.oldKeyMatcher = convention.compile(oldPropertyKey);
+            this.oldKeyWildcardMatcher = convention.compile(oldPropertyKey + ".*");
+            this.newKeyMatcher = convention.compile(newPropertyKey);
+            this.newKeyWildcardMatcher = convention.compile(newPropertyKey + ".*");
+            List<String> excluded = excludedSubKeys();
+            this.exceptMatchers = new ArrayList<>(excluded.size());
+            this.exceptWildcardMatchers = new ArrayList<>(excluded.size());
+            for (String subkey : excluded) {
+                exceptMatchers.add(convention.compile(oldPropertyKey + "." + subkey));
+                exceptWildcardMatchers.add(convention.compile(oldPropertyKey + "." + subkey + ".*"));
+            }
+        }
+
         @Override
         public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
             Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
@@ -108,12 +131,14 @@ public class ChangePropertyKey extends Recipe {
                     .collect(joining("."));
 
             if (newPropertyKey.startsWith(oldPropertyKey) &&
-                    (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
+                    (newKeyMatcher.matchesGlob(prop) ||
+                     newKeyWildcardMatcher.matchesGlob(prop) ||
+                     childMatchesNewPropertyKey(entry, prop))) {
                 return e;
             }
 
             String propertyToTest = newPropertyKey;
-            if (matches(prop, oldPropertyKey)) {
+            if (oldKeyMatcher.matchesGlob(prop)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -132,9 +157,10 @@ public class ChangePropertyKey extends Recipe {
                 }
             } else {
                 String parentProp = prop.substring(0, prop.length() - e.getKey().getValue().length()).replaceAll(".$", "");
-                if (matches(prop, oldPropertyKey + ".*") &&
-                        !(matches(parentProp, oldPropertyKey + ".*") || matches(parentProp, oldPropertyKey)) &&
-                        noneMatch(prop, oldPropertyKey, excludedSubKeys())) {
+                if (oldKeyWildcardMatcher.matchesGlob(prop) &&
+                        !(oldKeyWildcardMatcher.matchesGlob(parentProp) ||
+                          oldKeyMatcher.matchesGlob(parentProp)) &&
+                        noneMatchExcluded(prop)) {
                     Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                     while (propertyEntriesLeftToRight.hasNext()) {
                         Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -161,6 +187,15 @@ public class ChangePropertyKey extends Recipe {
                     Pattern.quote(cursorPropertyKey),
                     entry.getKey().getValue());
             return !FindProperty.find(entry, rescopedNewPropertyKey, relaxedBinding).isEmpty();
+        }
+
+        private boolean noneMatchExcluded(String key) {
+            for (int i = 0; i < exceptMatchers.size(); i++) {
+                if (exceptMatchers.get(i).matchesGlob(key) || exceptWildcardMatchers.get(i).matchesGlob(key)) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
@@ -206,22 +241,6 @@ public class ChangePropertyKey extends Recipe {
             }
         }
         return true;
-    }
-
-    private boolean noneMatch(String key, String basePattern, List<String> excludedSubKeys) {
-        for (String subkey : excludedSubKeys) {
-            String subKeyPattern = basePattern + "." + subkey;
-            if (matches(key, subKeyPattern) || matches(key, subKeyPattern + ".*")) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean matches(String string, String pattern) {
-        return !Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.matchesGlobRelaxedBinding(string, pattern) :
-                StringUtils.matchesGlob(string, pattern);
     }
 
     private List<String> excludedSubKeys() {

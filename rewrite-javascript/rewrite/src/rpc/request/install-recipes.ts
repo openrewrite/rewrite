@@ -16,6 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import {spawn} from "child_process";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
@@ -36,7 +37,7 @@ async function spawnNpmCommand(
     logger?: rpc.Logger,
     logPrefix?: string
 ): Promise<void> {
-    const child = spawn(getPlatformCommand(command), args, {cwd});
+    const child = spawn(getPlatformCommand(command), args, {cwd, ...(os.platform() === 'win32' ? { shell: true } : {})});
 
     if (logger) {
         const prefix = logPrefix ? `${logPrefix}: ` : '';
@@ -111,7 +112,7 @@ export class InstallRecipes {
 
                         // Rather than using npm on PATH, use `node_cli.js`.
                         // https://stackoverflow.com/questions/15957529/can-i-install-a-npm-package-from-javascript-running-in-node-js
-                        const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "");
+                        const packageSpec = recipePackage.packageName + (recipePackage.version ? `@${recipePackage.version}` : "@latest");
                         await spawnNpmCommand("npm", ["install", packageSpec, "--no-fund"], absoluteInstallDir, logger);
                         resolvedPath = require.resolve(path.join(absoluteInstallDir, "node_modules", recipePackage.packageName));
                         recipesName = request.recipes.packageName;

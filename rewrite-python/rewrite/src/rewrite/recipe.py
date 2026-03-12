@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, is_dataclass
 from typing import (
     Any,
     List,
@@ -28,10 +28,10 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from rewrite.data_table import DataTable
     from rewrite.visitor import TreeVisitor, Cursor
-    from rewrite.execution import ExecutionContext, LargeSourceSet
+    from rewrite.execution import ExecutionContext, LargeSourceSet, Result
     from rewrite.tree import SourceFile
-    from rewrite.result import Result
 
 
 def option(
@@ -103,6 +103,7 @@ class RecipeDescriptor:
     tags: List[str]
     estimated_effort_per_occurrence: int
     options: List[tuple[str, Any, OptionDescriptor]]
+    data_tables: List[dict]
     recipe_list: List[RecipeDescriptor]
 
     @classmethod
@@ -111,12 +112,15 @@ class RecipeDescriptor:
         options: List[tuple[str, Any, OptionDescriptor]] = []
 
         # Extract options from dataclass fields
-        if hasattr(recipe, "__dataclass_fields__"):
+        if is_dataclass(recipe) and not isinstance(recipe, type):
             for f in fields(recipe):
                 if "option" in f.metadata:
                     descriptor = f.metadata["option"]
                     value = getattr(recipe, f.name)
                     options.append((f.name, value, descriptor))
+
+        # Extract data table descriptors
+        data_tables = [dt.descriptor() for dt in recipe.data_tables]
 
         return cls(
             name=recipe.name,
@@ -125,6 +129,7 @@ class RecipeDescriptor:
             tags=recipe.tags,
             estimated_effort_per_occurrence=recipe.estimated_effort_per_occurrence,
             options=options,
+            data_tables=data_tables,
             recipe_list=[cls.from_recipe(r) for r in recipe.recipe_list()],
         )
 
@@ -215,6 +220,21 @@ class Recipe(ABC):
     def estimated_effort_per_occurrence(self) -> int:
         """Estimated minutes to perform this change manually."""
         return 5
+
+    @property
+    def data_tables(self) -> List[DataTable]:
+        """
+        Return data tables this recipe produces.
+
+        Override this method to declare what data tables your recipe
+        will populate during execution. Data tables allow recipes to
+        output structured data that can be displayed in the UI or
+        exported to CSV files.
+
+        Returns:
+            List of DataTable instances this recipe produces
+        """
+        return []
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         """

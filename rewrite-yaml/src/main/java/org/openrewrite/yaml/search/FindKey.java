@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.JsonPathMatcher;
 import org.openrewrite.yaml.YamlVisitor;
@@ -40,6 +41,11 @@ public class FindKey extends Recipe {
     String displayName = "Find YAML entries";
 
     String description = "Find YAML entries that match the specified [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression.";
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("key", key));
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

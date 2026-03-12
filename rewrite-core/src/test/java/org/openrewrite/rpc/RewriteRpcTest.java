@@ -25,7 +25,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
@@ -37,11 +39,12 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.util.Collections;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
-import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
@@ -64,8 +67,7 @@ class RewriteRpcTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
-        marketplace = env.toMarketplace(runtimeClasspath())
-          .setResolvers(singletonList(new TestRecipeBundleResolver()));
+        marketplace = env.toMarketplace(runtimeClasspath());
 
         JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
         JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
@@ -73,7 +75,7 @@ class RewriteRpcTest implements RewriteTest {
         client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace)
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace, List.of(new TestRecipeBundleResolver()))
           .batchSize(1);
     }
 
@@ -81,6 +83,109 @@ class RewriteRpcTest implements RewriteTest {
     void after() {
         client.shutdown();
         server.shutdown();
+    }
+
+    /**
+     * Verifies that getObject() uses remoteObjects (last synced state) as the
+     * diff baseline, not localObjects. When the local side modifies a tree
+     * (e.g., via a local recipe) before calling getObject(), the localObjects
+     * entry diverges from what the remote used as its baseline. Using
+     * localObjects would cause NO_CHANGE fields to retain the local
+     * modification rather than the synced value.
+     * <p>
+     * The bug only manifests for object fields (identity-compared via ==)
+     * where the sender emits NO_CHANGE. Here, the server changes only text
+     * (a value field), so Markers — an object field preserved by reference
+     * in withText() — is sent as NO_CHANGE. If the client locally created
+     * a different Markers object, the wrong baseline would retain it.
+     */
+    @Test
+    void getObjectUsesRemoteObjectsAsBaseline() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // Server has the tree; client fetches it → both synced
+        server.localObjects.put(id, original);
+        PlainText synced = client.getObject(id, sourceFileType);
+        UUID syncedMarkersId = synced.getMarkers().getId();
+
+        // Server modifies text only — Markers reference stays the same
+        // (original.withText() preserves the Markers by reference via @With),
+        // so the handler sends NO_CHANGE for the Markers field.
+        // Using original (not synced) ensures server's before == original.getMarkers()
+        // and after == original.withText(...).getMarkers() are the same reference.
+        server.localObjects.put(id, original.withText("Hello World"));
+
+        // Client locally modifies Markers (simulating a local recipe step),
+        // creating a new Markers object with a different ID
+        Markers localMarkers = synced.getMarkers().withId(Tree.randomId());
+        client.localObjects.put(id, synced.withMarkers(localMarkers));
+
+        // Fetch: server sends Markers=NO_CHANGE, text=CHANGE("Hello World").
+        // The receiver should apply NO_CHANGE against remoteObjects (synced
+        // markers), not localObjects (local markers).
+        PlainText result = client.getObject(id, sourceFileType);
+        assertThat(result.getText()).isEqualTo("Hello World");
+        assertThat(result.getMarkers().getId())
+          .describedAs("Markers should come from remoteObjects baseline, not localObjects")
+          .isEqualTo(syncedMarkersId);
+    }
+
+    /**
+     * Verifies that when getObject() fails mid-serialization on the sender side,
+     * the sender removes the stale entry from remoteObjects. This ensures that
+     * a subsequent getObject() for the same ID sends a full ADD (not a CHANGE
+     * delta against a partially-sent, stale baseline).
+     * <p>
+     * Without the fix, the sender would keep the stale remoteObjects entry and
+     * attempt a CHANGE diff on retry, causing cascading desync errors.
+     */
+    @Test
+    void sendFailureCleansUpRemoteObjects() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // Step 1: successful sync — both sides establish remoteObjects baseline
+        server.localObjects.put(id, original);
+        PlainText synced = client.getObject(id, sourceFileType);
+        assertThat(synced.getText()).isEqualTo("Hello");
+        assertThat(server.remoteObjects).containsKey(id);
+
+        // Step 2: replace with a PlainText that has null sourcePath, causing
+        // NPE in PlainTextRpcCodec.rpcSend() at d.getSourcePath().toString()
+        PlainText badTree = PlainText.builder()
+          .id(original.getId())
+          .text("Bad")
+          .build(); // no sourcePath → null → NPE during send
+        server.localObjects.put(id, badTree);
+
+        // Step 3: client.getObject() should fail because the sender NPEs mid-serialization
+        try {
+            client.getObject(id, sourceFileType);
+        } catch (Exception expected) {
+            // Expected — sender failed and emitted premature END_OF_OBJECT
+        }
+
+        // Step 4: verify the sender cleaned up its stale remoteObjects entry
+        assertThat(server.remoteObjects)
+          .describedAs("Sender should remove stale remoteObjects entry after send failure")
+          .doesNotContainKey(id);
+
+        // Step 5: put back a valid tree and retry — should succeed via full ADD
+        PlainText fixed = original.withText("Fixed");
+        server.localObjects.put(id, fixed);
+        PlainText result = client.getObject(id, sourceFileType);
+        assertThat(result.getText()).isEqualTo("Fixed");
     }
 
     @DocumentExample

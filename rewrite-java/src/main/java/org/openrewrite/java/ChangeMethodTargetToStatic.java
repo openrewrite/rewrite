@@ -108,28 +108,43 @@ public class ChangeMethodTargetToStatic extends Recipe {
             this.matchUnknownTypes = matchUnknownTypes;
         }
 
+        /**
+         * Check if the method call is already a static call on the target type.
+         */
+        private boolean isAlreadyStaticCallOnTargetType(@Nullable Expression target, MethodCall methodCall) {
+            boolean isStatic = methodCall.getMethodType() != null && methodCall.getMethodType().hasFlags(Flag.Static);
+            boolean isSameReceiverType = target != null && TypeUtils.isOfClassType(target.getType(), fullyQualifiedTargetTypeName);
+            boolean calledOnTargetType = target instanceof J.Identifier && ((J.Identifier) target).getFieldType() == null;
+            return isStatic && isSameReceiverType && calledOnTargetType;
+        }
+
+        /**
+         * Transform the method type to reflect the new declaring type and static flag.
+         */
+        private JavaType.Method transformMethodType(JavaType.Method methodType) {
+            JavaType.Method transformedType = methodType.withDeclaringType(classType);
+            if (!methodType.hasFlags(Flag.Static)) {
+                Set<Flag> flags = new LinkedHashSet<>(methodType.getFlags());
+                flags.add(Flag.Static);
+                transformedType = transformedType.withFlags(flags);
+            }
+            if (returnType != null) {
+                JavaType returnTypeType = JavaType.ShallowClass.build(returnType);
+                transformedType = transformedType.withReturnType(returnTypeType);
+            }
+            return transformedType;
+        }
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             Expression select = method.getSelect();
-            boolean isStatic = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
-            boolean isSameReceiverType = select != null && TypeUtils.isOfClassType(select.getType(), fullyQualifiedTargetTypeName);
-            boolean calledOnTargetType = select instanceof J.Identifier && ((J.Identifier) select).getFieldType() == null;
-            if ((!isStatic || !isSameReceiverType || !calledOnTargetType) &&
+            if (!isAlreadyStaticCallOnTargetType(select, method) &&
                 methodMatcher.matches(method, matchUnknownTypes)) {
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());
-                    transformedType = method.getMethodType().withDeclaringType(classType);
-                    if (!method.getMethodType().hasFlags(Flag.Static)) {
-                        Set<Flag> flags = new LinkedHashSet<>(method.getMethodType().getFlags());
-                        flags.add(Flag.Static);
-                        transformedType = transformedType.withFlags(flags);
-                    }
-                    if (returnType != null) {
-                        JavaType returnTypeType = JavaType.ShallowClass.build(returnType);
-                        transformedType = transformedType.withReturnType(returnTypeType);
-                    }
+                    transformedType = transformMethodType(method.getMethodType());
                 }
                 if (m.getSelect() == null) {
                     maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName(), !matchUnknownTypes);
@@ -150,6 +165,33 @@ public class ChangeMethodTargetToStatic extends Recipe {
                 }
                 m = m.withMethodType(transformedType)
                         .withName(m.getName().withType(transformedType));
+            }
+            return m;
+        }
+
+        @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+            J.MemberReference m = super.visitMemberReference(memberRef, ctx);
+            Expression containing = memberRef.getContaining();
+            if (!isAlreadyStaticCallOnTargetType(containing, memberRef) &&
+                methodMatcher.matches(memberRef)) {
+                JavaType.Method transformedType = null;
+                if (memberRef.getMethodType() != null) {
+                    maybeRemoveImport(memberRef.getMethodType().getDeclaringType());
+                    transformedType = transformMethodType(memberRef.getMethodType());
+                }
+                maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
+                m = memberRef.withContaining(
+                        new J.Identifier(randomId(),
+                                containing.getPrefix(),
+                                Markers.EMPTY,
+                                emptyList(),
+                                classType.getClassName(),
+                                classType,
+                                null
+                        )
+                );
+                m = m.withMethodType(transformedType);
             }
             return m;
         }
