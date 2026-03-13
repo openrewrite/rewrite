@@ -360,7 +360,7 @@ public class AutoFormatTests
         var cu = _parser.Parse(source);
 
         // Get the class declaration from the CU to use as the subtree target
-        var classDecl = cu.Members[0] as ClassDeclaration;
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
         Assert.NotNull(classDecl);
 
         // Build a cursor chain: root → CU → classDecl

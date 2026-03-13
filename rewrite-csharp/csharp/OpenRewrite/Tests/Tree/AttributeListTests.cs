@@ -97,7 +97,7 @@ public class AttributeListTests : RewriteTest
     {
         var parser = new CSharpParser();
         var cu = (CompilationUnit)parser.Parse("[Serializable(/*bar*/)]\nclass Test { }");
-        var annotated = (AnnotatedStatement)cu.Members[0];
+        var annotated = (AnnotatedStatement)cu.Members[0].Element;
         var annotation = annotated.AttributeLists[0].Attributes[0].Element;
         Assert.NotNull(annotation.Arguments);
         // The empty arg list should contain a J.Empty element

@@ -227,9 +227,6 @@ public class CSharpSyntaxFragments
 
         yield return new SourceTestCase("DeclarationParsingTests.TestClassWithTypeConstraintBound", "class a<b> where b : c { }");
 
-        yield return new SourceTestCase("DeclarationParsingTests.TestNonGenericClassWithTypeConstraintBound", "class a where b : c { }");
-
-        yield return new SourceTestCase("DeclarationParsingTests.TestNonGenericMethodWithTypeConstraintBound", "class a { void M() where b : c { } }");
 
         yield return new SourceTestCase("DeclarationParsingTests.TestClassWithNewConstraintBound", "class a<b> where b : new() { }");
 

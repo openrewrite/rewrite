@@ -87,6 +87,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             case ClassDeclaration cd when cd.Body.Markers.FindFirst<Semicolon>() != null:
                 break; // semicolon already printed by VisitClassDeclaration
 
+            // ClassDeclaration: trailing semicolon after block body (record C { };)
+            case ClassDeclaration cd when cd.Markers.FindFirst<Semicolon>() != null:
+                p.Append(';');
+                break;
+
+            // PropertyDeclaration ends with ';' when it has expression body or initializer
+            case PropertyDeclaration pd when pd.ExpressionBody != null || pd.Initializer != null:
+                p.Append(';');
+                break;
+
             // FieldAccess used as statement (like event accessor declarations)
             case FieldAccess:
                 break;
@@ -102,10 +112,21 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(compilationUnit, p);
 
+        foreach (var externAlias in compilationUnit.Externs)
+        {
+            Visit(externAlias.Element, p);
+            VisitSpace(externAlias.After, p);
+            PrintStatementTerminator(externAlias.Element, p);
+        }
+
+        foreach (var attrList in compilationUnit.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
+
         foreach (var member in compilationUnit.Members)
         {
-            Visit(member, p);
-            PrintStatementTerminator(member, p);
+            VisitStatement(member, p);
         }
 
         VisitSpace(compilationUnit.Eof, p);
@@ -130,6 +151,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             VisitSpace(usingDirective.Static.Before, p);
             p.Append("static");
+        }
+
+        if (usingDirective.IsUnsafe)
+        {
+            VisitSpace(usingDirective.Unsafe.Before, p);
+            p.Append("unsafe");
         }
 
         if (usingDirective.Alias != null)
@@ -164,6 +191,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         Visit(ns.Name.Element, p);
         VisitSpace(ns.Name.After, p);
         p.Append('{');
+
+        foreach (var externAlias in ns.Externs)
+        {
+            Visit(externAlias.Element, p);
+            VisitSpace(externAlias.After, p);
+            PrintStatementTerminator(externAlias.Element, p);
+        }
 
         foreach (var member in ns.Members)
         {
@@ -1007,6 +1041,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Print type
         Visit(prop.TypeExpression, p);
 
+        // Print explicit interface specifier (e.g., IFoo.)
+        if (prop.InterfaceSpecifier != null)
+        {
+            Visit(prop.InterfaceSpecifier.Element, p);
+            VisitSpace(prop.InterfaceSpecifier.After, p);
+            p.Append('.');
+        }
+
         // Print name
         Visit(prop.Name, p);
 
@@ -1016,11 +1058,18 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(prop.ExpressionBody.Before, p);
             p.Append("=>");
             Visit(prop.ExpressionBody.Element, p);
-            p.Append(';');
         }
         else if (prop.Accessors != null)
         {
             VisitBlock(prop.Accessors, p);
+        }
+
+        // Print initializer (e.g., ` = 10` in `public int X { get; set; } = 10;`)
+        if (prop.Initializer != null)
+        {
+            VisitSpace(prop.Initializer.Before, p);
+            p.Append('=');
+            Visit(prop.Initializer.Element, p);
         }
 
         AfterSyntax(prop, p);

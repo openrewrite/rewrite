@@ -192,17 +192,23 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var charsetBomMarked = q.Receive(cu.CharsetBomMarked);
         var checksum = q.Receive<Checksum?>(cu.Checksum);
         var fileAttributes = q.Receive<Core.FileAttributes?>(cu.FileAttributes);
+        var externs = q.ReceiveList(
+            cu.Externs ?? [],
+            rp => _delegate.VisitRightPadded(rp, q));
+        var attributeLists = q.ReceiveList(
+            cu.AttributeLists ?? [],
+            al => (AttributeList)_delegate.VisitNonNull(al, q));
         var members = q.ReceiveList(
-            (cu.Members ?? [])
-                .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
-                .ToList(),
+            cu.Members ?? [],
             rp => _delegate.VisitRightPadded(rp, q));
         var eof = q.Receive(cu.Eof, space => VisitSpace(space, q));
 
         return cu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
             .WithSourcePath(sourcePath!).WithCharset(charset!).WithCharsetBomMarked(charsetBomMarked)
             .WithChecksum(checksum).WithFileAttributes(fileAttributes)
-            .WithMembers(members?.Select(rp => rp.Element).ToList() ?? []).WithEof(eof!);
+            .WithExterns(externs ?? [])
+            .WithAttributeLists(attributeLists ?? [])
+            .WithMembers(members ?? []).WithEof(eof!);
     }
 
     // ---- UsingDirective ----
@@ -210,12 +216,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var global = q.Receive(ud.Global, rp => _delegate.VisitRightPadded(rp, q));
         var @static = q.Receive(ud.Static, lp => _delegate.VisitLeftPadded(lp, q));
-        // Unsafe: nagoya doesn't model this; consume and discard
-        q.Receive(new JLeftPadded<bool>(Space.Empty, false), lp => _delegate.VisitLeftPadded(lp, q));
+        var @unsafe = q.Receive(ud.Unsafe, lp => _delegate.VisitLeftPadded(lp, q));
         var alias = q.Receive(ud.Alias, rp => _delegate.VisitRightPadded(rp!, q));
         var namespaceOrType = q.Receive((J)ud.NamespaceOrType, el => (J)VisitNonNull(el, q));
         return ud.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
-            .WithGlobal(global!).WithStatic(@static!).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
+            .WithGlobal(global!).WithStatic(@static!).WithUnsafe(@unsafe!).WithAlias(alias).WithNamespaceOrType((TypeTree)namespaceOrType!);
     }
 
     // ---- PropertyDeclaration ----
@@ -439,7 +444,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var name = q.Receive(ns.Name, rp => _delegate.VisitRightPadded(rp, q));
         // Externs
-        q.ReceiveList<JRightPadded<Statement>>([], rp => _delegate.VisitRightPadded(rp, q));
+        var externs = q.ReceiveList(
+            ns.Externs ?? [],
+            rp => _delegate.VisitRightPadded(rp, q));
         // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
         var existingNsMembers = ns.Members ?? [];
         // Usings
@@ -456,7 +463,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         if (usings != null) allMembers.AddRange(usings);
         if (members != null) allMembers.AddRange(members);
 
-        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!).WithMembers(allMembers).WithEnd(end!);
+        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!)
+            .WithExterns(externs ?? [])
+            .WithMembers(allMembers).WithEnd(end!);
     }
 
     // ---- TupleType ----

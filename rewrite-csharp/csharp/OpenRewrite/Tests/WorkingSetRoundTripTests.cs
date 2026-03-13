@@ -211,8 +211,9 @@ public class WorkingSetRoundTripTests
         // Debug: inspect the AST structure
         Console.WriteLine($"\nOuter CU type: {cu.GetType().Name}");
         Console.WriteLine($"Outer CU members: {cu.Members.Count}");
-        foreach (var member in cu.Members)
+        foreach (var memberPadded in cu.Members)
         {
+            var member = memberPadded.Element;
             Console.WriteLine($"  Member type: {member.GetType().Name}");
             if (member is ConditionalDirective cd)
             {

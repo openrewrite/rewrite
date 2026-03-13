@@ -199,10 +199,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cu, c => (object)c.CharsetBomMarked);
         q.GetAndSend(cu, c => c.Checksum);
         q.GetAndSend(cu, c => c.FileAttributes);
-        q.GetAndSendList(cu,
-            c => (IList<JRightPadded<Statement>>)c.Members
-                .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
-                .ToList(),
+        q.GetAndSendList(cu, c => c.Externs,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        q.GetAndSendList(cu, c => c.AttributeLists, a => (object)a.Id, a => Visit(a, q));
+        q.GetAndSendList(cu, c => c.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(cu, c => c.Eof, space => VisitSpace(space, q));
         return cu;
@@ -216,8 +216,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(ud, u => u.Global, rp => VisitRightPadded(rp, q));
         q.GetAndSend(ud, u => u.Static, lp => VisitLeftPadded(lp, q));
-        // Unsafe: nagoya doesn't model this, send a default JLeftPadded<bool>(false)
-        q.GetAndSend(ud, _ => new JLeftPadded<bool>(Space.Empty, false), lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(ud, u => u.Unsafe, lp => VisitLeftPadded(lp, q));
         q.GetAndSend(ud, u => u.Alias, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(ud, u => (J)u.NamespaceOrType, el => Visit(el, q));
         return ud;
@@ -450,8 +449,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, RpcSendQueue q)
     {
         q.GetAndSend(ns, n => n.Name, rp => VisitRightPadded(rp, q));
-        // Externs: nagoya doesn't model
-        q.GetAndSendList(ns, _ => EmptyPaddedStatements,
+        q.GetAndSendList(ns, n => n.Externs,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         // Usings: extract from Members
         q.GetAndSendList(ns,
