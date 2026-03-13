@@ -142,8 +142,20 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     public virtual J VisitCompilationUnit(CompilationUnit compilationUnit, P p)
     {
-        var members = new List<Statement>();
         bool changed = false;
+
+        var attrLists = new List<AttributeList>();
+        foreach (var attrList in compilationUnit.AttributeLists)
+        {
+            var visited = Visit(attrList, p);
+            if (visited is AttributeList al)
+            {
+                if (!ReferenceEquals(al, attrList)) changed = true;
+                attrLists.Add(al);
+            }
+        }
+
+        var members = new List<Statement>();
         foreach (var member in compilationUnit.Members)
         {
             var visited = Visit(member, p);
@@ -154,7 +166,12 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        return changed ? compilationUnit.WithMembers(members) : compilationUnit;
+        if (changed)
+        {
+            compilationUnit = compilationUnit.WithAttributeLists(attrLists).WithMembers(members);
+        }
+
+        return compilationUnit;
     }
 
     public virtual J VisitUsingDirective(UsingDirective usingDirective, P p)

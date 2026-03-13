@@ -63,6 +63,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<Cs.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
+                .withAttributeLists(q.receiveList(cu.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)))
                 .getPadding().withMembers(q.receiveList(cu.getPadding().getMembers(), stmt -> visitRightPadded(stmt, q)))
                 .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
     }

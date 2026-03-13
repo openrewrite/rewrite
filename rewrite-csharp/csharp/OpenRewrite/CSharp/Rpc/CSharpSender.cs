@@ -199,6 +199,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cu, c => (object)c.CharsetBomMarked);
         q.GetAndSend(cu, c => c.Checksum);
         q.GetAndSend(cu, c => c.FileAttributes);
+        q.GetAndSendList(cu, c => c.AttributeLists, a => (object)a.Id, a => Visit(a, q));
         q.GetAndSendList(cu,
             c => (IList<JRightPadded<Statement>>)c.Members
                 .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
@@ -216,8 +217,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(ud, u => u.Global, rp => VisitRightPadded(rp, q));
         q.GetAndSend(ud, u => u.Static, lp => VisitLeftPadded(lp, q));
-        // Unsafe: nagoya doesn't model this, send a default JLeftPadded<bool>(false)
-        q.GetAndSend(ud, _ => new JLeftPadded<bool>(Space.Empty, false), lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(ud, u => u.Unsafe, lp => VisitLeftPadded(lp, q));
         q.GetAndSend(ud, u => u.Alias, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(ud, u => (J)u.NamespaceOrType, el => Visit(el, q));
         return ud;

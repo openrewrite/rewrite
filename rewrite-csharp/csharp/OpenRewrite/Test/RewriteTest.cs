@@ -67,6 +67,13 @@ public abstract class RewriteTest
 
             var source = parser.Parse(spec.Before, semanticModel: semanticModel);
 
+            // Verify no non-whitespace content leaked into Space fields
+            var whitespaceViolations = new List<WhitespaceViolation>();
+            new WhitespaceValidator().Visit(source, whitespaceViolations);
+            Assert.True(whitespaceViolations.Count == 0,
+                $"Found non-whitespace content in Space fields:\n" +
+                string.Join("\n", whitespaceViolations));
+
             // Verify round-trip: printed should match input
             var printed = printer.Print(source);
             Assert.Equal(spec.Before, printed);

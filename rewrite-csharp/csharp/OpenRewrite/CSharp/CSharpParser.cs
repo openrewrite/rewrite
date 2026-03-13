@@ -126,6 +126,7 @@ public class CSharpParser
             false,
             null,
             null,
+            [],
             new List<Statement> { directive },
             Space.Empty
         );
@@ -219,6 +220,7 @@ public class CSharpParser
             false,
             null,
             null,
+            [],
             new List<Statement> { directive },
             Space.Empty
         );
@@ -301,6 +303,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             members.Add(visited);
         }
 
+        // Handle assembly/module-level attributes
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            var visited = VisitAttributeList(attrList);
+            if (visited is AttributeList al)
+            {
+                attributeLists.Add(al);
+            }
+        }
+
         // Handle top-level statements and type declarations
         foreach (var member in node.Members)
         {
@@ -342,6 +355,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             false,
             null,
             null,
+            attributeLists,
             members,
             eof
         );
@@ -377,6 +391,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.StaticKeyword.Span.End;
         }
 
+        // Handle 'unsafe' keyword (C# 12+)
+        bool isUnsafe = node.UnsafeKeyword.IsKind(SyntaxKind.UnsafeKeyword);
+        Space unsafeBefore = Space.Empty;
+        if (isUnsafe)
+        {
+            unsafeBefore = ExtractSpaceBefore(node.UnsafeKeyword);
+            _cursor = node.UnsafeKeyword.Span.End;
+        }
+
         // Handle alias
         JRightPadded<Identifier>? alias = null;
         if (node.Alias != null)
@@ -410,6 +433,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             new JRightPadded<bool>(isGlobal, globalAfter, Markers.Empty),
             new JLeftPadded<bool>(staticBefore, isStatic),
+            new JLeftPadded<bool>(unsafeBefore, isUnsafe),
             alias,
             namespaceOrType!
         );

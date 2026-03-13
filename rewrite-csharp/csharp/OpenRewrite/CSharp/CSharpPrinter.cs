@@ -102,6 +102,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(compilationUnit, p);
 
+        foreach (var attrList in compilationUnit.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
+
         foreach (var member in compilationUnit.Members)
         {
             Visit(member, p);
@@ -130,6 +135,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             VisitSpace(usingDirective.Static.Before, p);
             p.Append("static");
+        }
+
+        if (usingDirective.IsUnsafe)
+        {
+            VisitSpace(usingDirective.Unsafe.Before, p);
+            p.Append("unsafe");
         }
 
         if (usingDirective.Alias != null)
