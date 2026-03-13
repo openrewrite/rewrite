@@ -121,10 +121,14 @@ tasks.withType<Test> {
 // Generate a NuGet-compatible version
 // Snapshots use pre-release suffix with timestamp: 8.73.0-snapshot.20260110143252
 // Releases use clean version: 8.73.0
-val nugetVersion: String = project.version.toString().replace(
-    "-SNAPSHOT",
-    "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-)
+val nugetVersion: String = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "-SNAPSHOT",
+        "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+    )
+} else {
+    project.version.toString().replace("-SNAPSHOT", "-snapshot")
+}
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"
@@ -278,16 +282,6 @@ val csharpPublishLocal by tasks.registering {
                 logger.lifecycle(addOutput)
             }
 
-        // Also copy to local-feed for cross-repo consumption
-        val localFeed = file("${System.getProperty("user.home")}/.nuget/local-feed")
-        localFeed.mkdirs()
-        csharpDir.resolve("dist").listFiles()
-            ?.filter { it.name.endsWith(".nupkg") }
-            ?.forEach { nupkg ->
-                val target = localFeed.resolve(nupkg.name)
-                nupkg.copyTo(target, overwrite = true)
-                logger.lifecycle("Published ${nupkg.name} to ${localFeed.absolutePath}")
-            }
     }
 }
 
