@@ -117,18 +117,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(compilationUnit, p);
 
-        foreach (var externAlias in compilationUnit.Externs)
-        {
-            Visit(externAlias.Element, p);
-            VisitSpace(externAlias.After, p);
-            PrintStatementTerminator(externAlias.Element, p);
-        }
-
-        foreach (var attrList in compilationUnit.AttributeLists)
-        {
-            Visit(attrList, p);
-        }
-
         foreach (var member in compilationUnit.Members)
         {
             VisitStatement(member, p);
@@ -182,9 +170,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(pkg, p);
         p.Append("namespace");
-        Visit(pkg.Expression.Element, p);
-        VisitSpace(pkg.Expression.After, p);
-        // Semicolon printed by PrintStatementTerminator
+        Visit(pkg.Expression, p);
         AfterSyntax(pkg, p);
         return pkg;
     }
@@ -196,13 +182,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         Visit(ns.Name.Element, p);
         VisitSpace(ns.Name.After, p);
         p.Append('{');
-
-        foreach (var externAlias in ns.Externs)
-        {
-            Visit(externAlias.Element, p);
-            VisitSpace(externAlias.After, p);
-            PrintStatementTerminator(externAlias.Element, p);
-        }
 
         foreach (var member in ns.Members)
         {
@@ -1403,9 +1382,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         Visit(enumValue.Name, p);
         if (enumValue.Initializer != null)
         {
-            VisitSpace(enumValue.Initializer.Before, p);
-            p.Append('=');
-            Visit(enumValue.Initializer.Element, p);
+            Visit(enumValue.Initializer, p);
         }
         AfterSyntax(enumValue, p);
         return enumValue;

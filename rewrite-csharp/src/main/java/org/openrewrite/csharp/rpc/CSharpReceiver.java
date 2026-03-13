@@ -63,8 +63,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<Cs.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
-                .getPadding().withExterns(q.receiveList(cu.getPadding().getExterns(), el -> visitRightPadded(el, q)))
-                .withAttributeLists(q.receiveList(cu.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)))
                 .getPadding().withMembers(q.receiveList(cu.getPadding().getMembers(), stmt -> visitRightPadded(stmt, q)))
                 .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
     }
@@ -222,13 +220,11 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitBlockScopeNamespaceDeclaration(Cs.BlockScopeNamespaceDeclaration blockScopeNamespaceDeclaration, RpcReceiveQueue q) {
-        return blockScopeNamespaceDeclaration
-                .getPadding().withName(q.receive(blockScopeNamespaceDeclaration.getPadding().getName(), el -> visitRightPadded(el, q)))
-                .getPadding().withExterns(q.receiveList(blockScopeNamespaceDeclaration.getPadding().getExterns(), el -> visitRightPadded(el, q)))
-                .getPadding().withUsings(q.receiveList(blockScopeNamespaceDeclaration.getPadding().getUsings(), el -> visitRightPadded(el, q)))
-                .getPadding().withMembers(q.receiveList(blockScopeNamespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, q)))
-                .withEnd(q.receive(blockScopeNamespaceDeclaration.getEnd(), space -> visitSpace(space, q)));
+    public J visitNamespaceDeclaration(Cs.NamespaceDeclaration namespaceDeclaration, RpcReceiveQueue q) {
+        return namespaceDeclaration
+                .getPadding().withName(q.receive(namespaceDeclaration.getPadding().getName(), el -> visitRightPadded(el, q)))
+                .getPadding().withMembers(q.receiveList(namespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, q)))
+                .withEnd(q.receive(namespaceDeclaration.getEnd(), space -> visitSpace(space, q)));
     }
 
     @Override
@@ -250,14 +246,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withIdentifier(q.receive(externAlias.getPadding().getIdentifier(), el -> visitLeftPadded(el, q)));
     }
 
-    @Override
-    public J visitFileScopeNamespaceDeclaration(Cs.FileScopeNamespaceDeclaration fileScopeNamespaceDeclaration, RpcReceiveQueue q) {
-        return fileScopeNamespaceDeclaration
-                .getPadding().withName(q.receive(fileScopeNamespaceDeclaration.getPadding().getName(), el -> visitRightPadded(el, q)))
-                .getPadding().withExterns(q.receiveList(fileScopeNamespaceDeclaration.getPadding().getExterns(), el -> visitRightPadded(el, q)))
-                .getPadding().withUsings(q.receiveList(fileScopeNamespaceDeclaration.getPadding().getUsings(), el -> visitRightPadded(el, q)))
-                .getPadding().withMembers(q.receiveList(fileScopeNamespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, q)));
-    }
 
     @Override
     public J visitInterpolatedString(Cs.InterpolatedString interpolatedString, RpcReceiveQueue q) {
@@ -292,7 +280,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         return usingDirective
                 .getPadding().withGlobal(q.receive(usingDirective.getPadding().getGlobal(), el -> visitRightPadded(el, q)))
                 .getPadding().withStatic(q.receive(usingDirective.getPadding().getStatic(), el -> visitLeftPadded(el, q)))
-                .getPadding().withUnsafe(q.receive(usingDirective.getPadding().getUnsafe(), el -> visitLeftPadded(el, q)))
                 .getPadding().withAlias(q.receive(usingDirective.getPadding().getAlias(), el -> visitRightPadded(el, q)))
                 .withNamespaceOrType(q.receive(usingDirective.getNamespaceOrType(), el -> (TypeTree) visitNonNull(el, q)));
     }
@@ -725,22 +712,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withTypeExpression(q.receive(arrayType.getTypeExpression(), el -> (TypeTree) visitNonNull(el, q)))
                 .withDimensions(q.receiveList(arrayType.getDimensions(), el -> (J.ArrayDimension) visitNonNull(el, q)))
                 .withType(q.receive(arrayType.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
-    public J visitTry(Cs.Try try_, RpcReceiveQueue q) {
-        return try_
-                .withBody(q.receive(try_.getBody(), el -> (J.Block) visitNonNull(el, q)))
-                .withCatches(q.receiveList(try_.getCatches(), el -> (Cs.Try.Catch) visitNonNull(el, q)))
-                .getPadding().withFinally(q.receive(try_.getPadding().getFinally(), el -> visitLeftPadded(el, q)));
-    }
-
-    @Override
-    public J visitTryCatch(Cs.Try.Catch catch_, RpcReceiveQueue q) {
-        return catch_
-                .withParameter(q.receive(catch_.getParameter(), el -> (J.ControlParentheses<J.VariableDeclarations>) visitNonNull(el, q)))
-                .getPadding().withFilterExpression(q.receive(catch_.getPadding().getFilterExpression(), el -> visitLeftPadded(el, q)))
-                .withBody(q.receive(catch_.getBody(), el -> (J.Block) visitNonNull(el, q)));
     }
 
     @Override

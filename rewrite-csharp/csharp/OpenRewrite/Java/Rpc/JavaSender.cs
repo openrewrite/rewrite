@@ -52,6 +52,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             ForLoop fl => VisitForLoop(fl, q),
             ForEachLoop.Control fec => VisitForEachControl(fec, q),
             ForEachLoop fel => VisitForEachLoop(fel, q),
+            Try.Resource tryResource => VisitTryResource(tryResource, q),
             Try.Catch tryCatch => VisitCatch(tryCatch, q),
             Try tr => VisitTry(tr, q),
             Throw thr => VisitThrow(thr, q),
@@ -285,7 +286,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSendList(enumValue, e => e.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(enumValue, e => (J)e.Name, name => Visit(name, q));
-        q.GetAndSend(enumValue, e => e.Initializer, init => VisitLeftPadded(init, q));
+        q.GetAndSend(enumValue, e => (J?)e.Initializer, init => Visit(init, q));
         return enumValue;
     }
 
@@ -456,7 +457,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitPackage(Package pkg, RpcSendQueue q)
     {
-        q.GetAndSend(pkg, p => (J)p.Expression.Element, expr => Visit(expr, q));
+        q.GetAndSend(pkg, p => (J)p.Expression, expr => Visit(expr, q));
         q.GetAndSendList(pkg, p => p.Annotations, a => a.Id, a => Visit(a, q));
         return pkg;
     }
@@ -523,6 +524,13 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSendList(tryStmt, t => t.Catches, c => c.Id, c => Visit(c, q));
         q.GetAndSend(tryStmt, t => t.Finally, fin => VisitLeftPadded(fin, q));
         return tryStmt;
+    }
+
+    public virtual J VisitTryResource(Try.Resource tryResource, RpcSendQueue q)
+    {
+        q.GetAndSend(tryResource, r => (J)r.VariableDeclarations, vars => Visit(vars, q));
+        q.GetAndSend(tryResource, r => r.TerminatedWithSemicolon);
+        return tryResource;
     }
 
     public override J VisitTypeCast(TypeCast typeCast, RpcSendQueue q)

@@ -29,9 +29,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 {
     private readonly CSharpSenderDelegate _delegate;
 
-    private static readonly IList<JRightPadded<Statement>> EmptyPaddedStatements =
-        Array.Empty<JRightPadded<Statement>>();
-
     public CSharpSender()
     {
         _delegate = new CSharpSenderDelegate(this);
@@ -199,9 +196,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cu, c => (object)c.CharsetBomMarked);
         q.GetAndSend(cu, c => c.Checksum);
         q.GetAndSend(cu, c => c.FileAttributes);
-        q.GetAndSendList(cu, c => c.Externs,
-            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
-        q.GetAndSendList(cu, c => c.AttributeLists, a => (object)a.Id, a => Visit(a, q));
         q.GetAndSendList(cu, c => c.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(cu, c => c.Eof, space => VisitSpace(space, q));
@@ -216,7 +210,6 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(ud, u => u.Global, rp => VisitRightPadded(rp, q));
         q.GetAndSend(ud, u => u.Static, lp => VisitLeftPadded(lp, q));
-        q.GetAndSend(ud, u => u.Unsafe, lp => VisitLeftPadded(lp, q));
         q.GetAndSend(ud, u => u.Alias, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(ud, u => (J)u.NamespaceOrType, el => Visit(el, q));
         return ud;
@@ -444,22 +437,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     }
 
     // ---- NamespaceDeclaration ----
-    // Java has BlockScopeNamespaceDeclaration / FileScopeNamespaceDeclaration;
-    // nagoya has unified NamespaceDeclaration
     public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, RpcSendQueue q)
     {
         q.GetAndSend(ns, n => n.Name, rp => VisitRightPadded(rp, q));
-        q.GetAndSendList(ns, n => n.Externs,
-            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
-        // Usings: extract from Members
-        q.GetAndSendList(ns,
-            n => (IList<JRightPadded<Statement>>)n.Members
-                .Where(m => m.Element is UsingDirective).ToList(),
-            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
-        // Members: non-using
-        q.GetAndSendList(ns,
-            n => (IList<JRightPadded<Statement>>)n.Members
-                .Where(m => m.Element is not UsingDirective).ToList(),
+        q.GetAndSendList(ns, n => n.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(ns, n => n.End, space => VisitSpace(space, q));
         return ns;
