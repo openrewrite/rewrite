@@ -8511,8 +8511,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             if (keyword is "if" or "elif" or "else" or "endif")
                 break;
 
-            // Capture prefix (whitespace before '#')
-            var prefix = _cursor < hashPos ? Space.Format(_source[_cursor..hashPos]) : Space.Empty;
+            // Capture prefix (whitespace and comments before '#')
+            var prefix = _cursor < hashPos ? CachedFormat(_source[_cursor..hashPos]) : Space.Empty;
 
             // Find end of directive content (before line ending)
             var contentEnd = hashPos;
