@@ -30,7 +30,7 @@ import org.openrewrite.marker.SearchResult;
 import java.util.HashSet;
 import java.util.Set;
 
-import static java.util.Objects.requireNonNull;
+
 import static java.util.stream.Collectors.toSet;
 
 @EqualsAndHashCode(callSuper = false)
@@ -61,26 +61,25 @@ public class FindAnnotations extends Recipe {
         return Preconditions.check(
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
-                    public J preVisit(J tree, ExecutionContext ctx) {
-                        stopAfterPreVisit();
-                        JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                        for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                            if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
-                                return SearchResult.found(cu);
+                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (tree instanceof JavaSourceFile) {
+                            JavaSourceFile cu = (JavaSourceFile) tree;
+                            for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                                if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
+                                    return SearchResult.found(cu);
+                                }
                             }
                         }
-                        for (J.Import anImport : cu.getImports()) {
-                            JavaType.FullyQualified type;
-                            if (anImport.isStatic()) {
-                                type = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
-                            } else {
-                                type = TypeUtils.asFullyQualified(anImport.getQualid().getType());
-                            }
-                            if (annotationMatcher.matchesAnnotationOrMetaAnnotation(type)) {
-                                return SearchResult.found(cu);
-                            }
+                        return super.visit(tree, ctx);
+                    }
+
+                    @Override
+                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                        J.Annotation a = super.visitAnnotation(annotation, ctx);
+                        if (annotationMatcher.matches(annotation)) {
+                            a = SearchResult.found(a);
                         }
-                        return tree;
+                        return a;
                     }
                 },
                 new JavaIsoVisitor<ExecutionContext>() {
