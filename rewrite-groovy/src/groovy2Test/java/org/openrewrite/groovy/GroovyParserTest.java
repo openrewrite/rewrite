@@ -18,9 +18,17 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyParserTest implements RewriteTest {
+
+    @Test
+    void groovyRuntimeIsVersion2() throws Exception {
+        Class<?> groovySystem = Class.forName("groovy.lang.GroovySystem");
+        String version = (String) groovySystem.getMethod("getVersion").invoke(null);
+        assertThat(version).startsWith("2.");
+    }
 
     @Test
     void shouldNotTreatDivisionAsDelimiter() {
@@ -85,6 +93,19 @@ class GroovyParserTest implements RewriteTest {
                 groovy(
                         """
                         (100)
+                        """
+                )
+        );
+    }
+
+    @Test
+    void shouldBeAbleToParseClassDeclaration() {
+        rewriteRun(
+                groovy(
+                        """
+                        class Foo {
+                            String bar
+                        }
                         """
                 )
         );
