@@ -1214,6 +1214,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
+        // Parse attribute lists
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
+
         // Parse modifiers
         var modifiers = new List<Modifier>();
         foreach (var mod in node.Modifiers)
@@ -1339,9 +1346,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         if (node.ExpressionBody != null)
             methodMarkers = methodMarkers.Add(new ExpressionBodied(Guid.NewGuid()));
 
-        return new MethodDeclaration(
+        var methodDecl = new MethodDeclaration(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             methodMarkers,
             [],
             modifiers,
@@ -1354,11 +1361,31 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null, // DefaultValue
             _typeMapping?.MethodType(node)
         );
+
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                methodDecl
+            );
+        }
+
+        return methodDecl;
     }
 
     public override J VisitConstructorDeclaration(ConstructorDeclarationSyntax node)
     {
         var prefix = ExtractPrefix(node);
+
+        // Parse attribute lists
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
 
         // Parse modifiers
         var modifiers = new List<Modifier>();
@@ -1468,9 +1495,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.SemicolonToken.Span.End;
         }
 
-        return new MethodDeclaration(
+        var ctorDecl = new MethodDeclaration(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             methodMarkers,
             [],
             modifiers,
@@ -1483,6 +1510,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             defaultValue,
             _typeMapping?.MethodType(node)
         );
+
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                ctorDecl
+            );
+        }
+
+        return ctorDecl;
     }
 
     public override J VisitDestructorDeclaration(DestructorDeclarationSyntax node)
@@ -7746,8 +7786,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
-        // Parse modifiers — attributes on fields are skipped for now as
-        // LeadingAnnotations takes IList<Modifier> in the C# model
+        // Parse attribute lists
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
+
+        // Parse modifiers
         var modifiers = new List<Modifier>();
         foreach (var mod in node.Modifiers)
         {
@@ -7831,9 +7877,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
         _cursor = node.SemicolonToken.Span.End;
 
-        return new VariableDeclarations(
+        var varDecl = new VariableDeclarations(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -7842,11 +7888,31 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             [],
             variables
         );
+
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                varDecl
+            );
+        }
+
+        return varDecl;
     }
 
     public override J VisitEventFieldDeclaration(EventFieldDeclarationSyntax node)
     {
         var prefix = ExtractPrefix(node);
+
+        // Parse attribute lists
+        var attributeLists = new List<AttributeList>();
+        foreach (var attrList in node.AttributeLists)
+        {
+            attributeLists.Add((AttributeList)Visit(attrList)!);
+        }
 
         // Parse modifiers — includes the 'event' keyword
         var modifiers = new List<Modifier>();
@@ -7931,9 +7997,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         SkipTo(node.SemicolonToken.SpanStart);
         SkipToken(node.SemicolonToken);
 
-        return new VariableDeclarations(
+        var varDecl = new VariableDeclarations(
             Guid.NewGuid(),
-            prefix,
+            attributeLists.Count > 0 ? Space.Empty : prefix,
             Markers.Empty,
             [],
             modifiers,
@@ -7942,6 +8008,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             [],
             variables
         );
+
+        if (attributeLists.Count > 0)
+        {
+            return new AnnotatedStatement(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                attributeLists,
+                varDecl
+            );
+        }
+
+        return varDecl;
     }
 
     public override J VisitLocalFunctionStatement(LocalFunctionStatementSyntax node)
