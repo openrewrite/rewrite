@@ -968,6 +968,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         // Parse the body (check for semicolon-terminated records first)
         Block body;
+        bool trailingSemicolon = false;
 
         // Types can end with semicolon instead of braces: record Person(string Name);  interface C;
         // Check if this is a semicolon-terminated type (semicolon present AND no open brace)
@@ -990,9 +991,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         else
         {
             body = VisitClassBody(node);
+
+            // Record types can have both a block body AND a trailing semicolon: `record C { };`
+            if (node.SemicolonToken.Span.Length > 0)
+            {
+                SkipTo(node.SemicolonToken.SpanStart);
+                SkipToken(node.SemicolonToken);
+                trailingSemicolon = true;
+            }
         }
 
-        var classMarkers = Markers.Empty;
+        var classMarkers = trailingSemicolon
+            ? Markers.Build([new Semicolon(Guid.NewGuid())])
+            : Markers.Empty;
 
         // If there's a primary constructor, prepend it as the first statement in the body.
         // The MethodDeclaration already carries a PrimaryConstructor marker to identify it.

@@ -87,6 +87,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             case ClassDeclaration cd when cd.Body.Markers.FindFirst<Semicolon>() != null:
                 break; // semicolon already printed by VisitClassDeclaration
 
+            // ClassDeclaration: trailing semicolon after block body (record C { };)
+            case ClassDeclaration cd when cd.Markers.FindFirst<Semicolon>() != null:
+                p.Append(';');
+                break;
+
             // PropertyDeclaration ends with ';' when it has expression body or initializer
             case PropertyDeclaration pd when pd.ExpressionBody != null || pd.Initializer != null:
                 p.Append(';');
