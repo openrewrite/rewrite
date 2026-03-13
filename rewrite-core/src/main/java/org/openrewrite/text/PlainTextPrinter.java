@@ -56,7 +56,7 @@ public class PlainTextPrinter<P> extends PlainTextVisitor<PrintOutputCapture<P>>
         // fenced markers (e.g. {{uuid}}) don't create a phantom unterminated
         // line that causes jgit to produce "\ No newline at end of file".
         String lineEnding = null;
-        if (!text.isEmpty() && text.endsWith("\n")) {
+        if (text.endsWith("\n")) {
             int cut = text.length() - 1;
             if (cut > 0 && text.charAt(cut - 1) == '\r') {
                 cut--;
