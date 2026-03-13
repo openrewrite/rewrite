@@ -43,6 +43,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
      */
     private final String remoteId;
 
+    public RewriteRpc getRpc() {
+        return rpc;
+    }
+
     private final RecipeDescriptor descriptor;
     private final String editVisitor;
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;

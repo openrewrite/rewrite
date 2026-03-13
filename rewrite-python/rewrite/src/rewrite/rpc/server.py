@@ -1056,9 +1056,16 @@ def handle_visit(params: dict) -> dict:
         if p_id:
             _execution_contexts[p_id] = ctx
 
-    # Always fetch the tree from Java to ensure we have the latest version.
-    # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
-    tree = get_object_from_java(tree_id, source_file_type)
+    # Check local cache first, then fetch from Java if not found.
+    # This is required for deferred GetObject batches: when consecutive same-RPC
+    # recipes run without Java fetching intermediate results, the previous Visit's
+    # output is in local_objects and must be used as input for the next Visit.
+    # Note: if a Java-side recipe modified the tree between visits, this cache
+    # would be stale — but the deferral scheduler guarantees that doesn't happen
+    # within a deferred batch (only consecutive same-RPC recipes are batched).
+    tree = local_objects.get(tree_id)
+    if tree is None:
+        tree = get_object_from_java(tree_id, source_file_type)
 
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
@@ -1068,10 +1075,19 @@ def handle_visit(params: dict) -> dict:
 
     # Apply the visitor
     from rewrite.visitor import Cursor
+    from rewrite.markers import SearchResult
     cursor = Cursor(None, Cursor.ROOT_VALUE)
 
+    # Extract recipe name from visitor name (e.g., "edit:recipeName" or "scan:recipeName")
+    colon_idx = visitor_name.find(':')
+    recipe_name = visitor_name[colon_idx + 1:] if colon_idx >= 0 else None
+
     before = tree
-    after = visitor.visit(tree, ctx, cursor)
+    SearchResult._current_recipe_name = recipe_name
+    try:
+        after = visitor.visit(tree, ctx, cursor)
+    finally:
+        SearchResult._current_recipe_name = None
 
     # Update local objects with the result and determine if modified
     # Use referential equality (identity comparison) to detect modifications
@@ -1089,8 +1105,9 @@ def handle_visit(params: dict) -> dict:
     else:
         modified = False
 
-    logger.debug(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
-    return {'modified': modified}
+    deleted = after is None and before is not None
+    logger.debug(f"Visit result: modified={modified}, deleted={deleted}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
+    return {'modified': modified, 'deleted': deleted}
 
 
 def _instantiate_visitor(visitor_name: str, ctx):

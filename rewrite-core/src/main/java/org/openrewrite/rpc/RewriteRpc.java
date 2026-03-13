@@ -96,6 +96,38 @@ public class RewriteRpc {
     private @Nullable List<String> remoteLanguages;
 
     /**
+     * When true, the host skips getObject() after a Visit RPC call,
+     * letting the remote keep the modified tree in its localObjects.
+     * The tree is fetched later via {@link #fetchDeferredResult}.
+     */
+    private boolean deferGetObject;
+
+    /**
+     * Set during {@link #visit} to indicate whether the last Visit RPC
+     * reported that the tree was modified.
+     */
+    private boolean lastVisitModified;
+
+    /**
+     * Tree IDs whose latest state is on the remote (deferred getObject).
+     * For these IDs, we must NOT overwrite localObjects with the stale host-side tree.
+     */
+    private final Set<String> deferredTreeIds = new HashSet<>();
+
+    /**
+     * Tree IDs that were deleted during a deferred batch.
+     */
+    private final Set<String> deferredDeletedIds = new HashSet<>();
+
+    /**
+     * Maps SearchResult UUIDs to the recipe name that created them.
+     * Populated during {@link #getObject} when the remote sends SearchResult
+     * markers with a recipeName field. Used by the scheduler for per-recipe
+     * attribution of search results during deferred batches.
+     */
+    private final Map<UUID, String> searchResultRecipes = new HashMap<>();
+
+    /**
      * Creates a new RPC interface that can be used to communicate with a remote.
      *
      * @param marketplace The marketplace of recipes that this peer makes available.
@@ -234,8 +266,13 @@ public class RewriteRpc {
     }
 
     public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
-        // Set the local state of this tree, so that when the remote asks for it, we know what to send.
-        localObjects.put(tree.getId().toString(), tree);
+        lastVisitModified = false;
+        String treeId = tree.getId().toString();
+
+        // Don't overwrite localObjects for deferred trees — remote has the latest
+        if (!deferredTreeIds.contains(treeId)) {
+            localObjects.put(treeId, tree);
+        }
 
         String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
@@ -243,10 +280,60 @@ public class RewriteRpc {
         String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
                 .getClass().getName();
         VisitResponse response = send("Visit", new Visit(visitorName, sourceFileType, null,
-                tree.getId().toString(), pId, cursorIds), VisitResponse.class);
-        return response.isModified() ?
-                getObject(tree.getId().toString(), sourceFileType) :
-                tree;
+                treeId, pId, cursorIds), VisitResponse.class);
+
+        if (response.isModified()) {
+            lastVisitModified = true;
+            if (response.isDeleted()) {
+                deferredDeletedIds.add(treeId);
+                if (deferGetObject) {
+                    return null;
+                }
+            }
+            if (deferGetObject) {
+                deferredTreeIds.add(treeId);
+                return tree; // Return original; remote holds the modified tree
+            }
+            Tree result = getObject(treeId, sourceFileType);
+            deferredTreeIds.remove(treeId);
+            return result;
+        }
+        return tree;
+    }
+
+    public void setDeferGetObject(boolean defer) {
+        this.deferGetObject = defer;
+    }
+
+    public boolean isLastVisitModified() {
+        return lastVisitModified;
+    }
+
+    public void resetLastVisitModified() {
+        this.lastVisitModified = false;
+    }
+
+    /**
+     * Fetch a deferred tree from the remote. Call this at the end of a deferred
+     * batch to retrieve the final state of the tree.
+     */
+    @SuppressWarnings("unchecked")
+    public <T extends SourceFile> @Nullable T fetchDeferredResult(String treeId, String sourceFileType) {
+        if (deferredDeletedIds.remove(treeId)) {
+            deferredTreeIds.remove(treeId);
+            return null;
+        }
+        T result = getObject(treeId, sourceFileType);
+        deferredTreeIds.remove(treeId);
+        return result;
+    }
+
+    public boolean isDeferredDeleted(String treeId) {
+        return deferredDeletedIds.contains(treeId);
+    }
+
+    public Map<UUID, String> getSearchResultRecipes() {
+        return searchResultRecipes;
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
@@ -484,7 +571,8 @@ public class RewriteRpc {
                 remoteRefs,
                 () -> send("GetObject", new GetObject(id, sourceFileType), GetObjectResponse.class),
                 sourceFileType,
-                log.get()
+                log.get(),
+                searchResultRecipes
         );
         Object remoteObject;
         try {

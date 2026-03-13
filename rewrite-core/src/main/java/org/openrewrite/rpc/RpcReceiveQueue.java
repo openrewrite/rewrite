@@ -17,6 +17,7 @@ package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.objenesis.ObjenesisStd;
+import org.openrewrite.marker.SearchResult;
 
 import java.io.PrintStream;
 import java.util.*;
@@ -35,11 +36,24 @@ public class RpcReceiveQueue {
     private final @Nullable String sourceFileType;
     private final @Nullable PrintStream log;
 
+    /**
+     * When non-null, intercepts SearchResult markers during receive and stores
+     * the recipe name (3rd RPC field sent by remotes) keyed by the SearchResult's UUID.
+     */
+    private final @Nullable Map<UUID, String> searchResultRecipes;
+
     public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
                            @Nullable String sourceFileType, @Nullable PrintStream log) {
+        this(refs, pull, sourceFileType, log, null);
+    }
+
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull,
+                           @Nullable String sourceFileType, @Nullable PrintStream log,
+                           @Nullable Map<UUID, String> searchResultRecipes) {
         this.refs = refs;
         this.sourceFileType = sourceFileType;
         this.log = log;
+        this.searchResultRecipes = searchResultRecipes;
         this.batch = new ArrayDeque<>();
         this.pull = pull;
     }
@@ -136,6 +150,14 @@ public class RpcReceiveQueue {
                     after = onChange.apply(before);
                 } else if (before != null && (codec = RpcCodec.forInstance(before, sourceFileType)) != null) {
                     after = codec.rpcReceive(before, this);
+                    // Remote languages send recipeName as a 3rd field after id and description.
+                    // Read it here so it doesn't desync the queue, and store for attribution.
+                    if (after instanceof SearchResult && searchResultRecipes != null) {
+                        String recipeName = receive((String) null);
+                        if (recipeName != null) {
+                            searchResultRecipes.put(((SearchResult) after).getId(), recipeName);
+                        }
+                    }
                 } else if (message.getValueType() == null) {
                     after = message.getValue();
                 } else {

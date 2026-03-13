@@ -859,15 +859,28 @@ public class RewriteRpcServer
             visitor = recipe.GetVisitor();
         }
 
-        var result = visitor.Visit(tree, ctx);
-
-        var modified = !ReferenceEquals(tree, result);
-        if (modified && result != null)
+        SearchResult.CurrentRecipeName = recipeId;
+        try
         {
-            _localObjects[request.TreeId] = result;
-        }
+            var result = visitor.Visit(tree, ctx);
 
-        return new VisitResponse { Modified = modified };
+            var modified = !ReferenceEquals(tree, result);
+            var deleted = result == null && tree != null;
+            if (result == null)
+            {
+                _localObjects.Remove(request.TreeId);
+            }
+            else if (modified)
+            {
+                _localObjects[request.TreeId] = result;
+            }
+
+            return new VisitResponse { Modified = modified, Deleted = deleted };
+        }
+        finally
+        {
+            SearchResult.CurrentRecipeName = null;
+        }
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
@@ -1233,5 +1246,6 @@ public class VisitRequest
 public class VisitResponse
 {
     public bool Modified { get; set; }
+    public bool Deleted { get; set; }
 }
 

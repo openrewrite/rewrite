@@ -78,6 +78,7 @@ RpcCodecs.registerCodec(MarkersKind.Markers, {
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     async rpcReceive(before: SearchResult, q: RpcReceiveQueue): Promise<SearchResult> {
+        // Only read id and description from Java (Java doesn't send recipeName)
         return updateIfChanged(before, {
             id: await q.receive(before.id),
             description: await q.receive(before.description),
@@ -87,6 +88,7 @@ RpcCodecs.registerCodec(MarkersKind.SearchResult, {
     async rpcSend(after: SearchResult, q: RpcSendQueue): Promise<void> {
         await q.getAndSend(after, a => a.id);
         await q.getAndSend(after, a => a.description);
+        await q.getAndSend(after, a => a.recipeName);
     }
 });
 

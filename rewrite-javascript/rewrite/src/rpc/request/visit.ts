@@ -18,10 +18,12 @@ import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, SourceFile, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
+import {setCurrentRecipeName} from "../../markers";
 import {withMetrics, extractSourcePath} from "./metrics";
 
 export interface VisitResponse {
     modified: boolean
+    deleted: boolean
 }
 
 // Tracks the last phase (scan or edit) for each recipe to detect cycle transitions
@@ -51,20 +53,34 @@ export class Visit {
                 metricsCsv,
                 (context) => async (request) => {
                     const p = await getObject(request.p, undefined);
-                    const before: Tree = await getObject(request.treeId, request.sourceFileType);
+                    // Check local cache first for deferred GetObject batches: when consecutive
+                    // same-RPC recipes run without Java fetching intermediate results, the
+                    // previous Visit's output is in localObjects and must be used here.
+                    const local = localObjects.get(request.treeId);
+                    const before: Tree = local ?? await getObject(request.treeId, request.sourceFileType);
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
                     context.target = extractSourcePath(before, cursor);
                     localObjects.set(before.id.toString(), before);
 
                     const visitor = await Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
-                    const after = await visitor.visit(before, p, cursor);
+                    // Set current recipe name so SearchResult.Found() can capture it
+                    const colonIdx = request.visitor.indexOf(':');
+                    const recipeName = colonIdx >= 0 ? request.visitor.substring(colonIdx + 1) : undefined;
+                    setCurrentRecipeName(recipeName);
+                    let after;
+                    try {
+                        after = await visitor.visit(before, p, cursor);
+                    } finally {
+                        setCurrentRecipeName(undefined);
+                    }
+                    const deleted = after == null && before != null;
                     if (!after) {
                         localObjects.delete(before.id.toString());
                     } else if (after !== before) {
                         localObjects.set(after.id.toString(), after);
                     }
 
-                    return {modified: before !== after};
+                    return {modified: before !== after, deleted};
                 }
             )
         );

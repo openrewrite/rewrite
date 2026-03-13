@@ -34,6 +34,9 @@ import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.rpc.RpcRecipe;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -195,15 +198,53 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         );
     }
 
+    /**
+     * Mutable state for tracking a batch of consecutive same-RPC recipes
+     * whose GetObject calls are deferred until the end of the batch.
+     */
+    private static class DeferralState {
+        @Nullable RewriteRpc rpc;
+        final List<Stack<Recipe>> recipeStacks = new ArrayList<>();
+        @Nullable SourceFile originalBeforeDefer;
+
+        void clear() {
+            rpc = null;
+            recipeStacks.clear();
+            originalBeforeDefer = null;
+        }
+    }
+
     protected @Nullable SourceFile editSource(LSS sourceSet, SourceFile sourceFile) {
         recipeRunStats.recordSourceVisited(sourceFile);
-        return allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
+        DeferralState deferral = new DeferralState();
+
+        SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
             Recipe recipe = recipeStack.peek();
             if (source == null) {
                 return null;
             }
 
-            SourceFile after = source;
+            RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
+
+            // Flush deferred batch if switching to a different RPC or non-RPC recipe
+            if (deferral.rpc != null && deferral.rpc != currentRpc) {
+                source = flushDeferred(deferral, source);
+                if (source == null) {
+                    return null;
+                }
+            }
+
+            // Should we defer getObject for this recipe?
+            // We're "in a batch" if this is an RPC recipe and either:
+            //   (a) the next recipe uses the same RPC (batch continues), or
+            //   (b) we're already in a deferred batch with this RPC (batch ends here)
+            Recipe nextRecipe = allRecipeStack.getNextRecipe();
+            RewriteRpc nextRpc = nextRecipe instanceof RpcRecipe ? ((RpcRecipe) nextRecipe).getRpc() : null;
+            boolean isInBatch = currentRpc != null && (nextRpc == currentRpc || deferral.rpc == currentRpc);
+
+            // Effectively-final copy for inner lambdas (source may have been reassigned by flush above)
+            final SourceFile src = source;
+            SourceFile after = src;
 
             try {
                 Duration duration = Duration.ofNanos(System.nanoTime() - cycleStartTime);
@@ -213,48 +254,183 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         ctx.getOnError().accept(t);
                         ctx.getOnTimeout().accept(t, ctx);
                     }
-                    return source;
+                    return src;
                 }
 
                 if (ctx.getMessage(PANIC) != null) {
-                    return source;
+                    return src;
                 }
 
                 TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
                 // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
                 visitor.setCursor(rootCursor);
 
+                if (isInBatch) {
+                    // Deferred path: run visitor but skip getObject
+                    currentRpc.resetLastVisitModified();
+                    try {
+                        currentRpc.setDeferGetObject(true);
+                        after = recipeRunStats.recordEdit(recipe, () -> {
+                            if (visitor.isAcceptable(src, ctx)) {
+                                //noinspection DataFlowIssue
+                                return (SourceFile) visitor.visit(src, ctx, rootCursor);
+                            }
+                            return src;
+                        });
+                    } finally {
+                        currentRpc.setDeferGetObject(false);
+                    }
+
+                    if (after == null) {
+                        // Tree was deleted during deferred visit
+                        madeChangesInThisCycle.add(recipe);
+                        deferral.recipeStacks.add(recipeStack);
+                        deferral.clear();
+                        return null;
+                    }
+
+                    if (currentRpc.isLastVisitModified()) {
+                        madeChangesInThisCycle.add(recipe);
+                        if (deferral.originalBeforeDefer == null) {
+                            deferral.originalBeforeDefer = src;
+                        }
+                        deferral.rpc = currentRpc;
+                        deferral.recipeStacks.add(recipeStack);
+                    } else if (ctx.hasNewMessages()) {
+                        madeChangesInThisCycle.add(recipe);
+                        ctx.resetHasNewMessages();
+                    }
+
+                    // If this is the last recipe in the batch, flush now
+                    if (nextRpc != currentRpc && deferral.rpc != null) {
+                        return flushDeferred(deferral, src);
+                    }
+
+                    return src; // Return unchanged during deferral
+                }
+
+                // Normal (non-deferred) path
                 after = recipeRunStats.recordEdit(recipe, () -> {
-                    if (visitor.isAcceptable(source, ctx)) {
+                    if (visitor.isAcceptable(src, ctx)) {
                         // propagate shared root cursor
                         //noinspection DataFlowIssue
-                        return (SourceFile) visitor.visit(source, ctx, rootCursor);
+                        return (SourceFile) visitor.visit(src, ctx, rootCursor);
                     }
-                    return source;
+                    return src;
                 });
 
-                if (after != source) {
+                if (after != src) {
                     madeChangesInThisCycle.add(recipe);
-                    recordSourceFileResultAndSearchResults(source, after, recipeStack, ctx);
-                    if (source.getMarkers().findFirst(Generated.class).isPresent()) {
+                    recordSourceFileResultAndSearchResults(src, after, recipeStack, ctx);
+                    if (src.getMarkers().findFirst(Generated.class).isPresent()) {
                         // skip edits made to generated source files so that they don't show up in a diff
                         // that later fails to apply on a freshly cloned repository
-                        return source;
+                        return src;
                     }
-                    recipeRunStats.recordSourceFileChanged(source, after);
+                    recipeRunStats.recordSourceFileChanged(src, after);
                 } else if (ctx.hasNewMessages()) {
                     // consider any recipes adding new messages as a changing recipe (which can request another cycle)
                     madeChangesInThisCycle.add(recipe);
                     ctx.resetHasNewMessages();
                 }
             } catch (Throwable t) {
-                after = handleError(recipe, source, after, t);
+                if (isInBatch) {
+                    deferral.clear();
+                }
+                after = handleError(recipe, src, after, t);
             }
-            if (after != null && after != source) {
+            if (after != null && after != src) {
                 after = addRecipesThatMadeChanges(recipeStack, after);
             }
             return after;
         }, sourceFile);
+
+        // Flush any remaining deferred batch at end of recipe list
+        if (deferral.rpc != null && result != null) {
+            result = flushDeferred(deferral, result);
+        }
+
+        return result;
+    }
+
+    private @Nullable SourceFile flushDeferred(DeferralState deferral, SourceFile source) {
+        if (deferral.rpc == null || deferral.recipeStacks.isEmpty()) {
+            deferral.clear();
+            return source;
+        }
+
+        RewriteRpc rpc = deferral.rpc;
+        SourceFile fetched = rpc.fetchDeferredResult(
+                source.getId().toString(), source.getClass().getName());
+
+        if (fetched == null) {
+            deferral.clear();
+            return null;
+        }
+
+        SourceFile originalBefore = deferral.originalBeforeDefer;
+        if (originalBefore != null) {
+            // Use the attribution map from RPC to correctly assign search results to recipes
+            Map<UUID, String> attributionMap = rpc.getSearchResultRecipes();
+
+            // Record SourcesFileResults per recipe and collect search results with attribution
+            for (Stack<Recipe> stack : deferral.recipeStacks) {
+                recordDeferredSourceFileResult(originalBefore, fetched, stack, attributionMap, ctx);
+            }
+            if (!originalBefore.getMarkers().findFirst(Generated.class).isPresent()) {
+                recipeRunStats.recordSourceFileChanged(originalBefore, fetched);
+            }
+            for (Stack<Recipe> stack : deferral.recipeStacks) {
+                fetched = addRecipesThatMadeChanges(stack, fetched);
+            }
+
+            // Clear the attribution map after processing
+            attributionMap.clear();
+        }
+
+        deferral.clear();
+        return fetched;
+    }
+
+    /**
+     * Records source file results and search results for a deferred recipe,
+     * using the attribution map to correctly assign search results to the recipe
+     * that created them (rather than attributing all search results to every
+     * recipe in the deferred batch).
+     */
+    private void recordDeferredSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after,
+                                                Stack<Recipe> recipeStack,
+                                                Map<UUID, String> attributionMap,
+                                                ExecutionContext ctx) {
+        String beforePath = (before == null) ? "" : before.getSourcePath().toString();
+        String afterPath = (after == null) ? "" : after.getSourcePath().toString();
+        Recipe recipe = recipeStack.peek();
+        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
+                0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+
+        String parentName = "";
+        boolean hierarchical = recipeStack.size() > 1;
+        if (hierarchical) {
+            parentName = recipeStack.get(recipeStack.size() - 2).getName();
+        }
+        sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
+                beforePath,
+                afterPath,
+                parentName,
+                recipe.getName(),
+                effortSeconds,
+                cycle));
+
+        // Use the attribution map: only include search results created by this recipe
+        String recipeName = recipe.getName();
+        List<SearchResults.Row> searchMarkers = collectSearchResults(before, after, recipeName, attributionMap);
+        for (SearchResults.Row searchResult : searchMarkers) {
+            searchResults.insertRow(ctx, searchResult);
+        }
+
+        if (hierarchical) {
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
+        }
     }
 
     protected void recordSourceFileResultAndSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
@@ -374,6 +550,19 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private List<SearchResults.Row> collectSearchResults(@Nullable SourceFile before, @Nullable SourceFile after, String recipeName) {
+        return collectSearchResults(before, after, recipeName, null);
+    }
+
+    /**
+     * Collects new SearchResult markers from the after tree.
+     *
+     * @param attributionMap When non-null, only includes search results whose UUID maps
+     *                       to the given recipeName in the attribution map. This prevents
+     *                       double-counting in deferred batches where multiple recipes'
+     *                       search results coexist in the same tree.
+     */
+    private List<SearchResults.Row> collectSearchResults(@Nullable SourceFile before, @Nullable SourceFile after,
+                                                         String recipeName, @Nullable Map<UUID, String> attributionMap) {
         if (after == null) {
             return emptyList();
         }
@@ -396,6 +585,15 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             @Override
             public <M extends Marker> M visitMarker(Marker marker, List<SearchResults.Row> ctx) {
                 if (marker instanceof SearchResult && !alreadyPresentMarkers.contains(marker)) {
+                    SearchResult sr = (SearchResult) marker;
+                    // If an attribution map is provided, only include search results
+                    // that were created by this specific recipe
+                    if (attributionMap != null) {
+                        String creator = attributionMap.get(sr.getId());
+                        if (creator == null || !creator.equals(recipeName)) {
+                            return super.visitMarker(marker, ctx);
+                        }
+                    }
                     Cursor cursor = getCursor();
                     if (!(cursor.getValue() instanceof Tree)) {
                         cursor = cursor.getParentTreeCursor();
@@ -405,7 +603,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 (before == null) ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString()),
                                 PathUtils.separatorsToUnix(after.getSourcePath().toString()),
                                 StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(), new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
-                                ((SearchResult) marker).getDescription(),
+                                sr.getDescription(),
                                 recipeName));
                     }
                 }

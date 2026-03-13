@@ -107,6 +107,16 @@ class SearchResult(Marker):
     def description(self) -> Optional[str]:
         return self._description
 
+    _recipe_name: Optional[str] = None
+
+    @property
+    def recipe_name(self) -> Optional[str]:
+        return self._recipe_name
+
+    # The name of the recipe currently being executed. Set by the Visit handler
+    # so that SearchResult creation can capture it.
+    _current_recipe_name: ClassVar[Optional[str]] = None
+
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
         desc = self._description or ""
         return comment_wrapper(f"({desc})" if desc else "")

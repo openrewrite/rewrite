@@ -1271,10 +1271,11 @@ def _send_search_result(marker, q):
     """Codec for sending SearchResult marker.
 
     Fields are sent in the order expected by Java's SearchResult.rpcReceive():
-    id, description
+    id, description, then recipeName (extra field read by RpcReceiveQueue)
     """
     q.get_and_send(marker, lambda x: str(x.id))
     q.get_and_send(marker, lambda x: x.description)
+    q.get_and_send(marker, lambda x: x.recipe_name)
 
 
 def _send_parse_exception_result(marker, q):
