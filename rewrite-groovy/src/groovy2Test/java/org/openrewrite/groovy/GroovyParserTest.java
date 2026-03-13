@@ -90,4 +90,17 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void shouldBeAbleToParseClassDeclaration() {
+        rewriteRun(
+                groovy(
+                        """
+                        class Foo {
+                            String bar
+                        }
+                        """
+                )
+        );
+    }
+
 }
