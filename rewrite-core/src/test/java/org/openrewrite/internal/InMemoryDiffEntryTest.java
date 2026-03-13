@@ -408,4 +408,81 @@ class InMemoryDiffEntryTest {
             assertThat(diff).doesNotContain("~~>");
         }
     }
+
+    @Test
+    void fencedSearchResultOnFileWithTrailingNewline() {
+        // Files with trailing newlines should not produce "\ No newline at end of file"
+        // when fenced markers are applied. The closing fence must be placed before the
+        // trailing newline, not after it.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\nline2\nline3\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            assertThat(diff).doesNotContain("No newline at end of file");
+            // The fenced markers should be present
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+        }
+    }
+
+    @Test
+    void fencedSearchResultOnFileWithoutTrailingNewline() {
+        // Files without trailing newlines should still produce "\ No newline at end of file"
+        // on both sides of the diff, since neither before nor after ends with a newline.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\nline2").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+            assertThat(diff).contains("No newline at end of file");
+        }
+    }
+
+    @Test
+    void fencedSearchResultOnFileWithWindowsLineEndings() {
+        // Windows-style line endings (\r\n) should be handled the same way —
+        // the closing fence goes before the trailing \r\n.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\r\nline2\r\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            assertThat(diff).doesNotContain("No newline at end of file");
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+        }
+    }
+
+    @Test
+    void fencedSearchResultPreservesLineCount() {
+        // A search-only result (text unchanged, only markers added) on a file with a
+        // trailing newline should not change the line count in the hunk header.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\nline2\nline3\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            // Before has 3 lines, after should also have 3 lines (not 4)
+            assertThat(diff).contains("@@ -1,3 +1,3 @@");
+        }
+    }
 }
