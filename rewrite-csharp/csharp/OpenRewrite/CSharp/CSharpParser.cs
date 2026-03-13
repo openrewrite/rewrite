@@ -128,7 +128,7 @@ public class CSharpParser
             null,
             [],
             [],
-            new List<Statement> { directive },
+            new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
             Space.Empty
         );
     }
@@ -223,7 +223,7 @@ public class CSharpParser
             null,
             [],
             [],
-            new List<Statement> { directive },
+            new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
             Space.Empty
         );
     }
@@ -286,34 +286,36 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
     public new CompilationUnit VisitCompilationUnit(CompilationUnitSyntax node)
     {
-        var members = new List<Statement>();
+        var members = new List<JRightPadded<Statement>>();
 
         // Process directives at the very start of the file (before any usings/members)
         // These would otherwise be absorbed into the CompilationUnit prefix
         var leadingDirectives = ProcessGapDirectives(node.SpanStart);
-        members.AddRange(leadingDirectives);
+        foreach (var d in leadingDirectives)
+            members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
 
         // If leading directives were found, don't extract prefix — the trailing
         // whitespace after the last directive naturally becomes the next member's prefix
         var prefix = leadingDirectives.Count > 0 ? Space.Empty : ExtractPrefix(node);
 
         // Handle extern alias directives
-        var externAliases = new List<ExternAlias>();
+        var externAliases = new List<JRightPadded<ExternAlias>>();
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(ea);
+                externAliases.Add(PadExternAlias(ea));
             }
         }
 
         // Handle using directives
         foreach (var usingDirective in node.Usings)
         {
-            members.AddRange(ProcessGapDirectives(usingDirective.SpanStart));
+            foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
+                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = VisitUsingDirective(usingDirective);
-            members.Add(visited);
+            members.Add(PadStatement(visited));
         }
 
         // Handle assembly/module-level attributes
@@ -330,11 +332,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Handle top-level statements and type declarations
         foreach (var member in node.Members)
         {
-            members.AddRange(ProcessGapDirectives(member.SpanStart));
+            foreach (var d in ProcessGapDirectives(member.SpanStart))
+                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = Visit(member);
             if (visited is Statement stmt)
             {
-                members.Add(stmt);
+                members.Add(PadStatement(stmt));
             }
 
             // For file-scoped namespaces, the type declarations are children of the
@@ -347,31 +350,34 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     var fsExVisited = VisitExternAliasDirective(fsExtern);
                     if (fsExVisited is Statement fsExStmt)
                     {
-                        members.Add(fsExStmt);
+                        members.Add(PadStatement(fsExStmt));
                     }
                 }
 
                 foreach (var fsUsing in fsns.Usings)
                 {
-                    members.AddRange(ProcessGapDirectives(fsUsing.SpanStart));
+                    foreach (var d in ProcessGapDirectives(fsUsing.SpanStart))
+                        members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
                     var fsUVisited = VisitUsingDirective(fsUsing);
-                    members.Add(fsUVisited);
+                    members.Add(PadStatement(fsUVisited));
                 }
 
                 foreach (var nsMember in fsns.Members)
                 {
-                    members.AddRange(ProcessGapDirectives(nsMember.SpanStart));
+                    foreach (var d in ProcessGapDirectives(nsMember.SpanStart))
+                        members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
                     var nsVisited = Visit(nsMember);
                     if (nsVisited is Statement nsStmt)
                     {
-                        members.Add(nsStmt);
+                        members.Add(PadStatement(nsStmt));
                     }
                 }
             }
         }
 
         // Process trailing directives before EOF
-        members.AddRange(ProcessGapDirectives(_source.Length));
+        foreach (var d in ProcessGapDirectives(_source.Length))
+            members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
 
         var eof = ExtractRemaining();
 
@@ -453,9 +459,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Parse namespace or type
         var namespaceOrType = VisitType(node.NamespaceOrType);
 
-        // Consume the semicolon
-        SkipTo(node.SemicolonToken.SpanStart);
-        SkipToken(node.SemicolonToken);
+        // Capture space before semicolon into _pendingSemicolonSpace
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+        _cursor = node.SemicolonToken.Span.End;
 
         return new UsingDirective(
             Guid.NewGuid(),
@@ -515,13 +521,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.OpenBraceToken.Span.End;
 
         // Parse extern alias directives within the namespace
-        var externAliases = new List<ExternAlias>();
+        var externAliases = new List<JRightPadded<ExternAlias>>();
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(ea);
+                externAliases.Add(PadExternAlias(ea));
             }
         }
 
@@ -3297,7 +3303,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null
             );
 
-        // Consume semicolon
+        // Capture space before semicolon into _pendingSemicolonSpace
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
         _cursor = node.SemicolonToken.Span.End;
 
         return new ExternAlias(Guid.NewGuid(), prefix, Markers.Empty,
@@ -9141,6 +9148,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var after = _pendingSemicolonSpace;
         _pendingSemicolonSpace = Space.Empty;
         return new JRightPadded<Statement>(s, after, Markers.Empty);
+    }
+
+    /// <summary>
+    /// Wraps an ExternAlias in JRightPadded, consuming any pending semicolon space into After.
+    /// </summary>
+    private JRightPadded<ExternAlias> PadExternAlias(ExternAlias ea)
+    {
+        var after = _pendingSemicolonSpace;
+        _pendingSemicolonSpace = Space.Empty;
+        return new JRightPadded<ExternAlias>(ea, after, Markers.Empty);
     }
 
     private Space ExtractPrefix(SyntaxNode node)

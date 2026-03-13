@@ -199,16 +199,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cu, c => (object)c.CharsetBomMarked);
         q.GetAndSend(cu, c => c.Checksum);
         q.GetAndSend(cu, c => c.FileAttributes);
-        q.GetAndSendList(cu,
-            c => (IList<JRightPadded<Statement>>)c.Externs
-                .Select(e => new JRightPadded<Statement>(e, Space.Empty, Markers.Empty))
-                .ToList(),
+        q.GetAndSendList(cu, c => c.Externs,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSendList(cu, c => c.AttributeLists, a => (object)a.Id, a => Visit(a, q));
-        q.GetAndSendList(cu,
-            c => (IList<JRightPadded<Statement>>)c.Members
-                .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
-                .ToList(),
+        q.GetAndSendList(cu, c => c.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(cu, c => c.Eof, space => VisitSpace(space, q));
         return cu;
@@ -455,10 +449,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, RpcSendQueue q)
     {
         q.GetAndSend(ns, n => n.Name, rp => VisitRightPadded(rp, q));
-        q.GetAndSendList(ns,
-            n => (IList<JRightPadded<Statement>>)n.Externs
-                .Select(e => new JRightPadded<Statement>(e, Space.Empty, Markers.Empty))
-                .ToList(),
+        q.GetAndSendList(ns, n => n.Externs,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         // Usings: extract from Members
         q.GetAndSendList(ns,

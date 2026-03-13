@@ -1588,9 +1588,9 @@ public sealed class CompilationUnit(
     bool charsetBomMarked,
     Checksum? checksum,
     Core.FileAttributes? fileAttributes,
-    IList<ExternAlias> externs,
+    IList<JRightPadded<ExternAlias>> externs,
     IList<AttributeList> attributeLists,
-    IList<Statement> members,
+    IList<JRightPadded<Statement>> members,
     Space eof
 ) : Cs, SourceFile, IEquatable<CompilationUnit>
 {
@@ -1602,9 +1602,9 @@ public sealed class CompilationUnit(
     public bool CharsetBomMarked { get; } = charsetBomMarked;
     public Checksum? Checksum { get; } = checksum;
     public Core.FileAttributes? FileAttributes { get; } = fileAttributes;
-    public IList<ExternAlias> Externs { get; } = externs;
+    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
     public IList<AttributeList> AttributeLists { get; } = attributeLists;
-    public IList<Statement> Members { get; } = members;
+    public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space Eof { get; } = eof;
 
     public CompilationUnit WithId(Guid id) =>
@@ -1623,11 +1623,11 @@ public sealed class CompilationUnit(
         ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
     public CompilationUnit WithFileAttributes(Core.FileAttributes? fileAttributes) =>
         ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Externs, AttributeLists, Members, Eof);
-    public CompilationUnit WithExterns(IList<ExternAlias> externs) =>
+    public CompilationUnit WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
         ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, externs, AttributeLists, Members, Eof);
     public CompilationUnit WithAttributeLists(IList<AttributeList> attributeLists) =>
         ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, attributeLists, Members, Eof);
-    public CompilationUnit WithMembers(IList<Statement> members) =>
+    public CompilationUnit WithMembers(IList<JRightPadded<Statement>> members) =>
         ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, members, Eof);
     public CompilationUnit WithEof(Space eof) =>
         ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, eof);
@@ -1824,7 +1824,7 @@ public sealed class NamespaceDeclaration(
     Space prefix,
     Markers markers,
     JRightPadded<Expression> name,
-    IList<ExternAlias> externs,
+    IList<JRightPadded<ExternAlias>> externs,
     IList<JRightPadded<Statement>> members,
     Space end
 ) : Cs, Statement, IEquatable<NamespaceDeclaration>
@@ -1833,7 +1833,7 @@ public sealed class NamespaceDeclaration(
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public JRightPadded<Expression> Name { get; } = name;
-    public IList<ExternAlias> Externs { get; } = externs;
+    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space End { get; } = end;
 
@@ -1845,7 +1845,7 @@ public sealed class NamespaceDeclaration(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Externs, Members, End);
     public NamespaceDeclaration WithName(JRightPadded<Expression> name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Externs, Members, End);
-    public NamespaceDeclaration WithExterns(IList<ExternAlias> externs) =>
+    public NamespaceDeclaration WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
         ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, Name, externs, Members, End);
     public NamespaceDeclaration WithMembers(IList<JRightPadded<Statement>> members) =>
         ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, Externs, members, End);

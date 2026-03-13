@@ -144,14 +144,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         bool changed = false;
 
-        var externsList = new List<ExternAlias>();
-        foreach (var externAlias in compilationUnit.Externs)
+        var externsList = new List<JRightPadded<ExternAlias>>();
+        foreach (var externPadded in compilationUnit.Externs)
         {
-            var visited = Visit(externAlias, p);
+            var visited = Visit(externPadded.Element, p);
             if (visited is ExternAlias ea)
             {
-                if (!ReferenceEquals(ea, externAlias)) changed = true;
-                externsList.Add(ea);
+                if (!ReferenceEquals(ea, externPadded.Element)) changed = true;
+                externsList.Add(externPadded.WithElement(ea));
             }
         }
 
@@ -166,14 +166,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        var members = new List<Statement>();
-        foreach (var member in compilationUnit.Members)
+        var members = new List<JRightPadded<Statement>>();
+        foreach (var memberPadded in compilationUnit.Members)
         {
-            var visited = Visit(member, p);
+            var visited = Visit(memberPadded.Element, p);
             if (visited is Statement stmt)
             {
-                if (!ReferenceEquals(stmt, member)) changed = true;
-                members.Add(stmt);
+                if (!ReferenceEquals(stmt, memberPadded.Element)) changed = true;
+                members.Add(memberPadded.WithElement(stmt));
             }
         }
 
@@ -907,14 +907,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var name = Visit(ns.Name.Element, p);
         bool changed = false;
 
-        var newExterns = new List<ExternAlias>();
-        foreach (var externAlias in ns.Externs)
+        var newExterns = new List<JRightPadded<ExternAlias>>();
+        foreach (var externPadded in ns.Externs)
         {
-            var visited = Visit(externAlias, p);
+            var visited = Visit(externPadded.Element, p);
             if (visited is ExternAlias ea)
             {
-                if (!ReferenceEquals(ea, externAlias)) changed = true;
-                newExterns.Add(ea);
+                if (!ReferenceEquals(ea, externPadded.Element)) changed = true;
+                newExterns.Add(externPadded.WithElement(ea));
             }
         }
 

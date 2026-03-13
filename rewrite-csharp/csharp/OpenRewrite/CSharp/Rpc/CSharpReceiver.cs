@@ -193,26 +193,22 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var checksum = q.Receive<Checksum?>(cu.Checksum);
         var fileAttributes = q.Receive<Core.FileAttributes?>(cu.FileAttributes);
         var externs = q.ReceiveList(
-            (cu.Externs ?? [])
-                .Select(e => new JRightPadded<Statement>(e, Space.Empty, Markers.Empty))
-                .ToList(),
+            cu.Externs ?? [],
             rp => _delegate.VisitRightPadded(rp, q));
         var attributeLists = q.ReceiveList(
             cu.AttributeLists ?? [],
             al => (AttributeList)_delegate.VisitNonNull(al, q));
         var members = q.ReceiveList(
-            (cu.Members ?? [])
-                .Select(m => new JRightPadded<Statement>(m, Space.Empty, Markers.Empty))
-                .ToList(),
+            cu.Members ?? [],
             rp => _delegate.VisitRightPadded(rp, q));
         var eof = q.Receive(cu.Eof, space => VisitSpace(space, q));
 
         return cu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
             .WithSourcePath(sourcePath!).WithCharset(charset!).WithCharsetBomMarked(charsetBomMarked)
             .WithChecksum(checksum).WithFileAttributes(fileAttributes)
-            .WithExterns(externs?.Select(rp => (ExternAlias)rp.Element).ToList() ?? [])
+            .WithExterns(externs ?? [])
             .WithAttributeLists(attributeLists ?? [])
-            .WithMembers(members?.Select(rp => rp.Element).ToList() ?? []).WithEof(eof!);
+            .WithMembers(members ?? []).WithEof(eof!);
     }
 
     // ---- UsingDirective ----
@@ -449,9 +445,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var name = q.Receive(ns.Name, rp => _delegate.VisitRightPadded(rp, q));
         // Externs
         var externs = q.ReceiveList(
-            (ns.Externs ?? [])
-                .Select(e => new JRightPadded<Statement>(e, Space.Empty, Markers.Empty))
-                .ToList(),
+            ns.Externs ?? [],
             rp => _delegate.VisitRightPadded(rp, q));
         // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
         var existingNsMembers = ns.Members ?? [];
@@ -470,7 +464,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         if (members != null) allMembers.AddRange(members);
 
         return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!)
-            .WithExterns(externs?.Select(rp => (ExternAlias)rp.Element).ToList() ?? [])
+            .WithExterns(externs ?? [])
             .WithMembers(allMembers).WithEnd(end!);
     }
 
