@@ -469,7 +469,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 if (sourceFile instanceof Properties.File) {
                     return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
                 }
-                return sourceFile.getMarkers().findFirst(GradleProject.class).isPresent();
+                return (sourceFile instanceof G.CompilationUnit || sourceFile instanceof K.CompilationUnit)
+                        && sourceFile.getMarkers().findFirst(GradleProject.class).isPresent();
             }
 
             @Override
