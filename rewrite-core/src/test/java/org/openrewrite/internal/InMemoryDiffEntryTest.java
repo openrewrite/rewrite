@@ -34,6 +34,7 @@ import org.openrewrite.text.PlainTextParser;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -402,36 +403,25 @@ class InMemoryDiffEntryTest {
     }
 
     @Test
-    void unicodeDiff() {
-        // Test that getDiff() correctly handles unicode content by using
-        // the file's charset for decoding, not the platform default charset.
-        String before = """
-                public void test() {
-                    String content = "ユーザー: \\"佐藤\\" — emoji: \uD83C\uDF89 — accented: café";
-                    assertNotNull("Should generate UUID for unicode content", id);
-                    assertEquals("UUID should be 36 characters", 36, id.length());
-                }
-                """;
-        String after = """
-                public void test() {
-                    String content = "ユーザー: \\"佐藤\\" — emoji: \uD83C\uDF89 — accented: café";
-                    assertNotNull(id, "Should generate UUID for unicode content");
-                    assertEquals(36, id.length(), "UUID should be 36 characters");
-                }
-                """;
+    void nonUtf8SourceFileDiffPreservesCharset() {
+        // Use ISO-8859-1 charset with characters that encode differently than UTF-8.
+        // "café" contains é (0xE9 in ISO-8859-1, 0xC3 0xA9 in UTF-8).
+        // Without the fix, getDiff() would use the platform default charset (UTF-8 on
+        // most dev machines) to decode ISO-8859-1 bytes, corrupting the output.
+        Charset iso88591 = Charset.forName("ISO-8859-1");
+        PlainText before = PlainTextParser.builder().build()
+                .parse("line1\ncafé résumé naïve\nline3\n").findFirst().get()
+                .withSourcePath(Paths.get("file.txt"))
+                .withCharset(iso88591);
+        PlainText after = before.withText("line1\ncafé résumé naïve\nline3 changed\n");
 
-        try (InMemoryDiffEntry entry = new InMemoryDiffEntry(
-                Path.of("Test.java"), Path.of("Test.java"), null,
-                before, after, emptySet())) {
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), false)) {
             String diff = entry.getDiff();
             assertThat(diff).isNotEmpty();
-            // Verify the unicode context line is preserved in the diff
-            assertThat(diff).contains("ユーザー");
-            assertThat(diff).contains("🎉");
-            assertThat(diff).contains("café");
-            // Verify the changes are captured
-            assertThat(diff).contains("-    assertNotNull(\"Should generate UUID for unicode content\", id);");
-            assertThat(diff).contains("+    assertNotNull(id, \"Should generate UUID for unicode content\");");
+            // The context line with ISO-8859-1 characters must be preserved
+            assertThat(diff).contains("café résumé naïve");
+            assertThat(diff).contains("-line3");
+            assertThat(diff).contains("+line3 changed");
         }
     }
 
