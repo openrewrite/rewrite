@@ -97,6 +97,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 p.Append(';');
                 break;
 
+            // AnnotatedStatement: delegate to inner statement
+            case AnnotatedStatement ann:
+                PrintStatementTerminator(ann.Statement, p);
+                break;
+
             // FieldAccess used as statement (like event accessor declarations)
             case FieldAccess:
                 break;
