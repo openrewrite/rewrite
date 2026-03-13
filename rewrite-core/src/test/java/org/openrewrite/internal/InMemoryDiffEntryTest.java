@@ -19,7 +19,11 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.jgit.api.ApplyResult;
+import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.lib.FileMode;
+import org.openrewrite.jgit.lib.Repository;
+import org.openrewrite.jgit.util.FileUtils;
 import org.openrewrite.marker.GitTreeEntry;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -27,6 +31,12 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashSet;
@@ -393,6 +403,29 @@ class InMemoryDiffEntryTest {
     }
 
     @Test
+    void nonUtf8SourceFileDiffPreservesCharset() {
+        // Use ISO-8859-1 charset with characters that encode differently than UTF-8.
+        // "café" contains é (0xE9 in ISO-8859-1, 0xC3 0xA9 in UTF-8).
+        // Without the fix, getDiff() would use the platform default charset (UTF-8 on
+        // most dev machines) to decode ISO-8859-1 bytes, corrupting the output.
+        Charset iso88591 = Charset.forName("ISO-8859-1");
+        PlainText before = PlainTextParser.builder().build()
+                .parse("line1\ncafé résumé naïve\nline3\n").findFirst().get()
+                .withSourcePath(Paths.get("file.txt"))
+                .withCharset(iso88591);
+        PlainText after = before.withText("line1\ncafé résumé naïve\nline3 changed\n");
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), false)) {
+            String diff = entry.getDiff();
+            assertThat(diff).isNotEmpty();
+            // The context line with ISO-8859-1 characters must be preserved
+            assertThat(diff).contains("café résumé naïve");
+            assertThat(diff).contains("-line3");
+            assertThat(diff).contains("+line3 changed");
+        }
+    }
+
+    @Test
     void fencedMarkerPrinterIsApplied() {
         PlainText before = PlainTextParser.builder().build().parse("Hello").findFirst().get()
           .withSourcePath(Paths.get("file.txt"));
@@ -465,6 +498,87 @@ class InMemoryDiffEntryTest {
             assertThat(diff).doesNotContain("No newline at end of file");
             String expectedMarker = "{{" + searchResult.getId() + "}}";
             assertThat(diff).contains(expectedMarker);
+        }
+    }
+
+    @Test
+    void unicodeDiffCanBeAppliedByJgit() throws Exception {
+        // Simulate the exact pipeline: InMemoryDiffEntry generates diff,
+        // diff is converted to bytes, jgit ApplyCommand applies it to the file on disk.
+        // This is the pipeline that fails for customer issue #1994.
+
+        StringBuilder before = new StringBuilder();
+        StringBuilder after = new StringBuilder();
+        for (int i = 1; i <= 210; i++) {
+            if (i == 203) {
+                String line = "        String content = \"ユーザー: \\\"佐藤\\\" — emoji: \uD83C\uDF89 — accented: café\";\n";
+                before.append(line);
+                after.append(line);
+            } else if (i == 204) {
+                String line = "        String id = ContentIdentifierUtil.generate(content, util.getCorpBondNamespace());\n";
+                before.append(line);
+                after.append(line);
+            } else if (i == 205) {
+                before.append("        assertNotNull(\"Should generate UUID for unicode content\", id);\n");
+                after.append("        assertNotNull(id, \"Should generate UUID for unicode content\");\n");
+            } else if (i == 206) {
+                before.append("        assertEquals(\"UUID should be 36 characters\", 36, id.length());\n");
+                after.append("        assertEquals(36, id.length(), \"UUID should be 36 characters\");\n");
+            } else {
+                String line = "        line " + i + ";\n";
+                before.append(line);
+                after.append(line);
+            }
+        }
+
+        String beforeStr = before.toString();
+        String afterStr = after.toString();
+
+        // Step 1: Generate diff using InMemoryDiffEntry (like the worker does)
+        String diff;
+        try (InMemoryDiffEntry entry = new InMemoryDiffEntry(
+                Path.of("Test.java"), Path.of("Test.java"), null,
+                beforeStr, afterStr, emptySet())) {
+            diff = entry.getDiff();
+        }
+        assertThat(diff).isNotEmpty();
+        assertThat(diff).contains("ユーザー");
+        assertThat(diff).contains("🎉");
+
+        // Step 2: Simulate SCM service applying the diff
+        // Create a temp git repo with the original file
+        File trash = Files.createTempDirectory("unicode-diff-test").toFile();
+        try {
+            Git git = Git.init().setDirectory(trash).call();
+            Repository db = git.getRepository();
+
+            // Write the original file
+            File testFile = new File(trash, "Test.java");
+            try (FileOutputStream fos = new FileOutputStream(testFile)) {
+                fos.write(beforeStr.getBytes(StandardCharsets.UTF_8));
+            }
+            git.add().addFilepattern("Test.java").call();
+            git.commit().setMessage("initial").call();
+
+            // Apply the diff (simulating GitClient.applyPatch)
+            byte[] diffBytes = diff.getBytes(StandardCharsets.UTF_8);
+            ApplyResult result = git.apply()
+                    .setPatch(new ByteArrayInputStream(diffBytes))
+                    .call();
+
+            assertThat(result.getUpdatedFiles()).isNotEmpty();
+
+            // Verify the result
+            String resultContent = new String(Files.readAllBytes(testFile.toPath()), StandardCharsets.UTF_8);
+            assertThat(resultContent).contains("assertNotNull(id, \"Should generate UUID for unicode content\")");
+            assertThat(resultContent).contains("assertEquals(36, id.length(), \"UUID should be 36 characters\")");
+            assertThat(resultContent).contains("ユーザー");
+            assertThat(resultContent).contains("🎉");
+            assertThat(resultContent).contains("café");
+
+            db.close();
+        } finally {
+            FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
         }
     }
 
