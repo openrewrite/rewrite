@@ -2020,14 +2020,27 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _cursor = node.ExpressionBody.ArrowToken.Span.End;
             var expr = Visit(node.ExpressionBody.Expression);
             expressionBody = new JLeftPadded<Expression>(arrowSpace, (Expression)expr!);
-
-            // Consume semicolon
-            SkipTo(node.SemicolonToken.SpanStart);
-            SkipToken(node.SemicolonToken);
         }
         else if (node.AccessorList != null)
         {
             accessors = VisitAccessorList(node.AccessorList);
+        }
+
+        // Parse initializer (e.g., `= 10` in `public int X { get; set; } = 10;`)
+        JLeftPadded<Expression>? initializer = null;
+        if (node.Initializer != null)
+        {
+            var equalsSpace = ExtractSpaceBefore(node.Initializer.EqualsToken);
+            _cursor = node.Initializer.EqualsToken.Span.End;
+            var initExpr = (Expression)Visit(node.Initializer.Value)!;
+            initializer = new JLeftPadded<Expression>(equalsSpace, initExpr);
+        }
+
+        // Consume trailing semicolon if present (after initializer)
+        if (node.SemicolonToken.Span.Length > 0)
+        {
+            _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+            _cursor = node.SemicolonToken.Span.End;
         }
 
         return new PropertyDeclaration(
@@ -2041,7 +2054,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             name,
             accessors,
             expressionBody,
-            null
+            initializer
         );
     }
 

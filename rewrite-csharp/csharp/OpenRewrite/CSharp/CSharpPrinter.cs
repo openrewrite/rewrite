@@ -87,6 +87,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             case ClassDeclaration cd when cd.Body.Markers.FindFirst<Semicolon>() != null:
                 break; // semicolon already printed by VisitClassDeclaration
 
+            // PropertyDeclaration ends with ';' when it has expression body or initializer
+            case PropertyDeclaration pd when pd.ExpressionBody != null || pd.Initializer != null:
+                p.Append(';');
+                break;
+
             // FieldAccess used as statement (like event accessor declarations)
             case FieldAccess:
                 break;
@@ -1040,11 +1045,18 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(prop.ExpressionBody.Before, p);
             p.Append("=>");
             Visit(prop.ExpressionBody.Element, p);
-            p.Append(';');
         }
         else if (prop.Accessors != null)
         {
             VisitBlock(prop.Accessors, p);
+        }
+
+        // Print initializer (e.g., ` = 10` in `public int X { get; set; } = 10;`)
+        if (prop.Initializer != null)
+        {
+            VisitSpace(prop.Initializer.Before, p);
+            p.Append('=');
+            Visit(prop.Initializer.Element, p);
         }
 
         AfterSyntax(prop, p);
