@@ -43,8 +43,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
     public J visitCompilationUnit(Cs.CompilationUnit compilationUnit, P p) {
         compilationUnit = compilationUnit.withPrefix(visitSpace(compilationUnit.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         compilationUnit = compilationUnit.withMarkers(visitMarkers(compilationUnit.getMarkers(), p));
-        compilationUnit = compilationUnit.getPadding().withExterns(ListUtils.map(compilationUnit.getPadding().getExterns(), el -> visitRightPadded(el, CsRightPadded.Location.COMPILATION_UNIT_EXTERNS, p)));
-        compilationUnit = compilationUnit.withAttributeLists(ListUtils.map(compilationUnit.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, p)));
         compilationUnit = compilationUnit.getPadding().withMembers(ListUtils.map(compilationUnit.getPadding().getMembers(), el -> visitRightPadded(el, CsRightPadded.Location.COMPILATION_UNIT_MEMBERS, p)));
         return compilationUnit.withEof(visitSpace(compilationUnit.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
     }
@@ -299,20 +297,18 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return binary.withRight(visitAndCast(binary.getRight(), p));
     }
 
-    public J visitBlockScopeNamespaceDeclaration(Cs.BlockScopeNamespaceDeclaration blockScopeNamespaceDeclaration, P p) {
-        blockScopeNamespaceDeclaration = blockScopeNamespaceDeclaration.withPrefix(visitSpace(blockScopeNamespaceDeclaration.getPrefix(), CsSpace.Location.BLOCK_SCOPE_NAMESPACE_DECLARATION_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(blockScopeNamespaceDeclaration, p);
-        if (!(tempStatement instanceof Cs.BlockScopeNamespaceDeclaration))
+    public J visitNamespaceDeclaration(Cs.NamespaceDeclaration namespaceDeclaration, P p) {
+        namespaceDeclaration = namespaceDeclaration.withPrefix(visitSpace(namespaceDeclaration.getPrefix(), CsSpace.Location.NAMESPACE_DECLARATION_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(namespaceDeclaration, p);
+        if (!(tempStatement instanceof Cs.NamespaceDeclaration))
         {
             return tempStatement;
         }
-        blockScopeNamespaceDeclaration = (Cs.BlockScopeNamespaceDeclaration) tempStatement;
-        blockScopeNamespaceDeclaration = blockScopeNamespaceDeclaration.withMarkers(visitMarkers(blockScopeNamespaceDeclaration.getMarkers(), p));
-        blockScopeNamespaceDeclaration = blockScopeNamespaceDeclaration.getPadding().withName(visitRightPadded(blockScopeNamespaceDeclaration.getPadding().getName(), CsRightPadded.Location.BLOCK_SCOPE_NAMESPACE_DECLARATION_NAME, p));
-        blockScopeNamespaceDeclaration = blockScopeNamespaceDeclaration.getPadding().withExterns(ListUtils.map(blockScopeNamespaceDeclaration.getPadding().getExterns(), el -> visitRightPadded(el, CsRightPadded.Location.BLOCK_SCOPE_NAMESPACE_DECLARATION_EXTERNS, p)));
-        blockScopeNamespaceDeclaration = blockScopeNamespaceDeclaration.getPadding().withUsings(ListUtils.map(blockScopeNamespaceDeclaration.getPadding().getUsings(), el -> visitRightPadded(el, CsRightPadded.Location.BLOCK_SCOPE_NAMESPACE_DECLARATION_USINGS, p)));
-        blockScopeNamespaceDeclaration = blockScopeNamespaceDeclaration.getPadding().withMembers(ListUtils.map(blockScopeNamespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, CsRightPadded.Location.BLOCK_SCOPE_NAMESPACE_DECLARATION_MEMBERS, p)));
-        return blockScopeNamespaceDeclaration.withEnd(visitSpace(blockScopeNamespaceDeclaration.getEnd(), CsSpace.Location.BLOCK_SCOPE_NAMESPACE_DECLARATION_END, p));
+        namespaceDeclaration = (Cs.NamespaceDeclaration) tempStatement;
+        namespaceDeclaration = namespaceDeclaration.withMarkers(visitMarkers(namespaceDeclaration.getMarkers(), p));
+        namespaceDeclaration = namespaceDeclaration.getPadding().withName(visitRightPadded(namespaceDeclaration.getPadding().getName(), CsRightPadded.Location.NAMESPACE_DECLARATION_NAME, p));
+        namespaceDeclaration = namespaceDeclaration.getPadding().withMembers(ListUtils.map(namespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, CsRightPadded.Location.NAMESPACE_DECLARATION_MEMBERS, p)));
+        return namespaceDeclaration.withEnd(visitSpace(namespaceDeclaration.getEnd(), CsSpace.Location.NAMESPACE_DECLARATION_END, p));
     }
 
     public J visitCollectionExpression(Cs.CollectionExpression collectionExpression, P p) {
@@ -351,20 +347,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return externAlias.getPadding().withIdentifier(visitLeftPadded(externAlias.getPadding().getIdentifier(), CsLeftPadded.Location.EXTERN_ALIAS_IDENTIFIER, p));
     }
 
-    public J visitFileScopeNamespaceDeclaration(Cs.FileScopeNamespaceDeclaration fileScopeNamespaceDeclaration, P p) {
-        fileScopeNamespaceDeclaration = fileScopeNamespaceDeclaration.withPrefix(visitSpace(fileScopeNamespaceDeclaration.getPrefix(), CsSpace.Location.FILE_SCOPE_NAMESPACE_DECLARATION_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(fileScopeNamespaceDeclaration, p);
-        if (!(tempStatement instanceof Cs.FileScopeNamespaceDeclaration))
-        {
-            return tempStatement;
-        }
-        fileScopeNamespaceDeclaration = (Cs.FileScopeNamespaceDeclaration) tempStatement;
-        fileScopeNamespaceDeclaration = fileScopeNamespaceDeclaration.withMarkers(visitMarkers(fileScopeNamespaceDeclaration.getMarkers(), p));
-        fileScopeNamespaceDeclaration = fileScopeNamespaceDeclaration.getPadding().withName(visitRightPadded(fileScopeNamespaceDeclaration.getPadding().getName(), CsRightPadded.Location.FILE_SCOPE_NAMESPACE_DECLARATION_NAME, p));
-        fileScopeNamespaceDeclaration = fileScopeNamespaceDeclaration.getPadding().withExterns(ListUtils.map(fileScopeNamespaceDeclaration.getPadding().getExterns(), el -> visitRightPadded(el, CsRightPadded.Location.FILE_SCOPE_NAMESPACE_DECLARATION_EXTERNS, p)));
-        fileScopeNamespaceDeclaration = fileScopeNamespaceDeclaration.getPadding().withUsings(ListUtils.map(fileScopeNamespaceDeclaration.getPadding().getUsings(), el -> visitRightPadded(el, CsRightPadded.Location.FILE_SCOPE_NAMESPACE_DECLARATION_USINGS, p)));
-        return fileScopeNamespaceDeclaration.getPadding().withMembers(ListUtils.map(fileScopeNamespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, CsRightPadded.Location.FILE_SCOPE_NAMESPACE_DECLARATION_MEMBERS, p)));
-    }
 
     public J visitInterpolatedString(Cs.InterpolatedString interpolatedString, P p) {
         interpolatedString = interpolatedString.withPrefix(visitSpace(interpolatedString.getPrefix(), CsSpace.Location.INTERPOLATED_STRING_PREFIX, p));
@@ -427,7 +409,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         usingDirective = usingDirective.withMarkers(visitMarkers(usingDirective.getMarkers(), p));
         usingDirective = usingDirective.getPadding().withGlobal(visitRightPadded(usingDirective.getPadding().getGlobal(), CsRightPadded.Location.USING_DIRECTIVE_GLOBAL, p));
         usingDirective = usingDirective.getPadding().withStatic(visitLeftPadded(usingDirective.getPadding().getStatic(), CsLeftPadded.Location.USING_DIRECTIVE_STATIC, p));
-        usingDirective = usingDirective.getPadding().withUnsafe(visitLeftPadded(usingDirective.getPadding().getUnsafe(), CsLeftPadded.Location.USING_DIRECTIVE_UNSAFE, p));
         usingDirective = usingDirective.getPadding().withAlias(visitRightPadded(usingDirective.getPadding().getAlias(), CsRightPadded.Location.USING_DIRECTIVE_ALIAS, p));
         return usingDirective.withNamespaceOrType(visitAndCast(usingDirective.getNamespaceOrType(), p));
     }
@@ -1093,28 +1074,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         arrayType = arrayType.withMarkers(visitMarkers(arrayType.getMarkers(), p));
         arrayType = arrayType.withTypeExpression(visitAndCast(arrayType.getTypeExpression(), p));
         return arrayType.withDimensions(ListUtils.map(arrayType.getDimensions(), el -> (J.ArrayDimension)visit(el, p)));
-    }
-
-    public J visitTry(Cs.Try try_, P p) {
-        try_ = try_.withPrefix(visitSpace(try_.getPrefix(), CsSpace.Location.TRY_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(try_, p);
-        if (!(tempStatement instanceof Cs.Try))
-        {
-            return tempStatement;
-        }
-        try_ = (Cs.Try) tempStatement;
-        try_ = try_.withMarkers(visitMarkers(try_.getMarkers(), p));
-        try_ = try_.withBody(visitAndCast(try_.getBody(), p));
-        try_ = try_.withCatches(ListUtils.map(try_.getCatches(), el -> (Cs.Try.Catch)visit(el, p)));
-        return try_.getPadding().withFinally(visitLeftPadded(try_.getPadding().getFinally(), CsLeftPadded.Location.TRY_FINALLIE, p));
-    }
-
-    public J visitTryCatch(Cs.Try.Catch catch_, P p) {
-        catch_ = catch_.withPrefix(visitSpace(catch_.getPrefix(), CsSpace.Location.TRY_CATCH_PREFIX, p));
-        catch_ = catch_.withMarkers(visitMarkers(catch_.getMarkers(), p));
-        catch_ = catch_.withParameter(visitAndCast(catch_.getParameter(), p));
-        catch_ = catch_.getPadding().withFilterExpression(visitLeftPadded(catch_.getPadding().getFilterExpression(), CsLeftPadded.Location.TRY_CATCH_FILTER_EXPRESSION, p));
-        return catch_.withBody(visitAndCast(catch_.getBody(), p));
     }
 
     public J visitAccessorDeclaration(Cs.AccessorDeclaration accessorDeclaration, P p) {

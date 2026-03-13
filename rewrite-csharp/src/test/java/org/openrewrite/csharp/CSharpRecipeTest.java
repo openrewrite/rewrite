@@ -136,7 +136,7 @@ class CSharpRecipeTest implements RewriteTest {
                 if (result != null) return result;
             }
         }
-        if (tree instanceof Cs.BlockScopeNamespaceDeclaration ns) {
+        if (tree instanceof Cs.NamespaceDeclaration ns) {
             for (var member : ns.getMembers()) {
                 J.MethodInvocation result = findFirstMethodInvocation(member);
                 if (result != null) return result;

@@ -126,8 +126,6 @@ public class CSharpParser
             false,
             null,
             null,
-            [],
-            [],
             new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
             Space.Empty
         );
@@ -221,8 +219,6 @@ public class CSharpParser
             false,
             null,
             null,
-            [],
-            [],
             new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
             Space.Empty
         );
@@ -298,14 +294,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // whitespace after the last directive naturally becomes the next member's prefix
         var prefix = leadingDirectives.Count > 0 ? Space.Empty : ExtractPrefix(node);
 
-        // Handle extern alias directives
-        var externAliases = new List<JRightPadded<ExternAlias>>();
+        // Handle extern alias directives — added as members
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
-            if (visited is ExternAlias ea)
+            if (visited is Statement stmt)
             {
-                externAliases.Add(PadExternAlias(ea));
+                members.Add(PadStatement(stmt));
             }
         }
 
@@ -318,14 +313,13 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             members.Add(PadStatement(visited));
         }
 
-        // Handle assembly/module-level attributes
-        var attributeLists = new List<AttributeList>();
+        // Handle assembly/module-level attributes — added as members
         foreach (var attrList in node.AttributeLists)
         {
             var visited = VisitAttributeList(attrList);
-            if (visited is AttributeList al)
+            if (visited is Statement attrStmt)
             {
-                attributeLists.Add(al);
+                members.Add(PadStatement(attrStmt));
             }
         }
 
@@ -390,8 +384,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             false,
             null,
             null,
-            externAliases,
-            attributeLists,
             members,
             eof
         );
@@ -497,7 +489,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            new JRightPadded<Expression>(nameExpr, nameAfter, Markers.Empty),
+            nameExpr,
             []  // No annotations for C# namespaces
         );
     }
@@ -520,21 +512,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var nameAfter = ExtractSpaceBefore(node.OpenBraceToken);
         _cursor = node.OpenBraceToken.Span.End;
 
-        // Parse extern alias directives within the namespace
-        var externAliases = new List<JRightPadded<ExternAlias>>();
+        // Parse members (extern aliases, using directives, types, nested namespaces)
+        var members = new List<JRightPadded<Statement>>();
+
+        // Parse extern alias directives within the namespace — added as members
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
-            if (visited is ExternAlias ea)
+            if (visited is Statement stmt)
             {
-                externAliases.Add(PadExternAlias(ea));
+                members.Add(PadStatement(stmt));
             }
         }
 
-        // Parse members (using directives, types, nested namespaces)
-        var members = new List<JRightPadded<Statement>>();
-
-        // First, handle using directives within the namespace
+        // Handle using directives within the namespace
         foreach (var usingDirective in node.Usings)
         {
             foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
@@ -568,7 +559,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             prefix,
             Markers.Empty,
             new JRightPadded<Expression>(nameExpr, nameAfter, Markers.Empty),
-            externAliases,
             members,
             end
         );
