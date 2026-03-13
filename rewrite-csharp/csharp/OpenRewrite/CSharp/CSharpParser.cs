@@ -127,6 +127,7 @@ public class CSharpParser
             null,
             null,
             [],
+            [],
             new List<Statement> { directive },
             Space.Empty
         );
@@ -221,6 +222,7 @@ public class CSharpParser
             null,
             null,
             [],
+            [],
             new List<Statement> { directive },
             Space.Empty
         );
@@ -295,6 +297,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // whitespace after the last directive naturally becomes the next member's prefix
         var prefix = leadingDirectives.Count > 0 ? Space.Empty : ExtractPrefix(node);
 
+        // Handle extern alias directives
+        var externAliases = new List<ExternAlias>();
+        foreach (var externAlias in node.Externs)
+        {
+            var visited = VisitExternAliasDirective(externAlias);
+            if (visited is ExternAlias ea)
+            {
+                externAliases.Add(ea);
+            }
+        }
+
         // Handle using directives
         foreach (var usingDirective in node.Usings)
         {
@@ -329,6 +342,22 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             // appear as top-level members in the OpenRewrite AST.
             if (member is FileScopedNamespaceDeclarationSyntax fsns)
             {
+                foreach (var fsExtern in fsns.Externs)
+                {
+                    var fsExVisited = VisitExternAliasDirective(fsExtern);
+                    if (fsExVisited is Statement fsExStmt)
+                    {
+                        members.Add(fsExStmt);
+                    }
+                }
+
+                foreach (var fsUsing in fsns.Usings)
+                {
+                    members.AddRange(ProcessGapDirectives(fsUsing.SpanStart));
+                    var fsUVisited = VisitUsingDirective(fsUsing);
+                    members.Add(fsUVisited);
+                }
+
                 foreach (var nsMember in fsns.Members)
                 {
                     members.AddRange(ProcessGapDirectives(nsMember.SpanStart));
@@ -355,6 +384,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             false,
             null,
             null,
+            externAliases,
             attributeLists,
             members,
             eof
@@ -484,6 +514,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var nameAfter = ExtractSpaceBefore(node.OpenBraceToken);
         _cursor = node.OpenBraceToken.Span.End;
 
+        // Parse extern alias directives within the namespace
+        var externAliases = new List<ExternAlias>();
+        foreach (var externAlias in node.Externs)
+        {
+            var visited = VisitExternAliasDirective(externAlias);
+            if (visited is ExternAlias ea)
+            {
+                externAliases.Add(ea);
+            }
+        }
+
         // Parse members (using directives, types, nested namespaces)
         var members = new List<JRightPadded<Statement>>();
 
@@ -521,6 +562,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             prefix,
             Markers.Empty,
             new JRightPadded<Expression>(nameExpr, nameAfter, Markers.Empty),
+            externAliases,
             members,
             end
         );

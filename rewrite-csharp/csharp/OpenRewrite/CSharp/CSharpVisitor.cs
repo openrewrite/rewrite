@@ -144,6 +144,17 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         bool changed = false;
 
+        var externsList = new List<ExternAlias>();
+        foreach (var externAlias in compilationUnit.Externs)
+        {
+            var visited = Visit(externAlias, p);
+            if (visited is ExternAlias ea)
+            {
+                if (!ReferenceEquals(ea, externAlias)) changed = true;
+                externsList.Add(ea);
+            }
+        }
+
         var attrLists = new List<AttributeList>();
         foreach (var attrList in compilationUnit.AttributeLists)
         {
@@ -168,7 +179,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         if (changed)
         {
-            compilationUnit = compilationUnit.WithAttributeLists(attrLists).WithMembers(members);
+            compilationUnit = compilationUnit.WithExterns(externsList).WithAttributeLists(attrLists).WithMembers(members);
         }
 
         return compilationUnit;
@@ -894,28 +905,36 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     {
         ns = (NamespaceDeclaration)VisitStatement(ns, p);
         var name = Visit(ns.Name.Element, p);
+        bool changed = false;
 
-        var members = ns.Members;
+        var newExterns = new List<ExternAlias>();
+        foreach (var externAlias in ns.Externs)
+        {
+            var visited = Visit(externAlias, p);
+            if (visited is ExternAlias ea)
+            {
+                if (!ReferenceEquals(ea, externAlias)) changed = true;
+                newExterns.Add(ea);
+            }
+        }
+
         var newMembers = new List<JRightPadded<Statement>>();
-        bool membersChanged = false;
-
-        foreach (var member in members)
+        foreach (var member in ns.Members)
         {
             var visited = Visit(member.Element, p);
             if (visited is Statement stmt)
             {
-                if (!ReferenceEquals(stmt, member.Element))
-                {
-                    membersChanged = true;
-                }
+                if (!ReferenceEquals(stmt, member.Element)) changed = true;
                 newMembers.Add(member.WithElement(stmt));
             }
         }
 
-        if ((name is Expression e && !ReferenceEquals(e, ns.Name.Element)) ||
-            membersChanged)
+        if ((name is Expression e && !ReferenceEquals(e, ns.Name.Element)) || changed)
         {
-            return ns.WithName(name is Expression newName ? ns.Name.WithElement(newName) : ns.Name).WithMembers(membersChanged ? newMembers : ns.Members);
+            return ns
+                .WithName(name is Expression newName ? ns.Name.WithElement(newName) : ns.Name)
+                .WithExterns(changed ? newExterns : ns.Externs)
+                .WithMembers(changed ? newMembers : ns.Members);
         }
 
         return ns;

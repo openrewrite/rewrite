@@ -192,6 +192,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var charsetBomMarked = q.Receive(cu.CharsetBomMarked);
         var checksum = q.Receive<Checksum?>(cu.Checksum);
         var fileAttributes = q.Receive<Core.FileAttributes?>(cu.FileAttributes);
+        var externs = q.ReceiveList(
+            (cu.Externs ?? [])
+                .Select(e => new JRightPadded<Statement>(e, Space.Empty, Markers.Empty))
+                .ToList(),
+            rp => _delegate.VisitRightPadded(rp, q));
         var attributeLists = q.ReceiveList(
             cu.AttributeLists ?? [],
             al => (AttributeList)_delegate.VisitNonNull(al, q));
@@ -205,6 +210,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         return cu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
             .WithSourcePath(sourcePath!).WithCharset(charset!).WithCharsetBomMarked(charsetBomMarked)
             .WithChecksum(checksum).WithFileAttributes(fileAttributes)
+            .WithExterns(externs?.Select(rp => (ExternAlias)rp.Element).ToList() ?? [])
             .WithAttributeLists(attributeLists ?? [])
             .WithMembers(members?.Select(rp => rp.Element).ToList() ?? []).WithEof(eof!);
     }
@@ -442,7 +448,11 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var name = q.Receive(ns.Name, rp => _delegate.VisitRightPadded(rp, q));
         // Externs
-        q.ReceiveList<JRightPadded<Statement>>([], rp => _delegate.VisitRightPadded(rp, q));
+        var externs = q.ReceiveList(
+            (ns.Externs ?? [])
+                .Select(e => new JRightPadded<Statement>(e, Space.Empty, Markers.Empty))
+                .ToList(),
+            rp => _delegate.VisitRightPadded(rp, q));
         // Members may be null when receiving a brand-new tree (ADD via GetUninitializedObject)
         var existingNsMembers = ns.Members ?? [];
         // Usings
@@ -459,7 +469,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         if (usings != null) allMembers.AddRange(usings);
         if (members != null) allMembers.AddRange(members);
 
-        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!).WithMembers(allMembers).WithEnd(end!);
+        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!)
+            .WithExterns(externs?.Select(rp => (ExternAlias)rp.Element).ToList() ?? [])
+            .WithMembers(allMembers).WithEnd(end!);
     }
 
     // ---- TupleType ----

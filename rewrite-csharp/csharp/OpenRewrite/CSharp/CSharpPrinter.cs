@@ -102,6 +102,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(compilationUnit, p);
 
+        foreach (var externAlias in compilationUnit.Externs)
+        {
+            Visit(externAlias, p);
+            PrintStatementTerminator(externAlias, p);
+        }
+
         foreach (var attrList in compilationUnit.AttributeLists)
         {
             Visit(attrList, p);
@@ -175,6 +181,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         Visit(ns.Name.Element, p);
         VisitSpace(ns.Name.After, p);
         p.Append('{');
+
+        foreach (var externAlias in ns.Externs)
+        {
+            Visit(externAlias, p);
+            PrintStatementTerminator(externAlias, p);
+        }
 
         foreach (var member in ns.Members)
         {
