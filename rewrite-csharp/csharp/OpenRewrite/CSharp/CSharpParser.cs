@@ -7722,8 +7722,22 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         var prefix = ExtractPrefix(node);
 
-        // Parse modifiers (const, etc.)
+        // Parse await/using keywords (not included in node.Modifiers)
         var modifiers = new List<Modifier>();
+        if (node.AwaitKeyword != default)
+        {
+            var awaitPrefix = ExtractSpaceBefore(node.AwaitKeyword);
+            _cursor = node.AwaitKeyword.Span.End;
+            modifiers.Add(CreateModifier(awaitPrefix, node.AwaitKeyword));
+        }
+        if (node.UsingKeyword != default)
+        {
+            var usingPrefix = ExtractSpaceBefore(node.UsingKeyword);
+            _cursor = node.UsingKeyword.Span.End;
+            modifiers.Add(CreateModifier(usingPrefix, node.UsingKeyword));
+        }
+
+        // Parse modifiers (const, etc.)
         foreach (var mod in node.Modifiers)
         {
             var modPrefix = ExtractSpaceBefore(mod);
