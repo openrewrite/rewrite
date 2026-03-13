@@ -1996,6 +1996,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Parse the type
         var typeExpr = VisitType(node.Type);
 
+        // Parse explicit interface specifier (e.g., `IFoo.` in `void IFoo.Bar()`)
+        JRightPadded<TypeTree>? interfaceSpecifier = null;
+        if (node.ExplicitInterfaceSpecifier != null)
+        {
+            var ifaceType = (TypeTree)VisitType(node.ExplicitInterfaceSpecifier.Name)!;
+            var dotSpace = ExtractSpaceBefore(node.ExplicitInterfaceSpecifier.DotToken);
+            _cursor = node.ExplicitInterfaceSpecifier.DotToken.Span.End;
+            interfaceSpecifier = new JRightPadded<TypeTree>(ifaceType, dotSpace, Markers.Empty);
+        }
+
         // Parse the property name
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
@@ -2050,7 +2060,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             [],
             modifiers,
             typeExpr!,
-            null,
+            interfaceSpecifier,
             name,
             accessors,
             expressionBody,

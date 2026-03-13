@@ -1036,6 +1036,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Print type
         Visit(prop.TypeExpression, p);
 
+        // Print explicit interface specifier (e.g., IFoo.)
+        if (prop.InterfaceSpecifier != null)
+        {
+            Visit(prop.InterfaceSpecifier.Element, p);
+            VisitSpace(prop.InterfaceSpecifier.After, p);
+            p.Append('.');
+        }
+
         // Print name
         Visit(prop.Name, p);
 
