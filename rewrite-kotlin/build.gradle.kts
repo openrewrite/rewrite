@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":rewrite-java"))
 
     implementation(kotlin("compiler-embeddable", kotlinVersion))
+    implementation(kotlin("reflect", kotlinVersion))
     implementation(kotlin("stdlib", kotlinVersion))
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
