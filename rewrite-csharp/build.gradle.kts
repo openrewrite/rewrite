@@ -168,8 +168,9 @@ val csharpPack by tasks.registering(Exec::class) {
         "/p:Version=$nugetVersion"
     )
 
-    inputs.dir(csharpDir.resolve("OpenRewrite"))
-    inputs.dir(csharpDir.resolve("OpenRewrite.Tool"))
+    // Track only source files — exclude bin/obj build outputs to avoid stale up-to-date checks
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
     inputs.property("version", nugetVersion)
     outputs.dir(csharpDir.resolve("dist"))
 
@@ -231,7 +232,7 @@ val csharpPublishLocal by tasks.registering {
         val localsOutput = run(dotnet, "nuget", "locals", "global-packages", "--list")
         val cachePath = localsOutput.trim().substringAfter("global-packages: ")
 
-        // Install each nupkg into the NuGet cache
+        // Clear stale entries from all NuGet caches for each package
         csharpDir.resolve("dist").listFiles()
             ?.filter { it.name.endsWith(".nupkg") }
             ?.forEach { nupkg ->
@@ -241,11 +242,18 @@ val csharpPublishLocal by tasks.registering {
                 // Find the version part by matching the nugetVersion suffix
                 val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
 
-                // Clear the specific version from cache
+                // Clear the specific version from global packages cache
                 val packageCacheDir = file("$cachePath/${packageId.lowercase()}/$nugetVersion")
                 if (packageCacheDir.exists()) {
                     logger.lifecycle("Clearing cached: ${packageCacheDir.absolutePath}")
                     packageCacheDir.deleteRecursively()
+                }
+
+                // Clear any globally installed tool versions (used by `dotnet tool install -g`)
+                val toolStoreDir = file("${System.getProperty("user.home")}/.dotnet/tools/.store/${packageId.lowercase()}")
+                if (toolStoreDir.exists()) {
+                    logger.lifecycle("Clearing tool store: ${toolStoreDir.absolutePath}")
+                    toolStoreDir.deleteRecursively()
                 }
             }
 
