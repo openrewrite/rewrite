@@ -90,7 +90,7 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
-            var results = recipeSpec.Recipe.Run(sources, new ExecutionContext());
+            var results = RecipeScheduler.Run(recipeSpec.Recipe, sources, new ExecutionContext());
 
             foreach (var (spec, source) in parsed)
             {

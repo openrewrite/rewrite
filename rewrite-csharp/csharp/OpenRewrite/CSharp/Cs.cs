@@ -46,7 +46,7 @@ public sealed class UsingDirective(
     Markers markers,
     JRightPadded<bool> global,
     JLeftPadded<bool> @static,
-    JLeftPadded<bool> @unsafe,
+    JLeftPadded<bool>? @unsafe,
     JRightPadded<Identifier>? alias,
     TypeTree namespaceOrType
 ) : Cs, Statement, IEquatable<UsingDirective>
@@ -56,7 +56,7 @@ public sealed class UsingDirective(
     public Markers Markers { get; } = markers;
     public JRightPadded<bool> Global { get; } = global;
     public JLeftPadded<bool> Static { get; } = @static;
-    public JLeftPadded<bool> Unsafe { get; } = @unsafe;
+    public JLeftPadded<bool>? Unsafe { get; } = @unsafe;
     public JRightPadded<Identifier>? Alias { get; } = alias;
     public TypeTree NamespaceOrType { get; } = namespaceOrType;
 
@@ -70,7 +70,7 @@ public sealed class UsingDirective(
         ReferenceEquals(global, Global) ? this : new(Id, Prefix, Markers, global, Static, Unsafe, Alias, NamespaceOrType);
     public UsingDirective WithStatic(JLeftPadded<bool> @static) =>
         ReferenceEquals(@static, Static) ? this : new(Id, Prefix, Markers, Global, @static, Unsafe, Alias, NamespaceOrType);
-    public UsingDirective WithUnsafe(JLeftPadded<bool> @unsafe) =>
+    public UsingDirective WithUnsafe(JLeftPadded<bool>? @unsafe) =>
         ReferenceEquals(@unsafe, Unsafe) ? this : new(Id, Prefix, Markers, Global, Static, @unsafe, Alias, NamespaceOrType);
     public UsingDirective WithAlias(JRightPadded<Identifier>? alias) =>
         ReferenceEquals(alias, Alias) ? this : new(Id, Prefix, Markers, Global, Static, Unsafe, alias, NamespaceOrType);
@@ -90,7 +90,7 @@ public sealed class UsingDirective(
     /// <summary>
     /// Whether this is a 'using unsafe' directive (C# 12+).
     /// </summary>
-    public bool IsUnsafe => Unsafe.Element;
+    public bool IsUnsafe => Unsafe?.Element ?? false;
 
 
     Tree Tree.WithId(Guid id) => WithId(id);
@@ -1588,8 +1588,6 @@ public sealed class CompilationUnit(
     bool charsetBomMarked,
     Checksum? checksum,
     Core.FileAttributes? fileAttributes,
-    IList<JRightPadded<ExternAlias>> externs,
-    IList<AttributeList> attributeLists,
     IList<JRightPadded<Statement>> members,
     Space eof
 ) : Cs, SourceFile, IEquatable<CompilationUnit>
@@ -1602,35 +1600,29 @@ public sealed class CompilationUnit(
     public bool CharsetBomMarked { get; } = charsetBomMarked;
     public Checksum? Checksum { get; } = checksum;
     public Core.FileAttributes? FileAttributes { get; } = fileAttributes;
-    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
-    public IList<AttributeList> AttributeLists { get; } = attributeLists;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space Eof { get; } = eof;
 
     public CompilationUnit WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
+        id == Id ? this : new(id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithSourcePath(string sourcePath) =>
-        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
+        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithCharset(string charset) =>
-        string.Equals(charset, Charset, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, SourcePath, charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
+        string.Equals(charset, Charset, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, SourcePath, charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithCharsetBomMarked(bool charsetBomMarked) =>
-        charsetBomMarked == CharsetBomMarked ? this : new(Id, Prefix, Markers, SourcePath, Charset, charsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
+        charsetBomMarked == CharsetBomMarked ? this : new(Id, Prefix, Markers, SourcePath, Charset, charsetBomMarked, Checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithChecksum(Checksum? checksum) =>
-        ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Externs, AttributeLists, Members, Eof);
+        ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Members, Eof);
     public CompilationUnit WithFileAttributes(Core.FileAttributes? fileAttributes) =>
-        ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Externs, AttributeLists, Members, Eof);
-    public CompilationUnit WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
-        ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, externs, AttributeLists, Members, Eof);
-    public CompilationUnit WithAttributeLists(IList<AttributeList> attributeLists) =>
-        ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, attributeLists, Members, Eof);
+        ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Members, Eof);
     public CompilationUnit WithMembers(IList<JRightPadded<Statement>> members) =>
-        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, members, Eof);
+        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, members, Eof);
     public CompilationUnit WithEof(Space eof) =>
-        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, AttributeLists, Members, eof);
+        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, eof);
 
     Tree Tree.WithId(Guid id) => WithId(id);
     SourceFile SourceFile.WithSourcePath(string sourcePath) => WithSourcePath(sourcePath);
@@ -1824,7 +1816,6 @@ public sealed class NamespaceDeclaration(
     Space prefix,
     Markers markers,
     JRightPadded<Expression> name,
-    IList<JRightPadded<ExternAlias>> externs,
     IList<JRightPadded<Statement>> members,
     Space end
 ) : Cs, Statement, IEquatable<NamespaceDeclaration>
@@ -1833,24 +1824,21 @@ public sealed class NamespaceDeclaration(
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public JRightPadded<Expression> Name { get; } = name;
-    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space End { get; } = end;
 
     public NamespaceDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Name, Externs, Members, End);
+        id == Id ? this : new(id, Prefix, Markers, Name, Members, End);
     public NamespaceDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, Externs, Members, End);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, Members, End);
     public NamespaceDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Externs, Members, End);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Members, End);
     public NamespaceDeclaration WithName(JRightPadded<Expression> name) =>
-        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Externs, Members, End);
-    public NamespaceDeclaration WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
-        ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, Name, externs, Members, End);
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Members, End);
     public NamespaceDeclaration WithMembers(IList<JRightPadded<Statement>> members) =>
-        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, Externs, members, End);
+        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, members, End);
     public NamespaceDeclaration WithEnd(Space end) =>
-        ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Name, Externs, Members, end);
+        ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Name, Members, end);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

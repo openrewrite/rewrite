@@ -523,14 +523,14 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        // Initializer (JLeftPadded<Expression>? — NewClass)
-        JLeftPadded<Expression>? newInitializer = enumValue.Initializer;
+        // Initializer (NewClass?)
+        NewClass? newInitializer = enumValue.Initializer;
         if (enumValue.Initializer != null)
         {
-            var visitedInit = Visit(enumValue.Initializer.Element, p);
-            if (visitedInit is Expression e && !ReferenceEquals(e, enumValue.Initializer.Element))
+            var visitedInit = Visit(enumValue.Initializer, p);
+            if (visitedInit is NewClass nc && !ReferenceEquals(nc, enumValue.Initializer))
             {
-                newInitializer = enumValue.Initializer.WithElement(e);
+                newInitializer = nc;
                 changed = true;
             }
         }
@@ -1094,18 +1094,18 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Resources
-        JContainer<NameTree>? newResources = node.Resources;
+        JContainer<Try.Resource>? newResources = node.Resources;
         if (node.Resources != null)
         {
-            var resElements = new List<JRightPadded<NameTree>>();
+            var resElements = new List<JRightPadded<Try.Resource>>();
             bool resChanged = false;
             foreach (var paddedRes in node.Resources.Elements)
             {
                 var visited = Visit(paddedRes.Element, p);
-                if (visited is NameTree nt)
+                if (visited is Try.Resource r)
                 {
-                    if (!ReferenceEquals(nt, paddedRes.Element)) resChanged = true;
-                    resElements.Add(paddedRes.WithElement(nt));
+                    if (!ReferenceEquals(r, paddedRes.Element)) resChanged = true;
+                    resElements.Add(paddedRes.WithElement(r));
                 }
                 else
                 {
@@ -2138,14 +2138,14 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             }
         }
 
-        // Clazz (TypeTree?)
-        TypeTree? newClazz = node.Clazz;
+        // Clazz (J?)
+        J? newClazz = node.Clazz;
         if (node.Clazz != null)
         {
             var visited = Visit(node.Clazz, p);
-            if (visited is TypeTree tt && !ReferenceEquals(tt, node.Clazz))
+            if (visited is J j && !ReferenceEquals(j, node.Clazz))
             {
-                newClazz = tt;
+                newClazz = j;
                 changed = true;
             }
         }
@@ -3081,12 +3081,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var newMarkers = VisitMarkers(node.Markers, p);
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
-        // Expression (JRightPadded<Expression>)
-        JRightPadded<Expression> newExpression = node.Expression;
-        var visitedExpr = Visit(node.Expression.Element, p);
-        if (visitedExpr is Expression e && !ReferenceEquals(e, node.Expression.Element))
+        // Expression
+        Expression newExpression = node.Expression;
+        var visitedExpr = Visit(node.Expression, p);
+        if (visitedExpr is Expression e && !ReferenceEquals(e, node.Expression))
         {
-            newExpression = node.Expression.WithElement(e);
+            newExpression = e;
             changed = true;
         }
 

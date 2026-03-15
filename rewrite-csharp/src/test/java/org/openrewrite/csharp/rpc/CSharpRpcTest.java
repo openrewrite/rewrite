@@ -32,6 +32,7 @@ import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -74,6 +75,7 @@ class CSharpRpcTest {
             CSharpRewriteRpc.setFactory(
                     CSharpRewriteRpc.builder()
                             .csharpServerEntry(csharpServerEntry)
+                            .timeout(Duration.ofSeconds(120))
                             .traceRpcMessages(true)
                             .log(Paths.get("/tmp/csharp-rpc.log"))
             );
@@ -1310,13 +1312,7 @@ class CSharpRpcTest {
         if (tree instanceof Statement stmt) {
             // Namespace members are accessible via the visitor pattern, but for
             // simple traversal we check common wrapper types
-            if (tree instanceof Cs.BlockScopeNamespaceDeclaration ns) {
-                for (var member : ns.getMembers()) {
-                    T result = findFirst(member, type);
-                    if (result != null) return result;
-                }
-            }
-            if (tree instanceof Cs.FileScopeNamespaceDeclaration ns) {
+            if (tree instanceof Cs.NamespaceDeclaration ns) {
                 for (var member : ns.getMembers()) {
                     T result = findFirst(member, type);
                     if (result != null) return result;

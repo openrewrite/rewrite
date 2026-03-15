@@ -150,28 +150,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(compilationUnit.Markers, p);
         if (!ReferenceEquals(newMarkers, compilationUnit.Markers)) changed = true;
 
-        var externsList = new List<JRightPadded<ExternAlias>>();
-        foreach (var externPadded in compilationUnit.Externs)
-        {
-            var visited = Visit(externPadded.Element, p);
-            if (visited is ExternAlias ea)
-            {
-                if (!ReferenceEquals(ea, externPadded.Element)) changed = true;
-                externsList.Add(externPadded.WithElement(ea));
-            }
-        }
-
-        var attrLists = new List<AttributeList>();
-        foreach (var attrList in compilationUnit.AttributeLists)
-        {
-            var visited = Visit(attrList, p);
-            if (visited is AttributeList al)
-            {
-                if (!ReferenceEquals(al, attrList)) changed = true;
-                attrLists.Add(al);
-            }
-        }
-
         var members = new List<JRightPadded<Statement>>();
         foreach (var memberPadded in compilationUnit.Members)
         {
@@ -185,7 +163,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         if (changed)
         {
-            compilationUnit = compilationUnit.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExterns(externsList).WithAttributeLists(attrLists).WithMembers(members);
+            compilationUnit = compilationUnit.WithPrefix(newPrefix).WithMarkers(newMarkers).WithMembers(members);
         }
 
         return compilationUnit;
@@ -1138,17 +1116,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         var name = Visit(ns.Name.Element, p);
 
-        var newExterns = new List<JRightPadded<ExternAlias>>();
-        foreach (var externPadded in ns.Externs)
-        {
-            var visited = Visit(externPadded.Element, p);
-            if (visited is ExternAlias ea)
-            {
-                if (!ReferenceEquals(ea, externPadded.Element)) changed = true;
-                newExterns.Add(externPadded.WithElement(ea));
-            }
-        }
-
         var newMembers = new List<JRightPadded<Statement>>();
         foreach (var member in ns.Members)
         {
@@ -1165,7 +1132,6 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             return ns
                 .WithPrefix(newPrefix).WithMarkers(newMarkers)
                 .WithName(name is Expression newName ? ns.Name.WithElement(newName) : ns.Name)
-                .WithExterns(changed ? newExterns : ns.Externs)
                 .WithMembers(changed ? newMembers : ns.Members);
         }
 

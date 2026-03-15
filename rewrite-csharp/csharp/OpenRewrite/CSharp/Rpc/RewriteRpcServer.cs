@@ -91,8 +91,6 @@ public class RewriteRpcServer
         _marketplace = marketplace;
 
         // Register type name overrides for nagoya types that don't match Java names
-        RpcSendQueue.RegisterJavaTypeName(typeof(NamespaceDeclaration),
-            "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration");
         RpcSendQueue.RegisterJavaTypeName(typeof(CsLambda),
             "org.openrewrite.csharp.tree.Cs$Lambda");
         // Cs-prefixed types in C# that correspond to unprefixed Java names

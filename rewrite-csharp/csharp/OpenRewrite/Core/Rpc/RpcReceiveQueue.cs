@@ -448,8 +448,6 @@ public class RpcReceiveQueue
             "org.openrewrite.FileAttributes" => typeof(FileAttributes),
 
             // Special C# type name overrides (reverse of RpcSendQueue.RegisterJavaTypeName)
-            "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration" =>
-                typeof(NamespaceDeclaration),
             "org.openrewrite.csharp.tree.Cs$Lambda" =>
                 typeof(CsLambda),
             "org.openrewrite.csharp.tree.Cs$Binary" =>

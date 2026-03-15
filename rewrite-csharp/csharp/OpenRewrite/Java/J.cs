@@ -137,14 +137,14 @@ public sealed class Package(
     Guid id,
     Space prefix,
     Markers markers,
-    JRightPadded<Expression> expression,
+    Expression expression,
     IList<Annotation> annotations
 ) : J, Statement, IEquatable<Package>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JRightPadded<Expression> Expression { get; } = expression;
+    public Expression Expression { get; } = expression;
     public IList<Annotation> Annotations { get; } = annotations;
 
     public Package WithId(Guid id) =>
@@ -153,7 +153,7 @@ public sealed class Package(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Annotations);
     public Package WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Annotations);
-    public Package WithExpression(JRightPadded<Expression> expression) =>
+    public Package WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Annotations);
     public Package WithAnnotations(IList<Annotation> annotations) =>
         ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, Expression, annotations);
@@ -662,7 +662,7 @@ public sealed class Try(
     Guid id,
     Space prefix,
     Markers markers,
-    JContainer<NameTree>? resources,
+    JContainer<Try.Resource>? resources,
     Block body,
     IList<Try.Catch> catches,
     JLeftPadded<Block>? @finally
@@ -671,7 +671,7 @@ public sealed class Try(
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JContainer<NameTree>? Resources { get; } = resources;
+    public JContainer<Try.Resource>? Resources { get; } = resources;
     public Block Body { get; } = body;
     public IList<Try.Catch> Catches { get; } = catches;
     public JLeftPadded<Block>? Finally { get; } = @finally;
@@ -682,7 +682,7 @@ public sealed class Try(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Resources, Body, Catches, Finally);
     public Try WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Resources, Body, Catches, Finally);
-    public Try WithResources(JContainer<NameTree>? resources) =>
+    public Try WithResources(JContainer<Try.Resource>? resources) =>
         ReferenceEquals(resources, Resources) ? this : new(Id, Prefix, Markers, resources, Body, Catches, Finally);
     public Try WithBody(Block body) =>
         ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Resources, body, Catches, Finally);
@@ -690,6 +690,38 @@ public sealed class Try(
         ReferenceEquals(catches, Catches) ? this : new(Id, Prefix, Markers, Resources, Body, catches, Finally);
     public Try WithFinally(JLeftPadded<Block>? @finally) =>
         ReferenceEquals(@finally, Finally) ? this : new(Id, Prefix, Markers, Resources, Body, Catches, @finally);
+
+    public sealed class Resource(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        J variableDeclarations,
+        bool terminatedWithSemicolon
+    ) : J, IEquatable<Resource>
+    {
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public J VariableDeclarations { get; } = variableDeclarations;
+        public bool TerminatedWithSemicolon { get; } = terminatedWithSemicolon;
+
+        public Resource WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, VariableDeclarations, TerminatedWithSemicolon);
+        public Resource WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, VariableDeclarations, TerminatedWithSemicolon);
+        public Resource WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, VariableDeclarations, TerminatedWithSemicolon);
+        public Resource WithVariableDeclarations(J variableDeclarations) =>
+            ReferenceEquals(variableDeclarations, VariableDeclarations) ? this : new(Id, Prefix, Markers, variableDeclarations, TerminatedWithSemicolon);
+        public Resource WithTerminatedWithSemicolon(bool terminatedWithSemicolon) =>
+            terminatedWithSemicolon == TerminatedWithSemicolon ? this : new(Id, Prefix, Markers, VariableDeclarations, terminatedWithSemicolon);
+
+        Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Resource? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Resource);
+        public override int GetHashCode() => Id.GetHashCode();
+    }
 
         public sealed class Catch(
         Guid id,
@@ -970,7 +1002,7 @@ public sealed class EnumValue(
     Markers markers,
     IList<Annotation> annotations,
     Identifier name,
-    JLeftPadded<Expression>? initializer
+    NewClass? initializer
 ) : J, IEquatable<EnumValue>
 {
     public Guid Id { get; } = id;
@@ -978,7 +1010,7 @@ public sealed class EnumValue(
     public Markers Markers { get; } = markers;
     public IList<Annotation> Annotations { get; } = annotations;
     public Identifier Name { get; } = name;
-    public JLeftPadded<Expression>? Initializer { get; } = initializer;
+    public NewClass? Initializer { get; } = initializer;
 
     public EnumValue WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Annotations, Name, Initializer);
@@ -990,7 +1022,7 @@ public sealed class EnumValue(
         ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, Name, Initializer);
     public EnumValue WithName(Identifier name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Annotations, name, Initializer);
-    public EnumValue WithInitializer(JLeftPadded<Expression>? initializer) =>
+    public EnumValue WithInitializer(NewClass? initializer) =>
         ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, Annotations, Name, initializer);
 
     Tree Tree.WithId(Guid id) => WithId(id);
@@ -2249,7 +2281,7 @@ public sealed class NewClass(
     Markers markers,
     JRightPadded<Expression>? enclosing,
     Space @new,
-    TypeTree? clazz,
+    J? clazz,
     JContainer<Expression> arguments,
     Block? body,
     JavaType.Method? constructorType
@@ -2260,7 +2292,7 @@ public sealed class NewClass(
     public Markers Markers { get; } = markers;
     public JRightPadded<Expression>? Enclosing { get; } = enclosing;
     public Space New { get; } = @new;
-    public TypeTree? Clazz { get; } = clazz;
+    public J? Clazz { get; } = clazz;
     public JContainer<Expression> Arguments { get; } = arguments;
     public Block? Body { get; } = body;
     public JavaType.Method? ConstructorType { get; } = constructorType;
@@ -2275,7 +2307,7 @@ public sealed class NewClass(
         ReferenceEquals(enclosing, Enclosing) ? this : new(Id, Prefix, Markers, enclosing, New, Clazz, Arguments, Body, ConstructorType);
     public NewClass WithNew(Space @new) =>
         ReferenceEquals(@new, New) ? this : new(Id, Prefix, Markers, Enclosing, @new, Clazz, Arguments, Body, ConstructorType);
-    public NewClass WithClazz(TypeTree? clazz) =>
+    public NewClass WithClazz(J? clazz) =>
         ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, Enclosing, New, clazz, Arguments, Body, ConstructorType);
     public NewClass WithArguments(JContainer<Expression> arguments) =>
         ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, arguments, Body, ConstructorType);

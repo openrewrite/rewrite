@@ -65,6 +65,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             ForLoop fl => VisitForLoop(fl, q),
             ForEachLoop.Control fec => VisitForEachControl(fec, q),
             ForEachLoop fel => VisitForEachLoop(fel, q),
+            Try.Resource tryResource => VisitTryResource(tryResource, q),
             Try.Catch tryCatch => VisitCatch(tryCatch, q),
             Try tr => VisitTry(tr, q),
             Throw thr => VisitThrow(thr, q),
@@ -314,8 +315,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var annotations = q.ReceiveList(enumValue.Annotations, a => (Annotation)VisitNonNull(a, q));
         var name = q.Receive((J)enumValue.Name, el => (J)VisitNonNull(el, q));
-        var initializer = q.Receive(enumValue.Initializer, lp => VisitLeftPadded(lp, q));
-        return enumValue.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithAnnotations(annotations!).WithName((Identifier)name!).WithInitializer(initializer);
+        var initializer = q.Receive((J?)enumValue.Initializer, el => (J)VisitNonNull(el, q));
+        return enumValue.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithAnnotations(annotations!).WithName((Identifier)name!).WithInitializer((NewClass?)initializer);
     }
 
     public override J VisitEnumValueSet(EnumValueSet enumValueSet, RpcReceiveQueue q)
@@ -499,17 +500,14 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var arguments = q.Receive(newClass.Arguments, c => VisitContainer(c, q));
         var body = q.Receive((J?)newClass.Body, el => (J)VisitNonNull(el!, q));
         var constructorType = q.Receive(newClass.ConstructorType, t => (JavaType.Method)VisitType(t, q)!);
-        return newClass.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithEnclosing(enclosing).WithNew(@new!).WithClazz((TypeTree?)clazz).WithArguments(arguments!).WithBody((Block?)body).WithConstructorType(constructorType);
+        return newClass.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithEnclosing(enclosing).WithNew(@new!).WithClazz(clazz).WithArguments(arguments!).WithBody((Block?)body).WithConstructorType(constructorType);
     }
 
     public override J VisitPackage(Package pkg, RpcReceiveQueue q)
     {
-        var expression = q.Receive(pkg.Expression?.Element as J, el => (J)VisitNonNull(el, q));
+        var expression = q.Receive((J)pkg.Expression, el => (J)VisitNonNull(el, q));
         var annotations = q.ReceiveList(pkg.Annotations, a => (Annotation)VisitNonNull(a, q));
-        var expr = pkg.Expression != null
-            ? pkg.Expression.WithElement((Expression)expression!)
-            : JRightPadded<Expression>.Build((Expression)expression!);
-        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression(expr).WithAnnotations(annotations!);
+        return pkg.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithExpression((Expression)expression!).WithAnnotations(annotations!);
     }
 
     public J VisitParentheses<T>(Parentheses<T> parentheses, RpcReceiveQueue q) where T : J
@@ -584,6 +582,13 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var catches = q.ReceiveList(tryStmt.Catches, c => (Try.Catch)VisitNonNull(c, q));
         var @finally = q.Receive(tryStmt.Finally, lp => VisitLeftPadded(lp, q));
         return tryStmt.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithResources(resources).WithBody((Block)body!).WithCatches(catches!).WithFinally(@finally);
+    }
+
+    public virtual J VisitTryResource(Try.Resource tryResource, RpcReceiveQueue q)
+    {
+        var variableDeclarations = q.Receive((J)tryResource.VariableDeclarations, el => (J)VisitNonNull(el, q));
+        var terminatedWithSemicolon = q.Receive(tryResource.TerminatedWithSemicolon);
+        return tryResource.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithVariableDeclarations((J)variableDeclarations!).WithTerminatedWithSemicolon(terminatedWithSemicolon);
     }
 
     public override J VisitTypeCast(TypeCast typeCast, RpcReceiveQueue q)
