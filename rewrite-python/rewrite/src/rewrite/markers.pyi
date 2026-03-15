@@ -42,9 +42,6 @@ class Markers:
 class SearchResult(Marker):
     _id: UUID
     _description: Optional[str]
-    _recipe_name: Optional[str] = None
-
-    _current_recipe_name: ClassVar[Optional[str]]
 
     def replace(self, **kwargs: Any) -> Self: ...
 
@@ -52,8 +49,6 @@ class SearchResult(Marker):
     def id(self) -> UUID: ...
     @property
     def description(self) -> Optional[str]: ...
-    @property
-    def recipe_name(self) -> Optional[str]: ...
 
 @dataclass(frozen=True)
 class UnknownJavaMarker(Marker):

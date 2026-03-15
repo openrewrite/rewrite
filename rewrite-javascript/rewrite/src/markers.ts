@@ -134,17 +134,6 @@ export const emptyMarkers: Markers = asRef({
 export interface SearchResult extends Marker {
     readonly kind: typeof MarkersKind.SearchResult,
     readonly description?: string
-    readonly recipeName?: string
-}
-
-/**
- * The name of the recipe currently being executed. Set by the Visit handler
- * so that foundSearchResult() can capture it at creation time.
- */
-let _currentRecipeName: string | undefined;
-
-export function setCurrentRecipeName(name: string | undefined): void {
-    _currentRecipeName = name;
 }
 
 export function foundSearchResult<T extends { markers: Markers }>(t: T, description?: string): T {
@@ -157,8 +146,7 @@ export function foundSearchResult<T extends { markers: Markers }>(t: T, descript
                 markers: [...t.markers.markers, {
                     kind: MarkersKind.SearchResult,
                     id: randomId(),
-                    description: description,
-                    recipeName: _currentRecipeName
+                    description: description
                 } as SearchResult]
             }
         } as T;

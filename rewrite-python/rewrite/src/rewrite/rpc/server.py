@@ -1056,16 +1056,9 @@ def handle_visit(params: dict) -> dict:
         if p_id:
             _execution_contexts[p_id] = ctx
 
-    # Check local cache first, then fetch from Java if not found.
-    # This is required for deferred GetObject batches: when consecutive same-RPC
-    # recipes run without Java fetching intermediate results, the previous Visit's
-    # output is in local_objects and must be used as input for the next Visit.
-    # Note: if a Java-side recipe modified the tree between visits, this cache
-    # would be stale — but the deferral scheduler guarantees that doesn't happen
-    # within a deferred batch (only consecutive same-RPC recipes are batched).
-    tree = local_objects.get(tree_id)
-    if tree is None:
-        tree = get_object_from_java(tree_id, source_file_type)
+    # Always fetch the tree from Java to ensure we have the latest version.
+    # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
+    tree = get_object_from_java(tree_id, source_file_type)
 
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
@@ -1075,19 +1068,10 @@ def handle_visit(params: dict) -> dict:
 
     # Apply the visitor
     from rewrite.visitor import Cursor
-    from rewrite.markers import SearchResult
     cursor = Cursor(None, Cursor.ROOT_VALUE)
 
-    # Extract recipe name from visitor name (e.g., "edit:recipeName" or "scan:recipeName")
-    colon_idx = visitor_name.find(':')
-    recipe_name = visitor_name[colon_idx + 1:] if colon_idx >= 0 else None
-
     before = tree
-    SearchResult._current_recipe_name = recipe_name
-    try:
-        after = visitor.visit(tree, ctx, cursor)
-    finally:
-        SearchResult._current_recipe_name = None
+    after = visitor.visit(tree, ctx, cursor)
 
     # Update local objects with the result and determine if modified
     # Use referential equality (identity comparison) to detect modifications
@@ -1105,9 +1089,116 @@ def handle_visit(params: dict) -> dict:
     else:
         modified = False
 
-    deleted = after is None and before is not None
-    logger.debug(f"Visit result: modified={modified}, deleted={deleted}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
-    return {'modified': modified, 'deleted': deleted}
+    logger.debug(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
+    return {'modified': modified}
+
+
+def handle_batch_visit(params: dict) -> dict:
+    """Handle a BatchVisit RPC request.
+
+    Runs multiple visitors in sequence on the same tree, collecting
+    per-visitor metadata (modified, deleted, new search result IDs).
+    """
+    tree_id = params.get('treeId')
+    source_file_type = params.get('sourceFileType')
+    p_id = params.get('p')
+    visitors = params.get('visitors', [])
+
+    if not tree_id:
+        raise ValueError("'treeId' is required")
+
+    logger.debug(f"BatchVisit: treeId={tree_id}, visitors={len(visitors)}")
+
+    # Get or create execution context
+    if p_id and p_id in _execution_contexts:
+        ctx = _execution_contexts[p_id]
+    else:
+        from rewrite import InMemoryExecutionContext
+        ctx = InMemoryExecutionContext()
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
+        if p_id:
+            _execution_contexts[p_id] = ctx
+
+    # Fetch tree once from Java
+    tree = get_object_from_java(tree_id, source_file_type)
+    if tree is None:
+        raise ValueError(f"Tree not found: {tree_id}")
+
+    from rewrite.visitor import Cursor
+    from rewrite.markers import SearchResult
+    cursor = Cursor(None, Cursor.ROOT_VALUE)
+
+    results = []
+    for item in visitors:
+        visitor_name = item.get('visitor', '')
+
+        # Collect SearchResult IDs before
+        before_ids = _collect_search_result_ids(tree)
+
+        # Instantiate and run visitor
+        visitor = _instantiate_visitor(visitor_name, ctx)
+        before = tree
+        after = visitor.visit(tree, ctx, cursor)
+
+        modified = after is not before
+        deleted = after is None
+
+        # Diff SearchResult IDs
+        if deleted:
+            new_search_result_ids = []
+        else:
+            after_ids = _collect_search_result_ids(after)
+            new_search_result_ids = list(after_ids - before_ids)
+
+        results.append({
+            'modified': modified,
+            'deleted': deleted,
+            'hasNewMessages': False,
+            'newSearchResultIds': new_search_result_ids,
+        })
+
+        if deleted:
+            if tree_id in local_objects:
+                del local_objects[tree_id]
+            break
+
+        if modified:
+            tree = after
+
+    # Store final tree in localObjects for subsequent GetObject
+    if tree is not None:
+        local_objects[str(tree.id)] = tree
+        if str(tree.id) != tree_id:
+            local_objects[tree_id] = tree
+
+    return {'results': results}
+
+
+def _collect_search_result_ids(tree) -> set:
+    """Collect all SearchResult marker UUIDs from a tree."""
+    from rewrite.markers import SearchResult
+    ids = set()
+    if tree is None:
+        return ids
+
+    def _walk(node):
+        if hasattr(node, 'markers') and node.markers is not None:
+            for m in node.markers.markers:
+                if isinstance(m, SearchResult):
+                    ids.add(str(m.id))
+
+    # Use the visitor framework to walk all nodes
+    from rewrite.visitor import TreeVisitor
+    class _Collector(TreeVisitor):
+        def pre_visit(self, tree, p):
+            _walk(tree)
+            return tree
+    _Collector().visit(tree, None)
+    return ids
 
 
 def _instantiate_visitor(visitor_name: str, ctx):
@@ -1248,6 +1339,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
         'Visit': handle_visit,
+        'BatchVisit': handle_batch_visit,
         'Generate': handle_generate,
     }
 

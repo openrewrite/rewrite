@@ -22,12 +22,9 @@ import lombok.Value;
 @Value
 public class VisitResponse {
     boolean modified;
-    boolean deleted;
 
     @JsonCreator
-    public VisitResponse(@JsonProperty("modified") boolean modified,
-                         @JsonProperty("deleted") boolean deleted) {
+    public VisitResponse(@JsonProperty("modified") boolean modified) {
         this.modified = modified;
-        this.deleted = deleted;
     }
 }

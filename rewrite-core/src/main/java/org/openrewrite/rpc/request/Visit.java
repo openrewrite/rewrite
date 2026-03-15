@@ -64,22 +64,19 @@ public class Visit implements RpcRequest {
 
         @Override
         protected Object handle(Visit request) throws Exception {
-            Object local = localObjects.get(request.getTreeId());
-            Tree before = local instanceof Tree ? (Tree) local :
-                    (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
+            Tree before = (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
             Object p = getVisitorP(request);
             TreeVisitor<?, Object> visitor = preparedRecipes.instantiateVisitor(request.getVisitor(),
                     request.getVisitorOptions());
             Tree after = visitor.visit(before, p, getCursor.apply(request.getCursor(),
                     request.getSourceFileType()));
-            boolean deleted = after == null && before != null;
             if (after == null) {
                 localObjects.remove(before.getId().toString());
             } else {
                 localObjects.put(after.getId().toString(), after);
             }
 
-            return new VisitResponse(before != after, deleted);
+            return new VisitResponse(before != after);
         }
 
         private Object getVisitorP(Visit request) {

@@ -53,6 +53,14 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final @Nullable String scanVisitor;
     private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 
+    public String getEditVisitor() {
+        return editVisitor;
+    }
+
+    public @Nullable String getScanVisitor() {
+        return scanVisitor;
+    }
+
     @Override
     public String getName() {
         return descriptor.getName();

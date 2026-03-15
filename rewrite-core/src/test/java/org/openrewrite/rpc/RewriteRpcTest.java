@@ -289,13 +289,13 @@ class RewriteRpcTest implements RewriteTest {
 
     /**
      * When a composite recipe has consecutive sub-recipes that are all RpcRecipes
-     * bound to the same RewriteRpc instance, the scheduler defers getObject() calls
-     * between them. The remote keeps the modified tree in localObjects and the host
-     * only fetches the final result at the end of the batch. This test verifies that
+     * bound to the same RewriteRpc instance, the scheduler batches them into a
+     * single BatchVisit RPC call. The remote runs all visitors in sequence and
+     * the host fetches the final result at the end. This test verifies that
      * two consecutive same-RPC ChangeText recipes produce the correct final output.
      */
     @Test
-    void consecutiveSameRpcRecipesAreDeferredAndProduceCorrectResult() {
+    void consecutiveSameRpcRecipesAreBatchedAndProduceCorrectResult() {
         Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1"));
         Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2"));
 
@@ -314,8 +314,8 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     /**
-     * Verifies three consecutive same-RPC recipes. The scheduler should defer
-     * getObject for all three and fetch only once at the end.
+     * Verifies three consecutive same-RPC recipes. The scheduler should batch
+     * all three into one BatchVisit and fetch only once at the end.
      */
     @Test
     void threeConsecutiveSameRpcRecipes() {
@@ -337,7 +337,7 @@ class RewriteRpcTest implements RewriteTest {
 
     /**
      * When a batch of same-RPC recipes is followed by a non-RPC recipe,
-     * the scheduler should flush the deferred batch at the boundary and
+     * the scheduler should flush the batch at the boundary and
      * then run the non-RPC recipe on the fetched result.
      */
     @Test
@@ -348,7 +348,8 @@ class RewriteRpcTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new CompositeRecipe(List.of(rpc1, local)))
-            .validateRecipeSerialization(false),
+            .validateRecipeSerialization(false)
+            .expectedCyclesThatMakeChanges(2),
           text(
             "hello",
             "from-local"
@@ -358,10 +359,10 @@ class RewriteRpcTest implements RewriteTest {
 
     /**
      * A single RPC recipe (no consecutive same-RPC peer) should behave
-     * identically to the non-deferred path — no deferral, immediate getObject.
+     * identically to the non-batched path — no batching, immediate getObject.
      */
     @Test
-    void singleRpcRecipeNoDeferral() {
+    void singleRpcRecipeNoBatch() {
         Recipe r = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "only"));
 
         rewriteRun(
