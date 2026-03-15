@@ -17,7 +17,9 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <!-- VSTHRD200: RPC method names must match Java-side protocol (no Async suffix) -->
     <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
-    <NoWarn>VSTHRD200;VSTHRD002</NoWarn>
+    <!-- VSTHRD103: Synchronous blocks needed for RPC interop -->
+    <!-- CS0114: Intentional method hiding in sender/receiver visitors -->
+    <NoWarn>VSTHRD200;VSTHRD002;VSTHRD103;CS0114</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
