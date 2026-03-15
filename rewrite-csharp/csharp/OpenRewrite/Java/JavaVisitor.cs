@@ -89,6 +89,36 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         };
     }
 
+    public virtual Space VisitSpace(Space space, P p)
+    {
+        return space;
+    }
+
+    public virtual Markers VisitMarkers(Markers markers, P p)
+    {
+        if (ReferenceEquals(markers, Markers.Empty) || markers.MarkerList.Count == 0)
+        {
+            return markers;
+        }
+
+        var list = markers.MarkerList;
+        bool changed = false;
+        var newList = new List<Marker>(list.Count);
+        foreach (var marker in list)
+        {
+            var visited = VisitMarker(marker, p);
+            newList.Add(visited);
+            if (!ReferenceEquals(visited, marker)) changed = true;
+        }
+
+        return changed ? markers.WithMarkerList(newList) : markers;
+    }
+
+    public virtual Marker VisitMarker(Marker marker, P p)
+    {
+        return marker;
+    }
+
     public virtual J VisitExpression(Expression expression, P p)
     {
         return (J)expression;
@@ -113,6 +143,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not Annotation node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         NameTree newAnnotationType = node.AnnotationType;
         var visitedType = Visit(node.AnnotationType, p);
@@ -148,7 +184,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithAnnotationType(newAnnotationType).WithArguments(newArguments)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAnnotationType(newAnnotationType).WithArguments(newArguments)
             : node;
     }
 
@@ -160,8 +196,15 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var stmtResult = VisitStatement(block, p);
         if (stmtResult is not Block node) return stmtResult;
 
-        var statements = new List<JRightPadded<Statement>>();
         bool changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        var statements = new List<JRightPadded<Statement>>();
         foreach (var stmt in node.Statements)
         {
             var visited = Visit(stmt.Element, p);
@@ -176,7 +219,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
                 changed = true;
             }
         }
-        return changed ? node.WithStatements(statements) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithStatements(statements) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -188,6 +231,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not ClassDeclaration node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // LeadingAnnotations
         IList<Annotation> newLeadingAnnotations = node.LeadingAnnotations;
@@ -378,6 +427,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         return changed
             ? node
+                .WithPrefix(newPrefix)
+                .WithMarkers(newMarkers)
                 .WithLeadingAnnotations(newLeadingAnnotations)
                 .WithClassKind(newKind)
                 .WithName(newName)
@@ -400,6 +451,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not EnumValueSet node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
         var newEnums = new List<JRightPadded<EnumValue>>();
         bool enumsChanged = false;
         foreach (var paddedValue in node.Enums)
@@ -417,7 +475,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
         if (enumsChanged) changed = true;
 
-        return changed ? node.WithEnums(enumsChanged ? newEnums : node.Enums) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithEnums(enumsChanged ? newEnums : node.Enums) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -426,6 +484,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     public virtual J VisitEnumValue(EnumValue enumValue, P p)
     {
         var changed = false;
+
+        var newPrefix = VisitSpace(enumValue.Prefix, p);
+        if (!ReferenceEquals(newPrefix, enumValue.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(enumValue.Markers, p);
+        if (!ReferenceEquals(newMarkers, enumValue.Markers)) changed = true;
 
         // Annotations
         IList<Annotation> newAnnotations = enumValue.Annotations;
@@ -472,7 +536,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? enumValue.WithAnnotations(newAnnotations).WithName(newName).WithInitializer(newInitializer)
+            ? enumValue.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAnnotations(newAnnotations).WithName(newName).WithInitializer(newInitializer)
             : enumValue;
     }
 
@@ -485,6 +549,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not MethodDeclaration node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // LeadingAnnotations
         IList<Annotation> newLeadingAnnotations = node.LeadingAnnotations;
@@ -638,6 +708,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         return changed
             ? node
+                .WithPrefix(newPrefix)
+                .WithMarkers(newMarkers)
                 .WithLeadingAnnotations(newLeadingAnnotations)
                 .WithTypeParameters(newTypeParameters)
                 .WithReturnTypeExpression(newReturnType)
@@ -658,15 +730,28 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var stmtResult = VisitStatement(ret, p);
         if (stmtResult is not Return node) return stmtResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        Expression? newExpression = node.Expression;
         if (node.Expression != null)
         {
             var visited = Visit(node.Expression, p);
             if (visited is Expression expr && !ReferenceEquals(expr, node.Expression))
             {
-                return node.WithExpression(expr);
+                newExpression = expr;
+                changed = true;
             }
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpression(newExpression)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -678,6 +763,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not If node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Condition (ControlParentheses<Expression>)
         ControlParentheses<Expression> newCondition = node.Condition;
@@ -710,7 +801,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithCondition(newCondition).WithThenPart(newThenPart).WithElsePart(newElsePart)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithCondition(newCondition).WithThenPart(newThenPart).WithElsePart(newElsePart)
             : node;
     }
 
@@ -721,6 +812,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     {
         var changed = false;
 
+        var newPrefix = VisitSpace(@else.Prefix, p);
+        if (!ReferenceEquals(newPrefix, @else.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(@else.Markers, p);
+        if (!ReferenceEquals(newMarkers, @else.Markers)) changed = true;
+
         JRightPadded<Statement> newBody = @else.Body;
         var visitedBody = Visit(@else.Body.Element, p);
         if (visitedBody is Statement bs && !ReferenceEquals(bs, @else.Body.Element))
@@ -729,7 +826,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? @else.WithBody(newBody) : @else;
+        return changed ? @else.WithPrefix(newPrefix).WithMarkers(newMarkers).WithBody(newBody) : @else;
     }
 
     // -----------------------------------------------------------------------
@@ -741,6 +838,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not WhileLoop node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         ControlParentheses<Expression> newCondition = node.Condition;
         var visitedCondition = Visit(node.Condition, p);
@@ -758,7 +861,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithCondition(newCondition).WithBody(newBody) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithCondition(newCondition).WithBody(newBody) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -770,6 +873,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not DoWhileLoop node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Body
         JRightPadded<Statement> newBody = node.Body;
@@ -789,7 +898,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithBody(newBody).WithCondition(newCondition) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithBody(newBody).WithCondition(newCondition) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -801,6 +910,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not ForLoop node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Control
         ForLoop.Control newControl = node.LoopControl;
@@ -820,7 +935,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithLoopControl(newControl).WithBody(newBody) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLoopControl(newControl).WithBody(newBody) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -829,6 +944,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     public virtual J VisitForControl(ForLoop.Control control, P p)
     {
         var changed = false;
+
+        var newPrefix = VisitSpace(control.Prefix, p);
+        if (!ReferenceEquals(newPrefix, control.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(control.Markers, p);
+        if (!ReferenceEquals(newMarkers, control.Markers)) changed = true;
 
         // Init
         var newInit = new List<JRightPadded<Statement>>();
@@ -877,6 +998,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         return changed
             ? control
+                .WithPrefix(newPrefix)
+                .WithMarkers(newMarkers)
                 .WithInit(initChanged ? newInit : control.Init)
                 .WithCondition(newControlCondition)
                 .WithUpdate(updateChanged ? newUpdate : control.Update)
@@ -892,6 +1015,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not ForEachLoop node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Control
         ForEachLoop.Control newControl = node.LoopControl;
@@ -911,7 +1040,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithLoopControl(newControl).WithBody(newBody) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLoopControl(newControl).WithBody(newBody) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -920,6 +1049,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     public virtual J VisitForEachControl(ForEachLoop.Control control, P p)
     {
         var changed = false;
+
+        var newPrefix = VisitSpace(control.Prefix, p);
+        if (!ReferenceEquals(newPrefix, control.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(control.Markers, p);
+        if (!ReferenceEquals(newMarkers, control.Markers)) changed = true;
 
         // Variable
         JRightPadded<VariableDeclarations> newVariable = control.Variable;
@@ -939,7 +1074,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? control.WithVariable(newVariable).WithIterable(newIterable) : control;
+        return changed ? control.WithPrefix(newPrefix).WithMarkers(newMarkers).WithVariable(newVariable).WithIterable(newIterable) : control;
     }
 
     // -----------------------------------------------------------------------
@@ -951,6 +1086,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Try node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Resources
         JContainer<NameTree>? newResources = node.Resources;
@@ -1014,7 +1155,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithResources(newResources).WithBody(newBody).WithCatches(catchesChanged ? newCatches : node.Catches).WithFinally(newFinally)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithResources(newResources).WithBody(newBody).WithCatches(catchesChanged ? newCatches : node.Catches).WithFinally(newFinally)
             : node;
     }
 
@@ -1024,6 +1165,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     public virtual J VisitCatch(Try.Catch cat, P p)
     {
         var changed = false;
+
+        var newPrefix = VisitSpace(cat.Prefix, p);
+        if (!ReferenceEquals(newPrefix, cat.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(cat.Markers, p);
+        if (!ReferenceEquals(newMarkers, cat.Markers)) changed = true;
 
         // Parameter (ControlParentheses<VariableDeclarations>)
         ControlParentheses<VariableDeclarations> newParam = cat.Parameter;
@@ -1043,7 +1190,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? cat.WithParameter(newParam).WithBody(newBody) : cat;
+        return changed ? cat.WithPrefix(newPrefix).WithMarkers(newMarkers).WithParameter(newParam).WithBody(newBody) : cat;
     }
 
     // -----------------------------------------------------------------------
@@ -1054,12 +1201,25 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var stmtResult = VisitStatement(thr, p);
         if (stmtResult is not Throw node) return stmtResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        Expression newException = node.Exception;
         var visited = Visit(node.Exception, p);
         if (visited is Expression e && !ReferenceEquals(e, node.Exception))
         {
-            return node.WithException(e);
+            newException = e;
+            changed = true;
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithException(newException)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1070,15 +1230,28 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var stmtResult = VisitStatement(brk, p);
         if (stmtResult is not Break node) return stmtResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        Identifier? newLabel = node.Label;
         if (node.Label != null)
         {
             var visited = Visit(node.Label, p);
             if (visited is Identifier id && !ReferenceEquals(id, node.Label))
             {
-                return node.WithLabel(id);
+                newLabel = id;
+                changed = true;
             }
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLabel(newLabel)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1089,15 +1262,28 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var stmtResult = VisitStatement(cont, p);
         if (stmtResult is not Continue node) return stmtResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        Identifier? newLabel = node.Label;
         if (node.Label != null)
         {
             var visited = Visit(node.Label, p);
             if (visited is Identifier id && !ReferenceEquals(id, node.Label))
             {
-                return node.WithLabel(id);
+                newLabel = id;
+                changed = true;
             }
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLabel(newLabel)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1111,7 +1297,17 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(node, p);
         if (exprResult is not Empty node2) return exprResult;
 
-        return node2;
+        var changed = false;
+
+        var newPrefix = VisitSpace(node2.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node2.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node2.Markers, p);
+        if (!ReferenceEquals(newMarkers, node2.Markers)) changed = true;
+
+        return changed
+            ? node2.WithPrefix(newPrefix).WithMarkers(newMarkers)
+            : node2;
     }
 
     // -----------------------------------------------------------------------
@@ -1122,12 +1318,25 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(cp, p);
         if (exprResult is not ControlParentheses<Expression> node) return exprResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        JRightPadded<Expression> newTree = node.Tree;
         var visited = Visit(node.Tree.Element, p);
         if (visited is Expression e && !ReferenceEquals(e, node.Tree.Element))
         {
-            return node.WithTree(node.Tree.WithElement(e));
+            newTree = node.Tree.WithElement(e);
+            changed = true;
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1138,12 +1347,25 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(cp, p);
         if (exprResult is not ControlParentheses<TypeTree> node) return exprResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        JRightPadded<TypeTree> newTree = node.Tree;
         var visited = Visit(node.Tree.Element, p);
         if (visited is TypeTree tt && !ReferenceEquals(tt, node.Tree.Element))
         {
-            return node.WithTree(node.Tree.WithElement(tt));
+            newTree = node.Tree.WithElement(tt);
+            changed = true;
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1154,12 +1376,25 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(cp, p);
         if (exprResult is not ControlParentheses<VariableDeclarations> node) return exprResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        JRightPadded<VariableDeclarations> newTree = node.Tree;
         var visited = Visit(node.Tree.Element, p);
         if (visited is VariableDeclarations vd && !ReferenceEquals(vd, node.Tree.Element))
         {
-            return node.WithTree(node.Tree.WithElement(vd));
+            newTree = node.Tree.WithElement(vd);
+            changed = true;
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1170,7 +1405,17 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(literal, p);
         if (exprResult is not Literal node) return exprResult;
 
-        return node;
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1182,6 +1427,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not Identifier node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Annotations
         IList<Annotation> newAnnotations = node.Annotations;
@@ -1221,7 +1472,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithAnnotations(newAnnotations).WithType(newType).WithFieldType(newFieldType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAnnotations(newAnnotations).WithType(newType).WithFieldType(newFieldType)
             : node;
     }
 
@@ -1237,6 +1488,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not FieldAccess node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Target
         Expression newTarget = node.Target;
@@ -1264,7 +1521,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithTarget(newTarget).WithName(newName).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTarget(newTarget).WithName(newName).WithType(newType)
             : node;
     }
 
@@ -1277,6 +1534,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not MemberReference node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Containing (JRightPadded<Expression>)
         JRightPadded<Expression> newContaining = node.Containing;
@@ -1333,7 +1596,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newVariableType, node.VariableType)) changed = true;
 
         return changed
-            ? node.WithContaining(newContaining).WithTypeParameters(newTypeParams).WithReference(newReference)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithContaining(newContaining).WithTypeParameters(newTypeParams).WithReference(newReference)
                   .WithType(newType).WithMethodType(newMethodType).WithVariableType(newVariableType)
             : node;
     }
@@ -1347,6 +1610,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not Binary node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         Expression newLeft = node.Left;
         var visitedLeft = Visit(node.Left, p);
@@ -1368,7 +1637,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithLeft(newLeft).WithRight(newRight).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLeft(newLeft).WithRight(newRight).WithType(newType)
             : node;
     }
 
@@ -1384,6 +1653,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Ternary node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Condition
         Expression newCondition = node.Condition;
@@ -1417,7 +1692,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithCondition(newCondition).WithTruePart(newTruePart).WithFalsePart(newFalsePart).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithCondition(newCondition).WithTruePart(newTruePart).WithFalsePart(newFalsePart).WithType(newType)
             : node;
     }
 
@@ -1433,6 +1708,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not Assignment node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Variable
         Expression newVariable = node.Variable;
@@ -1457,7 +1738,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithVariable(newVariable).WithAssignmentValue(newAssignmentValue).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithVariable(newVariable).WithAssignmentValue(newAssignmentValue).WithType(newType)
             : node;
     }
 
@@ -1473,6 +1754,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not AssignmentOperation node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Variable
         Expression newVariable = node.Variable;
@@ -1497,7 +1784,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithVariable(newVariable).WithAssignmentValue(newAssignmentValue).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithVariable(newVariable).WithAssignmentValue(newAssignmentValue).WithType(newType)
             : node;
     }
 
@@ -1514,6 +1801,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         var changed = false;
 
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
         Expression newExpression = node.Expression;
         var visitedExpr = Visit(node.Expression, p);
         if (visitedExpr is Expression ve && !ReferenceEquals(ve, node.Expression))
@@ -1526,7 +1819,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithExpression(newExpression).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpression(newExpression).WithType(newType)
             : node;
     }
 
@@ -1538,12 +1831,25 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(parens, p);
         if (exprResult is not Parentheses<Expression> node) return exprResult;
 
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        JRightPadded<Expression> newTree = node.Tree;
         var visited = Visit(node.Tree.Element, p);
         if (visited is Expression e && !ReferenceEquals(e, node.Tree.Element))
         {
-            return node.WithTree(node.Tree.WithElement(e));
+            newTree = node.Tree.WithElement(e);
+            changed = true;
         }
-        return node;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1554,11 +1860,14 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var stmtResult = VisitStatement(expressionStatement, p);
         if (stmtResult is not ExpressionStatement node) return stmtResult;
 
+        // ExpressionStatement delegates Prefix/Markers to its inner Expression,
+        // so they are visited when the Expression itself is visited.
         var expr = Visit(node.Expression, p);
         if (expr is Expression e && !ReferenceEquals(e, node.Expression))
         {
             return node.WithExpression(e);
         }
+
         return node;
     }
 
@@ -1571,6 +1880,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not VariableDeclarations node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // LeadingAnnotations
         IList<Annotation> newLeadingAnnotations = node.LeadingAnnotations;
@@ -1626,7 +1941,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (varsChanged) changed = true;
 
         return changed
-            ? node.WithLeadingAnnotations(newLeadingAnnotations).WithTypeExpression(newTypeExpr).WithVariables(varsChanged ? newVars : node.Variables)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLeadingAnnotations(newLeadingAnnotations).WithTypeExpression(newTypeExpr).WithVariables(varsChanged ? newVars : node.Variables)
             : node;
     }
 
@@ -1636,6 +1951,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     public virtual J VisitNamedVariable(NamedVariable namedVariable, P p)
     {
         var changed = false;
+
+        var newPrefix = VisitSpace(namedVariable.Prefix, p);
+        if (!ReferenceEquals(newPrefix, namedVariable.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(namedVariable.Markers, p);
+        if (!ReferenceEquals(newMarkers, namedVariable.Markers)) changed = true;
 
         // Name
         Identifier newName = namedVariable.Name;
@@ -1663,7 +1984,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, namedVariable.Type)) changed = true;
 
         return changed
-            ? namedVariable.WithName(newName).WithInitializer(newInitializer).WithType(newType)
+            ? namedVariable.WithPrefix(newPrefix).WithMarkers(newMarkers).WithName(newName).WithInitializer(newInitializer).WithType(newType)
             : namedVariable;
     }
 
@@ -1675,7 +1996,17 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var exprResult = VisitExpression(primitive, p);
         if (exprResult is not Primitive node) return exprResult;
 
-        return node;
+        var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
+        return changed
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers)
+            : node;
     }
 
     // -----------------------------------------------------------------------
@@ -1690,6 +2021,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not MethodInvocation node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Select (JRightPadded<Expression>?)
         JRightPadded<Expression>? newSelect = node.Select;
@@ -1766,7 +2103,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMethodType, node.MethodType)) changed = true;
 
         return changed
-            ? node.WithSelect(newSelect).WithTypeParameters(newTypeParams).WithName(newName).WithArguments(newArgs).WithMethodType(newMethodType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithSelect(newSelect).WithTypeParameters(newTypeParams).WithName(newName).WithArguments(newArgs).WithMethodType(newMethodType)
             : node;
     }
 
@@ -1782,6 +2119,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not NewClass node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Enclosing (JRightPadded<Expression>?)
         JRightPadded<Expression>? newEnclosing = node.Enclosing;
@@ -1847,7 +2190,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newConstructorType, node.ConstructorType)) changed = true;
 
         return changed
-            ? node.WithEnclosing(newEnclosing).WithClazz(newClazz).WithArguments(newArgs).WithBody(newBody).WithConstructorType(newConstructorType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithEnclosing(newEnclosing).WithClazz(newClazz).WithArguments(newArgs).WithBody(newBody).WithConstructorType(newConstructorType)
             : node;
     }
 
@@ -1860,6 +2203,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not NewArray node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // TypeExpression
         TypeTree? newTypeExpr = node.TypeExpression;
@@ -1922,7 +2271,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithTypeExpression(newTypeExpr).WithDimensions(dimsChanged ? newDims : node.Dimensions).WithInitializer(newInitializer).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTypeExpression(newTypeExpr).WithDimensions(dimsChanged ? newDims : node.Dimensions).WithInitializer(newInitializer).WithType(newType)
             : node;
     }
 
@@ -1935,6 +2284,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not InstanceOf node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Expression (JRightPadded<Expression>)
         JRightPadded<Expression> newExpr = node.Expression;
@@ -1971,7 +2326,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithExpression(newExpr).WithClazz(newClazz).WithPattern(newPattern).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpression(newExpr).WithClazz(newClazz).WithPattern(newPattern).WithType(newType)
             : node;
     }
 
@@ -1984,6 +2339,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not NullableType node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Annotations
         IList<Annotation> newAnnotations = node.Annotations;
@@ -2022,7 +2383,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithAnnotations(newAnnotations).WithTypeTreePadded(newTypeTreePadded).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAnnotations(newAnnotations).WithTypeTreePadded(newTypeTreePadded).WithType(newType)
             : node;
     }
 
@@ -2035,6 +2396,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not ParameterizedType node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Clazz
         NameTree newClazz = node.Clazz;
@@ -2076,7 +2443,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithClazz(newClazz).WithTypeParameters(newTypeParams).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithClazz(newClazz).WithTypeParameters(newTypeParams).WithType(newType)
             : node;
     }
 
@@ -2089,6 +2456,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not ArrayType node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // ElementType
         TypeTree newElementType = node.ElementType;
@@ -2130,7 +2503,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithElementType(newElementType).WithAnnotations(newAnnotations).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithElementType(newElementType).WithAnnotations(newAnnotations).WithType(newType)
             : node;
     }
 
@@ -2143,6 +2516,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not ArrayAccess node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Indexed
         Expression newIndexed = node.Indexed;
@@ -2167,7 +2546,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithIndexed(newIndexed).WithDimension(newDimension).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithIndexed(newIndexed).WithDimension(newDimension).WithType(newType)
             : node;
     }
 
@@ -2176,12 +2555,25 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     // -----------------------------------------------------------------------
     public virtual J VisitArrayDimension(ArrayDimension dimension, P p)
     {
+        var changed = false;
+
+        var newPrefix = VisitSpace(dimension.Prefix, p);
+        if (!ReferenceEquals(newPrefix, dimension.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(dimension.Markers, p);
+        if (!ReferenceEquals(newMarkers, dimension.Markers)) changed = true;
+
+        JRightPadded<Expression> newIndex = dimension.Index;
         var visited = Visit(dimension.Index.Element, p);
         if (visited is Expression i && !ReferenceEquals(i, dimension.Index.Element))
         {
-            return dimension.WithIndex(dimension.Index.WithElement(i));
+            newIndex = dimension.Index.WithElement(i);
+            changed = true;
         }
-        return dimension;
+
+        return changed
+            ? dimension.WithPrefix(newPrefix).WithMarkers(newMarkers).WithIndex(newIndex)
+            : dimension;
     }
 
     // -----------------------------------------------------------------------
@@ -2196,6 +2588,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Lambda node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Params (Lambda.Parameters)
         Lambda.Parameters newParams = node.Params;
@@ -2220,7 +2618,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithParams(newParams).WithBody(newBody).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithParams(newParams).WithBody(newBody).WithType(newType)
             : node;
     }
 
@@ -2229,8 +2627,15 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     // -----------------------------------------------------------------------
     public virtual J VisitLambdaParameters(Lambda.Parameters parameters, P p)
     {
-        var elements = new List<JRightPadded<J>>();
         bool changed = false;
+
+        var newPrefix = VisitSpace(parameters.Prefix, p);
+        if (!ReferenceEquals(newPrefix, parameters.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(parameters.Markers, p);
+        if (!ReferenceEquals(newMarkers, parameters.Markers)) changed = true;
+
+        var elements = new List<JRightPadded<J>>();
 
         foreach (var paddedParam in parameters.Elements)
         {
@@ -2246,7 +2651,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             }
         }
 
-        return changed ? parameters.WithElements(elements) : parameters;
+        return changed ? parameters.WithPrefix(newPrefix).WithMarkers(newMarkers).WithElements(elements) : parameters;
     }
 
     // -----------------------------------------------------------------------
@@ -2259,6 +2664,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         var changed = false;
 
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
         // Selector (ControlParentheses<Expression>)
         ControlParentheses<Expression> newSelector = node.Selector;
         var visitedSelector = Visit(node.Selector, p);
@@ -2277,7 +2688,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithSelector(newSelector).WithCases(newCases) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithSelector(newSelector).WithCases(newCases) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -2290,6 +2701,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         var changed = false;
 
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
+
         // Selector (ControlParentheses<Expression>)
         ControlParentheses<Expression> newSelector = node.Selector;
         var visitedSelector = Visit(node.Selector, p);
@@ -2308,7 +2725,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithSelector(newSelector).WithCases(newCases) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithSelector(newSelector).WithCases(newCases) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -2320,6 +2737,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Case node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // CaseLabels (JContainer<J>)
         JContainer<J> newCaseLabels = node.CaseLabels;
@@ -2392,7 +2815,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithCaseLabels(newCaseLabels).WithGuard(newGuard).WithBody(newBody).WithStatements(newStatements)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithCaseLabels(newCaseLabels).WithGuard(newGuard).WithBody(newBody).WithStatements(newStatements)
             : node;
     }
 
@@ -2405,6 +2828,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not DeconstructionPattern node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Deconstructor
         Expression newDeconstructor = node.Deconstructor;
@@ -2443,7 +2872,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithDeconstructor(newDeconstructor).WithNested(newNested).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithDeconstructor(newDeconstructor).WithNested(newNested).WithType(newType)
             : node;
     }
 
@@ -2456,6 +2885,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Label node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // LabelName (JRightPadded<Identifier>)
         JRightPadded<Identifier> newLabelName = node.LabelName;
@@ -2476,7 +2911,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithLabelName(newLabelName).WithStatement(newStatement)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLabelName(newLabelName).WithStatement(newStatement)
             : node;
     }
 
@@ -2489,6 +2924,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Synchronized node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Lock (ControlParentheses<Expression>)
         ControlParentheses<Expression> newLock = node.Lock;
@@ -2508,7 +2949,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithLock(newLock).WithBody(newBody) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLock(newLock).WithBody(newBody) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -2520,6 +2961,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (exprResult is not TypeCast node) return exprResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Clazz (ControlParentheses<TypeTree>)
         ControlParentheses<TypeTree> newClazz = node.Clazz;
@@ -2539,7 +2986,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        return changed ? node.WithClazz(newClazz).WithExpression(newExpr) : node;
+        return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithClazz(newClazz).WithExpression(newExpr) : node;
     }
 
     // -----------------------------------------------------------------------
@@ -2548,6 +2995,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     public virtual J VisitTypeParameter(TypeParameter typeParameter, P p)
     {
         var changed = false;
+
+        var newPrefix = VisitSpace(typeParameter.Prefix, p);
+        if (!ReferenceEquals(newPrefix, typeParameter.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(typeParameter.Markers, p);
+        if (!ReferenceEquals(newMarkers, typeParameter.Markers)) changed = true;
 
         // Annotations
         IList<Annotation> newAnnotations = typeParameter.Annotations;
@@ -2608,7 +3061,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? typeParameter.WithAnnotations(newAnnotations).WithName(newName).WithBounds(newBounds)
+            ? typeParameter.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAnnotations(newAnnotations).WithName(newName).WithBounds(newBounds)
             : typeParameter;
     }
 
@@ -2621,6 +3074,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (stmtResult is not Package node) return stmtResult;
 
         var changed = false;
+
+        var newPrefix = VisitSpace(node.Prefix, p);
+        if (!ReferenceEquals(newPrefix, node.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(node.Markers, p);
+        if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Expression (JRightPadded<Expression>)
         JRightPadded<Expression> newExpression = node.Expression;
@@ -2655,7 +3114,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         return changed
-            ? node.WithExpression(newExpression).WithAnnotations(newAnnotations)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpression(newExpression).WithAnnotations(newAnnotations)
             : node;
     }
 }

@@ -973,16 +973,13 @@ public class RewriteRpcServer
 
     private class SearchResultCollector(HashSet<string> ids) : CSharpVisitor<int>
     {
-        protected override J? Accept(J tree, int p)
+        public override Marker VisitMarker(Marker marker, int p)
         {
-            foreach (var marker in tree.Markers.MarkerList)
+            if (marker is SearchResult sr)
             {
-                if (marker is SearchResult sr)
-                {
-                    ids.Add(sr.Id.ToString());
-                }
+                ids.Add(sr.Id.ToString());
             }
-            return base.Accept(tree, p);
+            return base.VisitMarker(marker, p);
         }
     }
 
