@@ -825,6 +825,13 @@ public class RewriteRpcServer
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
     public async Task<VisitResponse> Visit(VisitRequest request)
     {
+        // Skip non-C# source files (e.g., Quark for binary files)
+        if (request.SourceFileType != null &&
+            !request.SourceFileType.StartsWith("org.openrewrite.csharp."))
+        {
+            return new VisitResponse { Modified = false };
+        }
+
         // Parse visitor name: "edit:<recipeId>" or "scan:<recipeId>"
         var parts = request.VisitorName.Split(':', 2);
         if (parts.Length != 2)
@@ -894,6 +901,20 @@ public class RewriteRpcServer
     [JsonRpcMethod("BatchVisit", UseSingleObjectParameterDeserialization = true)]
     public async Task<BatchVisitResponse> BatchVisit(BatchVisitRequest request)
     {
+        // Skip non-C# source files (e.g., Quark for binary files)
+        if (request.SourceFileType != null &&
+            !request.SourceFileType.StartsWith("org.openrewrite.csharp."))
+        {
+            return new BatchVisitResponse
+            {
+                Results = request.Visitors.Select(_ => new BatchVisitResult
+                {
+                    Modified = false,
+                    Deleted = false
+                }).ToList()
+            };
+        }
+
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         var ctx = GetOrCreateExecutionContext(request.PId);
         var results = new List<BatchVisitResult>();
