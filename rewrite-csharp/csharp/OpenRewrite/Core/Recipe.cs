@@ -91,41 +91,25 @@ public abstract class Recipe
         }
         return options;
     }
+}
 
-    public virtual List<Result> Run(List<SourceFile> sources, ExecutionContext ctx)
-    {
-        var visitor = GetVisitor();
-        return EditSources(sources, visitor, ctx);
-    }
-
-    protected static List<Result> EditSources(
-        List<SourceFile> sources,
-        JavaVisitor<ExecutionContext> visitor,
-        ExecutionContext ctx)
-    {
-        var results = new List<Result>();
-        foreach (var source in sources)
-        {
-            var after = visitor.Visit((Tree)source, ctx);
-            if (after == null)
-            {
-                results.Add(new Result(source, null));
-            }
-            else if (after is SourceFile sf && !ReferenceEquals(source, after))
-            {
-                results.Add(new Result(source, sf));
-            }
-        }
-
-        return results;
-    }
+/// <summary>
+/// Non-generic interface for scanning recipes, allowing the scheduler to
+/// manage the scan/generate/edit lifecycle without knowing the accumulator type.
+/// </summary>
+public interface IScanningRecipe
+{
+    object InitialValue(ExecutionContext ctx);
+    JavaVisitor<ExecutionContext> Scanner(object acc);
+    JavaVisitor<ExecutionContext> Editor(object acc);
+    IEnumerable<SourceFile> Generate(object acc, ExecutionContext ctx);
 }
 
 /// <summary>
 /// A recipe that first scans source files to accumulate data, then transforms them.
 /// </summary>
 /// <typeparam name="T">The type of the accumulator for scanning data.</typeparam>
-public abstract class ScanningRecipe<T> : Recipe
+public abstract class ScanningRecipe<T> : Recipe, IScanningRecipe
 {
     public abstract T GetInitialValue(ExecutionContext ctx);
 
@@ -138,35 +122,14 @@ public abstract class ScanningRecipe<T> : Recipe
     public sealed override JavaVisitor<ExecutionContext> GetVisitor()
     {
         throw new InvalidOperationException(
-            "ScanningRecipe.GetVisitor() should not be called directly. Use Run() instead.");
+            "ScanningRecipe.GetVisitor() should not be called directly.");
     }
 
-    public override List<Result> Run(List<SourceFile> sources, ExecutionContext ctx)
-    {
-        var acc = GetInitialValue(ctx);
-
-        // Phase 1: Scan
-        var scanner = GetScanner(acc);
-        foreach (var source in sources)
-        {
-            scanner.Visit((Tree)source, ctx);
-        }
-
-        // Phase 2: Generate
-        var generated = Generate(acc, ctx).ToList();
-
-        // Phase 3: Edit
-        var visitor = GetVisitor(acc);
-        var results = EditSources(sources, visitor, ctx);
-
-        // Add generated files
-        foreach (var gen in generated)
-        {
-            results.Add(new Result(null, gen));
-        }
-
-        return results;
-    }
+    // IScanningRecipe explicit implementation — type-erased bridge for the scheduler
+    object IScanningRecipe.InitialValue(ExecutionContext ctx) => GetInitialValue(ctx)!;
+    JavaVisitor<ExecutionContext> IScanningRecipe.Scanner(object acc) => GetScanner((T)acc);
+    JavaVisitor<ExecutionContext> IScanningRecipe.Editor(object acc) => GetVisitor((T)acc);
+    IEnumerable<SourceFile> IScanningRecipe.Generate(object acc, ExecutionContext ctx) => Generate((T)acc, ctx);
 }
 
 /// <summary>
