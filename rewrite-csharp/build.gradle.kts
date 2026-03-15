@@ -3,7 +3,8 @@
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import java.time.LocalDateTime
+import java.time.Instant
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
@@ -119,16 +120,12 @@ tasks.withType<Test> {
 // ============================================
 
 // Generate a NuGet-compatible version
-// Snapshots use pre-release suffix with timestamp: 8.73.0-snapshot.20260110143252
+// Snapshots use pre-release suffix with UTC timestamp: 8.73.0-snapshot.20260110143252
 // Releases use clean version: 8.73.0
-val nugetVersion: String = if (System.getenv("CI") != null) {
-    project.version.toString().replace(
-        "-SNAPSHOT",
-        "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-    )
-} else {
-    project.version.toString().replace("-SNAPSHOT", "-snapshot")
-}
+val nugetVersion: String = project.version.toString().replace(
+    "-SNAPSHOT",
+    "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+)
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"
