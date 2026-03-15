@@ -329,8 +329,16 @@ public class RewriteRpcServer
         }
         try
         {
-            var printer = new CSharpPrinter<int>();
-            return printer.Print(tree);
+            var markerPrinter = request.MarkerPrinter switch
+            {
+                "SANITIZED" => Core.MarkerPrinter.Sanitized,
+                "FENCED" => Core.MarkerPrinter.Fenced,
+                "SEARCH_MARKERS_ONLY" => Core.MarkerPrinter.SearchMarkersOnly,
+                _ => Core.MarkerPrinter.Default
+            };
+            var capture = new PrintOutputCapture<int>(0, markerPrinter);
+            new CSharpPrinter<int>().Visit(tree, capture);
+            return capture.ToString();
         }
         catch (Exception ex)
         {
@@ -1208,6 +1216,7 @@ public class PrintRequest
     public string TreeId { get; set; } = "";
     public string? SourcePath { get; set; }
     public string? SourceFileType { get; set; }
+    public string? MarkerPrinter { get; set; }
 }
 
 public class GetMarketplaceResponseRow
