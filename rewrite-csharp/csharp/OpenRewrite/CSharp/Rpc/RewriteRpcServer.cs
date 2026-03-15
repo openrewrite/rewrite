@@ -967,19 +967,22 @@ public class RewriteRpcServer
         var ids = new HashSet<string>();
         if (tree == null) return ids;
 
-        new SearchResultCollector(ids).Visit(tree, null);
+        new SearchResultCollector(ids).Visit(tree, 0);
         return ids;
     }
 
-    private class SearchResultCollector(HashSet<string> ids) : JavaVisitor<object?>
+    private class SearchResultCollector(HashSet<string> ids) : CSharpVisitor<int>
     {
-        public override Marker VisitMarker(Marker marker, object? p)
+        protected override J? Accept(J tree, int p)
         {
-            if (marker is SearchResult sr)
+            foreach (var marker in tree.Markers.MarkerList)
             {
-                ids.Add(sr.Id.ToString());
+                if (marker is SearchResult sr)
+                {
+                    ids.Add(sr.Id.ToString());
+                }
             }
-            return base.VisitMarker(marker, p);
+            return base.Accept(tree, p);
         }
     }
 
