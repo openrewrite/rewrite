@@ -45,18 +45,18 @@ export interface BatchVisitRequest {
     visitors: BatchVisitItem[]
 }
 
-function collectSearchResultIds(tree: Tree | null | undefined): Set<string> {
+async function collectSearchResultIds(tree: Tree | null | undefined): Promise<Set<string>> {
     const ids = new Set<string>();
     if (!tree) return ids;
 
-    new class extends TreeVisitor<any, Set<string>> {
+    await new class extends TreeVisitor<any, Set<string>> {
         protected async visitMarker(marker: any, ctx: Set<string>): Promise<any> {
             if (marker && marker.kind === MarkersKind.SearchResult) {
                 ctx.add((marker as SearchResult).id.toString());
             }
             return super.visitMarker(marker, ctx);
         }
-    }().reduce(tree, ids);
+    }().visit(tree, ids);
     return ids;
 }
 
@@ -79,7 +79,7 @@ export class BatchVisit {
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
 
                     const results: BatchVisitResult[] = [];
-                    const knownIds = collectSearchResultIds(tree);
+                    const knownIds = await collectSearchResultIds(tree);
 
                     for (const item of request.visitors) {
                         // Instantiate and run visitor
@@ -96,7 +96,7 @@ export class BatchVisit {
                         if (deleted) {
                             searchResultIds = [];
                         } else {
-                            const afterIds = collectSearchResultIds(after);
+                            const afterIds = await collectSearchResultIds(after);
                             searchResultIds = [...afterIds].filter(id => !knownIds.has(id));
                             for (const id of searchResultIds) knownIds.add(id);
                         }

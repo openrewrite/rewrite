@@ -29,12 +29,12 @@ type RecipePhase = 'scan' | 'edit';
 const recipePhases: WeakMap<Recipe, RecipePhase> = new WeakMap();
 
 export class Visit {
-    constructor(private readonly visitor: string,
-                private readonly sourceFileType: string,
-                private readonly visitorOptions: Map<string, any> | undefined,
-                private readonly treeId: string,
-                private readonly p: string,
-                private readonly cursor: string[] | undefined) {
+    constructor(readonly visitor: string,
+                readonly sourceFileType: string,
+                readonly visitorOptions: Map<string, any> | undefined,
+                readonly treeId: string,
+                readonly p: string,
+                readonly cursor: string[] | undefined) {
     }
 
     static handle(connection: rpc.MessageConnection,
