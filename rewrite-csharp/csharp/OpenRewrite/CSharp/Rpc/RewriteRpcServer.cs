@@ -915,14 +915,20 @@ public class RewriteRpcServer
             };
         }
 
+        var sw = Stopwatch.StartNew();
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        var fetchMs = sw.ElapsedMilliseconds;
+
         var ctx = GetOrCreateExecutionContext(request.PId);
         var results = new List<BatchVisitResult>();
         var knownIds = CollectSearchResultIds(tree);
+        var collectMs = sw.ElapsedMilliseconds - fetchMs;
+
+        long visitMs = 0, searchCollectMs = 0;
+        int modifiedCount = 0;
 
         foreach (var item in request.Visitors)
         {
-
             // Parse visitor name and instantiate
             var parts = item.Visitor.Split(':', 2);
             if (parts.Length != 2)
@@ -958,15 +964,24 @@ public class RewriteRpcServer
                 visitor = recipe.GetVisitor();
             }
 
+            var visitStart = sw.ElapsedMilliseconds;
             var result = visitor.Visit(tree, ctx);
+            visitMs += sw.ElapsedMilliseconds - visitStart;
+
             var modified = !ReferenceEquals(tree, result);
             var deleted = result == null;
+            if (modified) modifiedCount++;
 
             // Diff SearchResult IDs against the running set
+            var searchStart = sw.ElapsedMilliseconds;
             List<string> searchResultIds;
             if (deleted)
             {
-                searchResultIds = new List<string>();
+                searchResultIds = [];
+            }
+            else if (!modified)
+            {
+                searchResultIds = [];
             }
             else
             {
@@ -974,6 +989,7 @@ public class RewriteRpcServer
                 searchResultIds = afterIds.Except(knownIds).ToList();
                 knownIds.UnionWith(searchResultIds);
             }
+            searchCollectMs += sw.ElapsedMilliseconds - searchStart;
 
             results.Add(new BatchVisitResult
             {
@@ -993,6 +1009,15 @@ public class RewriteRpcServer
             {
                 tree = result!;
             }
+        }
+
+        sw.Stop();
+        if (sw.ElapsedMilliseconds > 100)
+        {
+            Log.Debug("BatchVisit: {TreeId} {Visitors} visitors, {Modified} modified, " +
+                "fetch={FetchMs}ms visit={VisitMs}ms searchCollect={SearchMs}ms total={TotalMs}ms",
+                request.TreeId, request.Visitors.Count, modifiedCount,
+                fetchMs, visitMs, searchCollectMs, sw.ElapsedMilliseconds);
         }
 
         // Store final tree in localObjects
