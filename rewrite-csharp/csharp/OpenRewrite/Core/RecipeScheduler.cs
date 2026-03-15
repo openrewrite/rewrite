@@ -68,7 +68,7 @@ public static class RecipeScheduler
             var scanner = scanning.Scanner(acc);
             foreach (var source in sources)
             {
-                scanner.Visit((Tree)source, ctx);
+                scanner.Visit(source, ctx);
             }
 
             // Phase 2: Generate
@@ -89,14 +89,14 @@ public static class RecipeScheduler
     }
 
     private static List<Result> VisitAll(
-        JavaVisitor<ExecutionContext> visitor,
+        ITreeVisitor<ExecutionContext> visitor,
         List<SourceFile> sources,
         ExecutionContext ctx)
     {
         var results = new List<Result>();
         foreach (var source in sources)
         {
-            var after = visitor.Visit((Tree)source, ctx);
+            var after = visitor.Visit(source, ctx);
             if (after == null)
             {
                 results.Add(new Result(source, null));

@@ -830,7 +830,7 @@ public class RewriteRpcServer
         }
 
         var ctx = GetOrCreateExecutionContext(request.PId);
-        JavaVisitor<ExecutionContext> visitor;
+        ITreeVisitor<ExecutionContext> visitor;
 
         var scanningBase = GetScanningRecipeBase(recipe.GetType());
         if (scanningBase != null)
@@ -841,7 +841,7 @@ public class RewriteRpcServer
                 var getScannerMethod = scanningBase.GetMethod("GetScanner")
                     ?? throw new InvalidOperationException(
                         $"Could not find GetScanner method on {scanningBase.Name}");
-                visitor = (JavaVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
+                visitor = (ITreeVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
             }
             else
             {
@@ -849,7 +849,7 @@ public class RewriteRpcServer
                     [scanningBase.GetGenericArguments()[0]])
                     ?? throw new InvalidOperationException(
                         $"Could not find GetVisitor(T) method on {scanningBase.Name}");
-                visitor = (JavaVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
+                visitor = (ITreeVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
             }
         }
         else
@@ -894,7 +894,7 @@ public class RewriteRpcServer
             if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
                 throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
 
-            JavaVisitor<ExecutionContext> visitor;
+            ITreeVisitor<ExecutionContext> visitor;
             var scanningBase = GetScanningRecipeBase(recipe.GetType());
             if (scanningBase != null)
             {
@@ -903,14 +903,14 @@ public class RewriteRpcServer
                 {
                     var getScannerMethod = scanningBase.GetMethod("GetScanner")
                         ?? throw new InvalidOperationException($"Could not find GetScanner on {scanningBase.Name}");
-                    visitor = (JavaVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
+                    visitor = (ITreeVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
                 }
                 else
                 {
                     var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
                         [scanningBase.GetGenericArguments()[0]])
                         ?? throw new InvalidOperationException($"Could not find GetVisitor on {scanningBase.Name}");
-                    visitor = (JavaVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
+                    visitor = (ITreeVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
                 }
             }
             else

@@ -22,8 +22,26 @@ namespace OpenRewrite.Core;
 /// </summary>
 /// <typeparam name="T">The type of tree this visitor handles.</typeparam>
 /// <typeparam name="P">A context object passed through every visit method.</typeparam>
-public class TreeVisitor<T, P> where T : class, Tree
+/// <summary>
+/// Non-generic visitor interface so that Recipe.GetVisitor() can return
+/// a visitor without binding to a specific tree type (equivalent to
+/// Java's TreeVisitor&lt;?, P&gt;).
+/// </summary>
+public interface ITreeVisitor<P>
 {
+    Tree? Visit(Tree? tree, P p);
+
+    static ITreeVisitor<P> Noop() => new NoopVisitor<P>();
+}
+
+internal class NoopVisitor<P> : ITreeVisitor<P>
+{
+    public Tree? Visit(Tree? tree, P p) => tree;
+}
+
+public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
+{
+    Tree? ITreeVisitor<P>.Visit(Tree? tree, P p) => Visit(tree, p);
     public Cursor Cursor { get; set; } = new();
     private int _visitCount;
     private bool _stopAfterPreVisit;
@@ -104,5 +122,10 @@ public class TreeVisitor<T, P> where T : class, Tree
         _afterVisit.Add(visitor);
     }
 
-    public static TreeVisitor<T, P> Noop() => new();
+    public static TreeVisitor<T, P> Noop() => new NoopVisitor();
+
+    private class NoopVisitor : TreeVisitor<T, P>
+    {
+        public override T? Visit(Tree? tree, P p) => tree as T;
+    }
 }

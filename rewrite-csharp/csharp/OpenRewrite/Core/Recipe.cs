@@ -44,7 +44,7 @@ public abstract class Recipe
 
     public virtual List<Recipe> GetRecipeList() => [];
 
-    public virtual JavaVisitor<ExecutionContext> GetVisitor() => new();
+    public virtual ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
 
     public RecipeDescriptor GetDescriptor()
     {
@@ -100,8 +100,8 @@ public abstract class Recipe
 public interface IScanningRecipe
 {
     object InitialValue(ExecutionContext ctx);
-    JavaVisitor<ExecutionContext> Scanner(object acc);
-    JavaVisitor<ExecutionContext> Editor(object acc);
+    ITreeVisitor<ExecutionContext> Scanner(object acc);
+    ITreeVisitor<ExecutionContext> Editor(object acc);
     IEnumerable<SourceFile> Generate(object acc, ExecutionContext ctx);
 }
 
@@ -113,13 +113,13 @@ public abstract class ScanningRecipe<T> : Recipe, IScanningRecipe
 {
     public abstract T GetInitialValue(ExecutionContext ctx);
 
-    public abstract JavaVisitor<ExecutionContext> GetScanner(T acc);
+    public abstract ITreeVisitor<ExecutionContext> GetScanner(T acc);
 
-    public virtual JavaVisitor<ExecutionContext> GetVisitor(T acc) => new();
+    public virtual ITreeVisitor<ExecutionContext> GetVisitor(T acc) => ITreeVisitor<ExecutionContext>.Noop();
 
     public virtual IEnumerable<SourceFile> Generate(T acc, ExecutionContext ctx) => [];
 
-    public sealed override JavaVisitor<ExecutionContext> GetVisitor()
+    public sealed override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         throw new InvalidOperationException(
             "ScanningRecipe.GetVisitor() should not be called directly.");
@@ -127,8 +127,8 @@ public abstract class ScanningRecipe<T> : Recipe, IScanningRecipe
 
     // IScanningRecipe explicit implementation — type-erased bridge for the scheduler
     object IScanningRecipe.InitialValue(ExecutionContext ctx) => GetInitialValue(ctx)!;
-    JavaVisitor<ExecutionContext> IScanningRecipe.Scanner(object acc) => GetScanner((T)acc);
-    JavaVisitor<ExecutionContext> IScanningRecipe.Editor(object acc) => GetVisitor((T)acc);
+    ITreeVisitor<ExecutionContext> IScanningRecipe.Scanner(object acc) => GetScanner((T)acc);
+    ITreeVisitor<ExecutionContext> IScanningRecipe.Editor(object acc) => GetVisitor((T)acc);
     IEnumerable<SourceFile> IScanningRecipe.Generate(object acc, ExecutionContext ctx) => Generate((T)acc, ctx);
 }
 
