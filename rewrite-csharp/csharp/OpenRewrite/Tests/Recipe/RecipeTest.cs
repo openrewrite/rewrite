@@ -66,6 +66,18 @@ public class RecipeTest : RewriteTest
     }
 
     [Fact]
+    public void NoOpVisitorPreservesReferenceEquality()
+    {
+        var parser = new CSharpParser();
+        var source = parser.Parse("class C { void M() { var x = 1; } }");
+        var visitor = new CSharpVisitor<Core.ExecutionContext>();
+        var result = visitor.Visit(source, new Core.ExecutionContext());
+        Assert.True(ReferenceEquals(source, result),
+            $"No-op visitor should preserve reference equality. " +
+            $"source type={source.GetType().Name}, result type={result?.GetType().Name}");
+    }
+
+    [Fact]
     public void RecipeDescriptorHasOptions()
     {
         var recipe = new RenameClassRecipe { From = "Foo", To = "Bar" };

@@ -138,7 +138,8 @@ public class RpcSendQueue
         var afterVal = Reference.GetValue<object>(after);
         var beforeVal = Reference.GetValue<object>(before);
 
-        if (ReferenceEquals(beforeVal, afterVal))
+        if (ReferenceEquals(beforeVal, afterVal) ||
+            (beforeVal != null && beforeVal.GetType().IsValueType && beforeVal.Equals(afterVal)))
         {
             Put(new RpcObjectData { State = NO_CHANGE });
         }
@@ -211,7 +212,7 @@ public class RpcSendQueue
 
     private Dictionary<object, int> PutListPositions<T>(IList<T> after, IList<T>? before, Func<T, object> id)
     {
-        var beforeIdx = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+        var beforeIdx = new Dictionary<object, int>();
         if (before != null)
         {
             for (int i = 0; i < before.Count; i++)
