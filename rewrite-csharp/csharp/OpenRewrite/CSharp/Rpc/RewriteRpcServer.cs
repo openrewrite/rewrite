@@ -557,6 +557,25 @@ public class RewriteRpcServer
             </Project>
             """);
 
+        // Add local NuGet feed as a package source if it exists, so that
+        // locally-published SDK snapshots are discovered alongside nuget.org
+        var localFeed = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".nuget", "local-feed");
+        if (Directory.Exists(localFeed))
+        {
+            var nugetConfig = Path.Combine(_recipesProjectDir, "nuget.config");
+            File.WriteAllText(nugetConfig, $"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <configuration>
+                  <packageSources>
+                    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+                    <add key="local-feed" value="{localFeed}" />
+                  </packageSources>
+                </configuration>
+                """);
+        }
+
         return csprojPath;
     }
 
