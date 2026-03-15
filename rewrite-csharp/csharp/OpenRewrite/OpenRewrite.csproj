@@ -19,7 +19,7 @@
     <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
     <!-- VSTHRD103: Synchronous blocks needed for RPC interop -->
     <!-- CS0114: Intentional method hiding in sender/receiver visitors -->
-    <NoWarn>VSTHRD200;VSTHRD002;VSTHRD103;CS0114</NoWarn>
+    <NoWarn>VSTHRD200;VSTHRD002;VSTHRD103;CS0114;CS8602;CS8603;CS8604</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
