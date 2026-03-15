@@ -1148,17 +1148,17 @@ def handle_batch_visit(params: dict) -> dict:
 
         # Diff SearchResult IDs against the running set
         if deleted:
-            new_search_result_ids = []
+            search_result_ids = []
         else:
             after_ids = _collect_search_result_ids(after)
-            new_search_result_ids = list(after_ids - known_ids)
-            known_ids.update(new_search_result_ids)
+            search_result_ids = list(after_ids - known_ids)
+            known_ids.update(search_result_ids)
 
         results.append({
             'modified': modified,
             'deleted': deleted,
             'hasNewMessages': False,
-            'newSearchResultIds': new_search_result_ids,
+            'searchResultIds': search_result_ids,
         })
 
         if deleted:

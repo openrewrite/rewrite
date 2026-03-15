@@ -30,7 +30,7 @@ export interface BatchVisitResult {
     modified: boolean
     deleted: boolean
     hasNewMessages: boolean
-    newSearchResultIds: string[]
+    searchResultIds: string[]
 }
 
 export interface BatchVisitResponse {
@@ -92,16 +92,16 @@ export class BatchVisit {
                         const deleted = after == null;
 
                         // Diff SearchResult IDs against the running set
-                        let newSearchResultIds: string[];
+                        let searchResultIds: string[];
                         if (deleted) {
-                            newSearchResultIds = [];
+                            searchResultIds = [];
                         } else {
                             const afterIds = collectSearchResultIds(after);
-                            newSearchResultIds = [...afterIds].filter(id => !knownIds.has(id));
-                            for (const id of newSearchResultIds) knownIds.add(id);
+                            searchResultIds = [...afterIds].filter(id => !knownIds.has(id));
+                            for (const id of searchResultIds) knownIds.add(id);
                         }
 
-                        results.push({modified, deleted, hasNewMessages: false, newSearchResultIds});
+                        results.push({modified, deleted, hasNewMessages: false, searchResultIds});
 
                         if (deleted) {
                             localObjects.delete(request.treeId);

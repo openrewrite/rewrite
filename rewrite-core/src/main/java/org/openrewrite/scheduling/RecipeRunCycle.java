@@ -438,7 +438,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
 
             // Map new SearchResult IDs to this recipe's name
-            for (String searchResultId : r.getNewSearchResultIds()) {
+            for (String searchResultId : r.getSearchResultIds()) {
                 attributionMap.put(UUID.fromString(searchResultId), recipe.getName());
             }
         }

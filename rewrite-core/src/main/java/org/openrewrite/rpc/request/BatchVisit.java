@@ -73,18 +73,18 @@ public class BatchVisit implements RpcRequest {
                 boolean deleted = after == null;
 
                 // Diff SearchResult IDs against the running set
-                List<String> newSearchResultIds;
+                List<String> searchResultIds;
                 if (deleted) {
-                    newSearchResultIds = Collections.emptyList();
+                    searchResultIds = Collections.emptyList();
                 } else {
                     Set<String> afterIds = collectSearchResultIds(after);
                     afterIds.removeAll(knownIds);
-                    newSearchResultIds = new ArrayList<>(afterIds);
-                    knownIds.addAll(newSearchResultIds);
+                    searchResultIds = new ArrayList<>(afterIds);
+                    knownIds.addAll(searchResultIds);
                 }
 
                 results.add(new BatchVisitResponse.BatchVisitResult(
-                        modified, deleted, false, newSearchResultIds));
+                        modified, deleted, false, searchResultIds));
 
                 if (deleted) {
                     localObjects.remove(request.getTreeId());

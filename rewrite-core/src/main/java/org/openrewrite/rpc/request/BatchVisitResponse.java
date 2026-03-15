@@ -35,17 +35,17 @@ public class BatchVisitResponse {
         boolean modified;
         boolean deleted;
         boolean hasNewMessages;
-        List<String> newSearchResultIds;
+        List<String> searchResultIds;
 
         @JsonCreator
         public BatchVisitResult(@JsonProperty("modified") boolean modified,
                                 @JsonProperty("deleted") boolean deleted,
                                 @JsonProperty("hasNewMessages") boolean hasNewMessages,
-                                @JsonProperty("newSearchResultIds") List<String> newSearchResultIds) {
+                                @JsonProperty("searchResultIds") List<String> searchResultIds) {
             this.modified = modified;
             this.deleted = deleted;
             this.hasNewMessages = hasNewMessages;
-            this.newSearchResultIds = newSearchResultIds;
+            this.searchResultIds = searchResultIds;
         }
     }
 }

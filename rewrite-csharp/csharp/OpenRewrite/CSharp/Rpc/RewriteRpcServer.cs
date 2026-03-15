@@ -917,16 +917,16 @@ public class RewriteRpcServer
             var deleted = result == null;
 
             // Diff SearchResult IDs against the running set
-            List<string> newSearchResultIds;
+            List<string> searchResultIds;
             if (deleted)
             {
-                newSearchResultIds = new List<string>();
+                searchResultIds = new List<string>();
             }
             else
             {
                 var afterIds = CollectSearchResultIds(result!);
-                newSearchResultIds = afterIds.Except(knownIds).ToList();
-                knownIds.UnionWith(newSearchResultIds);
+                searchResultIds = afterIds.Except(knownIds).ToList();
+                knownIds.UnionWith(searchResultIds);
             }
 
             results.Add(new BatchVisitResult
@@ -934,7 +934,7 @@ public class RewriteRpcServer
                 Modified = modified,
                 Deleted = deleted,
                 HasNewMessages = false,
-                NewSearchResultIds = newSearchResultIds
+                SearchResultIds = searchResultIds
             });
 
             if (deleted)
@@ -1370,7 +1370,7 @@ public class BatchVisitResult
     public bool Modified { get; set; }
     public bool Deleted { get; set; }
     public bool HasNewMessages { get; set; }
-    public List<string> NewSearchResultIds { get; set; } = new();
+    public List<string> SearchResultIds { get; set; } = new();
 }
 
 public class BatchVisitResponse
