@@ -232,7 +232,7 @@ class RecipeSchedulerTest implements RewriteTest {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
                             @Nullable SourceFile before, @Nullable SourceFile after,
-                            java.util.Stack<Recipe> recipeStack, ExecutionContext ctx) {
+                            java.util.List<Recipe> recipeStack, ExecutionContext ctx) {
                         if (before instanceof PlainText) {
                             beforeContents.add(((PlainText) before).getText());
                         }
@@ -279,7 +279,7 @@ class RecipeSchedulerTest implements RewriteTest {
                     @Override
                     protected void recordSourceFileResultAndSearchResults(
                             @Nullable SourceFile before, @Nullable SourceFile after,
-                            java.util.Stack<Recipe> recipeStack, ExecutionContext ctx) {
+                            java.util.List<Recipe> recipeStack, ExecutionContext ctx) {
                         // Track files that were generated (before is null)
                         if (before == null && after != null) {
                             generatedPaths.add(after.getSourcePath().toString());
