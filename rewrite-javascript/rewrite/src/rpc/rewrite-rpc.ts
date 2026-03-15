@@ -32,7 +32,8 @@ import {
     Print,
     TraceGetObject,
     Visit,
-    VisitResponse
+    VisitResponse,
+    BatchVisit
 } from "./request";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
@@ -87,6 +88,7 @@ export class RewriteRpc {
         const marketplace = options.marketplace || new RecipeMarketplace();
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);

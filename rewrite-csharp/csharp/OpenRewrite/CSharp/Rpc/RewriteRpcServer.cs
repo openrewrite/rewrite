@@ -813,16 +813,8 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
         }
 
-        // Fetch tree from local cache or from the remote (Java) process
-        Tree tree;
-        if (_localObjects.TryGetValue(request.TreeId, out var obj) && obj is Tree localTree)
-        {
-            tree = localTree;
-        }
-        else
-        {
-            tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
-        }
+        // Fetch tree from the remote (Java) process
+        var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
 
         if (phase != "scan" && phase != "edit")
         {
@@ -860,12 +852,133 @@ public class RewriteRpcServer
         var result = visitor.Visit(tree, ctx);
 
         var modified = !ReferenceEquals(tree, result);
-        if (modified && result != null)
+        if (result == null)
+        {
+            _localObjects.Remove(request.TreeId);
+        }
+        else if (modified)
         {
             _localObjects[request.TreeId] = result;
         }
 
         return new VisitResponse { Modified = modified };
+    }
+
+    [JsonRpcMethod("BatchVisit", UseSingleObjectParameterDeserialization = true)]
+    public async Task<BatchVisitResponse> BatchVisit(BatchVisitRequest request)
+    {
+        var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
+        var ctx = GetOrCreateExecutionContext(request.PId);
+        var results = new List<BatchVisitResult>();
+        var knownIds = CollectSearchResultIds(tree);
+
+        foreach (var item in request.Visitors)
+        {
+
+            // Parse visitor name and instantiate
+            var parts = item.Visitor.Split(':', 2);
+            if (parts.Length != 2)
+                throw new ArgumentException($"Invalid visitor name format: {item.Visitor}");
+
+            var phase = parts[0];
+            var recipeId = parts[1];
+
+            if (!_preparedRecipes.TryGetValue(recipeId, out var recipe))
+                throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
+
+            JavaVisitor<ExecutionContext> visitor;
+            var scanningBase = GetScanningRecipeBase(recipe.GetType());
+            if (scanningBase != null)
+            {
+                var acc = GetOrCreateAccumulator(recipeId, recipe, scanningBase, ctx);
+                if (phase == "scan")
+                {
+                    var getScannerMethod = scanningBase.GetMethod("GetScanner")
+                        ?? throw new InvalidOperationException($"Could not find GetScanner on {scanningBase.Name}");
+                    visitor = (JavaVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
+                }
+                else
+                {
+                    var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
+                        [scanningBase.GetGenericArguments()[0]])
+                        ?? throw new InvalidOperationException($"Could not find GetVisitor on {scanningBase.Name}");
+                    visitor = (JavaVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
+                }
+            }
+            else
+            {
+                visitor = recipe.GetVisitor();
+            }
+
+            var result = visitor.Visit(tree, ctx);
+            var modified = !ReferenceEquals(tree, result);
+            var deleted = result == null;
+
+            // Diff SearchResult IDs against the running set
+            List<string> searchResultIds;
+            if (deleted)
+            {
+                searchResultIds = new List<string>();
+            }
+            else
+            {
+                var afterIds = CollectSearchResultIds(result!);
+                searchResultIds = afterIds.Except(knownIds).ToList();
+                knownIds.UnionWith(searchResultIds);
+            }
+
+            results.Add(new BatchVisitResult
+            {
+                Modified = modified,
+                Deleted = deleted,
+                HasNewMessages = false,
+                SearchResultIds = searchResultIds
+            });
+
+            if (deleted)
+            {
+                _localObjects.Remove(request.TreeId);
+                break;
+            }
+
+            if (modified)
+            {
+                tree = result!;
+            }
+        }
+
+        // Store final tree in localObjects
+        if (tree != null)
+        {
+            _localObjects[tree.Id.ToString()] = tree;
+            if (tree.Id.ToString() != request.TreeId)
+            {
+                _localObjects[request.TreeId] = tree;
+            }
+        }
+
+        return new BatchVisitResponse { Results = results };
+    }
+
+    private static HashSet<string> CollectSearchResultIds(Tree? tree)
+    {
+        var ids = new HashSet<string>();
+        if (tree == null) return ids;
+
+        new SearchResultCollector(ids).Visit(tree, 0);
+        return ids;
+    }
+
+    private class SearchResultCollector(HashSet<string> ids) : CSharpVisitor<int>
+    {
+        public override Marker VisitMarker(Marker marker, int p)
+        {
+            if (marker is SearchResult sr)
+            {
+                ids.Add(sr.Id.ToString());
+            }
+            return base.VisitMarker(marker, p);
+        }
     }
 
     public static async Task RunAsync(RecipeMarketplace? marketplace = null,
@@ -1231,5 +1344,35 @@ public class VisitRequest
 public class VisitResponse
 {
     public bool Modified { get; set; }
+}
+
+public class BatchVisitRequest
+{
+    public string SourceFileType { get; set; } = "";
+    public string TreeId { get; set; } = "";
+    [JsonProperty("p")]
+    public string? PId { get; set; }
+    [JsonProperty("cursor")]
+    public List<string>? CursorIds { get; set; }
+    public List<BatchVisitItem> Visitors { get; set; } = new();
+}
+
+public class BatchVisitItem
+{
+    public string Visitor { get; set; } = "";
+    public Dictionary<string, object>? VisitorOptions { get; set; }
+}
+
+public class BatchVisitResult
+{
+    public bool Modified { get; set; }
+    public bool Deleted { get; set; }
+    public bool HasNewMessages { get; set; }
+    public List<string> SearchResultIds { get; set; } = new();
+}
+
+public class BatchVisitResponse
+{
+    public List<BatchVisitResult> Results { get; set; } = new();
 }
 

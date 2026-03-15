@@ -120,6 +120,8 @@ public class RewriteRpc {
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
                 this::getObject, this::getCursor));
+        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(localObjects, preparedRecipes,
+                this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 this::getObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
@@ -247,6 +249,20 @@ public class RewriteRpc {
         return response.isModified() ?
                 getObject(tree.getId().toString(), sourceFileType) :
                 tree;
+    }
+
+    public <P> BatchVisitResponse batchVisit(Tree tree, P p, @Nullable Cursor cursor,
+                                             List<BatchVisit.BatchVisitItem> visitors) {
+        String treeId = tree.getId().toString();
+        localObjects.put(treeId, tree);
+
+        String pId = maybeUnwrapExecutionContext(p);
+        List<String> cursorIds = getCursorIds(cursor);
+
+        String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
+                .getClass().getName();
+        return send("BatchVisit", new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
+                BatchVisitResponse.class);
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {

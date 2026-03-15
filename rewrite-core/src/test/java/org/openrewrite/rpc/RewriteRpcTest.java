@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -282,6 +283,95 @@ class RewriteRpcTest implements RewriteTest {
           text(
             "hi",
             "hello"
+          )
+        );
+    }
+
+    /**
+     * When a composite recipe has consecutive sub-recipes that are all RpcRecipes
+     * bound to the same RewriteRpc instance, the scheduler batches them into a
+     * single BatchVisit RPC call. The remote runs all visitors in sequence and
+     * the host fetches the final result at the end. This test verifies that
+     * two consecutive same-RPC ChangeText recipes produce the correct final output.
+     */
+    @Test
+    void consecutiveSameRpcRecipesAreBatchedAndProduceCorrectResult() {
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r1, r2)))
+            .validateRecipeSerialization(false)
+            // Consecutive ChangeText recipes aren't idempotent (r1 re-applies in cycle 2).
+            // We only need 1 cycle to verify deferral correctness.
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "step2"
+          )
+        );
+    }
+
+    /**
+     * Verifies three consecutive same-RPC recipes. The scheduler should batch
+     * all three into one BatchVisit and fetch only once at the end.
+     */
+    @Test
+    void threeConsecutiveSameRpcRecipes() {
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "C"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
+            .validateRecipeSerialization(false)
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "C"
+          )
+        );
+    }
+
+    /**
+     * When a batch of same-RPC recipes is followed by a non-RPC recipe,
+     * the scheduler should flush the batch at the boundary and
+     * then run the non-RPC recipe on the fetched result.
+     */
+    @Test
+    void sameRpcBatchFollowedByNonRpcRecipe() {
+        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "from-rpc"));
+        Recipe local = new org.openrewrite.text.ChangeText("from-local");
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(rpc1, local)))
+            .validateRecipeSerialization(false)
+            .expectedCyclesThatMakeChanges(2),
+          text(
+            "hello",
+            "from-local"
+          )
+        );
+    }
+
+    /**
+     * A single RPC recipe (no consecutive same-RPC peer) should behave
+     * identically to the non-batched path — no batching, immediate getObject.
+     */
+    @Test
+    void singleRpcRecipeNoBatch() {
+        Recipe r = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "only"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r)))
+            .validateRecipeSerialization(false),
+          text(
+            "hello",
+            "only"
           )
         );
     }
