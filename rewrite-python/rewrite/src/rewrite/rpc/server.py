@@ -1133,11 +1133,10 @@ def handle_batch_visit(params: dict) -> dict:
     cursor = Cursor(None, Cursor.ROOT_VALUE)
 
     results = []
+    known_ids = _collect_search_result_ids(tree)
+
     for item in visitors:
         visitor_name = item.get('visitor', '')
-
-        # Collect SearchResult IDs before
-        before_ids = _collect_search_result_ids(tree)
 
         # Instantiate and run visitor
         visitor = _instantiate_visitor(visitor_name, ctx)
@@ -1147,12 +1146,13 @@ def handle_batch_visit(params: dict) -> dict:
         modified = after is not before
         deleted = after is None
 
-        # Diff SearchResult IDs
+        # Diff SearchResult IDs against the running set
         if deleted:
             new_search_result_ids = []
         else:
             after_ids = _collect_search_result_ids(after)
-            new_search_result_ids = list(after_ids - before_ids)
+            new_search_result_ids = list(after_ids - known_ids)
+            known_ids.update(new_search_result_ids)
 
         results.append({
             'modified': modified,

@@ -79,11 +79,9 @@ export class BatchVisit {
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
 
                     const results: BatchVisitResult[] = [];
+                    const knownIds = collectSearchResultIds(tree);
 
                     for (const item of request.visitors) {
-                        // Collect SearchResult IDs before
-                        const beforeIds = collectSearchResultIds(tree);
-
                         // Instantiate and run visitor
                         const visitor = await Visit.instantiateVisitor(
                             {visitor: item.visitor, visitorOptions: item.visitorOptions},
@@ -93,13 +91,14 @@ export class BatchVisit {
                         const modified = after !== tree;
                         const deleted = after == null;
 
-                        // Diff SearchResult IDs
+                        // Diff SearchResult IDs against the running set
                         let newSearchResultIds: string[];
                         if (deleted) {
                             newSearchResultIds = [];
                         } else {
                             const afterIds = collectSearchResultIds(after);
-                            newSearchResultIds = [...afterIds].filter(id => !beforeIds.has(id));
+                            newSearchResultIds = [...afterIds].filter(id => !knownIds.has(id));
+                            for (const id of newSearchResultIds) knownIds.add(id);
                         }
 
                         results.push({modified, deleted, hasNewMessages: false, newSearchResultIds});

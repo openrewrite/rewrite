@@ -61,11 +61,9 @@ public class BatchVisit implements RpcRequest {
             Cursor cursor = getCursor.apply(request.getCursor(), request.getSourceFileType());
 
             List<BatchVisitResponse.BatchVisitResult> results = new ArrayList<>();
+            Set<String> knownIds = collectSearchResultIds(tree);
 
             for (BatchVisitItem item : request.getVisitors()) {
-                // Collect SearchResult IDs before this visitor
-                Set<String> beforeIds = collectSearchResultIds(tree);
-
                 // Instantiate and run visitor
                 TreeVisitor<?, Object> visitor = preparedRecipes.instantiateVisitor(
                         item.getVisitor(), item.getVisitorOptions());
@@ -74,14 +72,15 @@ public class BatchVisit implements RpcRequest {
                 boolean modified = after != tree;
                 boolean deleted = after == null;
 
-                // Diff SearchResult IDs
+                // Diff SearchResult IDs against the running set
                 List<String> newSearchResultIds;
                 if (deleted) {
                     newSearchResultIds = Collections.emptyList();
                 } else {
                     Set<String> afterIds = collectSearchResultIds(after);
-                    afterIds.removeAll(beforeIds);
+                    afterIds.removeAll(knownIds);
                     newSearchResultIds = new ArrayList<>(afterIds);
+                    knownIds.addAll(newSearchResultIds);
                 }
 
                 results.add(new BatchVisitResponse.BatchVisitResult(

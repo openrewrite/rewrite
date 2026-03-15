@@ -872,11 +872,10 @@ public class RewriteRpcServer
         var tree = await GetObjectFromRemoteAsync(request.TreeId, request.SourceFileType);
         var ctx = GetOrCreateExecutionContext(request.PId);
         var results = new List<BatchVisitResult>();
+        var knownIds = CollectSearchResultIds(tree);
 
         foreach (var item in request.Visitors)
         {
-            // Collect SearchResult IDs before
-            var beforeIds = CollectSearchResultIds(tree);
 
             // Parse visitor name and instantiate
             var parts = item.Visitor.Split(':', 2);
@@ -917,7 +916,7 @@ public class RewriteRpcServer
             var modified = !ReferenceEquals(tree, result);
             var deleted = result == null;
 
-            // Diff SearchResult IDs
+            // Diff SearchResult IDs against the running set
             List<string> newSearchResultIds;
             if (deleted)
             {
@@ -926,7 +925,8 @@ public class RewriteRpcServer
             else
             {
                 var afterIds = CollectSearchResultIds(result!);
-                newSearchResultIds = afterIds.Except(beforeIds).ToList();
+                newSearchResultIds = afterIds.Except(knownIds).ToList();
+                knownIds.UnionWith(newSearchResultIds);
             }
 
             results.Add(new BatchVisitResult
