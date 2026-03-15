@@ -400,18 +400,19 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         RewriteRpc rpc = batch.rpc;
         SourceFile originalBefore = batch.originalBeforeBatch != null ? batch.originalBeforeBatch : source;
 
-        // Send BatchVisit RPC
+        // T1: Send BatchVisit RPC
+        long t1 = System.nanoTime();
         BatchVisitResponse response;
         try {
             response = rpc.batchVisit(originalBefore, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
-            // On error, record for first recipe in batch and clear
             if (!batch.recipeStacks.isEmpty()) {
                 handleError(batch.recipeStacks.get(0).peek(), originalBefore, originalBefore, t);
             }
             batch.clear();
             return source;
         }
+        long t1End = System.nanoTime();
 
         // Build attribution map: SearchResult UUID → recipe name
         Map<UUID, String> attributionMap = new HashMap<>();
@@ -437,7 +438,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 break;
             }
 
-            // Map new SearchResult IDs to this recipe's name
             for (String searchResultId : r.getSearchResultIds()) {
                 attributionMap.put(UUID.fromString(searchResultId), recipe.getName());
             }
@@ -448,29 +448,149 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             return null;
         }
 
+        // T2: GetObject (fetch modified tree from remote)
+        long t2 = System.nanoTime();
         SourceFile fetched;
         if (anyModified) {
-            // Fetch final tree state from remote
             fetched = rpc.getObject(originalBefore.getId().toString(), originalBefore.getClass().getName());
         } else {
             fetched = source;
         }
+        long t2End = System.nanoTime();
 
+        // T3: Record results + T4: Add RecipesThatMadeChanges
+        long t3 = System.nanoTime();
+        long t4 = 0, t4End = 0;
         if (anyModified) {
-            // Record SourcesFileResults per recipe and collect search results with attribution
+            // Collect ALL search results from the after tree ONCE, grouped by recipe
+            Map<String, List<SearchResults.Row>> searchResultsByRecipe =
+                    collectAllBatchSearchResults(originalBefore, fetched, attributionMap);
+
             for (Stack<Recipe> stack : batch.recipeStacks) {
-                recordBatchSourceFileResult(originalBefore, fetched, stack, attributionMap, ctx);
+                recordBatchSourceFileResultFast(originalBefore, fetched, stack,
+                        searchResultsByRecipe, ctx);
             }
             if (!originalBefore.getMarkers().findFirst(Generated.class).isPresent()) {
                 recipeRunStats.recordSourceFileChanged(originalBefore, fetched);
             }
+            long t3End = System.nanoTime();
+            t4 = System.nanoTime();
             for (Stack<Recipe> stack : batch.recipeStacks) {
                 fetched = addRecipesThatMadeChanges(stack, fetched);
+            }
+            t4End = System.nanoTime();
+
+            long batchMs = (t1End - t1) / 1_000_000;
+            long getObjMs = (t2End - t2) / 1_000_000;
+            long recordMs = (t3End - t3) / 1_000_000;
+            long markerMs = (t4End - t4) / 1_000_000;
+            long totalMs = batchMs + getObjMs + recordMs + markerMs;
+            if (totalMs > 200) {
+                System.err.printf("[flushBatch] %s: batch=%dms getObj=%dms record=%dms markers=%dms total=%dms (%d recipes)%n",
+                        originalBefore.getSourcePath(), batchMs, getObjMs, recordMs, markerMs, totalMs, batch.items.size());
             }
         }
 
         batch.clear();
         return fetched;
+    }
+
+    /**
+     * Collect all new SearchResult markers from the after tree in a single traversal,
+     * grouped by recipe name via the attribution map. This replaces the O(recipes × treeSize)
+     * approach of calling collectSearchResults per recipe.
+     */
+    private Map<String, List<SearchResults.Row>> collectAllBatchSearchResults(
+            @Nullable SourceFile before, @Nullable SourceFile after,
+            Map<UUID, String> attributionMap) {
+        if (after == null) {
+            return emptyMap();
+        }
+
+        // Collect markers already present in the before tree (single traversal)
+        Set<SearchResult> alreadyPresent;
+        if (before != null) {
+            alreadyPresent = new TreeVisitor<Tree, Set<SearchResult>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Set<SearchResult> ctx) {
+                    if (marker instanceof SearchResult) {
+                        ctx.add((SearchResult) marker);
+                    }
+                    return super.visitMarker(marker, ctx);
+                }
+            }.reduce(before, newSetFromMap(new IdentityHashMap<>()));
+        } else {
+            alreadyPresent = emptySet();
+        }
+
+        // Collect all new search results from after tree (single traversal), grouped by recipe
+        Map<String, List<SearchResults.Row>> resultsByRecipe = new HashMap<>();
+        new TreeVisitor<Tree, Integer>() {
+            @Override
+            public <M extends Marker> M visitMarker(Marker marker, Integer p) {
+                if (marker instanceof SearchResult && !alreadyPresent.contains(marker)) {
+                    SearchResult sr = (SearchResult) marker;
+                    String creator = attributionMap.get(sr.getId());
+                    if (creator != null) {
+                        Cursor cursor = getCursor();
+                        if (!(cursor.getValue() instanceof Tree)) {
+                            cursor = cursor.getParentTreeCursor();
+                        }
+                        if (cursor.getValue() instanceof Tree) {
+                            SearchResults.Row row = new SearchResults.Row(
+                                    (before == null) ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString()),
+                                    PathUtils.separatorsToUnix(after.getSourcePath().toString()),
+                                    StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(),
+                                            new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
+                                    sr.getDescription(),
+                                    creator);
+                            resultsByRecipe.computeIfAbsent(creator, k -> new ArrayList<>()).add(row);
+                        }
+                    }
+                }
+                return super.visitMarker(marker, p);
+            }
+        }.visit(after, 0);
+
+        return resultsByRecipe;
+    }
+
+    /**
+     * Records source file results for a batched recipe using pre-collected search results.
+     * Avoids the O(recipes × treeSize) cost of traversing the tree per recipe.
+     */
+    private void recordBatchSourceFileResultFast(@Nullable SourceFile before, @Nullable SourceFile after,
+                                                  Stack<Recipe> recipeStack,
+                                                  Map<String, List<SearchResults.Row>> searchResultsByRecipe,
+                                                  ExecutionContext ctx) {
+        String beforePath = (before == null) ? "" : before.getSourcePath().toString();
+        String afterPath = (after == null) ? "" : after.getSourcePath().toString();
+        Recipe recipe = recipeStack.peek();
+        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
+                0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+
+        String parentName = "";
+        boolean hierarchical = recipeStack.size() > 1;
+        if (hierarchical) {
+            parentName = recipeStack.get(recipeStack.size() - 2).getName();
+        }
+        sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
+                beforePath,
+                afterPath,
+                parentName,
+                recipe.getName(),
+                effortSeconds,
+                cycle));
+
+        // Use pre-collected search results — O(1) lookup instead of O(treeSize) traversal
+        List<SearchResults.Row> rows = searchResultsByRecipe.getOrDefault(recipe.getName(), emptyList());
+        for (SearchResults.Row row : rows) {
+            searchResults.insertRow(ctx, row);
+        }
+
+        if (hierarchical) {
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), ctx);
+        }
     }
 
     /**
