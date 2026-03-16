@@ -433,6 +433,40 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6398")
+    @Test
+    void cstyleArrayMethodWithParams() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            class A {
+                public byte getData(int offset, int length)[] {
+                  return new byte[]{};
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6398")
+    @Test
+    void cstyleArrayMethodMultiDimension() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            class A {
+                public int get()[][] {
+                  return new int[][]{};
+                }
+            }
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5445")
     @Test
     void parseSwitchBlock() {

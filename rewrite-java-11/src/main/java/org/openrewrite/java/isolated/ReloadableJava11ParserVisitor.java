@@ -35,6 +35,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.marker.CStyleArrayDeclaration;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
@@ -940,7 +941,28 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         List<J.Annotation> returnTypeAnnotations = collectAnnotations(annotationPosTable);
-        TypeTree returnType = convert(node.getReturnType());
+        boolean cStyleArrayReturn = false;
+        TypeTree returnType;
+        if (node.getReturnType() instanceof JCArrayTypeTree) {
+            JCExpression elementType = (JCExpression) node.getReturnType();
+            while (elementType instanceof JCArrayTypeTree || elementType instanceof JCAnnotatedType) {
+                if (elementType instanceof JCAnnotatedType) {
+                    elementType = ((JCAnnotatedType) elementType).underlyingType;
+                }
+                if (elementType instanceof JCArrayTypeTree) {
+                    elementType = ((JCArrayTypeTree) elementType).elemtype;
+                }
+            }
+            int idx = indexOfNextNonWhitespace(elementType.getEndPosition(endPosTable), source);
+            if (idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@')) {
+                returnType = convert(node.getReturnType());
+            } else {
+                returnType = convert(elementType);
+                cStyleArrayReturn = true;
+            }
+        } else {
+            returnType = convert(node.getReturnType());
+        }
         if (returnType != null && !returnTypeAnnotations.isEmpty()) {
             returnType = new J.AnnotatedType(randomId(), EMPTY, Markers.EMPTY,
                     returnTypeAnnotations, returnType);
@@ -979,6 +1001,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
                         Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
+        List<JLeftPadded<Space>> cStyleDimensions = cStyleArrayReturn ? arrayDimensions() : emptyList();
+
         JContainer<NameTree> throws_ = node.getThrows().isEmpty() ? null :
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
                         Markers.EMPTY);
@@ -988,7 +1012,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
 
-        return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
+        Markers markers = Markers.EMPTY;
+        if (cStyleArrayReturn) {
+            markers = markers.addIfAbsent(new CStyleArrayDeclaration(randomId(), cStyleDimensions));
+        }
+
+        return new J.MethodDeclaration(randomId(), fmt, markers,
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throws_, body, defaultValue,
