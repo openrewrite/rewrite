@@ -392,6 +392,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
         private @Nullable Path metricsCsv;
         private Duration timeout = Duration.ofSeconds(60);
+        private @Nullable Path dataTableOutputDir;
         private boolean traceRpcMessages;
 
         private @Nullable Integer debugPort;
@@ -428,6 +429,11 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         public Builder timeout(Duration timeout) {
             this.timeout = timeout;
+            return this;
+        }
+
+        public Builder dataTableOutputDir(@Nullable Path dataTableOutputDir) {
+            this.dataTableOutputDir = dataTableOutputDir;
             return this;
         }
 
@@ -640,6 +646,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         String.join(" ", cmdArr), process.environment())
                         .livenessCheck(process::getLivenessCheck)
                         .timeout(timeout)
+                        .dataTableOutputDir(dataTableOutputDir)
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

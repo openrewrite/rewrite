@@ -208,6 +208,11 @@ public class RewriteRpc {
         return this;
     }
 
+    public RewriteRpc dataTableOutputDir(@Nullable Path dataTableOutputDir) {
+        this.dataTableOutputDir = dataTableOutputDir;
+        return this;
+    }
+
     public void shutdown() {
         PrintStream logOut = log.get();
         if (logOut != null) {
