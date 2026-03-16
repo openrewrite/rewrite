@@ -4461,7 +4461,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             node.TextToken.ValueText,  // Unescaped value
             node.TextToken.Text,       // Source text (with {{ and }})
             null,
-            new JavaType.Primitive(JavaType.PrimitiveKind.String)
+            JavaType.Primitive.Of(JavaType.PrimitiveKind.String)
         );
     }
 
@@ -8867,7 +8867,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var line = new Literal(
             Guid.NewGuid(), linePrefix, Markers.Empty,
             int.Parse(lineNum), lineNum, null,
-            new JavaType.Primitive(JavaType.PrimitiveKind.Int)
+            JavaType.Primitive.Of(JavaType.PrimitiveKind.Int)
         );
 
         // Optional file
@@ -8883,7 +8883,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 file = new Literal(
                     Guid.NewGuid(), filePrefix, Markers.Empty,
                     fileTrimmed.Trim('"'), fileTrimmed, null,
-                    new JavaType.Primitive(JavaType.PrimitiveKind.String)
+                    JavaType.Primitive.Of(JavaType.PrimitiveKind.String)
                 );
             }
         }
@@ -9912,12 +9912,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     {
         return kind switch
         {
-            SyntaxKind.StringLiteralExpression => new JavaType.Primitive(JavaType.PrimitiveKind.String),
-            SyntaxKind.NumericLiteralExpression => new JavaType.Primitive(JavaType.PrimitiveKind.Int),
-            SyntaxKind.TrueLiteralExpression => new JavaType.Primitive(JavaType.PrimitiveKind.Boolean),
-            SyntaxKind.FalseLiteralExpression => new JavaType.Primitive(JavaType.PrimitiveKind.Boolean),
-            SyntaxKind.CharacterLiteralExpression => new JavaType.Primitive(JavaType.PrimitiveKind.Char),
-            SyntaxKind.NullLiteralExpression => new JavaType.Primitive(JavaType.PrimitiveKind.Null),
+            SyntaxKind.StringLiteralExpression => JavaType.Primitive.Of(JavaType.PrimitiveKind.String),
+            SyntaxKind.NumericLiteralExpression => JavaType.Primitive.Of(JavaType.PrimitiveKind.Int),
+            SyntaxKind.TrueLiteralExpression => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean),
+            SyntaxKind.FalseLiteralExpression => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean),
+            SyntaxKind.CharacterLiteralExpression => JavaType.Primitive.Of(JavaType.PrimitiveKind.Char),
+            SyntaxKind.NullLiteralExpression => JavaType.Primitive.Of(JavaType.PrimitiveKind.Null),
             _ => null
         };
     }

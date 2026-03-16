@@ -28,6 +28,15 @@ public abstract class JavaType
     /// </summary>
     public sealed class Primitive : JavaType
     {
+        // Shared instances for referential deduplication across the tree.
+        // The RPC layer uses AsRef + identity tracking, so reusing instances
+        // avoids sending duplicate type data for every node that shares a type.
+        private static readonly Primitive[] Instances = Enum.GetValues<PrimitiveKind>()
+            .Select(k => new Primitive(k))
+            .ToArray();
+
+        public static Primitive Of(PrimitiveKind kind) => Instances[(int)kind];
+
         public PrimitiveKind Kind { get; }
 
         public Primitive(PrimitiveKind kind)
