@@ -751,6 +751,7 @@ class PythonRpcReceiver:
         name_annotations = q.receive_list(method.name_annotations if method.name_annotations else [])
         name = q.receive(method.name)
         parameters = q.receive(method.padding.parameters, lambda c: self._receive_container(c, q) if c else None)
+        dimensions_after_name = q.receive_list(method.dimensions_after_name)
         throws = q.receive(
             method.padding.throws if hasattr(method.padding, 'throws') else None,
             lambda c: self._receive_container(c, q) if c else None
@@ -764,7 +765,8 @@ class PythonRpcReceiver:
         return replace_if_changed(method, leading_annotations=leading_annotations, modifiers=modifiers,
                                   type_parameters=type_parameters, return_type_expression=return_type_expression,
                                   name_annotations=name_annotations, name=name,
-                                  parameters=parameters, throws=throws, body=body, default_value=default_value,
+                                  parameters=parameters, dimensions_after_name=dimensions_after_name,
+                                  throws=throws, body=body, default_value=default_value,
                                   method_type=method_type)
 
     def _visit_j_switch(self, switch, q: RpcReceiveQueue):

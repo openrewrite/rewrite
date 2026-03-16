@@ -493,6 +493,7 @@ export namespace J {
         readonly nameAnnotations: Annotation[];
         readonly name: Identifier;
         readonly parameters: Container<Statement>;
+        readonly dimensionsAfterName: LeftPadded<Space>[];
         readonly throws?: Container<NameTree>;
         readonly body?: Block;
         readonly defaultValue?: LeftPadded<Expression>;

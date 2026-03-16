@@ -737,6 +737,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSendList(method, m => m.nameAnnotations, a => a.id, name => this.visit(name, q));
         await q.getAndSend(method, m => m.name, name => this.visit(name, q));
         await q.getAndSend(method, m => m.parameters, params => this.visitContainer(params, q));
+        await q.getAndSendList(method, m => m.dimensionsAfterName, d => JSON.stringify(d.element), dims => this.visitLeftPadded(dims, q));
         await q.getAndSend(method, m => m.throws, throws => this.visitContainer(throws, q));
         await q.getAndSend(method, m => m.body, body => this.visit(body, q));
         await q.getAndSend(method, m => m.defaultValue, def => this.visitLeftPadded(def, q));
@@ -1466,6 +1467,7 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             nameAnnotations: (await q.receiveList(method.nameAnnotations, name => this.visit(name, q)))!,
             name: await q.receive(method.name, name => this.visit(name, q)),
             parameters: await q.receive(method.parameters, params => this.visitContainer(params, q)),
+            dimensionsAfterName: await q.receiveListDefined(method.dimensionsAfterName, dim => this.visitLeftPadded(dim, q)),
             throws: await q.receive(method.throws, throws => this.visitContainer(throws, q)),
             body: await q.receive(method.body, body => this.visit(body, q)),
             defaultValue: await q.receive(method.defaultValue, def => this.visitLeftPadded(def, q)),

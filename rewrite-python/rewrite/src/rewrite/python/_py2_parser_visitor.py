@@ -670,6 +670,7 @@ class Py2ParserVisitor:
             [],  # name_annotations
             j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], name, None, None),
             JContainer(Space.EMPTY, [], Markers.EMPTY),  # parameters
+            [],  # dimensions_after_name
             None,  # throws
             j.Block(random_id(), Space.EMPTY, Markers.EMPTY,
                     JRightPadded(False, Space.EMPTY, Markers.EMPTY), [], Space.EMPTY),
