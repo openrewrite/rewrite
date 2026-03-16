@@ -683,7 +683,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
+            _typeMapping?.ClassType(node),
             null
         );
 
@@ -775,14 +775,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var enumMemberVarType = _typeMapping?.VariableType(node);
         var name = new Identifier(
             Guid.NewGuid(),
             namePrefix,
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
-            null
+            enumMemberVarType?.Type,
+            enumMemberVarType
         );
 
         JLeftPadded<Expression>? initializer = null;
@@ -857,7 +858,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
+            _typeMapping?.ClassType(node),
             null
         );
 
@@ -1232,7 +1233,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
+            _typeMapping?.MethodType(node),
             null
         );
 
@@ -1391,7 +1392,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Parse name (class name)
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
-        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, null, null);
+        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, _typeMapping?.MethodType(node), null);
 
         // Parse parameters (same pattern as VisitMethodDeclaration)
         var paramsPrefix = ExtractSpaceBefore(node.ParameterList.OpenParenToken);
@@ -1537,7 +1538,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Use tildePrefix as the name's prefix to preserve attribute text (e.g., [Double(1)])
         var name = new Identifier(Guid.NewGuid(), tildePrefix, Markers.Empty,
             [],
-            "~" + node.Identifier.Text, null,
+            "~" + node.Identifier.Text, _typeMapping?.MethodType(node),
             null
             );
 
@@ -1613,7 +1614,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
-        var identifier = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, null, null);
+        var identifier = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, _typeMapping?.ClassType(node), null);
 
         JContainer<TypeParameter>? typeParameters = null;
         if (node.TypeParameterList != null)
@@ -1701,7 +1702,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
-        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, null, null);
+        var eventVarType = _typeMapping?.VariableType(node);
+        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, eventVarType?.Type, eventVarType);
 
         JContainer<Statement>? accessors = null;
         if (node.AccessorList != null)
@@ -2050,14 +2052,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Parse the property name
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var propVarType = _typeMapping?.VariableType(node);
         var name = new Identifier(
             Guid.NewGuid(),
             namePrefix,
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
-            null
+            propVarType?.Type,
+            propVarType
         );
 
         // Parse either expression body or accessor list
@@ -2228,14 +2231,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Parse the parameter name
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var paramVarType = _typeMapping?.VariableType(node);
         var name = new Identifier(
             Guid.NewGuid(),
             namePrefix,
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
-            null
+            paramVarType?.Type,
+            paramVarType
         );
 
         // Parse default value if present
@@ -2259,7 +2263,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             name,
             [],
             initializer,
-            _typeMapping?.VariableType(node)
+            paramVarType
         );
 
         return new VariableDeclarations(
@@ -2722,8 +2726,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             // Regular type pattern: case int i:
             var namePrefix = ExtractSpaceBefore(varDesignation.Identifier);
             _cursor = varDesignation.Identifier.Span.End;
-            var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], varDesignation.Identifier.Text, null, null);
-            namedVar = new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, name, [], null, null);
+            var patternVarType = _typeMapping?.VariableType(varDesignation);
+            var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], varDesignation.Identifier.Text, patternVarType?.Type, patternVarType);
+            namedVar = new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, name, [], null, patternVarType);
         }
         else if (node.Designation is DiscardDesignationSyntax discardDesignation)
         {
@@ -2776,8 +2781,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var namePrefix = ExtractSpaceBefore(varDesignation.Identifier);
             _cursor = varDesignation.Identifier.Span.End;
-            var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], varDesignation.Identifier.Text, null, null);
-            namedVar = new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, name, [], null, null);
+            var varPatternVarType = _typeMapping?.VariableType(varDesignation);
+            var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], varDesignation.Identifier.Text, varPatternVarType?.Type, varPatternVarType);
+            namedVar = new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, name, [], null, varPatternVarType);
         }
         else if (node.Designation is DiscardDesignationSyntax discardDesignation)
         {
@@ -3095,10 +3101,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             var desigPrefix = ExtractSpaceBefore(varDesignation.Identifier);
             _cursor = varDesignation.Identifier.Span.End;
+            var desigVarType = _typeMapping?.VariableType(varDesignation);
             designation = new Identifier(
                 Guid.NewGuid(), desigPrefix, Markers.Empty,
                 [],
-                varDesignation.Identifier.Text, null,
+                varDesignation.Identifier.Text, desigVarType?.Type,
                 null
                 );
         }
@@ -3775,7 +3782,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
                 var namePrefix = ExtractSpaceBefore(v.Identifier);
                 _cursor = v.Identifier.Span.End;
-                var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], v.Identifier.Text, null, null);
+                var forLoopVarType = _typeMapping?.VariableType(v);
+                var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], v.Identifier.Text, forLoopVarType?.Type, forLoopVarType);
 
                 JLeftPadded<Expression>? initializer = null;
                 if (v.Initializer != null)
@@ -3930,7 +3938,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var typeExpr = VisitType(node.Type);
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
-        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, null, null);
+        var foreachVarType = _typeMapping?.VariableType(node);
+        var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], node.Identifier.Text, foreachVarType?.Type, foreachVarType);
         var namedVar = new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, name, [], null, _typeMapping?.VariableType(node));
         var varDecl = new VariableDeclarations(
             Guid.NewGuid(),
@@ -4020,7 +4029,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 {
                     var exNamePrefix = ExtractSpaceBefore(catchClause.Declaration.Identifier);
                     _cursor = catchClause.Declaration.Identifier.Span.End;
-                    exName = new Identifier(Guid.NewGuid(), exNamePrefix, Markers.Empty, [], catchClause.Declaration.Identifier.Text, null, null);
+                    var catchVarType = _typeMapping?.VariableType(catchClause.Declaration);
+                    exName = new Identifier(Guid.NewGuid(), exNamePrefix, Markers.Empty, [], catchClause.Declaration.Identifier.Text, catchVarType?.Type, catchVarType);
                 }
 
                 var varDecl = new VariableDeclarations(
@@ -4532,14 +4542,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Skip past the identifier token
         _cursor = node.Identifier.Span.End;
 
+        var (type, fieldType) = _typeMapping?.TypeAndFieldType(node) ?? (null, null);
         return new Identifier(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
             [],
             name,
-            _typeMapping?.Type(node),
-            null
+            type,
+            fieldType
         );
     }
 
@@ -5261,7 +5272,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var dotPrefix = ExtractSpaceBefore(node.OperatorToken);
         _cursor = node.OperatorToken.Span.End;
 
-        // Parse the member name
+        // Parse the member name — resolve type/fieldType from the outer member access node
+        var memberType = _typeMapping?.Type(node);
+        var memberFieldType = _typeMapping?.FieldType(node);
         Identifier name;
         JContainer<Expression>? typeArguments = null;
         if (node.Name is GenericNameSyntax genericName)
@@ -5275,8 +5288,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 genericName.Identifier.Text,
-                null,
-                null
+                memberType,
+                memberFieldType
             );
             typeArguments = ParseTypeArgumentList(genericName.TypeArgumentList);
         }
@@ -5292,8 +5305,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 simpleName.Identifier.Text,
-                null,
-                null
+                memberType,
+                memberFieldType
             );
         }
 
@@ -5344,6 +5357,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     public override J VisitInvocationExpression(InvocationExpressionSyntax node)
     {
         var prefix = ExtractPrefix(node);
+        var invocationMethodType = _typeMapping?.MethodType(node);
 
         JRightPadded<Expression>? select = null;
         Identifier name;
@@ -5362,7 +5376,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 var clazz = new Identifier(
                     Guid.NewGuid(), targetPrefix, Markers.Empty,
                     [],
-                    genericTarget.Identifier.Text, null,
+                    genericTarget.Identifier.Text, _typeMapping?.RawType(genericTarget),
                     null
                 );
                 var genTypeParams = ParseTypeArgumentList(genericTarget.TypeArgumentList);
@@ -5409,7 +5423,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     Markers.Empty,
                     [],
                     genericName.Identifier.Text,
-                    null,
+                    invocationMethodType,
                     null
                 );
                 typeParameters = ParseTypeArgumentList(genericName.TypeArgumentList);
@@ -5426,7 +5440,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     Markers.Empty,
                     [],
                     simpleName.Identifier.Text,
-                    null,
+                    invocationMethodType,
                     null
                 );
             }
@@ -5442,7 +5456,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 genericName.Identifier.Text,
-                null,
+                invocationMethodType,
                 null
             );
             typeParameters = ParseTypeArgumentList(genericName.TypeArgumentList);
@@ -5458,7 +5472,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 identifierName.Identifier.Text,
-                null,
+                invocationMethodType,
                 null
             );
         }
@@ -5696,14 +5710,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         if (node.Type == null)
         {
             _cursor = node.Identifier.Span.End;
+            var lambdaParamVarType = _typeMapping?.VariableType(node);
             return new Identifier(
                 Guid.NewGuid(),
                 prefix, // Use the param prefix as identifier prefix
                 Markers.Empty,
                 [],
                 node.Identifier.Text,
-                null,
-                null
+                lambdaParamVarType?.Type,
+                lambdaParamVarType
             );
         }
 
@@ -5723,14 +5738,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Parse the parameter name
         var namePrefix = ExtractSpaceBefore(node.Identifier);
         _cursor = node.Identifier.Span.End;
+        var typedLambdaParamVarType = _typeMapping?.VariableType(node);
         var name = new Identifier(
             Guid.NewGuid(),
             namePrefix,
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
-            null
+            typedLambdaParamVarType?.Type,
+            typedLambdaParamVarType
         );
 
         // Parse default value if present (C# 12+ for lambdas)
@@ -7689,14 +7705,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 _cursor = v.ArgumentList.Span.End;
             }
 
+            var localDeclVarType = _typeMapping?.VariableType(v);
             var name = new Identifier(
                 Guid.NewGuid(),
                 namePrefix,
                 Markers.Empty,
                 [],
                 nameText,
-                null,
-                null
+                localDeclVarType?.Type,
+                localDeclVarType
             );
 
             // Parse initializer if present
@@ -7831,14 +7848,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 _cursor = v.ArgumentList.Span.End;
             }
 
+            var fieldDeclVarType = _typeMapping?.VariableType(v);
             var name = new Identifier(
                 Guid.NewGuid(),
                 namePrefix,
                 Markers.Empty,
                 [],
                 nameText,
-                null,
-                null
+                fieldDeclVarType?.Type,
+                fieldDeclVarType
             );
 
             // Parse initializer if present
@@ -7954,14 +7972,15 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
             var namePrefix = ExtractSpaceBefore(v.Identifier);
             _cursor = v.Identifier.Span.End;
+            var eventFieldVarType = _typeMapping?.VariableType(v);
             var name = new Identifier(
                 Guid.NewGuid(),
                 namePrefix,
                 Markers.Empty,
                 [],
                 v.Identifier.Text,
-                null,
-                null
+                eventFieldVarType?.Type,
+                eventFieldVarType
             );
 
             JLeftPadded<Expression>? initializer = null;
@@ -8052,7 +8071,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             [],
             node.Identifier.Text,
-            null,
+            _typeMapping?.MethodType(node),
             null
         );
 
@@ -8180,7 +8199,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     Markers.Empty,
                     [],
                     predefined.Keyword.Text,
-                    null,
+                    _typeMapping?.Type(predefined),
                     null
                 );
             }
@@ -8230,7 +8249,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 Markers.Empty,
                 [],
                 genericName.Identifier.Text,
-                null,
+                _typeMapping?.RawType(genericName),
                 null
             );
 
@@ -9387,7 +9406,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
                 var namePrefix = ExtractSpaceBefore(v.Identifier);
                 _cursor = v.Identifier.Span.End;
-                var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], v.Identifier.Text, null, null);
+                var localVarType = _typeMapping?.VariableType(v);
+                var name = new Identifier(Guid.NewGuid(), namePrefix, Markers.Empty, [], v.Identifier.Text, localVarType?.Type, localVarType);
 
                 JLeftPadded<Expression>? initializer = null;
                 if (v.Initializer != null)
