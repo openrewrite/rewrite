@@ -400,8 +400,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         RewriteRpc rpc = batch.rpc;
         SourceFile originalBefore = batch.originalBeforeBatch != null ? batch.originalBeforeBatch : source;
 
-        // T1: Send BatchVisit RPC
-        long t1 = System.nanoTime();
+        // Send BatchVisit RPC
         BatchVisitResponse response;
         try {
             response = rpc.batchVisit(originalBefore, ctx, rootCursor, batch.items);
@@ -412,7 +411,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             batch.clear();
             return source;
         }
-        long t1End = System.nanoTime();
 
         // Build attribution map: SearchResult UUID → recipe name
         Map<UUID, String> attributionMap = new HashMap<>();
@@ -448,21 +446,17 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             return null;
         }
 
-        // T2: GetObject (fetch modified tree from remote)
-        long t2 = System.nanoTime();
         SourceFile fetched;
         if (anyModified) {
+            // Fetch final tree state from remote
             fetched = rpc.getObject(originalBefore.getId().toString(), originalBefore.getClass().getName());
         } else {
             fetched = source;
         }
-        long t2End = System.nanoTime();
 
-        // T3: Record results + T4: Add RecipesThatMadeChanges
-        long t3 = System.nanoTime();
-        long t4 = 0, t4End = 0;
         if (anyModified) {
-            // Collect ALL search results from the after tree ONCE, grouped by recipe
+            // Collect ALL search results from the after tree ONCE, grouped by recipe.
+            // This is O(treeSize) instead of O(recipes × treeSize).
             Map<String, List<SearchResults.Row>> searchResultsByRecipe =
                     collectAllBatchSearchResults(originalBefore, fetched, attributionMap);
 
@@ -473,21 +467,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             if (!originalBefore.getMarkers().findFirst(Generated.class).isPresent()) {
                 recipeRunStats.recordSourceFileChanged(originalBefore, fetched);
             }
-            long t3End = System.nanoTime();
-            t4 = System.nanoTime();
             for (Stack<Recipe> stack : batch.recipeStacks) {
                 fetched = addRecipesThatMadeChanges(stack, fetched);
-            }
-            t4End = System.nanoTime();
-
-            long batchMs = (t1End - t1) / 1_000_000;
-            long getObjMs = (t2End - t2) / 1_000_000;
-            long recordMs = (t3End - t3) / 1_000_000;
-            long markerMs = (t4End - t4) / 1_000_000;
-            long totalMs = batchMs + getObjMs + recordMs + markerMs;
-            if (totalMs > 200) {
-                System.err.printf("[flushBatch] %s: batch=%dms getObj=%dms record=%dms markers=%dms total=%dms (%d recipes)%n",
-                        originalBefore.getSourcePath(), batchMs, getObjMs, recordMs, markerMs, totalMs, batch.items.size());
             }
         }
 
@@ -496,9 +477,15 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     /**
-     * Collect all new SearchResult markers from the after tree in a single traversal,
-     * grouped by recipe name via the attribution map. This replaces the O(recipes × treeSize)
-     * approach of calling collectSearchResults per recipe.
+     * Collect all new SearchResult markers from the after tree, grouped by recipe name.
+     * <p>
+     * Uses a single fenced print of the entire file to extract code snippets for all
+     * search results at once, instead of printing each matched subtree individually.
+     * For files with many search results (common in batch mode), this reduces the cost
+     * from O(searchResults × subtreeSize) prints to O(1) file print.
+     * <p>
+     * For files with 2 or fewer new search results, falls back to per-result printing
+     * to avoid the overhead of parsing the fenced output.
      */
     private Map<String, List<SearchResults.Row>> collectAllBatchSearchResults(
             @Nullable SourceFile before, @Nullable SourceFile after,
@@ -507,50 +494,78 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             return emptyMap();
         }
 
-        // Collect markers already present in the before tree (single traversal)
-        Set<SearchResult> alreadyPresent;
+        // Collect markers already present in the before tree
+        Set<UUID> alreadyPresentIds;
         if (before != null) {
-            alreadyPresent = new TreeVisitor<Tree, Set<SearchResult>>() {
+            alreadyPresentIds = new TreeVisitor<Tree, Set<UUID>>() {
                 @Override
-                public <M extends Marker> M visitMarker(Marker marker, Set<SearchResult> ctx) {
+                public <M extends Marker> M visitMarker(Marker marker, Set<UUID> ctx) {
                     if (marker instanceof SearchResult) {
-                        ctx.add((SearchResult) marker);
+                        ctx.add(marker.getId());
                     }
                     return super.visitMarker(marker, ctx);
                 }
-            }.reduce(before, newSetFromMap(new IdentityHashMap<>()));
+            }.reduce(before, new HashSet<>());
         } else {
-            alreadyPresent = emptySet();
+            alreadyPresentIds = emptySet();
         }
 
-        // Collect all new search results from after tree (single traversal), grouped by recipe
-        Map<String, List<SearchResults.Row>> resultsByRecipe = new HashMap<>();
+        // Collect new SearchResult UUIDs and descriptions (single traversal, no printing)
+        Map<UUID, String> newSearchResultDescriptions = new LinkedHashMap<>();
         new TreeVisitor<Tree, Integer>() {
             @Override
             public <M extends Marker> M visitMarker(Marker marker, Integer p) {
-                if (marker instanceof SearchResult && !alreadyPresent.contains(marker)) {
+                if (marker instanceof SearchResult && !alreadyPresentIds.contains(marker.getId())) {
                     SearchResult sr = (SearchResult) marker;
-                    String creator = attributionMap.get(sr.getId());
-                    if (creator != null) {
-                        Cursor cursor = getCursor();
-                        if (!(cursor.getValue() instanceof Tree)) {
-                            cursor = cursor.getParentTreeCursor();
-                        }
-                        if (cursor.getValue() instanceof Tree) {
-                            SearchResults.Row row = new SearchResults.Row(
-                                    (before == null) ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString()),
-                                    PathUtils.separatorsToUnix(after.getSourcePath().toString()),
-                                    StringUtils.trimIndent(((Tree) cursor.getValue()).print(getCursor(),
-                                            new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED))),
-                                    sr.getDescription(),
-                                    creator);
-                            resultsByRecipe.computeIfAbsent(creator, k -> new ArrayList<>()).add(row);
-                        }
+                    if (attributionMap.containsKey(sr.getId())) {
+                        newSearchResultDescriptions.put(sr.getId(), sr.getDescription());
                     }
                 }
                 return super.visitMarker(marker, p);
             }
         }.visit(after, 0);
+
+        if (newSearchResultDescriptions.isEmpty()) {
+            return emptyMap();
+        }
+
+        String beforePath = (before == null) ? "" : PathUtils.separatorsToUnix(before.getSourcePath().toString());
+        String afterPath = PathUtils.separatorsToUnix(after.getSourcePath().toString());
+        Map<String, List<SearchResults.Row>> resultsByRecipe = new HashMap<>();
+
+        if (newSearchResultDescriptions.size() <= 2) {
+            // Few results: per-result printing is cheaper than parsing fenced output
+            for (Map.Entry<UUID, String> entry : newSearchResultDescriptions.entrySet()) {
+                String creator = attributionMap.get(entry.getKey());
+                if (creator != null) {
+                    resultsByRecipe.computeIfAbsent(creator, k -> new ArrayList<>())
+                            .add(new SearchResults.Row(beforePath, afterPath, "", entry.getValue(), creator));
+                }
+            }
+        } else {
+            // Many results: single fenced print, then extract snippets by UUID
+            String fenced = after.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.FENCED));
+            for (Map.Entry<UUID, String> entry : newSearchResultDescriptions.entrySet()) {
+                UUID id = entry.getKey();
+                String creator = attributionMap.get(id);
+                if (creator == null) continue;
+
+                String fence = "{{" + id + "}}";
+                int start = fenced.indexOf(fence);
+                if (start >= 0) {
+                    int contentStart = start + fence.length();
+                    int end = fenced.indexOf(fence, contentStart);
+                    String snippet = (end > contentStart)
+                            ? StringUtils.trimIndent(fenced.substring(contentStart, end))
+                            : "";
+                    resultsByRecipe.computeIfAbsent(creator, k -> new ArrayList<>())
+                            .add(new SearchResults.Row(beforePath, afterPath, snippet, entry.getValue(), creator));
+                } else {
+                    resultsByRecipe.computeIfAbsent(creator, k -> new ArrayList<>())
+                            .add(new SearchResults.Row(beforePath, afterPath, "", entry.getValue(), creator));
+                }
+            }
+        }
 
         return resultsByRecipe;
     }
