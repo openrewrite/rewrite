@@ -1522,7 +1522,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeWildcardImportWithDirectImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.util.*;
@@ -2239,7 +2238,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void wildcardImportsWithConflictingNames() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.sql.*;
