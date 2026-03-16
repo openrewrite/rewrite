@@ -253,6 +253,11 @@ internal class CSharpTypeMapping
 
     private JavaType.Variable MapVariable(string name, JavaType? owner, JavaType? type)
     {
+        // Variable types don't have a Roslyn ISymbol key, but they're cached
+        // implicitly through the VariableType method being called per-declaration.
+        // We still create a new instance per call, but the parser only calls
+        // VariableType once per declaration site — the same Variable is then
+        // shared across all references via the tree structure.
         return new JavaType.Variable(name, owner, type, null);
     }
 
@@ -260,16 +265,16 @@ internal class CSharpTypeMapping
     {
         return symbol.SpecialType switch
         {
-            SpecialType.System_Boolean => new JavaType.Primitive(JavaType.PrimitiveKind.Boolean),
-            SpecialType.System_Byte => new JavaType.Primitive(JavaType.PrimitiveKind.Byte),
-            SpecialType.System_Char => new JavaType.Primitive(JavaType.PrimitiveKind.Char),
-            SpecialType.System_Double => new JavaType.Primitive(JavaType.PrimitiveKind.Double),
-            SpecialType.System_Single => new JavaType.Primitive(JavaType.PrimitiveKind.Float),
-            SpecialType.System_Int32 => new JavaType.Primitive(JavaType.PrimitiveKind.Int),
-            SpecialType.System_Int64 => new JavaType.Primitive(JavaType.PrimitiveKind.Long),
-            SpecialType.System_Int16 => new JavaType.Primitive(JavaType.PrimitiveKind.Short),
-            SpecialType.System_Void => new JavaType.Primitive(JavaType.PrimitiveKind.Void),
-            SpecialType.System_String => new JavaType.Primitive(JavaType.PrimitiveKind.String),
+            SpecialType.System_Boolean => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean),
+            SpecialType.System_Byte => JavaType.Primitive.Of(JavaType.PrimitiveKind.Byte),
+            SpecialType.System_Char => JavaType.Primitive.Of(JavaType.PrimitiveKind.Char),
+            SpecialType.System_Double => JavaType.Primitive.Of(JavaType.PrimitiveKind.Double),
+            SpecialType.System_Single => JavaType.Primitive.Of(JavaType.PrimitiveKind.Float),
+            SpecialType.System_Int32 => JavaType.Primitive.Of(JavaType.PrimitiveKind.Int),
+            SpecialType.System_Int64 => JavaType.Primitive.Of(JavaType.PrimitiveKind.Long),
+            SpecialType.System_Int16 => JavaType.Primitive.Of(JavaType.PrimitiveKind.Short),
+            SpecialType.System_Void => JavaType.Primitive.Of(JavaType.PrimitiveKind.Void),
+            SpecialType.System_String => JavaType.Primitive.Of(JavaType.PrimitiveKind.String),
             _ => null
         };
     }

@@ -526,7 +526,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     public override J VisitPrimitive(Primitive primitive, RpcReceiveQueue q)
     {
         var type = q.Receive(
-            primitive.Kind != 0 ? (JavaType?)new JavaType.Primitive(primitive.Kind) : null,
+            primitive.Kind != 0 ? (JavaType?)JavaType.Primitive.Of(primitive.Kind) : null,
             t => VisitType(t, q)!);
         var kind = type is JavaType.Primitive p ? p.Kind : primitive.Kind;
         return primitive.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithKind(kind);
@@ -777,7 +777,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
 
             case JavaType.Primitive prim:
                 var keyword = q.Receive(GetPrimitiveKeyword(prim.Kind));
-                javaType = new JavaType.Primitive(KeywordToPrimitiveKind(keyword!));
+                javaType = JavaType.Primitive.Of(KeywordToPrimitiveKind(keyword!));
                 break;
 
             case JavaType.Method method:

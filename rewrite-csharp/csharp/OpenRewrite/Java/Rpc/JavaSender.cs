@@ -470,7 +470,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitPrimitive(Primitive primitive, RpcSendQueue q)
     {
-        q.GetAndSend(primitive, p => AsRef(new JavaType.Primitive(p.Kind)), type => VisitType(GetValueNonNull<JavaType>(type), q));
+        q.GetAndSend(primitive, p => AsRef(JavaType.Primitive.Of(p.Kind)), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return primitive;
     }
 
