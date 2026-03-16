@@ -36,6 +36,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.io.File;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -94,6 +95,8 @@ public class RewriteRpc {
     final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
 
     private @Nullable List<String> remoteLanguages;
+
+    private @Nullable Path dataTableOutputDir;
 
     /**
      * Creates a new RPC interface that can be used to communicate with a remote.
@@ -210,6 +213,20 @@ public class RewriteRpc {
         if (logOut != null) {
             logOut.close();
         }
+        if (dataTableOutputDir != null) {
+            try {
+                File[] remaining = dataTableOutputDir.toFile().listFiles();
+                if (remaining != null) {
+                    for (File f : remaining) {
+                        //noinspection ResultOfMethodCallIgnored
+                        f.delete();
+                    }
+                }
+                //noinspection ResultOfMethodCallIgnored
+                dataTableOutputDir.toFile().delete();
+            } catch (Exception ignored) {
+            }
+        }
         jsonRpc.shutdown();
     }
 
@@ -318,7 +335,8 @@ public class RewriteRpc {
     }
 
     public RpcRecipe prepareRecipe(String id, Map<String, Object> options) {
-        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+        String dtOutputDir = getOrCreateDataTableOutputDir();
+        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options, dtOutputDir), PrepareRecipeResponse.class);
 
         // FIXME do this validation on the server side instead
         for (OptionDescriptor option : r.getDescriptor().getOptions()) {
@@ -486,6 +504,27 @@ public class RewriteRpc {
             }).collect(toList());
         }
         return cursorIds;
+    }
+
+    private String getOrCreateDataTableOutputDir() {
+        if (dataTableOutputDir == null) {
+            try {
+                dataTableOutputDir = Files.createTempDirectory("rewrite-data-tables");
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        }
+        return dataTableOutputDir.toString();
+    }
+
+    /**
+     * Reads CSV files from the data table output directory and inserts the rows
+     * into the given ExecutionContext.
+     */
+    public void readDataTablesFromCsv(ExecutionContext ctx) {
+        if (dataTableOutputDir != null && Files.isDirectory(dataTableOutputDir)) {
+            CsvDataTableStore.readIntoContext(dataTableOutputDir, ctx);
+        }
     }
 
     @VisibleForTesting

@@ -45,6 +45,10 @@ import {ParserInput} from "../parser";
 import {ReferenceMap} from "../reference";
 import {GetLanguages} from "./request/get-languages";
 
+export interface RpcConfig {
+    dataTableOutputDir?: string;
+}
+
 export class RewriteRpc {
     private static _global?: RewriteRpc;
 
@@ -79,6 +83,7 @@ export class RewriteRpc {
 
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
+        const rpcConfig: RpcConfig = {};
 
         // Need this indirection, otherwise `this` will be undefined when executed in the handlers.
         const getObject = (id: string, sourceFileType?: string) => this.getObject(id, sourceFileType);
@@ -87,14 +92,14 @@ export class RewriteRpc {
 
         const marketplace = options.marketplace || new RecipeMarketplace();
 
-        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
-        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
+        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv, rpcConfig);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv, rpcConfig);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
         GetMarketplace.handle(this.connection, marketplace, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
-        PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
+        PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv, rpcConfig);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
         ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);

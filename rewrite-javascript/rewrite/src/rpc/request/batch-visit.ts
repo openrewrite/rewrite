@@ -18,8 +18,9 @@ import {Recipe} from "../../recipe";
 import {Cursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {MarkersKind, SearchResult} from "../../markers";
-import {Visit} from "./visit";
+import {Visit, maybeSetupDataTableStore} from "./visit";
 import {withMetrics} from "./metrics";
+import {RpcConfig} from "../rewrite-rpc";
 
 export interface BatchVisitItem {
     visitor: string
@@ -67,7 +68,8 @@ export class BatchVisit {
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string, sourceFileType?: string) => any,
                   getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
-                  metricsCsv?: string): void {
+                  metricsCsv?: string,
+                  rpcConfig?: RpcConfig): void {
         connection.onRequest(
             new rpc.RequestType<BatchVisitRequest, BatchVisitResponse, Error>("BatchVisit"),
             withMetrics<BatchVisitRequest, BatchVisitResponse>(
@@ -75,6 +77,7 @@ export class BatchVisit {
                 metricsCsv,
                 (_context) => async (request) => {
                     const p = await getObject(request.p, undefined);
+                    maybeSetupDataTableStore(p, rpcConfig);
                     let tree: Tree = await getObject(request.treeId, request.sourceFileType);
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
 

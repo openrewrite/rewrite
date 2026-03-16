@@ -18,6 +18,7 @@ package org.openrewrite.rpc.internal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import lombok.Getter;
+import lombok.Setter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -32,6 +33,9 @@ public class PreparedRecipeCache {
 
     private final @Getter Map<String, Recipe> instantiated = new HashMap<>();
     private final @Getter Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
+
+    @Getter @Setter
+    private @Nullable String dataTableOutputDir;
 
     @SuppressWarnings("unchecked")
     public <P> TreeVisitor<?, P> instantiateVisitor(String visitorName, @Nullable Map<String, Object> visitorOptions) {
@@ -59,6 +63,15 @@ public class PreparedRecipeCache {
             return (TreeVisitor<?, P>) mapper.convertValue(withJsonType, visitorType);
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public static void maybeSetupDataTableStore(PreparedRecipeCache cache, ExecutionContext ctx) {
+        String outputDir = cache.getDataTableOutputDir();
+        if (outputDir != null && ctx.getMessage(ExecutionContext.DATA_TABLE_STORE) == null) {
+            CsvDataTableStore store = new CsvDataTableStore(java.nio.file.Paths.get(outputDir));
+            store.acceptRows(true);
+            ctx.putMessage(ExecutionContext.DATA_TABLE_STORE, store);
         }
     }
 }

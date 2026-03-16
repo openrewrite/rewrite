@@ -82,6 +82,7 @@ public class Visit implements RpcRequest {
         private Object getVisitorP(Visit request) {
             Object p = getObject.apply(request.getP(), request.getSourceFileType());
             if (p instanceof ExecutionContext) {
+                PreparedRecipeCache.maybeSetupDataTableStore(preparedRecipes, (ExecutionContext) p);
                 String visitorName = request.getVisitor();
 
                 if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {

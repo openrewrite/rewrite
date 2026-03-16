@@ -122,6 +122,7 @@ public class BatchVisit implements RpcRequest {
         private Object getVisitorP(BatchVisit request) {
             Object p = getObject.apply(request.getP(), request.getSourceFileType());
             if (p instanceof ExecutionContext) {
+                PreparedRecipeCache.maybeSetupDataTableStore(preparedRecipes, (ExecutionContext) p);
                 // Use the first visitor to determine recipe context
                 if (!request.getVisitors().isEmpty()) {
                     String visitorName = request.getVisitors().get(0).getVisitor();

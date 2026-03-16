@@ -37,6 +37,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String DATA_TABLES = "org.openrewrite.dataTables";
+    String DATA_TABLE_STORE = "org.openrewrite.dataTables.store";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
     String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";

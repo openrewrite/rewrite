@@ -78,6 +78,10 @@ public class DataTable<Row> {
             dataTablesOfType.add(row);
             return allDataTables;
         });
+        CsvDataTableStore store = ctx.getMessage(ExecutionContext.DATA_TABLE_STORE);
+        if (store != null) {
+            store.insertRow(this, row);
+        }
     }
 
     /**

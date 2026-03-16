@@ -19,6 +19,8 @@ import {Cursor, rootCursor, SourceFile, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics, extractSourcePath} from "./metrics";
+import {CsvDataTableStore, DATA_TABLE_STORE} from "../../data-table";
+import {RpcConfig} from "../rewrite-rpc";
 
 export interface VisitResponse {
     modified: boolean
@@ -27,6 +29,16 @@ export interface VisitResponse {
 // Tracks the last phase (scan or edit) for each recipe to detect cycle transitions
 type RecipePhase = 'scan' | 'edit';
 const recipePhases: WeakMap<Recipe, RecipePhase> = new WeakMap();
+
+export function maybeSetupDataTableStore(p: any, rpcConfig?: RpcConfig) {
+    if (rpcConfig?.dataTableOutputDir && p instanceof ExecutionContext) {
+        if (!p.messages[DATA_TABLE_STORE]) {
+            const store = new CsvDataTableStore(rpcConfig.dataTableOutputDir);
+            store.acceptRows(true);
+            p.messages[DATA_TABLE_STORE] = store;
+        }
+    }
+}
 
 export class Visit {
     constructor(readonly visitor: string,
@@ -43,7 +55,8 @@ export class Visit {
                   recipeCursors: WeakMap<Recipe, Cursor>,
                   getObject: (id: string, sourceFileType?: string) => any,
                   getCursor: (cursorIds: string[] | undefined, sourceFileType?: string) => Promise<Cursor>,
-                  metricsCsv?: string): void {
+                  metricsCsv?: string,
+                  rpcConfig?: RpcConfig): void {
         connection.onRequest(
             new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
             withMetrics<Visit, VisitResponse>(
@@ -51,6 +64,7 @@ export class Visit {
                 metricsCsv,
                 (context) => async (request) => {
                     const p = await getObject(request.p, undefined);
+                    maybeSetupDataTableStore(p, rpcConfig);
                     const before: Tree = await getObject(request.treeId, request.sourceFileType);
                     const cursor = await getCursor(request.cursor, request.sourceFileType);
                     context.target = extractSourcePath(before, cursor);

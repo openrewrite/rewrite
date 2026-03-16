@@ -23,15 +23,18 @@ import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
+import {RpcConfig} from "../rewrite-rpc";
 
 export class PrepareRecipe {
-    constructor(private readonly id: string, private readonly options?: any) {
+    constructor(private readonly id: string, private readonly options?: any,
+                private readonly dataTableOutputDir?: string) {
     }
 
     static handle(connection: MessageConnection,
                   marketplace: RecipeMarketplace,
                   preparedRecipes: Map<String, Recipe>,
-                  metricsCsv?: string) {
+                  metricsCsv?: string,
+                  rpcConfig?: RpcConfig) {
         const snowflake = SnowflakeId();
         connection.onRequest(
             new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
@@ -40,6 +43,9 @@ export class PrepareRecipe {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = request.id;
+                    if (request.dataTableOutputDir && rpcConfig) {
+                        rpcConfig.dataTableOutputDir = request.dataTableOutputDir;
+                    }
                     const id = snowflake.generate();
                     const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {

@@ -52,6 +52,7 @@ public class RewriteRpcServer
     private readonly Dictionary<string, Recipe> _preparedRecipes = new();
     private readonly Dictionary<string, object?> _recipeAccumulators = new();
     private readonly Dictionary<string, ExecutionContext> _executionContexts = new();
+    private string? _dataTableOutputDir;
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
 
@@ -777,6 +778,11 @@ public class RewriteRpcServer
     [JsonRpcMethod("PrepareRecipe", UseSingleObjectParameterDeserialization = true)]
     public Task<PrepareRecipeResponse> PrepareRecipe(PrepareRecipeRequest request)
     {
+        if (request.DataTableOutputDir != null)
+        {
+            _dataTableOutputDir = request.DataTableOutputDir;
+        }
+
         var found = _marketplace.FindRecipe(request.Id);
         if (found == null)
         {
@@ -1203,6 +1209,12 @@ public class RewriteRpcServer
             return existing;
 
         var ctx = new ExecutionContext();
+        if (_dataTableOutputDir != null)
+        {
+            var store = new CsvDataTableStore(_dataTableOutputDir);
+            store.AcceptRows(true);
+            ctx.PutMessage(DataTable<object>.DataTableStoreKey, store);
+        }
         if (pId != null)
             _executionContexts[pId] = ctx;
         return ctx;
@@ -1372,6 +1384,7 @@ public class PrepareRecipeRequest
 {
     public string Id { get; set; } = "";
     public Dictionary<string, object?>? Options { get; set; }
+    public string? DataTableOutputDir { get; set; }
 }
 
 public class PrepareRecipeResponse

@@ -127,18 +127,9 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public void onComplete(ExecutionContext ctx) {
-        // This will merge data tables from the remote into the local context.
-        //
-        // When multiple recipes ran on the same RPC peer, they will all have been
-        // adding to the same ExecutionContext instance on that peer, and so really
-        // a CHANGE will only be returned for the first of any recipes on that peer.
-        //
-        // It doesn't matter which one added data table entries, because they all share
-        // the same view of the data tables.
-        String id = ctx.getMessage("org.openrewrite.rpc.id");
-        if (id != null) {
-            rpc.getObject(id, null);
-        }
+        // Read data table CSVs written by the remote process and insert
+        // them into the local context so the host can access them.
+        rpc.readDataTablesFromCsv(ctx);
     }
 
     @Override

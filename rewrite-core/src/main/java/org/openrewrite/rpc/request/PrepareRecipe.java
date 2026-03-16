@@ -19,6 +19,7 @@ import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.internal.SnowflakeId;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
@@ -31,6 +32,7 @@ import static java.util.Collections.emptyList;
 public class PrepareRecipe implements RpcRequest {
     String id;
     Map<String, Object> options;
+    @Nullable String dataTableOutputDir;
 
     public interface Loader {
         Recipe load(String id, Map<String, Object> options) throws Exception;
@@ -43,6 +45,9 @@ public class PrepareRecipe implements RpcRequest {
 
         @Override
         protected Object handle(PrepareRecipe request) throws Exception {
+            if (request.getDataTableOutputDir() != null) {
+                preparedRecipes.setDataTableOutputDir(request.getDataTableOutputDir());
+            }
             Recipe recipe = recipeLoader.load(request.id, request.getOptions());
             String instanceId = SnowflakeId.generateId();
             preparedRecipes.getInstantiated().put(instanceId, recipe);

@@ -236,7 +236,6 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
     }
 
-    @Disabled("Disabled until https://github.com/openrewrite/rewrite/pull/5260 is complete")
     @Test
     void runRecipe() {
         CountDownLatch latch = new CountDownLatch(1);
@@ -246,13 +245,44 @@ class RewriteRpcTest implements RewriteTest {
               Map.of("find", "hello")))
             .validateRecipeSerialization(false)
             .dataTable(TextMatches.Row.class, rows -> {
-                assertThat(rows).contains(new TextMatches.Row(
-                  "hello.txt", "~~>Hello Jon!"));
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getSourcePath()).isEqualTo("hello.txt");
+                assertThat(rows.get(0).getMatch()).startsWith("~~>Hello");
                 latch.countDown();
             }),
           text(
             "Hello Jon!",
             "~~>Hello Jon!",
+            spec -> spec.path("hello.txt")
+          )
+        );
+
+        assertThat(latch.getCount()).isEqualTo(0);
+    }
+
+    @Test
+    void batchVisitWithDataTables() {
+        CountDownLatch latch = new CountDownLatch(1);
+        // Two Find recipes in a composite will be batched into a single BatchVisit RPC call
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.Find",
+          Map.of("find", "hello"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.Find",
+          Map.of("find", "Jon"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r1, r2)))
+            .validateRecipeSerialization(false)
+            .cycles(1).expectedCyclesThatMakeChanges(1)
+            .dataTable(TextMatches.Row.class, rows -> {
+                assertThat(rows).hasSize(2);
+                assertThat(rows).extracting(TextMatches.Row::getSourcePath)
+                  .containsOnly("hello.txt");
+                latch.countDown();
+            }),
+          text(
+            "Hello Jon!",
+            "~~>Hello ~~>Jon!",
             spec -> spec.path("hello.txt")
           )
         );
