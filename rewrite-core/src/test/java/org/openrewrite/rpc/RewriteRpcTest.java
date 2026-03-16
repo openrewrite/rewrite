@@ -34,6 +34,7 @@ import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.marketplace.*;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -331,6 +332,42 @@ class RewriteRpcTest implements RewriteTest {
           text(
             "hello",
             "C"
+          )
+        );
+    }
+
+    /**
+     * When a batch contains recipes where only some modify the tree,
+     * only those recipes should appear in the RecipesThatMadeChanges marker.
+     * Previously, all recipes in the batch were attributed regardless of
+     * whether they actually modified the tree.
+     */
+    @Test
+    void batchOnlyAttributesRecipesThatActuallyMadeChanges() {
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.Find", Map.of("find", "NOMATCH_PATTERN"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
+            .validateRecipeSerialization(false)
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "B",
+            spec -> spec.afterRecipe(result -> {
+                RecipesThatMadeChanges marker = result.getMarkers()
+                  .findFirst(RecipesThatMadeChanges.class)
+                  .orElseThrow(() -> new AssertionError("Expected RecipesThatMadeChanges marker"));
+                List<String> recipeNames = marker.getRecipes().stream()
+                  .map(stack -> stack.get(stack.size() - 1).getName())
+                  .toList();
+                assertThat(recipeNames)
+                  .describedAs("Only recipes that modified the tree should be attributed")
+                  .contains("org.openrewrite.text.ChangeText")
+                  .doesNotContain("org.openrewrite.text.Find");
+            })
           )
         );
     }
