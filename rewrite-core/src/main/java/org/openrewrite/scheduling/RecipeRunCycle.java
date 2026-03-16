@@ -467,8 +467,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             if (!originalBefore.getMarkers().findFirst(Generated.class).isPresent()) {
                 recipeRunStats.recordSourceFileChanged(originalBefore, fetched);
             }
-            for (Stack<Recipe> stack : batch.recipeStacks) {
-                fetched = addRecipesThatMadeChanges(stack, fetched);
+            for (int i = 0; i < batch.recipeStacks.size(); i++) {
+                if (response.getResults().get(i).isModified()) {
+                    fetched = addRecipesThatMadeChanges(batch.recipeStacks.get(i), fetched);
+                }
             }
         }
 
