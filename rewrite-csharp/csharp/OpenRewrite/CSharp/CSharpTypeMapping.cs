@@ -69,6 +69,21 @@ internal class CSharpTypeMapping
     }
 
     /// <summary>
+    /// Gets the raw (unparameterized) type for a generic name, e.g., List for List&lt;int&gt;.
+    /// Returns the type itself if it's not a generic instantiation.
+    /// </summary>
+    public JavaType? RawType(SyntaxNode node)
+    {
+        var typeInfo = _model.GetTypeInfo(node);
+        var typeSymbol = typeInfo.Type ?? (_model.GetSymbolInfo(node).Symbol as INamedTypeSymbol);
+        if (typeSymbol is INamedTypeSymbol named && named.IsGenericType && !named.IsDefinition)
+        {
+            return MapType(named.OriginalDefinition);
+        }
+        return typeSymbol != null ? MapType(typeSymbol) : null;
+    }
+
+    /// <summary>
     /// Gets the method type for a method declaration or invocation.
     /// </summary>
     public JavaType.Method? MethodType(SyntaxNode node)
@@ -94,12 +109,48 @@ internal class CSharpTypeMapping
     public JavaType.Variable? VariableType(SyntaxNode node)
     {
         var symbol = _model.GetDeclaredSymbol(node);
+        return VariableFromSymbol(symbol);
+    }
+
+    /// <summary>
+    /// Gets the variable type for an identifier reference (not a declaration).
+    /// Returns null if the identifier doesn't reference a field, local, parameter, or property.
+    /// </summary>
+    public JavaType.Variable? FieldType(SyntaxNode node)
+    {
+        var symbol = _model.GetSymbolInfo(node).Symbol;
+        return VariableFromSymbol(symbol);
+    }
+
+    /// <summary>
+    /// Resolves both the type and fieldType for an identifier reference in a single
+    /// GetSymbolInfo call, avoiding redundant Roslyn API queries.
+    /// </summary>
+    public (JavaType? type, JavaType.Variable? fieldType) TypeAndFieldType(SyntaxNode node)
+    {
+        var typeInfo = _model.GetTypeInfo(node);
+        var type = typeInfo.Type != null ? MapType(typeInfo.Type) : null;
+
+        var symbolInfo = _model.GetSymbolInfo(node);
+
+        // If Type() didn't resolve via GetTypeInfo, fall back to symbol
+        if (type == null && symbolInfo.Symbol is INamedTypeSymbol namedType)
+        {
+            type = MapType(namedType);
+        }
+
+        var fieldType = VariableFromSymbol(symbolInfo.Symbol);
+        return (type, fieldType);
+    }
+
+    private JavaType.Variable? VariableFromSymbol(ISymbol? symbol)
+    {
         return symbol switch
         {
-            IFieldSymbol f => MapVariable(f.Name, MapType(f.ContainingType), MapType(f.Type)),
-            ILocalSymbol l => MapVariable(l.Name, null, MapType(l.Type)),
-            IParameterSymbol p => MapVariable(p.Name, null, MapType(p.Type)),
-            IPropertySymbol prop => MapVariable(prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
+            IFieldSymbol f => MapVariable(f, f.Name, MapType(f.ContainingType), MapType(f.Type)),
+            ILocalSymbol l => MapVariable(l, l.Name, null, MapType(l.Type)),
+            IParameterSymbol p => MapVariable(p, p.Name, null, MapType(p.Type)),
+            IPropertySymbol prop => MapVariable(prop, prop.Name, MapType(prop.ContainingType), MapType(prop.Type)),
             _ => null
         };
     }
@@ -251,14 +302,14 @@ internal class CSharpTypeMapping
         return method;
     }
 
-    private JavaType.Variable MapVariable(string name, JavaType? owner, JavaType? type)
+    private JavaType.Variable MapVariable(ISymbol symbol, string name, JavaType? owner, JavaType? type)
     {
-        // Variable types don't have a Roslyn ISymbol key, but they're cached
-        // implicitly through the VariableType method being called per-declaration.
-        // We still create a new instance per call, but the parser only calls
-        // VariableType once per declaration site — the same Variable is then
-        // shared across all references via the tree structure.
-        return new JavaType.Variable(name, owner, type, null);
+        if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Variable v)
+            return v;
+
+        var variable = new JavaType.Variable(name, owner, type, null);
+        _typeCache[symbol] = variable;
+        return variable;
     }
 
     private static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
