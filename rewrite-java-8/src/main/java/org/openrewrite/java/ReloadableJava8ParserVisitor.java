@@ -32,7 +32,6 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.CStyleArrayDeclaration;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
@@ -1011,15 +1010,10 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
 
-        Markers markers = Markers.EMPTY;
-        if (cStyleArrayReturn) {
-            markers = markers.addIfAbsent(new CStyleArrayDeclaration(randomId(), cStyleDimensions));
-        }
-
-        return new J.MethodDeclaration(randomId(), fmt, markers,
+        return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
-                returnType, name, params, throws_, body, defaultValue,
+                returnType, name, params, cStyleDimensions, throws_, body, defaultValue,
                 typeMapping.methodDeclarationType(jcMethod.sym, null));
     }
 
