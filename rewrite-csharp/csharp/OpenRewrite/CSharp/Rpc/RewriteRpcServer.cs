@@ -972,6 +972,7 @@ public class RewriteRpcServer
             var deleted = result == null;
             if (modified) modifiedCount++;
 
+
             // Diff SearchResult IDs against the running set
             var searchStart = sw.ElapsedMilliseconds;
             List<string> searchResultIds;

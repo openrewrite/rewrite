@@ -460,9 +460,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             Map<String, List<SearchResults.Row>> searchResultsByRecipe =
                     collectAllBatchSearchResults(originalBefore, fetched, attributionMap);
 
-            for (Stack<Recipe> stack : batch.recipeStacks) {
-                recordBatchSourceFileResultFast(originalBefore, fetched, stack,
-                        searchResultsByRecipe, ctx);
+            for (int i = 0; i < batch.recipeStacks.size(); i++) {
+                if (response.getResults().get(i).isModified()) {
+                    recordBatchSourceFileResultFast(originalBefore, fetched, batch.recipeStacks.get(i),
+                            searchResultsByRecipe, ctx);
+                }
             }
             if (!originalBefore.getMarkers().findFirst(Generated.class).isPresent()) {
                 recipeRunStats.recordSourceFileChanged(originalBefore, fetched);
