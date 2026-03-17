@@ -58,9 +58,9 @@ class XmlSendReceiveTest implements RewriteTest {
         JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
         server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
-                .batchSize(1);
+          .batchSize(1);
         client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
-                .batchSize(1);
+          .batchSize(1);
     }
 
     @AfterEach
@@ -86,144 +86,143 @@ class XmlSendReceiveTest implements RewriteTest {
     @Test
     void sendReceiveSimpleTag() {
         rewriteRun(
-                xml(
-                        """
-                                <?xml version="1.0" encoding="UTF-8"?>
-                                <root>
-                                    <child>original</child>
-                                </root>
-                                """,
-                        """
-                                <?xml version="1.0" encoding="UTF-8"?>
-                                <root>
-                                    <child>changed</child>
-                                </root>
-                                """
-                )
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <root>
+                  <child>original</child>
+              </root>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <root>
+                  <child>changed</child>
+              </root>
+              """
+          )
         );
     }
 
     @Test
     void sendReceiveAttributes() {
         rewriteRun(
-                spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-                    @Override
-                    @SneakyThrows
-                    public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                        Tree t = server.visit((SourceFile) tree, ChangeAttributeValue.class.getName(), 0);
-                        stopAfterPreVisit();
-                        return t;
-                    }
-                })),
-                xml(
-                        """
-                                <root attr="old">
-                                    <child key="value"/>
-                                </root>
-                                """,
-                        """
-                                <root attr="new">
-                                    <child key="value"/>
-                                </root>
-                                """
-                )
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, ChangeAttributeValue.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
+          xml(
+            """
+              <root attr="old">
+                  <child key="value"/>
+              </root>
+              """,
+            """
+              <root attr="new">
+                  <child key="value"/>
+              </root>
+              """
+          )
         );
     }
 
     @Test
     void sendReceiveComment() {
         rewriteRun(
-                spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-                    @Override
-                    @SneakyThrows
-                    public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                        Tree t = server.visit((SourceFile) tree, ChangeComment.class.getName(), 0);
-                        stopAfterPreVisit();
-                        return t;
-                    }
-                })),
-                xml(
-                        """
-                                <root>
-                                    <!-- old comment -->
-                                    <child/>
-                                </root>
-                                """,
-                        """
-                                <root>
-                                    <!-- new comment -->
-                                    <child/>
-                                </root>
-                                """
-                )
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, ChangeComment.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
+          xml(
+            """
+              <root>
+                  <!-- old comment -->
+                  <child/>
+              </root>
+              """,
+            """
+              <root>
+                  <!-- new comment -->
+                  <child/>
+              </root>
+              """
+          )
         );
     }
 
     @Test
     void sendReceiveIdempotent() {
         rewriteRun(
-                spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-                    @Override
-                    @SneakyThrows
-                    public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                        // Send and receive without modification (identity visitor)
-                        Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
-                        stopAfterPreVisit();
-                        return t;
-                    }
-                })),
-                xml(
-                        """
-                                <?xml version="1.0" encoding="UTF-8"?>
-                                <root attr="value">
-                                    <!-- a comment -->
-                                    <child>text</child>
-                                    <empty/>
-                                </root>
-                                """
-                )
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <root attr="value">
+                  <!-- a comment -->
+                  <child>text</child>
+                  <empty/>
+              </root>
+              """
+          )
         );
     }
 
     @Test
     void sendReceiveProcessingInstruction() {
         rewriteRun(
-                spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-                    @Override
-                    @SneakyThrows
-                    public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                        Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
-                        stopAfterPreVisit();
-                        return t;
-                    }
-                })),
-                xml(
-                        """
-                                <?xml version="1.0"?>
-                                <?xml-stylesheet type="text/xsl" href="style.xsl"?>
-                                <root/>
-                                """
-                )
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
+          xml(
+            """
+              <?xml version="1.0"?>
+              <?xml-stylesheet type="text/xsl" href="style.xsl"?>
+              <root/>
+              """
+          )
         );
     }
 
     @Test
     void sendReceiveCdata() {
         rewriteRun(
-                spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-                    @Override
-                    @SneakyThrows
-                    public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
-                        Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
-                        stopAfterPreVisit();
-                        return t;
-                    }
-                })),
-                xml(
-                        """
-                                <root><![CDATA[some <special> data]]></root>
-                                """
-                )
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, NoOp.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
+          xml(
+            """
+              <root><![CDATA[some <special> data]]></root>
+              """
+          )
         );
     }
 
@@ -242,7 +241,7 @@ class XmlSendReceiveTest implements RewriteTest {
         public Xml visitAttribute(Xml.Attribute attribute, Integer p) {
             if ("attr".equals(attribute.getKey().getName())) {
                 return attribute.withValue(
-                        attribute.getValue().withValue("new")
+                  attribute.getValue().withValue("new")
                 );
             }
             return super.visitAttribute(attribute, p);
