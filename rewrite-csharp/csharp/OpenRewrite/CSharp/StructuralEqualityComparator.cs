@@ -21,7 +21,8 @@ namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Compares two J (LST) nodes for structural equality, ignoring whitespace,
-/// formatting, markers, node IDs, and type attribution.
+/// formatting, node IDs, and type attribution. Most markers are ignored, but
+/// semantic markers like NullSafe (distinguishing ?. from .) are compared.
 /// </summary>
 public static class StructuralEqualityComparator
 {
