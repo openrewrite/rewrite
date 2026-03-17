@@ -139,4 +139,60 @@ public class StructuralEqualityComparatorTests
         var b = ParseExpression("\"world\";");
         Assert.False(StructuralEqualityComparator.AreStructurallyEqual(a, b));
     }
+
+    [Fact]
+    public void SameReferenceIsEqual()
+    {
+        var a = ParseExpression("x + y;");
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(a, a));
+    }
+
+    [Fact]
+    public void BooleanLiterals()
+    {
+        var a = ParseExpression("true;");
+        var b = ParseExpression("true;");
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(a, b));
+    }
+
+    [Fact]
+    public void DifferentBooleanLiterals()
+    {
+        var a = ParseExpression("true;");
+        var b = ParseExpression("false;");
+        Assert.False(StructuralEqualityComparator.AreStructurallyEqual(a, b));
+    }
+
+    [Fact]
+    public void NullLiterals()
+    {
+        var a = ParseExpression("null;");
+        var b = ParseExpression("null;");
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(a, b));
+    }
+
+    [Fact]
+    public void DifferentArgumentCounts()
+    {
+        var a = ParseExpression("Math.Max(1, 2);");
+        var b = ParseExpression("Math.Min(1);");
+        Assert.False(StructuralEqualityComparator.AreStructurallyEqual(a, b));
+    }
+
+    [Fact]
+    public void NullSafeVsRegularAccess()
+    {
+        // s?.Length uses NullSafe marker, s.Length does not — structurally different
+        var a = ParseExpression("s?.Length;");
+        var b = ParseExpression("s.Length;");
+        Assert.False(StructuralEqualityComparator.AreStructurallyEqual(a, b));
+    }
+
+    [Fact]
+    public void IdenticalNullSafeAccess()
+    {
+        var a = ParseExpression("s?.Length;");
+        var b = ParseExpression("s?.Length;");
+        Assert.True(StructuralEqualityComparator.AreStructurallyEqual(a, b));
+    }
 }
