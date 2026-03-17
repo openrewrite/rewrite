@@ -467,6 +467,26 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6398")
+    @Test
+    void cstyleArrayMethodPreservesSpacesAndComments() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            class A {
+                public byte toByteArray() /* c1 */ [ /* c2 */ ] {
+                  return new byte[]{};
+                }
+                public int matrix()  [  ]  [  ] {
+                  return new int[][]{};
+                }
+            }
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5445")
     @Test
     void parseSwitchBlock() {
