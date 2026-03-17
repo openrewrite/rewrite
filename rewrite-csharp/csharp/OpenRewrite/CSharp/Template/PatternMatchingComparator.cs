@@ -69,6 +69,10 @@ internal class PatternMatchingComparator
         if (pattern.GetType() != candidate.GetType())
             return false;
 
+        // NullSafe marker must match: ?. and . are structurally different
+        if (HasNullSafe(pattern) != HasNullSafe(candidate))
+            return false;
+
         // Generic property-based comparison: iterate all structural properties
         // and compare them recursively, skipping formatting/identity fields.
         var properties = TreeHelper.GetStructuralProperties(pattern.GetType());
@@ -281,5 +285,10 @@ internal class PatternMatchingComparator
     {
         var type = value.GetType();
         return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JContainer<>);
+    }
+
+    private static bool HasNullSafe(J node)
+    {
+        return node.Markers.FindFirst<NullSafe>() != null;
     }
 }
