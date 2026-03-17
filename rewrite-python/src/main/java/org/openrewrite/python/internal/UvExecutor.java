@@ -26,7 +26,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -37,7 +39,6 @@ public class UvExecutor {
 
     private static final long DEFAULT_TIMEOUT_SECONDS = 120;
     private static @Nullable String cachedUvPath;
-
     @Value
     public static class RunResult {
         boolean success;
@@ -55,12 +56,26 @@ public class UvExecutor {
      * @return the run result
      */
     public static RunResult run(Path workDir, String uvPath, String... args) throws IOException, InterruptedException {
+        return run(workDir, uvPath, Collections.emptyMap(), args);
+    }
+
+    /**
+     * Run a uv command in the given directory with additional environment variables.
+     *
+     * @param workDir     the working directory
+     * @param uvPath      the path to the uv executable
+     * @param environment additional environment variables (e.g., SSL_CERT_FILE, HTTP_PROXY)
+     * @param args        the arguments to pass to uv
+     * @return the run result
+     */
+    public static RunResult run(Path workDir, String uvPath, Map<String, String> environment, String... args) throws IOException, InterruptedException {
         String[] command = new String[args.length + 1];
         command[0] = uvPath;
         System.arraycopy(args, 0, command, 1, args.length);
 
         ProcessBuilder pb = new ProcessBuilder(command);
         pb.directory(workDir.toFile());
+        pb.environment().putAll(environment);
         pb.redirectErrorStream(false);
 
         Process process = pb.start();

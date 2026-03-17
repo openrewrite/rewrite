@@ -35,6 +35,8 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyMap;
+
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -50,6 +52,15 @@ public class RequirementsTxtParser implements Parser {
     private static final Pattern EXTRA_MARKER_PATTERN = Pattern.compile("\\bextra\\s*==");
 
     private final PlainTextParser plainTextParser = new PlainTextParser();
+    private final Map<String, String> subprocessEnvironment;
+
+    public RequirementsTxtParser() {
+        this(emptyMap());
+    }
+
+    public RequirementsTxtParser(Map<String, String> subprocessEnvironment) {
+        this.subprocessEnvironment = subprocessEnvironment;
+    }
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -64,7 +75,7 @@ public class RequirementsTxtParser implements Parser {
                 originalFilePath = relativeTo.resolve(text.getSourcePath());
             }
             Path workspace = DependencyWorkspace.getOrCreateRequirementsWorkspace(
-                    text.getText(), originalFilePath);
+                    text.getText(), originalFilePath, subprocessEnvironment);
             if (workspace == null) {
                 return sf;
             }
