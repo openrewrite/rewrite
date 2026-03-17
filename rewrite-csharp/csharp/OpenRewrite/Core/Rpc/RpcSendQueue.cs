@@ -342,6 +342,7 @@ public class RpcSendQueue
                 _ => $"org.openrewrite.java.tree.J${name}",
             },
             "OpenRewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",
+            "OpenRewrite.Xml" => $"org.openrewrite.xml.tree.Xml${name}",
             "OpenRewrite.Core" => name switch
             {
                 "Markers" => "org.openrewrite.marker.Markers",

@@ -36,6 +36,7 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("io.moderne:jsonrpc:latest.integration")
 }
 
 //Javadoc compiler will complain about the use of the internal types.
