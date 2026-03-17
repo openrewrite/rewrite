@@ -61,6 +61,8 @@ public sealed class QueryExpression(
     public QueryExpression WithBody(QueryBody body) =>
         ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, FromClause, body);
 
+    public JavaType? Type => FromClause.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(QueryExpression? other) => other is not null && Id == other.Id;
@@ -140,6 +142,8 @@ public sealed class FromClause(
         ReferenceEquals(identifierPadded, IdentifierPadded) ? this : new(Id, Prefix, Markers, TypeIdentifier, identifierPadded, Expression);
     public FromClause WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, TypeIdentifier, IdentifierPadded, expression);
+
+    public JavaType? Type => Expression.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

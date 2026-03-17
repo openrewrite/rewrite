@@ -926,9 +926,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
 
     public override J VisitTypeWithArguments(TypeWithArguments twa, RpcReceiveQueue q)
     {
-        var type = q.Receive((J)twa.Type, el => (J)VisitNonNull(el, q));
+        var type = q.Receive((J)twa.TypeExpression, el => (J)VisitNonNull(el, q));
         var arguments = q.Receive(twa.Arguments, c => VisitContainer(c, q));
-        return twa.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithType((TypeTree)type!).WithArguments(arguments!);
+        return twa.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTypeExpression((TypeTree)type!).WithArguments(arguments!);
     }
 
     public override J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, RpcReceiveQueue q)

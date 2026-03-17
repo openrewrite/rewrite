@@ -1005,7 +1005,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 
     public override J VisitTypeWithArguments(TypeWithArguments twa, RpcSendQueue q)
     {
-        q.GetAndSend(twa, t => (J)t.Type, el => Visit(el, q));
+        q.GetAndSend(twa, t => (J)t.TypeExpression, el => Visit(el, q));
         q.GetAndSend(twa, t => t.Arguments, c => VisitContainer(c, q));
         return twa;
     }
