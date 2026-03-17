@@ -330,7 +330,7 @@ extensions.configure<LicenseExtension> {
 val licenseCsharp by tasks.registering(LicenseCheck::class) {
     group = "license"
     description = "Check license headers on C# files"
-    source = fileTree(csharpDir) { include("**/*.cs") }
+    source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     mapping("cs", "SLASHSTAR_STYLE")
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
@@ -339,7 +339,7 @@ val licenseCsharp by tasks.registering(LicenseCheck::class) {
 val licenseFormatCsharp by tasks.registering(LicenseFormat::class) {
     group = "license"
     description = "Apply license headers to C# files"
-    source = fileTree(csharpDir) { include("**/*.cs") }
+    source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     mapping("cs", "SLASHSTAR_STYLE")
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
