@@ -793,6 +793,59 @@ public class PatternMatchTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void MatchesAsCastWithCaptures()
+    {
+        var expr = Capture.Of<Expression>("expr");
+        var type = Capture.Of<Expression>("type");
+        RewriteRun(
+            spec => spec.SetRecipe(FindCsBinary($"{expr} as {type}")),
+            CSharp(
+                "class C { void M() { object o = 1; var x = o as string; } }",
+                "class C { void M() { object o = 1; var x = /*~~>*/o as string; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void MatchesAsCastWithLeftCapture()
+    {
+        var expr = Capture.Of<Expression>("expr");
+        RewriteRun(
+            spec => spec.SetRecipe(FindCsBinary($"{expr} as string")),
+            CSharp(
+                "class C { void M() { object o = 1; var x = o as string; } }",
+                "class C { void M() { object o = 1; var x = /*~~>*/o as string; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void MatchesAsCastWithRightCapture()
+    {
+        var type = Capture.Of<Expression>("type");
+        RewriteRun(
+            spec => spec.SetRecipe(FindCsBinary($"o as {type}")),
+            CSharp(
+                "class C { void M() { object o = 1; var x = o as string; } }",
+                "class C { void M() { object o = 1; var x = /*~~>*/o as string; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void AsCastDoesNotMatchDifferentOperator()
+    {
+        var expr = Capture.Of<Expression>("expr");
+        var type = Capture.Of<Expression>("type");
+        RewriteRun(
+            spec => spec.SetRecipe(FindCsBinary($"{expr} as {type}")),
+            CSharp(
+                "class C { void M() { object o = 1; var x = o is string; } }"
+            )
+        );
+    }
+
     // ===============================================================
     // Capture binding behavior
     // ===============================================================
@@ -942,6 +995,7 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe FindNullSafeExpression(string c) => Search<NullSafeExpression>(c);
     private static Core.Recipe FindIsPattern(string c) => Search<IsPattern>(c);
     private static Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
+    private static Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
 }
 
 /// <summary>
