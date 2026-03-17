@@ -156,6 +156,7 @@ public static class TypeUtils
         return expr switch
         {
             MethodInvocation mi => mi.MethodType?.ReturnType,
+            NewClass nc => nc.ConstructorType?.DeclaringType,
             Identifier id => id.Type,
             FieldAccess fa => fa.Type,
             Literal lit => lit.Type,
