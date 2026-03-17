@@ -3886,12 +3886,9 @@ public interface J extends Tree {
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class MethodDeclaration implements J, Statement, TypedTree {
 
-        /**
-         * Backwards-compatible factory for deserialization of older LSTs
-         * that do not have the {@code dimensionsAfterName} field.
-         * Remove once older LSTs without this field are no longer in circulation.
-         */
         @SuppressWarnings("unused")
+        @Deprecated
+        @ToBeRemoved(after = "2026-09-17")
         @JsonCreator
         static MethodDeclaration create(
                 UUID id,
