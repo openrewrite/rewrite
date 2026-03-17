@@ -396,7 +396,7 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
                         var capturedArg = capturedList[j];
                         // First element inherits the placeholder's prefix
                         if (j == 0)
-                            capturedArg = (Expression)TreeHelper.SetPrefix(capturedArg, ident.Prefix);
+                            capturedArg = TreeHelper.SetPrefix(capturedArg, ident.Prefix);
                         expanded.Add(new JRightPadded<Expression>(
                             capturedArg, Space.Empty, Markers.Empty));
                     }

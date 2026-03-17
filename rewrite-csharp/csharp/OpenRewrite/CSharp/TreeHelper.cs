@@ -18,7 +18,7 @@ using System.Reflection;
 using OpenRewrite.Core;
 using OpenRewrite.Java;
 
-namespace OpenRewrite.CSharp.Template;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Generic helpers for operating on LST nodes without type-specific switches.
@@ -47,31 +47,31 @@ public static class TreeHelper
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> StructuralPropertiesCache = new();
 
     /// <summary>
-    /// Call WithPrefix on any J node via cached reflection.
+    /// Call WithPrefix on any J node via cached reflection, preserving the concrete type.
     /// Returns the original node unchanged if the type doesn't have WithPrefix.
     /// </summary>
-    public static J SetPrefix(J node, Space prefix)
+    public static T SetPrefix<T>(T node, Space prefix) where T : J
     {
         var method = WithPrefixCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithPrefix", [typeof(Space)]));
 
         if (method != null)
-            return (J)method.Invoke(node, [prefix])!;
+            return (T)method.Invoke(node, [prefix])!;
 
         return node;
     }
 
     /// <summary>
-    /// Call WithId on any J node via cached reflection.
+    /// Call WithId on any J node via cached reflection, preserving the concrete type.
     /// Returns the original node unchanged if the type doesn't have WithId.
     /// </summary>
-    public static J SetId(J node, Guid id)
+    public static T SetId<T>(T node, Guid id) where T : J
     {
         var method = WithIdCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithId", [typeof(Guid)]));
 
         if (method != null)
-            return (J)method.Invoke(node, [id])!;
+            return (T)method.Invoke(node, [id])!;
 
         return node;
     }
