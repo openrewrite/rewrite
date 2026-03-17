@@ -3433,7 +3433,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitTypeWithArguments(TypeWithArguments twa, PrintOutputCapture<P> p)
     {
         BeforeSyntax(twa, p);
-        Visit(twa.Type, p);
+        Visit(twa.TypeExpression, p);
         VisitContainer("(", twa.Arguments, ",", ")", p);
         AfterSyntax(twa, p);
         return twa;

@@ -609,6 +609,8 @@ public sealed class NamedExpression(
     public NamedExpression WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Name, expression);
 
+    public JavaType? Type => Expression.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(NamedExpression? other) => other is not null && Id == other.Id;
@@ -659,6 +661,8 @@ public sealed class RefExpression(
     public RefExpression WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Kind, expression);
 
+    public JavaType? Type => Expression.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(RefExpression? other) => other is not null && Id == other.Id;
@@ -696,6 +700,8 @@ public sealed class DeclarationExpression(
         ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, typeExpression, Variables);
     public DeclarationExpression WithVariables(Expression variables) =>
         ReferenceEquals(variables, Variables) ? this : new(Id, Prefix, Markers, TypeExpression, variables);
+
+    public JavaType? Type => Variables.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -746,6 +752,8 @@ public sealed class CsLambda(
     public CsLambda WithLambdaExpression(Lambda lambdaExpression) =>
         ReferenceEquals(lambdaExpression, LambdaExpression) ? this : new(Id, Prefix, Markers, AttributeLists, Modifiers, ReturnType, lambdaExpression);
 
+    public JavaType? Type => LambdaExpression.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(CsLambda? other) => other is not null && Id == other.Id;
@@ -786,6 +794,8 @@ public sealed class RelationalPattern(
         ReferenceEquals(@operator, Operator) ? this : new(Id, Prefix, Markers, @operator, Value);
     public RelationalPattern WithValue(Expression value) =>
         ReferenceEquals(value, Value) ? this : new(Id, Prefix, Markers, Operator, value);
+
+    JavaType? Expression.Type => null;
 
     public enum Type
     {
@@ -836,6 +846,8 @@ public sealed class IsPattern(
     public IsPattern WithPattern(JLeftPadded<Pattern> pattern) =>
         ReferenceEquals(pattern, Pattern) ? this : new(Id, Prefix, Markers, Expression, pattern);
 
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(IsPattern? other) => other is not null && Id == other.Id;
@@ -867,6 +879,8 @@ public sealed class StatementExpression(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Statement);
     public StatementExpression WithStatement(Statement statement) =>
         ReferenceEquals(statement, Statement) ? this : new(Id, Prefix, Markers, statement);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1080,6 +1094,8 @@ public sealed class PropertyPattern(
         ReferenceEquals(subpatterns, Subpatterns) ? this : new(Id, Prefix, Markers, TypeQualifier, subpatterns, Designation);
     public PropertyPattern WithDesignation(Identifier? designation) =>
         ReferenceEquals(designation, Designation) ? this : new(Id, Prefix, Markers, TypeQualifier, Subpatterns, designation);
+
+    public JavaType? Type => TypeQualifier?.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1690,6 +1706,8 @@ public sealed class InterpolatedString(
     public InterpolatedString WithParts(IList<J> parts) =>
         ReferenceEquals(parts, Parts) ? this : new(Id, Prefix, Markers, Delimiter, EndDelimiter, parts);
 
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.String);
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(InterpolatedString? other) => other is not null && Id == other.Id;
@@ -2006,7 +2024,7 @@ public sealed class NullSafeExpression(
 
     public Expression Expression => ExpressionPadded.Element;
 
-    public JavaType? Type => null;
+    public JavaType? Type => Expression.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2042,6 +2060,8 @@ public sealed class TupleExpression(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Arguments);
     public TupleExpression WithArguments(JContainer<Expression> arguments) =>
         ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, arguments);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2169,6 +2189,8 @@ public sealed class ArrayRankSpecifier(
     public ArrayRankSpecifier WithSizes(JContainer<Expression> sizes) =>
         ReferenceEquals(sizes, Sizes) ? this : new(Id, Prefix, Markers, sizes);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ArrayRankSpecifier? other) => other is not null && Id == other.Id;
@@ -2257,6 +2279,8 @@ public sealed class StackAllocExpression(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression);
     public StackAllocExpression WithExpression(NewArray expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression);
+
+    public JavaType? Type => Expression.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2561,6 +2585,8 @@ public sealed class AllowsConstraintClause(
     public AllowsConstraintClause WithExpressions(JContainer<Expression> expressions) =>
         ReferenceEquals(expressions, Expressions) ? this : new(Id, Prefix, Markers, expressions);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(AllowsConstraintClause? other) => other is not null && Id == other.Id;
@@ -2586,6 +2612,8 @@ public sealed class RefStructConstraint(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
     public RefStructConstraint WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2622,6 +2650,9 @@ public sealed class ClassOrStructConstraint(
         nullable == Nullable ? this : new(Id, Prefix, Markers, Kind, nullable);
 
     public enum TypeKind { Class, Struct }
+
+    JavaType? Expression.Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ClassOrStructConstraint? other) => other is not null && Id == other.Id;
@@ -2648,6 +2679,8 @@ public sealed class ConstructorConstraint(
     public ConstructorConstraint WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ConstructorConstraint? other) => other is not null && Id == other.Id;
@@ -2673,6 +2706,8 @@ public sealed class DefaultConstraint(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
     public DefaultConstraint WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2703,6 +2738,8 @@ public sealed class SingleVariableDesignation(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name);
     public SingleVariableDesignation WithName(Identifier name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name);
+
+    public JavaType? Type => Name.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2763,6 +2800,8 @@ public sealed class DiscardVariableDesignation(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Discard);
     public DiscardVariableDesignation WithDiscard(Identifier discard) =>
         ReferenceEquals(discard, Discard) ? this : new(Id, Prefix, Markers, discard);
+
+    public JavaType? Type => Discard.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2867,6 +2906,8 @@ public sealed class ImplicitElementAccess(
     public ImplicitElementAccess WithArgumentList(JContainer<Expression> argumentList) =>
         ReferenceEquals(argumentList, ArgumentList) ? this : new(Id, Prefix, Markers, argumentList);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ImplicitElementAccess? other) => other is not null && Id == other.Id;
@@ -2894,6 +2935,8 @@ public sealed class ConstantPattern(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Value);
     public ConstantPattern WithValue(Expression value) =>
         ReferenceEquals(value, Value) ? this : new(Id, Prefix, Markers, value);
+
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -2955,6 +2998,8 @@ public sealed class ListPattern(
     public ListPattern WithDesignation(VariableDesignation? designation) =>
         ReferenceEquals(designation, Designation) ? this : new(Id, Prefix, Markers, Patterns, designation);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(ListPattern? other) => other is not null && Id == other.Id;
@@ -2978,6 +3023,8 @@ public sealed class SlicePattern(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers);
     public SlicePattern WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
+
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -3086,6 +3133,8 @@ public sealed class CheckedExpression(
     public CheckedExpression WithExpressionValue(ControlParentheses<Expression> expressionValue) =>
         ReferenceEquals(expressionValue, ExpressionValue) ? this : new(Id, Prefix, Markers, CheckedOrUncheckedKeyword, expressionValue);
 
+    public JavaType? Type => ExpressionValue.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(CheckedExpression? other) => other is not null && Id == other.Id;
@@ -3151,6 +3200,8 @@ public sealed class RangeExpression(
         ReferenceEquals(start, Start) ? this : new(Id, Prefix, Markers, start, End);
     public RangeExpression WithEnd(Expression? end) =>
         ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Start, end);
+
+    public JavaType? Type => null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -3518,6 +3569,8 @@ public sealed class EnumMemberDeclaration(
     public EnumMemberDeclaration WithInitializer(JLeftPadded<Expression>? initializer) =>
         ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, AttributeLists, Name, initializer);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(EnumMemberDeclaration? other) => other is not null && Id == other.Id;
@@ -3551,6 +3604,8 @@ public sealed class AliasQualifiedName(
         ReferenceEquals(alias, Alias) ? this : new(Id, Prefix, Markers, alias, Name);
     public AliasQualifiedName WithName(Expression name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Alias, name);
+
+    public JavaType? Type => Name.Type;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -3832,27 +3887,28 @@ public sealed class TypeWithArguments(
     Guid id,
     Space prefix,
     Markers markers,
-    TypeTree type,
+    TypeTree typeExpression,
     JContainer<Expression> arguments
 ) : Cs, TypeTree, Expression, IEquatable<TypeWithArguments>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public TypeTree Type { get; } = type;
+    public TypeTree TypeExpression { get; } = typeExpression;
     public JContainer<Expression> Arguments { get; } = arguments;
-    public JavaType? NodeType => null;
+
+    public JavaType? Type => TypeExpression.Type;
 
     public TypeWithArguments WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Type, Arguments);
+        id == Id ? this : new(id, Prefix, Markers, TypeExpression, Arguments);
     public TypeWithArguments WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Type, Arguments);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, TypeExpression, Arguments);
     public TypeWithArguments WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Type, Arguments);
-    public TypeWithArguments WithType(TypeTree type) =>
-        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, type, Arguments);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, TypeExpression, Arguments);
+    public TypeWithArguments WithTypeExpression(TypeTree typeExpression) =>
+        ReferenceEquals(typeExpression, TypeExpression) ? this : new(Id, Prefix, Markers, typeExpression, Arguments);
     public TypeWithArguments WithArguments(JContainer<Expression> arguments) =>
-        ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, Type, arguments);
+        ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, TypeExpression, arguments);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

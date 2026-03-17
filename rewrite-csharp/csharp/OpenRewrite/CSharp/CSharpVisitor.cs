@@ -3003,15 +3003,15 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(twa.Markers, p);
         if (!ReferenceEquals(newMarkers, twa.Markers)) changed = true;
 
-        var newType = (TypeTree?)Visit(twa.Type, p);
-        if (newType != null && !ReferenceEquals(newType, twa.Type)) changed = true;
+        var newType = (TypeTree?)Visit(twa.TypeExpression, p);
+        if (newType != null && !ReferenceEquals(newType, twa.TypeExpression)) changed = true;
 
         var newArgs = VisitContainer(twa.Arguments, p);
         if (!ReferenceEquals(newArgs, twa.Arguments)) changed = true;
 
         return changed
             ? twa.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                 .WithType(newType ?? twa.Type)
+                 .WithTypeExpression(newType ?? twa.TypeExpression)
                  .WithArguments(newArgs ?? twa.Arguments)
             : twa;
     }
