@@ -155,7 +155,7 @@ internal static class TemplateEngine
         if (node is ExpressionStatement es)
             return es.WithExpression((Expression)StripPrefix(es.Expression));
 
-        return TreeHelper.SetPrefix(node, Space.Empty);
+        return J.SetPrefix(node, Space.Empty);
     }
 
     /// <summary>
@@ -188,7 +188,7 @@ internal static class TemplateEngine
     /// </summary>
     private static J PreservePrefix(J replacement, J original)
     {
-        return TreeHelper.SetPrefix(replacement, original.Prefix);
+        return J.SetPrefix(replacement, original.Prefix);
     }
 
     /// <summary>
@@ -208,7 +208,7 @@ internal static class TemplateEngine
 
         // Assign a fresh ID so FindById targets exactly this instance,
         // not a stale node from a prior application of the same template
-        tree = TreeHelper.SetId(tree, Guid.NewGuid());
+        tree = J.SetId(tree, Guid.NewGuid());
 
         // Replace the original node with the template result in the CU
         var replacer = new NodeReplacer(original.Id, tree);
@@ -319,7 +319,7 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
             if (captured != null)
             {
                 // Preserve the placeholder's prefix on the captured node
-                return TreeHelper.SetPrefix(captured, identifier.Prefix);
+                return J.SetPrefix(captured, identifier.Prefix);
             }
         }
         return base.VisitIdentifier(identifier, p);
@@ -396,7 +396,7 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
                         var capturedArg = capturedList[j];
                         // First element inherits the placeholder's prefix
                         if (j == 0)
-                            capturedArg = TreeHelper.SetPrefix(capturedArg, ident.Prefix);
+                            capturedArg = J.SetPrefix(capturedArg, ident.Prefix);
                         expanded.Add(new JRightPadded<Expression>(
                             capturedArg, Space.Empty, Markers.Empty));
                     }
