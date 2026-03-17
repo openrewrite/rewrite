@@ -94,6 +94,82 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         return space;
     }
 
+    public virtual JLeftPadded<T>? VisitLeftPadded<T>(JLeftPadded<T>? left, P p)
+    {
+        if (left == null) return null;
+
+        Cursor = new Cursor(Cursor, left);
+
+        var before = VisitSpace(left.Before, p);
+        var t = left.Element;
+        bool elementChanged = false;
+        if (t is J j)
+        {
+            var visited = Visit(j, p);
+            if (visited is T vt) { t = vt; elementChanged = !ReferenceEquals(visited, j); }
+            else { Cursor = Cursor.Parent!; return null; }
+        }
+
+        Cursor = Cursor.Parent!;
+
+        if (ReferenceEquals(before, left.Before) && !elementChanged)
+            return left;
+        return new JLeftPadded<T>(before, t);
+    }
+
+    public virtual JRightPadded<T>? VisitRightPadded<T>(JRightPadded<T>? right, P p)
+    {
+        if (right == null) return null;
+
+        Cursor = new Cursor(Cursor, right);
+
+        var t = right.Element;
+        bool elementChanged = false;
+        if (t is J j)
+        {
+            var visited = Visit(j, p);
+            if (visited is T vt) { t = vt; elementChanged = !ReferenceEquals(visited, j); }
+            else { Cursor = Cursor.Parent!; return null; }
+        }
+
+        var after = VisitSpace(right.After, p);
+        var markers = VisitMarkers(right.Markers, p);
+
+        Cursor = Cursor.Parent!;
+
+        if (ReferenceEquals(after, right.After) && !elementChanged && ReferenceEquals(markers, right.Markers))
+            return right;
+        return new JRightPadded<T>(t, after, markers);
+    }
+
+    public virtual JContainer<T>? VisitContainer<T>(JContainer<T>? container, P p) where T : J
+    {
+        if (container == null) return null;
+
+        Cursor = new Cursor(Cursor, container);
+
+        var before = VisitSpace(container.Before, p);
+        var elements = container.Elements;
+        var changed = false;
+        var newElements = new List<JRightPadded<T>>(elements.Count);
+        foreach (var elem in elements)
+        {
+            var visited = VisitRightPadded(elem, p);
+            if (visited != null)
+            {
+                if (!ReferenceEquals(visited, elem)) changed = true;
+                newElements.Add(visited);
+            }
+            else changed = true;
+        }
+
+        Cursor = Cursor.Parent!;
+
+        if (!changed && ReferenceEquals(before, container.Before))
+            return container;
+        return new JContainer<T>(before, newElements, container.Markers);
+    }
+
     public virtual Markers VisitMarkers(Markers markers, P p)
     {
         if (ReferenceEquals(markers, Markers.Empty) || markers.MarkerList.Count == 0)
@@ -1625,6 +1701,9 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
+        var newOperator = VisitLeftPadded(node.Operator, p);
+        if (newOperator != null && !ReferenceEquals(newOperator, node.Operator)) changed = true;
+
         Expression newRight = node.Right;
         var visitedRight = Visit(node.Right, p);
         if (visitedRight is Expression vr && !ReferenceEquals(vr, node.Right))
@@ -1637,7 +1716,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newType, node.Type)) changed = true;
 
         return changed
-            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLeft(newLeft).WithRight(newRight).WithType(newType)
+            ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLeft(newLeft).WithOperator(newOperator ?? node.Operator).WithRight(newRight).WithType(newType)
             : node;
     }
 
@@ -1670,22 +1749,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // TruePart (JLeftPadded<Expression>)
-        JLeftPadded<Expression> newTruePart = node.TruePart;
-        var visitedTrue = Visit(node.TruePart.Element, p);
-        if (visitedTrue is Expression vt && !ReferenceEquals(vt, node.TruePart.Element))
-        {
-            newTruePart = node.TruePart.WithElement(vt);
-            changed = true;
-        }
+        var newTruePart = VisitLeftPadded(node.TruePart, p) ?? node.TruePart;
+        if (!ReferenceEquals(newTruePart, node.TruePart)) changed = true;
 
         // FalsePart (JLeftPadded<Expression>)
-        JLeftPadded<Expression> newFalsePart = node.FalsePart;
-        var visitedFalse = Visit(node.FalsePart.Element, p);
-        if (visitedFalse is Expression vf && !ReferenceEquals(vf, node.FalsePart.Element))
-        {
-            newFalsePart = node.FalsePart.WithElement(vf);
-            changed = true;
-        }
+        var newFalsePart = VisitLeftPadded(node.FalsePart, p) ?? node.FalsePart;
+        if (!ReferenceEquals(newFalsePart, node.FalsePart)) changed = true;
 
         // Type
         JavaType? newType = VisitType(node.Type, p);
@@ -1725,13 +1794,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // AssignmentValue (JLeftPadded<Expression>)
-        JLeftPadded<Expression> newAssignmentValue = node.AssignmentValue;
-        var visitedValue = Visit(node.AssignmentValue.Element, p);
-        if (visitedValue is Expression val && !ReferenceEquals(val, node.AssignmentValue.Element))
-        {
-            newAssignmentValue = node.AssignmentValue.WithElement(val);
-            changed = true;
-        }
+        var newAssignmentValue = VisitLeftPadded(node.AssignmentValue, p) ?? node.AssignmentValue;
+        if (!ReferenceEquals(newAssignmentValue, node.AssignmentValue)) changed = true;
 
         // Type
         JavaType? newType = VisitType(node.Type, p);

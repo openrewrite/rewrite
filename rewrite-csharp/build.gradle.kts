@@ -71,6 +71,23 @@ val csharpBuild by tasks.registering(Exec::class) {
     }
 }
 
+val csharpTest by tasks.registering(Exec::class) {
+    group = "csharp"
+    description = "Run C# xunit tests"
+    dependsOn(csharpBuild)
+
+    workingDir = csharpDir
+    commandLine(findDotnet(), "test", "--no-build", "--verbosity", "normal")
+
+    doFirst {
+        logger.lifecycle("Running C# tests in ${csharpDir}")
+    }
+}
+
+tasks.named("check") {
+    dependsOn(csharpTest)
+}
+
 testing {
     suites {
         register<JvmTestSuite>("integTest") {

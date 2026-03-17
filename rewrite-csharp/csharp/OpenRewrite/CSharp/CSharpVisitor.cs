@@ -123,6 +123,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             WithExpression we => VisitWithExpression(we, p),
             SpreadExpression se => VisitSpreadExpression(se, p),
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, p),
+            TypeWithArguments twa => VisitTypeWithArguments(twa, p),
+            ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, p),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, p),
             QueryBody qb => VisitQueryBody(qb, p),
@@ -151,19 +153,23 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (!ReferenceEquals(newMarkers, compilationUnit.Markers)) changed = true;
 
         var members = new List<JRightPadded<Statement>>();
+        bool membersChanged = false;
         foreach (var memberPadded in compilationUnit.Members)
         {
-            var visited = Visit(memberPadded.Element, p);
-            if (visited is Statement stmt)
+            var visited = VisitRightPadded(memberPadded, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(stmt, memberPadded.Element)) changed = true;
-                members.Add(memberPadded.WithElement(stmt));
+                if (!ReferenceEquals(visited, memberPadded)) membersChanged = true;
+                members.Add(visited);
             }
+            else membersChanged = true;
         }
+        if (membersChanged) changed = true;
 
         if (changed)
         {
-            compilationUnit = compilationUnit.WithPrefix(newPrefix).WithMarkers(newMarkers).WithMembers(members);
+            compilationUnit = compilationUnit.WithPrefix(newPrefix).WithMarkers(newMarkers)
+                .WithMembers(membersChanged ? members : compilationUnit.Members);
         }
 
         return compilationUnit;
@@ -180,16 +186,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(usingDirective.Markers, p);
         if (!ReferenceEquals(newMarkers, usingDirective.Markers)) changed = true;
 
-        JRightPadded<Identifier>? newAlias = usingDirective.Alias;
-        if (usingDirective.Alias != null)
-        {
-            var visitedAlias = Visit(usingDirective.Alias.Element, p);
-            if (visitedAlias is Identifier a && !ReferenceEquals(a, usingDirective.Alias.Element))
-            {
-                newAlias = usingDirective.Alias.WithElement(a);
-                changed = true;
-            }
-        }
+        var newAlias = VisitRightPadded(usingDirective.Alias, p);
+        if (!ReferenceEquals(newAlias, usingDirective.Alias)) changed = true;
 
         TypeTree newNs = usingDirective.NamespaceOrType;
         var visitedNs = Visit(usingDirective.NamespaceOrType, p);
@@ -236,16 +234,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JRightPadded<TypeTree>? newInterfaceSpec = prop.InterfaceSpecifier;
-        if (prop.InterfaceSpecifier != null)
-        {
-            var visitedIs = Visit(prop.InterfaceSpecifier.Element, p);
-            if (visitedIs is TypeTree ist && !ReferenceEquals(ist, prop.InterfaceSpecifier.Element))
-            {
-                newInterfaceSpec = prop.InterfaceSpecifier.WithElement(ist);
-                changed = true;
-            }
-        }
+        var newInterfaceSpec = VisitRightPadded(prop.InterfaceSpecifier, p);
+        if (!ReferenceEquals(newInterfaceSpec, prop.InterfaceSpecifier)) changed = true;
 
         Identifier newName = prop.Name;
         var visitedName = Visit(prop.Name, p);
@@ -266,27 +256,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        JLeftPadded<Expression>? newExprBody = prop.ExpressionBody;
-        if (prop.ExpressionBody != null)
-        {
-            var visitedExpr = Visit(prop.ExpressionBody.Element, p);
-            if (visitedExpr is Expression e && !ReferenceEquals(e, prop.ExpressionBody.Element))
-            {
-                newExprBody = prop.ExpressionBody.WithElement(e);
-                changed = true;
-            }
-        }
+        var newExprBody = VisitLeftPadded(prop.ExpressionBody, p);
+        if (!ReferenceEquals(newExprBody, prop.ExpressionBody)) changed = true;
 
-        JLeftPadded<Expression>? newInit = prop.Initializer;
-        if (prop.Initializer != null)
-        {
-            var visitedInit = Visit(prop.Initializer.Element, p);
-            if (visitedInit is Expression ie && !ReferenceEquals(ie, prop.Initializer.Element))
-            {
-                newInit = prop.Initializer.WithElement(ie);
-                changed = true;
-            }
-        }
+        var newInit = VisitLeftPadded(prop.Initializer, p);
+        if (!ReferenceEquals(newInit, prop.Initializer)) changed = true;
 
         return changed
             ? prop.WithPrefix(newPrefix).WithMarkers(newMarkers)
@@ -332,16 +306,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        JLeftPadded<Expression>? newExprBody = accessor.ExpressionBody;
-        if (accessor.ExpressionBody != null)
-        {
-            var visited = Visit(accessor.ExpressionBody.Element, p);
-            if (visited is Expression e && !ReferenceEquals(e, accessor.ExpressionBody.Element))
-            {
-                newExprBody = accessor.ExpressionBody.WithElement(e);
-                changed = true;
-            }
-        }
+        var newExprBody = VisitLeftPadded(accessor.ExpressionBody, p);
+        if (!ReferenceEquals(newExprBody, accessor.ExpressionBody)) changed = true;
 
         return changed
             ? accessor.WithPrefix(newPrefix).WithMarkers(newMarkers)
@@ -361,31 +327,27 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(attrList.Markers, p);
         if (!ReferenceEquals(newMarkers, attrList.Markers)) changed = true;
 
-        if (attrList.Target != null)
+        var newTarget = VisitRightPadded(attrList.Target, p);
+        if (!ReferenceEquals(newTarget, attrList.Target))
         {
-            var visitedTarget = Visit(attrList.Target.Element, p);
-            if (visitedTarget is Identifier tid && !ReferenceEquals(tid, attrList.Target.Element))
-            {
-                attrList = attrList.WithTarget(attrList.Target.WithElement(tid));
-                changed = true;
-            }
+            attrList = attrList.WithTarget(newTarget);
+            changed = true;
         }
 
         var newAttrs = new List<JRightPadded<Annotation>>();
+        bool attrsChanged = false;
         foreach (var paddedAttr in attrList.Attributes)
         {
-            var visited = Visit(paddedAttr.Element, p);
-            if (visited is Annotation a)
+            var visited = VisitRightPadded(paddedAttr, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(a, paddedAttr.Element)) changed = true;
-                newAttrs.Add(paddedAttr.WithElement(a));
+                if (!ReferenceEquals(visited, paddedAttr)) attrsChanged = true;
+                newAttrs.Add(visited);
             }
-            else
-            {
-                newAttrs.Add(paddedAttr);
-            }
+            else attrsChanged = true;
         }
-        return changed ? attrList.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAttributes(newAttrs) : attrList;
+        if (attrsChanged) changed = true;
+        return changed ? attrList.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAttributes(attrsChanged ? newAttrs : attrList.Attributes) : attrList;
     }
 
     public virtual J VisitNamedExpression(NamedExpression ne, P p)
@@ -399,13 +361,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(ne.Markers, p);
         if (!ReferenceEquals(newMarkers, ne.Markers)) changed = true;
 
-        JRightPadded<Identifier> newName = ne.Name;
-        var visitedName = Visit(ne.Name.Element, p);
-        if (visitedName is Identifier id && !ReferenceEquals(id, ne.Name.Element))
-        {
-            newName = ne.Name.WithElement(id);
-            changed = true;
-        }
+        var newName = VisitRightPadded(ne.Name, p)!;
+        if (!ReferenceEquals(newName, ne.Name)) changed = true;
 
         Expression newExpr = ne.Expression;
         var visitedExpr = Visit(ne.Expression, p);
@@ -491,18 +448,15 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (!ReferenceEquals(newMarkers, isPattern.Markers)) changed = true;
 
         var expr = Visit(isPattern.Expression, p);
-        var pattern = Visit(isPattern.Pattern.Element, p);
+        if (expr is Expression newExpr && !ReferenceEquals(newExpr, isPattern.Expression)) changed = true;
 
-        if ((expr is Expression e && !ReferenceEquals(e, isPattern.Expression)) ||
-            (pattern is Pattern pat && !ReferenceEquals(pat, isPattern.Pattern.Element)))
-        {
-            changed = true;
-        }
+        var newPattern = VisitLeftPadded(isPattern.Pattern, p);
+        if (!ReferenceEquals(newPattern, isPattern.Pattern)) changed = true;
 
         return changed
             ? isPattern.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                       .WithExpression(expr is Expression newExpr ? newExpr : isPattern.Expression)
-                       .WithPattern(pattern is Pattern newPat ? isPattern.Pattern.WithElement(newPat) : isPattern.Pattern)
+                       .WithExpression(expr is Expression e ? e : isPattern.Expression)
+                       .WithPattern(newPattern ?? isPattern.Pattern)
             : isPattern;
     }
 
@@ -593,13 +547,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(pointerType.Markers, p);
         if (!ReferenceEquals(newMarkers, pointerType.Markers)) changed = true;
 
-        JRightPadded<TypeTree> newElementType = pointerType.ElementType;
-        var visited = Visit(pointerType.ElementType.Element, p);
-        if (visited is TypeTree tt && !ReferenceEquals(tt, pointerType.ElementType.Element))
-        {
-            newElementType = pointerType.ElementType.WithElement(tt);
-            changed = true;
-        }
+        var newElementType = VisitRightPadded(pointerType.ElementType, p)!;
+        if (!ReferenceEquals(newElementType, pointerType.ElementType)) changed = true;
 
         return changed
             ? pointerType.WithPrefix(newPrefix).WithMarkers(newMarkers).WithElementType(newElementType)
@@ -649,13 +598,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(externAlias.Markers, p);
         if (!ReferenceEquals(newMarkers, externAlias.Markers)) changed = true;
 
-        JLeftPadded<Identifier> newIdentifier = externAlias.Identifier;
-        var visited = Visit(externAlias.Identifier.Element, p);
-        if (visited is Identifier id && !ReferenceEquals(id, externAlias.Identifier.Element))
-        {
-            newIdentifier = externAlias.Identifier.WithElement(id);
-            changed = true;
-        }
+        var newIdentifier = VisitLeftPadded(externAlias.Identifier, p)!;
+        if (!ReferenceEquals(newIdentifier, externAlias.Identifier)) changed = true;
 
         return changed
             ? externAlias.WithPrefix(newPrefix).WithMarkers(newMarkers).WithIdentifier(newIdentifier)
@@ -673,23 +617,12 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(initializerExpression.Markers, p);
         if (!ReferenceEquals(newMarkers, initializerExpression.Markers)) changed = true;
 
-        var newExprs = new List<JRightPadded<Expression>>();
-        foreach (var expr in initializerExpression.Expressions.Elements)
-        {
-            var visited = Visit(expr.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, expr.Element)) changed = true;
-                newExprs.Add(expr.WithElement(e));
-            }
-            else
-            {
-                newExprs.Add(expr);
-            }
-        }
+        var newExprs = VisitContainer(initializerExpression.Expressions, p);
+        if (!ReferenceEquals(newExprs, initializerExpression.Expressions)) changed = true;
+
         return changed
             ? initializerExpression.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                                   .WithExpressions(initializerExpression.Expressions.WithElements(newExprs))
+                                   .WithExpressions(newExprs ?? initializerExpression.Expressions)
             : initializerExpression;
     }
 
@@ -704,13 +637,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(nullSafeExpression.Markers, p);
         if (!ReferenceEquals(newMarkers, nullSafeExpression.Markers)) changed = true;
 
-        JRightPadded<Expression> newExprPadded = nullSafeExpression.ExpressionPadded;
-        var visited = Visit(nullSafeExpression.Expression, p);
-        if (visited is Expression e && !ReferenceEquals(e, nullSafeExpression.Expression))
-        {
-            newExprPadded = nullSafeExpression.ExpressionPadded.WithElement(e);
-            changed = true;
-        }
+        var newExprPadded = VisitRightPadded(nullSafeExpression.ExpressionPadded, p)!;
+        if (!ReferenceEquals(newExprPadded, nullSafeExpression.ExpressionPadded)) changed = true;
 
         return changed
             ? nullSafeExpression.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpressionPadded(newExprPadded)
@@ -733,27 +661,10 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             defaultExpression = defaultExpression.WithPrefix(newPrefix).WithMarkers(newMarkers);
         }
 
-        if (defaultExpression.TypeOperator != null)
+        var newTypeOperator = VisitContainer(defaultExpression.TypeOperator, p);
+        if (!ReferenceEquals(newTypeOperator, defaultExpression.TypeOperator))
         {
-            var newElements = new List<JRightPadded<TypeTree>>();
-            bool changed = false;
-            foreach (var paddedType in defaultExpression.TypeOperator.Elements)
-            {
-                var visited = Visit(paddedType.Element, p);
-                if (visited is TypeTree tt)
-                {
-                    if (!ReferenceEquals(tt, paddedType.Element)) changed = true;
-                    newElements.Add(paddedType.WithElement(tt));
-                }
-                else
-                {
-                    newElements.Add(paddedType);
-                }
-            }
-            if (changed)
-            {
-                return defaultExpression.WithTypeOperator(defaultExpression.TypeOperator.WithElements(newElements));
-            }
+            return defaultExpression.WithTypeOperator(newTypeOperator);
         }
         return defaultExpression;
     }
@@ -919,41 +830,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JLeftPadded<Identifier>? newWhereConstraint = ctp.WhereConstraint;
-        if (ctp.WhereConstraint != null)
-        {
-            var visitedWc = Visit(ctp.WhereConstraint.Element, p);
-            if (visitedWc is Identifier wid && !ReferenceEquals(wid, ctp.WhereConstraint.Element))
-            {
-                newWhereConstraint = ctp.WhereConstraint.WithElement(wid);
-                changed = true;
-            }
-        }
+        var newWhereConstraint = VisitLeftPadded(ctp.WhereConstraint, p);
+        if (!ReferenceEquals(newWhereConstraint, ctp.WhereConstraint)) changed = true;
 
-        JContainer<Expression>? newConstraints = ctp.Constraints;
-        if (ctp.Constraints != null)
-        {
-            var constraintElements = new List<JRightPadded<Expression>>();
-            bool constraintsChanged = false;
-            foreach (var ce in ctp.Constraints.Elements)
-            {
-                var visitedCe = Visit(ce.Element, p);
-                if (visitedCe is Expression expr)
-                {
-                    if (!ReferenceEquals(expr, ce.Element)) constraintsChanged = true;
-                    constraintElements.Add(ce.WithElement(expr));
-                }
-                else
-                {
-                    constraintElements.Add(ce);
-                }
-            }
-            if (constraintsChanged)
-            {
-                newConstraints = ctp.Constraints.WithElements(constraintElements);
-                changed = true;
-            }
-        }
+        var newConstraints = VisitContainer(ctp.Constraints, p);
+        if (!ReferenceEquals(newConstraints, ctp.Constraints)) changed = true;
 
         JavaType? newType = (JavaType?)VisitType(ctp.Type, p);
         if (!ReferenceEquals(newType, ctp.Type)) changed = true;
@@ -1005,36 +886,23 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newPrefix = VisitSpace(interp.Prefix, p);
         var newMarkers = VisitMarkers(interp.Markers, p);
 
+        bool changed = false;
+
         var expr = Visit(interp.Expression, p);
+        if (expr is Expression e && !ReferenceEquals(e, interp.Expression)) changed = true;
 
-        Expression? newAlignment = null;
-        if (interp.Alignment != null)
-        {
-            var visited = Visit(interp.Alignment.Element, p);
-            if (visited is Expression ae && !ReferenceEquals(ae, interp.Alignment.Element))
-            {
-                newAlignment = ae;
-            }
-        }
+        var newAlignment = VisitLeftPadded(interp.Alignment, p);
+        if (!ReferenceEquals(newAlignment, interp.Alignment)) changed = true;
 
-        Identifier? newFormat = null;
-        if (interp.Format != null)
-        {
-            var visited = Visit(interp.Format.Element, p);
-            if (visited is Identifier f && !ReferenceEquals(f, interp.Format.Element))
-            {
-                newFormat = f;
-            }
-        }
+        var newFormat = VisitLeftPadded(interp.Format, p);
+        if (!ReferenceEquals(newFormat, interp.Format)) changed = true;
 
-        if ((expr is Expression e && !ReferenceEquals(e, interp.Expression)) ||
-            newAlignment != null || newFormat != null ||
-            !ReferenceEquals(newPrefix, interp.Prefix) || !ReferenceEquals(newMarkers, interp.Markers))
+        if (changed || !ReferenceEquals(newPrefix, interp.Prefix) || !ReferenceEquals(newMarkers, interp.Markers))
         {
             return interp.WithPrefix(newPrefix).WithMarkers(newMarkers)
                          .WithExpression(expr is Expression newExpr ? newExpr : interp.Expression)
-                         .WithAlignment(newAlignment != null && interp.Alignment != null ? interp.Alignment.WithElement(newAlignment) : interp.Alignment)
-                         .WithFormat(newFormat != null && interp.Format != null ? interp.Format.WithElement(newFormat) : interp.Format);
+                         .WithAlignment(newAlignment)
+                         .WithFormat(newFormat);
         }
 
         return interp;
@@ -1114,28 +982,28 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(ns.Markers, p);
         if (!ReferenceEquals(newMarkers, ns.Markers)) changed = true;
 
-        var name = Visit(ns.Name.Element, p);
+        var newNamePadded = VisitRightPadded(ns.Name, p)!;
+        if (!ReferenceEquals(newNamePadded, ns.Name)) changed = true;
 
         var newMembers = new List<JRightPadded<Statement>>();
+        bool membersChanged = false;
         foreach (var member in ns.Members)
         {
-            var visited = Visit(member.Element, p);
-            if (visited is Statement stmt)
+            var visited = VisitRightPadded(member, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(stmt, member.Element)) changed = true;
-                newMembers.Add(member.WithElement(stmt));
+                if (!ReferenceEquals(visited, member)) membersChanged = true;
+                newMembers.Add(visited);
             }
+            else membersChanged = true;
         }
+        if (membersChanged) changed = true;
 
-        if ((name is Expression e && !ReferenceEquals(e, ns.Name.Element)) || changed)
-        {
-            return ns
-                .WithPrefix(newPrefix).WithMarkers(newMarkers)
-                .WithName(name is Expression newName ? ns.Name.WithElement(newName) : ns.Name)
-                .WithMembers(changed ? newMembers : ns.Members);
-        }
-
-        return ns;
+        return changed
+            ? ns.WithPrefix(newPrefix).WithMarkers(newMarkers)
+                .WithName(newNamePadded)
+                .WithMembers(membersChanged ? newMembers : ns.Members)
+            : ns;
     }
 
     public virtual J VisitTupleType(TupleType tupleType, P p)
@@ -1149,22 +1017,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(tupleType.Markers, p);
         if (!ReferenceEquals(newMarkers, tupleType.Markers)) prefixMarkersChanged = true;
 
-        var elements = tupleType.Elements.Elements;
-        var newElements = new List<JRightPadded<TupleElement>>();
-        bool elementsChanged = false;
-
-        foreach (var element in elements)
-        {
-            var visited = Visit(element.Element, p);
-            if (visited is TupleElement te)
-            {
-                if (!ReferenceEquals(te, element.Element))
-                {
-                    elementsChanged = true;
-                }
-                newElements.Add(element.WithElement(te));
-            }
-        }
+        var newElements = VisitContainer(tupleType.Elements, p);
+        bool elementsChanged = !ReferenceEquals(newElements, tupleType.Elements);
 
         JavaType? newType = (JavaType?)VisitType(tupleType.Type, p);
         if (!ReferenceEquals(newType, tupleType.Type)) elementsChanged = true;
@@ -1172,7 +1026,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (elementsChanged || prefixMarkersChanged)
         {
             return tupleType.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                            .WithElements(new JContainer<TupleElement>(tupleType.Elements.Before, newElements, tupleType.Elements.Markers)).WithType(newType);
+                            .WithElements(newElements ?? tupleType.Elements).WithType(newType);
         }
 
         return tupleType;
@@ -1189,27 +1043,13 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(tupleExpr.Markers, p);
         if (!ReferenceEquals(newMarkers, tupleExpr.Markers)) prefixMarkersChanged = true;
 
-        var args = tupleExpr.Arguments.Elements;
-        var newArgs = new List<JRightPadded<Expression>>();
-        bool argsChanged = false;
-
-        foreach (var arg in args)
-        {
-            var visited = Visit(arg.Element, p);
-            if (visited is Expression expr)
-            {
-                if (!ReferenceEquals(expr, arg.Element))
-                {
-                    argsChanged = true;
-                }
-                newArgs.Add(arg.WithElement(expr));
-            }
-        }
+        var newArgs = VisitContainer(tupleExpr.Arguments, p);
+        bool argsChanged = !ReferenceEquals(newArgs, tupleExpr.Arguments);
 
         if (argsChanged || prefixMarkersChanged)
         {
             return tupleExpr.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                            .WithArguments(new JContainer<Expression>(tupleExpr.Arguments.Before, newArgs, tupleExpr.Arguments.Markers));
+                            .WithArguments(newArgs ?? tupleExpr.Arguments);
         }
 
         return tupleExpr;
@@ -1244,21 +1084,20 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (!ReferenceEquals(newMarkers, pragmaWarningDirective.Markers)) changed = true;
 
         var newCodes = new List<JRightPadded<Expression>>();
+        bool codesChanged = false;
         foreach (var code in pragmaWarningDirective.WarningCodes)
         {
-            var visited = Visit(code.Element, p);
-            if (visited is Expression e)
+            var visited = VisitRightPadded(code, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(e, code.Element)) changed = true;
-                newCodes.Add(code.WithElement(e));
+                if (!ReferenceEquals(visited, code)) codesChanged = true;
+                newCodes.Add(visited);
             }
-            else
-            {
-                newCodes.Add(code);
-            }
+            else codesChanged = true;
         }
+        if (codesChanged) changed = true;
         return changed
-            ? pragmaWarningDirective.WithPrefix(newPrefix).WithMarkers(newMarkers).WithWarningCodes(newCodes)
+            ? pragmaWarningDirective.WithPrefix(newPrefix).WithMarkers(newMarkers).WithWarningCodes(codesChanged ? newCodes : pragmaWarningDirective.WarningCodes)
             : pragmaWarningDirective;
     }
 
@@ -1445,13 +1284,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(nameColon.Markers, p);
         if (!ReferenceEquals(newMarkers, nameColon.Markers)) changed = true;
 
-        JRightPadded<Identifier> newName = nameColon.Name;
-        var visited = Visit(nameColon.Name.Element, p);
-        if (visited is Identifier id && !ReferenceEquals(id, nameColon.Name.Element))
-        {
-            newName = nameColon.Name.WithElement(id);
-            changed = true;
-        }
+        var newName = VisitRightPadded(nameColon.Name, p)!;
+        if (!ReferenceEquals(newName, nameColon.Name)) changed = true;
 
         return changed
             ? nameColon.WithPrefix(newPrefix).WithMarkers(newMarkers).WithName(newName)
@@ -1508,23 +1342,12 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(arrayRankSpecifier.Markers, p);
         if (!ReferenceEquals(newMarkers, arrayRankSpecifier.Markers)) changed = true;
 
-        var newSizes = new List<JRightPadded<Expression>>();
-        foreach (var size in arrayRankSpecifier.Sizes.Elements)
-        {
-            var visited = Visit(size.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, size.Element)) changed = true;
-                newSizes.Add(size.WithElement(e));
-            }
-            else
-            {
-                newSizes.Add(size);
-            }
-        }
+        var newSizes = VisitContainer(arrayRankSpecifier.Sizes, p);
+        if (!ReferenceEquals(newSizes, arrayRankSpecifier.Sizes)) changed = true;
+
         return changed
             ? arrayRankSpecifier.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                                .WithSizes(arrayRankSpecifier.Sizes.WithElements(newSizes))
+                                .WithSizes(newSizes ?? arrayRankSpecifier.Sizes)
             : arrayRankSpecifier;
     }
 
@@ -1651,13 +1474,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
         if (attrChanged) changed = true;
 
-        JLeftPadded<TypeTree> newTypeExpr = eventDeclaration.TypeExpressionPadded;
-        var visitedType = Visit(eventDeclaration.TypeExpressionPadded.Element, p);
-        if (visitedType is TypeTree tt && !ReferenceEquals(tt, eventDeclaration.TypeExpressionPadded.Element))
-        {
-            newTypeExpr = eventDeclaration.TypeExpressionPadded.WithElement(tt);
-            changed = true;
-        }
+        var newTypeExpr = VisitLeftPadded(eventDeclaration.TypeExpressionPadded, p)!;
+        if (!ReferenceEquals(newTypeExpr, eventDeclaration.TypeExpressionPadded)) changed = true;
 
         Identifier newName = eventDeclaration.Name;
         var visitedName = Visit(eventDeclaration.Name, p);
@@ -1667,41 +1485,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JRightPadded<TypeTree>? newInterfaceSpec = eventDeclaration.InterfaceSpecifier;
-        if (eventDeclaration.InterfaceSpecifier != null)
-        {
-            var visitedIs = Visit(eventDeclaration.InterfaceSpecifier.Element, p);
-            if (visitedIs is TypeTree ist && !ReferenceEquals(ist, eventDeclaration.InterfaceSpecifier.Element))
-            {
-                newInterfaceSpec = eventDeclaration.InterfaceSpecifier.WithElement(ist);
-                changed = true;
-            }
-        }
+        var newInterfaceSpec = VisitRightPadded(eventDeclaration.InterfaceSpecifier, p);
+        if (!ReferenceEquals(newInterfaceSpec, eventDeclaration.InterfaceSpecifier)) changed = true;
 
-        JContainer<Statement>? newAccessors = eventDeclaration.Accessors;
-        if (eventDeclaration.Accessors != null)
-        {
-            var accessorElements = new List<JRightPadded<Statement>>();
-            bool accessorsChanged = false;
-            foreach (var acc in eventDeclaration.Accessors.Elements)
-            {
-                var visitedAcc = Visit(acc.Element, p);
-                if (visitedAcc is Statement s)
-                {
-                    if (!ReferenceEquals(s, acc.Element)) accessorsChanged = true;
-                    accessorElements.Add(acc.WithElement(s));
-                }
-                else
-                {
-                    accessorElements.Add(acc);
-                }
-            }
-            if (accessorsChanged)
-            {
-                newAccessors = eventDeclaration.Accessors.WithElements(accessorElements);
-                changed = true;
-            }
-        }
+        var newAccessors = VisitContainer(eventDeclaration.Accessors, p);
+        if (!ReferenceEquals(newAccessors, eventDeclaration.Accessors)) changed = true;
 
         return changed
             ? eventDeclaration.WithPrefix(newPrefix).WithMarkers(newMarkers)
@@ -1758,25 +1546,25 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (!ReferenceEquals(newMarkers, collectionExpression.Markers)) changed = true;
 
         var newElements = new List<JRightPadded<Expression>>();
+        bool elementsChanged = false;
         foreach (var elem in collectionExpression.Elements)
         {
-            var visited = Visit(elem.Element, p);
-            if (visited is Expression e)
+            var visited = VisitRightPadded(elem, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(e, elem.Element)) changed = true;
-                newElements.Add(elem.WithElement(e));
+                if (!ReferenceEquals(visited, elem)) elementsChanged = true;
+                newElements.Add(visited);
             }
-            else
-            {
-                newElements.Add(elem);
-            }
+            else elementsChanged = true;
         }
+        if (elementsChanged) changed = true;
 
         JavaType? newType = (JavaType?)VisitType(collectionExpression.Type, p);
         if (!ReferenceEquals(newType, collectionExpression.Type)) changed = true;
 
         return changed
-            ? collectionExpression.WithPrefix(newPrefix).WithMarkers(newMarkers).WithElements(newElements).WithType(newType)
+            ? collectionExpression.WithPrefix(newPrefix).WithMarkers(newMarkers)
+                .WithElements(elementsChanged ? newElements : collectionExpression.Elements).WithType(newType)
             : collectionExpression;
     }
 
@@ -1799,13 +1587,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JRightPadded<Statement> newBody = forEachVariableLoop.Body;
-        var visitedBody = Visit(forEachVariableLoop.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, forEachVariableLoop.Body.Element))
-        {
-            newBody = forEachVariableLoop.Body.WithElement(bs);
-            changed = true;
-        }
+        var newBody = VisitRightPadded(forEachVariableLoop.Body, p)!;
+        if (!ReferenceEquals(newBody, forEachVariableLoop.Body)) changed = true;
 
         return changed
             ? forEachVariableLoop.WithPrefix(newPrefix).WithMarkers(newMarkers).WithControlElement(newControl).WithBody(newBody)
@@ -1822,21 +1605,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(control.Markers, p);
         if (!ReferenceEquals(newMarkers, control.Markers)) changed = true;
 
-        JRightPadded<Expression> newVariable = control.Variable;
-        var visitedVar = Visit(control.Variable.Element, p);
-        if (visitedVar is Expression ve && !ReferenceEquals(ve, control.Variable.Element))
-        {
-            newVariable = control.Variable.WithElement(ve);
-            changed = true;
-        }
+        var newVariable = VisitRightPadded(control.Variable, p)!;
+        if (!ReferenceEquals(newVariable, control.Variable)) changed = true;
 
-        JRightPadded<Expression> newIterable = control.Iterable;
-        var visitedIterable = Visit(control.Iterable.Element, p);
-        if (visitedIterable is Expression ie && !ReferenceEquals(ie, control.Iterable.Element))
-        {
-            newIterable = control.Iterable.WithElement(ie);
-            changed = true;
-        }
+        var newIterable = VisitRightPadded(control.Iterable, p)!;
+        if (!ReferenceEquals(newIterable, control.Iterable)) changed = true;
 
         return changed
             ? control.WithPrefix(newPrefix).WithMarkers(newMarkers).WithVariable(newVariable).WithIterable(newIterable)
@@ -1854,13 +1627,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(usingStatement.Markers, p);
         if (!ReferenceEquals(newMarkers, usingStatement.Markers)) changed = true;
 
-        JLeftPadded<Expression> newExpr = usingStatement.ExpressionPadded;
-        var visitedExpr = Visit(usingStatement.ExpressionPadded.Element, p);
-        if (visitedExpr is Expression e && !ReferenceEquals(e, usingStatement.ExpressionPadded.Element))
-        {
-            newExpr = usingStatement.ExpressionPadded.WithElement(e);
-            changed = true;
-        }
+        var newExpr = VisitLeftPadded(usingStatement.ExpressionPadded, p)!;
+        if (!ReferenceEquals(newExpr, usingStatement.ExpressionPadded)) changed = true;
 
         Statement newStmt = usingStatement.Statement;
         var visitedStmt = Visit(usingStatement.Statement, p);
@@ -1886,22 +1654,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(clause.Markers, p);
         if (!ReferenceEquals(newMarkers, clause.Markers)) changed = true;
 
-        var newExprs = new List<JRightPadded<Expression>>();
-        foreach (var expr in clause.Expressions.Elements)
-        {
-            var visited = Visit(expr.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, expr.Element)) changed = true;
-                newExprs.Add(expr.WithElement(e));
-            }
-            else
-            {
-                newExprs.Add(expr);
-            }
-        }
+        var newExprs = VisitContainer(clause.Expressions, p);
+        if (!ReferenceEquals(newExprs, clause.Expressions)) changed = true;
+
         return changed
-            ? clause.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpressions(clause.Expressions.WithElements(newExprs))
+            ? clause.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpressions(newExprs ?? clause.Expressions)
             : clause;
     }
 
@@ -2004,29 +1761,15 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(designation.Markers, p);
         if (!ReferenceEquals(newMarkers, designation.Markers)) changed = true;
 
-        var newVars = new List<JRightPadded<VariableDesignation>>();
-        bool varsChanged = false;
-        foreach (var v in designation.Variables.Elements)
-        {
-            var visited = Visit(v.Element, p);
-            if (visited is VariableDesignation vd)
-            {
-                if (!ReferenceEquals(vd, v.Element)) varsChanged = true;
-                newVars.Add(v.WithElement(vd));
-            }
-            else
-            {
-                newVars.Add(v);
-            }
-        }
-        if (varsChanged) changed = true;
+        var newVars = VisitContainer(designation.Variables, p);
+        if (!ReferenceEquals(newVars, designation.Variables)) changed = true;
 
         JavaType? newType = (JavaType?)VisitType(designation.Type, p);
         if (!ReferenceEquals(newType, designation.Type)) changed = true;
 
         return changed
             ? designation.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                         .WithVariables(designation.Variables.WithElements(newVars)).WithType(newType)
+                         .WithVariables(newVars ?? designation.Variables).WithType(newType)
             : designation;
     }
 
@@ -2170,23 +1913,12 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(implicitElementAccess.Markers, p);
         if (!ReferenceEquals(newMarkers, implicitElementAccess.Markers)) changed = true;
 
-        var newArgs = new List<JRightPadded<Expression>>();
-        foreach (var arg in implicitElementAccess.ArgumentList.Elements)
-        {
-            var visited = Visit(arg.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, arg.Element)) changed = true;
-                newArgs.Add(arg.WithElement(e));
-            }
-            else
-            {
-                newArgs.Add(arg);
-            }
-        }
+        var newArgs = VisitContainer(implicitElementAccess.ArgumentList, p);
+        if (!ReferenceEquals(newArgs, implicitElementAccess.ArgumentList)) changed = true;
+
         return changed
             ? implicitElementAccess.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                                   .WithArgumentList(implicitElementAccess.ArgumentList.WithElements(newArgs))
+                                   .WithArgumentList(newArgs ?? implicitElementAccess.ArgumentList)
             : implicitElementAccess;
     }
 
@@ -2217,21 +1949,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(listPattern.Markers, p);
         if (!ReferenceEquals(newMarkers, listPattern.Markers)) changed = true;
 
-        var newPatterns = new List<JRightPadded<Pattern>>();
-        bool patternsChanged = false;
-        foreach (var pat in listPattern.Patterns.Elements)
-        {
-            var visited = Visit(pat.Element, p);
-            if (visited is Pattern v)
-            {
-                if (!ReferenceEquals(v, pat.Element)) patternsChanged = true;
-                newPatterns.Add(pat.WithElement(v));
-            }
-            else
-            {
-                newPatterns.Add(pat);
-            }
-        }
+        var newPatterns = VisitContainer(listPattern.Patterns, p);
+        bool patternsChanged = !ReferenceEquals(newPatterns, listPattern.Patterns);
         if (patternsChanged) changed = true;
 
         VariableDesignation? newDesignation = listPattern.Designation;
@@ -2247,7 +1966,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return changed
             ? listPattern.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                         .WithPatterns(listPattern.Patterns.WithElements(newPatterns)).WithDesignation(newDesignation)
+                         .WithPatterns(newPatterns ?? listPattern.Patterns).WithDesignation(newDesignation)
             : listPattern;
     }
 
@@ -2262,38 +1981,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(switchExpression.Markers, p);
         if (!ReferenceEquals(newMarkers, switchExpression.Markers)) changed = true;
 
-        JRightPadded<Expression> newExpr = switchExpression.ExpressionPadded;
-        var visitedExpr = Visit(switchExpression.ExpressionPadded.Element, p);
-        if (visitedExpr is Expression e && !ReferenceEquals(e, switchExpression.ExpressionPadded.Element))
-        {
-            newExpr = switchExpression.ExpressionPadded.WithElement(e);
-            changed = true;
-        }
+        var newExpr = VisitRightPadded(switchExpression.ExpressionPadded, p)!;
+        if (!ReferenceEquals(newExpr, switchExpression.ExpressionPadded)) changed = true;
 
-        JContainer<SwitchExpressionArm> newArms = switchExpression.Arms;
-        var armElements = new List<JRightPadded<SwitchExpressionArm>>();
-        bool armsChanged = false;
-        foreach (var arm in switchExpression.Arms.Elements)
-        {
-            var visited = Visit(arm.Element, p);
-            if (visited is SwitchExpressionArm a)
-            {
-                if (!ReferenceEquals(a, arm.Element)) armsChanged = true;
-                armElements.Add(arm.WithElement(a));
-            }
-            else
-            {
-                armElements.Add(arm);
-            }
-        }
-        if (armsChanged)
-        {
-            newArms = switchExpression.Arms.WithElements(armElements);
-            changed = true;
-        }
+        var newArms = VisitContainer(switchExpression.Arms, p);
+        if (!ReferenceEquals(newArms, switchExpression.Arms)) changed = true;
 
         return changed
-            ? switchExpression.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpressionPadded(newExpr).WithArms(newArms)
+            ? switchExpression.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpressionPadded(newExpr).WithArms(newArms ?? switchExpression.Arms)
             : switchExpression;
     }
 
@@ -2315,24 +2010,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JLeftPadded<Expression>? newWhen = arm.WhenExpression;
-        if (arm.WhenExpression != null)
-        {
-            var visitedWhen = Visit(arm.WhenExpression.Element, p);
-            if (visitedWhen is Expression we && !ReferenceEquals(we, arm.WhenExpression.Element))
-            {
-                newWhen = arm.WhenExpression.WithElement(we);
-                changed = true;
-            }
-        }
+        var newWhen = VisitLeftPadded(arm.WhenExpression, p);
+        if (!ReferenceEquals(newWhen, arm.WhenExpression)) changed = true;
 
-        JLeftPadded<Expression> newExpr = arm.ExpressionPadded;
-        var visitedExpr = Visit(arm.ExpressionPadded.Element, p);
-        if (visitedExpr is Expression e && !ReferenceEquals(e, arm.ExpressionPadded.Element))
-        {
-            newExpr = arm.ExpressionPadded.WithElement(e);
-            changed = true;
-        }
+        var newExpr = VisitLeftPadded(arm.ExpressionPadded, p)!;
+        if (!ReferenceEquals(newExpr, arm.ExpressionPadded)) changed = true;
 
         return changed
             ? arm.WithPrefix(newPrefix).WithMarkers(newMarkers).WithPattern(newPattern).WithWhenExpression(newWhen).WithExpressionPadded(newExpr)
@@ -2414,16 +2096,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(rangeExpression.Markers, p);
         if (!ReferenceEquals(newMarkers, rangeExpression.Markers)) changed = true;
 
-        JRightPadded<Expression>? newStart = rangeExpression.Start;
-        if (rangeExpression.Start != null)
-        {
-            var visited = Visit(rangeExpression.Start.Element, p);
-            if (visited is Expression e && !ReferenceEquals(e, rangeExpression.Start.Element))
-            {
-                newStart = rangeExpression.Start.WithElement(e);
-                changed = true;
-            }
-        }
+        var newStart = VisitRightPadded(rangeExpression.Start, p);
+        if (!ReferenceEquals(newStart, rangeExpression.Start)) changed = true;
 
         Expression? newEnd = rangeExpression.End;
         if (rangeExpression.End != null)
@@ -2460,16 +2134,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JRightPadded<TypeTree>? newInterfaceSpec = indexerDeclaration.ExplicitInterfaceSpecifier;
-        if (indexerDeclaration.ExplicitInterfaceSpecifier != null)
-        {
-            var visitedIs = Visit(indexerDeclaration.ExplicitInterfaceSpecifier.Element, p);
-            if (visitedIs is TypeTree ist && !ReferenceEquals(ist, indexerDeclaration.ExplicitInterfaceSpecifier.Element))
-            {
-                newInterfaceSpec = indexerDeclaration.ExplicitInterfaceSpecifier.WithElement(ist);
-                changed = true;
-            }
-        }
+        var newInterfaceSpec = VisitRightPadded(indexerDeclaration.ExplicitInterfaceSpecifier, p);
+        if (!ReferenceEquals(newInterfaceSpec, indexerDeclaration.ExplicitInterfaceSpecifier)) changed = true;
 
         Expression newIndexer = indexerDeclaration.Indexer;
         var visitedIndexer = Visit(indexerDeclaration.Indexer, p);
@@ -2479,38 +2145,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JContainer<Expression> newParams = indexerDeclaration.Parameters;
-        var paramElements = new List<JRightPadded<Expression>>();
-        bool paramsChanged = false;
-        foreach (var param in indexerDeclaration.Parameters.Elements)
-        {
-            var visitedParam = Visit(param.Element, p);
-            if (visitedParam is Expression pe)
-            {
-                if (!ReferenceEquals(pe, param.Element)) paramsChanged = true;
-                paramElements.Add(param.WithElement(pe));
-            }
-            else
-            {
-                paramElements.Add(param);
-            }
-        }
-        if (paramsChanged)
-        {
-            newParams = indexerDeclaration.Parameters.WithElements(paramElements);
-            changed = true;
-        }
+        var newParams = VisitContainer(indexerDeclaration.Parameters, p);
+        if (!ReferenceEquals(newParams, indexerDeclaration.Parameters)) changed = true;
 
-        JLeftPadded<Expression>? newExprBody = indexerDeclaration.ExpressionBody;
-        if (indexerDeclaration.ExpressionBody != null)
-        {
-            var visitedExpr = Visit(indexerDeclaration.ExpressionBody.Element, p);
-            if (visitedExpr is Expression e && !ReferenceEquals(e, indexerDeclaration.ExpressionBody.Element))
-            {
-                newExprBody = indexerDeclaration.ExpressionBody.WithElement(e);
-                changed = true;
-            }
-        }
+        var newExprBody = VisitLeftPadded(indexerDeclaration.ExpressionBody, p);
+        if (!ReferenceEquals(newExprBody, indexerDeclaration.ExpressionBody)) changed = true;
 
         Block? newAccessors = indexerDeclaration.Accessors;
         if (indexerDeclaration.Accessors != null)
@@ -2526,7 +2165,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         return changed
             ? indexerDeclaration.WithPrefix(newPrefix).WithMarkers(newMarkers)
                                .WithTypeExpression(newTypeExpr).WithExplicitInterfaceSpecifier(newInterfaceSpec)
-                               .WithIndexer(newIndexer).WithParameters(newParams)
+                               .WithIndexer(newIndexer).WithParameters(newParams ?? indexerDeclaration.Parameters)
                                .WithExpressionBody(newExprBody).WithAccessors(newAccessors)
             : indexerDeclaration;
     }
@@ -2555,13 +2194,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
         if (attrChanged) changed = true;
 
-        JLeftPadded<TypeTree> newReturnType = delegateDeclaration.ReturnType;
-        var visitedReturn = Visit(delegateDeclaration.ReturnType.Element, p);
-        if (visitedReturn is TypeTree tt && !ReferenceEquals(tt, delegateDeclaration.ReturnType.Element))
-        {
-            newReturnType = delegateDeclaration.ReturnType.WithElement(tt);
-            changed = true;
-        }
+        var newReturnType = VisitLeftPadded(delegateDeclaration.ReturnType, p)!;
+        if (!ReferenceEquals(newReturnType, delegateDeclaration.ReturnType)) changed = true;
 
         Identifier newName = delegateDeclaration.IdentifierName;
         var visitedName = Visit(delegateDeclaration.IdentifierName, p);
@@ -2571,58 +2205,17 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JContainer<TypeParameter>? newTypeParams = delegateDeclaration.TypeParameters;
-        if (delegateDeclaration.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<TypeParameter>>();
-            bool tpChanged = false;
-            foreach (var tp in delegateDeclaration.TypeParameters.Elements)
-            {
-                var visitedTp = Visit(tp.Element, p);
-                if (visitedTp is TypeParameter tpe)
-                {
-                    if (!ReferenceEquals(tpe, tp.Element)) tpChanged = true;
-                    tpElements.Add(tp.WithElement(tpe));
-                }
-                else
-                {
-                    tpElements.Add(tp);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParams = delegateDeclaration.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
+        var newTypeParams = VisitContainer(delegateDeclaration.TypeParameters, p);
+        if (!ReferenceEquals(newTypeParams, delegateDeclaration.TypeParameters)) changed = true;
 
-        JContainer<Statement> newParams = delegateDeclaration.Parameters;
-        var paramElements = new List<JRightPadded<Statement>>();
-        bool paramsChanged = false;
-        foreach (var param in delegateDeclaration.Parameters.Elements)
-        {
-            var visitedParam = Visit(param.Element, p);
-            if (visitedParam is Statement s)
-            {
-                if (!ReferenceEquals(s, param.Element)) paramsChanged = true;
-                paramElements.Add(param.WithElement(s));
-            }
-            else
-            {
-                paramElements.Add(param);
-            }
-        }
-        if (paramsChanged)
-        {
-            newParams = delegateDeclaration.Parameters.WithElements(paramElements);
-            changed = true;
-        }
+        var newParams = VisitContainer(delegateDeclaration.Parameters, p);
+        if (!ReferenceEquals(newParams, delegateDeclaration.Parameters)) changed = true;
 
         return changed
             ? delegateDeclaration.WithPrefix(newPrefix).WithMarkers(newMarkers)
                                  .WithAttributes(attrChanged ? newAttrLists : delegateDeclaration.Attributes)
                                  .WithReturnType(newReturnType).WithIdentifierName(newName)
-                                 .WithTypeParameters(newTypeParams).WithParameters(newParams)
+                                 .WithTypeParameters(newTypeParams).WithParameters(newParams ?? delegateDeclaration.Parameters)
             : delegateDeclaration;
     }
 
@@ -2637,46 +2230,17 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(conversion.Markers, p);
         if (!ReferenceEquals(newMarkers, conversion.Markers)) changed = true;
 
-        JLeftPadded<TypeTree> newReturnType = conversion.ReturnType;
-        var visitedReturn = Visit(conversion.ReturnType.Element, p);
-        if (visitedReturn is TypeTree tt && !ReferenceEquals(tt, conversion.ReturnType.Element))
-        {
-            newReturnType = conversion.ReturnType.WithElement(tt);
-            changed = true;
-        }
+        var newInterfaceSpec = VisitRightPadded(conversion.InterfaceSpecifier, p);
+        if (!ReferenceEquals(newInterfaceSpec, conversion.InterfaceSpecifier)) changed = true;
 
-        JContainer<Statement> newParams = conversion.Parameters;
-        var paramElements = new List<JRightPadded<Statement>>();
-        bool paramsChanged = false;
-        foreach (var param in conversion.Parameters.Elements)
-        {
-            var visitedParam = Visit(param.Element, p);
-            if (visitedParam is Statement s)
-            {
-                if (!ReferenceEquals(s, param.Element)) paramsChanged = true;
-                paramElements.Add(param.WithElement(s));
-            }
-            else
-            {
-                paramElements.Add(param);
-            }
-        }
-        if (paramsChanged)
-        {
-            newParams = conversion.Parameters.WithElements(paramElements);
-            changed = true;
-        }
+        var newReturnType = VisitLeftPadded(conversion.ReturnType, p)!;
+        if (!ReferenceEquals(newReturnType, conversion.ReturnType)) changed = true;
 
-        JLeftPadded<Expression>? newExprBody = conversion.ExpressionBody;
-        if (conversion.ExpressionBody != null)
-        {
-            var visitedExpr = Visit(conversion.ExpressionBody.Element, p);
-            if (visitedExpr is Expression e && !ReferenceEquals(e, conversion.ExpressionBody.Element))
-            {
-                newExprBody = conversion.ExpressionBody.WithElement(e);
-                changed = true;
-            }
-        }
+        var newParams = VisitContainer(conversion.Parameters, p);
+        if (!ReferenceEquals(newParams, conversion.Parameters)) changed = true;
+
+        var newExprBody = VisitLeftPadded(conversion.ExpressionBody, p);
+        if (!ReferenceEquals(newExprBody, conversion.ExpressionBody)) changed = true;
 
         Block? newBody = conversion.Body;
         if (conversion.Body != null)
@@ -2691,7 +2255,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return changed
             ? conversion.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                        .WithReturnType(newReturnType).WithParameters(newParams)
+                        .WithInterfaceSpecifier(newInterfaceSpec)
+                        .WithReturnType(newReturnType).WithParameters(newParams ?? conversion.Parameters)
                         .WithExpressionBody(newExprBody).WithBody(newBody)
             : conversion;
     }
@@ -2720,16 +2285,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
         if (attrChanged) changed = true;
 
-        JRightPadded<TypeTree>? newInterfaceSpec = operatorDeclaration.ExplicitInterfaceSpecifier;
-        if (operatorDeclaration.ExplicitInterfaceSpecifier != null)
-        {
-            var visitedIs = Visit(operatorDeclaration.ExplicitInterfaceSpecifier.Element, p);
-            if (visitedIs is TypeTree ist && !ReferenceEquals(ist, operatorDeclaration.ExplicitInterfaceSpecifier.Element))
-            {
-                newInterfaceSpec = operatorDeclaration.ExplicitInterfaceSpecifier.WithElement(ist);
-                changed = true;
-            }
-        }
+        var newInterfaceSpec = VisitRightPadded(operatorDeclaration.ExplicitInterfaceSpecifier, p);
+        if (!ReferenceEquals(newInterfaceSpec, operatorDeclaration.ExplicitInterfaceSpecifier)) changed = true;
 
         Keyword newOpKw = operatorDeclaration.OperatorKeyword;
         var visitedOpKw = Visit(operatorDeclaration.OperatorKeyword, p);
@@ -2758,27 +2315,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JContainer<Expression> newParams = operatorDeclaration.Parameters;
-        var paramElements = new List<JRightPadded<Expression>>();
-        bool paramsChanged = false;
-        foreach (var param in operatorDeclaration.Parameters.Elements)
-        {
-            var visitedParam = Visit(param.Element, p);
-            if (visitedParam is Expression pe)
-            {
-                if (!ReferenceEquals(pe, param.Element)) paramsChanged = true;
-                paramElements.Add(param.WithElement(pe));
-            }
-            else
-            {
-                paramElements.Add(param);
-            }
-        }
-        if (paramsChanged)
-        {
-            newParams = operatorDeclaration.Parameters.WithElements(paramElements);
-            changed = true;
-        }
+        var newParams = VisitContainer(operatorDeclaration.Parameters, p);
+        if (!ReferenceEquals(newParams, operatorDeclaration.Parameters)) changed = true;
 
         Block newBody = operatorDeclaration.Body;
         var visitedBody = Visit(operatorDeclaration.Body, p);
@@ -2796,7 +2334,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
                                  .WithAttributeLists(attrChanged ? newAttrLists : operatorDeclaration.AttributeLists)
                                  .WithExplicitInterfaceSpecifier(newInterfaceSpec)
                                  .WithOperatorKeyword(newOpKw).WithCheckedKeyword(newCheckedKw)
-                                 .WithReturnType(newReturnType).WithParameters(newParams)
+                                 .WithReturnType(newReturnType).WithParameters(newParams ?? operatorDeclaration.Parameters)
                                  .WithBody(newBody).WithMethodType(newMethodType)
             : operatorDeclaration;
     }
@@ -2832,49 +2370,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        JLeftPadded<Identifier> newName = enumDeclaration.NamePadded;
-        var visitedName = Visit(enumDeclaration.NamePadded.Element, p);
-        if (visitedName is Identifier id && !ReferenceEquals(id, enumDeclaration.NamePadded.Element))
-        {
-            newName = enumDeclaration.NamePadded.WithElement(id);
-            changed = true;
-        }
+        var newName = VisitLeftPadded(enumDeclaration.NamePadded, p)!;
+        if (!ReferenceEquals(newName, enumDeclaration.NamePadded)) changed = true;
 
-        JLeftPadded<TypeTree>? newBaseType = enumDeclaration.BaseType;
-        if (enumDeclaration.BaseType != null)
-        {
-            var visitedBase = Visit(enumDeclaration.BaseType.Element, p);
-            if (visitedBase is TypeTree bt && !ReferenceEquals(bt, enumDeclaration.BaseType.Element))
-            {
-                newBaseType = enumDeclaration.BaseType.WithElement(bt);
-                changed = true;
-            }
-        }
+        var newBaseType = VisitLeftPadded(enumDeclaration.BaseType, p);
+        if (!ReferenceEquals(newBaseType, enumDeclaration.BaseType)) changed = true;
 
-        JContainer<Expression>? newMembers = enumDeclaration.Members;
-        if (enumDeclaration.Members != null)
-        {
-            var memberElements = new List<JRightPadded<Expression>>();
-            bool membersChanged = false;
-            foreach (var m in enumDeclaration.Members.Elements)
-            {
-                var visitedM = Visit(m.Element, p);
-                if (visitedM is Expression e)
-                {
-                    if (!ReferenceEquals(e, m.Element)) membersChanged = true;
-                    memberElements.Add(m.WithElement(e));
-                }
-                else
-                {
-                    memberElements.Add(m);
-                }
-            }
-            if (membersChanged)
-            {
-                newMembers = enumDeclaration.Members.WithElements(memberElements);
-                changed = true;
-            }
-        }
+        var newMembers = VisitContainer(enumDeclaration.Members, p);
+        if (!ReferenceEquals(newMembers, enumDeclaration.Members)) changed = true;
 
         return changed
             ? enumDeclaration.WithPrefix(newPrefix).WithMarkers(newMarkers)
@@ -2914,16 +2417,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JLeftPadded<Expression>? newInit = enumMember.Initializer;
-        if (enumMember.Initializer != null)
-        {
-            var visitedInit = Visit(enumMember.Initializer.Element, p);
-            if (visitedInit is Expression ie && !ReferenceEquals(ie, enumMember.Initializer.Element))
-            {
-                newInit = enumMember.Initializer.WithElement(ie);
-                changed = true;
-            }
-        }
+        var newInit = VisitLeftPadded(enumMember.Initializer, p);
+        if (!ReferenceEquals(newInit, enumMember.Initializer)) changed = true;
 
         return changed
             ? enumMember.WithPrefix(newPrefix).WithMarkers(newMarkers)
@@ -2943,13 +2438,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(aliasQualifiedName.Markers, p);
         if (!ReferenceEquals(newMarkers, aliasQualifiedName.Markers)) changed = true;
 
-        JRightPadded<Identifier> newAlias = aliasQualifiedName.Alias;
-        var visitedAlias = Visit(aliasQualifiedName.Alias.Element, p);
-        if (visitedAlias is Identifier aid && !ReferenceEquals(aid, aliasQualifiedName.Alias.Element))
-        {
-            newAlias = aliasQualifiedName.Alias.WithElement(aid);
-            changed = true;
-        }
+        var newAlias = VisitRightPadded(aliasQualifiedName.Alias, p)!;
+        if (!ReferenceEquals(newAlias, aliasQualifiedName.Alias)) changed = true;
 
         Expression newName = aliasQualifiedName.Name;
         var visited = Visit(aliasQualifiedName.Name, p);
@@ -3011,13 +2501,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JLeftPadded<Identifier> newName = pointerFieldAccess.NamePadded;
-        var visitedName = Visit(pointerFieldAccess.NamePadded.Element, p);
-        if (visitedName is Identifier id && !ReferenceEquals(id, pointerFieldAccess.NamePadded.Element))
-        {
-            newName = pointerFieldAccess.NamePadded.WithElement(id);
-            changed = true;
-        }
+        var newName = VisitLeftPadded(pointerFieldAccess.NamePadded, p)!;
+        if (!ReferenceEquals(newName, pointerFieldAccess.NamePadded)) changed = true;
 
         JavaType? newType = (JavaType?)VisitType(pointerFieldAccess.Type, p);
         if (!ReferenceEquals(newType, pointerFieldAccess.Type)) changed = true;
@@ -3143,13 +2628,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        JRightPadded<Identifier> newId = fromClause.IdentifierPadded;
-        var visitedId = Visit(fromClause.IdentifierPadded.Element, p);
-        if (visitedId is Identifier id && !ReferenceEquals(id, fromClause.IdentifierPadded.Element))
-        {
-            newId = fromClause.IdentifierPadded.WithElement(id);
-            changed = true;
-        }
+        var newId = VisitRightPadded(fromClause.IdentifierPadded, p)!;
+        if (!ReferenceEquals(newId, fromClause.IdentifierPadded)) changed = true;
 
         Expression newExpr = fromClause.Expression;
         var expr = Visit(fromClause.Expression, p);
@@ -3175,13 +2655,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(letClause.Markers, p);
         if (!ReferenceEquals(newMarkers, letClause.Markers)) changed = true;
 
-        JRightPadded<Identifier> newId = letClause.IdentifierPadded;
-        var visitedId = Visit(letClause.IdentifierPadded.Element, p);
-        if (visitedId is Identifier id && !ReferenceEquals(id, letClause.IdentifierPadded.Element))
-        {
-            newId = letClause.IdentifierPadded.WithElement(id);
-            changed = true;
-        }
+        var newId = VisitRightPadded(letClause.IdentifierPadded, p)!;
+        if (!ReferenceEquals(newId, letClause.IdentifierPadded)) changed = true;
 
         Expression newExpr = letClause.Expression;
         var expr = Visit(letClause.Expression, p);
@@ -3206,29 +2681,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(joinClause.Markers, p);
         if (!ReferenceEquals(newMarkers, joinClause.Markers)) changed = true;
 
-        JRightPadded<Identifier> newId = joinClause.IdentifierPadded;
-        var visitedId = Visit(joinClause.IdentifierPadded.Element, p);
-        if (visitedId is Identifier id && !ReferenceEquals(id, joinClause.IdentifierPadded.Element))
-        {
-            newId = joinClause.IdentifierPadded.WithElement(id);
-            changed = true;
-        }
+        var newId = VisitRightPadded(joinClause.IdentifierPadded, p)!;
+        if (!ReferenceEquals(newId, joinClause.IdentifierPadded)) changed = true;
 
-        JRightPadded<Expression> newIn = joinClause.InExpression;
-        var visitedIn = Visit(joinClause.InExpression.Element, p);
-        if (visitedIn is Expression ie && !ReferenceEquals(ie, joinClause.InExpression.Element))
-        {
-            newIn = joinClause.InExpression.WithElement(ie);
-            changed = true;
-        }
+        var newIn = VisitRightPadded(joinClause.InExpression, p)!;
+        if (!ReferenceEquals(newIn, joinClause.InExpression)) changed = true;
 
-        JRightPadded<Expression> newLeft = joinClause.LeftExpression;
-        var visitedLeft = Visit(joinClause.LeftExpression.Element, p);
-        if (visitedLeft is Expression le && !ReferenceEquals(le, joinClause.LeftExpression.Element))
-        {
-            newLeft = joinClause.LeftExpression.WithElement(le);
-            changed = true;
-        }
+        var newLeft = VisitRightPadded(joinClause.LeftExpression, p)!;
+        if (!ReferenceEquals(newLeft, joinClause.LeftExpression)) changed = true;
 
         Expression newRight = joinClause.RightExpression;
         var visitedRight = Visit(joinClause.RightExpression, p);
@@ -3238,16 +2698,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JLeftPadded<JoinIntoClause>? newInto = joinClause.Into;
-        if (joinClause.Into != null)
-        {
-            var visitedInto = Visit(joinClause.Into.Element, p);
-            if (visitedInto is JoinIntoClause jic && !ReferenceEquals(jic, joinClause.Into.Element))
-            {
-                newInto = joinClause.Into.WithElement(jic);
-                changed = true;
-            }
-        }
+        var newInto = VisitLeftPadded(joinClause.Into, p);
+        if (!ReferenceEquals(newInto, joinClause.Into)) changed = true;
 
         return changed
             ? joinClause.WithPrefix(newPrefix).WithMarkers(newMarkers)
@@ -3313,13 +2765,19 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         if (!ReferenceEquals(newMarkers, orderByClause.Markers)) changed = true;
 
         var orderings = new List<JRightPadded<Ordering>>();
+        bool orderingsChanged = false;
         foreach (var rp in orderByClause.Orderings)
         {
-            var visited = (Ordering)VisitOrdering(rp.Element, p);
-            if (!ReferenceEquals(visited, rp.Element)) changed = true;
-            orderings.Add(rp.WithElement(visited));
+            var visited = VisitRightPadded(rp, p);
+            if (visited != null)
+            {
+                if (!ReferenceEquals(visited, rp)) orderingsChanged = true;
+                orderings.Add(visited);
+            }
+            else orderingsChanged = true;
         }
-        return changed ? orderByClause.WithPrefix(newPrefix).WithMarkers(newMarkers).WithOrderings(orderings) : orderByClause;
+        if (orderingsChanged) changed = true;
+        return changed ? orderByClause.WithPrefix(newPrefix).WithMarkers(newMarkers).WithOrderings(orderingsChanged ? orderings : orderByClause.Orderings) : orderByClause;
     }
 
     public virtual J VisitOrdering(Ordering ordering, P p)
@@ -3332,13 +2790,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(ordering.Markers, p);
         if (!ReferenceEquals(newMarkers, ordering.Markers)) changed = true;
 
-        JRightPadded<Expression> newExprPadded = ordering.ExpressionPadded;
-        var expr = Visit(ordering.Expression, p);
-        if (expr is Expression e && !ReferenceEquals(e, ordering.Expression))
-        {
-            newExprPadded = ordering.ExpressionPadded.WithElement(e);
-            changed = true;
-        }
+        var newExprPadded = VisitRightPadded(ordering.ExpressionPadded, p)!;
+        if (!ReferenceEquals(newExprPadded, ordering.ExpressionPadded)) changed = true;
 
         return changed
             ? ordering.WithPrefix(newPrefix).WithMarkers(newMarkers).WithExpressionPadded(newExprPadded)
@@ -3378,13 +2831,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(groupClause.Markers, p);
         if (!ReferenceEquals(newMarkers, groupClause.Markers)) changed = true;
 
-        JRightPadded<Expression> newGroupExpr = groupClause.GroupExpression;
-        var visitedGroup = Visit(groupClause.GroupExpression.Element, p);
-        if (visitedGroup is Expression ge && !ReferenceEquals(ge, groupClause.GroupExpression.Element))
-        {
-            newGroupExpr = groupClause.GroupExpression.WithElement(ge);
-            changed = true;
-        }
+        var newGroupExpr = VisitRightPadded(groupClause.GroupExpression, p)!;
+        if (!ReferenceEquals(newGroupExpr, groupClause.GroupExpression)) changed = true;
 
         Expression newKey = groupClause.Key;
         var visitedKey = Visit(groupClause.Key, p);
@@ -3441,29 +2889,15 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(anonymousObject.Markers, p);
         if (!ReferenceEquals(newMarkers, anonymousObject.Markers)) changed = true;
 
-        var initElements = new List<JRightPadded<Expression>>();
-        bool initsChanged = false;
-        foreach (var init in anonymousObject.Initializers.Elements)
-        {
-            var visited = Visit(init.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, init.Element)) initsChanged = true;
-                initElements.Add(init.WithElement(e));
-            }
-            else
-            {
-                initElements.Add(init);
-            }
-        }
-        if (initsChanged) changed = true;
+        var newInits = VisitContainer(anonymousObject.Initializers, p);
+        if (!ReferenceEquals(newInits, anonymousObject.Initializers)) changed = true;
 
         JavaType? newType = (JavaType?)VisitType(anonymousObject.Type, p);
         if (!ReferenceEquals(newType, anonymousObject.Type)) changed = true;
 
         return changed
             ? anonymousObject.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                             .WithInitializers(initsChanged ? anonymousObject.Initializers.WithElements(initElements) : anonymousObject.Initializers)
+                             .WithInitializers(newInits ?? anonymousObject.Initializers)
                              .WithType(newType)
             : anonymousObject;
     }
@@ -3487,13 +2921,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             changed = true;
         }
 
-        JLeftPadded<Expression> newInit = withExpression.InitializerPadded;
-        var visitedInit = Visit(withExpression.InitializerPadded.Element, p);
-        if (visitedInit is Expression ie && !ReferenceEquals(ie, withExpression.InitializerPadded.Element))
-        {
-            newInit = withExpression.InitializerPadded.WithElement(ie);
-            changed = true;
-        }
+        var newInit = VisitLeftPadded(withExpression.InitializerPadded, p)!;
+        if (!ReferenceEquals(newInit, withExpression.InitializerPadded)) changed = true;
 
         JavaType? newType = (JavaType?)VisitType(withExpression.Type, p);
         if (!ReferenceEquals(newType, withExpression.Type)) changed = true;
@@ -3542,56 +2971,72 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(functionPointerType.Markers, p);
         if (!ReferenceEquals(newMarkers, functionPointerType.Markers)) changed = true;
 
-        if (functionPointerType.UnmanagedCallingConventionTypes != null)
+        var newConvTypes = VisitContainer(functionPointerType.UnmanagedCallingConventionTypes, p);
+        if (!ReferenceEquals(newConvTypes, functionPointerType.UnmanagedCallingConventionTypes))
         {
-            var convElements = new List<JRightPadded<Identifier>>();
-            bool convChanged = false;
-            foreach (var ct in functionPointerType.UnmanagedCallingConventionTypes.Elements)
-            {
-                var visited = Visit(ct.Element, p);
-                if (visited is Identifier id)
-                {
-                    if (!ReferenceEquals(id, ct.Element)) convChanged = true;
-                    convElements.Add(ct.WithElement(id));
-                }
-                else
-                {
-                    convElements.Add(ct);
-                }
-            }
-            if (convChanged)
-            {
-                functionPointerType = functionPointerType.WithUnmanagedCallingConventionTypes(
-                    functionPointerType.UnmanagedCallingConventionTypes.WithElements(convElements));
-                changed = true;
-            }
+            functionPointerType = functionPointerType.WithUnmanagedCallingConventionTypes(newConvTypes);
+            changed = true;
         }
 
-        var paramTypeElements = new List<JRightPadded<TypeTree>>();
-        bool paramTypesChanged = false;
-        foreach (var pt in functionPointerType.ParameterTypes.Elements)
-        {
-            var visited = Visit(pt.Element, p);
-            if (visited is TypeTree tt)
-            {
-                if (!ReferenceEquals(tt, pt.Element)) paramTypesChanged = true;
-                paramTypeElements.Add(pt.WithElement(tt));
-            }
-            else
-            {
-                paramTypeElements.Add(pt);
-            }
-        }
-        if (paramTypesChanged) changed = true;
+        var newParamTypes = VisitContainer(functionPointerType.ParameterTypes, p);
+        if (!ReferenceEquals(newParamTypes, functionPointerType.ParameterTypes)) changed = true;
 
         JavaType? newType = (JavaType?)VisitType(functionPointerType.Type, p);
         if (!ReferenceEquals(newType, functionPointerType.Type)) changed = true;
 
         return changed
             ? functionPointerType.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                                 .WithParameterTypes(paramTypesChanged ? functionPointerType.ParameterTypes.WithElements(paramTypeElements) : functionPointerType.ParameterTypes)
+                                 .WithParameterTypes(newParamTypes ?? functionPointerType.ParameterTypes)
                                  .WithType(newType)
             : functionPointerType;
+    }
+
+    public virtual J VisitTypeWithArguments(TypeWithArguments twa, P p)
+    {
+        twa = (TypeWithArguments)VisitExpression(twa, p);
+        var changed = false;
+
+        var newPrefix = VisitSpace(twa.Prefix, p);
+        if (!ReferenceEquals(newPrefix, twa.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(twa.Markers, p);
+        if (!ReferenceEquals(newMarkers, twa.Markers)) changed = true;
+
+        var newType = (TypeTree?)Visit(twa.Type, p);
+        if (newType != null && !ReferenceEquals(newType, twa.Type)) changed = true;
+
+        var newArgs = VisitContainer(twa.Arguments, p);
+        if (!ReferenceEquals(newArgs, twa.Arguments)) changed = true;
+
+        return changed
+            ? twa.WithPrefix(newPrefix).WithMarkers(newMarkers)
+                 .WithType(newType ?? twa.Type)
+                 .WithArguments(newArgs ?? twa.Arguments)
+            : twa;
+    }
+
+    public virtual J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, P p)
+    {
+        eim = (ExplicitInterfaceMember)VisitStatement(eim, p);
+        var changed = false;
+
+        var newPrefix = VisitSpace(eim.Prefix, p);
+        if (!ReferenceEquals(newPrefix, eim.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(eim.Markers, p);
+        if (!ReferenceEquals(newMarkers, eim.Markers)) changed = true;
+
+        var newInterfaceSpecifier = VisitRightPadded(eim.InterfaceSpecifier, p)!;
+        if (!ReferenceEquals(newInterfaceSpecifier, eim.InterfaceSpecifier)) changed = true;
+
+        var newMethodDecl = (MethodDeclaration?)Visit(eim.MethodDeclaration, p);
+        if (newMethodDecl != null && !ReferenceEquals(newMethodDecl, eim.MethodDeclaration)) changed = true;
+
+        return changed
+            ? eim.WithPrefix(newPrefix).WithMarkers(newMarkers)
+                 .WithInterfaceSpecifier(newInterfaceSpecifier)
+                 .WithMethodDeclaration(newMethodDecl ?? eim.MethodDeclaration)
+            : eim;
     }
 
     /// <summary>

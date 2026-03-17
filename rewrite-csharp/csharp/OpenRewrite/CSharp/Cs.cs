@@ -3246,6 +3246,7 @@ public sealed class ConversionOperatorDeclaration(
     Markers markers,
     IList<Modifier> modifiers,
     JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> kind,
+    JRightPadded<TypeTree>? interfaceSpecifier,
     JLeftPadded<TypeTree> returnType,
     JContainer<Statement> parameters,
     JLeftPadded<Expression>? expressionBody,
@@ -3257,29 +3258,33 @@ public sealed class ConversionOperatorDeclaration(
     public Markers Markers { get; } = markers;
     public IList<Modifier> Modifiers { get; } = modifiers;
     public JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> Kind { get; } = kind;
+    /// <summary>The explicit interface type (e.g., N.I), right-padded with the space before the dot. Null when no explicit interface.</summary>
+    public JRightPadded<TypeTree>? InterfaceSpecifier { get; } = interfaceSpecifier;
     public JLeftPadded<TypeTree> ReturnType { get; } = returnType;
     public JContainer<Statement> Parameters { get; } = parameters;
     public JLeftPadded<Expression>? ExpressionBody { get; } = expressionBody;
     public Block? Body { get; } = body;
 
     public ConversionOperatorDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        id == Id ? this : new(id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithModifiers(IList<Modifier> modifiers) =>
-        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithKind(JLeftPadded<ConversionOperatorDeclaration.ExplicitImplicit> kind) =>
-        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, ReturnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(kind, Kind) ? this : new(Id, Prefix, Markers, Modifiers, kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
+    public ConversionOperatorDeclaration WithInterfaceSpecifier(JRightPadded<TypeTree>? interfaceSpecifier) =>
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, Modifiers, Kind, interfaceSpecifier, ReturnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithReturnType(JLeftPadded<TypeTree> returnType) =>
-        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, returnType, Parameters, ExpressionBody, Body);
+        ReferenceEquals(returnType, ReturnType) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, returnType, Parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithParameters(JContainer<Statement> parameters) =>
-        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, ReturnType, parameters, ExpressionBody, Body);
+        ReferenceEquals(parameters, Parameters) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, parameters, ExpressionBody, Body);
     public ConversionOperatorDeclaration WithExpressionBody(JLeftPadded<Expression>? expressionBody) =>
-        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, ReturnType, Parameters, expressionBody, Body);
+        ReferenceEquals(expressionBody, ExpressionBody) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, expressionBody, Body);
     public ConversionOperatorDeclaration WithBody(Block? body) =>
-        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, ReturnType, Parameters, ExpressionBody, body);
+        ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Modifiers, Kind, InterfaceSpecifier, ReturnType, Parameters, ExpressionBody, body);
 
     public enum ExplicitImplicit { Implicit, Explicit }
     Tree Tree.WithId(Guid id) => WithId(id);
@@ -3795,6 +3800,80 @@ public sealed class FunctionPointerType(
 
     public bool Equals(FunctionPointerType? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as FunctionPointerType);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// A base type reference with constructor arguments, e.g., Base(x, y) in class Derived(int x) : Base(x, y) { }.
+/// Wraps a TypeTree for the base type and a JContainer for the argument list.
+/// </summary>
+public sealed class TypeWithArguments(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    TypeTree type,
+    JContainer<Expression> arguments
+) : Cs, TypeTree, Expression, IEquatable<TypeWithArguments>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public TypeTree Type { get; } = type;
+    public JContainer<Expression> Arguments { get; } = arguments;
+    public JavaType? NodeType => null;
+
+    public TypeWithArguments WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Type, Arguments);
+    public TypeWithArguments WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Type, Arguments);
+    public TypeWithArguments WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Type, Arguments);
+    public TypeWithArguments WithType(TypeTree type) =>
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, type, Arguments);
+    public TypeWithArguments WithArguments(JContainer<Expression> arguments) =>
+        ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, Type, arguments);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(TypeWithArguments? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as TypeWithArguments);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// Wraps a J.MethodDeclaration that has an explicit interface specifier (e.g., void IFoo.Bar()).
+/// The interface specifier is stored separately since J.MethodDeclaration.Name is Identifier only.
+/// </summary>
+public sealed class ExplicitInterfaceMember(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    JRightPadded<TypeTree> interfaceSpecifier,
+    MethodDeclaration methodDeclaration
+) : Cs, Statement, IEquatable<ExplicitInterfaceMember>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    /// <summary>The interface type (e.g., IFoo), right-padded with the space before the dot.</summary>
+    public JRightPadded<TypeTree> InterfaceSpecifier { get; } = interfaceSpecifier;
+    public MethodDeclaration MethodDeclaration { get; } = methodDeclaration;
+
+    public ExplicitInterfaceMember WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, InterfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, InterfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, InterfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithInterfaceSpecifier(JRightPadded<TypeTree> interfaceSpecifier) =>
+        ReferenceEquals(interfaceSpecifier, InterfaceSpecifier) ? this : new(Id, Prefix, Markers, interfaceSpecifier, MethodDeclaration);
+    public ExplicitInterfaceMember WithMethodDeclaration(MethodDeclaration methodDeclaration) =>
+        ReferenceEquals(methodDeclaration, MethodDeclaration) ? this : new(Id, Prefix, Markers, InterfaceSpecifier, methodDeclaration);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ExplicitInterfaceMember? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ExplicitInterfaceMember);
     public override int GetHashCode() => Id.GetHashCode();
 }
 

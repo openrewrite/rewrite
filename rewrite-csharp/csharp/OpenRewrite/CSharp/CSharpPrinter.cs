@@ -3416,6 +3416,31 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return functionPointerType;
     }
 
+    public override J VisitTypeWithArguments(TypeWithArguments twa, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(twa, p);
+        Visit(twa.Type, p);
+        VisitContainer("(", twa.Arguments, ",", ")", p);
+        AfterSyntax(twa, p);
+        return twa;
+    }
+
+    public override J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(eim, p);
+
+        // Print the interface specifier: IFoo.
+        Visit(eim.InterfaceSpecifier.Element, p);
+        VisitSpace(eim.InterfaceSpecifier.After, p);
+        p.Append('.');
+
+        // Print the wrapped method declaration (without its own prefix, since we handle it)
+        Visit(eim.MethodDeclaration, p);
+
+        AfterSyntax(eim, p);
+        return eim;
+    }
+
     public override J VisitDelegateDeclaration(DelegateDeclaration delegateDeclaration, PrintOutputCapture<P> p)
     {
         BeforeSyntax(delegateDeclaration, p);
@@ -3644,6 +3669,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // implicit/explicit kind
         VisitSpace(conversion.Kind.Before, p);
         p.Append(conversion.Kind.Element == ConversionOperatorDeclaration.ExplicitImplicit.Implicit ? "implicit" : "explicit");
+
+        // Explicit interface specifier (e.g., N.I.)
+        if (conversion.InterfaceSpecifier != null)
+        {
+            Visit(conversion.InterfaceSpecifier.Element, p);
+            VisitSpace(conversion.InterfaceSpecifier.After, p);
+            p.Append('.');
+        }
 
         // 'operator' keyword + return type
         VisitSpace(conversion.ReturnType.Before, p);
