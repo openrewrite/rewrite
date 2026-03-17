@@ -15,1406 +15,1591 @@
  */
 package org.openrewrite.csharp.rpc;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.marketplace.RecipeBundle;
-import org.openrewrite.marketplace.RecipeMarketplace;
-import org.openrewrite.rpc.RewriteRpc;
-import org.openrewrite.tree.ParseError;
+import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.lang.reflect.Field;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.csharp.Assertions.csharp;
 
 /**
  * Integration tests for C# RPC communication.
+ * Uses rewriteRun with csharp() assertions for round-trip verification.
  */
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
-class CSharpRpcTest {
+class CSharpRpcTest implements RewriteTest {
 
-    private static final String TEST_CSPROJ = """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
-              </PropertyGroup>
-            </Project>
-            """;
+    // ---- Round-trip parsing tests ----
 
-    private static boolean factoryConfigured = false;
-    private CSharpRewriteRpc rpc;
-
-    private List<SourceFile> parseSolution(Path tempDir, Path... sourceFiles) throws IOException {
-        Path csproj = tempDir.resolve("Test.csproj");
-        if (!Files.exists(csproj)) {
-            Files.writeString(csproj, TEST_CSPROJ);
-        }
-        return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).toList();
-    }
-
-    @BeforeEach
-    void setUp() {
-        if (!factoryConfigured) {
-            Path csharpServerEntry = findCSharpServerEntry();
-            CSharpRewriteRpc.setFactory(
-                    CSharpRewriteRpc.builder()
-                            .csharpServerEntry(csharpServerEntry)
-                            .timeout(Duration.ofSeconds(120))
-                            .traceRpcMessages(true)
-                            .log(Paths.get("/tmp/csharp-rpc.log"))
-            );
-            factoryConfigured = true;
-        }
-        rpc = CSharpRewriteRpc.getOrStart();
-    }
-
-    @AfterEach
-    void tearDown() {
-        CSharpRewriteRpc.shutdownCurrent();
-    }
-
-    private static Path findCSharpServerEntry() {
-        // Try common locations relative to the test run directory
-        Path basePath = Paths.get(System.getProperty("user.dir"));
-        Path[] searchPaths = {
-                // From rewrite-csharp module dir
-                basePath.resolve("csharp"),
-                // From rewrite root dir
-                basePath.resolve("rewrite-csharp/csharp"),
-        };
-
-        for (Path searchPath : searchPaths) {
-            Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-            if (csproj.toFile().exists()) {
-                return csproj.toAbsolutePath().normalize();
+    @Test
+    void parseAndPrintSimpleClass() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class HelloWorld
+                {
+                    public void SayHello()
+                    {
+                        Console.WriteLine("Hello, World!");
+                    }
+                }
             }
-        }
-
-        throw new IllegalStateException("Could not find C# Rewrite project");
+            """
+        ));
     }
 
     @Test
-    void rpcServerStarts() {
-        // Just verify the RPC server starts and responds
-        assertThat(rpc).isNotNull();
-        assertThat(rpc.getCommand()).contains("dotnet");
-    }
-
-    @Test
-    void parseAndPrintSimpleClass(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
+    void parseClassWithProperties() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Person
                 {
-                    public class HelloWorld
+                    public string FirstName { get; set; }
+                    public string LastName { get; set; }
+                    public int Age { get; set; }
+            
+                    public string FullName => $"{FirstName} {LastName}";
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseClassWithUsings() {
+        rewriteRun(csharp(
+          """
+            using System;
+            using System.Collections.Generic;
+            using System.Linq;
+            
+            namespace Services
+            {
+                public class DataService
+                {
+                    private readonly List<string> _items = new();
+            
+                    public void AddItem(string item)
                     {
-                        public void SayHello()
+                        _items.Add(item);
+                    }
+            
+                    public IEnumerable<string> GetItems()
+                    {
+                        return _items.Where(x => !string.IsNullOrEmpty(x));
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseMultipleFiles() {
+        rewriteRun(
+          csharp(
+            """
+              namespace Models
+              {
+                  public class Person
+                  {
+                      public string Name { get; set; }
+                  }
+              }
+              """
+          ),
+          csharp(
+            """
+              namespace Models
+              {
+                  public class Address
+                  {
+                      public string Street { get; set; }
+                      public string City { get; set; }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void parseAsyncAwait() {
+        rewriteRun(csharp(
+          """
+            using System.Threading.Tasks;
+            
+            namespace Services
+            {
+                public class AsyncService
+                {
+                    public async Task<string> GetDataAsync()
+                    {
+                        await Task.Delay(100);
+                        return "data";
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseSwitchExpression() {
+        rewriteRun(csharp(
+          """
+            namespace Utils
+            {
+                public class Formatter
+                {
+                    public string FormatDay(int day) => day switch
+                    {
+                        1 => "Monday",
+                        2 => "Tuesday",
+                        3 => "Wednesday",
+                        4 => "Thursday",
+                        5 => "Friday",
+                        6 => "Saturday",
+                        7 => "Sunday",
+                        _ => "Unknown"
+                    };
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parsePatternMatching() {
+        rewriteRun(csharp(
+          """
+            namespace Utils
+            {
+                public class TypeChecker
+                {
+                    public string Describe(object obj)
+                    {
+                        if (obj is string s)
                         {
-                            Console.WriteLine("Hello, World!");
+                            return $"String with length {s.Length}";
                         }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("HelloWorld.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-
-        // Verify it's not a parse error
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        // Verify it's a C# compilation unit
-        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
-
-        // Verify print roundtrip - the printed output should match the input
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-        // Verify no unparsed code hiding in spaces
-
-    }
-
-    @Test
-    void parseClassWithProperties(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public class Person
-                    {
-                        public string FirstName { get; set; }
-                        public string LastName { get; set; }
-                        public int Age { get; set; }
-
-                        public string FullName => $"{FirstName} {LastName}";
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Person.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
-
-        // Verify print roundtrip
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-    }
-
-    @Test
-    void parseClassWithUsings(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-                using System.Collections.Generic;
-                using System.Linq;
-
-                namespace Services
-                {
-                    public class DataService
-                    {
-                        private readonly List<string> _items = new();
-
-                        public void AddItem(string item)
+                        else if (obj is int n and > 0)
                         {
-                            _items.Add(item);
+                            return $"Positive int: {n}";
                         }
-
-                        public IEnumerable<string> GetItems()
+                        else if (obj is null)
                         {
-                            return _items.Where(x => !string.IsNullOrEmpty(x));
+                            return "null";
                         }
+                        return "unknown";
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("DataService.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
-
-        Cs.CompilationUnit cu = (Cs.CompilationUnit) parsed;
-
-        // Verify usings were parsed (usings are in the flat members list)
-        assertThat(cu.getMembers().stream().filter(m -> m instanceof Cs.UsingDirective).count()).isEqualTo(3);
-
-        // Verify print roundtrip
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parseMultipleFiles(@TempDir Path tempDir) throws IOException {
-        String source1 = """
-                namespace Models
+    void parseRecord() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public record Point(int X, int Y);
+            
+                public record Person(string FirstName, string LastName)
                 {
-                    public class Person
-                    {
-                        public string Name { get; set; }
-                    }
+                    public string FullName => $"{FirstName} {LastName}";
                 }
-                """;
-
-        String source2 = """
-                namespace Models
-                {
-                    public class Address
-                    {
-                        public string Street { get; set; }
-                        public string City { get; set; }
-                    }
-                }
-                """;
-
-        Path file1 = tempDir.resolve("Person.cs");
-        Path file2 = tempDir.resolve("Address.cs");
-        Files.writeString(file1, source1);
-        Files.writeString(file2, source2);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(2);
-
-        for (SourceFile sf : sourceFiles) {
-            assertThat(sf).isNotInstanceOf(ParseError.class);
-            assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
-            assertThat(rpc.print(sf)).isNotBlank();
-        }
+            }
+            """
+        ));
     }
 
     @Test
-    void parseAsyncAwait(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System.Threading.Tasks;
-
-                namespace Services
+    void parseRegionDirective() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class Foo
                 {
-                    public class AsyncService
+                    #region Methods
+                    public void A()
                     {
-                        public async Task<string> GetDataAsync()
-                        {
-                            await Task.Delay(100);
-                            return "data";
-                        }
                     }
+                    #endregion
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("AsyncService.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        // Verify print roundtrip
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parseSwitchExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Utils
+    void parsePragmaWarningDirective() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class Foo
                 {
-                    public class Formatter
+                    #pragma warning disable CS0168
+                    public void A()
                     {
-                        public string FormatDay(int day) => day switch
-                        {
-                            1 => "Monday",
-                            2 => "Tuesday",
-                            3 => "Wednesday",
-                            4 => "Thursday",
-                            5 => "Friday",
-                            6 => "Saturday",
-                            7 => "Sunday",
-                            _ => "Unknown"
-                        };
+                        int x;
                     }
+                    #pragma warning restore CS0168
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Formatter.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        // Verify print roundtrip
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parsePatternMatching(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Utils
+    void parseNullableDirective() {
+        rewriteRun(csharp(
+          """
+            #nullable enable
+            namespace Test
+            {
+                public class Foo
                 {
-                    public class TypeChecker
-                    {
-                        public string Describe(object obj)
-                        {
-                            if (obj is string s)
-                            {
-                                return $"String with length {s.Length}";
-                            }
-                            else if (obj is int n and > 0)
-                            {
-                                return $"Positive int: {n}";
-                            }
-                            else if (obj is null)
-                            {
-                                return "null";
-                            }
-                            return "unknown";
-                        }
-                    }
+                    public string? Name { get; set; }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("TypeChecker.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        // Verify print roundtrip
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parseRecord(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseErrorAndWarningDirectives() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class Foo
                 {
-                    public record Point(int X, int Y);
-
-                    public record Person(string FirstName, string LastName)
+                    public void A()
                     {
-                        public string FullName => $"{FirstName} {LastName}";
+                        #warning This method is not implemented
+                        throw new System.NotImplementedException();
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Records.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        // Verify print roundtrip
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parseRegionDirective(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
+    void parseLineDirective() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class Foo
                 {
-                    public class Foo
+                    public void A()
                     {
-                        #region Methods
-                        public void A()
-                        {
-                        }
-                        #endregion
+                        #line 200
+                        int x = 1;
+                        #line default
+                        int y = 2;
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Region.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parsePragmaWarningDirective(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
+    void parsePragmaWarningMultipleCodes() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class Foo
                 {
-                    public class Foo
+                    #pragma warning disable CS0168, CS0219
+                    public void A()
                     {
-                        #pragma warning disable CS0168
-                        public void A()
-                        {
-                            int x;
-                        }
-                        #pragma warning restore CS0168
+                        int x;
+                        int y;
                     }
+                    #pragma warning restore CS0168, CS0219
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Pragma.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parseNullableDirective(@TempDir Path tempDir) throws IOException {
-        String source = """
-                #nullable enable
-                namespace Test
+    void parseClassWithFields() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Person
                 {
-                    public class Foo
-                    {
-                        public string? Name { get; set; }
-                    }
+                    private readonly string _name;
+                    public static int Count = 0;
+                    private readonly List<string> _items = new();
+                    private const int MaxItems = 100;
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Nullable.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parseErrorAndWarningDirectives(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
+    void parseClassWithConstructor() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Animal
                 {
-                    public class Foo
+                    private readonly string _name;
+            
+                    public Animal(string name)
                     {
-                        public void A()
-                        {
-                            #warning This method is not implemented
-                            throw new System.NotImplementedException();
-                        }
+                        _name = name;
+                    }
+            
+                    public string GetName()
+                    {
+                        return _name;
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("ErrorWarning.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
     @Test
-    void parseLineDirective(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
+    void parseConstructorWithInitializer() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Base
                 {
-                    public class Foo
+                    public Base(int x)
                     {
-                        public void A()
-                        {
-                            #line 200
-                            int x = 1;
-                            #line default
-                            int y = 2;
-                        }
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Line.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            
+                public class Derived : Base
+                {
+                    public Derived(int x) : base(x)
+                    {
+                    }
+                }
+            }
+            """
+        ));
     }
 
     @Test
-    void parsePragmaWarningMultipleCodes(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
+    void parseExpressionBodiedConstructor() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Point
                 {
-                    public class Foo
-                    {
-                        #pragma warning disable CS0168, CS0219
-                        public void A()
-                        {
-                            int x;
-                            int y;
-                        }
-                        #pragma warning restore CS0168, CS0219
-                    }
+                    private int _x;
+            
+                    public Point(int x) => _x = x;
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("PragmaMulti.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
+            }
+            """
+        ));
     }
 
+    // ---- Type attribution tests ----
+
     @Test
-    void parseClassWithFields(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseWithTypeAttribution() {
+        rewriteRun(csharp(
+          """
+            using System;
+            
+            namespace TypeTest
+            {
+                public class Calculator
                 {
-                    public class Person
+                    public int Add(int a, int b)
                     {
-                        private readonly string _name;
-                        public static int Count = 0;
-                        private readonly List<string> _items = new();
-                        private const int MaxItems = 100;
+                        return a + b;
+                    }
+            
+                    public string Greet(string name)
+                    {
+                        return "Hello, " + name;
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Person.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-    }
-
-    @Test
-    void parseClassWithConstructor(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public class Animal
-                    {
-                        private readonly string _name;
-
-                        public Animal(string name)
-                        {
-                            _name = name;
-                        }
-
-                        public string GetName()
-                        {
-                            return _name;
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Animal.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-    }
-
-    @Test
-    void parseConstructorWithInitializer(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public class Base
-                    {
-                        public Base(int x)
-                        {
-                        }
-                    }
-
-                    public class Derived : Base
-                    {
-                        public Derived(int x) : base(x)
-                        {
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Derived.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-    }
-
-    @Test
-    void parseExpressionBodiedConstructor(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public class Point
-                    {
-                        private int _x;
-
-                        public Point(int x) => _x = x;
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Point.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-    }
-
-    @Test
-    void getMarketplace() {
-        RecipeBundle bundle = new RecipeBundle("nuget", "test-recipes",
-                null, null, null);
-        RecipeMarketplace marketplace = rpc.getMarketplace(bundle);
-        assertThat(marketplace).isNotNull();
-        // No IRecipeActivator implementations in the base C# project,
-        // so the marketplace should be empty
-        assertThat(marketplace.getAllRecipes()).isEmpty();
-        assertThat(marketplace.getCategories()).isEmpty();
-    }
-
-    @Test
-    void parseWithTypeAttribution(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-
-                namespace TypeTest
-                {
-                    public class Calculator
-                    {
-                        public int Add(int a, int b)
-                        {
-                            return a + b;
-                        }
-
-                        public string Greet(string name)
-                        {
-                            return "Hello, " + name;
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Calculator.cs");
-        Files.writeString(sourceFile, source);
-
-        // Parse via MSBuildWorkspace which handles type attribution automatically
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
-
-        // Verify print roundtrip still works with type attribution
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-
-        // Navigate the tree: CompilationUnit -> namespace -> class -> methods
-        Cs.CompilationUnit cu = (Cs.CompilationUnit) parsed;
-        assertThat(cu.getMembers()).isNotEmpty();
-
-        // Find the namespace declaration (skip usings in flat members list)
-        Statement namespaceMember = cu.getMembers().stream()
+            }
+            """,
+          spec -> spec.beforeRecipe(cu -> {
+              Statement namespaceMember = cu.getMembers().stream()
                 .filter(m -> !(m instanceof Cs.UsingDirective))
                 .findFirst()
                 .orElseThrow();
 
-        // Find the class declaration within the namespace
-        J.ClassDeclaration classDecl = findFirst(namespaceMember, J.ClassDeclaration.class);
-        assertThat(classDecl).as("ClassDeclaration should be found in tree").isNotNull();
+              J.ClassDeclaration classDecl = findFirst(namespaceMember, J.ClassDeclaration.class);
+              assertThat(classDecl).isNotNull();
 
-        // Find the Add method to verify it was parsed correctly
-        J.MethodDeclaration addMethod = findMethodByName(classDecl, "Add");
-        assertThat(addMethod).as("Add method should be found").isNotNull();
-
-        // Verify type attribution is present on the method
-        assertThat(addMethod.getMethodType())
-                .as("MethodType should be populated via type attribution")
-                .isNotNull();
-        assertThat(addMethod.getMethodType().getName()).isEqualTo("Add");
-        assertThat(addMethod.getMethodType().getReturnType()).isInstanceOf(JavaType.Primitive.class);
-        assertThat(((JavaType.Primitive) addMethod.getMethodType().getReturnType()).getKeyword()).isEqualTo("int");
-
-        // Verify parameter types
-        assertThat(addMethod.getMethodType().getParameterTypes()).hasSize(2);
-        assertThat(addMethod.getMethodType().getParameterTypes().get(0)).isInstanceOf(JavaType.Primitive.class);
-        assertThat(addMethod.getMethodType().getParameterNames()).containsExactly("a", "b");
-
-        // Verify declaring type
-        assertThat(addMethod.getMethodType().getDeclaringType()).isNotNull();
-        assertThat(addMethod.getMethodType().getDeclaringType().getFullyQualifiedName())
+              J.MethodDeclaration addMethod = findMethodByName(classDecl, "Add");
+              assertThat(addMethod).isNotNull();
+              assertThat(addMethod.getMethodType()).isNotNull();
+              assertThat(addMethod.getMethodType().getName()).isEqualTo("Add");
+              assertThat(addMethod.getMethodType().getReturnType()).isInstanceOf(JavaType.Primitive.class);
+              assertThat(addMethod.getMethodType().getParameterNames()).containsExactly("a", "b");
+              assertThat(addMethod.getMethodType().getDeclaringType().getFullyQualifiedName())
                 .isEqualTo("TypeTest.Calculator");
 
-        // Find the Greet method
-        J.MethodDeclaration greetMethod = findMethodByName(classDecl, "Greet");
-        assertThat(greetMethod).as("Greet method should be found").isNotNull();
-        assertThat(greetMethod.getMethodType()).isNotNull();
-        assertThat(greetMethod.getMethodType().getName()).isEqualTo("Greet");
-        assertThat(greetMethod.getMethodType().getReturnType()).isInstanceOf(JavaType.Primitive.class);
-        assertThat(((JavaType.Primitive) greetMethod.getMethodType().getReturnType()).getKeyword()).isEqualTo("String");
+              J.MethodDeclaration greetMethod = findMethodByName(classDecl, "Greet");
+              assertThat(greetMethod).isNotNull();
+              assertThat(greetMethod.getMethodType()).isNotNull();
+              assertThat(greetMethod.getMethodType().getName()).isEqualTo("Greet");
+          })
+        ));
     }
 
     @Test
-    void comprehensiveTypeAttribution(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-
-                namespace TypeAttrTest
+    void comprehensiveTypeAttribution() {
+        rewriteRun(csharp(
+          """
+            using System;
+            
+            namespace TypeAttrTest
+            {
+                public class Animal
                 {
-                    public class Animal
+                    public string Name { get; set; }
+                    public int Age;
+            
+                    public int GetAge()
                     {
-                        public string Name { get; set; }
-                        public int Age;
-
-                        public int GetAge()
+                        return Age;
+                    }
+            
+                    public void Process(int x)
+                    {
+                        var y = x + x;
+                        if (y is int n)
                         {
-                            return Age;
-                        }
-
-                        public void Process(int x)
-                        {
-                            var y = x + x;
-                            if (y is int n)
-                            {
-                            }
-                        }
-
-                        public static void UseDelegate()
-                        {
-                            Action a = UseDelegate;
                         }
                     }
-
-                    public enum Color
+            
+                    public static void UseDelegate()
                     {
-                        Red,
-                        Green
+                        Action a = UseDelegate;
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Animal.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        // Verify round-trip
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-
-        Cs.CompilationUnit cu = (Cs.CompilationUnit) parsed;
-
-        // Find the namespace, then the class
-        Statement namespaceMember = cu.getMembers().stream()
+            
+                public enum Color
+                {
+                    Red,
+                    Green
+                }
+            }
+            """,
+          spec -> spec.beforeRecipe(cu -> {
+              Statement namespaceMember = cu.getMembers().stream()
                 .filter(m -> !(m instanceof Cs.UsingDirective))
                 .findFirst()
                 .orElseThrow();
 
-        // B1. Class declaration name has FullyQualified type
-        J.ClassDeclaration classDecl = findFirst(namespaceMember, J.ClassDeclaration.class);
-        assertThat(classDecl).isNotNull();
-        assertThat(classDecl.getName().getType())
-                .as("Class declaration name should have FullyQualified type")
+              J.ClassDeclaration classDecl = findFirst(namespaceMember, J.ClassDeclaration.class);
+              assertThat(classDecl).isNotNull();
+              assertThat(classDecl.getName().getType())
                 .isInstanceOf(JavaType.FullyQualified.class);
-        assertThat(((JavaType.FullyQualified) classDecl.getName().getType()).getFullyQualifiedName())
+              assertThat(((JavaType.FullyQualified) Objects.requireNonNull(classDecl.getName().getType()))
+                .getFullyQualifiedName())
                 .isEqualTo("TypeAttrTest.Animal");
 
-        // B3. Method declaration name has Method type
-        J.MethodDeclaration getAgeMethod = findMethodByName(classDecl, "GetAge");
-        assertThat(getAgeMethod).isNotNull();
-        assertThat(getAgeMethod.getName().getType())
-                .as("Method declaration name should have Method type")
-                .isInstanceOf(JavaType.Method.class);
-        assertThat(((JavaType.Method) getAgeMethod.getName().getType()).getName())
-                .isEqualTo("GetAge");
+              J.MethodDeclaration getAgeMethod = findMethodByName(classDecl, "GetAge");
+              assertThat(getAgeMethod).isNotNull();
+              assertThat(getAgeMethod.getName().getType()).isInstanceOf(JavaType.Method.class);
+          })
+        ));
+    }
 
-        // B5. Property declaration name has type + fieldType
-        // Find property by looking at class body statements
-        Cs.PropertyDeclaration propDecl = null;
-        for (Statement stmt : classDecl.getBody().getStatements()) {
-            if (stmt instanceof Cs.PropertyDeclaration pd && pd.getName().getSimpleName().equals("Name")) {
-                propDecl = pd;
-                break;
-            }
-        }
-        assertThat(propDecl).as("Property 'Name' should be found").isNotNull();
-        assertThat(propDecl.getName().getFieldType())
-                .as("Property name should have fieldType (Variable)")
-                .isNotNull();
+    // ---- More round-trip tests ----
 
-        // B7. Field declaration variable name has fieldType
-        J.VariableDeclarations fieldDecl = null;
-        for (Statement stmt : classDecl.getBody().getStatements()) {
-            if (stmt instanceof J.VariableDeclarations vd) {
-                for (J.VariableDeclarations.NamedVariable nv : vd.getVariables()) {
-                    if (nv.getSimpleName().equals("Age")) {
-                        fieldDecl = vd;
-                        break;
+    @Test
+    void parseBaseExpression() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Animal
+                {
+                    public virtual string Name { get; set; }
+                }
+            
+                public class Dog : Animal
+                {
+                    public void Speak()
+                    {
+                        var name = base.Name;
                     }
                 }
             }
-        }
-        assertThat(fieldDecl).as("Field 'Age' should be found").isNotNull();
-        J.VariableDeclarations.NamedVariable ageVar = fieldDecl.getVariables().getFirst();
-        assertThat(ageVar.getName().getFieldType())
-                .as("Field variable name should have fieldType")
-                .isNotNull();
-        assertThat(ageVar.getName().getType())
-                .as("Field variable name should have type")
-                .isInstanceOf(JavaType.Primitive.class);
-
-        // C3. Invocation name has Method type
-        J.MethodDeclaration processMethod = findMethodByName(classDecl, "Process");
-        assertThat(processMethod).isNotNull();
-        assertThat(processMethod.getMethodType()).isNotNull();
-
-        // E5. Pattern variable in 'is int n' has type
-        // (verified indirectly via successful round-trip with types populated)
-
-        // 17A. Method group as delegate: Action a = UseDelegate — fieldType should be null on the method name
-        // (this is verified by the successful round-trip — method groups resolve to method symbols,
-        // which FieldType guards against by only matching variable-like symbols)
+            """
+        ));
     }
 
     @Test
-    void parseBaseExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseGenericTypes() {
+        rewriteRun(csharp(
+          """
+            using System.Collections.Generic;
+            
+            namespace Models
+            {
+                public class Container
                 {
-                    public class Animal
+                    private List<string> _items = new List<string>();
+                    private Dictionary<string, int> _counts = new Dictionary<string, int>();
+            
+                    public List<string> GetItems()
                     {
-                        public virtual string Name { get; set; }
+                        return _items;
                     }
+                }
+            }
+            """
+        ));
+    }
 
-                    public class Dog : Animal
+    @Test
+    void parseEventFieldDeclaration() {
+        rewriteRun(csharp(
+          """
+            using System;
+            
+            namespace Models
+            {
+                public class Button
+                {
+                    public event EventHandler Click;
+                    public event EventHandler<string> TextChanged;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseLocalFunction() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Calculator
+                {
+                    public int Compute(int x)
                     {
-                        public void Speak()
+                        int Double(int n)
                         {
-                            var name = base.Name;
+                            return n * 2;
                         }
+            
+                        return Double(x);
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Dog.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseGenericTypes(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System.Collections.Generic;
-
-                namespace Models
+    void parseThrowExpression() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Validator
                 {
-                    public class Container
-                    {
-                        private List<string> _items = new List<string>();
-                        private Dictionary<string, int> _counts = new Dictionary<string, int>();
-
-                        public List<string> GetItems()
-                        {
-                            return _items;
-                        }
-                    }
+                    public string GetValue(bool valid, string value) =>
+                        valid ? value : throw new System.InvalidOperationException();
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Container.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseEventFieldDeclaration(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-
-                namespace Models
+    void parseTypeOfExpression() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class TypeHelper
                 {
-                    public class Button
+                    public System.Type GetIntType()
                     {
-                        public event EventHandler Click;
-                        public event EventHandler<string> TextChanged;
+                        return typeof(int);
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Button.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseLocalFunction(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseSizeOf() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class SizeHelper
                 {
-                    public class Calculator
+                    public int GetIntSize()
                     {
-                        public int Compute(int x)
-                        {
-                            int Double(int n)
-                            {
-                                return n * 2;
-                            }
-
-                            return Double(x);
-                        }
+                        return sizeof(int);
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Calculator.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseThrowExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseLabeledStatement() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class LabelHelper
                 {
-                    public class Validator
+                    public void Process()
                     {
-                        public string GetValue(bool valid, string value) =>
-                            valid ? value : throw new System.InvalidOperationException();
+                    start:
+                        Console.WriteLine("Hello");
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Validator.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseTypeOfExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseUnsafeStatement() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class UnsafeHelper
                 {
-                    public class TypeHelper
+                    public unsafe int GetSize()
                     {
-                        public System.Type GetIntType()
-                        {
-                            return typeof(int);
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("TypeHelper.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseSizeOf(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public class SizeHelper
-                    {
-                        public int GetIntSize()
+                        unsafe
                         {
                             return sizeof(int);
                         }
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("SizeHelper.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseLabeledStatement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseDefaultExpression() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class DefaultHelper
                 {
-                    public class LabelHelper
+                    public int GetDefault()
                     {
-                        public void Process()
+                        int x = default(int);
+                        string s = default;
+                        return x;
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseFixedStatement() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class FixedHelper
+                {
+                    public unsafe void Process(byte[] data)
+                    {
+                        fixed (byte* p = data)
                         {
-                        start:
-                            Console.WriteLine("Hello");
                         }
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("LabelHelper.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseUnsafeStatement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseInitializerExpression() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Person
                 {
-                    public class UnsafeHelper
+                    public string Name { get; set; }
+                    public int Age { get; set; }
+                }
+            
+                public class Factory
+                {
+                    public Person Create()
                     {
-                        public unsafe int GetSize()
+                        return new Person { Name = "John", Age = 25 };
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseDestructorDeclaration() {
+        rewriteRun(csharp(
+          """
+            class Resource
+            {
+                ~Resource()
+                {
+                    Cleanup();
+                }
+            
+                void Cleanup() { }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseNullForgivingOperator() {
+        rewriteRun(csharp(
+          """
+            class C
+            {
+                string x = null!;
+                string y = GetValue()!;
+            
+                static string GetValue() => null!;
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseNullableType() {
+        rewriteRun(csharp(
+          """
+            class C
+            {
+                int? x;
+                string? y;
+            
+                int? Add(int? a, string? b)
+                {
+                    return a;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseLinqQuery() {
+        rewriteRun(csharp(
+          """
+            using System.Linq;
+            class Program
+            {
+                void M()
+                {
+                    int[] numbers = { 1, 2, 3, 4, 5 };
+                    var result = from n in numbers
+                                 where n > 2
+                                 orderby n descending
+                                 select n * 2;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseSwitchStatement() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Dispatcher
+                {
+                    public void Handle(int code)
+                    {
+                        switch (code)
                         {
-                            unsafe
-                            {
-                                return sizeof(int);
-                            }
+                            case 1:
+                                break;
+                            case 2:
+                            case 3:
+                                break;
+                            default:
+                                break;
                         }
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("UnsafeHelper.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseDefaultExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseUsingStatement() {
+        rewriteRun(csharp(
+          """
+            using System;
+            using System.IO;
+            namespace App
+            {
+                public class FileReader
                 {
-                    public class DefaultHelper
+                    public void Read()
                     {
-                        public int GetDefault()
+                        using (var stream = new MemoryStream())
                         {
-                            int x = default(int);
-                            string s = default;
-                            return x;
                         }
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("DefaultHelper.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseFixedStatement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseCheckedUnchecked() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Math
                 {
-                    public class FixedHelper
+                    public int Compute(int x)
                     {
-                        public unsafe void Process(byte[] data)
+                        checked
                         {
-                            fixed (byte* p = data)
-                            {
-                            }
+                            return x + 1;
+                        }
+                    }
+            
+                    public int Fast(int x) => unchecked(x * 2);
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseGotoStatement() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Flow
+                {
+                    public void Run()
+                    {
+                        goto end;
+                        end:
+                        return;
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseEnumDeclaration() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public enum Color
+                {
+                    Red,
+                    Green = 1,
+                    Blue = 2
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseDelegateDeclaration() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public delegate void Handler(int x);
+                public delegate T Factory<T>();
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseForEachVariable() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Parser
+                {
+                    public void Parse()
+                    {
+                        var pairs = new (int, string)[] { (1, "a"), (2, "b") };
+                        foreach (var (num, str) in pairs)
+                        {
                         }
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("FixedHelper.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
     @Test
-    void parseInitializerExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
+    void parseIndexerDeclaration() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Grid
                 {
-                    public class Person
+                    private int[] data = new int[10];
+            
+                    public int this[int index]
                     {
-                        public string Name { get; set; }
-                        public int Age { get; set; }
+                        get { return data[index]; }
+                        set { data[index] = value; }
                     }
+                }
+            }
+            """
+        ));
+    }
 
-                    public class Factory
+    @Test
+    void parseOperatorDeclaration() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public struct Point
+                {
+                    public int X;
+                    public int Y;
+            
+                    public static Point operator +(Point a, Point b)
                     {
-                        public Person Create()
+                        return new Point();
+                    }
+            
+                    public static implicit operator int(Point p) => p.X;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseRangeExpression() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Slicer
+                {
+                    public void Slice()
+                    {
+                        var arr = new int[] { 1, 2, 3, 4, 5 };
+                        var sub = arr[1..3];
+                        var rest = arr[2..];
+                        var first = arr[..2];
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseCollectionExpression() {
+        rewriteRun(csharp(
+          """
+            using System.Collections.Generic;
+            namespace App
+            {
+                public class Builder
+                {
+                    public void Build()
+                    {
+                        List<int> nums = [1, 2, 3];
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseTypeConstraints() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Factory<T> where T : class, new()
+                {
+                    public T Create()
+                    {
+                        return new T();
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseEventDeclaration() {
+        rewriteRun(csharp(
+          """
+            using System;
+            namespace App
+            {
+                public class Button
+                {
+                    public event EventHandler Clicked
+                    {
+                        add { }
+                        remove { }
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseYieldStatement() {
+        rewriteRun(csharp(
+          """
+            using System.Collections.Generic;
+            namespace App
+            {
+                public class Generator
+                {
+                    public IEnumerable<int> GetNumbers()
+                    {
+                        yield return 1;
+                        yield return 2;
+                        yield break;
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseTupleType() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Data
+                {
+                    public (int X, int Y) GetPoint()
+                    {
+                        return (1, 2);
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseStackAllocExpression() {
+        rewriteRun(csharp(
+          """
+            using System;
+            namespace App
+            {
+                public class Memory
+                {
+                    public void Alloc()
+                    {
+                        Span<int> nums = stackalloc int[3];
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseAnonymousObjectCreation() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Demo
+                {
+                    public void Run()
+                    {
+                        var obj = new { Name = "test", Age = 1 };
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseWithExpression() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public record Person(string Name, int Age);
+            
+                public class Demo
+                {
+                    public void Run()
+                    {
+                        var p = new Person("Alice", 30);
+                        var p2 = p with { Name = "Bob" };
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseSpreadElement() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Demo
+                {
+                    public void Run()
+                    {
+                        int[] a = [1, 2];
+                        int[] b = [..a, 3];
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseAliasQualifiedName() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Demo
+                {
+                    public void Run()
+                    {
+                        global::System.Console.WriteLine("hi");
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseAnonymousMethodExpression() {
+        rewriteRun(csharp(
+          """
+            using System;
+            
+            namespace App
+            {
+                public class Demo
+                {
+                    public void Run()
+                    {
+                        Func<int, int> f = delegate(int x) { return x + 1; };
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseRefType() {
+        rewriteRun(csharp(
+          """
+            namespace App
+            {
+                public class Demo
+                {
+                    private int _value;
+            
+                    public ref int GetRef()
+                    {
+                        return ref _value;
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseImplicitStackAlloc() {
+        rewriteRun(csharp(
+          """
+            using System;
+            
+            namespace App
+            {
+                public class Demo
+                {
+                    public void Run()
+                    {
+                        Span<int> s = stackalloc[] { 1, 2, 3 };
+                    }
+                }
+            }
+            """
+        ));
+    }
+
+    // ---- Preprocessor directive tests ----
+
+    @Test
+    void parseSimpleIfEndif() {
+        rewriteRun(csharp(
+          """
+            #if DEBUG
+            using System.Diagnostics;
+            #endif
+            namespace Test
+            {
+                public class Foo
+                {
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseSimpleIfElse() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+            #if DEBUG
+                public class DebugFoo
+                {
+                }
+            #else
+                public class ReleaseFoo
+                {
+                }
+            #endif
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseKeywordSplittingDirective() {
+        rewriteRun(csharp(
+          """
+            public
+            #if SOMETHING
+            record
+            #else
+            class
+            #endif
+            MyObject { }
+            """
+        ));
+    }
+
+    @Test
+    void parseNestedDirectives() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+            #if A
+                public class Outer
+                {
+            #if B
+                    public void InnerMethod() { }
+            #endif
+                }
+            #endif
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseElifDirective() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class Foo
+                {
+            #if PLATFORM_A
+                    public void PlatformA() { }
+            #elif PLATFORM_B
+                    public void PlatformB() { }
+            #else
+                    public void Default() { }
+            #endif
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseDirectiveWithComplexCondition() {
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                public class Foo
+                {
+            #if DEBUG && !TRACE
+                    public void DebugOnly() { }
+            #endif
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseDirectiveChangingBaseClass() {
+        rewriteRun(csharp(
+          """
+            #if(IsSupplyBuildpack)
+            public partial class MyBuildpack : SupplyBuildpack
+            #elif(IsFinalBuildpack)
+            public partial class MyBuildpack : FinalBuildpack
+            #elif(IsHttpModuleBuildpack || IsHostedServiceBuildpack)
+            public partial class MyBuildpack : PluginInjectorBuildpack
+            #endif
+            {
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parsePolyfillConditionalClass() {
+        rewriteRun(csharp(
+          """
+            using System;
+            
+            namespace Polyfills
+            {
+            #if !NET6_0_OR_GREATER
+                internal static class ArgumentNullException
+                {
+                    public static void ThrowIfNull(object? argument, string? paramName = null)
+                    {
+                        if (argument is null)
+                            throw new System.ArgumentNullException(paramName);
+                    }
+                }
+            #endif
+            }
+            """
+        ));
+    }
+
+    // ---- Complex structure tests ----
+
+    @Test
+    void parseClassWithMixedMembersAndBoolProperty() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class NavItem
+                {
+                    public NavItem(string? type, NavLevel ol)
+                        : this(type, false, null, ol)
+                    {
+                    }
+            
+                    public NavItem(string? type, bool isHidden, string? head, NavLevel ol)
+                    {
+                        Type = type;
+                        IsHidden = isHidden;
+                        Head = head;
+                        Ol = ol;
+                    }
+            
+                    public string? Type { get; }
+                    public bool IsHidden { get; }
+                    public string? Head { get; }
+                    public NavLevel Ol { get; }
+                }
+            
+                public class NavLevel
+                {
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseNullCoalescingOperator() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public class Config
+                {
+                    private string _name;
+            
+                    public Config(string? name)
+                    {
+                        _name = name ?? "default";
+                    }
+            
+                    public string Name => _name;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseClassWithOverrideExpressionBodiedProperty() {
+        rewriteRun(csharp(
+          """
+            namespace Models
+            {
+                public enum ContentType
+                {
+                    TEXT,
+                    BINARY
+                }
+            
+                public abstract class BaseFile
+                {
+                    public abstract ContentType FileType { get; }
+                }
+            
+                public class TextFile : BaseFile
+                {
+                    public TextFile(string content)
+                    {
+                        Content = content ?? throw new System.ArgumentNullException(nameof(content));
+                    }
+            
+                    public string Content { get; }
+            
+                    public override ContentType FileType => ContentType.TEXT;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
+    void parseControlParenthesesVariants() {
+        rewriteRun(csharp(
+          """
+            using System;
+            
+            namespace ControlFlow
+            {
+                public class Handler
+                {
+                    public void Process(object input)
+                    {
+                        if (input == null)
                         {
-                            return new Person { Name = "John", Age = 25 };
+                            return;
+                        }
+            
+                        while (input != null)
+                        {
+                            break;
+                        }
+            
+                        switch (input)
+                        {
+                            case string s:
+                                Console.WriteLine(s);
+                                break;
+                            default:
+                                break;
+                        }
+            
+                        try
+                        {
+                            var text = (string)input;
+                        }
+                        catch (InvalidCastException ex)
+                        {
+                            Console.WriteLine(ex.Message);
                         }
                     }
                 }
-                """;
-
-        Path sourceFile = tempDir.resolve("Factory.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
+            }
+            """
+        ));
     }
 
-    @Test
-    void parseDestructorDeclaration(@TempDir Path tempDir) throws IOException {
-        String source = """
-                class Resource
-                {
-                    ~Resource()
-                    {
-                        Cleanup();
-                    }
-
-                    void Cleanup() { }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Resource.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseNullForgivingOperator(@TempDir Path tempDir) throws IOException {
-        String source = """
-                class C
-                {
-                    string x = null!;
-                    string y = GetValue()!;
-
-                    static string GetValue() => null!;
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("C.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseNullableType(@TempDir Path tempDir) throws IOException {
-        String source = """
-                class C
-                {
-                    int? x;
-                    string? y;
-
-                    int? Add(int? a, string? b)
-                    {
-                        return a;
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("C.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseLinqQuery(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System.Linq;
-                class Program
-                {
-                    void M()
-                    {
-                        int[] numbers = { 1, 2, 3, 4, 5 };
-                        var result = from n in numbers
-                                     where n > 2
-                                     orderby n descending
-                                     select n * 2;
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Linq.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
+    // ---- Helpers ----
 
     @SuppressWarnings("unchecked")
     private static <T> T findFirst(Object tree, Class<T> type) {
@@ -1433,711 +1618,13 @@ class CSharpRpcTest {
                 if (result != null) return result;
             }
         }
-        // Handle namespace declarations (which are in Cs.CompilationUnit.members)
-        if (tree instanceof Statement stmt) {
-            // Namespace members are accessible via the visitor pattern, but for
-            // simple traversal we check common wrapper types
-            if (tree instanceof Cs.NamespaceDeclaration ns) {
-                for (var member : ns.getMembers()) {
-                    T result = findFirst(member, type);
-                    if (result != null) return result;
-                }
+        if (tree instanceof Cs.NamespaceDeclaration ns) {
+            for (var member : ns.getMembers()) {
+                T result = findFirst(member, type);
+                if (result != null) return result;
             }
         }
         return null;
-    }
-
-    @Test
-    void parseSwitchStatement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Dispatcher
-                    {
-                        public void Handle(int code)
-                        {
-                            switch (code)
-                            {
-                                case 1:
-                                    break;
-                                case 2:
-                                case 3:
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Dispatcher.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseUsingStatement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-                using System.IO;
-                namespace App
-                {
-                    public class FileReader
-                    {
-                        public void Read()
-                        {
-                            using (var stream = new MemoryStream())
-                            {
-                            }
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("FileReader.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseCheckedUnchecked(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Math
-                    {
-                        public int Compute(int x)
-                        {
-                            checked
-                            {
-                                return x + 1;
-                            }
-                        }
-
-                        public int Fast(int x) => unchecked(x * 2);
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Math.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseGotoStatement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Flow
-                    {
-                        public void Run()
-                        {
-                            goto end;
-                            end:
-                            return;
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Flow.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseEnumDeclaration(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public enum Color
-                    {
-                        Red,
-                        Green = 1,
-                        Blue = 2
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Color.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseDelegateDeclaration(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public delegate void Handler(int x);
-                    public delegate T Factory<T>();
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Handler.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseForEachVariable(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Parser
-                    {
-                        public void Parse()
-                        {
-                            var pairs = new (int, string)[] { (1, "a"), (2, "b") };
-                            foreach (var (num, str) in pairs)
-                            {
-                            }
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Parser.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseIndexerDeclaration(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Grid
-                    {
-                        private int[] data = new int[10];
-
-                        public int this[int index]
-                        {
-                            get { return data[index]; }
-                            set { data[index] = value; }
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Grid.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseOperatorDeclaration(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public struct Point
-                    {
-                        public int X;
-                        public int Y;
-
-                        public static Point operator +(Point a, Point b)
-                        {
-                            return new Point();
-                        }
-
-                        public static implicit operator int(Point p) => p.X;
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Point.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseRangeExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Slicer
-                    {
-                        public void Slice()
-                        {
-                            var arr = new int[] { 1, 2, 3, 4, 5 };
-                            var sub = arr[1..3];
-                            var rest = arr[2..];
-                            var first = arr[..2];
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Slicer.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseCollectionExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System.Collections.Generic;
-                namespace App
-                {
-                    public class Builder
-                    {
-                        public void Build()
-                        {
-                            List<int> nums = [1, 2, 3];
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Builder.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseTypeConstraints(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Factory<T> where T : class, new()
-                    {
-                        public T Create()
-                        {
-                            return new T();
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Factory.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseEventDeclaration(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-                namespace App
-                {
-                    public class Button
-                    {
-                        public event EventHandler Clicked
-                        {
-                            add { }
-                            remove { }
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Button.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseYieldStatement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System.Collections.Generic;
-                namespace App
-                {
-                    public class Generator
-                    {
-                        public IEnumerable<int> GetNumbers()
-                        {
-                            yield return 1;
-                            yield return 2;
-                            yield break;
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Generator.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseTupleType(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Data
-                    {
-                        public (int X, int Y) GetPoint()
-                        {
-                            return (1, 2);
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Data.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseStackAllocExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-                namespace App
-                {
-                    public class Memory
-                    {
-                        public void Alloc()
-                        {
-                            Span<int> nums = stackalloc int[3];
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Memory.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseAnonymousObjectCreation(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Demo
-                    {
-                        public void Run()
-                        {
-                            var obj = new { Name = "test", Age = 1 };
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Demo.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseWithExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public record Person(string Name, int Age);
-
-                    public class Demo
-                    {
-                        public void Run()
-                        {
-                            var p = new Person("Alice", 30);
-                            var p2 = p with { Name = "Bob" };
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Demo.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseSpreadElement(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Demo
-                    {
-                        public void Run()
-                        {
-                            int[] a = [1, 2];
-                            int[] b = [..a, 3];
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Demo.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    // TODO: parseImplicitElementAccess — requires CsArgument type mapping (Cs$CsArgument not yet on Java side)
-
-    @Test
-    void parseAliasQualifiedName(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Demo
-                    {
-                        public void Run()
-                        {
-                            global::System.Console.WriteLine("hi");
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Demo.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseAnonymousMethodExpression(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-
-                namespace App
-                {
-                    public class Demo
-                    {
-                        public void Run()
-                        {
-                            Func<int, int> f = delegate(int x) { return x + 1; };
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Demo.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseRefType(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace App
-                {
-                    public class Demo
-                    {
-                        private int _value;
-
-                        public ref int GetRef()
-                        {
-                            return ref _value;
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Demo.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    // TODO: parsePointerFieldAccess — requires address-of (&) operator support in unsafe context
-
-    @Test
-    void parseImplicitStackAlloc(@TempDir Path tempDir) throws IOException {
-        String source = """
-                using System;
-
-                namespace App
-                {
-                    public class Demo
-                    {
-                        public void Run()
-                        {
-                            Span<int> s = stackalloc[] { 1, 2, 3 };
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Demo.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
     }
 
     private static J.MethodDeclaration findMethodByName(J.ClassDeclaration classDecl, String name) {
@@ -2147,425 +1634,5 @@ class CSharpRpcTest {
             }
         }
         return null;
-    }
-
-    // Cs.ClassDeclaration overload removed — now using J.ClassDeclaration everywhere
-
-    @Test
-    void parseSimpleIfEndif(@TempDir Path tempDir) throws IOException {
-        String source = """
-                #if DEBUG
-                using System.Diagnostics;
-                #endif
-                namespace Test
-                {
-                    public class Foo
-                    {
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("IfEndif.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseSimpleIfElse(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
-                {
-                #if DEBUG
-                    public class DebugFoo
-                    {
-                    }
-                #else
-                    public class ReleaseFoo
-                    {
-                    }
-                #endif
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("IfElse.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseKeywordSplittingDirective(@TempDir Path tempDir) throws IOException {
-        String source = """
-                public
-                #if SOMETHING
-                record
-                #else
-                class
-                #endif
-                MyObject { }
-                """;
-
-        Path sourceFile = tempDir.resolve("KeywordSplit.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseNestedDirectives(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
-                {
-                #if A
-                    public class Outer
-                    {
-                #if B
-                        public void InnerMethod() { }
-                #endif
-                    }
-                #endif
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Nested.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseElifDirective(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
-                {
-                    public class Foo
-                    {
-                #if PLATFORM_A
-                        public void PlatformA() { }
-                #elif PLATFORM_B
-                        public void PlatformB() { }
-                #else
-                        public void Default() { }
-                #endif
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Elif.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseDirectiveWithComplexCondition(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Test
-                {
-                    public class Foo
-                    {
-                #if DEBUG && !TRACE
-                        public void DebugOnly() { }
-                #endif
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Complex.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseDirectiveChangingBaseClass(@TempDir Path tempDir) throws IOException {
-        // From PR #6678 comment — directives slicing a class declaration at the base class
-        String source = """
-                #if(IsSupplyBuildpack)
-                public partial class MyBuildpack : SupplyBuildpack
-                #elif(IsFinalBuildpack)
-                public partial class MyBuildpack : FinalBuildpack
-                #elif(IsHttpModuleBuildpack || IsHostedServiceBuildpack)
-                public partial class MyBuildpack : PluginInjectorBuildpack
-                #endif
-                {
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("BaseClass.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parsePolyfillConditionalClass(@TempDir Path tempDir) throws IOException {
-        // From PR #6678 comment — entire class conditionally included as polyfill
-        String source = """
-                using System;
-
-                namespace Polyfills
-                {
-                #if !NET6_0_OR_GREATER
-                    internal static class ArgumentNullException
-                    {
-                        public static void ThrowIfNull(object? argument, string? paramName = null)
-                        {
-                            if (argument is null)
-                                throw new System.ArgumentNullException(paramName);
-                        }
-                    }
-                #endif
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Polyfill.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseClassWithMixedMembersAndBoolProperty(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public class NavItem
-                    {
-                        public NavItem(string? type, NavLevel ol)
-                            : this(type, false, null, ol)
-                        {
-                        }
-
-                        public NavItem(string? type, bool isHidden, string? head, NavLevel ol)
-                        {
-                            Type = type;
-                            IsHidden = isHidden;
-                            Head = head;
-                            Ol = ol;
-                        }
-
-                        public string? Type { get; }
-                        public bool IsHidden { get; }
-                        public string? Head { get; }
-                        public NavLevel Ol { get; }
-                    }
-
-                    public class NavLevel
-                    {
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("NavItem.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseNullCoalescingOperator(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public class Config
-                    {
-                        private string _name;
-
-                        public Config(string? name)
-                        {
-                            _name = name ?? "default";
-                        }
-
-                        public string Name => _name;
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Config.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseClassWithOverrideExpressionBodiedProperty(@TempDir Path tempDir) throws IOException {
-        String source = """
-                namespace Models
-                {
-                    public enum ContentType
-                    {
-                        TEXT,
-                        BINARY
-                    }
-
-                    public abstract class BaseFile
-                    {
-                        public abstract ContentType FileType { get; }
-                    }
-
-                    public class TextFile : BaseFile
-                    {
-                        public TextFile(string content)
-                        {
-                            Content = content ?? throw new System.ArgumentNullException(nameof(content));
-                        }
-
-                        public string Content { get; }
-
-                        public override ContentType FileType => ContentType.TEXT;
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("TextFile.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
-    }
-
-    @Test
-    void parseControlParenthesesVariants(@TempDir Path tempDir) throws Exception {
-        String source = """
-                using System;
-
-                namespace ControlFlow
-                {
-                    public class Handler
-                    {
-                        public void Process(object input)
-                        {
-                            if (input == null)
-                            {
-                                return;
-                            }
-
-                            while (input != null)
-                            {
-                                break;
-                            }
-
-                            switch (input)
-                            {
-                                case string s:
-                                    Console.WriteLine(s);
-                                    break;
-                                default:
-                                    break;
-                            }
-
-                            try
-                            {
-                                var text = (string)input;
-                            }
-                            catch (InvalidCastException ex)
-                            {
-                                Console.WriteLine(ex.Message);
-                            }
-                        }
-                    }
-                }
-                """;
-
-        Path sourceFile = tempDir.resolve("Handler.cs");
-        Files.writeString(sourceFile, source);
-
-        List<SourceFile> sourceFiles = parseSolution(tempDir);
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile parsed = sourceFiles.getFirst();
-        assertThat(parsed).isNotInstanceOf(ParseError.class);
-        assertThat(parsed).isInstanceOf(Cs.CompilationUnit.class);
-
-        // Clear Java's remoteObjects to force the ADD path when printing.
-        // After parseSolution, Java received the tree FROM C# but never sent it
-        // TO C#. Clearing remoteObjects forces Java's GetObject.Handler to send
-        // the full tree via ADD (instead of NO_CHANGE), exercising the C# receiver's
-        // ADD-based reconstruction of generic types like ControlParentheses<Expression>,
-        // ControlParentheses<TypeTree>, and ControlParentheses<VariableDeclarations>.
-        Field remoteObjectsField = RewriteRpc.class.getDeclaredField("remoteObjects");
-        remoteObjectsField.setAccessible(true);
-        ((Map<?, ?>) remoteObjectsField.get(rpc)).clear();
-
-        String printed = rpc.print(parsed);
-        assertThat(printed).isEqualTo(source);
     }
 }

@@ -16,14 +16,28 @@
 package org.openrewrite.csharp.rpc;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Response from ParseSolution RPC call.
- * Contains a list of parsed source file items with their IDs, types, and project paths.
+ * Contains parsed source file items and per-project MSBuild metadata.
  */
-class ParseSolutionResponse extends ArrayList<ParseSolutionResponse.Item> {
+class ParseSolutionResponse {
+    List<Item> items = emptyList();
+    List<ProjectMetadata> projects = emptyList();
+
+    int itemCount() {
+        return items.size();
+    }
+
+    Item getItem(int index) {
+        return items.get(index);
+    }
 
     /**
      * A single parsed source file item.
@@ -45,5 +59,67 @@ class ParseSolutionResponse extends ArrayList<ParseSolutionResponse.Item> {
          * The path of the project this file belongs to.
          */
         String projectPath;
+    }
+
+    /**
+     * MSBuild-evaluated project metadata for a single .csproj.
+     * Returned by the C# side after MSBuildWorkspace evaluation.
+     */
+    @Value
+    static class ProjectMetadata {
+        /**
+         * Path to the .csproj file (absolute or relative to rootDir).
+         */
+        String projectPath;
+
+        /**
+         * The SDK attribute from the Project element.
+         */
+        @Nullable
+        String sdk;
+
+        /**
+         * MSBuild properties with provenance (property name to value + source file).
+         */
+        Map<String, PropertyEntry> properties;
+
+        /**
+         * Per-target-framework metadata.
+         */
+        List<TargetFrameworkEntry> targetFrameworks;
+    }
+
+    @Value
+    static class PropertyEntry {
+        String value;
+        @Nullable String definedIn;
+    }
+
+    @Value
+    static class TargetFrameworkEntry {
+        String targetFramework;
+        List<PackageReferenceEntry> packageReferences;
+        List<ResolvedPackageEntry> resolvedPackages;
+        List<ProjectReferenceEntry> projectReferences;
+    }
+
+    @Value
+    static class PackageReferenceEntry {
+        String include;
+        @Nullable String requestedVersion;
+        @Nullable String resolvedVersion;
+    }
+
+    @Value
+    static class ResolvedPackageEntry {
+        String name;
+        String resolvedVersion;
+        List<ResolvedPackageEntry> dependencies;
+        int depth;
+    }
+
+    @Value
+    static class ProjectReferenceEntry {
+        String include;
     }
 }

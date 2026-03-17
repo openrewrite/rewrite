@@ -15,22 +15,19 @@
  */
 package org.openrewrite.csharp.rpc;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.csharp.marker.MSBuildProject;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -52,10 +49,10 @@ class CSharpParseProjectTest {
         if (!factoryConfigured) {
             Path csharpServerEntry = findCSharpServerEntry();
             CSharpRewriteRpc.setFactory(
-                    CSharpRewriteRpc.builder()
-                            .csharpServerEntry(csharpServerEntry)
-                            .traceRpcMessages(false)
-                            .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
+              CSharpRewriteRpc.builder()
+                .csharpServerEntry(csharpServerEntry)
+                .traceRpcMessages(false)
+                .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
             );
             factoryConfigured = true;
         }
@@ -70,8 +67,8 @@ class CSharpParseProjectTest {
     private static Path findCSharpServerEntry() {
         Path basePath = Paths.get(System.getProperty("user.dir"));
         Path[] searchPaths = {
-                basePath.resolve("csharp"),
-                basePath.resolve("rewrite-csharp/csharp"),
+          basePath.resolve("csharp"),
+          basePath.resolve("rewrite-csharp/csharp"),
         };
 
         for (Path searchPath : searchPaths) {
@@ -88,41 +85,41 @@ class CSharpParseProjectTest {
     void parseSimpleProject(@TempDir Path tempDir) throws IOException {
         // Create a minimal .csproj
         Files.writeString(tempDir.resolve("Test.csproj"), """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
-                  </PropertyGroup>
-                </Project>
-                """);
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+            </PropertyGroup>
+          </Project>
+          """);
 
         // Create source files
         Files.writeString(tempDir.resolve("Program.cs"), """
-                namespace Test
-                {
-                    public class Program
-                    {
-                        public static void Main(string[] args)
-                        {
-                        }
-                    }
-                }
-                """);
+          namespace Test
+          {
+              public class Program
+              {
+                  public static void Main(string[] args)
+                  {
+                  }
+              }
+          }
+          """);
 
         Files.writeString(tempDir.resolve("Helper.cs"), """
-                namespace Test
-                {
-                    public class Helper
-                    {
-                        public string GetMessage() => "hello";
-                    }
-                }
-                """);
+          namespace Test
+          {
+              public class Helper
+              {
+                  public string GetMessage() => "hello";
+              }
+          }
+          """);
 
         List<SourceFile> sourceFiles = rpc.parseSolution(
-                tempDir.resolve("Test.csproj"),
-                tempDir,
-                new InMemoryExecutionContext()
-        ).toList();
+          tempDir.resolve("Test.csproj"),
+          tempDir,
+          new InMemoryExecutionContext()
+        ).sourceFiles().toList();
 
         assertThat(sourceFiles).hasSize(2);
         for (SourceFile sf : sourceFiles) {
@@ -135,36 +132,36 @@ class CSharpParseProjectTest {
     void parseProjectWithNuGetReference(@TempDir Path tempDir) throws IOException {
         // Create a .csproj with a NuGet reference
         Files.writeString(tempDir.resolve("Test.csproj"), """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
-                  </PropertyGroup>
-                  <ItemGroup>
-                    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-                  </ItemGroup>
-                </Project>
-                """);
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+            </ItemGroup>
+          </Project>
+          """);
 
         Files.writeString(tempDir.resolve("Program.cs"), """
-                using Newtonsoft.Json;
-
-                namespace Test
-                {
-                    public class Program
-                    {
-                        public string Serialize(object obj)
-                        {
-                            return JsonConvert.SerializeObject(obj);
-                        }
-                    }
-                }
-                """);
+          using Newtonsoft.Json;
+          
+          namespace Test
+          {
+              public class Program
+              {
+                  public string Serialize(object obj)
+                  {
+                      return JsonConvert.SerializeObject(obj);
+                  }
+              }
+          }
+          """);
 
         List<SourceFile> sourceFiles = rpc.parseSolution(
-                tempDir.resolve("Test.csproj"),
-                tempDir,
-                new InMemoryExecutionContext()
-        ).toList();
+          tempDir.resolve("Test.csproj"),
+          tempDir,
+          new InMemoryExecutionContext()
+        ).sourceFiles().toList();
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile sf = sourceFiles.getFirst();
@@ -179,43 +176,43 @@ class CSharpParseProjectTest {
     void parseProjectWithPartialClasses(@TempDir Path tempDir) throws IOException {
         // Create a .csproj
         Files.writeString(tempDir.resolve("Test.csproj"), """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
-                  </PropertyGroup>
-                </Project>
-                """);
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+            </PropertyGroup>
+          </Project>
+          """);
 
         // Create two partial class files
         Files.writeString(tempDir.resolve("PersonProperties.cs"), """
-                namespace Models
-                {
-                    public partial class Person
-                    {
-                        public string FirstName { get; set; }
-                        public string LastName { get; set; }
-                    }
-                }
-                """);
+          namespace Models
+          {
+              public partial class Person
+              {
+                  public string FirstName { get; set; }
+                  public string LastName { get; set; }
+              }
+          }
+          """);
 
         Files.writeString(tempDir.resolve("PersonMethods.cs"), """
-                namespace Models
-                {
-                    public partial class Person
-                    {
-                        public string GetFullName()
-                        {
-                            return FirstName + " " + LastName;
-                        }
-                    }
-                }
-                """);
+          namespace Models
+          {
+              public partial class Person
+              {
+                  public string GetFullName()
+                  {
+                      return FirstName + " " + LastName;
+                  }
+              }
+          }
+          """);
 
         List<SourceFile> sourceFiles = rpc.parseSolution(
-                tempDir.resolve("Test.csproj"),
-                tempDir,
-                new InMemoryExecutionContext()
-        ).toList();
+          tempDir.resolve("Test.csproj"),
+          tempDir,
+          new InMemoryExecutionContext()
+        ).sourceFiles().toList();
 
         assertThat(sourceFiles).hasSize(2);
         for (SourceFile sf : sourceFiles) {
@@ -228,41 +225,41 @@ class CSharpParseProjectTest {
     void generatedFilesExcludedFromLst(@TempDir Path tempDir) throws IOException {
         // Create a .csproj
         Files.writeString(tempDir.resolve("Test.csproj"), """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
-                  </PropertyGroup>
-                </Project>
-                """);
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+            </PropertyGroup>
+          </Project>
+          """);
 
         // Create a user source file
         Files.writeString(tempDir.resolve("Program.cs"), """
-                namespace Test
-                {
-                    public class Program
-                    {
-                    }
-                }
-                """);
+          namespace Test
+          {
+              public class Program
+              {
+              }
+          }
+          """);
 
         // Simulate source generator output in obj/
         Path generatedDir = tempDir.resolve("obj/Debug/net10.0/generated/MyGenerator/MyGenerator.MySourceGenerator");
         Files.createDirectories(generatedDir);
         Files.writeString(generatedDir.resolve("Generated.cs"), """
-                namespace Test
-                {
-                    public static class GeneratedHelper
-                    {
-                        public static string Version => "1.0.0";
-                    }
-                }
-                """);
+          namespace Test
+          {
+              public static class GeneratedHelper
+              {
+                  public static string Version => "1.0.0";
+              }
+          }
+          """);
 
         List<SourceFile> sourceFiles = rpc.parseSolution(
-                tempDir.resolve("Test.csproj"),
-                tempDir,
-                new InMemoryExecutionContext()
-        ).toList();
+          tempDir.resolve("Test.csproj"),
+          tempDir,
+          new InMemoryExecutionContext()
+        ).sourceFiles().toList();
 
         // Only the user file should be in the LST — generated files are excluded
         assertThat(sourceFiles).hasSize(1);
@@ -278,28 +275,28 @@ class CSharpParseProjectTest {
         Files.createDirectories(projectDir);
 
         Files.writeString(projectDir.resolve("MyApp.csproj"), """
-                <Project Sdk="Microsoft.NET.Sdk">
-                  <PropertyGroup>
-                    <TargetFramework>net10.0</TargetFramework>
-                  </PropertyGroup>
-                </Project>
-                """);
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+            </PropertyGroup>
+          </Project>
+          """);
 
         Files.writeString(projectDir.resolve("Program.cs"), """
-                namespace MyApp
-                {
-                    public class Program
-                    {
-                    }
-                }
-                """);
+          namespace MyApp
+          {
+              public class Program
+              {
+              }
+          }
+          """);
 
         // Parse with rootDir pointing to the temp dir root
         List<SourceFile> sourceFiles = rpc.parseSolution(
-                projectDir.resolve("MyApp.csproj"),
-                tempDir,
-                new InMemoryExecutionContext()
-        ).toList();
+          projectDir.resolve("MyApp.csproj"),
+          tempDir,
+          new InMemoryExecutionContext()
+        ).sourceFiles().toList();
 
         assertThat(sourceFiles).hasSize(1);
         SourceFile sf = sourceFiles.getFirst();
@@ -307,6 +304,53 @@ class CSharpParseProjectTest {
         // Source path should be relative to tempDir, not the project dir
         String sourcePath = sf.getSourcePath().toString();
         assertThat(sourcePath).startsWith("src");
+    }
+
+    @Test
+    void parseSolutionResultApiSurfaceFiles(@TempDir Path tempDir) throws IOException {
+        Files.writeString(tempDir.resolve("Test.csproj"), """
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net10.0</TargetFramework>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+            </ItemGroup>
+          </Project>
+          """);
+
+        Files.writeString(tempDir.resolve("Program.cs"), """
+          namespace Test
+          {
+              public class Program
+              {
+              }
+          }
+          """);
+
+        ParseSolutionResult result = rpc.parseSolution(
+          tempDir.resolve("Test.csproj"),
+          tempDir,
+          new InMemoryExecutionContext()
+        );
+
+        // sourceFiles() should produce a lazy stream of C# source files
+        List<SourceFile> sourceFiles = result.sourceFiles().toList();
+        assertThat(sourceFiles).isNotEmpty();
+        for (SourceFile sf : sourceFiles) {
+            assertThat(sf).isNotInstanceOf(ParseError.class);
+        }
+
+        // projects() contains per-project MSBuild metadata from the C# side
+        assertThat(result.projects()).hasSize(1);
+        MSBuildProject marker = result.projects().getFirst();
+        assertThat(marker.getSdk()).isEqualTo("Microsoft.NET.Sdk");
+        assertThat(marker.getTargetFrameworks()).hasSize(1);
+        assertThat(marker.getTargetFrameworks().getFirst().getTargetFramework()).isEqualTo("net10.0");
+        assertThat(marker.getTargetFrameworks().getFirst().getPackageReferences()).hasSize(1);
+        assertThat(marker.getTargetFrameworks().getFirst().getPackageReferences().getFirst().getInclude())
+          .isEqualTo("Newtonsoft.Json");
+        assertThat(result.projectPaths()).hasSize(1);
     }
 
     // ---- Full working set sweep ----
@@ -324,18 +368,18 @@ class CSharpParseProjectTest {
         assumeTrue(rootProperty != null, "System property 'workingSetRoot' not set");
         Path workingSetRoot = Paths.get(rootProperty);
         assumeTrue(Files.isDirectory(workingSetRoot),
-                "Working set root not found: " + workingSetRoot);
+          "Working set root not found: " + workingSetRoot);
 
         // Find all .sln and .slnx files
         List<Path> solutionFiles;
         try (var walk = Files.walk(workingSetRoot)) {
             solutionFiles = walk
-                    .filter(p -> {
-                        String name = p.getFileName().toString().toLowerCase();
-                        return name.endsWith(".sln") || name.endsWith(".slnx");
-                    })
-                    .sorted()
-                    .collect(Collectors.toList());
+              .filter(p -> {
+                  String name = p.getFileName().toString().toLowerCase();
+                  return name.endsWith(".sln") || name.endsWith(".slnx");
+              })
+              .sorted()
+              .collect(Collectors.toList());
         }
 
         System.out.println("Found " + solutionFiles.size() + " solution files under " + workingSetRoot);
@@ -357,11 +401,11 @@ class CSharpParseProjectTest {
             // Restart RPC for each solution to avoid state leaks and OOM
             CSharpRewriteRpc.shutdownCurrent();
             CSharpRewriteRpc.setFactory(
-                    CSharpRewriteRpc.builder()
-                            .csharpServerEntry(findCSharpServerEntry())
-                            .traceRpcMessages(false)
-                            .timeout(Duration.ofMinutes(40))
-                            .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
+              CSharpRewriteRpc.builder()
+                .csharpServerEntry(findCSharpServerEntry())
+                .traceRpcMessages(false)
+                .timeout(Duration.ofMinutes(40))
+                .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
             );
             factoryConfigured = true;
             rpc = CSharpRewriteRpc.getOrStart();
@@ -372,7 +416,7 @@ class CSharpParseProjectTest {
             });
 
             try {
-                List<SourceFile> sourceFiles = rpc.parseSolution(solutionPath, rootDir, ctx).toList();
+                List<SourceFile> sourceFiles = rpc.parseSolution(solutionPath, rootDir, ctx).sourceFiles().toList();
 
                 int parseErrors = 0;
                 for (SourceFile sf : sourceFiles) {
@@ -388,7 +432,7 @@ class CSharpParseProjectTest {
                 totalSolutions++;
 
                 System.out.println("  OK: " + sourceFiles.size() + " files" +
-                        (parseErrors > 0 ? ", " + parseErrors + " parse errors" : ""));
+                                   (parseErrors > 0 ? ", " + parseErrors + " parse errors" : ""));
             } catch (Exception e) {
                 failedSolutions++;
                 System.err.println("  FAILED: " + e.getClass().getSimpleName() + ": " + e.getMessage());
