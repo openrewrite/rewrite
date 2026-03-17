@@ -729,10 +729,8 @@ class CSharpRpcTest {
                 null, null, null);
         RecipeMarketplace marketplace = rpc.getMarketplace(bundle);
         assertThat(marketplace).isNotNull();
-        // No IRecipeActivator implementations in the base C# project,
-        // so the marketplace should be empty
-        assertThat(marketplace.getAllRecipes()).isEmpty();
-        assertThat(marketplace.getCategories()).isEmpty();
+        // XML recipes are registered via XmlRecipeActivator
+        assertThat(marketplace.getAllRecipes()).isNotEmpty();
     }
 
     @Test
