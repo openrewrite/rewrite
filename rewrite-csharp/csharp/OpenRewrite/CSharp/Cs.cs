@@ -23,7 +23,7 @@ namespace OpenRewrite.CSharp;
 /// The base interface for C#-specific LST elements.
 /// Most C# syntax maps to J elements; Cs is for C#-specific constructs.
 /// </summary>
-public interface Cs : J
+public partial interface Cs : J
 {
 }
 
