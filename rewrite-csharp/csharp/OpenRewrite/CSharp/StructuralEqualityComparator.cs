@@ -42,7 +42,7 @@ public static class StructuralEqualityComparator
             return false;
 
         // NullSafe marker distinguishes ?. from . — this is semantic, not formatting
-        if (HasNullSafe(a) != HasNullSafe(b))
+        if (TreeHelper.HasNullSafe(a) != TreeHelper.HasNullSafe(b))
             return false;
 
         var properties = TreeHelper.GetStructuralProperties(a.GetType());
@@ -69,27 +69,35 @@ public static class StructuralEqualityComparator
         if (a is J ja && b is J jb)
             return CompareNodes(ja, jb);
 
-        // JRightPadded<T> / JLeftPadded<T> — unwrap and recurse
-        if (IsGenericOf(a, typeof(JRightPadded<>)) && IsGenericOf(b, typeof(JRightPadded<>)))
-            return CompareValues(TreeHelper.UnwrapPadded(a), TreeHelper.UnwrapPadded(b));
-
-        if (IsGenericOf(a, typeof(JLeftPadded<>)) && IsGenericOf(b, typeof(JLeftPadded<>)))
-            return CompareValues(TreeHelper.UnwrapPadded(a), TreeHelper.UnwrapPadded(b));
-
-        // JContainer<T> — extract elements (returns JRightPadded<T> wrappers) and compare
-        if (IsGenericOf(a, typeof(JContainer<>)) && IsGenericOf(b, typeof(JContainer<>)))
+        // Generic wrappers — get type info once and dispatch
+        var typeA = a.GetType();
+        var typeB = b.GetType();
+        if (typeA.IsGenericType && typeB.IsGenericType)
         {
-            var elemsA = TreeHelper.GetContainerElements(a);
-            var elemsB = TreeHelper.GetContainerElements(b);
-            if (elemsA == null && elemsB == null) return true;
-            if (elemsA == null || elemsB == null) return false;
-            if (elemsA.Count != elemsB.Count) return false;
-            for (int i = 0; i < elemsA.Count; i++)
+            var defA = typeA.GetGenericTypeDefinition();
+            var defB = typeB.GetGenericTypeDefinition();
+            if (defA == defB)
             {
-                if (!CompareValues(elemsA[i], elemsB[i]))
-                    return false;
+                // JRightPadded<T> / JLeftPadded<T> — unwrap and recurse
+                if (defA == typeof(JRightPadded<>) || defA == typeof(JLeftPadded<>))
+                    return CompareValues(TreeHelper.UnwrapPadded(a), TreeHelper.UnwrapPadded(b));
+
+                // JContainer<T> — extract elements (returns JRightPadded<T> wrappers) and compare
+                if (defA == typeof(JContainer<>))
+                {
+                    var elemsA = TreeHelper.GetContainerElements(a);
+                    var elemsB = TreeHelper.GetContainerElements(b);
+                    if (elemsA == null && elemsB == null) return true;
+                    if (elemsA == null || elemsB == null) return false;
+                    if (elemsA.Count != elemsB.Count) return false;
+                    for (int i = 0; i < elemsA.Count; i++)
+                    {
+                        if (!CompareValues(elemsA[i], elemsB[i]))
+                            return false;
+                    }
+                    return true;
+                }
             }
-            return true;
         }
 
         // IList — lock-step element comparison
@@ -111,16 +119,5 @@ public static class StructuralEqualityComparator
                 return false;
         }
         return true;
-    }
-
-    private static bool IsGenericOf(object value, Type genericDefinition)
-    {
-        var type = value.GetType();
-        return type.IsGenericType && type.GetGenericTypeDefinition() == genericDefinition;
-    }
-
-    private static bool HasNullSafe(J node)
-    {
-        return node.Markers.FindFirst<NullSafe>() != null;
     }
 }

@@ -21,7 +21,8 @@ using OpenRewrite.Java;
 namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
-/// Helpers for structural comparison of LST nodes used by the pattern matching engine.
+/// Helpers for structural comparison of LST nodes used by the pattern matching
+/// and structural equality engines.
 /// </summary>
 internal static class TreeHelper
 {
@@ -90,23 +91,27 @@ internal static class TreeHelper
     /// <summary>
     /// Extract the inner element from a padded wrapper.
     /// </summary>
+    private static readonly ConcurrentDictionary<Type, PropertyInfo?> ElementPropertyCache = new();
+
     internal static object? UnwrapPadded(object value)
     {
         var type = value.GetType();
-        var elementProp = type.GetProperty("Element");
+        var elementProp = ElementPropertyCache.GetOrAdd(type, t => t.GetProperty("Element"));
         return elementProp?.GetValue(value);
     }
 
     /// <summary>
     /// Extract elements from a JContainer.
     /// </summary>
+    private static readonly ConcurrentDictionary<Type, PropertyInfo?> ContainerElementsPropertyCache = new();
+
     internal static IList<object>? GetContainerElements(object value)
     {
         var type = value.GetType();
         if (!type.IsGenericType || type.GetGenericTypeDefinition() != typeof(JContainer<>))
             return null;
 
-        var elementsProp = type.GetProperty("Elements");
+        var elementsProp = ContainerElementsPropertyCache.GetOrAdd(type, t => t.GetProperty("Elements"));
         if (elementsProp?.GetValue(value) is not System.Collections.IList list)
             return null;
 
@@ -116,5 +121,20 @@ internal static class TreeHelper
             if (item != null) result.Add(item);
         }
         return result;
+    }
+
+    internal static bool IsRightPadded(object value) => IsGenericOf(value, typeof(JRightPadded<>));
+    internal static bool IsLeftPadded(object value) => IsGenericOf(value, typeof(JLeftPadded<>));
+    internal static bool IsContainer(object value) => IsGenericOf(value, typeof(JContainer<>));
+
+    private static bool IsGenericOf(object value, Type genericDefinition)
+    {
+        var type = value.GetType();
+        return type.IsGenericType && type.GetGenericTypeDefinition() == genericDefinition;
+    }
+
+    internal static bool HasNullSafe(J node)
+    {
+        return node.Markers.FindFirst<NullSafe>() != null;
     }
 }
