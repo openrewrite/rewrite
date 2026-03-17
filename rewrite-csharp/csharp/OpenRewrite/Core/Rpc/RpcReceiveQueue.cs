@@ -528,6 +528,13 @@ public class RpcReceiveQueue
             return FindType("OpenRewrite.CSharp", name);
         }
 
+        // Pattern: org.openrewrite.xml.tree.Xml$ClassName → OpenRewrite.Xml.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.xml.tree.Xml$"))
+        {
+            var name = javaTypeName["org.openrewrite.xml.tree.Xml$".Length..];
+            return FindType("OpenRewrite.Xml", name);
+        }
+
         // Marker type conventions — markers live in marker packages, not tree packages
         // Pattern: org.openrewrite.csharp.marker.ClassName → OpenRewrite.CSharp.ClassName
         if (javaTypeName.StartsWith("org.openrewrite.csharp.marker."))

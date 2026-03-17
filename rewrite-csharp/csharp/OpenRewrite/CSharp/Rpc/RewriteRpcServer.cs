@@ -31,7 +31,7 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.CSharp.Rpc;
 
-public class RewriteRpcServer
+public class RewriteRpcServer : IRewriteRpcServer
 {
     private static RewriteRpcServer? _current;
 
@@ -337,7 +337,10 @@ public class RewriteRpcServer
                 _ => Core.MarkerPrinter.Default
             };
             var capture = new PrintOutputCapture<int>(0, markerPrinter);
-            new CSharpPrinter<int>().Visit(tree, capture);
+            if (tree is OpenRewrite.Xml.Xml)
+                new OpenRewrite.Xml.XmlPrinter<int>().Visit((OpenRewrite.Xml.Xml)tree, capture);
+            else
+                new CSharpPrinter<int>().Visit(tree, capture);
             return capture.ToString();
         }
         catch (Exception ex)
@@ -825,9 +828,10 @@ public class RewriteRpcServer
     [JsonRpcMethod("Visit", UseSingleObjectParameterDeserialization = true)]
     public async Task<VisitResponse> Visit(VisitRequest request)
     {
-        // Skip non-C# source files (e.g., Quark for binary files)
+        // Skip source file types that the C# server can't handle
         if (request.SourceFileType != null &&
-            !request.SourceFileType.StartsWith("org.openrewrite.csharp."))
+            !request.SourceFileType.StartsWith("org.openrewrite.csharp.") &&
+            !request.SourceFileType.StartsWith("org.openrewrite.xml."))
         {
             return new VisitResponse { Modified = false };
         }
@@ -901,9 +905,10 @@ public class RewriteRpcServer
     [JsonRpcMethod("BatchVisit", UseSingleObjectParameterDeserialization = true)]
     public async Task<BatchVisitResponse> BatchVisit(BatchVisitRequest request)
     {
-        // Skip non-C# source files (e.g., Quark for binary files)
+        // Skip source file types that the C# server can't handle
         if (request.SourceFileType != null &&
-            !request.SourceFileType.StartsWith("org.openrewrite.csharp."))
+            !request.SourceFileType.StartsWith("org.openrewrite.csharp.") &&
+            !request.SourceFileType.StartsWith("org.openrewrite.xml."))
         {
             return new BatchVisitResponse
             {
@@ -1227,8 +1232,19 @@ public class RewriteRpcServer
     private class TreeCodec : IRpcCodec
     {
         public static readonly TreeCodec Instance = new();
-        public void RpcSend(object after, RpcSendQueue q) => new CSharpSender().Visit((J)after, q);
-        public object RpcReceive(object before, RpcReceiveQueue q) => new CSharpReceiver().Visit((J)before, q)!;
+        public void RpcSend(object after, RpcSendQueue q)
+        {
+            if (after is OpenRewrite.Xml.Xml xml)
+                new OpenRewrite.Xml.Rpc.XmlSender().Visit(xml, q);
+            else
+                new CSharpSender().Visit((J)after, q);
+        }
+        public object RpcReceive(object before, RpcReceiveQueue q)
+        {
+            if (before is OpenRewrite.Xml.Xml xml)
+                return new OpenRewrite.Xml.Rpc.XmlReceiver().Visit(xml, q)!;
+            return new CSharpReceiver().Visit((J)before, q)!;
+        }
     }
 }
 
