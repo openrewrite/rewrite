@@ -284,6 +284,14 @@ public class CSharpSyntaxFragments
 
         yield return new SourceTestCase("DeclarationParsingTests.TestNestedDelegate", "class a { delegate b c(); }");
 
+        yield return new SourceTestCase("DeclarationParsingTests.TestDelegateWithPreprocessorConstraint", """
+            public delegate TResult Projection<TState, out TResult>(ref TState state)
+            #if NET10_0_OR_GREATER
+                where TState : allows ref struct
+            #endif
+                ;
+            """);
+
         yield return new SourceTestCase("DeclarationParsingTests.TestClassMethod", "class a { b X() { } }");
 
         yield return new SourceTestCase("DeclarationParsingTests.TestClassMethodWithRefReturn", "class a { ref b X() { } }");

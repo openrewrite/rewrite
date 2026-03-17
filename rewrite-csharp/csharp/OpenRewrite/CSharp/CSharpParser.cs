@@ -1714,6 +1714,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             typeParameters = MergeConstraintClauses(typeParameters, node.ConstraintClauses);
         }
 
+        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
         _cursor = node.SemicolonToken.Span.End;
 
         return new DelegateDeclaration(Guid.NewGuid(), prefix, Markers.Empty,
