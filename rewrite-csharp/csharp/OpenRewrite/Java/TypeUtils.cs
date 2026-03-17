@@ -38,6 +38,10 @@ public static class TypeUtils
     {
         if (type == null) return false;
 
+        // Primitive(String) is assignable to "System.String" but has no Class representation
+        if (type is JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.String })
+            return string.Equals("System.String", fullyQualifiedName, StringComparison.Ordinal);
+
         var cls = AsClass(type);
         if (cls == null) return false;
 
@@ -50,6 +54,10 @@ public static class TypeUtils
     public static bool IsAssignableTo(JavaType? type, IReadOnlyCollection<string> fullyQualifiedNames)
     {
         if (type == null) return false;
+
+        // Primitive(String) is assignable to "System.String" but has no Class representation
+        if (type is JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.String })
+            return fullyQualifiedNames.Contains("System.String");
 
         var cls = AsClass(type);
         if (cls == null) return false;
@@ -130,6 +138,7 @@ public static class TypeUtils
         {
             JavaType.Class cls => cls.FullyQualifiedName,
             JavaType.Parameterized p => p.Type != null ? GetFullyQualifiedName(p.Type) : null,
+            JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.String } => "System.String",
             JavaType.Primitive prim => prim.Keyword,
             _ => null
         };
