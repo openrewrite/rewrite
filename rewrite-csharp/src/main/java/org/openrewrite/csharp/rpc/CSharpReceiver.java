@@ -673,6 +673,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         return conversionOperatorDeclaration
                 .withModifiers(q.receiveList(conversionOperatorDeclaration.getModifiers(), el -> (J.Modifier) visitNonNull(el, q)))
                 .getPadding().withKind(q.receive(conversionOperatorDeclaration.getPadding().getKind(), el -> visitLeftPadded(el, q, toEnum(Cs.ConversionOperatorDeclaration.ExplicitImplicit.class))))
+                .getPadding().withInterfaceSpecifier(q.receive(conversionOperatorDeclaration.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q)))
                 .getPadding().withReturnType(q.receive(conversionOperatorDeclaration.getPadding().getReturnType(), el -> visitLeftPadded(el, q)))
                 .getPadding().withParameters(q.receive(conversionOperatorDeclaration.getPadding().getParameters(), el -> visitContainer(el, q)))
                 .getPadding().withExpressionBody(q.receive(conversionOperatorDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)))
@@ -851,6 +852,31 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withUnmanagedCallingConventionTypes(q.receive(functionPointerType.getPadding().getUnmanagedCallingConventionTypes(), el -> visitContainer(el, q)))
                 .getPadding().withParameterTypes(q.receive(functionPointerType.getPadding().getParameterTypes(), el -> visitContainer(el, q)))
                 .withType(q.receive(functionPointerType.getType(), el -> visitType(el, q)));
+    }
+
+    @Override
+    public J visitTypeWithArguments(Cs.TypeWithArguments typeWithArguments, RpcReceiveQueue q) {
+        return typeWithArguments
+                .withTypeExpression(q.receive(typeWithArguments.getTypeExpression(), el -> (TypeTree) visitNonNull(el, q)))
+                .getPadding().withArguments(q.receive(typeWithArguments.getPadding().getArguments(), el -> visitContainer(el, q)));
+    }
+
+    @Override
+    public J visitExplicitInterfaceMember(Cs.ExplicitInterfaceMember explicitInterfaceMember, RpcReceiveQueue q) {
+        return explicitInterfaceMember
+                .getPadding().withInterfaceSpecifier(q.receive(explicitInterfaceMember.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q)))
+                .withMethodDeclaration(q.receive(explicitInterfaceMember.getMethodDeclaration(), el -> (J.MethodDeclaration) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitExceptionFilteredTry(Cs.ExceptionFilteredTry exceptionFilteredTry, RpcReceiveQueue q) {
+        exceptionFilteredTry = exceptionFilteredTry
+                .withATry(q.receive(exceptionFilteredTry.getATry(), el -> (J.Try) visitNonNull(el, q)));
+        List<JLeftPadded<J.ControlParentheses<Expression>>> filters = new ArrayList<>(exceptionFilteredTry.getCatchFilters().size());
+        for (JLeftPadded<J.ControlParentheses<Expression>> filter : exceptionFilteredTry.getCatchFilters()) {
+            filters.add(q.receive(filter, el -> visitLeftPadded(el, q)));
+        }
+        return exceptionFilteredTry.withCatchFilters(filters);
     }
 
     // Delegate methods to JavaReceiver

@@ -158,6 +158,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             WithExpression we => VisitWithExpression(we, q),
             SpreadExpression se => VisitSpreadExpression(se, q),
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, q),
+            TypeWithArguments twa => VisitTypeWithArguments(twa, q),
+            ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, q),
+            ExceptionFilteredTry eft => VisitExceptionFilteredTry(eft, q),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, q),
             QueryBody qb => VisitQueryBody(qb, q),
@@ -818,11 +821,12 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         var modifiers = q.ReceiveList(cod.Modifiers, m => (Modifier)VisitNonNull(m, q));
         var kind = q.Receive(cod.Kind, lp => _delegate.VisitLeftPadded(lp, q));
+        var interfaceSpec = q.Receive(cod.InterfaceSpecifier, rp => _delegate.VisitRightPadded(rp!, q));
         var returnType = q.Receive(cod.ReturnType, lp => _delegate.VisitLeftPadded(lp, q));
         var parameters = q.Receive(cod.Parameters, c => VisitContainer(c, q));
         var exprBody = q.Receive(cod.ExpressionBody, lp => _delegate.VisitLeftPadded(lp!, q));
         var body = q.Receive((J?)cod.Body, el => (J)VisitNonNull(el!, q));
-        return cod.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithReturnType(returnType!).WithParameters(parameters!).WithExpressionBody(exprBody).WithBody((Block?)body);
+        return cod.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithModifiers(modifiers!).WithKind(kind!).WithInterfaceSpecifier(interfaceSpec).WithReturnType(returnType!).WithParameters(parameters!).WithExpressionBody(exprBody).WithBody((Block?)body);
     }
 
     public override J VisitOperatorDeclaration(OperatorDeclaration opd, RpcReceiveQueue q)
@@ -918,6 +922,31 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var parameterTypes = q.Receive(fpt.ParameterTypes, el => _delegate.VisitContainer(el, q));
         var type = q.Receive(fpt.Type, t => VisitType(t, q)!);
         return fpt.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCallingConvention(callingConvention).WithUnmanagedCallingConventionTypes(unmanagedConventionTypes).WithParameterTypes(parameterTypes!).WithType(type);
+    }
+
+    public override J VisitTypeWithArguments(TypeWithArguments twa, RpcReceiveQueue q)
+    {
+        var type = q.Receive((J)twa.Type, el => (J)VisitNonNull(el, q));
+        var arguments = q.Receive(twa.Arguments, c => VisitContainer(c, q));
+        return twa.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithType((TypeTree)type!).WithArguments(arguments!);
+    }
+
+    public override J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, RpcReceiveQueue q)
+    {
+        var interfaceSpec = q.Receive(eim.InterfaceSpecifier, rp => _delegate.VisitRightPadded(rp, q));
+        var methodDecl = q.Receive((J)eim.MethodDeclaration, el => (J)VisitNonNull(el, q));
+        return eim.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithInterfaceSpecifier(interfaceSpec!).WithMethodDeclaration((MethodDeclaration)methodDecl!);
+    }
+
+    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcReceiveQueue q)
+    {
+        var @try = q.Receive((J)eft.Try, el => (J)VisitNonNull(el, q));
+        var catchFilters = new List<JLeftPadded<ControlParentheses<Expression>>?>(eft.CatchFilters.Count);
+        foreach (var filter in eft.CatchFilters)
+        {
+            catchFilters.Add(q.Receive(filter, el => _delegate.VisitLeftPadded(el!, q)));
+        }
+        return eft.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTry((Try)@try!).WithCatchFilters(catchFilters);
     }
 
     // ---- LINQ ----

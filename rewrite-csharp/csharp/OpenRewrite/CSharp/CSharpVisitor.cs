@@ -125,6 +125,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, p),
             TypeWithArguments twa => VisitTypeWithArguments(twa, p),
             ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, p),
+            ExceptionFilteredTry eft => VisitExceptionFilteredTry(eft, p),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, p),
             QueryBody qb => VisitQueryBody(qb, p),
@@ -3013,6 +3014,52 @@ public class CSharpVisitor<P> : JavaVisitor<P>
                  .WithType(newType ?? twa.Type)
                  .WithArguments(newArgs ?? twa.Arguments)
             : twa;
+    }
+
+    public virtual J VisitExceptionFilteredTry(ExceptionFilteredTry eft, P p)
+    {
+        eft = (ExceptionFilteredTry)VisitStatement(eft, p);
+        var changed = false;
+
+        var newPrefix = VisitSpace(eft.Prefix, p);
+        if (!ReferenceEquals(newPrefix, eft.Prefix)) changed = true;
+
+        var newMarkers = VisitMarkers(eft.Markers, p);
+        if (!ReferenceEquals(newMarkers, eft.Markers)) changed = true;
+
+        var newTry = (Try?)Visit(eft.Try, p);
+        if (newTry != null && !ReferenceEquals(newTry, eft.Try)) changed = true;
+
+        // Visit filter expressions
+        var newFilters = new List<JLeftPadded<ControlParentheses<Expression>>?>(eft.CatchFilters.Count);
+        bool filtersChanged = false;
+        foreach (var filter in eft.CatchFilters)
+        {
+            if (filter != null)
+            {
+                var visited = (ControlParentheses<Expression>?)Visit(filter.Element, p);
+                if (visited != null && !ReferenceEquals(visited, filter.Element))
+                {
+                    filtersChanged = true;
+                    newFilters.Add(new JLeftPadded<ControlParentheses<Expression>>(filter.Before, visited));
+                }
+                else
+                {
+                    newFilters.Add(filter);
+                }
+            }
+            else
+            {
+                newFilters.Add(null);
+            }
+        }
+        if (filtersChanged) changed = true;
+
+        return changed
+            ? eft.WithPrefix(newPrefix).WithMarkers(newMarkers)
+                 .WithTry(newTry ?? eft.Try)
+                 .WithCatchFilters(filtersChanged ? newFilters : eft.CatchFilters)
+            : eft;
     }
 
     public virtual J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, P p)

@@ -1012,6 +1012,7 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         conversionOperatorDeclaration = conversionOperatorDeclaration.withMarkers(visitMarkers(conversionOperatorDeclaration.getMarkers(), p));
         conversionOperatorDeclaration = conversionOperatorDeclaration.withModifiers(ListUtils.map(conversionOperatorDeclaration.getModifiers(), el -> (J.Modifier)visit(el, p)));
         conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withKind(visitLeftPadded(conversionOperatorDeclaration.getPadding().getKind(), CsLeftPadded.Location.CONVERSION_OPERATOR_DECLARATION_KIND, p));
+        conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withInterfaceSpecifier(visitRightPadded(conversionOperatorDeclaration.getPadding().getInterfaceSpecifier(), CsRightPadded.Location.CONVERSION_OPERATOR_DECLARATION_INTERFACE_SPECIFIER, p));
         conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withReturnType(visitLeftPadded(conversionOperatorDeclaration.getPadding().getReturnType(), CsLeftPadded.Location.CONVERSION_OPERATOR_DECLARATION_RETURN_TYPE, p));
         conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withParameters(visitContainer(conversionOperatorDeclaration.getPadding().getParameters(), CsContainer.Location.CONVERSION_OPERATOR_DECLARATION_PARAMETERS, p));
         conversionOperatorDeclaration = conversionOperatorDeclaration.getPadding().withExpressionBody(visitLeftPadded(conversionOperatorDeclaration.getPadding().getExpressionBody(), CsLeftPadded.Location.CONVERSION_OPERATOR_DECLARATION_EXPRESSION_BODY, p));
@@ -1292,6 +1293,48 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         functionPointerType = functionPointerType.getPadding().withUnmanagedCallingConventionTypes(visitContainer(functionPointerType.getPadding().getUnmanagedCallingConventionTypes(), CsContainer.Location.FUNCTION_POINTER_TYPE_UNMANAGED_CALLING_CONVENTION_TYPES, p));
         functionPointerType = functionPointerType.getPadding().withParameterTypes(visitContainer(functionPointerType.getPadding().getParameterTypes(), CsContainer.Location.FUNCTION_POINTER_TYPE_PARAMETER_TYPES, p));
         return functionPointerType;
+    }
+
+    public J visitTypeWithArguments(Cs.TypeWithArguments typeWithArguments, P p) {
+        typeWithArguments = typeWithArguments.withPrefix(visitSpace(typeWithArguments.getPrefix(), CsSpace.Location.TYPE_WITH_ARGUMENTS_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(typeWithArguments, p);
+        if (!(tempExpression instanceof Cs.TypeWithArguments))
+        {
+            return tempExpression;
+        }
+        typeWithArguments = (Cs.TypeWithArguments) tempExpression;
+        typeWithArguments = typeWithArguments.withMarkers(visitMarkers(typeWithArguments.getMarkers(), p));
+        typeWithArguments = typeWithArguments.withTypeExpression(visitAndCast(typeWithArguments.getTypeExpression(), p));
+        typeWithArguments = typeWithArguments.getPadding().withArguments(visitContainer(typeWithArguments.getPadding().getArguments(), CsContainer.Location.TYPE_WITH_ARGUMENTS_ARGUMENTS, p));
+        return typeWithArguments;
+    }
+
+    public J visitExplicitInterfaceMember(Cs.ExplicitInterfaceMember explicitInterfaceMember, P p) {
+        explicitInterfaceMember = explicitInterfaceMember.withPrefix(visitSpace(explicitInterfaceMember.getPrefix(), CsSpace.Location.EXPLICIT_INTERFACE_MEMBER_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(explicitInterfaceMember, p);
+        if (!(tempStatement instanceof Cs.ExplicitInterfaceMember))
+        {
+            return tempStatement;
+        }
+        explicitInterfaceMember = (Cs.ExplicitInterfaceMember) tempStatement;
+        explicitInterfaceMember = explicitInterfaceMember.withMarkers(visitMarkers(explicitInterfaceMember.getMarkers(), p));
+        explicitInterfaceMember = explicitInterfaceMember.getPadding().withInterfaceSpecifier(visitRightPadded(explicitInterfaceMember.getPadding().getInterfaceSpecifier(), CsRightPadded.Location.EXPLICIT_INTERFACE_MEMBER_INTERFACE_SPECIFIER, p));
+        explicitInterfaceMember = explicitInterfaceMember.withMethodDeclaration(visitAndCast(explicitInterfaceMember.getMethodDeclaration(), p));
+        return explicitInterfaceMember;
+    }
+
+    public J visitExceptionFilteredTry(Cs.ExceptionFilteredTry exceptionFilteredTry, P p) {
+        exceptionFilteredTry = exceptionFilteredTry.withPrefix(visitSpace(exceptionFilteredTry.getPrefix(), CsSpace.Location.EXCEPTION_FILTERED_TRY_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(exceptionFilteredTry, p);
+        if (!(tempStatement instanceof Cs.ExceptionFilteredTry))
+        {
+            return tempStatement;
+        }
+        exceptionFilteredTry = (Cs.ExceptionFilteredTry) tempStatement;
+        exceptionFilteredTry = exceptionFilteredTry.withMarkers(visitMarkers(exceptionFilteredTry.getMarkers(), p));
+        exceptionFilteredTry = exceptionFilteredTry.withATry(visitAndCast(exceptionFilteredTry.getATry(), p));
+        exceptionFilteredTry = exceptionFilteredTry.withCatchFilters(ListUtils.map(exceptionFilteredTry.getCatchFilters(), el -> visitLeftPadded(el, CsLeftPadded.Location.TRY_CATCH_FILTER_EXPRESSION, p)));
+        return exceptionFilteredTry;
     }
 
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,

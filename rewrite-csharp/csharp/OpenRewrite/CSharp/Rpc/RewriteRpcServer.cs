@@ -149,6 +149,10 @@ public class RewriteRpcServer
         RpcSendQueue.RegisterJavaTypeName(typeof(ForEachVariableLoopControl),
             "org.openrewrite.csharp.tree.Cs$ForEachVariableLoop$Control");
 
+        // Marker type overrides for markers that live in Cs.java but map to marker package
+        RpcSendQueue.RegisterJavaTypeName(typeof(ImplicitTypeParameters),
+            "org.openrewrite.csharp.marker.ImplicitTypeParameters");
+
         // LINQ types live in Linq$ not Cs$ on the Java side
         RpcSendQueue.RegisterJavaTypeName(typeof(QueryExpression),
             "org.openrewrite.csharp.tree.Linq$QueryExpression");

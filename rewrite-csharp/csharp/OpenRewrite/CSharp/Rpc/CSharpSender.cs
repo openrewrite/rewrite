@@ -157,6 +157,9 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             WithExpression we => VisitWithExpression(we, q),
             SpreadExpression se => VisitSpreadExpression(se, q),
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, q),
+            TypeWithArguments twa => VisitTypeWithArguments(twa, q),
+            ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, q),
+            ExceptionFilteredTry eft => VisitExceptionFilteredTry(eft, q),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, q),
             QueryBody qb => VisitQueryBody(qb, q),
@@ -893,6 +896,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSendList(cod, c => c.Modifiers,
             m => (object)m.Id, m => Visit(m, q));
         q.GetAndSend(cod, c => c.Kind, lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(cod, c => c.InterfaceSpecifier, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(cod, c => c.ReturnType, lp => VisitLeftPadded(lp, q));
         q.GetAndSend(cod, c => c.Parameters, c2 => VisitContainer(c2, q));
         q.GetAndSend(cod, c => c.ExpressionBody, lp => VisitLeftPadded(lp!, q));
@@ -997,6 +1001,30 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(fpt, f => f.ParameterTypes, el => VisitContainer(el, q));
         q.GetAndSend(fpt, f => AsRef(f.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
         return fpt;
+    }
+
+    public override J VisitTypeWithArguments(TypeWithArguments twa, RpcSendQueue q)
+    {
+        q.GetAndSend(twa, t => (J)t.Type, el => Visit(el, q));
+        q.GetAndSend(twa, t => t.Arguments, c => VisitContainer(c, q));
+        return twa;
+    }
+
+    public override J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, RpcSendQueue q)
+    {
+        q.GetAndSend(eim, e => e.InterfaceSpecifier, rp => VisitRightPadded(rp, q));
+        q.GetAndSend(eim, e => (J)e.MethodDeclaration, el => Visit(el, q));
+        return eim;
+    }
+
+    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcSendQueue q)
+    {
+        q.GetAndSend(eft, e => (J)e.Try, el => Visit(el, q));
+        foreach (var filter in eft.CatchFilters)
+        {
+            q.GetAndSend(eft, _ => (object?)filter, el => VisitLeftPadded((JLeftPadded<ControlParentheses<Expression>>)el!, q));
+        }
+        return eft;
     }
 
     // ---- Helper delegation to JavaSender ----

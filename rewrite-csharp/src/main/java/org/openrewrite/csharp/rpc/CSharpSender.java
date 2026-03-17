@@ -744,6 +744,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J visitConversionOperatorDeclaration(Cs.ConversionOperatorDeclaration conversionOperatorDeclaration, RpcSendQueue q) {
         q.getAndSendList(conversionOperatorDeclaration, Cs.ConversionOperatorDeclaration::getModifiers, Tree::getId, el -> visit(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getKind(), el -> visitLeftPadded(el, q));
+        q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getReturnType(), el -> visitLeftPadded(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getParameters(), el -> visitContainer(el, q));
         q.getAndSend(conversionOperatorDeclaration, c -> c.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q));
@@ -840,6 +841,29 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
         q.getAndSend(functionPointerType, f -> f.getPadding().getParameterTypes(), el -> visitContainer(el, q));
         q.getAndSend(functionPointerType, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
         return functionPointerType;
+    }
+
+    @Override
+    public J visitTypeWithArguments(Cs.TypeWithArguments typeWithArguments, RpcSendQueue q) {
+        q.getAndSend(typeWithArguments, Cs.TypeWithArguments::getTypeExpression, el -> visit(el, q));
+        q.getAndSend(typeWithArguments, t -> t.getPadding().getArguments(), el -> visitContainer(el, q));
+        return typeWithArguments;
+    }
+
+    @Override
+    public J visitExplicitInterfaceMember(Cs.ExplicitInterfaceMember explicitInterfaceMember, RpcSendQueue q) {
+        q.getAndSend(explicitInterfaceMember, e -> e.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q));
+        q.getAndSend(explicitInterfaceMember, Cs.ExplicitInterfaceMember::getMethodDeclaration, el -> visit(el, q));
+        return explicitInterfaceMember;
+    }
+
+    @Override
+    public J visitExceptionFilteredTry(Cs.ExceptionFilteredTry exceptionFilteredTry, RpcSendQueue q) {
+        q.getAndSend(exceptionFilteredTry, Cs.ExceptionFilteredTry::getATry, el -> visit(el, q));
+        for (JLeftPadded<J.ControlParentheses<Expression>> filter : exceptionFilteredTry.getCatchFilters()) {
+            q.getAndSend(exceptionFilteredTry, e -> filter, el -> visitLeftPadded(el, q));
+        }
+        return exceptionFilteredTry;
     }
 
     // Delegate methods to JavaSender

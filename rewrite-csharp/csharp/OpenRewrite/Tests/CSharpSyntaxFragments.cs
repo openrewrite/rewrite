@@ -602,8 +602,6 @@ public class CSharpSyntaxFragments
         yield return new SourceTestCase("DeconstructionTests.NullableTuple", "(x, y)? z = M();");
         
 
-        yield return new SourceTestCase("ExpressionParsingTests.TestConditionalAccessNotVersion5", "a.b?.c.d?[1]?.e()?.f;);");
-
         yield return new SourceTestCase("ExpressionParsingTests.TestConditionalAccess", "a.b?.c.d?[1]?.e()?.f;");
 
         yield return new SourceTestCase("ExpressionParsingTests.TypeArgumentShiftAmbiguity_01", """

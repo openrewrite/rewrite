@@ -486,6 +486,8 @@ public class RpcReceiveQueue
                 typeof(NullSafe),
             "org.openrewrite.csharp.marker.PointerMemberAccess" =>
                 typeof(PointerMemberAccess),
+            "org.openrewrite.csharp.marker.ImplicitTypeParameters" =>
+                typeof(ImplicitTypeParameters),
 
             _ => FromJavaTypeNameByConvention(javaTypeName)
         };

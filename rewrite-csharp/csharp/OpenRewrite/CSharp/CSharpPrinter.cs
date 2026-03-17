@@ -702,6 +702,41 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     }
 
     /// <summary>
+    /// Prints type parameters inside angle brackets, skipping synthetic entries.
+    /// </summary>
+    private void PrintTypeParameterList(JContainer<TypeParameter> typeParameters, PrintOutputCapture<P> p)
+    {
+        VisitSpace(typeParameters.Before, p);
+        p.Append('<');
+        bool needsComma = false;
+        for (var i = 0; i < typeParameters.Elements.Count; i++)
+        {
+            var typeParam = typeParameters.Elements[i];
+            bool isSynthetic = typeParam.Element.Bounds?.Markers.FindFirst<ImplicitTypeParameters>() != null;
+            if (isSynthetic) continue;
+
+            if (needsComma)
+            {
+                p.Append(',');
+            }
+
+            if (typeParam.Element.Bounds?.Elements.Count > 0 &&
+                typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp)
+            {
+                PrintConstrainedTypeParameterDecl(ctp, p);
+            }
+            else
+            {
+                Visit(typeParam.Element, p);
+            }
+
+            VisitSpace(typeParam.After, p);
+            needsComma = true;
+        }
+        p.Append('>');
+    }
+
+    /// <summary>
     /// Prints all where clauses from a type parameter container in source order.
     /// </summary>
     private void PrintTypeParameterConstraintsInSourceOrder(JContainer<TypeParameter>? typeParameters, PrintOutputCapture<P> p)
@@ -1236,32 +1271,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Print type parameters (generics) — only print <attrs variance name, ...>
         if (classDecl.TypeParameters != null)
         {
-            VisitSpace(classDecl.TypeParameters.Before, p);
-            p.Append('<');
-            for (var i = 0; i < classDecl.TypeParameters.Elements.Count; i++)
+            bool isImplicit = classDecl.TypeParameters.Markers.FindFirst<ImplicitTypeParameters>() != null;
+            if (!isImplicit)
             {
-                var typeParam = classDecl.TypeParameters.Elements[i];
-                // The ConstrainedTypeParameter is in Bounds[0]
-                if (typeParam.Element.Bounds?.Elements.Count > 0 &&
-                    typeParam.Element.Bounds.Elements[0].Element is ConstrainedTypeParameter ctp)
-                {
-                    PrintConstrainedTypeParameterDecl(ctp, p);
-                }
-                else
-                {
-                    Visit(typeParam.Element.Name, p);
-                }
-                if (i < classDecl.TypeParameters.Elements.Count - 1)
-                {
-                    VisitSpace(typeParam.After, p);
-                    p.Append(',');
-                }
-                else
-                {
-                    VisitSpace(typeParam.After, p);
-                }
+                PrintTypeParameterList(classDecl.TypeParameters, p);
             }
-            p.Append('>');
         }
 
         // Print primary constructor (C# 12) if present
@@ -1418,7 +1432,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Print type parameters (e.g., <T, U>)
         if (method.TypeParameters != null)
         {
-            VisitContainer("<", method.TypeParameters, ",", ">", p);
+            PrintTypeParameterList(method.TypeParameters, p);
         }
 
         // Print parameters
@@ -3423,6 +3437,52 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         VisitContainer("(", twa.Arguments, ",", ")", p);
         AfterSyntax(twa, p);
         return twa;
+    }
+
+    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(eft, p);
+
+        // Print 'try' keyword and body via the inner Try's prefix
+        var innerTry = eft.Try;
+        VisitSpace(innerTry.Prefix, p);
+        p.Append("try");
+
+        Visit(innerTry.Body, p);
+
+        // Print catch clauses with filters
+        for (int i = 0; i < innerTry.Catches.Count; i++)
+        {
+            var catchClause = innerTry.Catches[i];
+            VisitSpace(catchClause.Prefix, p);
+            p.Append("catch");
+            Visit(catchClause.Parameter, p);
+
+            // Print filter if present: when (expr)
+            if (i < eft.CatchFilters.Count && eft.CatchFilters[i] is { } filter)
+            {
+                VisitSpace(filter.Before, p);
+                p.Append("when");
+                VisitSpace(filter.Element.Prefix, p);
+                p.Append('(');
+                Visit(filter.Element.Tree.Element, p);
+                VisitSpace(filter.Element.Tree.After, p);
+                p.Append(')');
+            }
+
+            Visit(catchClause.Body, p);
+        }
+
+        // Print finally if present
+        if (innerTry.Finally != null)
+        {
+            VisitSpace(innerTry.Finally.Before, p);
+            p.Append("finally");
+            Visit(innerTry.Finally.Element, p);
+        }
+
+        AfterSyntax(eft, p);
+        return eft;
     }
 
     public override J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, PrintOutputCapture<P> p)

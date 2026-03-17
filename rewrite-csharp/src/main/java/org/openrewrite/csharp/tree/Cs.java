@@ -6492,6 +6492,25 @@ public interface Cs extends J {
         }
 
         /**
+         * The explicit interface type (e.g., {@code N.I}), right-padded with the
+         * space before the dot. Null when no explicit interface.
+         * <pre>
+         * N.I.implicit operator int(MyType t)
+         * ^^^
+         * </pre>
+         */
+        @Nullable
+        JRightPadded<TypeTree> interfaceSpecifier;
+
+        public @Nullable TypeTree getInterfaceSpecifier() {
+            return interfaceSpecifier == null ? null : interfaceSpecifier.getElement();
+        }
+
+        public ConversionOperatorDeclaration withInterfaceSpecifier(@Nullable TypeTree interfaceSpecifier) {
+            return getPadding().withInterfaceSpecifier(JRightPadded.withElement(this.interfaceSpecifier, interfaceSpecifier));
+        }
+
+        /**
          * <pre>
          * public static implicit operator string(MyType t)
          *                                ^^^^^^^
@@ -6585,23 +6604,33 @@ public interface Cs extends J {
         public static class Padding {
             private final ConversionOperatorDeclaration t;
 
-            public JLeftPadded<TypeTree> getReturnType() {
-                return t.returnType;
-            }
-
-            public ConversionOperatorDeclaration withReturnType(JLeftPadded<TypeTree> returnType) {
-                return t.returnType == returnType ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, t.kind, returnType, t.parameters,
-                        t.expressionBody, t.body);
-            }
-
             public JLeftPadded<ExplicitImplicit> getKind() {
                 return t.kind;
             }
 
             public ConversionOperatorDeclaration withKind(JLeftPadded<ExplicitImplicit> kind) {
                 return t.kind == kind ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, kind, t.returnType, t.parameters,
+                        t.modifiers, kind, t.interfaceSpecifier, t.returnType, t.parameters,
+                        t.expressionBody, t.body);
+            }
+
+            public @Nullable JRightPadded<TypeTree> getInterfaceSpecifier() {
+                return t.interfaceSpecifier;
+            }
+
+            public ConversionOperatorDeclaration withInterfaceSpecifier(@Nullable JRightPadded<TypeTree> interfaceSpecifier) {
+                return t.interfaceSpecifier == interfaceSpecifier ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
+                        t.modifiers, t.kind, interfaceSpecifier, t.returnType, t.parameters,
+                        t.expressionBody, t.body);
+            }
+
+            public JLeftPadded<TypeTree> getReturnType() {
+                return t.returnType;
+            }
+
+            public ConversionOperatorDeclaration withReturnType(JLeftPadded<TypeTree> returnType) {
+                return t.returnType == returnType ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
+                        t.modifiers, t.kind, t.interfaceSpecifier, returnType, t.parameters,
                         t.expressionBody, t.body);
             }
 
@@ -6611,7 +6640,7 @@ public interface Cs extends J {
 
             public ConversionOperatorDeclaration withParameters(JContainer<Statement> parameters) {
                 return t.parameters == parameters ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, t.kind, t.returnType, parameters,
+                        t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, parameters,
                         t.expressionBody, t.body);
             }
 
@@ -6621,7 +6650,7 @@ public interface Cs extends J {
 
             public ConversionOperatorDeclaration withExpressionBody(@Nullable JLeftPadded<Expression> expressionBody) {
                 return t.expressionBody == expressionBody ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, t.kind, t.returnType, t.parameters,
+                        t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, t.parameters,
                         expressionBody, t.body);
             }
         }
@@ -8445,6 +8474,230 @@ public interface Cs extends J {
             public FunctionPointerType withParameterTypes(JContainer<TypeTree> parameterTypes) {
                 return t.parameterTypes == parameterTypes ? t : new FunctionPointerType(t.id, t.prefix, t.markers, t.callingConvention, t.unmanagedCallingConventionTypes, parameterTypes, t.type);
             }
+        }
+    }
+
+    /**
+     * A base type reference with constructor arguments, e.g., {@code Base(x, y)}
+     * in {@code class Derived(int x) : Base(x, y) { }}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeWithArguments implements Cs, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        TypeTree typeExpression;
+
+        JContainer<Expression> arguments;
+
+        public List<Expression> getArguments() {
+            return arguments.getElements();
+        }
+
+        public TypeWithArguments withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typeExpression.getType();
+        }
+
+        @Override
+        public TypeWithArguments withType(@Nullable JavaType javaType) {
+            return withTypeExpression(typeExpression.withType(javaType));
+        }
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitTypeWithArguments(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TypeWithArguments t;
+
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
+            }
+
+            public TypeWithArguments withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new TypeWithArguments(t.id, t.prefix, t.markers, t.typeExpression, arguments);
+            }
+        }
+    }
+
+    /**
+     * Wraps a {@link J.MethodDeclaration} that has an explicit interface specifier
+     * (e.g., {@code void IFoo.Bar()}). The interface specifier is stored separately
+     * since {@link J.MethodDeclaration#getName()} is an {@link J.Identifier} only.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ExplicitInterfaceMember implements Cs, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * The interface type (e.g., IFoo), right-padded with the space before the dot.
+         */
+        JRightPadded<TypeTree> interfaceSpecifier;
+
+        public TypeTree getInterfaceSpecifier() {
+            return interfaceSpecifier.getElement();
+        }
+
+        public ExplicitInterfaceMember withInterfaceSpecifier(TypeTree interfaceSpecifier) {
+            return getPadding().withInterfaceSpecifier(JRightPadded.withElement(this.interfaceSpecifier, interfaceSpecifier));
+        }
+
+        @With
+        @Getter
+        J.MethodDeclaration methodDeclaration;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitExplicitInterfaceMember(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExplicitInterfaceMember t;
+
+            public JRightPadded<TypeTree> getInterfaceSpecifier() {
+                return t.interfaceSpecifier;
+            }
+
+            public ExplicitInterfaceMember withInterfaceSpecifier(JRightPadded<TypeTree> interfaceSpecifier) {
+                return t.interfaceSpecifier == interfaceSpecifier ? t : new ExplicitInterfaceMember(t.id, t.prefix, t.markers, interfaceSpecifier, t.methodDeclaration);
+            }
+        }
+    }
+
+    /**
+     * C# try statement with exception filter support ({@code catch when (expr)}).
+     * Wraps a {@link J.Try} and adds a parallel list of catch filters (when clauses).
+     * Each filter corresponds positionally to a catch clause in the inner Try;
+     * null entries indicate no filter for that catch.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class ExceptionFilteredTry implements Cs, Statement {
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.Try aTry;
+
+        /**
+         * Parallel to {@link J.Try#getCatches()}. Each entry is the {@code when(expr)} filter
+         * for the corresponding catch clause, or null if no filter. The {@link JLeftPadded#getBefore()}
+         * is the space before {@code when}. The {@link J.ControlParentheses} prefix is
+         * the space before {@code (}.
+         */
+        @With
+        @Getter
+        List<JLeftPadded<J.ControlParentheses<Expression>>> catchFilters;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitExceptionFilteredTry(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 

@@ -496,6 +496,27 @@ public sealed class PatternCombinator(Guid id)
 }
 
 /// <summary>
+/// Marker on a <see cref="ClassDeclaration"/> TypeParameters container indicating
+/// the type parameters are synthetic (no angle brackets in source). Created when
+/// constraint clauses exist but no type parameter list (e.g., interface C where T : U;).
+/// </summary>
+public sealed class ImplicitTypeParameters(Guid id) : Marker, IRpcCodec<ImplicitTypeParameters>, IEquatable<ImplicitTypeParameters>
+{
+    public Guid Id { get; } = id;
+
+    public ImplicitTypeParameters WithId(Guid id) =>
+        id == Id ? this : new(id);
+
+    public void RpcSend(ImplicitTypeParameters after, RpcSendQueue q) => q.GetAndSend(after, m => m.Id);
+    public ImplicitTypeParameters RpcReceive(ImplicitTypeParameters before, RpcReceiveQueue q) =>
+        before.WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse));
+
+    public bool Equals(ImplicitTypeParameters? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ImplicitTypeParameters);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
 /// Marker on a <see cref="ConstrainedTypeParameter"/> that records the source-order index
 /// of its <c>where</c> clause, so the printer can output constraints in source order
 /// rather than type-parameter declaration order.
@@ -3874,6 +3895,48 @@ public sealed class ExplicitInterfaceMember(
 
     public bool Equals(ExplicitInterfaceMember? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as ExplicitInterfaceMember);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
+/// C# try statement with exception filter support. Wraps a J.Try and adds a parallel list
+/// of catch filters (when clauses). Each filter corresponds positionally to a catch clause
+/// in the inner Try; null entries indicate no filter for that catch.
+/// </summary>
+public sealed class ExceptionFilteredTry(
+    Guid id,
+    Space prefix,
+    Markers markers,
+    Try @try,
+    IList<JLeftPadded<ControlParentheses<Expression>>?> catchFilters
+) : Cs, Statement, IEquatable<ExceptionFilteredTry>
+{
+    public Guid Id { get; } = id;
+    public Space Prefix { get; } = prefix;
+    public Markers Markers { get; } = markers;
+    public Try Try { get; } = @try;
+    /// <summary>
+    /// Parallel to Try.Catches. Each entry is the when(expr) filter for the corresponding
+    /// catch clause, or null if no filter. JLeftPadded.Before = space before 'when'.
+    /// ControlParentheses.Prefix = space before '('. RightPadded.After = space before ')'.
+    /// </summary>
+    public IList<JLeftPadded<ControlParentheses<Expression>>?> CatchFilters { get; } = catchFilters;
+
+    public ExceptionFilteredTry WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Try, CatchFilters);
+    public ExceptionFilteredTry WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Try, CatchFilters);
+    public ExceptionFilteredTry WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Try, CatchFilters);
+    public ExceptionFilteredTry WithTry(Try @try) =>
+        ReferenceEquals(@try, Try) ? this : new(Id, Prefix, Markers, @try, CatchFilters);
+    public ExceptionFilteredTry WithCatchFilters(IList<JLeftPadded<ControlParentheses<Expression>>?> catchFilters) =>
+        ReferenceEquals(catchFilters, CatchFilters) ? this : new(Id, Prefix, Markers, Try, catchFilters);
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ExceptionFilteredTry? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ExceptionFilteredTry);
     public override int GetHashCode() => Id.GetHashCode();
 }
 

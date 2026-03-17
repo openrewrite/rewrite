@@ -955,8 +955,11 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
         else if (node.TypeParameterList == null && node.ConstraintClauses.Count > 0)
         {
-            // Non-generic type with where clauses — leave cursor in place so the
-            // constraint text is captured in the body prefix for lossless round-trip
+            // Non-generic type with where clauses — create a synthetic empty type parameter container
+            // and merge constraints into it. Mark as implicit so the printer skips <>.
+            typeParameters = new JContainer<TypeParameter>(Space.Empty, [],
+                Markers.Build([new ImplicitTypeParameters(Guid.NewGuid())]));
+            typeParameters = MergeConstraintClauses(typeParameters, node.ConstraintClauses);
         }
 
         // Parse the body (check for semicolon-terminated records first)
@@ -4092,6 +4095,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         // Parse catch clauses
         var catches = new List<Try.Catch>();
+        var catchFilters = new List<JLeftPadded<ControlParentheses<Expression>>?>();
+        bool hasAnyFilter = false;
         foreach (var catchClause in node.Catches)
         {
             var catchPrefix = ExtractSpaceBefore(catchClause.CatchKeyword);
@@ -4148,6 +4153,25 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 );
             }
 
+            // Parse catch filter (when clause) if present
+            JLeftPadded<ControlParentheses<Expression>>? catchFilter = null;
+            if (catchClause.Filter != null)
+            {
+                var whenPrefix = ExtractSpaceBefore(catchClause.Filter.WhenKeyword);
+                _cursor = catchClause.Filter.WhenKeyword.Span.End;
+                var openParenPrefix = ExtractSpaceBefore(catchClause.Filter.OpenParenToken);
+                _cursor = catchClause.Filter.OpenParenToken.Span.End;
+                var filterExpr = (Expression)Visit(catchClause.Filter.FilterExpression)!;
+                var closeParenPrefix = ExtractSpaceBefore(catchClause.Filter.CloseParenToken);
+                _cursor = catchClause.Filter.CloseParenToken.Span.End;
+                var controlParens = new ControlParentheses<Expression>(
+                    Guid.NewGuid(), openParenPrefix, Markers.Empty,
+                    new JRightPadded<Expression>(filterExpr, closeParenPrefix, Markers.Empty));
+                catchFilter = new JLeftPadded<ControlParentheses<Expression>>(whenPrefix, controlParens);
+                hasAnyFilter = true;
+            }
+            catchFilters.Add(catchFilter);
+
             var catchBody = (Block)VisitBlock(catchClause.Block);
 
             catches.Add(new Try.Catch(
@@ -4169,15 +4193,28 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             finallyBlock = new JLeftPadded<Block>(finallyPrefix, finallyBody);
         }
 
-        return new Try(
+        var tryStmt = new Try(
             Guid.NewGuid(),
-            prefix,
+            hasAnyFilter ? Space.Empty : prefix,
             Markers.Empty,
             null,
             body,
             catches,
             finallyBlock
         );
+
+        if (hasAnyFilter)
+        {
+            return new ExceptionFilteredTry(
+                Guid.NewGuid(),
+                prefix,
+                Markers.Empty,
+                tryStmt,
+                catchFilters
+            );
+        }
+
+        return tryStmt;
     }
 
     public override J VisitThrowStatement(ThrowStatementSyntax node)
@@ -7313,17 +7350,26 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     {
                         if (ctp.WhereConstraint != null)
                         {
-                            // Already has a where clause — rewind cursor to before this clause
-                            // so its text is captured in the body prefix for lossless round-trip
-                            _cursor = cursorBeforeClause;
-                            merged = false;
+                            // Duplicate where clause for same type param — create a separate
+                            // synthetic type parameter entry so both where clauses round-trip
+                            var dupCtp = new ConstrainedTypeParameter(
+                                Guid.NewGuid(), Space.Empty, Markers.Empty,
+                                [], null, whereIdentifier, whereConstraint, constraintsContainer, null);
+                            var syntheticTp = new TypeParameter(
+                                Guid.NewGuid(), Space.Empty, Markers.Empty, [], [],
+                                new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], paramName, null, null),
+                                new JContainer<TypeTree>(Space.Empty,
+                                    [new JRightPadded<TypeTree>(dupCtp, Space.Empty, Markers.Empty)],
+                                    Markers.Build([new ImplicitTypeParameters(Guid.NewGuid())])));
+                            typeParams.Add(new JRightPadded<TypeParameter>(syntheticTp, Space.Empty, Markers.Empty));
+                            merged = true;
                         }
                         else
                         {
                             var updatedCtp = ctp.WithWhereConstraint(whereConstraint).WithConstraints(constraintsContainer)
                                 .WithMarkers(ctp.Markers.Add(new WhereClauseOrder(Guid.NewGuid(), whereOrder)));
                             var updatedBounds = new JContainer<TypeTree>(
-                                tp.Element.Bounds.Before,
+                                tp.Element.Bounds!.Before,
                                 [new JRightPadded<TypeTree>(updatedCtp, Space.Empty, Markers.Empty)],
                                 tp.Element.Bounds.Markers
                             );
@@ -7336,8 +7382,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
             if (!merged)
             {
-                _cursor = cursorBeforeClause; // Rewind so unmatched clause text is captured in body prefix
-                break;
+                // Unmatched constraint — create a synthetic type parameter to hold it
+                var ctp = new ConstrainedTypeParameter(
+                    Guid.NewGuid(), Space.Empty, Markers.Empty,
+                    [], null, whereIdentifier, whereConstraint, constraintsContainer, null);
+                var syntheticTp = new TypeParameter(
+                    Guid.NewGuid(), Space.Empty, Markers.Empty, [], [],
+                    new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], paramName, null, null),
+                    new JContainer<TypeTree>(Space.Empty,
+                        [new JRightPadded<TypeTree>(ctp, Space.Empty, Markers.Empty)],
+                        Markers.Build([new ImplicitTypeParameters(Guid.NewGuid())])));
+                typeParams.Add(new JRightPadded<TypeParameter>(syntheticTp, Space.Empty, Markers.Empty));
             }
             whereOrder++;
         }
