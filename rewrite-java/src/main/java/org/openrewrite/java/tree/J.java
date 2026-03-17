@@ -3885,6 +3885,35 @@ public interface J extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class MethodDeclaration implements J, Statement, TypedTree {
+
+        /**
+         * Backwards-compatible factory for deserialization of older LSTs
+         * that do not have the {@code dimensionsAfterName} field.
+         * Remove once older LSTs without this field are no longer in circulation.
+         */
+        @SuppressWarnings("unused")
+        @JsonCreator
+        static MethodDeclaration create(
+                UUID id,
+                Space prefix,
+                Markers markers,
+                List<Annotation> leadingAnnotations,
+                List<Modifier> modifiers,
+                @Nullable TypeParameters typeParameters,
+                @Nullable TypeTree returnTypeExpression,
+                IdentifierWithAnnotations name,
+                JContainer<Statement> parameters,
+                @Nullable List<JLeftPadded<Space>> dimensionsAfterName,
+                @Nullable JContainer<NameTree> throwz,
+                @Nullable Block body,
+                @Nullable JLeftPadded<Expression> defaultValue,
+                JavaType.@Nullable Method methodType) {
+            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers,
+                    typeParameters, returnTypeExpression, name, parameters,
+                    dimensionsAfterName != null ? dimensionsAfterName : emptyList(),
+                    throwz, body, defaultValue, methodType);
+        }
+
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
