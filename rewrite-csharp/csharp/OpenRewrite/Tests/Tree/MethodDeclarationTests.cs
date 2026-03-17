@@ -118,4 +118,38 @@ public class MethodDeclarationTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void ExplicitInterfaceImplementationVoid()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                interface IFoo { void Bar(); }
+                class Foo : IFoo {
+                    void IFoo.Bar() { }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ExplicitInterfaceImplementationWithReturnType()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System.Collections;
+                public class MyCollection : IEnumerable
+                {
+                    IEnumerator IEnumerable.GetEnumerator()
+                    {
+                        return null;
+                    }
+                }
+                """
+            )
+        );
+    }
 }
