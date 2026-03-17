@@ -1411,7 +1411,19 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         BeforeSyntax(method, p);
+        PrintMethodDeclarationBody(method, null, p);
+        AfterSyntax(method, p);
+        return method;
+    }
 
+    /// <summary>
+    /// Prints the body of a method declaration, optionally inserting an explicit interface
+    /// specifier between the return type and the method name.
+    /// In C# source order: [modifiers] ReturnType [InterfaceName.] MethodName(params) { body }
+    /// </summary>
+    private void PrintMethodDeclarationBody(MethodDeclaration method,
+        JRightPadded<TypeTree>? interfaceSpecifier, PrintOutputCapture<P> p)
+    {
         // Print modifiers
         foreach (var mod in method.Modifiers)
         {
@@ -1423,6 +1435,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         if (method.ReturnTypeExpression != null)
         {
             Visit(method.ReturnTypeExpression, p);
+        }
+
+        // Print explicit interface specifier if present (e.g., IFoo.)
+        if (interfaceSpecifier != null)
+        {
+            Visit(interfaceSpecifier.Element, p);
+            VisitSpace(interfaceSpecifier.After, p);
+            p.Append('.');
         }
 
         // Print name
@@ -1501,9 +1521,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             VisitBlock(method.Body, p);
         }
-
-        AfterSyntax(method, p);
-        return method;
     }
 
     public override J VisitReturn(Return ret, PrintOutputCapture<P> p)
@@ -3489,13 +3506,20 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(eim, p);
 
-        // Print the interface specifier: IFoo.
-        Visit(eim.InterfaceSpecifier.Element, p);
-        VisitSpace(eim.InterfaceSpecifier.After, p);
-        p.Append('.');
-
-        // Print the wrapped method declaration (without its own prefix, since we handle it)
-        Visit(eim.MethodDeclaration, p);
+        if (eim.MethodDeclaration is MethodDeclaration method)
+        {
+            // In C# source order: [modifiers] ReturnType InterfaceName.MethodName(params)
+            // The interface specifier is printed between the return type and the method name.
+            PrintMethodDeclarationBody(method, eim.InterfaceSpecifier, p);
+        }
+        else
+        {
+            // Fallback for non-method declarations (properties, indexers, events)
+            Visit(eim.InterfaceSpecifier.Element, p);
+            VisitSpace(eim.InterfaceSpecifier.After, p);
+            p.Append('.');
+            Visit(eim.MethodDeclaration, p);
+        }
 
         AfterSyntax(eim, p);
         return eim;

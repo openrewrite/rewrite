@@ -446,6 +446,29 @@ class CSharpRecipeTest implements RewriteTest {
     }
 
     @Test
+    void explicitInterfaceImplementationRoundTrip() {
+        rewriteRun(
+                spec -> spec
+                        .parser(CSharpParser.builder())
+                        .typeValidationOptions(TypeValidation.builder()
+                                .allowNonWhitespaceInWhitespace(true)
+                                .build()),
+                csharp(
+                        """
+                        using System.Collections;
+                        public class MyCollection : IEnumerable
+                        {
+                            IEnumerator IEnumerable.GetEnumerator()
+                            {
+                                return null;
+                            }
+                        }
+                        """
+                )
+        );
+    }
+
+    @Test
     void changePackage() {
         rewriteRun(
                 spec -> spec
