@@ -16,20 +16,12 @@
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
+using static OpenRewrite.Tests.CSharp.TestHelpers;
 
 namespace OpenRewrite.Tests.CSharp;
 
 public class CsHelpersTests
 {
-    private static Identifier MakeId(string name) =>
-        new(Guid.NewGuid(), Space.Empty, Markers.Empty, [], name, null, null);
-
-    private static FieldAccess MakeFieldAccess(string target, string name) =>
-        new(Guid.NewGuid(), Space.Empty, Markers.Empty,
-            MakeId(target),
-            new JLeftPadded<Identifier>(Space.Empty, MakeId(name)),
-            null);
-
     // =============================================================
     // GetSimpleName
     // =============================================================
@@ -107,7 +99,4 @@ public class CsHelpersTests
             null);
         Assert.False(Cs.HasNoArguments(mi));
     }
-
-    private static JRightPadded<T> Pad<T>(T element) =>
-        new(element, Space.Empty, Markers.Empty);
 }

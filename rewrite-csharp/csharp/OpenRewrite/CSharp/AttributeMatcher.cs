@@ -114,21 +114,16 @@ public class AttributeMatcher
     internal static string NormalizeAttributeName(string name)
     {
         const string suffix = "Attribute";
-        if (name.Length > suffix.Length && name.EndsWith(suffix, StringComparison.Ordinal))
-        {
-            // Handle FQN: strip suffix from last segment only
-            var lastDot = name.LastIndexOf('.');
-            if (lastDot >= 0)
-            {
-                var segment = name[(lastDot + 1)..];
-                if (segment.Length > suffix.Length && segment.EndsWith(suffix, StringComparison.Ordinal))
-                    return name[..(name.Length - suffix.Length)];
-                return name;
-            }
+        if (!name.EndsWith(suffix, StringComparison.Ordinal))
+            return name;
 
-            return name[..^suffix.Length];
-        }
+        // For FQNs, only strip the suffix from the last segment
+        var lastDot = name.LastIndexOf('.');
+        var segment = lastDot >= 0 ? name[(lastDot + 1)..] : name;
 
-        return name;
+        // Don't strip if the segment IS "Attribute" (nothing would remain)
+        return segment.Length > suffix.Length
+            ? name[..^suffix.Length]
+            : name;
     }
 }

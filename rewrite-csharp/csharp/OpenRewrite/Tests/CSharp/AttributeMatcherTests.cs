@@ -16,29 +16,12 @@
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
+using static OpenRewrite.Tests.CSharp.TestHelpers;
 
 namespace OpenRewrite.Tests.CSharp;
 
 public class AttributeMatcherTests
 {
-    private static Identifier MakeId(string name) =>
-        new(Guid.NewGuid(), Space.Empty, Markers.Empty, [], name, null, null);
-
-    private static Identifier MakeIdWithType(string name, JavaType type) =>
-        new(Guid.NewGuid(), Space.Empty, Markers.Empty, [], name, type, null);
-
-    private static FieldAccess MakeFieldAccess(string target, string name) =>
-        new(Guid.NewGuid(), Space.Empty, Markers.Empty,
-            MakeId(target),
-            new JLeftPadded<Identifier>(Space.Empty, MakeId(name)),
-            null);
-
-    private static Annotation MakeAnnotation(NameTree annotationType) =>
-        new(Guid.NewGuid(), Space.Empty, Markers.Empty, annotationType, null);
-
-    private static JRightPadded<T> Pad<T>(T element) =>
-        new(element, Space.Empty, Markers.Empty);
-
     private static AnnotatedStatement MakeAnnotatedStatement(params Annotation[] annotations)
     {
         var attrList = new AttributeList(
@@ -108,6 +91,13 @@ public class AttributeMatcherTests
     {
         // "Attribute" itself should not be stripped to empty string
         Assert.Equal("Attribute", AttributeMatcher.NormalizeAttributeName("Attribute"));
+    }
+
+    [Fact]
+    public void NormalizeName_MultiSegmentFqn()
+    {
+        Assert.Equal("System.ComponentModel.Description",
+            AttributeMatcher.NormalizeAttributeName("System.ComponentModel.DescriptionAttribute"));
     }
 
     // =============================================================
