@@ -762,6 +762,74 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Null-conditional member access (?.)
+    // ===============================================================
+
+    [Fact]
+    public void MatchesNullConditionalMethodCall()
+    {
+        var obj = Capture.Of<Expression>("obj");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"{obj}?.ToString()")),
+            CSharp(
+                "class C { void M() { string s = null; var x = s?.ToString(); } }",
+                "class C { void M() { string s = null; var x = /*~~>*/s?.ToString(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void NullConditionalPatternDoesNotMatchRegularDotAccess()
+    {
+        var obj = Capture.Of<Expression>("obj");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"{obj}?.ToString()")),
+            CSharp(
+                // Regular dot access should NOT match a ?. pattern
+                "class C { void M() { var x = \"hello\".ToString(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void RegularDotPatternDoesNotMatchNullConditionalAccess()
+    {
+        var obj = Capture.Of<Expression>("obj");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"{obj}.ToString()")),
+            CSharp(
+                // ?. access should NOT match a regular . pattern
+                "class C { void M() { string s = null; var x = s?.ToString(); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void MatchesNullConditionalFieldAccess()
+    {
+        var obj = Capture.Of<Expression>("obj");
+        RewriteRun(
+            spec => spec.SetRecipe(FindFieldAccess($"{obj}?.Length")),
+            CSharp(
+                "class C { void M() { string s = null; var x = s?.Length; } }",
+                "class C { void M() { string s = null; var x = /*~~>*/s?.Length; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void MatchesExactNullConditionalMethodCall()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("s?.ToString()")),
+            CSharp(
+                "class C { void M() { string s = null; var x = s?.ToString(); } }",
+                "class C { void M() { string s = null; var x = /*~~>*/s?.ToString(); } }"
+            )
+        );
+    }
+
+    // ===============================================================
     // C#-specific: IsPattern (is with pattern variable)
     // ===============================================================
 
@@ -912,6 +980,7 @@ public class PatternMatchTests : RewriteTest
 
     private static Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
     private static Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
+    private static Core.Recipe FindFieldAccess(TemplateStringHandler h) => Search<FieldAccess>(h);
     private static Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
     private static Core.Recipe FindLiteral(string c) => Search<Literal>(c);
     private static Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
