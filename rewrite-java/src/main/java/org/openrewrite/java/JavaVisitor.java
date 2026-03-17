@@ -832,6 +832,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.getAnnotations().withName(m.getAnnotations().getName().withAnnotations(ListUtils.map(m.getAnnotations().getName().getAnnotations(), a -> visitAndCast(a, p))));
         m = m.withName((J.Identifier) visitNonNull(m.getName(), p));
         m = m.getPadding().withParameters(visitContainer(m.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, p));
+        m = m.withDimensionsAfterName(
+                ListUtils.map(m.getDimensionsAfterName(),
+                        dim -> dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))
+                                .withElement(visitSpace(dim.getElement(), Space.Location.DIMENSION, p))
+                )
+        );
         if (m.getPadding().getThrows() != null) {
             m = m.getPadding().withThrows(visitContainer(m.getPadding().getThrows(), JContainer.Location.THROWS, p));
         }
