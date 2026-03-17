@@ -67,26 +67,22 @@ class ParseSolutionResponse {
      */
     @Value
     static class ProjectMetadata {
-        /**
-         * Path to the .csproj file (absolute or relative to rootDir).
-         */
         String projectPath;
 
-        /**
-         * The SDK attribute from the Project element.
-         */
         @Nullable
         String sdk;
 
-        /**
-         * MSBuild properties with provenance (property name to value + source file).
-         */
         Map<String, PropertyEntry> properties;
 
-        /**
-         * Per-target-framework metadata.
-         */
         List<TargetFrameworkEntry> targetFrameworks;
+
+        List<PackageSourceEntry> packageSources;
+    }
+
+    @Value
+    static class PackageSourceEntry {
+        String key;
+        String url;
     }
 
     @Value

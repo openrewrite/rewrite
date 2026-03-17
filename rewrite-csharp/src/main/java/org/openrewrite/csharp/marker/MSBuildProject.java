@@ -65,6 +65,15 @@ public class MSBuildProject implements Marker, Serializable {
     Map<String, PropertyValue> properties = emptyMap();
 
     /**
+     * NuGet package sources configured for this project, extracted from nuget.config.
+     * Used by version upgrade recipes to resolve available package versions.
+     * Analogous to MavenRepository list on MavenResolutionResult/GradleProject.
+     */
+    @With
+    @Builder.Default
+    List<PackageSource> packageSources = emptyList();
+
+    /**
      * Per-target-framework metadata. Each TFM has its own set of
      * package references, resolved packages, and project references,
      * since MSBuild evaluates the project independently per TFM.
@@ -152,5 +161,25 @@ public class MSBuildProject implements Marker, Serializable {
 
         @Nullable
         Path definedIn;
+    }
+
+    /**
+     * A NuGet package source from nuget.config.
+     * Analogous to MavenRepository in the Maven/Gradle ecosystems.
+     */
+    @Value
+    @Builder
+    @AllArgsConstructor
+    public static class PackageSource implements Serializable {
+        /**
+         * The key/name of the package source (e.g., "nuget.org", "mycompany-feed").
+         */
+        String key;
+
+        /**
+         * The NuGet V3 service index URL
+         * (e.g., "https://api.nuget.org/v3/index.json").
+         */
+        String url;
     }
 }

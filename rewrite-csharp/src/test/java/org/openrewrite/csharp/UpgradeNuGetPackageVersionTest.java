@@ -32,7 +32,7 @@ class UpgradeNuGetPackageVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpgradeNuGetPackageVersion("Newtonsoft.Json", "14.0.1"));
+        spec.recipe(new UpgradeNuGetPackageVersion("Newtonsoft.Json", "14.0.1", null));
     }
 
     @Test
@@ -125,7 +125,7 @@ class UpgradeNuGetPackageVersionTest implements RewriteTest {
     @Test
     void upgradeWithGlobPattern() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeNuGetPackageVersion("Newtonsoft.*", "14.0.1")),
+          spec -> spec.recipe(new UpgradeNuGetPackageVersion("Newtonsoft.*", "14.0.1", null)),
           csproj(
             """
               <Project Sdk="Microsoft.NET.Sdk">
@@ -370,7 +370,7 @@ class UpgradeNuGetPackageVersionTest implements RewriteTest {
                 </ItemGroup>
               </Project>
               """,
-            spec -> spec.mapBeforeRecipe(doc -> (Xml.Document) doc.withMarkers(doc.getMarkers().setByType(marker)))
+            spec -> spec.mapBeforeRecipe(doc -> doc.withMarkers(doc.getMarkers().setByType(marker)))
           ),
           // Directory.Build.props defines the property — should be updated
           csproj(

@@ -18,11 +18,10 @@ package org.openrewrite.csharp;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.csharp.marker.MSBuildProject;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -38,20 +37,9 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 /**
  * Upgrades a NuGet package reference version in .csproj files.
  * <p>
- * Handles three version definition patterns:
- * <pre>
- * 1. Literal version in .csproj:
- *    &lt;PackageReference Include="Foo" Version="1.0.0" /&gt;
- *    → Update the Version attribute directly
- *
- * 2. Property reference in .csproj:
- *    &lt;PackageReference Include="Foo" Version="$(FooVersion)" /&gt;
- *    → Find and update the &lt;FooVersion&gt; property
- *
- * 3. Central package management (Directory.Packages.props):
- *    &lt;PackageVersion Include="Foo" Version="1.0.0" /&gt;
- *    → Update the Version in the .props file
- * </pre>
+ * Supports the same version selectors as Maven and Gradle upgrade recipes:
+ * exact versions, {@code latest.release}, {@code latest.patch},
+ * tilde ({@code ~1.2.3}), caret ({@code ^1.2.3}), and other semver selectors.
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -63,9 +51,21 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
     String packageName;
 
     @Option(displayName = "New version",
-            description = "The version to upgrade to.",
-            example = "14.0.1")
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
+            example = "latest.release")
     String newVersion;
+
+    @Option(displayName = "Version pattern",
+            description = "Allows version selection to be extended beyond the original Node Semver semantics. " +
+                          "So for example, setting 'newVersion' to \"25-29\" can be paired with a metadata pattern " +
+                          "of \"-jre\" to select version 29.0-jre.",
+            example = "-jre",
+            required = false)
+    @Nullable
+    String versionPattern;
 
     @Override
     public String getDisplayName() {
@@ -76,10 +76,22 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
     public String getDescription() {
         return "Upgrades the version of a NuGet `<PackageReference>` or `<PackageVersion>` in .csproj " +
                "and Directory.Packages.props files. Handles property references by updating the property " +
-               "value instead of the version attribute.";
+               "value instead of the version attribute. Supports semver version selectors.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(
+                Semver.validate(newVersion, versionPattern));
     }
 
     static class Accumulator {
+        /**
+         * The resolved target version for each package (keyed by Include name).
+         * Null if no suitable version was found.
+         */
+        Map<String, String> resolvedVersions = new LinkedHashMap<>();
+
         /**
          * Properties that need to be updated (property name to new value),
          * keyed by the source path of the file where the property is defined.
@@ -94,6 +106,7 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -104,9 +117,19 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
                             if (!matchesGlob(ref.getInclude(), packageName)) {
                                 continue;
                             }
+
+                            String currentVersion = ref.getResolvedVersion();
+
+                            // Resolve the target version using semver selector
+                            String targetVersion = resolveTargetVersion(
+                                    ref.getInclude(), currentVersion, marker, versionComparator, ctx);
+                            if (targetVersion == null) {
+                                continue;
+                            }
+                            acc.resolvedVersions.put(ref.getInclude(), targetVersion);
+
                             String requested = ref.getRequestedVersion();
                             if (requested != null && isPropertyReference(requested)) {
-                                // Version uses a property — record the property update
                                 String propertyName = extractPropertyName(requested);
                                 MSBuildProject.PropertyValue pv = marker.getProperties().get(propertyName);
                                 Path definedIn = pv != null && pv.getDefinedIn() != null
@@ -114,7 +137,7 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
                                         : sourcePath;
                                 acc.propertyUpdates
                                         .computeIfAbsent(definedIn, k -> new LinkedHashMap<>())
-                                        .put(propertyName, newVersion);
+                                        .put(propertyName, targetVersion);
                             }
                         }
                     }
@@ -126,45 +149,52 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                // Handle <PackageReference Include="..." Version="..." />
                 if ("PackageReference".equals(t.getName())) {
                     String include = getAttributeValue(t, "Include");
-                    if (include != null && matchesGlob(include, packageName)) {
+                    String targetVersion = include != null ? acc.resolvedVersions.get(include) : null;
+                    if (targetVersion != null) {
                         String versionAttr = getAttributeValue(t, "Version");
                         if (versionAttr != null && !isPropertyReference(versionAttr)
-                                && !newVersion.equals(versionAttr)) {
-                            t = changeAttribute(t, "Version", newVersion);
+                                && !targetVersion.equals(versionAttr)) {
+                            t = changeAttribute(t, "Version", targetVersion);
                         }
 
-                        // Handle <PackageReference Include="..."><Version>...</Version></PackageReference>
                         if (versionAttr == null) {
                             t.getChild("Version").ifPresent(versionTag -> {
                                 String currentValue = versionTag.getValue().orElse("");
-                                if (!newVersion.equals(currentValue)) {
-                                    doAfterVisit(new ChangeTagValueVisitor<>(versionTag, newVersion));
+                                if (!targetVersion.equals(currentValue)) {
+                                    doAfterVisit(new ChangeTagValueVisitor<>(versionTag, targetVersion));
                                 }
                             });
                         }
                     }
                 }
 
-                // Handle <PackageVersion Include="..." Version="..." /> (central package management)
                 if ("PackageVersion".equals(t.getName())) {
                     String include = getAttributeValue(t, "Include");
                     if (include != null && matchesGlob(include, packageName)) {
-                        String versionAttr = getAttributeValue(t, "Version");
-                        if (versionAttr != null && !newVersion.equals(versionAttr)) {
-                            t = changeAttribute(t, "Version", newVersion);
+                        // For PackageVersion (central pkg mgmt), use resolved version if available,
+                        // otherwise fall back to exact version for ExactVersion selectors
+                        String targetVersion = acc.resolvedVersions.get(include);
+                        if (targetVersion == null && versionComparator instanceof org.openrewrite.semver.ExactVersion) {
+                            targetVersion = ((org.openrewrite.semver.ExactVersion) versionComparator).getVersion();
+                        }
+                        if (targetVersion != null) {
+                            String versionAttr = getAttributeValue(t, "Version");
+                            if (versionAttr != null && !targetVersion.equals(versionAttr)) {
+                                t = changeAttribute(t, "Version", targetVersion);
+                            }
                         }
                     }
                 }
 
-                // Handle property definitions (e.g., <FooVersion>1.0.0</FooVersion>)
+                // Handle property definitions
                 Path sourcePath = getCursor().firstEnclosingOrThrow(Xml.Document.class).getSourcePath();
                 Map<String, String> propsForFile = acc.propertyUpdates.get(sourcePath);
                 if (propsForFile != null && propsForFile.containsKey(t.getName())) {
@@ -178,6 +208,38 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
                 return t;
             }
         };
+    }
+
+    /**
+     * Resolve the target version for a package using the semver version comparator.
+     * For exact version selectors, returns the exact version directly.
+     * For selectors like latest.release, queries available versions from NuGet package sources.
+     */
+    private @Nullable String resolveTargetVersion(
+            String packageInclude,
+            @Nullable String currentVersion,
+            MSBuildProject marker,
+            VersionComparator versionComparator,
+            ExecutionContext ctx) {
+
+        // For exact version selectors, the comparator's isValid checks the exact version
+        if (versionComparator instanceof org.openrewrite.semver.ExactVersion) {
+            return ((org.openrewrite.semver.ExactVersion) versionComparator).getVersion();
+        }
+
+        // For semver selectors, we need available versions to select from.
+        // Try to get them from NuGet package sources on the marker.
+        List<String> availableVersions = NuGetVersionResolver.resolveAvailableVersions(
+                packageInclude, marker.getPackageSources(), ctx);
+
+        if (availableVersions.isEmpty()) {
+            return null;
+        }
+
+        return versionComparator.upgrade(
+                currentVersion != null ? currentVersion : "0.0.0",
+                availableVersions
+        ).orElse(null);
     }
 
     private static boolean isPropertyReference(@Nullable String value) {

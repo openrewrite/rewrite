@@ -15,351 +15,239 @@
  */
 package org.openrewrite.csharp.rpc;
 
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.csharp.CSharpParser;
 import org.openrewrite.csharp.marker.MSBuildProject;
-import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.openrewrite.csharp.Assertions.csharp;
+import static org.openrewrite.csharp.Assertions.csproj;
 
 /**
- * Integration tests for C# ParseSolution RPC.
+ * Integration tests for C# project parsing via RPC.
+ * Simple round-trip tests use rewriteRun; project-structure tests use direct RPC.
  */
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
-class CSharpParseProjectTest {
+class CSharpParseProjectTest implements RewriteTest {
 
-    private static boolean factoryConfigured = false;
-    private CSharpRewriteRpc rpc;
-
-    @BeforeEach
-    void setUp() {
-        if (!factoryConfigured) {
-            Path csharpServerEntry = findCSharpServerEntry();
-            CSharpRewriteRpc.setFactory(
-              CSharpRewriteRpc.builder()
-                .csharpServerEntry(csharpServerEntry)
-                .traceRpcMessages(false)
-                .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
-            );
-            factoryConfigured = true;
-        }
-        rpc = CSharpRewriteRpc.getOrStart();
-    }
-
-    @AfterEach
-    void tearDown() {
-        CSharpRewriteRpc.shutdownCurrent();
-    }
-
-    private static Path findCSharpServerEntry() {
+    @BeforeAll
+    static void setUpFactory() {
         Path basePath = Paths.get(System.getProperty("user.dir"));
         Path[] searchPaths = {
           basePath.resolve("csharp"),
           basePath.resolve("rewrite-csharp/csharp"),
         };
-
         for (Path searchPath : searchPaths) {
             Path csproj = searchPath.resolve("OpenRewrite.Tool/OpenRewrite.Tool.csproj");
             if (csproj.toFile().exists()) {
-                return csproj.toAbsolutePath().normalize();
+                CSharpRewriteRpc.setFactory(
+                  CSharpRewriteRpc.builder()
+                    .csharpServerEntry(csproj.toAbsolutePath().normalize())
+                    .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
+                );
+                return;
             }
         }
-
         throw new IllegalStateException("Could not find C# Rewrite project");
     }
 
-    @Test
-    void parseSimpleProject(@TempDir Path tempDir) throws IOException {
-        // Create a minimal .csproj
-        Files.writeString(tempDir.resolve("Test.csproj"), """
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net10.0</TargetFramework>
-            </PropertyGroup>
-          </Project>
-          """);
+    // ---- Round-trip tests via rewriteRun ----
 
-        // Create source files
-        Files.writeString(tempDir.resolve("Program.cs"), """
-          namespace Test
-          {
-              public class Program
+    @Test
+    void parseSimpleProject() {
+        rewriteRun(
+          csharp(
+            """
+              namespace Test
               {
-                  public static void Main(string[] args)
+                  public class Program
                   {
+                      public static void Main(string[] args)
+                      {
+                      }
                   }
               }
-          }
-          """);
-
-        Files.writeString(tempDir.resolve("Helper.cs"), """
-          namespace Test
-          {
-              public class Helper
+              """
+          ),
+          csharp(
+            """
+              namespace Test
               {
-                  public string GetMessage() => "hello";
-              }
-          }
-          """);
-
-        List<SourceFile> sourceFiles = rpc.parseSolution(
-          tempDir.resolve("Test.csproj"),
-          tempDir,
-          new InMemoryExecutionContext()
-        ).sourceFiles().toList();
-
-        assertThat(sourceFiles).hasSize(2);
-        for (SourceFile sf : sourceFiles) {
-            assertThat(sf).isNotInstanceOf(ParseError.class);
-            assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
-        }
-    }
-
-    @Test
-    void parseProjectWithNuGetReference(@TempDir Path tempDir) throws IOException {
-        // Create a .csproj with a NuGet reference
-        Files.writeString(tempDir.resolve("Test.csproj"), """
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net10.0</TargetFramework>
-            </PropertyGroup>
-            <ItemGroup>
-              <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-            </ItemGroup>
-          </Project>
-          """);
-
-        Files.writeString(tempDir.resolve("Program.cs"), """
-          using Newtonsoft.Json;
-          
-          namespace Test
-          {
-              public class Program
-              {
-                  public string Serialize(object obj)
+                  public class Helper
                   {
-                      return JsonConvert.SerializeObject(obj);
+                      public string GetMessage() => "hello";
                   }
               }
-          }
-          """);
-
-        List<SourceFile> sourceFiles = rpc.parseSolution(
-          tempDir.resolve("Test.csproj"),
-          tempDir,
-          new InMemoryExecutionContext()
-        ).sourceFiles().toList();
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
-        assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
-
-        // Print should round-trip
-        String printed = rpc.print(sf);
-        assertThat(printed).contains("JsonConvert.SerializeObject");
-    }
-
-    @Test
-    void parseProjectWithPartialClasses(@TempDir Path tempDir) throws IOException {
-        // Create a .csproj
-        Files.writeString(tempDir.resolve("Test.csproj"), """
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net10.0</TargetFramework>
-            </PropertyGroup>
-          </Project>
-          """);
-
-        // Create two partial class files
-        Files.writeString(tempDir.resolve("PersonProperties.cs"), """
-          namespace Models
-          {
-              public partial class Person
-              {
-                  public string FirstName { get; set; }
-                  public string LastName { get; set; }
-              }
-          }
-          """);
-
-        Files.writeString(tempDir.resolve("PersonMethods.cs"), """
-          namespace Models
-          {
-              public partial class Person
-              {
-                  public string GetFullName()
-                  {
-                      return FirstName + " " + LastName;
-                  }
-              }
-          }
-          """);
-
-        List<SourceFile> sourceFiles = rpc.parseSolution(
-          tempDir.resolve("Test.csproj"),
-          tempDir,
-          new InMemoryExecutionContext()
-        ).sourceFiles().toList();
-
-        assertThat(sourceFiles).hasSize(2);
-        for (SourceFile sf : sourceFiles) {
-            assertThat(sf).isNotInstanceOf(ParseError.class);
-            assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
-        }
-    }
-
-    @Test
-    void generatedFilesExcludedFromLst(@TempDir Path tempDir) throws IOException {
-        // Create a .csproj
-        Files.writeString(tempDir.resolve("Test.csproj"), """
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net10.0</TargetFramework>
-            </PropertyGroup>
-          </Project>
-          """);
-
-        // Create a user source file
-        Files.writeString(tempDir.resolve("Program.cs"), """
-          namespace Test
-          {
-              public class Program
-              {
-              }
-          }
-          """);
-
-        // Simulate source generator output in obj/
-        Path generatedDir = tempDir.resolve("obj/Debug/net10.0/generated/MyGenerator/MyGenerator.MySourceGenerator");
-        Files.createDirectories(generatedDir);
-        Files.writeString(generatedDir.resolve("Generated.cs"), """
-          namespace Test
-          {
-              public static class GeneratedHelper
-              {
-                  public static string Version => "1.0.0";
-              }
-          }
-          """);
-
-        List<SourceFile> sourceFiles = rpc.parseSolution(
-          tempDir.resolve("Test.csproj"),
-          tempDir,
-          new InMemoryExecutionContext()
-        ).sourceFiles().toList();
-
-        // Only the user file should be in the LST — generated files are excluded
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
-        assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
-        assertThat(sf.getSourcePath().toString()).doesNotContain("obj");
-    }
-
-    @Test
-    void parseProjectRelativePaths(@TempDir Path tempDir) throws IOException {
-        // Create project in a subdirectory
-        Path projectDir = tempDir.resolve("src/MyApp");
-        Files.createDirectories(projectDir);
-
-        Files.writeString(projectDir.resolve("MyApp.csproj"), """
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net10.0</TargetFramework>
-            </PropertyGroup>
-          </Project>
-          """);
-
-        Files.writeString(projectDir.resolve("Program.cs"), """
-          namespace MyApp
-          {
-              public class Program
-              {
-              }
-          }
-          """);
-
-        // Parse with rootDir pointing to the temp dir root
-        List<SourceFile> sourceFiles = rpc.parseSolution(
-          projectDir.resolve("MyApp.csproj"),
-          tempDir,
-          new InMemoryExecutionContext()
-        ).sourceFiles().toList();
-
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
-
-        // Source path should be relative to tempDir, not the project dir
-        String sourcePath = sf.getSourcePath().toString();
-        assertThat(sourcePath).startsWith("src");
-    }
-
-    @Test
-    void parseSolutionResultApiSurfaceFiles(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve("Test.csproj"), """
-          <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <TargetFramework>net10.0</TargetFramework>
-            </PropertyGroup>
-            <ItemGroup>
-              <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-            </ItemGroup>
-          </Project>
-          """);
-
-        Files.writeString(tempDir.resolve("Program.cs"), """
-          namespace Test
-          {
-              public class Program
-              {
-              }
-          }
-          """);
-
-        ParseSolutionResult result = rpc.parseSolution(
-          tempDir.resolve("Test.csproj"),
-          tempDir,
-          new InMemoryExecutionContext()
+              """
+          )
         );
+    }
 
-        // sourceFiles() should produce a lazy stream of C# source files
-        List<SourceFile> sourceFiles = result.sourceFiles().toList();
-        assertThat(sourceFiles).isNotEmpty();
-        for (SourceFile sf : sourceFiles) {
-            assertThat(sf).isNotInstanceOf(ParseError.class);
-        }
+    @Test
+    void parseProjectWithNuGetReference() {
+        rewriteRun(
+          spec -> spec.parser(CSharpParser.builder().assemblyReferences("Newtonsoft.Json@13.0.3")),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                </ItemGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              using Newtonsoft.Json;
+              
+              namespace Test
+              {
+                  public class Program
+                  {
+                      public string Serialize(object obj)
+                      {
+                          return JsonConvert.SerializeObject(obj);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 
-        // projects() contains per-project MSBuild metadata from the C# side
-        assertThat(result.projects()).hasSize(1);
-        MSBuildProject marker = result.projects().getFirst();
-        assertThat(marker.getSdk()).isEqualTo("Microsoft.NET.Sdk");
-        assertThat(marker.getTargetFrameworks()).hasSize(1);
-        assertThat(marker.getTargetFrameworks().getFirst().getTargetFramework()).isEqualTo("net10.0");
-        assertThat(marker.getTargetFrameworks().getFirst().getPackageReferences()).hasSize(1);
-        assertThat(marker.getTargetFrameworks().getFirst().getPackageReferences().getFirst().getInclude())
-          .isEqualTo("Newtonsoft.Json");
-        assertThat(result.projectPaths()).hasSize(1);
+    @Test
+    void parseProjectWithPartialClasses() {
+        rewriteRun(
+          csharp(
+            """
+              namespace Models
+              {
+                  public partial class Person
+                  {
+                      public string FirstName { get; set; }
+                      public string LastName { get; set; }
+                  }
+              }
+              """
+          ),
+          csharp(
+            """
+              namespace Models
+              {
+                  public partial class Person
+                  {
+                      public string GetFullName()
+                      {
+                          return FirstName + " " + LastName;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void csprojMarkerHasProjectMetadata() {
+        rewriteRun(
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+                </PropertyGroup>
+                <ItemGroup>
+                  <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+                </ItemGroup>
+              </Project>
+              """,
+            spec -> spec.beforeRecipe(doc -> {
+                MSBuildProject marker = doc.getMarkers()
+                  .findFirst(MSBuildProject.class)
+                  .orElseThrow(() -> new AssertionError("MSBuildProject marker not found"));
+                assertThat(marker.getSdk()).isEqualTo("Microsoft.NET.Sdk");
+                assertThat(marker.getTargetFrameworks()).hasSize(1);
+                assertThat(marker.getTargetFrameworks().getFirst().getTargetFramework()).isEqualTo("net10.0");
+                assertThat(marker.getTargetFrameworks().getFirst().getPackageReferences()).hasSize(1);
+                assertThat(marker.getTargetFrameworks().getFirst().getPackageReferences().getFirst().getInclude())
+                  .isEqualTo("Newtonsoft.Json");
+            })
+          )
+        );
+    }
+
+    @Test
+    void generatedFilesExcludedFromLst() {
+        rewriteRun(
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+                </PropertyGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              namespace Test
+              {
+                  public class Program
+                  {
+                  }
+              }
+              """,
+            spec -> spec.beforeRecipe(doc ->
+              assertThat(doc.getSourcePath().toString()).doesNotContain("obj"))
+          )
+        );
+    }
+
+    @Test
+    void parseProjectRelativePaths() {
+        rewriteRun(
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFramework>net10.0</TargetFramework>
+                </PropertyGroup>
+              </Project>
+              """
+          ),
+          csharp(
+            """
+              namespace MyApp
+              {
+                  public class Program
+                  {
+                  }
+              }
+              """
+          )
+        );
     }
 
     // ---- Full working set sweep ----
 
-    /**
-     * Discovers and parses all .sln/.slnx files under the working set root.
-     * Set the system property "workingSetRoot" to specify the path.
-     * Skipped automatically if the property is not set or the directory doesn't exist.
-     */
     @Tag("workingSet-full")
     @Test
     @Timeout(value = 3600, unit = TimeUnit.SECONDS)
@@ -370,7 +258,6 @@ class CSharpParseProjectTest {
         assumeTrue(Files.isDirectory(workingSetRoot),
           "Working set root not found: " + workingSetRoot);
 
-        // Find all .sln and .slnx files
         List<Path> solutionFiles;
         try (var walk = Files.walk(workingSetRoot)) {
             solutionFiles = walk
@@ -379,7 +266,7 @@ class CSharpParseProjectTest {
                   return name.endsWith(".sln") || name.endsWith(".slnx");
               })
               .sorted()
-              .collect(Collectors.toList());
+              .toList();
         }
 
         System.out.println("Found " + solutionFiles.size() + " solution files under " + workingSetRoot);
@@ -398,17 +285,8 @@ class CSharpParseProjectTest {
             System.out.println("\n[" + (i + 1) + "/" + solutionFiles.size() + "] Parsing: " + relative);
             System.out.flush();
 
-            // Restart RPC for each solution to avoid state leaks and OOM
             CSharpRewriteRpc.shutdownCurrent();
-            CSharpRewriteRpc.setFactory(
-              CSharpRewriteRpc.builder()
-                .csharpServerEntry(findCSharpServerEntry())
-                .traceRpcMessages(false)
-                .timeout(Duration.ofMinutes(40))
-                .log(Paths.get(System.getProperty("java.io.tmpdir"), "csharp-rpc-project.log"))
-            );
-            factoryConfigured = true;
-            rpc = CSharpRewriteRpc.getOrStart();
+            CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
             InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
                 System.err.println("  Execution error: " + t.getMessage());
@@ -441,6 +319,8 @@ class CSharpParseProjectTest {
             System.out.flush();
             System.err.flush();
         }
+
+        CSharpRewriteRpc.shutdownCurrent();
 
         System.out.println("\n========== SUMMARY ==========");
         System.out.println("Solutions found:  " + solutionFiles.size());

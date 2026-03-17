@@ -131,10 +131,18 @@ public class ParseSolutionResult {
             }
         }
 
+        List<MSBuildProject.PackageSource> packageSources = new ArrayList<>();
+        if (raw.getPackageSources() != null) {
+            for (ParseSolutionResponse.PackageSourceEntry psEntry : raw.getPackageSources()) {
+                packageSources.add(new MSBuildProject.PackageSource(psEntry.getKey(), psEntry.getUrl()));
+            }
+        }
+
         return MSBuildProject.builder()
                 .id(randomId())
                 .sdk(raw.getSdk())
                 .properties(properties)
+                .packageSources(packageSources)
                 .targetFrameworks(targetFrameworks)
                 .build();
     }

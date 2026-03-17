@@ -332,6 +332,9 @@ public class RewriteRpcServer
             }
         }
 
+        // Discover NuGet package sources from nuget.config files
+        metadata.PackageSources = FindNuGetPackageSources(projectPath, rootDir);
+
         // Build per-TFM metadata
         foreach (var tfm in frameworks)
         {
@@ -356,6 +359,81 @@ public class RewriteRpcServer
         }
 
         return metadata;
+    }
+
+    /// <summary>
+    /// Discovers NuGet package sources by walking up from the project directory
+    /// to the repository root looking for nuget.config files.
+    /// NuGet resolves sources hierarchically — closest config wins.
+    /// </summary>
+    private static List<PackageSourceEntry> FindNuGetPackageSources(string projectPath, string rootDir)
+    {
+        var sources = new List<PackageSourceEntry>();
+        var dir = Path.GetDirectoryName(projectPath);
+
+        while (dir != null && dir.StartsWith(rootDir, StringComparison.OrdinalIgnoreCase))
+        {
+            var configPath = Path.Combine(dir, "nuget.config");
+            // Case-insensitive check (NuGet.Config, nuget.config, NuGet.config all valid)
+            if (!File.Exists(configPath))
+            {
+                configPath = Path.Combine(dir, "NuGet.Config");
+                if (!File.Exists(configPath))
+                {
+                    configPath = Path.Combine(dir, "NuGet.config");
+                }
+            }
+
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    var configDoc = XDocument.Load(configPath);
+                    var packageSources = configDoc.Root?
+                        .Element("packageSources")?
+                        .Elements("add");
+
+                    if (packageSources != null)
+                    {
+                        foreach (var source in packageSources)
+                        {
+                            var key = source.Attribute("key")?.Value;
+                            var url = source.Attribute("value")?.Value;
+                            if (key != null && url != null &&
+                                !sources.Any(s => s.Key == key))
+                            {
+                                sources.Add(new PackageSourceEntry
+                                {
+                                    Key = key,
+                                    Url = url
+                                });
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug("Failed to parse nuget.config at {Path}: {Ex}", configPath, ex.Message);
+                }
+                // NuGet uses the closest config — stop walking up once we find one
+                break;
+            }
+
+            if (dir == rootDir) break;
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        // Default to nuget.org if no sources found
+        if (sources.Count == 0)
+        {
+            sources.Add(new PackageSourceEntry
+            {
+                Key = "nuget.org",
+                Url = "https://api.nuget.org/v3/index.json"
+            });
+        }
+
+        return sources;
     }
 
     /// <summary>
@@ -1507,6 +1585,13 @@ public class ProjectMetadata
     public string? Sdk { get; set; }
     public Dictionary<string, PropertyEntry> Properties { get; set; } = new();
     public List<TargetFrameworkEntry> TargetFrameworks { get; set; } = new();
+    public List<PackageSourceEntry> PackageSources { get; set; } = new();
+}
+
+public class PackageSourceEntry
+{
+    public string Key { get; set; } = "";
+    public string Url { get; set; } = "";
 }
 
 public class PropertyEntry
