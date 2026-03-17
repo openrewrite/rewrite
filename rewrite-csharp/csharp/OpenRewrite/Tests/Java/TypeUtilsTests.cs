@@ -116,6 +116,20 @@ public class TypeUtilsTests
     }
 
     [Fact]
+    public void IsAssignableTo_PrimitiveString()
+    {
+        var prim = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.String);
+        Assert.True(TypeUtils.IsAssignableTo(prim, "System.String"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_PrimitiveString_NotAssignableToOther()
+    {
+        var prim = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.String);
+        Assert.False(TypeUtils.IsAssignableTo(prim, "System.Int32"));
+    }
+
+    [Fact]
     public void IsAssignableTo_NullType()
     {
         Assert.False(TypeUtils.IsAssignableTo(null, "System.String"));
@@ -235,6 +249,20 @@ public class TypeUtilsTests
     public void GetFullyQualifiedName_Class()
     {
         Assert.Equal("System.String", TypeUtils.GetFullyQualifiedName(MakeClass("System.String")));
+    }
+
+    [Fact]
+    public void GetFullyQualifiedName_PrimitiveString()
+    {
+        Assert.Equal("System.String",
+            TypeUtils.GetFullyQualifiedName(JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.String)));
+    }
+
+    [Fact]
+    public void GetFullyQualifiedName_PrimitiveInt()
+    {
+        Assert.Equal("int",
+            TypeUtils.GetFullyQualifiedName(JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)));
     }
 
     [Fact]
