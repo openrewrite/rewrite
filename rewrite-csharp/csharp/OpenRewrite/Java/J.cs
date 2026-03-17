@@ -22,7 +22,7 @@ namespace OpenRewrite.Java;
 /// The base interface for all Java-family LST elements.
 /// C# LST elements extend J where the syntax is isomorphic.
 /// </summary>
-public interface J : Tree
+public partial interface J : Tree
 {
     Space Prefix { get; }
     Markers Markers { get; }

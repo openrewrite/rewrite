@@ -21,14 +21,10 @@ using OpenRewrite.Java;
 namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
-/// Generic helpers for operating on LST nodes without type-specific switches.
-/// Uses reflection with caching to call WithPrefix and enumerate structural properties.
+/// Helpers for structural comparison of LST nodes used by the pattern matching engine.
 /// </summary>
-public static class TreeHelper
+internal static class TreeHelper
 {
-    private static readonly ConcurrentDictionary<Type, MethodInfo?> WithPrefixCache = new();
-    private static readonly ConcurrentDictionary<Type, MethodInfo?> WithIdCache = new();
-
     /// <summary>
     /// Property names to always skip when comparing tree nodes structurally.
     /// </summary>
@@ -45,36 +41,6 @@ public static class TreeHelper
     ];
 
     private static readonly ConcurrentDictionary<Type, PropertyInfo[]> StructuralPropertiesCache = new();
-
-    /// <summary>
-    /// Call WithPrefix on any J node via cached reflection.
-    /// Returns the original node unchanged if the type doesn't have WithPrefix.
-    /// </summary>
-    public static J SetPrefix(J node, Space prefix)
-    {
-        var method = WithPrefixCache.GetOrAdd(node.GetType(), type =>
-            type.GetMethod("WithPrefix", [typeof(Space)]));
-
-        if (method != null)
-            return (J)method.Invoke(node, [prefix])!;
-
-        return node;
-    }
-
-    /// <summary>
-    /// Call WithId on any J node via cached reflection.
-    /// Returns the original node unchanged if the type doesn't have WithId.
-    /// </summary>
-    public static J SetId(J node, Guid id)
-    {
-        var method = WithIdCache.GetOrAdd(node.GetType(), type =>
-            type.GetMethod("WithId", [typeof(Guid)]));
-
-        if (method != null)
-            return (J)method.Invoke(node, [id])!;
-
-        return node;
-    }
 
     /// <summary>
     /// Get the structural (non-formatting) properties of a J node for comparison.
