@@ -70,7 +70,7 @@ internal class PatternMatchingComparator
             return false;
 
         // NullSafe marker must match: ?. and . are structurally different
-        if (HasNullSafe(pattern) != HasNullSafe(candidate))
+        if (TreeHelper.HasNullSafe(pattern) != TreeHelper.HasNullSafe(candidate))
             return false;
 
         // Generic property-based comparison: iterate all structural properties
@@ -106,15 +106,15 @@ internal class PatternMatchingComparator
             return MatchNode(pj, cj, cursor);
 
         // JRightPadded<T> — unwrap and compare the element
-        if (IsRightPadded(patternValue) && IsRightPadded(candidateValue))
+        if (TreeHelper.IsRightPadded(patternValue) && TreeHelper.IsRightPadded(candidateValue))
             return MatchPaddedElement(patternValue, candidateValue, cursor);
 
         // JLeftPadded<T> — unwrap and compare the element
-        if (IsLeftPadded(patternValue) && IsLeftPadded(candidateValue))
+        if (TreeHelper.IsLeftPadded(patternValue) && TreeHelper.IsLeftPadded(candidateValue))
             return MatchPaddedElement(patternValue, candidateValue, cursor);
 
         // JContainer<T> — compare elements with variadic support
-        if (IsContainer(patternValue) && IsContainer(candidateValue))
+        if (TreeHelper.IsContainer(patternValue) && TreeHelper.IsContainer(candidateValue))
             return MatchContainer(patternValue, candidateValue, cursor);
 
         // IList — compare element-by-element
@@ -269,26 +269,4 @@ internal class PatternMatchingComparator
         return (min, max);
     }
 
-    private static bool IsRightPadded(object value)
-    {
-        var type = value.GetType();
-        return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JRightPadded<>);
-    }
-
-    private static bool IsLeftPadded(object value)
-    {
-        var type = value.GetType();
-        return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JLeftPadded<>);
-    }
-
-    private static bool IsContainer(object value)
-    {
-        var type = value.GetType();
-        return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JContainer<>);
-    }
-
-    private static bool HasNullSafe(J node)
-    {
-        return node.Markers.FindFirst<NullSafe>() != null;
-    }
 }
