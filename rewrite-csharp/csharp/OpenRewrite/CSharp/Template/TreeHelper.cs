@@ -24,7 +24,7 @@ namespace OpenRewrite.CSharp.Template;
 /// Generic helpers for operating on LST nodes without type-specific switches.
 /// Uses reflection with caching to call WithPrefix and enumerate structural properties.
 /// </summary>
-internal static class TreeHelper
+public static class TreeHelper
 {
     private static readonly ConcurrentDictionary<Type, MethodInfo?> WithPrefixCache = new();
     private static readonly ConcurrentDictionary<Type, MethodInfo?> WithIdCache = new();
@@ -50,7 +50,7 @@ internal static class TreeHelper
     /// Call WithPrefix on any J node via cached reflection.
     /// Returns the original node unchanged if the type doesn't have WithPrefix.
     /// </summary>
-    internal static J SetPrefix(J node, Space prefix)
+    public static J SetPrefix(J node, Space prefix)
     {
         var method = WithPrefixCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithPrefix", [typeof(Space)]));
@@ -65,7 +65,7 @@ internal static class TreeHelper
     /// Call WithId on any J node via cached reflection.
     /// Returns the original node unchanged if the type doesn't have WithId.
     /// </summary>
-    internal static J SetId(J node, Guid id)
+    public static J SetId(J node, Guid id)
     {
         var method = WithIdCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithId", [typeof(Guid)]));
