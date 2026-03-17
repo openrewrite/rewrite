@@ -3473,7 +3473,17 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             var catchClause = innerTry.Catches[i];
             VisitSpace(catchClause.Prefix, p);
             p.Append("catch");
-            Visit(catchClause.Parameter, p);
+
+            // Print catch parameter manually (ControlParentheses<VariableDeclarations>
+            // is not handled by VisitControlParentheses which only takes Expression)
+            if (catchClause.Parameter.Tree.Element.TypeExpression != null || catchClause.Parameter.Tree.Element.Variables.Count > 0)
+            {
+                VisitSpace(catchClause.Parameter.Prefix, p);
+                p.Append('(');
+                VisitVariableDeclarationsWithoutSemicolon(catchClause.Parameter.Tree.Element, p);
+                VisitSpace(catchClause.Parameter.Tree.After, p);
+                p.Append(')');
+            }
 
             // Print filter if present: when (expr)
             if (i < eft.CatchFilters.Count && eft.CatchFilters[i] is { } filter)
