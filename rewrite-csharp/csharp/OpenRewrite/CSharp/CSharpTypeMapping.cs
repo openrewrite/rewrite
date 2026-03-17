@@ -276,7 +276,11 @@ internal class CSharpTypeMapping
         var declaringType = symbol.ContainingType != null
             ? MapType(symbol.ContainingType) as JavaType.FullyQualified
             : null;
-        var returnType = MapType(symbol.ReturnType);
+        // In Roslyn, constructor ReturnType is void, but the Java model expects
+        // the declaring type as the return type for constructors
+        var returnType = symbol.MethodKind == MethodKind.Constructor && symbol.ContainingType != null
+            ? MapType(symbol.ContainingType)
+            : MapType(symbol.ReturnType);
         var parameterNames = symbol.Parameters.Length > 0
             ? symbol.Parameters.Select(p => p.Name).ToList()
             : null;

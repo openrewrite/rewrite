@@ -13,12 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
 
 public class NewClassTests : RewriteTest
 {
+    [Fact]
+    public void NewClassHasType()
+    {
+        var source = "class Foo { void Bar() { var x = new Foo(); } }";
+        var syntaxTree = CSharpSyntaxTree.ParseText(source);
+        var compilation = CSharpCompilation.Create("Test")
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddReferences(MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
+            .AddSyntaxTrees(syntaxTree);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+
+        var cu = new CSharpParser().Parse(source, semanticModel: semanticModel);
+        NewClass? found = null;
+        new NewClassFinder(nc => found = nc).Visit(cu, 0);
+
+        Assert.NotNull(found);
+        Assert.NotNull(found!.Type);
+        Assert.IsType<JavaType.Class>(found.Type);
+        Assert.Equal("Foo", ((JavaType.Class)found.Type).FullyQualifiedName);
+    }
+
+    private class NewClassFinder(Action<NewClass> callback) : CSharpVisitor<int>
+    {
+        public override J VisitNewClass(NewClass nc, int p)
+        {
+            callback(nc);
+            return base.VisitNewClass(nc, p);
+        }
+    }
+
     [Fact]
     public void SimpleConstructor()
     {
