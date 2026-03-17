@@ -31,7 +31,7 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.CSharp.Rpc;
 
-public class RewriteRpcServer : IRewriteRpcServer
+public class RewriteRpcServer
 {
     private static RewriteRpcServer? _current;
 
