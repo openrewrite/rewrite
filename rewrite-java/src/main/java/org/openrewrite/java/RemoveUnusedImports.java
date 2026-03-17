@@ -194,10 +194,7 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                     .getElement().withPrefix(elem.getPrefix())));
 
-                            // Register unfolded imports so later explicit imports for the same members are detected as duplicates
-                            for (JRightPadded<J.Import> unfoldedImport : anImport.imports) {
-                                checkedImports.add(unfoldedImport.getElement().toString());
-                            }
+                            anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
 
                             changed = true;
                         } else {
@@ -250,10 +247,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (!anImport.imports.isEmpty()) {
                                 anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                         .getElement().withPrefix(elem.getPrefix())));
-                                // Register unfolded imports so later explicit imports for the same types are detected as duplicates
-                                for (JRightPadded<J.Import> unfoldedImport : anImport.imports) {
-                                    checkedImports.add(unfoldedImport.getElement().toString());
-                                }
+                                anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
                                 changed = true;
                             } else {
                                 // No types are used unqualified, so remove the wildcard import entirely
