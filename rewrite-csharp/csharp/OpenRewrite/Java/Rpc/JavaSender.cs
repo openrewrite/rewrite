@@ -408,6 +408,8 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSendList(method, m => m.Name.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(method, m => (J)m.Name, name => Visit(name, q));
         q.GetAndSend(method, m => m.Parameters, @params => VisitContainer(@params, q));
+        q.GetAndSendList(method, m => m.DimensionsAfterName,
+            lp => lp.Element.ToString()!, lp => VisitLeftPadded(lp, q));
         q.GetAndSend(method, m => m.Throws, thr => VisitContainer(thr, q));
         q.GetAndSend(method, m => m.Body, body => Visit(body, q));
         q.GetAndSend(method, m => m.DefaultValue, def => VisitLeftPadded(def, q));
