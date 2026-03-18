@@ -2844,7 +2844,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append(space.Whitespace);
         foreach (var comment in space.Comments)
         {
-            if (comment.Multiline)
+            if (comment is XmlDocComment)
+            {
+                // XmlDocComment text starts after "//" — printer prepends "//"
+                p.Append("//").Append(comment.Text);
+            }
+            else if (comment.Multiline)
             {
                 p.Append("/*").Append(comment.Text).Append("*/");
             }
