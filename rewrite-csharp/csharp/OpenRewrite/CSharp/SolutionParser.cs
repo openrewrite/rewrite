@@ -81,7 +81,9 @@ internal static class DotNetRestore
     {
         Log.Debug("dotnet restore: starting for {Path}", path);
         var sw = Stopwatch.StartNew();
-        var psi = new ProcessStartInfo("dotnet", $"restore \"{path}\"")
+        // Disable NuGet vulnerability audit — audit warnings treated as errors
+        // (NU1902/NU1903) would fail restore, but we only need packages for parsing.
+        var psi = new ProcessStartInfo("dotnet", $"restore \"{path}\" /p:NuGetAudit=false")
         {
             WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
             RedirectStandardOutput = true,
