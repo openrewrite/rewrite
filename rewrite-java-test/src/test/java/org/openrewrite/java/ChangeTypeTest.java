@@ -2356,6 +2356,7 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4773")
     @Test
     void noRenameOfTypeWithMatchingPrefix() {
         rewriteRun(
@@ -2404,97 +2405,7 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Test
-    void changeTypeOfInnerClassConstructor() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.B$Builder", null))
-            .parser(JavaParser.fromJavaVersion().dependsOn(
-                """
-                  package foo;
-
-                  public class A {
-                    public static class Builder {}
-                  }
-                  """,
-                """
-                  package bar;
-
-                  public class B {
-                    public static class Builder {}
-                  }
-                  """
-              )
-            ),
-          java(
-            """
-              import foo.A;
-              import foo.A.Builder;
-
-              class Test {
-                void test() {
-                    A.Builder x = new A.Builder();
-                }
-              }
-              """,
-                """
-              import bar.B;
-
-              class Test {
-                void test() {
-                    B.Builder x = new B.Builder();
-                }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void changeTypeOfInnerClassContractorFromOuter() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("foo.A", "bar.B", null))
-            .parser(JavaParser.fromJavaVersion().dependsOn(
-                """
-                  package foo;
-
-                  public class A {
-                    public static class Builder {}
-                  }
-                  """,
-                """
-                  package bar;
-
-                  public class B {
-                    public static class Builder {}
-                  }
-                  """
-              )
-            ),
-          java(
-            """
-              import foo.A;
-              import foo.A.Builder;
-
-              class Test {
-                void test() {
-                    A.Builder x = new A.Builder();
-                }
-              }
-              """,
-            """
-              import bar.B;
-              import bar.B.Builder;
-
-              class Test {
-                void test() {
-                    B.Builder x = new B.Builder();
-                }
-              }
-              """
-          )
-        );
-    }
-
+    @Issue("https://github.com/openrewrite/rewrite/issues/4764")
     @Test
     void changeTypeOfInnerClass() {
         rewriteRun(
@@ -2590,6 +2501,97 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                 void test() {
                     A.Creator x = new A.Creator();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOfInnerCompletely() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.B$Builder", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class Builder {}
+                  }
+                  """,
+                """
+                  package bar;
+
+                  public class B {
+                    public static class Builder {}
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+              import foo.A.Builder;
+
+              class Test {
+                void test() {
+                    A.Builder x = new A.Builder();
+                }
+              }
+              """,
+            """
+          import bar.B;
+
+          class Test {
+            void test() {
+                B.Builder x = new B.Builder();
+            }
+          }
+          """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOfInnerClassImplicitly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A", "bar.B", null))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+
+                  public class A {
+                    public static class Builder {}
+                  }
+                  """,
+                """
+                  package bar;
+
+                  public class B {
+                    public static class Builder {}
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+              import foo.A.Builder;
+
+              class Test {
+                void test() {
+                    A.Builder x = new A.Builder();
+                }
+              }
+              """,
+            """
+              import bar.B;
+              import bar.B.Builder;
+
+              class Test {
+                void test() {
+                    B.Builder x = new B.Builder();
                 }
               }
               """
