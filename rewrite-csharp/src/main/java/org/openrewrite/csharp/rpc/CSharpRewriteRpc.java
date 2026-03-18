@@ -122,9 +122,13 @@ public class CSharpRewriteRpc extends RewriteRpc {
     public ParseSolutionResult parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
+        Map<String, Object> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true));
+
         // Phase 1: Eager RPC call to get lightweight response (IDs + metadata)
         parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
-        ParseSolutionResponse response = send("ParseSolution", new ParseSolution(path, rootDir), ParseSolutionResponse.class);
+        ParseSolutionResponse response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
         parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.itemCount()));
 
         // Phase 2: Lazy stream that retrieves full ASTs one at a time via getObject()

@@ -59,7 +59,7 @@ public class SolutionParserTests : IDisposable
             Path.Combine(_tempDir, "Test.csproj"), _tempDir);
 
         Assert.Single(results);
-        var cu = results[0];
+        var cu = Assert.IsType<CompilationUnit>(results[0]);
 
         var printed = new CSharpPrinter<int>().Print(cu);
         Assert.Equal("namespace Test { public class HelloWorld { } }\n", printed);

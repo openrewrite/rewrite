@@ -17,6 +17,7 @@ using System.Diagnostics;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using OpenRewrite.Core;
 using Serilog;
 
 namespace OpenRewrite.CSharp;
@@ -229,9 +230,14 @@ public class SolutionParser
     /// Uses solution configurations to determine preprocessor symbol permutations.
     /// Generated files (in obj/) are excluded from results — they contribute to
     /// semantic analysis via the compilation but are not included in the LST.
+    /// Per-file parse failures are returned as <see cref="ParseError"/> entries
+    /// rather than aborting the entire project. When <paramref name="requirePrintEqualsInput"/>
+    /// is true, each successfully parsed file is printed and compared against the original
+    /// source; mismatches are also returned as <see cref="ParseError"/>.
     /// </summary>
-    public List<CompilationUnit> ParseProject(
-        Solution solution, string projectPath, string rootDir)
+    public List<SourceFile> ParseProject(
+        Solution solution, string projectPath, string rootDir,
+        bool requirePrintEqualsInput = true)
     {
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
         Log.Debug("ParseProject: starting {ProjectName}", projectName);
@@ -258,7 +264,7 @@ public class SolutionParser
         Log.Debug("ParseProject: {ProjectName} has {UserDocCount} user source files (of {TotalDocCount} total)",
             projectName, userDocs.Count, project.Documents.Count());
 
-        var results = new List<CompilationUnit>();
+        var results = new List<SourceFile>();
         var fileIndex = 0;
         var projectSw = Stopwatch.StartNew();
         foreach (var doc in userDocs)
@@ -292,6 +298,20 @@ public class SolutionParser
                     cu = _parser.Parse(source, relativePath, semanticModel);
                 }
 
+                if (requirePrintEqualsInput)
+                {
+                    var printed = new CSharpPrinter<int>().Print(cu);
+                    if (printed != source)
+                    {
+                        Log.Debug("  IDEMPOTENCY [{FileIndex}/{TotalFiles}] {RelativePath}",
+                            fileIndex, userDocs.Count, relativePath);
+                        results.Add(ParseError.Build(relativePath, source,
+                            new InvalidOperationException(relativePath + " is not print idempotent.")));
+                        fileSw.Stop();
+                        continue;
+                    }
+                }
+
                 results.Add(cu);
                 fileSw.Stop();
 
@@ -306,8 +326,7 @@ public class SolutionParser
                 Log.Debug("  ERROR [{FileIndex}/{TotalFiles}] {RelativePath} ({ElapsedMs}ms): {ExType}: {ExMessage}",
                     fileIndex, userDocs.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"),
                     ex.GetType().Name, ex.Message);
-                // Re-throw to let the caller handle it
-                throw;
+                results.Add(ParseError.Build(relativePath, source, ex));
             }
         }
 

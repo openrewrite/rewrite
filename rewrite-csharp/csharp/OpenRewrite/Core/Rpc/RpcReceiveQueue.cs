@@ -489,6 +489,11 @@ public class RpcReceiveQueue
             "org.openrewrite.csharp.marker.ImplicitTypeParameters" =>
                 typeof(ImplicitTypeParameters),
 
+            "org.openrewrite.ParseExceptionResult" =>
+                typeof(ParseExceptionResult),
+            "org.openrewrite.tree.ParseError" =>
+                typeof(ParseError),
+
             _ => FromJavaTypeNameByConvention(javaTypeName)
         };
     }
