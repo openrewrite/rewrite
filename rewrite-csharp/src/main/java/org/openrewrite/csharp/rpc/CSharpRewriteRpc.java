@@ -323,6 +323,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
 
