@@ -73,20 +73,20 @@ public class FindEmptyMethods extends Recipe {
                 if (method.isConstructor()) {
                     checkConstructor = getCursor().getNearestMessage("CHECK_CONSTRUCTOR") != null;
                 }
-                if (checkConstructor != null && checkConstructor && isEmptyConstructor(method) || isEmptyMethod(method)) {
+                if (checkConstructor != null && checkConstructor && hasEmptyBody(method) || isEmptyMethod(method)) {
                     method = SearchResult.found(method);
                 }
                 return super.visitMethodDeclaration(method, ctx);
             }
 
-            private boolean isEmptyConstructor(J.MethodDeclaration method) {
+            private boolean hasEmptyBody(J.MethodDeclaration method) {
                 return method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty();
             }
 
             private boolean isEmptyMethod(J.MethodDeclaration method) {
                 return !method.isConstructor() && !isInterfaceMethod(method) &&
                        (matchOverrides == null || !matchOverrides && !TypeUtils.isOverride(method.getMethodType()) || matchOverrides) &&
-                       (method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty());
+                       hasEmptyBody(method);
             }
 
             private boolean isInterfaceMethod(J.MethodDeclaration method) {
