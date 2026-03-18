@@ -60,7 +60,7 @@ public class FindEmptyMethods extends Recipe {
                     return classDecl;
                 }
 
-                if (hasSinglePublicNoArgsConstructor(classDecl.getBody().getStatements())) {
+                if (hasEmptySinglePublicNoArgsConstructor(classDecl.getBody().getStatements())) {
                     getCursor().putMessage("CHECK_CONSTRUCTOR", true);
                 }
 
@@ -73,7 +73,7 @@ public class FindEmptyMethods extends Recipe {
                 if (method.isConstructor()) {
                     checkConstructor = getCursor().getNearestMessage("CHECK_CONSTRUCTOR") != null;
                 }
-                if (checkConstructor != null && checkConstructor && hasEmptyBody(method) || isEmptyMethod(method)) {
+                if (checkConstructor != null && checkConstructor || isEmptyMethod(method)) {
                     method = SearchResult.found(method);
                 }
                 return super.visitMethodDeclaration(method, ctx);
@@ -97,7 +97,7 @@ public class FindEmptyMethods extends Recipe {
                        !method.hasModifier(J.Modifier.Type.Default);
             }
 
-            private boolean hasSinglePublicNoArgsConstructor(List<Statement> classStatements) {
+            private boolean hasEmptySinglePublicNoArgsConstructor(List<Statement> classStatements) {
                 List<J.MethodDeclaration> constructors = classStatements.stream()
                         .filter(o -> o instanceof J.MethodDeclaration)
                         .map(o -> (J.MethodDeclaration) o)
@@ -106,7 +106,8 @@ public class FindEmptyMethods extends Recipe {
                 return constructors.size() == 1 &&
                        constructors.get(0).hasModifier(J.Modifier.Type.Public) &&
                        constructors.get(0).getParameters().size() == 1 &&
-                       constructors.get(0).getParameters().get(0) instanceof J.Empty;
+                       constructors.get(0).getParameters().get(0) instanceof J.Empty &&
+                       hasEmptyBody(constructors.get(0));
             }
         };
     }
