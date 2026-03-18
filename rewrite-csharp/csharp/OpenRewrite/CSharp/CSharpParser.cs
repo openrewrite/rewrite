@@ -3535,7 +3535,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.Keyword.Span.End;
 
         // Parse parentheses and type: (T)
-        SkipTo(node.OpenParenToken.SpanStart);
         var beforeParen = ExtractSpaceBefore(node.OpenParenToken);
         _cursor = node.OpenParenToken.Span.End;
 
