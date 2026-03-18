@@ -87,7 +87,7 @@ export namespace RecipeMarketplace {
                         const recipeInst = new recipe({});
                         this.recipes.set(await recipeInst.descriptor(), recipe);
                     } catch (e) {
-                        throw new Error(`Failed to install recipe. Ensure the constructor can be called without any arguments.`);
+                        throw new Error(`Failed to install recipe '${recipe.name}'. Ensure the constructor can be called without any arguments.`, {cause: e});
                     }
                 } else {
                     this.recipes.set(recipe, undefined);
