@@ -1,5 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.LicenseExtension
@@ -71,18 +73,26 @@ val csharpBuild by tasks.registering(Exec::class) {
     }
 }
 
+val junitXmlFile = csharpDir.resolve("build/test-results/xunit/junit.xml")
+
 val csharpTest by tasks.registering(Exec::class) {
     group = "csharp"
     description = "Run C# xunit tests"
     dependsOn(csharpBuild)
 
     workingDir = csharpDir
-    commandLine(findDotnet(), "test", "--no-build", "--verbosity", "normal")
+    commandLine(
+        findDotnet(), "test", "--no-build", "--verbosity", "normal",
+        "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
+    )
+    outputs.files(junitXmlFile)
 
     doFirst {
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
 }
+
+ImportJUnitXmlReports.register(tasks, csharpTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(csharpTest)

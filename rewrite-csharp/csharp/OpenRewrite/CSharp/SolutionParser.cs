@@ -80,8 +80,9 @@ internal static class DotNetRestore
     /// <summary>
     /// Replacement NuGet feeds for defunct dotnet.myget.org sources.
     /// MyGet was shut down; packages migrated to Azure DevOps Artifacts (dnceng).
+    /// Semicolons are escaped as %3B because MSBuild /p: treats literal ';' as a property separator.
     /// </summary>
-    private static readonly string AdditionalNuGetSources = string.Join(";",
+    private static readonly string AdditionalNuGetSources = string.Join("%3B",
         "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json",
         "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json",
         "https://pkgs.dev.azure.com/dnceng/public/_packaging/myget-legacy/nuget/v3/index.json");
@@ -93,13 +94,7 @@ internal static class DotNetRestore
         // Relax restore for LST parsing: disable NuGet vulnerability audit
         // (NU1902/NU1903 would fail restore), ignore dead NuGet sources,
         // and add replacement feeds for defunct MyGet sources.
-        var restoreArgs = string.Join(" ",
-            $"restore \"{path}\"",
-            "/p:NuGetAudit=false",
-            "/p:RestoreIgnoreFailedSources=true",
-            $"/p:RestoreAdditionalProjectSources=\"{AdditionalNuGetSources}\"",
-            "--ignore-failed-sources");
-        var psi = new ProcessStartInfo("dotnet", restoreArgs)
+        var psi = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
             RedirectStandardOutput = true,
@@ -107,6 +102,12 @@ internal static class DotNetRestore
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        psi.ArgumentList.Add("restore");
+        psi.ArgumentList.Add(path);
+        psi.ArgumentList.Add("/p:NuGetAudit=false");
+        psi.ArgumentList.Add("/p:RestoreIgnoreFailedSources=true");
+        psi.ArgumentList.Add($"/p:RestoreAdditionalProjectSources={AdditionalNuGetSources}");
+        psi.ArgumentList.Add("--ignore-failed-sources");
         // Reduce NuGet retry attempts so dead feeds fail fast
         psi.Environment["NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT"] = "1";
         psi.Environment["NUGET_ENHANCED_NETWORK_RETRY_DELAY_MILLISECONDS"] = "100";
