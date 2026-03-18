@@ -178,6 +178,11 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Linq$GroupClause");
         RpcSendQueue.RegisterJavaTypeName(typeof(QueryContinuation),
             "org.openrewrite.csharp.tree.Linq$QueryContinuation");
+
+        RpcSendQueue.RegisterJavaTypeName(typeof(ParseError),
+            "org.openrewrite.tree.ParseError");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ParseExceptionResult),
+            "org.openrewrite.ParseExceptionResult");
     }
 
     [JsonRpcMethod("ParseSolution", UseSingleObjectParameterDeserialization = true)]
@@ -187,6 +192,16 @@ public class RewriteRpcServer
         var solutionParser = new SolutionParser();
         var path = ResolvePath(request.Path);
         var rootDir = ResolvePath(request.RootDir);
+
+        var requirePrintEqualsInput = true;
+        if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val) == true)
+        {
+            // StreamJsonRpc with Newtonsoft.Json may deliver values as JToken wrappers
+            if (val is JToken jt)
+                requirePrintEqualsInput = jt.Value<bool>();
+            else
+                requirePrintEqualsInput = Convert.ToBoolean(val);
+        }
 
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
 
@@ -205,7 +220,7 @@ public class RewriteRpcServer
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
                 projectIndex, projectList.Count, Path.GetFileNameWithoutExtension(project.FilePath));
 
-            List<CompilationUnit> results;
+            List<SolutionParser.ParseResult> results;
             try
             {
                 results = solutionParser.ParseProject(solution, project.FilePath!, rootDir);
@@ -217,20 +232,42 @@ public class RewriteRpcServer
                 throw;
             }
 
-            foreach (var cu in results)
+            foreach (var result in results)
             {
-                var id = cu.Id.ToString();
-                _localObjects[id] = cu;
+                object sourceFile;
+                string sourceFileType;
+
+                if (result.Error != null)
+                {
+                    sourceFile = ParseError.Build(result.RelativePath, result.Source, result.Error);
+                    sourceFileType = "org.openrewrite.tree.ParseError";
+                }
+                else if (requirePrintEqualsInput &&
+                         new CSharpPrinter<int>().Print(result.Cu!) != result.Source)
+                {
+                    sourceFile = ParseError.Build(result.RelativePath, result.Source,
+                        new InvalidOperationException(result.RelativePath + " is not print idempotent."));
+                    sourceFileType = "org.openrewrite.tree.ParseError";
+                    Log.Debug("RPC ParseSolution: print idempotency failure for {RelativePath}", result.RelativePath);
+                }
+                else
+                {
+                    sourceFile = result.Cu!;
+                    sourceFileType = "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+                }
+
+                var id = sourceFile is CompilationUnit cu ? cu.Id.ToString() : ((ParseError)sourceFile).Id.ToString();
+                _localObjects[id] = sourceFile;
                 items.Add(new ParseSolutionResponseItem
                 {
                     Id = id,
-                    SourceFileType = "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+                    SourceFileType = sourceFileType,
                     ProjectPath = project.FilePath!
                 });
             }
         }
 
-        Log.Debug("RPC ParseSolution: completed, {ItemCount} compilation units total", items.Count);
+        Log.Debug("RPC ParseSolution: completed, {ItemCount} source files total", items.Count);
         return items;
     }
 
@@ -1239,16 +1276,21 @@ public class RewriteRpcServer
         public static readonly TreeCodec Instance = new();
         public void RpcSend(object after, RpcSendQueue q)
         {
-            if (after is OpenRewrite.Xml.Xml xml)
-                new OpenRewrite.Xml.Rpc.XmlSender().Visit(xml, q);
-            else
-                new CSharpSender().Visit((J)after, q);
+            switch (after)
+            {
+                case ParseError pe: pe.RpcSend(pe, q); break;
+                case OpenRewrite.Xml.Xml xml: new OpenRewrite.Xml.Rpc.XmlSender().Visit(xml, q); break;
+                default: new CSharpSender().Visit((J)after, q); break;
+            }
         }
         public object RpcReceive(object before, RpcReceiveQueue q)
         {
-            if (before is OpenRewrite.Xml.Xml xml)
-                return new OpenRewrite.Xml.Rpc.XmlReceiver().Visit(xml, q)!;
-            return new CSharpReceiver().Visit((J)before, q)!;
+            return before switch
+            {
+                ParseError pe => pe.RpcReceive(pe, q),
+                OpenRewrite.Xml.Xml xml => new OpenRewrite.Xml.Rpc.XmlReceiver().Visit(xml, q)!,
+                _ => new CSharpReceiver().Visit((J)before, q)!
+            };
         }
     }
 }
@@ -1282,6 +1324,7 @@ public class ParseSolutionRequest
 {
     public string Path { get; set; } = "";
     public string RootDir { get; set; } = "";
+    public Dictionary<string, object>? Options { get; set; }
 }
 
 public class ParseSolutionResponseItem

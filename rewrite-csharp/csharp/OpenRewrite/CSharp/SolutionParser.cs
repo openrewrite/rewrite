@@ -203,12 +203,19 @@ public class SolutionParser
     }
 
     /// <summary>
+    /// Result of parsing a single source file. Either Cu or Error is set, never both.
+    /// </summary>
+    public record ParseResult(CompilationUnit? Cu, string RelativePath, string Source, Exception? Error);
+
+    /// <summary>
     /// Parse all user source files in a project from a loaded solution.
     /// Uses solution configurations to determine preprocessor symbol permutations.
     /// Generated files (in obj/) are excluded from results — they contribute to
     /// semantic analysis via the compilation but are not included in the LST.
+    /// Per-file parse failures are captured as ParseResult entries with Error set,
+    /// rather than aborting the entire project.
     /// </summary>
-    public List<CompilationUnit> ParseProject(
+    public List<ParseResult> ParseProject(
         Solution solution, string projectPath, string rootDir)
     {
         var projectName = Path.GetFileNameWithoutExtension(projectPath);
@@ -236,7 +243,7 @@ public class SolutionParser
         Log.Debug("ParseProject: {ProjectName} has {UserDocCount} user source files (of {TotalDocCount} total)",
             projectName, userDocs.Count, project.Documents.Count());
 
-        var results = new List<CompilationUnit>();
+        var results = new List<ParseResult>();
         var fileIndex = 0;
         var projectSw = Stopwatch.StartNew();
         foreach (var doc in userDocs)
@@ -270,7 +277,7 @@ public class SolutionParser
                     cu = _parser.Parse(source, relativePath, semanticModel);
                 }
 
-                results.Add(cu);
+                results.Add(new ParseResult(cu, relativePath, source, null));
                 fileSw.Stop();
 
                 // Log every file with duration — slow files (>1s) get a warning prefix
@@ -284,8 +291,7 @@ public class SolutionParser
                 Log.Debug("  ERROR [{FileIndex}/{TotalFiles}] {RelativePath} ({ElapsedMs}ms): {ExType}: {ExMessage}",
                     fileIndex, userDocs.Count, relativePath, fileSw.Elapsed.TotalMilliseconds.ToString("F0"),
                     ex.GetType().Name, ex.Message);
-                // Re-throw to let the caller handle it
-                throw;
+                results.Add(new ParseResult(null, relativePath, source, ex));
             }
         }
 

@@ -123,6 +123,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
     public Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
+        Map<String, Object> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true));
+
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
             private @Nullable ParseSolutionResponse response;
@@ -131,7 +135,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
-                    response = send("ParseSolution", new ParseSolution(path, rootDir), ParseSolutionResponse.class);
+                    response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 

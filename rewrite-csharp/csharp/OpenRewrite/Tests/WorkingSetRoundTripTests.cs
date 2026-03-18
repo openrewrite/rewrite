@@ -453,10 +453,10 @@ public class WorkingSetRoundTripTests
 
         foreach (var projPath in projectPaths)
         {
-            List<CompilationUnit> compilationUnits;
+            List<SolutionParser.ParseResult> parseResults;
             try
             {
-                compilationUnits = parser.ParseProject(solution, projPath, rootDir);
+                parseResults = parser.ParseProject(solution, projPath, rootDir);
             }
             catch (Exception ex)
             {
@@ -464,6 +464,18 @@ public class WorkingSetRoundTripTests
                 Console.WriteLine($"  PARSE ERROR: {msg}");
                 failures.Add(msg);
                 continue;
+            }
+
+            var compilationUnits = parseResults
+                .Where(r => r.Error == null && r.Cu != null)
+                .Select(r => r.Cu!)
+                .ToList();
+
+            foreach (var r in parseResults.Where(r => r.Error != null))
+            {
+                var msg = $"Failed to parse {r.RelativePath}: {r.Error!.Message}";
+                Console.WriteLine($"  PARSE ERROR: {msg}");
+                failures.Add(msg);
             }
 
             Console.WriteLine($"  Project {Path.GetFileName(projPath)}: {compilationUnits.Count} files");
