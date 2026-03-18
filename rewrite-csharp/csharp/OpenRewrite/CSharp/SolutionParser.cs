@@ -77,13 +77,29 @@ internal static class DotNetRestore
         }
     }
 
+    /// <summary>
+    /// Replacement NuGet feeds for defunct dotnet.myget.org sources.
+    /// MyGet was shut down; packages migrated to Azure DevOps Artifacts (dnceng).
+    /// </summary>
+    private static readonly string AdditionalNuGetSources = string.Join(";",
+        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json",
+        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json",
+        "https://pkgs.dev.azure.com/dnceng/public/_packaging/myget-legacy/nuget/v3/index.json");
+
     private static async Task<RestoreResult> RunCoreAsync(string path, CancellationToken ct)
     {
         Log.Debug("dotnet restore: starting for {Path}", path);
         var sw = Stopwatch.StartNew();
-        // Disable NuGet vulnerability audit — audit warnings treated as errors
-        // (NU1902/NU1903) would fail restore, but we only need packages for parsing.
-        var psi = new ProcessStartInfo("dotnet", $"restore \"{path}\" /p:NuGetAudit=false --ignore-failed-sources")
+        // Relax restore for LST parsing: disable NuGet vulnerability audit
+        // (NU1902/NU1903 would fail restore), ignore dead NuGet sources,
+        // and add replacement feeds for defunct MyGet sources.
+        var restoreArgs = string.Join(" ",
+            $"restore \"{path}\"",
+            "/p:NuGetAudit=false",
+            "/p:RestoreIgnoreFailedSources=true",
+            $"/p:RestoreAdditionalProjectSources=\"{AdditionalNuGetSources}\"",
+            "--ignore-failed-sources");
+        var psi = new ProcessStartInfo("dotnet", restoreArgs)
         {
             WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
             RedirectStandardOutput = true,
@@ -91,6 +107,9 @@ internal static class DotNetRestore
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        // Reduce NuGet retry attempts so dead feeds fail fast
+        psi.Environment["NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT"] = "1";
+        psi.Environment["NUGET_ENHANCED_NETWORK_RETRY_DELAY_MILLISECONDS"] = "100";
 
         using var process = Process.Start(psi);
         if (process == null)
