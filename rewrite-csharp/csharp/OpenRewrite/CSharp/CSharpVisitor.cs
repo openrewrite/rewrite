@@ -167,10 +167,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
         if (membersChanged) changed = true;
 
+        var newEof = VisitSpace(compilationUnit.Eof, p);
+        if (!ReferenceEquals(newEof, compilationUnit.Eof)) changed = true;
+
         if (changed)
         {
             compilationUnit = compilationUnit.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                .WithMembers(membersChanged ? members : compilationUnit.Members);
+                .WithMembers(membersChanged ? members : compilationUnit.Members)
+                .WithEof(newEof);
         }
 
         return compilationUnit;
@@ -755,28 +759,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             }
         }
 
-        var newElements = new List<JRightPadded<Expression>>();
-        bool changed = false;
-
-        foreach (var ne in pp.Subpatterns.Elements)
-        {
-            var visited = ne.Element is NamedExpression namedExpr
-                ? VisitNamedExpression(namedExpr, p)
-                : Visit(ne.Element, p);
-            if (visited is Expression expr && !ReferenceEquals(expr, ne.Element))
-            {
-                changed = true;
-                newElements.Add(ne.WithElement(expr));
-            }
-            else
-            {
-                newElements.Add(ne);
-            }
-        }
-
-        var subpatterns = changed
-            ? pp.Subpatterns.WithElements(newElements)
-            : pp.Subpatterns;
+        var subpatterns = VisitContainer(pp.Subpatterns, p)!;
 
         Identifier? newDesignation = pp.Designation;
         if (pp.Designation != null)
@@ -898,12 +881,16 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newFormat = VisitLeftPadded(interp.Format, p);
         if (!ReferenceEquals(newFormat, interp.Format)) changed = true;
 
+        var newAfter = VisitSpace(interp.After, p);
+        if (!ReferenceEquals(newAfter, interp.After)) changed = true;
+
         if (changed || !ReferenceEquals(newPrefix, interp.Prefix) || !ReferenceEquals(newMarkers, interp.Markers))
         {
             return interp.WithPrefix(newPrefix).WithMarkers(newMarkers)
                          .WithExpression(expr is Expression newExpr ? newExpr : interp.Expression)
                          .WithAlignment(newAlignment)
-                         .WithFormat(newFormat);
+                         .WithFormat(newFormat)
+                         .WithAfter(newAfter);
         }
 
         return interp;
@@ -1000,10 +987,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
         if (membersChanged) changed = true;
 
+        var newEnd = VisitSpace(ns.End, p);
+        if (!ReferenceEquals(newEnd, ns.End)) changed = true;
+
         return changed
             ? ns.WithPrefix(newPrefix).WithMarkers(newMarkers)
                 .WithName(newNamePadded)
                 .WithMembers(membersChanged ? newMembers : ns.Members)
+                .WithEnd(newEnd)
             : ns;
     }
 
@@ -1064,13 +1055,19 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newMarkers = VisitMarkers(conditionalDirective.Markers, p);
 
         var branches = new List<JRightPadded<CompilationUnit>>();
+        bool branchesChanged = false;
         foreach (var branch in conditionalDirective.Branches)
         {
-            var visited = (CompilationUnit?)Visit(branch.Element, p);
+            var visited = VisitRightPadded(branch, p);
             if (visited != null)
-                branches.Add(branch.WithElement(visited));
+            {
+                if (!ReferenceEquals(visited, branch)) branchesChanged = true;
+                branches.Add(visited);
+            }
+            else branchesChanged = true;
         }
-        return conditionalDirective.WithPrefix(newPrefix).WithMarkers(newMarkers).WithBranches(branches);
+        return conditionalDirective.WithPrefix(newPrefix).WithMarkers(newMarkers)
+            .WithBranches(branchesChanged ? branches : conditionalDirective.Branches);
     }
 
     public virtual J VisitPragmaWarningDirective(PragmaWarningDirective pragmaWarningDirective, P p)
@@ -3037,16 +3034,12 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         {
             if (filter != null)
             {
-                var visited = (ControlParentheses<Expression>?)Visit(filter.Element, p);
-                if (visited != null && !ReferenceEquals(visited, filter.Element))
+                var visited = VisitLeftPadded(filter, p);
+                if (!ReferenceEquals(visited, filter))
                 {
                     filtersChanged = true;
-                    newFilters.Add(new JLeftPadded<ControlParentheses<Expression>>(filter.Before, visited));
                 }
-                else
-                {
-                    newFilters.Add(filter);
-                }
+                newFilters.Add(visited);
             }
             else
             {

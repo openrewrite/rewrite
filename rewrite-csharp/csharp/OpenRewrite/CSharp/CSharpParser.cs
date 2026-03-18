@@ -750,10 +750,19 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         _cursor = node.CloseBraceToken.Span.End;
 
+        // Handle trailing semicolon (e.g., `enum Color { ... };`)
+        var enumMarkers = Markers.Empty;
+        if (node.SemicolonToken.Span.Length > 0)
+        {
+            SkipTo(node.SemicolonToken.SpanStart);
+            SkipToken(node.SemicolonToken);
+            enumMarkers = Markers.Build([new Semicolon(Guid.NewGuid())]);
+        }
+
         return new EnumDeclaration(
             Guid.NewGuid(),
             prefix,
-            Markers.Empty,
+            enumMarkers,
             attributeLists.Count > 0 ? attributeLists : null,
             modifiers,
             new JLeftPadded<Identifier>(enumPrefix, name),
