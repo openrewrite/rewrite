@@ -21,6 +21,8 @@ import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Objects;
@@ -424,6 +426,18 @@ class CSharpRpcTest implements RewriteTest {
             }
             """
         ));
+    }
+
+    // ---- Marketplace tests ----
+
+    @Test
+    void getMarketplace() {
+        RecipeBundle bundle = new RecipeBundle("nuget", "test-recipes",
+                null, null, null);
+        RecipeMarketplace marketplace = CSharpRewriteRpc.getOrStart().getMarketplace(bundle);
+        assertThat(marketplace).isNotNull();
+        // XML recipes are registered via XmlRecipeActivator
+        assertThat(marketplace.getAllRecipes()).isNotEmpty();
     }
 
     // ---- Type attribution tests ----
