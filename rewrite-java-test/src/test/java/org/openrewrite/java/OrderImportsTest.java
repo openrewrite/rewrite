@@ -19,10 +19,12 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.emptySet;
@@ -764,6 +766,46 @@ class OrderImportsTest implements RewriteTest {
                   assertThat(importLayoutStyle.getClassCountToUseStarImport()).isEqualTo(9999);
                   assertThat(importLayoutStyle.getNameCountToUseStarImport()).isEqualTo(9999);
               })
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1708")
+    @Test
+    void preservesTabIndentationAfterReorderingImports() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(false, null)),
+          java(
+            "import java.util.Map;\n" +
+            "import java.util.ArrayList;\n" +
+            "import java.util.List;\n" +
+            "\n" +
+            "@SuppressWarnings({\n" +
+            "\t\t\"unchecked\",\n" +
+            "\t\t\"rawtypes\"\n" +
+            "})\n" +
+            "class Test {\n" +
+            "\n" +
+            "\tpublic void test() {\n" +
+            "\t\tList<String> list = new ArrayList<>();\n" +
+            "\t\tMap<String, String> map = null;\n" +
+            "\t}\n" +
+            "}\n",
+            "import java.util.ArrayList;\n" +
+            "import java.util.List;\n" +
+            "import java.util.Map;\n" +
+            "\n" +
+            "@SuppressWarnings({\n" +
+            "\t\t\"unchecked\",\n" +
+            "\t\t\"rawtypes\"\n" +
+            "})\n" +
+            "class Test {\n" +
+            "\n" +
+            "\tpublic void test() {\n" +
+            "\t\tList<String> list = new ArrayList<>();\n" +
+            "\t\tMap<String, String> map = null;\n" +
+            "\t}\n" +
+            "}\n"
           )
         );
     }
