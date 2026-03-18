@@ -93,13 +93,10 @@ internal static class DotNetRestore
         // Relax restore for LST parsing: disable NuGet vulnerability audit
         // (NU1902/NU1903 would fail restore), ignore dead NuGet sources,
         // and add replacement feeds for defunct MyGet sources.
-        var restoreArgs = string.Join(" ",
-            $"restore \"{path}\"",
-            "/p:NuGetAudit=false",
-            "/p:RestoreIgnoreFailedSources=true",
-            $"/p:RestoreAdditionalProjectSources=\"{AdditionalNuGetSources}\"",
-            "--ignore-failed-sources");
-        var psi = new ProcessStartInfo("dotnet", restoreArgs)
+        // Use ArgumentList instead of a single arguments string so that
+        // values containing semicolons (like RestoreAdditionalProjectSources)
+        // are properly quoted on all platforms.
+        var psi = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
             RedirectStandardOutput = true,
@@ -107,6 +104,12 @@ internal static class DotNetRestore
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        psi.ArgumentList.Add("restore");
+        psi.ArgumentList.Add(path);
+        psi.ArgumentList.Add("/p:NuGetAudit=false");
+        psi.ArgumentList.Add("/p:RestoreIgnoreFailedSources=true");
+        psi.ArgumentList.Add($"/p:RestoreAdditionalProjectSources={AdditionalNuGetSources}");
+        psi.ArgumentList.Add("--ignore-failed-sources");
         // Reduce NuGet retry attempts so dead feeds fail fast
         psi.Environment["NUGET_ENHANCED_MAX_NETWORK_TRY_COUNT"] = "1";
         psi.Environment["NUGET_ENHANCED_NETWORK_RETRY_DELAY_MILLISECONDS"] = "100";
