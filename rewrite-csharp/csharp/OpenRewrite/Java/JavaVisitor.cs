@@ -234,30 +234,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        JContainer<Expression>? newArguments = node.Arguments;
-        if (node.Arguments != null)
-        {
-            var newArgs = new List<JRightPadded<Expression>>();
-            bool argsChanged = false;
-            foreach (var paddedArg in node.Arguments.Elements)
-            {
-                var visited = Visit(paddedArg.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedArg.Element)) argsChanged = true;
-                    newArgs.Add(paddedArg.WithElement(e));
-                }
-                else
-                {
-                    newArgs.Add(paddedArg);
-                }
-            }
-            if (argsChanged)
-            {
-                newArguments = node.Arguments.WithElements(newArgs);
-                changed = true;
-            }
-        }
+        var newArguments = VisitContainer(node.Arguments, p);
+        if (!ReferenceEquals(newArguments, node.Arguments)) changed = true;
 
         return changed
             ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAnnotationType(newAnnotationType).WithArguments(newArguments)
@@ -286,17 +264,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var statements = new List<JRightPadded<Statement>>();
         foreach (var stmt in node.Statements)
         {
-            var visited = Visit(stmt.Element, p);
-            if (visited is Statement s)
+            var visited = VisitRightPadded(stmt, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(s, stmt.Element)) changed = true;
-                statements.Add(stmt.WithElement(s));
+                if (!ReferenceEquals(visited, stmt)) changed = true;
+                statements.Add(visited);
             }
-            else
-            {
-                // Statement was removed (visitor returned null)
-                changed = true;
-            }
+            else changed = true;
         }
         return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithEnd(newEnd).WithStatements(statements) : node;
     }
@@ -373,120 +347,24 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // TypeParameters
-        JContainer<TypeParameter>? newTypeParameters = node.TypeParameters;
-        if (node.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<TypeParameter>>();
-            bool tpChanged = false;
-            foreach (var paddedTp in node.TypeParameters.Elements)
-            {
-                var visited = Visit(paddedTp.Element, p);
-                if (visited is TypeParameter tp)
-                {
-                    if (!ReferenceEquals(tp, paddedTp.Element)) tpChanged = true;
-                    tpElements.Add(paddedTp.WithElement(tp));
-                }
-                else
-                {
-                    tpElements.Add(paddedTp);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParameters = node.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
+        var newTypeParameters = VisitContainer(node.TypeParameters, p);
+        if (!ReferenceEquals(newTypeParameters, node.TypeParameters)) changed = true;
 
         // PrimaryConstructor
-        JContainer<TypeTree>? newPrimaryConstructor = node.PrimaryConstructor;
-        if (node.PrimaryConstructor != null)
-        {
-            var pcElements = new List<JRightPadded<TypeTree>>();
-            bool pcChanged = false;
-            foreach (var paddedPc in node.PrimaryConstructor.Elements)
-            {
-                var visited = Visit(paddedPc.Element, p);
-                if (visited is TypeTree tt)
-                {
-                    if (!ReferenceEquals(tt, paddedPc.Element)) pcChanged = true;
-                    pcElements.Add(paddedPc.WithElement(tt));
-                }
-                else
-                {
-                    pcElements.Add(paddedPc);
-                }
-            }
-            if (pcChanged)
-            {
-                newPrimaryConstructor = node.PrimaryConstructor.WithElements(pcElements);
-                changed = true;
-            }
-        }
+        var newPrimaryConstructor = VisitContainer(node.PrimaryConstructor, p);
+        if (!ReferenceEquals(newPrimaryConstructor, node.PrimaryConstructor)) changed = true;
 
         // Extends
-        JLeftPadded<TypeTree>? newExtends = node.Extends;
-        if (node.Extends != null)
-        {
-            var visitedExtends = Visit(node.Extends.Element, p);
-            if (visitedExtends is TypeTree et && !ReferenceEquals(et, node.Extends.Element))
-            {
-                newExtends = node.Extends.WithElement(et);
-                changed = true;
-            }
-        }
+        var newExtends = VisitLeftPadded(node.Extends, p);
+        if (!ReferenceEquals(newExtends, node.Extends)) changed = true;
 
         // Implements
-        JContainer<TypeTree>? newImplements = node.Implements;
-        if (node.Implements != null)
-        {
-            var implElements = new List<JRightPadded<TypeTree>>();
-            bool implChanged = false;
-            foreach (var paddedImpl in node.Implements.Elements)
-            {
-                var visited = Visit(paddedImpl.Element, p);
-                if (visited is TypeTree tt)
-                {
-                    if (!ReferenceEquals(tt, paddedImpl.Element)) implChanged = true;
-                    implElements.Add(paddedImpl.WithElement(tt));
-                }
-                else
-                {
-                    implElements.Add(paddedImpl);
-                }
-            }
-            if (implChanged)
-            {
-                newImplements = node.Implements.WithElements(implElements);
-                changed = true;
-            }
-        }
+        var newImplements = VisitContainer(node.Implements, p);
+        if (!ReferenceEquals(newImplements, node.Implements)) changed = true;
 
         // Permits
-        JContainer<TypeTree>? newPermits = node.Permits;
-        if (node.Permits != null)
-        {
-            var permElements = new List<JRightPadded<TypeTree>>();
-            bool permChanged = false;
-            foreach (var paddedPerm in node.Permits.Elements)
-            {
-                var visited = Visit(paddedPerm.Element, p);
-                if (visited is TypeTree tt)
-                {
-                    if (!ReferenceEquals(tt, paddedPerm.Element)) permChanged = true;
-                    permElements.Add(paddedPerm.WithElement(tt));
-                }
-                else
-                {
-                    permElements.Add(paddedPerm);
-                }
-            }
-            if (permChanged)
-            {
-                newPermits = node.Permits.WithElements(permElements);
-                changed = true;
-            }
-        }
+        var newPermits = VisitContainer(node.Permits, p);
+        if (!ReferenceEquals(newPermits, node.Permits)) changed = true;
 
         // Body
         Block newBody = node.Body;
@@ -541,16 +419,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         bool enumsChanged = false;
         foreach (var paddedValue in node.Enums)
         {
-            var visited = Visit(paddedValue.Element, p);
-            if (visited is EnumValue ev)
+            var visited = VisitRightPadded(paddedValue, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(ev, paddedValue.Element)) enumsChanged = true;
-                newEnums.Add(paddedValue.WithElement(ev));
+                if (!ReferenceEquals(visited, paddedValue)) enumsChanged = true;
+                newEnums.Add(visited);
             }
-            else
-            {
-                newEnums.Add(paddedValue);
-            }
+            else enumsChanged = true;
         }
         if (enumsChanged) changed = true;
 
@@ -659,30 +534,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // TypeParameters
-        JContainer<TypeParameter>? newTypeParameters = node.TypeParameters;
-        if (node.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<TypeParameter>>();
-            bool tpChanged = false;
-            foreach (var paddedTp in node.TypeParameters.Elements)
-            {
-                var visited = Visit(paddedTp.Element, p);
-                if (visited is TypeParameter tp)
-                {
-                    if (!ReferenceEquals(tp, paddedTp.Element)) tpChanged = true;
-                    tpElements.Add(paddedTp.WithElement(tp));
-                }
-                else
-                {
-                    tpElements.Add(paddedTp);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParameters = node.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
+        var newTypeParameters = VisitContainer(node.TypeParameters, p);
+        if (!ReferenceEquals(newTypeParameters, node.TypeParameters)) changed = true;
 
         // ReturnTypeExpression
         TypeTree? newReturnType = node.ReturnTypeExpression;
@@ -706,53 +559,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Parameters
-        JContainer<Statement> newParams = node.Parameters;
-        var paramElements = new List<JRightPadded<Statement>>();
-        bool paramsChanged = false;
-        foreach (var paddedParam in node.Parameters.Elements)
-        {
-            var visited = Visit(paddedParam.Element, p);
-            if (visited is Statement s)
-            {
-                if (!ReferenceEquals(s, paddedParam.Element)) paramsChanged = true;
-                paramElements.Add(paddedParam.WithElement(s));
-            }
-            else
-            {
-                paramElements.Add(paddedParam);
-            }
-        }
-        if (paramsChanged)
-        {
-            newParams = node.Parameters.WithElements(paramElements);
-            changed = true;
-        }
+        var newParams = VisitContainer(node.Parameters, p)!;
+        if (!ReferenceEquals(newParams, node.Parameters)) changed = true;
 
         // Throws
-        JContainer<NameTree>? newThrows = node.Throws;
-        if (node.Throws != null)
-        {
-            var throwElements = new List<JRightPadded<NameTree>>();
-            bool throwsChanged = false;
-            foreach (var paddedThrow in node.Throws.Elements)
-            {
-                var visited = Visit(paddedThrow.Element, p);
-                if (visited is NameTree nt)
-                {
-                    if (!ReferenceEquals(nt, paddedThrow.Element)) throwsChanged = true;
-                    throwElements.Add(paddedThrow.WithElement(nt));
-                }
-                else
-                {
-                    throwElements.Add(paddedThrow);
-                }
-            }
-            if (throwsChanged)
-            {
-                newThrows = node.Throws.WithElements(throwElements);
-                changed = true;
-            }
-        }
+        var newThrows = VisitContainer(node.Throws, p);
+        if (!ReferenceEquals(newThrows, node.Throws)) changed = true;
 
         // Body
         Block? newBody = node.Body;
@@ -767,16 +579,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // DefaultValue
-        JLeftPadded<Expression>? newDefaultValue = node.DefaultValue;
-        if (node.DefaultValue != null)
-        {
-            var visitedDefault = Visit(node.DefaultValue.Element, p);
-            if (visitedDefault is Expression e && !ReferenceEquals(e, node.DefaultValue.Element))
-            {
-                newDefaultValue = node.DefaultValue.WithElement(e);
-                changed = true;
-            }
-        }
+        var newDefaultValue = VisitLeftPadded(node.DefaultValue, p);
+        if (!ReferenceEquals(newDefaultValue, node.DefaultValue)) changed = true;
 
         // MethodType
         JavaType.Method? newMethodType = (JavaType.Method?)VisitType(node.MethodType, p);
@@ -859,13 +663,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // ThenPart (JRightPadded<Statement>)
-        JRightPadded<Statement> newThenPart = node.ThenPart;
-        var visitedThen = Visit(node.ThenPart.Element, p);
-        if (visitedThen is Statement ts && !ReferenceEquals(ts, node.ThenPart.Element))
-        {
-            newThenPart = node.ThenPart.WithElement(ts);
-            changed = true;
-        }
+        var newThenPart = VisitRightPadded(node.ThenPart, p) ?? node.ThenPart;
+        if (!ReferenceEquals(newThenPart, node.ThenPart)) changed = true;
 
         // ElsePart
         If.Else? newElsePart = node.ElsePart;
@@ -897,13 +696,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var newMarkers = VisitMarkers(@else.Markers, p);
         if (!ReferenceEquals(newMarkers, @else.Markers)) changed = true;
 
-        JRightPadded<Statement> newBody = @else.Body;
-        var visitedBody = Visit(@else.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, @else.Body.Element))
-        {
-            newBody = @else.Body.WithElement(bs);
-            changed = true;
-        }
+        var newBody = VisitRightPadded(@else.Body, p) ?? @else.Body;
+        if (!ReferenceEquals(newBody, @else.Body)) changed = true;
 
         return changed ? @else.WithPrefix(newPrefix).WithMarkers(newMarkers).WithBody(newBody) : @else;
     }
@@ -932,13 +726,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             changed = true;
         }
 
-        JRightPadded<Statement> newBody = node.Body;
-        var visitedBody = Visit(node.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, node.Body.Element))
-        {
-            newBody = node.Body.WithElement(bs);
-            changed = true;
-        }
+        var newBody = VisitRightPadded(node.Body, p) ?? node.Body;
+        if (!ReferenceEquals(newBody, node.Body)) changed = true;
 
         return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithCondition(newCondition).WithBody(newBody) : node;
     }
@@ -960,22 +749,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Body
-        JRightPadded<Statement> newBody = node.Body;
-        var visitedBody = Visit(node.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, node.Body.Element))
-        {
-            newBody = node.Body.WithElement(bs);
-            changed = true;
-        }
+        var newBody = VisitRightPadded(node.Body, p) ?? node.Body;
+        if (!ReferenceEquals(newBody, node.Body)) changed = true;
 
         // Condition (JLeftPadded<ControlParentheses<Expression>>)
-        JLeftPadded<ControlParentheses<Expression>> newCondition = node.Condition;
-        var visitedCondition = Visit(node.Condition.Element, p);
-        if (visitedCondition is ControlParentheses<Expression> vc && !ReferenceEquals(vc, node.Condition.Element))
-        {
-            newCondition = node.Condition.WithElement(vc);
-            changed = true;
-        }
+        var newCondition = VisitLeftPadded(node.Condition, p) ?? node.Condition;
+        if (!ReferenceEquals(newCondition, node.Condition)) changed = true;
 
         return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithBody(newBody).WithCondition(newCondition) : node;
     }
@@ -1006,13 +785,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Body
-        JRightPadded<Statement> newBody = node.Body;
-        var visitedBody = Visit(node.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, node.Body.Element))
-        {
-            newBody = node.Body.WithElement(bs);
-            changed = true;
-        }
+        var newBody = VisitRightPadded(node.Body, p) ?? node.Body;
+        if (!ReferenceEquals(newBody, node.Body)) changed = true;
 
         return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLoopControl(newControl).WithBody(newBody) : node;
     }
@@ -1035,43 +809,32 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         bool initChanged = false;
         foreach (var init in control.Init)
         {
-            var visited = Visit(init.Element, p);
-            if (visited is Statement s)
+            var visited = VisitRightPadded(init, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(s, init.Element)) initChanged = true;
-                newInit.Add(init.WithElement(s));
+                if (!ReferenceEquals(visited, init)) initChanged = true;
+                newInit.Add(visited);
             }
-            else
-            {
-                newInit.Add(init);
-            }
+            else initChanged = true;
         }
         if (initChanged) changed = true;
 
         // Condition
-        JRightPadded<Expression> newControlCondition = control.Condition;
-        var visitedCondition = Visit(control.Condition.Element, p);
-        if (visitedCondition is Expression ce && !ReferenceEquals(ce, control.Condition.Element))
-        {
-            newControlCondition = control.Condition.WithElement(ce);
-            changed = true;
-        }
+        var newControlCondition = VisitRightPadded(control.Condition, p) ?? control.Condition;
+        if (!ReferenceEquals(newControlCondition, control.Condition)) changed = true;
 
         // Update
         var newUpdate = new List<JRightPadded<Statement>>();
         bool updateChanged = false;
         foreach (var update in control.Update)
         {
-            var visited = Visit(update.Element, p);
-            if (visited is Statement s)
+            var visited = VisitRightPadded(update, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(s, update.Element)) updateChanged = true;
-                newUpdate.Add(update.WithElement(s));
+                if (!ReferenceEquals(visited, update)) updateChanged = true;
+                newUpdate.Add(visited);
             }
-            else
-            {
-                newUpdate.Add(update);
-            }
+            else updateChanged = true;
         }
         if (updateChanged) changed = true;
 
@@ -1111,13 +874,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Body
-        JRightPadded<Statement> newBody = node.Body;
-        var visitedBody = Visit(node.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, node.Body.Element))
-        {
-            newBody = node.Body.WithElement(bs);
-            changed = true;
-        }
+        var newBody = VisitRightPadded(node.Body, p) ?? node.Body;
+        if (!ReferenceEquals(newBody, node.Body)) changed = true;
 
         return changed ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithLoopControl(newControl).WithBody(newBody) : node;
     }
@@ -1136,22 +894,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, control.Markers)) changed = true;
 
         // Variable
-        JRightPadded<VariableDeclarations> newVariable = control.Variable;
-        var visitedVar = Visit(control.Variable.Element, p);
-        if (visitedVar is VariableDeclarations vd && !ReferenceEquals(vd, control.Variable.Element))
-        {
-            newVariable = control.Variable.WithElement(vd);
-            changed = true;
-        }
+        var newVariable = VisitRightPadded(control.Variable, p) ?? control.Variable;
+        if (!ReferenceEquals(newVariable, control.Variable)) changed = true;
 
         // Iterable
-        JRightPadded<Expression> newIterable = control.Iterable;
-        var visitedIterable = Visit(control.Iterable.Element, p);
-        if (visitedIterable is Expression ie && !ReferenceEquals(ie, control.Iterable.Element))
-        {
-            newIterable = control.Iterable.WithElement(ie);
-            changed = true;
-        }
+        var newIterable = VisitRightPadded(control.Iterable, p) ?? control.Iterable;
+        if (!ReferenceEquals(newIterable, control.Iterable)) changed = true;
 
         return changed ? control.WithPrefix(newPrefix).WithMarkers(newMarkers).WithVariable(newVariable).WithIterable(newIterable) : control;
     }
@@ -1173,30 +921,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Resources
-        JContainer<Try.Resource>? newResources = node.Resources;
-        if (node.Resources != null)
-        {
-            var resElements = new List<JRightPadded<Try.Resource>>();
-            bool resChanged = false;
-            foreach (var paddedRes in node.Resources.Elements)
-            {
-                var visited = Visit(paddedRes.Element, p);
-                if (visited is Try.Resource r)
-                {
-                    if (!ReferenceEquals(r, paddedRes.Element)) resChanged = true;
-                    resElements.Add(paddedRes.WithElement(r));
-                }
-                else
-                {
-                    resElements.Add(paddedRes);
-                }
-            }
-            if (resChanged)
-            {
-                newResources = node.Resources.WithElements(resElements);
-                changed = true;
-            }
-        }
+        var newResources = VisitContainer(node.Resources, p);
+        if (!ReferenceEquals(newResources, node.Resources)) changed = true;
 
         // Body
         Block newBody = node.Body;
@@ -1222,16 +948,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (catchesChanged) changed = true;
 
         // Finally
-        JLeftPadded<Block>? newFinally = node.Finally;
-        if (node.Finally != null)
-        {
-            var visitedFinally = Visit(node.Finally.Element, p);
-            if (visitedFinally is Block fb && !ReferenceEquals(fb, node.Finally.Element))
-            {
-                newFinally = node.Finally.WithElement(fb);
-                changed = true;
-            }
-        }
+        var newFinally = VisitLeftPadded(node.Finally, p);
+        if (!ReferenceEquals(newFinally, node.Finally)) changed = true;
 
         return changed
             ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithResources(newResources).WithBody(newBody).WithCatches(catchesChanged ? newCatches : node.Catches).WithFinally(newFinally)
@@ -1405,13 +1123,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var newMarkers = VisitMarkers(node.Markers, p);
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
-        JRightPadded<Expression> newTree = node.Tree;
-        var visited = Visit(node.Tree.Element, p);
-        if (visited is Expression e && !ReferenceEquals(e, node.Tree.Element))
-        {
-            newTree = node.Tree.WithElement(e);
-            changed = true;
-        }
+        var newTree = VisitRightPadded(node.Tree, p) ?? node.Tree;
+        if (!ReferenceEquals(newTree, node.Tree)) changed = true;
 
         return changed
             ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
@@ -1434,13 +1147,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var newMarkers = VisitMarkers(node.Markers, p);
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
-        JRightPadded<TypeTree> newTree = node.Tree;
-        var visited = Visit(node.Tree.Element, p);
-        if (visited is TypeTree tt && !ReferenceEquals(tt, node.Tree.Element))
-        {
-            newTree = node.Tree.WithElement(tt);
-            changed = true;
-        }
+        var newTree = VisitRightPadded(node.Tree, p) ?? node.Tree;
+        if (!ReferenceEquals(newTree, node.Tree)) changed = true;
 
         return changed
             ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
@@ -1463,13 +1171,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var newMarkers = VisitMarkers(node.Markers, p);
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
-        JRightPadded<VariableDeclarations> newTree = node.Tree;
-        var visited = Visit(node.Tree.Element, p);
-        if (visited is VariableDeclarations vd && !ReferenceEquals(vd, node.Tree.Element))
-        {
-            newTree = node.Tree.WithElement(vd);
-            changed = true;
-        }
+        var newTree = VisitRightPadded(node.Tree, p) ?? node.Tree;
+        if (!ReferenceEquals(newTree, node.Tree)) changed = true;
 
         return changed
             ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
@@ -1584,13 +1287,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Name (JLeftPadded<Identifier>)
-        JLeftPadded<Identifier> newName = node.Name;
-        var visitedName = Visit(node.Name.Element, p);
-        if (visitedName is Identifier id && !ReferenceEquals(id, node.Name.Element))
-        {
-            newName = node.Name.WithElement(id);
-            changed = true;
-        }
+        var newName = VisitLeftPadded(node.Name, p) ?? node.Name;
+        if (!ReferenceEquals(newName, node.Name)) changed = true;
 
         // Type
         JavaType? newType = VisitType(node.Type, p);
@@ -1621,48 +1319,16 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Containing (JRightPadded<Expression>)
-        JRightPadded<Expression> newContaining = node.Containing;
-        var visitedContaining = Visit(node.Containing.Element, p);
-        if (visitedContaining is Expression ce && !ReferenceEquals(ce, node.Containing.Element))
-        {
-            newContaining = node.Containing.WithElement(ce);
-            changed = true;
-        }
+        var newContaining = VisitRightPadded(node.Containing, p) ?? node.Containing;
+        if (!ReferenceEquals(newContaining, node.Containing)) changed = true;
 
         // TypeParameters (JContainer<Expression>?)
-        JContainer<Expression>? newTypeParams = node.TypeParameters;
-        if (node.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<Expression>>();
-            bool tpChanged = false;
-            foreach (var paddedTp in node.TypeParameters.Elements)
-            {
-                var visited = Visit(paddedTp.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedTp.Element)) tpChanged = true;
-                    tpElements.Add(paddedTp.WithElement(e));
-                }
-                else
-                {
-                    tpElements.Add(paddedTp);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParams = node.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
+        var newTypeParams = VisitContainer(node.TypeParameters, p);
+        if (!ReferenceEquals(newTypeParams, node.TypeParameters)) changed = true;
 
         // Reference (JLeftPadded<Identifier>)
-        JLeftPadded<Identifier> newReference = node.Reference;
-        var visitedRef = Visit(node.Reference.Element, p);
-        if (visitedRef is Identifier id && !ReferenceEquals(id, node.Reference.Element))
-        {
-            newReference = node.Reference.WithElement(id);
-            changed = true;
-        }
+        var newReference = VisitLeftPadded(node.Reference, p) ?? node.Reference;
+        if (!ReferenceEquals(newReference, node.Reference)) changed = true;
 
         // Types
         JavaType? newType = VisitType(node.Type, p);
@@ -1906,13 +1572,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var newMarkers = VisitMarkers(node.Markers, p);
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
-        JRightPadded<Expression> newTree = node.Tree;
-        var visited = Visit(node.Tree.Element, p);
-        if (visited is Expression e && !ReferenceEquals(e, node.Tree.Element))
-        {
-            newTree = node.Tree.WithElement(e);
-            changed = true;
-        }
+        var newTree = VisitRightPadded(node.Tree, p) ?? node.Tree;
+        if (!ReferenceEquals(newTree, node.Tree)) changed = true;
 
         return changed
             ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithTree(newTree)
@@ -2002,16 +1663,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         bool varsChanged = false;
         foreach (var paddedVar in node.Variables)
         {
-            var visited = Visit(paddedVar.Element, p);
-            if (visited is NamedVariable nv)
+            var visited = VisitRightPadded(paddedVar, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(nv, paddedVar.Element)) varsChanged = true;
-                newVars.Add(paddedVar.WithElement(nv));
+                if (!ReferenceEquals(visited, paddedVar)) varsChanged = true;
+                newVars.Add(visited);
             }
-            else
-            {
-                newVars.Add(paddedVar);
-            }
+            else varsChanged = true;
         }
         if (varsChanged) changed = true;
 
@@ -2043,16 +1701,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Initializer (JLeftPadded<Expression>?)
-        JLeftPadded<Expression>? newInitializer = namedVariable.Initializer;
-        if (namedVariable.Initializer != null)
-        {
-            var visited = Visit(namedVariable.Initializer.Element, p);
-            if (visited is Expression expr && !ReferenceEquals(expr, namedVariable.Initializer.Element))
-            {
-                newInitializer = namedVariable.Initializer.WithElement(expr);
-                changed = true;
-            }
-        }
+        var newInitializer = VisitLeftPadded(namedVariable.Initializer, p);
+        if (!ReferenceEquals(newInitializer, namedVariable.Initializer)) changed = true;
 
         // Type
         JavaType? newType = VisitType(namedVariable.Type, p);
@@ -2104,42 +1754,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Select (JRightPadded<Expression>?)
-        JRightPadded<Expression>? newSelect = node.Select;
-        if (node.Select != null)
-        {
-            var visited = Visit(node.Select.Element, p);
-            if (visited is Expression sel && !ReferenceEquals(sel, node.Select.Element))
-            {
-                newSelect = node.Select.WithElement(sel);
-                changed = true;
-            }
-        }
+        var newSelect = VisitRightPadded(node.Select, p);
+        if (!ReferenceEquals(newSelect, node.Select)) changed = true;
 
         // TypeParameters (JContainer<Expression>?)
-        JContainer<Expression>? newTypeParams = node.TypeParameters;
-        if (node.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<Expression>>();
-            bool tpChanged = false;
-            foreach (var paddedTypeArg in node.TypeParameters.Elements)
-            {
-                var visited = Visit(paddedTypeArg.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedTypeArg.Element)) tpChanged = true;
-                    tpElements.Add(paddedTypeArg.WithElement(e));
-                }
-                else
-                {
-                    tpElements.Add(paddedTypeArg);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParams = node.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
+        var newTypeParams = VisitContainer(node.TypeParameters, p);
+        if (!ReferenceEquals(newTypeParams, node.TypeParameters)) changed = true;
 
         // Name
         Identifier newName = node.Name;
@@ -2151,27 +1771,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Arguments (JContainer<Expression>)
-        JContainer<Expression> newArgs = node.Arguments;
-        var argElements = new List<JRightPadded<Expression>>();
-        bool argsChanged = false;
-        foreach (var paddedArg in node.Arguments.Elements)
-        {
-            var visited = Visit(paddedArg.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, paddedArg.Element)) argsChanged = true;
-                argElements.Add(paddedArg.WithElement(e));
-            }
-            else
-            {
-                argElements.Add(paddedArg);
-            }
-        }
-        if (argsChanged)
-        {
-            newArgs = node.Arguments.WithElements(argElements);
-            changed = true;
-        }
+        var newArgs = VisitContainer(node.Arguments, p)!;
+        if (!ReferenceEquals(newArgs, node.Arguments)) changed = true;
 
         // MethodType
         JavaType.Method? newMethodType = (JavaType.Method?)VisitType(node.MethodType, p);
@@ -2206,16 +1807,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newNew, node.New)) changed = true;
 
         // Enclosing (JRightPadded<Expression>?)
-        JRightPadded<Expression>? newEnclosing = node.Enclosing;
-        if (node.Enclosing != null)
-        {
-            var visited = Visit(node.Enclosing.Element, p);
-            if (visited is Expression e && !ReferenceEquals(e, node.Enclosing.Element))
-            {
-                newEnclosing = node.Enclosing.WithElement(e);
-                changed = true;
-            }
-        }
+        var newEnclosing = VisitRightPadded(node.Enclosing, p);
+        if (!ReferenceEquals(newEnclosing, node.Enclosing)) changed = true;
 
         // Clazz (J?)
         J? newClazz = node.Clazz;
@@ -2230,27 +1823,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Arguments (JContainer<Expression>)
-        JContainer<Expression> newArgs = node.Arguments;
-        var argElements = new List<JRightPadded<Expression>>();
-        bool argsChanged = false;
-        foreach (var paddedArg in node.Arguments.Elements)
-        {
-            var visited = Visit(paddedArg.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, paddedArg.Element)) argsChanged = true;
-                argElements.Add(paddedArg.WithElement(e));
-            }
-            else
-            {
-                argElements.Add(paddedArg);
-            }
-        }
-        if (argsChanged)
-        {
-            newArgs = node.Arguments.WithElements(argElements);
-            changed = true;
-        }
+        var newArgs = VisitContainer(node.Arguments, p)!;
+        if (!ReferenceEquals(newArgs, node.Arguments)) changed = true;
 
         // Body (Block?)
         Block? newBody = node.Body;
@@ -2320,30 +1894,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (dimsChanged) changed = true;
 
         // Initializer (JContainer<Expression>?)
-        JContainer<Expression>? newInitializer = node.Initializer;
-        if (node.Initializer != null)
-        {
-            var initElements = new List<JRightPadded<Expression>>();
-            bool initChanged = false;
-            foreach (var paddedElem in node.Initializer.Elements)
-            {
-                var visited = Visit(paddedElem.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedElem.Element)) initChanged = true;
-                    initElements.Add(paddedElem.WithElement(e));
-                }
-                else
-                {
-                    initElements.Add(paddedElem);
-                }
-            }
-            if (initChanged)
-            {
-                newInitializer = node.Initializer.WithElements(initElements);
-                changed = true;
-            }
-        }
+        var newInitializer = VisitContainer(node.Initializer, p);
+        if (!ReferenceEquals(newInitializer, node.Initializer)) changed = true;
 
         // Type
         JavaType? newType = VisitType(node.Type, p);
@@ -2371,13 +1923,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // Expression (JRightPadded<Expression>)
-        JRightPadded<Expression> newExpr = node.Expression;
-        var visitedExpr = Visit(node.Expression.Element, p);
-        if (visitedExpr is Expression e && !ReferenceEquals(e, node.Expression.Element))
-        {
-            newExpr = node.Expression.WithElement(e);
-            changed = true;
-        }
+        var newExpr = VisitRightPadded(node.Expression, p) ?? node.Expression;
+        if (!ReferenceEquals(newExpr, node.Expression)) changed = true;
 
         // Clazz (J)
         J newClazz = node.Clazz;
@@ -2449,13 +1996,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // TypeTreePadded (JRightPadded<TypeTree>)
-        JRightPadded<TypeTree> newTypeTreePadded = node.TypeTreePadded;
-        var visitedTypeTree = Visit(node.TypeTree, p);
-        if (visitedTypeTree is TypeTree tt && !ReferenceEquals(tt, node.TypeTree))
-        {
-            newTypeTreePadded = node.TypeTreePadded.WithElement(tt);
-            changed = true;
-        }
+        var newTypeTreePadded = VisitRightPadded(node.TypeTreePadded, p) ?? node.TypeTreePadded;
+        if (!ReferenceEquals(newTypeTreePadded, node.TypeTreePadded)) changed = true;
 
         // Type
         JavaType? newType = VisitType(node.Type, p);
@@ -2492,30 +2034,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // TypeParameters (JContainer<Expression>?)
-        JContainer<Expression>? newTypeParams = node.TypeParameters;
-        if (node.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<Expression>>();
-            bool tpChanged = false;
-            foreach (var paddedParam in node.TypeParameters.Elements)
-            {
-                var visited = Visit(paddedParam.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedParam.Element)) tpChanged = true;
-                    tpElements.Add(paddedParam.WithElement(e));
-                }
-                else
-                {
-                    tpElements.Add(paddedParam);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParams = node.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
+        var newTypeParams = VisitContainer(node.TypeParameters, p);
+        if (!ReferenceEquals(newTypeParams, node.TypeParameters)) changed = true;
 
         // Type
         JavaType? newType = VisitType(node.Type, p);
@@ -2642,13 +2162,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         var newMarkers = VisitMarkers(dimension.Markers, p);
         if (!ReferenceEquals(newMarkers, dimension.Markers)) changed = true;
 
-        JRightPadded<Expression> newIndex = dimension.Index;
-        var visited = Visit(dimension.Index.Element, p);
-        if (visited is Expression i && !ReferenceEquals(i, dimension.Index.Element))
-        {
-            newIndex = dimension.Index.WithElement(i);
-            changed = true;
-        }
+        var newIndex = VisitRightPadded(dimension.Index, p) ?? dimension.Index;
+        if (!ReferenceEquals(newIndex, dimension.Index)) changed = true;
 
         return changed
             ? dimension.WithPrefix(newPrefix).WithMarkers(newMarkers).WithIndex(newIndex)
@@ -2722,16 +2237,13 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
 
         foreach (var paddedParam in parameters.Elements)
         {
-            var visitedParam = Visit(paddedParam.Element, p);
-            if (visitedParam is J vp)
+            var visited = VisitRightPadded(paddedParam, p);
+            if (visited != null)
             {
-                if (!ReferenceEquals(vp, paddedParam.Element)) changed = true;
-                elements.Add(paddedParam.WithElement(vp));
+                if (!ReferenceEquals(visited, paddedParam)) changed = true;
+                elements.Add(visited);
             }
-            else
-            {
-                elements.Add(paddedParam);
-            }
+            else changed = true;
         }
 
         return changed ? parameters.WithPrefix(newPrefix).WithMarkers(newMarkers).WithElements(elements) : parameters;
@@ -2828,27 +2340,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // CaseLabels (JContainer<J>)
-        JContainer<J> newCaseLabels = node.CaseLabels;
-        var newLabels = new List<JRightPadded<J>>();
-        bool labelsChanged = false;
-        foreach (var labelPadded in node.CaseLabels.Elements)
-        {
-            var visited = Visit(labelPadded.Element, p);
-            if (visited is J v)
-            {
-                if (!ReferenceEquals(v, labelPadded.Element)) labelsChanged = true;
-                newLabels.Add(labelPadded.WithElement(v));
-            }
-            else
-            {
-                newLabels.Add(labelPadded);
-            }
-        }
-        if (labelsChanged)
-        {
-            newCaseLabels = node.CaseLabels.WithElements(newLabels);
-            changed = true;
-        }
+        var newCaseLabels = VisitContainer(node.CaseLabels, p)!;
+        if (!ReferenceEquals(newCaseLabels, node.CaseLabels)) changed = true;
 
         // Guard (Expression?)
         Expression? newGuard = node.Guard;
@@ -2863,39 +2356,12 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Body (JRightPadded<J>?)
-        JRightPadded<J>? newBody = node.Body;
-        if (node.Body != null)
-        {
-            var visitedBody = Visit(node.Body.Element, p);
-            if (visitedBody is J vb && !ReferenceEquals(vb, node.Body.Element))
-            {
-                newBody = node.Body.WithElement(vb);
-                changed = true;
-            }
-        }
+        var newBody = VisitRightPadded(node.Body, p);
+        if (!ReferenceEquals(newBody, node.Body)) changed = true;
 
         // Statements (JContainer<Statement>)
-        JContainer<Statement> newStatements = node.Statements;
-        var stmtElements = new List<JRightPadded<Statement>>();
-        bool statementsChanged = false;
-        foreach (var stmtPadded in node.Statements.Elements)
-        {
-            var visited = Visit(stmtPadded.Element, p);
-            if (visited is Statement s)
-            {
-                if (!ReferenceEquals(s, stmtPadded.Element)) statementsChanged = true;
-                stmtElements.Add(stmtPadded.WithElement(s));
-            }
-            else
-            {
-                stmtElements.Add(stmtPadded);
-            }
-        }
-        if (statementsChanged)
-        {
-            newStatements = node.Statements.WithElements(stmtElements);
-            changed = true;
-        }
+        var newStatements = VisitContainer(node.Statements, p)!;
+        if (!ReferenceEquals(newStatements, node.Statements)) changed = true;
 
         return changed
             ? node.WithPrefix(newPrefix).WithMarkers(newMarkers).WithCaseLabels(newCaseLabels).WithGuard(newGuard).WithBody(newBody).WithStatements(newStatements)
@@ -2928,27 +2394,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Nested (JContainer<J>)
-        JContainer<J> newNested = node.Nested;
-        var nestedElements = new List<JRightPadded<J>>();
-        bool nestedChanged = false;
-        foreach (var nested in node.Nested.Elements)
-        {
-            var visited = Visit(nested.Element, p);
-            if (visited is J v)
-            {
-                if (!ReferenceEquals(v, nested.Element)) nestedChanged = true;
-                nestedElements.Add(nested.WithElement(v));
-            }
-            else
-            {
-                nestedElements.Add(nested);
-            }
-        }
-        if (nestedChanged)
-        {
-            newNested = node.Nested.WithElements(nestedElements);
-            changed = true;
-        }
+        var newNested = VisitContainer(node.Nested, p)!;
+        if (!ReferenceEquals(newNested, node.Nested)) changed = true;
 
         // Type
         JavaType? newType = VisitType(node.Type, p);
@@ -2976,13 +2423,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         if (!ReferenceEquals(newMarkers, node.Markers)) changed = true;
 
         // LabelName (JRightPadded<Identifier>)
-        JRightPadded<Identifier> newLabelName = node.LabelName;
-        var visitedLabel = Visit(node.LabelName.Element, p);
-        if (visitedLabel is Identifier id && !ReferenceEquals(id, node.LabelName.Element))
-        {
-            newLabelName = node.LabelName.WithElement(id);
-            changed = true;
-        }
+        var newLabelName = VisitRightPadded(node.LabelName, p) ?? node.LabelName;
+        if (!ReferenceEquals(newLabelName, node.LabelName)) changed = true;
 
         // Statement
         Statement newStatement = node.Statement;
@@ -3118,30 +2560,8 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
         }
 
         // Bounds (JContainer<TypeTree>?)
-        JContainer<TypeTree>? newBounds = typeParameter.Bounds;
-        if (typeParameter.Bounds != null)
-        {
-            var boundElements = new List<JRightPadded<TypeTree>>();
-            bool boundsChanged = false;
-            foreach (var paddedBound in typeParameter.Bounds.Elements)
-            {
-                var visited = Visit(paddedBound.Element, p);
-                if (visited is TypeTree tt)
-                {
-                    if (!ReferenceEquals(tt, paddedBound.Element)) boundsChanged = true;
-                    boundElements.Add(paddedBound.WithElement(tt));
-                }
-                else
-                {
-                    boundElements.Add(paddedBound);
-                }
-            }
-            if (boundsChanged)
-            {
-                newBounds = typeParameter.Bounds.WithElements(boundElements);
-                changed = true;
-            }
-        }
+        var newBounds = VisitContainer(typeParameter.Bounds, p);
+        if (!ReferenceEquals(newBounds, typeParameter.Bounds)) changed = true;
 
         return changed
             ? typeParameter.WithPrefix(newPrefix).WithMarkers(newMarkers).WithAnnotations(newAnnotations).WithName(newName).WithBounds(newBounds)
