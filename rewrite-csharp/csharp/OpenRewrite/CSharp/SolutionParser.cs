@@ -80,8 +80,9 @@ internal static class DotNetRestore
     /// <summary>
     /// Replacement NuGet feeds for defunct dotnet.myget.org sources.
     /// MyGet was shut down; packages migrated to Azure DevOps Artifacts (dnceng).
+    /// Semicolons are escaped as %3B because MSBuild /p: treats literal ';' as a property separator.
     /// </summary>
-    private static readonly string AdditionalNuGetSources = string.Join(";",
+    private static readonly string AdditionalNuGetSources = string.Join("%3B",
         "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json",
         "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json",
         "https://pkgs.dev.azure.com/dnceng/public/_packaging/myget-legacy/nuget/v3/index.json");
@@ -93,9 +94,6 @@ internal static class DotNetRestore
         // Relax restore for LST parsing: disable NuGet vulnerability audit
         // (NU1902/NU1903 would fail restore), ignore dead NuGet sources,
         // and add replacement feeds for defunct MyGet sources.
-        // Use ArgumentList instead of a single arguments string so that
-        // values containing semicolons (like RestoreAdditionalProjectSources)
-        // are properly quoted on all platforms.
         var psi = new ProcessStartInfo("dotnet")
         {
             WorkingDirectory = Path.GetDirectoryName(path) ?? ".",
