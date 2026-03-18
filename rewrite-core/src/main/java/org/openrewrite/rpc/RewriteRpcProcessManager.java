@@ -25,10 +25,15 @@ import java.util.function.Supplier;
  */
 public class RewriteRpcProcessManager<R extends RewriteRpc> {
     private final ThreadLocal<R> rpc = new ThreadLocal<>();
-    private final ThreadLocal<Supplier<R>> factory;
+
+    /**
+     * Shared (not ThreadLocal) so that ForkJoinPool worker threads see the
+     * factory configured by the main thread via {@link #setFactory}.
+     */
+    private volatile Supplier<R> factory;
 
     public RewriteRpcProcessManager(Supplier<R> defaultFactory) {
-        this.factory = ThreadLocal.withInitial(() -> defaultFactory);
+        this.factory = defaultFactory;
     }
 
     public @Nullable R get() {
@@ -39,14 +44,14 @@ public class RewriteRpcProcessManager<R extends RewriteRpc> {
         R current = rpc.get();
         //noinspection ConstantValue
         if (current == null) {
-            current = factory.get().get();
+            current = factory.get();
             rpc.set(current);
         }
         return current;
     }
 
     public void setFactory(Supplier<R> factory) {
-        this.factory.set(factory);
+        this.factory = factory;
     }
 
     public void reset() {
