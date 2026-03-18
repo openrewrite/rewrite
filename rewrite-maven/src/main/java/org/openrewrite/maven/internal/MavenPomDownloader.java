@@ -273,7 +273,7 @@ public class MavenPomDownloader {
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
-                        Path path = new File(URI.create(baseUri + "maven-metadata-local.xml")).toPath();
+                        Path path = Paths.get(URI.create(baseUri + "maven-metadata-local.xml"));
                         if (Files.exists(path)) {
                             MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
                             if (parsed != null) {
@@ -392,7 +392,7 @@ public class MavenPomDownloader {
     }
 
     private MavenMetadata.@Nullable Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
-        Path dir = new File(URI.create(uri)).toPath();
+        Path dir = Paths.get(URI.create(uri));
         if (Files.exists(dir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
                 List<String> versions = new ArrayList<>();
