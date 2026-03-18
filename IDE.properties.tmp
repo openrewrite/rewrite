@@ -27,15 +27,18 @@ rewrite-java-25
 
 # Other language modules
 
+rewrite-csharp
 rewrite-docker
 rewrite-gradle
 rewrite-groovy
 rewrite-hcl
+rewrite-javascript
 rewrite-json
 rewrite-kotlin
 rewrite-maven
 rewrite-properties
 rewrite-protobuf
+rewrite-python
 rewrite-toml
 rewrite-xml
 rewrite-yaml
