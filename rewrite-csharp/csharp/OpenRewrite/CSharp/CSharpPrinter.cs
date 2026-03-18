@@ -92,6 +92,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 p.Append(';');
                 break;
 
+            // EnumDeclaration: trailing semicolon after closing brace (enum Color { ... };)
+            case EnumDeclaration ed when ed.Markers.FindFirst<Semicolon>() != null:
+                p.Append(';');
+                break;
+
             // PropertyDeclaration ends with ';' when it has expression body or initializer
             case PropertyDeclaration pd when pd.ExpressionBody != null || pd.Initializer != null:
                 p.Append(';');
