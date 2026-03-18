@@ -368,7 +368,8 @@ public class PythonRewriteRpc extends RewriteRpc {
         // Default to looking for a venv python, falling back to system python
         private Path pythonPath = findDefaultPythonPath();
         private @Nullable Path log;
-        private @Nullable Path pipPackagesPath;
+        private @Nullable Path pipPackagesPath = Paths.get(
+                System.getProperty("java.io.tmpdir"), "openrewrite-python-packages");
         private @Nullable Path recipeInstallDir;
 
         private static Path findDefaultPythonPath() {
