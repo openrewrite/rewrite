@@ -273,7 +273,7 @@ public class MavenPomDownloader {
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
-                        Path path = new File(URI.create(baseUri + "maven-metadata-local.xml")).toPath();
+                        Path path = Paths.get(URI.create(baseUri + "maven-metadata-local.xml"));
                         if (Files.exists(path)) {
                             MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
                             if (parsed != null) {
@@ -392,7 +392,7 @@ public class MavenPomDownloader {
     }
 
     private MavenMetadata.@Nullable Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
-        Path dir = new File(URI.create(uri)).toPath();
+        Path dir = Paths.get(URI.create(uri));
         if (Files.exists(dir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
                 List<String> versions = new ArrayList<>();
@@ -909,6 +909,13 @@ public class MavenPomDownloader {
             repository = repository.withUri(containingPom.getValue(repository.getUri()));
         }
         repository = applyAuthenticationToRepository(applyMirrors(repository));
+
+        // Normalize file URIs early, before the knownToExist check, so that all
+        // downstream URI.create() calls receive a properly encoded file:// URI.
+        if (!repository.getUri().contains("${") && repository.getUri().regionMatches(true, 0, "file:", 0, 5)) {
+            repository = repository.withUri(normalizeFileUri(repository.getUri()));
+        }
+
         try {
             if (repository.isKnownToExist()) {
                 return repository;
@@ -1236,5 +1243,40 @@ public class MavenPomDownloader {
             }
         }
         return null;
+    }
+
+    /**
+     * Normalizes a potentially malformed file:// URI string into a properly
+     * percent-encoded URI. Handles raw non-ASCII characters (e.g. umlauts in
+     * usernames), already percent-encoded characters, and Windows backslashes.
+     */
+    public static String normalizeFileUri(String uri) {
+        String path;
+        try {
+            // If the URI is parseable, use getPath() to get the decoded path.
+            // This correctly decodes %C3%BC → ü and passes through raw chars unchanged.
+            path = URI.create(uri).getPath();
+        } catch (IllegalArgumentException e) {
+            // URI is malformed (e.g. Windows backslashes in path) — extract path manually
+            path = uri.substring(5); // skip "file:"
+            while (path.startsWith("//")) {
+                path = path.substring(1);
+            }
+        }
+
+        // Normalize Windows backslashes
+        path = path.replace('\\', '/');
+
+        boolean trailingSlash = path.endsWith("/");
+
+        // Use Path.toUri() to produce a properly encoded file:// URI
+        Path filePath = Paths.get(path);
+        String normalized = filePath.toUri().toString();
+
+        // Preserve trailing slash if the original had one (important for repo base URIs)
+        if (trailingSlash && !normalized.endsWith("/")) {
+            normalized += "/";
+        }
+        return normalized;
     }
 }

@@ -30,6 +30,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
@@ -225,8 +226,11 @@ public class MavenSettings {
         return mavenLocal;
     }
 
-    private static String asUriString(final String pathname) {
-        return pathname.startsWith("file://") ? pathname : Paths.get(pathname).toUri().toString();
+    static String asUriString(final String pathname) {
+        if (pathname.regionMatches(true, 0, "file:", 0, 5)) {
+            return MavenPomDownloader.normalizeFileUri(pathname);
+        }
+        return Paths.get(pathname).toUri().toString();
     }
 
     /**
