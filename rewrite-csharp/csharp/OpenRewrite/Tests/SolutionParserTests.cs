@@ -59,10 +59,9 @@ public class SolutionParserTests : IDisposable
             Path.Combine(_tempDir, "Test.csproj"), _tempDir);
 
         Assert.Single(results);
-        var result = results[0];
-        Assert.Null(result.Error);
+        var cu = Assert.IsType<CompilationUnit>(results[0]);
 
-        var printed = new CSharpPrinter<int>().Print(result.Cu!);
+        var printed = new CSharpPrinter<int>().Print(cu);
         Assert.Equal("namespace Test { public class HelloWorld { } }\n", printed);
     }
 

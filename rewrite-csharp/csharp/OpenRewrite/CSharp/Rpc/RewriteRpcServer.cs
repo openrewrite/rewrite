@@ -220,10 +220,11 @@ public class RewriteRpcServer
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
                 projectIndex, projectList.Count, Path.GetFileNameWithoutExtension(project.FilePath));
 
-            List<SolutionParser.ParseResult> results;
+            List<SourceFile> sourceFiles;
             try
             {
-                results = solutionParser.ParseProject(solution, project.FilePath!, rootDir);
+                sourceFiles = solutionParser.ParseProject(solution, project.FilePath!, rootDir,
+                    requirePrintEqualsInput);
             }
             catch (Exception ex)
             {
@@ -232,31 +233,13 @@ public class RewriteRpcServer
                 throw;
             }
 
-            foreach (var result in results)
+            foreach (var sourceFile in sourceFiles)
             {
-                object sourceFile;
-                string sourceFileType;
+                var id = sourceFile.Id.ToString();
+                var sourceFileType = sourceFile is ParseError
+                    ? "org.openrewrite.tree.ParseError"
+                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
 
-                if (result.Error != null)
-                {
-                    sourceFile = ParseError.Build(result.RelativePath, result.Source, result.Error);
-                    sourceFileType = "org.openrewrite.tree.ParseError";
-                }
-                else if (requirePrintEqualsInput &&
-                         new CSharpPrinter<int>().Print(result.Cu!) != result.Source)
-                {
-                    sourceFile = ParseError.Build(result.RelativePath, result.Source,
-                        new InvalidOperationException(result.RelativePath + " is not print idempotent."));
-                    sourceFileType = "org.openrewrite.tree.ParseError";
-                    Log.Debug("RPC ParseSolution: print idempotency failure for {RelativePath}", result.RelativePath);
-                }
-                else
-                {
-                    sourceFile = result.Cu!;
-                    sourceFileType = "org.openrewrite.csharp.tree.Cs$CompilationUnit";
-                }
-
-                var id = sourceFile is CompilationUnit cu ? cu.Id.ToString() : ((ParseError)sourceFile).Id.ToString();
                 _localObjects[id] = sourceFile;
                 items.Add(new ParseSolutionResponseItem
                 {

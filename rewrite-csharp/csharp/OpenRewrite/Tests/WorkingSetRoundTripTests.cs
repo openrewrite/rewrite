@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using Microsoft.CodeAnalysis;
+using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 
 namespace OpenRewrite.Tests;
@@ -453,10 +454,11 @@ public class WorkingSetRoundTripTests
 
         foreach (var projPath in projectPaths)
         {
-            List<SolutionParser.ParseResult> parseResults;
+            List<SourceFile> sourceFiles;
             try
             {
-                parseResults = parser.ParseProject(solution, projPath, rootDir);
+                sourceFiles = parser.ParseProject(solution, projPath, rootDir,
+                    requirePrintEqualsInput: false);
             }
             catch (Exception ex)
             {
@@ -466,17 +468,14 @@ public class WorkingSetRoundTripTests
                 continue;
             }
 
-            var compilationUnits = parseResults
-                .Where(r => r.Error == null && r.Cu != null)
-                .Select(r => r.Cu!)
-                .ToList();
-
-            foreach (var r in parseResults.Where(r => r.Error != null))
+            foreach (var pe in sourceFiles.OfType<ParseError>())
             {
-                var msg = $"Failed to parse {r.RelativePath}: {r.Error!.Message}";
+                var msg = $"Failed to parse {pe.SourcePath}: {pe.Text[..Math.Min(200, pe.Text.Length)]}";
                 Console.WriteLine($"  PARSE ERROR: {msg}");
                 failures.Add(msg);
             }
+
+            var compilationUnits = sourceFiles.OfType<CompilationUnit>().ToList();
 
             Console.WriteLine($"  Project {Path.GetFileName(projPath)}: {compilationUnits.Count} files");
             totalFiles += compilationUnits.Count;
