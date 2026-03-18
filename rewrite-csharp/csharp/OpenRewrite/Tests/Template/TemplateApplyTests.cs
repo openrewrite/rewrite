@@ -465,7 +465,7 @@ file class RemoveEmptyStatementRecipe : Core.Recipe
     {
         public override J VisitEmpty(Empty empty, ExecutionContext ctx)
         {
-            if (Cursor.Parent?.Value is Block)
+            if (Cursor.GetParentTreeCursor().Value is Block)
                 return null!;
             return empty;
         }
