@@ -82,6 +82,7 @@ public class RewriteRpcServer
     public void Connect(JsonRpc jsonRpc)
     {
         _jsonRpc = jsonRpc;
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(this);
         jsonRpc.StartListening();
     }
@@ -1398,6 +1399,10 @@ public class RewriteRpcServer
         var server = new RewriteRpcServer(marketplace);
         server._jsonRpc = jsonRpc;
         _current = server;
+        // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
+        // Without this, the default NonConcurrentSynchronizationContext serializes
+        // dispatch, blocking incoming GetObject requests while BatchVisit is in progress.
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(server);
         jsonRpc.StartListening();
 

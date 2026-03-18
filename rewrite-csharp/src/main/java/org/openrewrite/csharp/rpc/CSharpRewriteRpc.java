@@ -369,6 +369,9 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     NUGET_PACKAGE_ID + "@" + version,
                     "-y",
                     "--allow-roll-forward",
+                    // Suppress NuGet informational messages (e.g. "Skipping NuGet package
+                    // signature verification") that would corrupt the RPC stdout channel.
+                    "-v", "q",
                     "--",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null

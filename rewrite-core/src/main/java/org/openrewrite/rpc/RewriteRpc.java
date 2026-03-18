@@ -115,8 +115,25 @@ public class RewriteRpc {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
+    /**
+     * Mutable resolver list so it can be updated after construction
+     * (e.g. when the RPC process is started eagerly before all resolvers are built).
+     */
+    private final List<RecipeBundleResolver> resolvers = new ArrayList<>();
+
+    /**
+     * Replace the resolver list. Useful when the RPC process is started before all
+     * resolvers are built (e.g. the NuGet resolver starts the C# RPC during
+     * buildResolvers, but Maven resolvers are added to the list afterward).
+     */
+    public void setResolvers(List<RecipeBundleResolver> resolvers) {
+        this.resolvers.clear();
+        this.resolvers.addAll(resolvers);
+    }
+
     public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
+        this.resolvers.addAll(resolvers);
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
                 this::getObject, this::getCursor));
@@ -129,7 +146,7 @@ public class RewriteRpc {
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return GetMarketplaceResponse.fromMarketplace(marketplace, resolvers);
+                return GetMarketplaceResponse.fromMarketplace(marketplace, RewriteRpc.this.resolvers);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
@@ -162,7 +179,7 @@ public class RewriteRpc {
         jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
             RecipeListing listing = marketplace.findRecipe(id);
             if (listing != null) {
-                return listing.prepare(resolvers, opts);
+                return listing.prepare(RewriteRpc.this.resolvers, opts);
             }
             // Fall back to loading by class name if not found in marketplace
             return new RecipeLoader(null).load(id, opts);
