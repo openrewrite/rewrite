@@ -24,7 +24,9 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
@@ -42,10 +44,14 @@ import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.io.File;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.StreamSupport;
@@ -702,7 +708,8 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             // Also test with raw (unencoded) umlauts in the URI, which is what happens
             // when the repo URL comes from Maven settings XML with non-ASCII path chars
-            String rawUri = "file://" + repoWithUmlaut.toAbsolutePath() + "/";
+            String absPath = repoWithUmlaut.toAbsolutePath().toString().replace('\\', '/');
+            String rawUri = "file://" + (absPath.startsWith("/") ? "" : "/") + absPath + "/";
             MavenRepository rawRepo = MavenRepository.builder()
               .id("local-raw")
               .uri(rawUri)
@@ -711,6 +718,84 @@ class MavenPomDownloaderTest implements RewriteTest {
             MavenMetadata rawMetaData = new MavenPomDownloader(emptyMap(), ctx)
               .downloadMetadata(new GroupArtifact("com.example", "my-lib"), null, List.of(rawRepo));
             assertThat(rawMetaData.getVersioning().getVersions()).containsExactly("1.0.0", "2.0.0");
+        }
+
+        @FunctionalInterface
+        interface UriToPath {
+            Path convert(String uri) throws Exception;
+        }
+
+        static Stream<Arguments> fileUriToPathConversionApproaches() {
+            return Stream.of(
+              // Encoded URI (what Path.toUri() produces): file:///tmp/m%C3%BCller/.m2/repo
+              Arguments.of("Paths.get(URI)", "encoded",
+                (UriToPath) uri -> Paths.get(URI.create(uri)), true),
+              Arguments.of("Paths.get(URI.getPath())", "encoded",
+                (UriToPath) uri -> Paths.get(URI.create(uri).getPath()), true),
+              Arguments.of("new File(URI).toPath()", "encoded",
+                (UriToPath) uri -> new File(URI.create(uri)).toPath(), true),
+
+              // Raw non-ASCII URI (from Maven settings.xml): file:///tmp/müller/.m2/repo
+              Arguments.of("Paths.get(URI)", "raw non-ASCII",
+                (UriToPath) uri -> Paths.get(URI.create(uri)), false),
+              Arguments.of("Paths.get(URI.getPath())", "raw non-ASCII",
+                (UriToPath) uri -> Paths.get(URI.create(uri).getPath()), true),
+              Arguments.of("new File(URI).toPath()", "raw non-ASCII",
+                (UriToPath) uri -> new File(URI.create(uri)).toPath(), true)
+            );
+        }
+
+        @ParameterizedTest(name = "{0} with {1} URI")
+        @MethodSource("fileUriToPathConversionApproaches")
+        void fileUriToPathConversion(String approach, String uriType, UriToPath converter, boolean shouldSucceed, @TempDir Path tempDir) {
+            Path expectedPath = tempDir.resolve("m\u00fcller/.m2/repository");
+            String uri;
+            switch (uriType) {
+                case "encoded":
+                    uri = expectedPath.toUri().toString();
+                    break;
+                case "raw non-ASCII":
+                    String absPath = expectedPath.toAbsolutePath().toString().replace('\\', '/');
+                    uri = "file://" + (absPath.startsWith("/") ? "" : "/") + absPath + "/";
+                    break;
+                default:
+                    throw new IllegalArgumentException(uriType);
+            }
+
+            if (shouldSucceed) {
+                assertDoesNotThrow(() -> {
+                    Path result = converter.convert(uri);
+                    assertThat(result.toString()).startsWith(expectedPath.toString());
+                }, approach + " should handle " + uriType + " URIs");
+            } else {
+                assertThatThrownBy(() -> converter.convert(uri))
+                  .isInstanceOf(IllegalArgumentException.class)
+                  .hasMessageContaining("Bad escape");
+            }
+        }
+
+        /**
+         * On Windows, {@code URI.getPath()} on {@code file:///C:/Users/...} returns {@code /C:/Users/...}.
+         * {@code Paths.get("/C:/Users/...")} fails on Windows because the leading slash before
+         * the drive letter is invalid. {@code new File(URI)} handles this via
+         * {@code WindowsFileSystem.fromURIPath()} which strips the leading slash.
+         * <p>
+         * This test can only verify the intermediate {@code getPath()} output on all platforms.
+         * The actual {@code Paths.get(String)} failure only occurs on Windows.
+         */
+        @Test
+        void windowsDriveLetterUriGetPathProducesLeadingSlash() {
+            URI uri = URI.create("file:///C:/Users/test/repo/");
+
+            // URI.getPath() returns "/C:/Users/test/repo/" — the leading slash before
+            // the drive letter is what causes Paths.get(String) to fail on Windows
+            assertThat(uri.getPath()).isEqualTo("/C:/Users/test/repo/");
+
+            // Paths.get(URI) handles it correctly on all platforms
+            assertDoesNotThrow(() -> Paths.get(uri));
+
+            // new File(URI).toPath() also handles it correctly on all platforms
+            assertDoesNotThrow(() -> new File(uri).toPath());
         }
 
         @Test
