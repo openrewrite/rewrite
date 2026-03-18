@@ -16,16 +16,62 @@
 package org.openrewrite.java.internal;
 
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.format.BlankLinesVisitor;
+import org.openrewrite.java.style.BlankLinesStyle;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.style.Style;
 
 public class FormatFirstClassPrefix<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-        if (classDecl == cu.getClasses().get(0)) {
-            return autoFormat(classDecl, classDecl.getName(), p, getCursor().getParentOrThrow());
+        if (classDecl != cu.getClasses().get(0)) {
+            return classDecl;
+        }
+
+        // Only adjust blank lines in the class prefix. Using autoFormat here would run
+        // the full formatting pipeline including NormalizeTabsOrSpaces, which can convert
+        // tabs to spaces (or vice versa) in annotation parameters and the class prefix.
+        BlankLinesStyle style = Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines);
+        Space prefix = classDecl.getPrefix();
+
+        if (cu.getImports().isEmpty()) {
+            if (cu.getPackageDeclaration() == null) {
+                if (!prefix.getWhitespace().isEmpty()) {
+                    classDecl = classDecl.withPrefix(prefix.withWhitespace(""));
+                }
+            } else {
+                String whitespace = BlankLinesVisitor.minimumLines(prefix.getWhitespace(),
+                        style.getMinimum().getAfterPackage());
+                if (!whitespace.equals(prefix.getWhitespace())) {
+                    classDecl = classDecl.withPrefix(prefix.withWhitespace(whitespace));
+                }
+            }
+        } else {
+            int min = style.getMinimum().getAfterImports();
+            int max = Math.max(style.getKeepMaximum().getInDeclarations(), min);
+            String whitespace = BlankLinesVisitor.minimumLines(prefix.getWhitespace(), min);
+            whitespace = keepMaximumLines(whitespace, max);
+            if (!whitespace.equals(prefix.getWhitespace())) {
+                classDecl = classDecl.withPrefix(prefix.withWhitespace(whitespace));
+            }
         }
         return classDecl;
+    }
+
+    private static String keepMaximumLines(String whitespace, int max) {
+        long newLineCount = whitespace.chars().filter(c -> c == '\n').count();
+        if (newLineCount - 1 > max) {
+            int startWhitespaceAtIndex = 0;
+            for (int i = 0; i < newLineCount - max; i++, startWhitespaceAtIndex++) {
+                startWhitespaceAtIndex = whitespace.indexOf('\n', startWhitespaceAtIndex);
+            }
+            startWhitespaceAtIndex--;
+            return whitespace.substring(startWhitespaceAtIndex);
+        }
+        return whitespace;
     }
 }
