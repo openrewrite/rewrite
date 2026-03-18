@@ -167,10 +167,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
         if (membersChanged) changed = true;
 
+        var newEof = VisitSpace(compilationUnit.Eof, p);
+        if (!ReferenceEquals(newEof, compilationUnit.Eof)) changed = true;
+
         if (changed)
         {
             compilationUnit = compilationUnit.WithPrefix(newPrefix).WithMarkers(newMarkers)
-                .WithMembers(membersChanged ? members : compilationUnit.Members);
+                .WithMembers(membersChanged ? members : compilationUnit.Members)
+                .WithEof(newEof);
         }
 
         return compilationUnit;
@@ -898,12 +902,16 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         var newFormat = VisitLeftPadded(interp.Format, p);
         if (!ReferenceEquals(newFormat, interp.Format)) changed = true;
 
+        var newAfter = VisitSpace(interp.After, p);
+        if (!ReferenceEquals(newAfter, interp.After)) changed = true;
+
         if (changed || !ReferenceEquals(newPrefix, interp.Prefix) || !ReferenceEquals(newMarkers, interp.Markers))
         {
             return interp.WithPrefix(newPrefix).WithMarkers(newMarkers)
                          .WithExpression(expr is Expression newExpr ? newExpr : interp.Expression)
                          .WithAlignment(newAlignment)
-                         .WithFormat(newFormat);
+                         .WithFormat(newFormat)
+                         .WithAfter(newAfter);
         }
 
         return interp;
@@ -1000,10 +1008,14 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         }
         if (membersChanged) changed = true;
 
+        var newEnd = VisitSpace(ns.End, p);
+        if (!ReferenceEquals(newEnd, ns.End)) changed = true;
+
         return changed
             ? ns.WithPrefix(newPrefix).WithMarkers(newMarkers)
                 .WithName(newNamePadded)
                 .WithMembers(membersChanged ? newMembers : ns.Members)
+                .WithEnd(newEnd)
             : ns;
     }
 
