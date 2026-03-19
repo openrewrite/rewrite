@@ -452,6 +452,8 @@ internal static class TemplateEngine
     /// <summary>
     /// Auto-format the template result within the enclosing compilation unit.
     /// Delegates to <see cref="RoslynFormatter.FormatSubtree"/> for the splice→format→extract pipeline.
+    /// The prefix set in the coordinates phase is preserved — the formatter only affects
+    /// internal whitespace (argument spacing, etc.), matching the JS/TS approach.
     /// </summary>
     internal static J AutoFormat(J tree, Cursor cursor)
     {
@@ -463,11 +465,18 @@ internal static class TemplateEngine
         if (cursor.Value is not J original)
             return tree;
 
+        // Save the prefix set by ApplyCoordinates — the formatter may override it
+        var preservedPrefix = tree.Prefix;
+
         // Assign a fresh ID so FindById targets exactly this instance,
         // not a stale node from a prior application of the same template
         tree = J.SetId(tree, Guid.NewGuid());
 
-        return RoslynFormatter.FormatSubtree(cu, original.Id, tree, stopAfter: null);
+        var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, tree, stopAfter: null);
+
+        // Restore the coordinate-set prefix. The formatter handles internal whitespace;
+        // the prefix (indentation/newlines before the node) comes from the original tree.
+        return J.SetPrefix(formatted, preservedPrefix);
     }
 
     private static string BuildCacheKey(string code, IReadOnlyDictionary<string, object> captures,
