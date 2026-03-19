@@ -732,7 +732,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Test
         void normalizeFileUriPreservesAlreadyEncodedUri(@TempDir Path tempDir) {
             Path repo = tempDir.resolve("müller/.m2/repository");
-            String encoded = repo.toUri().toString();
+            String encoded = repo.toUri().toASCIIString();
 
             String normalized = MavenPomDownloader.normalizeFileUri(encoded);
 
