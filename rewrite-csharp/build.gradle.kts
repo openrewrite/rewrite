@@ -88,9 +88,11 @@ val csharpTest by tasks.registering(Exec::class) {
     dependsOn(csharpBuild)
 
     workingDir = csharpDir
+    // Use relative path for JUnit XML to avoid absolute paths in cache key
+    val relativeJunitPath = junitXmlFile.relativeTo(csharpDir).path
     commandLine(
         findDotnet(), "test", "--no-build", "--verbosity", "normal",
-        "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
+        "--logger", "junit;LogFilePath=${relativeJunitPath}"
     )
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
@@ -166,10 +168,22 @@ tasks.withType<Test> {
 // CI builds use timestamped pre-release: 8.73.0-snapshot.20260110143252
 // Local builds use stable suffix that sorts higher: 8.73.0-zlocal
 // Releases use clean version: 8.73.0
+fun gitCommitTimestamp(): String {
+    val process = ProcessBuilder("git", "log", "-1", "--format=%ct")
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+    val timestamp = process.inputStream.bufferedReader().readText().trim()
+    process.waitFor()
+    return Instant.ofEpochSecond(timestamp.toLong())
+        .atZone(ZoneOffset.UTC)
+        .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+}
+
 val nugetVersion: String = if (System.getenv("CI") != null) {
     project.version.toString().replace(
         "-SNAPSHOT",
-        "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+        "-snapshot.${gitCommitTimestamp()}"
     )
 } else {
     project.version.toString().replace("-SNAPSHOT", "-zlocal")
