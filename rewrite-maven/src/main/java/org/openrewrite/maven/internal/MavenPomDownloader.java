@@ -1251,7 +1251,7 @@ public class MavenPomDownloader {
      * percent-encoded URI. Handles raw non-ASCII characters (e.g. umlauts in
      * usernames), already percent-encoded characters, and Windows backslashes.
      */
-    public static String normalizeFileUri(String uri) {
+    static String normalizeFileUri(String uri) {
         String path;
         try {
             // If the URI is parseable, use getPath() to get the decoded path.
