@@ -34,7 +34,6 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.*;
 
-import static java.nio.file.Files.isDirectory;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
@@ -105,27 +104,17 @@ public class ClasspathScanningLoader implements ResourceLoader {
         this.recipeLoader = new RecipeLoader(classLoader);
 
         this.performScan = () -> {
-            ClassGraph classGraph;
-            ClassGraph yamlGraph;
-
             String jarName = jar.toFile().getName();
-            classGraph = new ClassGraph()
+            ClassGraph classGraph = new ClassGraph()
                     .overrideClasspath(jar.toString())
                     .acceptJars(jarName)
                     .overrideClassLoaders(classLoader);
 
-            if (isDirectory(jar)) {
-                yamlGraph = new ClassGraph()
-                        .ignoreParentClassLoaders()
-                        .overrideClassLoaders(classLoader)
-                        .acceptPaths("META-INF/rewrite");
-            } else {
-                yamlGraph = new ClassGraph()
-                        .overrideClasspath(jar.toString())
-                        .acceptJars(jarName)
-                        .overrideClassLoaders(classLoader)
-                        .acceptPaths("META-INF/rewrite");
-            }
+            ClassGraph yamlGraph = new ClassGraph()
+                    .overrideClasspath(jar.toString())
+                    .acceptJars(jarName)
+                    .overrideClassLoaders(classLoader)
+                    .acceptPaths("META-INF/rewrite");
 
             scanClasses(classGraph, classLoader);
             scanYaml(yamlGraph, properties, dependencyResourceLoaders, classLoader);
