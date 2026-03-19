@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp.Rpc;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -27,10 +28,21 @@ namespace OpenRewrite.Java.Search;
 public static class Preconditions
 {
     /// <summary>
+    /// Wraps a visitor with a precondition check. The inner visitor only runs
+    /// on files where the precondition matches.
+    /// </summary>
+    public static JavaVisitor<ExecutionContext> Check(
+        ITreeVisitor<ExecutionContext> precondition,
+        JavaVisitor<ExecutionContext> visitor)
+    {
+        return new Check(precondition, visitor);
+    }
+
+    /// <summary>
     /// Creates a UsesType precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasType. Otherwise falls back to local implementation.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
+    public static ITreeVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
     {
         var rpc = RewriteRpcServer.Current;
         if (rpc != null)
@@ -39,7 +51,7 @@ public static class Preconditions
                 "org.openrewrite.java.search.HasType",
                 new Dictionary<string, object?>
                 {
-                    ["fullyQualifiedType"] = fullyQualifiedTypeName,
+                    ["fullyQualifiedTypeName"] = fullyQualifiedTypeName,
                     ["checkAssignability"] = false
                 }
             );
@@ -53,7 +65,7 @@ public static class Preconditions
     /// Creates a UsesMethod precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasMethod.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesMethod(string methodPattern)
+    public static ITreeVisitor<ExecutionContext> UsesMethod(string methodPattern)
     {
         var rpc = RewriteRpcServer.Current;
         if (rpc != null)
