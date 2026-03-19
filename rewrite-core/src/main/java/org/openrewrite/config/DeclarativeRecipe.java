@@ -66,13 +66,13 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
 
     @Setter
-    private List<Recipe> recipeList = new ArrayList<>();
+    private volatile List<Recipe> recipeList = Collections.emptyList();
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
     @Getter
     @Setter
-    private List<Recipe> preconditions = new ArrayList<>();
+    private volatile List<Recipe> preconditions = Collections.emptyList();
 
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
@@ -94,8 +94,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
         Set<String> initializingRecipes = new HashSet<>();
-        initialize(uninitializedRecipes, recipeList, recipeMap::get, initializingRecipes);
-        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes);
+        recipeList = initialize(uninitializedRecipes, recipeMap::get, initializingRecipes);
+        preconditions = initialize(uninitializedPreconditions, recipeMap::get, initializingRecipes);
     }
 
     @Deprecated
@@ -106,8 +106,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
         Set<String> initializingRecipes = new HashSet<>();
-        initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes);
-        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes);
+        recipeList = initialize(uninitializedRecipes, availableRecipes, initializingRecipes);
+        preconditions = initialize(uninitializedPreconditions, availableRecipes, initializingRecipes);
     }
 
     @Deprecated
@@ -116,8 +116,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         this.initialize(availableRecipes);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
-        initialized.clear();
+    private List<Recipe> initialize(List<Recipe> uninitialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+        List<Recipe> result = new ArrayList<>();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
@@ -127,7 +127,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     if (subRecipe instanceof DeclarativeRecipe) {
                         initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes);
                     }
-                    initialized.add(subRecipe);
+                    result.add(subRecipe);
                 } else {
                     initValidation = initValidation.and(
                             invalid(name + ".recipeList" +
@@ -140,9 +140,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 if (recipe instanceof DeclarativeRecipe) {
                     initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipe.getName(), availableRecipes, initializingRecipes);
                 }
-                initialized.add(recipe);
+                result.add(recipe);
             }
         }
+        return Collections.unmodifiableList(result);
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
@@ -155,8 +156,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
         } else {
             initializingRecipes.add(recipeName);
-            declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes);
-            declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes);
+            declarativeRecipe.recipeList = initialize(declarativeRecipe.uninitializedRecipes, availableRecipes, initializingRecipes);
+            declarativeRecipe.preconditions = initialize(declarativeRecipe.uninitializedPreconditions, availableRecipes, initializingRecipes);
             initializingRecipes.remove(recipeName);
         }
     }
