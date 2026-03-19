@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using OpenRewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
-namespace OpenRewrite.Java.Search;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// A visitor wrapper that runs a precondition check before the actual visitor.

@@ -16,9 +16,10 @@
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
-using OpenRewrite.Java.Search;
 using OpenRewrite.Test;
+using static OpenRewrite.Core.Preconditions;
 using static OpenRewrite.Java.J;
+using static OpenRewrite.Java.Search.Preconditions;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Recipe;
@@ -29,14 +30,13 @@ public class PreconditionsCheckTest : RewriteTest
     /// Directly test that LocalUsesType finds the type and Check delegates to visitor.
     /// </summary>
     [Fact]
-    public void CheckDelegatesToVisitorWhenPreconditionMatches()
+    public async Task CheckDelegatesToVisitorWhenPreconditionMatches()
     {
         var parser = new CSharpParser();
         var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
             "using System; class T { void M() { Console.WriteLine(\"hi\"); } }", path: "source.cs");
-        var refs = Assemblies.Net90
-            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, System.Threading.CancellationToken.None)
-            .GetAwaiter().GetResult();
+        var refs = await Assemblies.Net90
+            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, System.Threading.CancellationToken.None);
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("Test")
             .WithOptions(new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary))
             .AddReferences(refs)
@@ -47,12 +47,12 @@ public class PreconditionsCheckTest : RewriteTest
             semanticModel: semanticModel);
 
         // Step 1: Verify LocalUsesType finds System.Console
-        var precondition = Preconditions.UsesType("System.Console");
+        var precondition = UsesType("System.Console");
         var precondResult = precondition.Visit(source, new ExecutionContext());
         Assert.NotSame(source, precondResult); // Should be different (marked with SearchResult)
 
         // Step 2: Verify Check delegates to inner visitor
-        var check = Preconditions.Check(precondition, new NoOpCSharpVisitor());
+        var check = Check(precondition, new NoOpCSharpVisitor());
         var checkResult = check.Visit(source, new ExecutionContext());
         // If precondition matched, inner visitor ran (even if no-op)
     }
@@ -103,14 +103,13 @@ public class PreconditionsCheckTest : RewriteTest
     /// have JavaType attached when reference assemblies are provided.
     /// </summary>
     [Fact]
-    public void TypeAttributionProducesJavaTypes()
+    public async Task TypeAttributionProducesJavaTypes()
     {
         var parser = new CSharpParser();
         var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
             "using System; class T { void M() { Console.WriteLine(\"hi\"); } }", path: "source.cs");
-        var refs = Assemblies.Net90
-            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, System.Threading.CancellationToken.None)
-            .GetAwaiter().GetResult();
+        var refs = await Assemblies.Net90
+            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, System.Threading.CancellationToken.None);
         var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("Test")
             .WithOptions(new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary))
             .AddReferences(refs)
@@ -212,8 +211,8 @@ class RenameWriteLineRecipe : Core.Recipe
     public override string Description => "Renames Console.WriteLine to Console.Write.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor() =>
-        Preconditions.Check(
-            Preconditions.UsesType("System.Console"),
+        Check(
+            UsesType("System.Console"),
             new Visitor());
 
     private class Visitor : CSharpVisitor<ExecutionContext>

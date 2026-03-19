@@ -25,7 +25,6 @@ using Newtonsoft.Json.Serialization;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
-using OpenRewrite.Java.Search;
 using Serilog;
 using StreamJsonRpc;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;

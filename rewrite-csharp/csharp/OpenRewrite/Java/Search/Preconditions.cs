@@ -21,23 +21,12 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.Java.Search;
 
 /// <summary>
-/// Convenience functions for common precondition visitors.
+/// Search-based precondition visitors.
 /// When connected to Java via RPC, delegates to Java's implementations.
 /// Otherwise falls back to local implementations.
 /// </summary>
 public static class Preconditions
 {
-    /// <summary>
-    /// Wraps a visitor with a precondition check. The inner visitor only runs
-    /// on files where the precondition matches.
-    /// </summary>
-    public static ITreeVisitor<ExecutionContext> Check(
-        ITreeVisitor<ExecutionContext> precondition,
-        ITreeVisitor<ExecutionContext> visitor)
-    {
-        return new Check(precondition, visitor);
-    }
-
     /// <summary>
     /// Creates a UsesType precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasType. Otherwise falls back to local implementation.
