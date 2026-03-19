@@ -37,19 +37,20 @@ internal static class TemplateEngine
     internal static J Parse(string code, IReadOnlyDictionary<string, object> captures,
         IReadOnlyList<string> usings, IReadOnlyList<string> context)
     {
-        var cacheKey = BuildCacheKey(code, usings, context);
+        var cacheKey = BuildCacheKey(code, captures, usings, context);
         if (GlobalCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        var result = ParseInternal(code, usings, context);
+        var result = ParseInternal(code, captures, usings, context);
         GlobalCache.TryAdd(cacheKey, result);
         return result;
     }
 
-    private static J ParseInternal(string code, IReadOnlyList<string> usings,
-        IReadOnlyList<string> context)
+    private static J ParseInternal(string code, IReadOnlyDictionary<string, object> captures,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context)
     {
-        var scaffold = BuildScaffold(code, usings, context);
+        var preamble = BuildTypePreamble(captures);
+        var scaffold = BuildScaffold(code, preamble, usings, context);
         var parser = new CSharpParser();
         var cu = parser.Parse(scaffold, "__template__.cs");
 
@@ -57,11 +58,32 @@ internal static class TemplateEngine
     }
 
     /// <summary>
-    /// Build a parseable C# source from the template code.
-    /// Wraps the template code in: usings + class __T__ { void __M__() { code; } }
+    /// Build typed field declarations for captures that have a Type.
+    /// These are emitted as class fields on the scaffold class so they are in scope
+    /// inside the method body. This avoids mixing preamble statements with the template
+    /// code, so <see cref="ExtractTemplateNode"/> doesn't need to skip anything.
     /// </summary>
-    private static string BuildScaffold(string code, IReadOnlyList<string> usings,
-        IReadOnlyList<string> context)
+    private static List<string> BuildTypePreamble(IReadOnlyDictionary<string, object> captures)
+    {
+        var preamble = new List<string>();
+        foreach (var kvp in captures)
+        {
+            var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+            if (!string.IsNullOrEmpty(captureType))
+            {
+                preamble.Add($"{captureType} {Placeholder.ToPlaceholder(kvp.Key)};");
+            }
+        }
+        return preamble;
+    }
+
+    /// <summary>
+    /// Build a parseable C# source from the template code.
+    /// Typed capture declarations are emitted as class fields (before the method),
+    /// so the method body contains only the template code.
+    /// </summary>
+    private static string BuildScaffold(string code, IReadOnlyList<string> preamble,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context)
     {
         var sb = new System.Text.StringBuilder();
 
@@ -79,6 +101,14 @@ internal static class TemplateEngine
         }
 
         sb.AppendLine("class __T__ {");
+
+        // Typed capture declarations as class fields — in scope inside the method
+        foreach (var decl in preamble)
+        {
+            sb.Append("    ");
+            sb.AppendLine(decl);
+        }
+
         sb.AppendLine("    void __M__() {");
         sb.Append("        ");
         sb.Append(code);
@@ -236,12 +266,24 @@ internal static class TemplateEngine
         return finder.Result;
     }
 
-    private static string BuildCacheKey(string code, IReadOnlyList<string> usings,
-        IReadOnlyList<string> context)
+    private static string BuildCacheKey(string code, IReadOnlyDictionary<string, object> captures,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context)
     {
         var sb = new System.Text.StringBuilder();
         sb.Append("code:");
         sb.Append(code);
+
+        // Include capture types in cache key so typed and untyped patterns
+        // with the same code don't collide
+        foreach (var kvp in captures.OrderBy(c => c.Key))
+        {
+            var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+            if (!string.IsNullOrEmpty(captureType))
+            {
+                sb.Append($"|type:{kvp.Key}={captureType}");
+            }
+        }
+
         if (usings.Count > 0)
         {
             sb.Append("|usings:");
