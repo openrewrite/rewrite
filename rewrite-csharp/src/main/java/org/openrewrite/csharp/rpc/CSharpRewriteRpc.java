@@ -363,12 +363,21 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         private Stream<@Nullable String> buildToolExecCommand(String version) {
+            // When the tool package exists in the NuGet global cache (e.g. from pTML),
+            // add it as a source so dotnet tool exec can resolve it without remote feeds
+            Path globalCachePath = Paths.get(System.getProperty("user.home"),
+                    ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
+            String addSource = Files.isDirectory(globalCachePath) ? globalCachePath.toString() : null;
+
             return Stream.of(
                     dotnetPath.toString(),
                     "tool", "exec",
                     NUGET_PACKAGE_ID + "@" + version,
                     "-y",
                     "--allow-roll-forward",
+                    addSource != null ? "--add-source" : null,
+                    addSource,
+                    "--ignore-failed-sources",
                     // Suppress NuGet informational messages (e.g. "Skipping NuGet package
                     // signature verification") that would corrupt the RPC stdout channel.
                     "-v", "q",
