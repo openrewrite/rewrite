@@ -1208,29 +1208,39 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     expr = (Expression)Visit(arg.Expression)!;
                 }
 
-                Space afterSpace = Space.Empty;
+                Space afterSpace;
                 if (i < node.ArgumentList.Arguments.Count - 1)
                 {
                     var sep = node.ArgumentList.Arguments.GetSeparator(i);
                     afterSpace = ExtractSpaceBefore(sep);
                     _cursor = sep.Span.End;
                 }
+                else
+                {
+                    // Last argument: capture space before closing paren
+                    afterSpace = ExtractSpaceBefore(node.ArgumentList.CloseParenToken);
+                }
                 args.Add(new JRightPadded<Expression>(expr, afterSpace, Markers.Empty));
             }
 
-            var closeParenSpace = ExtractSpaceBefore(node.ArgumentList.CloseParenToken);
-            _cursor = node.ArgumentList.CloseParenToken.Span.End;
-
             // When the argument list is empty but has content between parens (e.g. comments),
-            // preserve it as a J.Empty element so it round-trips correctly
-            if (args.Count == 0 && !closeParenSpace.IsEmpty)
+            // preserve it as a J.Empty element so it round-trips correctly.
+            // This branch is mutually exclusive with the last-argument branch above:
+            // ExtractSpaceBefore is idempotent w.r.t. cursor position, and _cursor is
+            // advanced past CloseParenToken once after both branches.
+            if (args.Count == 0)
             {
-                args.Add(new JRightPadded<Expression>(
-                    new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty),
-                    closeParenSpace,
-                    Markers.Empty
-                ));
+                var closeParenSpace = ExtractSpaceBefore(node.ArgumentList.CloseParenToken);
+                if (!closeParenSpace.IsEmpty)
+                {
+                    args.Add(new JRightPadded<Expression>(
+                        new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty),
+                        closeParenSpace,
+                        Markers.Empty
+                    ));
+                }
             }
+            _cursor = node.ArgumentList.CloseParenToken.Span.End;
 
             arguments = new JContainer<Expression>(openParenSpace, args, Markers.Empty);
         }
