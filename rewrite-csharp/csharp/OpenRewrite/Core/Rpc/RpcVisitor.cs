@@ -28,6 +28,8 @@ public class RpcVisitor : JavaVisitor<ExecutionContext>
     private readonly RewriteRpcServer _rpc;
     private readonly string _visitorName;
 
+    public string VisitorName => _visitorName;
+
     public RpcVisitor(RewriteRpcServer rpc, string visitorName)
     {
         _rpc = rpc;

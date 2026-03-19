@@ -27,6 +27,17 @@ namespace OpenRewrite.Java.Search;
 public static class Preconditions
 {
     /// <summary>
+    /// Wraps a visitor with a precondition check. The inner visitor only runs
+    /// on files where the precondition matches.
+    /// </summary>
+    public static JavaVisitor<ExecutionContext> Check(
+        JavaVisitor<ExecutionContext> precondition,
+        JavaVisitor<ExecutionContext> visitor)
+    {
+        return new Check(precondition, visitor);
+    }
+
+    /// <summary>
     /// Creates a UsesType precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasType. Otherwise falls back to local implementation.
     /// </summary>
@@ -39,7 +50,7 @@ public static class Preconditions
                 "org.openrewrite.java.search.HasType",
                 new Dictionary<string, object?>
                 {
-                    ["fullyQualifiedType"] = fullyQualifiedTypeName,
+                    ["fullyQualifiedTypeName"] = fullyQualifiedTypeName,
                     ["checkAssignability"] = false
                 }
             );

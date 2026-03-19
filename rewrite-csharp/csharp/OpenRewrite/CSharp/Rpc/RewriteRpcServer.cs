@@ -25,6 +25,7 @@ using Newtonsoft.Json.Serialization;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.Java;
+using OpenRewrite.Java.Search;
 using Serilog;
 using StreamJsonRpc;
 using static OpenRewrite.Core.Rpc.RpcObjectData.ObjectState;
@@ -1109,13 +1110,66 @@ public class RewriteRpcServer
         var id = Guid.NewGuid().ToString();
         _preparedRecipes[id] = recipe;
 
-        return Task.FromResult(new PrepareRecipeResponse
+        var response = new PrepareRecipeResponse
         {
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
             ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
-        });
+        };
+
+        if (recipe is IDelegatesTo del)
+        {
+            response.DelegatesTo = new DelegatesTo
+            {
+                RecipeName = del.JavaRecipeName,
+                Options = del.Options
+            };
+        }
+        else
+        {
+            OptimizePreconditions(recipe, response);
+        }
+
+        return Task.FromResult(response);
+    }
+
+    /// <summary>
+    /// Inspects a recipe's visitor to extract preconditions that Java can evaluate
+    /// before sending files via RPC. Also adds a FindTreesOfType precondition based
+    /// on the visitor type so Java only sends compatible files.
+    /// </summary>
+    private void OptimizePreconditions(Recipe recipe, PrepareRecipeResponse response)
+    {
+        try
+        {
+            var visitor = recipe.GetVisitor();
+
+            var innerVisitor = visitor;
+            if (visitor is Check check && check.Precondition is RpcVisitor rpcPrecondition)
+            {
+                response.EditPreconditions.Add(new Precondition
+                {
+                    VisitorName = rpcPrecondition.VisitorName,
+                    VisitorOptions = new()
+                });
+                innerVisitor = check.Visitor;
+            }
+
+            // Add tree type precondition so Java only sends files this visitor can handle
+            if (innerVisitor is CSharpVisitor<ExecutionContext>)
+            {
+                response.EditPreconditions.Add(new Precondition
+                {
+                    VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
+                    VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
+                });
+            }
+        }
+        catch
+        {
+            // Some recipes may fail during GetVisitor() — skip precondition detection
+        }
     }
 
     private static Recipe InstantiateWithOptions(Type recipeType, Dictionary<string, object?> options)
@@ -1772,6 +1826,13 @@ public class PrepareRecipeResponse
     public List<Precondition> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
     public List<Precondition> ScanPreconditions { get; set; } = [];
+    public DelegatesTo? DelegatesTo { get; set; }
+}
+
+public class DelegatesTo
+{
+    public string RecipeName { get; set; } = "";
+    public Dictionary<string, object?> Options { get; set; } = new();
 }
 
 public class Precondition
