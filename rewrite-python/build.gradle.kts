@@ -150,7 +150,7 @@ testing {
                             excludeTags("python3")
                         }
 
-
+                        shouldRunAfter(tasks.named("test"))
                     }
                 }
             }
