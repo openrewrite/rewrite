@@ -31,9 +31,9 @@ public static class Preconditions
     /// Wraps a visitor with a precondition check. The inner visitor only runs
     /// on files where the precondition matches.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> Check(
+    public static ITreeVisitor<ExecutionContext> Check(
         ITreeVisitor<ExecutionContext> precondition,
-        JavaVisitor<ExecutionContext> visitor)
+        ITreeVisitor<ExecutionContext> visitor)
     {
         return new Check(precondition, visitor);
     }
