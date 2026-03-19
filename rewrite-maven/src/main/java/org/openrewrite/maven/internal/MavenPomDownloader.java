@@ -39,6 +39,7 @@ import org.openrewrite.semver.Semver;
 import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -1269,14 +1270,21 @@ public class MavenPomDownloader {
 
         boolean trailingSlash = path.endsWith("/");
 
-        // Use Path.toUri() to produce a properly encoded file:// URI
-        Path filePath = Paths.get(path);
-        String normalized = filePath.toUri().toString();
-
-        // Preserve trailing slash if the original had one (important for repo base URIs)
-        if (trailingSlash && !normalized.endsWith("/")) {
-            normalized += "/";
+        // Ensure path is absolute for file URI
+        if (!path.startsWith("/")) {
+            path = "/" + path;
         }
-        return normalized;
+
+        try {
+            // Use multi-arg URI constructor to properly percent-encode the path.
+            // This avoids Paths.get(String) which fails on Windows with /C:/... paths.
+            String normalized = new URI("file", "", path, null).toASCIIString();
+            if (trailingSlash && !normalized.endsWith("/")) {
+                normalized += "/";
+            }
+            return normalized;
+        } catch (URISyntaxException e) {
+            return uri;
+        }
     }
 }
