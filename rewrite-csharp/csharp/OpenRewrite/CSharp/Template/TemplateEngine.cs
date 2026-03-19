@@ -34,25 +34,39 @@ internal static class TemplateEngine
     /// The code is wrapped in a scaffold to make it parseable, then the inner
     /// expression or statement is extracted.
     /// </summary>
+    /// <param name="dependencies">NuGet package dependencies (package name → version) for type attribution.
+    /// When provided, a dependency workspace will be created so Roslyn can resolve external types.</param>
     internal static J Parse(string code, IReadOnlyDictionary<string, object> captures,
-        IReadOnlyList<string> usings, IReadOnlyList<string> context)
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies)
     {
-        var cacheKey = BuildCacheKey(code, captures, usings, context);
+        var cacheKey = BuildCacheKey(code, captures, usings, context, dependencies);
         if (GlobalCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        var result = ParseInternal(code, captures, usings, context);
+        var result = ParseInternal(code, captures, usings, context, dependencies);
         GlobalCache.TryAdd(cacheKey, result);
         return result;
     }
 
     private static J ParseInternal(string code, IReadOnlyDictionary<string, object> captures,
-        IReadOnlyList<string> usings, IReadOnlyList<string> context)
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies)
     {
         var preamble = BuildTypePreamble(captures);
         var scaffold = BuildScaffold(code, preamble, usings, context);
         var parser = new CSharpParser();
-        var cu = parser.Parse(scaffold, "__template__.cs");
+
+        CompilationUnit cu;
+        if (dependencies.Count > 0)
+        {
+            var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
+            cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
+        }
+        else
+        {
+            cu = parser.Parse(scaffold, "__template__.cs");
+        }
 
         return ExtractTemplateNode(cu, code);
     }
@@ -62,16 +76,43 @@ internal static class TemplateEngine
     /// These are emitted as class fields on the scaffold class so they are in scope
     /// inside the method body. This avoids mixing preamble statements with the template
     /// code, so <see cref="ExtractTemplateNode"/> doesn't need to skip anything.
+    /// Dispatches on <see cref="CaptureKind"/> to generate the right scaffold form.
     /// </summary>
     private static List<string> BuildTypePreamble(IReadOnlyDictionary<string, object> captures)
     {
         var preamble = new List<string>();
         foreach (var kvp in captures)
         {
-            var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
-            if (!string.IsNullOrEmpty(captureType))
+            var kind = kvp.Value.GetType().GetProperty("Kind")?.GetValue(kvp.Value);
+            var placeholder = Placeholder.ToPlaceholder(kvp.Key);
+
+            if (kind is CaptureKind captureKind)
             {
-                preamble.Add($"{captureType} {Placeholder.ToPlaceholder(kvp.Key)};");
+                switch (captureKind)
+                {
+                    case CaptureKind.Expression:
+                        var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+                        if (!string.IsNullOrEmpty(captureType))
+                        {
+                            preamble.Add($"{captureType} {placeholder};");
+                        }
+                        break;
+                    case CaptureKind.Type:
+                        // TODO: emit scaffold that places placeholder in a type position
+                        break;
+                    case CaptureKind.Name:
+                        // No preamble needed — pure identifier substitution
+                        break;
+                }
+            }
+            else
+            {
+                // Fallback for captures without Kind (shouldn't happen, but defensive)
+                var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+                if (!string.IsNullOrEmpty(captureType))
+                {
+                    preamble.Add($"{captureType} {placeholder};");
+                }
             }
         }
         return preamble;
@@ -243,7 +284,8 @@ internal static class TemplateEngine
     }
 
     private static string BuildCacheKey(string code, IReadOnlyDictionary<string, object> captures,
-        IReadOnlyList<string> usings, IReadOnlyList<string> context)
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies)
     {
         var sb = new System.Text.StringBuilder();
         sb.Append("code:");
@@ -269,6 +311,12 @@ internal static class TemplateEngine
         {
             sb.Append("|context:");
             sb.Append(string.Join(",", context));
+        }
+        if (dependencies.Count > 0)
+        {
+            sb.Append("|deps:");
+            sb.Append(string.Join(",", dependencies.OrderBy(d => d.Key)
+                .Select(d => $"{d.Key}={d.Value}")));
         }
         return sb.ToString();
     }
