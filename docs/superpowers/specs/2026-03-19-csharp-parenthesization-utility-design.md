@@ -74,14 +74,32 @@ static bool IsAssociative(Expression expr)
 #### `GetPrecedence` Logic
 
 Pattern-matches on expression type:
-- `Binary` → maps `Binary.OperatorType` to levels 2-10
-- `CsBinary` → maps `As` to 7, `NullCoalescing` to 0, `And`/`Or` (pattern combinators) to 2/1
-- `Unary` / `CsUnary` → 13
+- `Binary` → maps `Binary.OperatorType` to levels 2-10 (see table above)
+- `CsBinary` → maps `As` to 7, `NullCoalescing` to 0. Pattern combinators `And`/`Or` are handled separately (see Pattern Combinator Precedence below)
+- `Unary` → 13 for all `Unary.OperatorType` variants
+- `CsUnary` → 13 for all `CsUnary.OperatorKind` variants: `SuppressNullableWarning` (null-forgiving `!`), `PointerType`, `AddressOf`, `Spread`, `FromEnd` (`^`), `Not` (pattern `not`)
 - `TypeCast` → 13
+- `IsPattern` (`Cs.IsPattern`) → 7 (relational level, same as `is` keyword)
+- `RangeExpression` (`Cs.RangeExpression`) → 12
+- `SwitchExpression` (`Cs.SwitchExpression`) → 11
+- `WithExpression` (`Cs.WithExpression`) → 11
 - `Ternary` → -1
-- `Assignment` / `AssignmentOperation` → -2
+- `Assignment` → -2
+- `AssignmentOperation` → -2 (covers all compound assignments including `??=`, which appears as both `NullCoalescing` and `Coalesce` variants in the enum — both map to -2)
+- `Lambda` (`J.Lambda`) → -2
 - `Parentheses<Expression>` → int.MaxValue (already parenthesized, never needs more)
 - Everything else (identifiers, literals, method invocations, etc.) → int.MaxValue (primary expressions, never need parens)
+
+#### Pattern Combinator Precedence
+
+C# 9+ pattern combinators (`and`, `or`, `not`) operate in a separate precedence domain from expression operators. They appear inside `is` expressions (e.g., `x is > 0 and < 10`). The C# spec defines their relative precedence as: `not` (highest) > `and` > `or` (lowest).
+
+Since pattern combinators never compete with expression-level operators (they only appear within pattern contexts), they are handled as a sub-domain:
+- `CsBinary.And` (pattern `and`) → precedence within patterns, not directly comparable to expression levels
+- `CsBinary.Or` (pattern `or`) → lower than `and` within patterns
+- `CsUnary.Not` (pattern `not`) → highest within patterns
+
+In practice, `NeedsParentheses` treats pattern combinators by comparing within the pattern sub-domain: `or` inside `and` needs parens, `and` inside `or` does not. This avoids conflating pattern precedence with expression-level precedence.
 
 #### `NeedsParentheses` Logic
 
@@ -89,8 +107,16 @@ Pattern-matches on expression type:
 2. If `child` precedence < `parent` precedence → `true` (child binds too loosely)
 3. Equal precedence:
    - Same operator and both associative → `false`
+   - Right-associative operators (`??`): `isRightOperand` → `false` (natural grouping is right-to-left)
    - Same mathematical group (add/sub or mul/div/mod) and `isRightOperand` with non-associative operator → `true`
    - Different operators at same level, not in same group → `true` (clarity)
+
+#### `IsAssociative` Logic
+
+Returns `true` for operators where `(a op b) op c == a op (b op c)`:
+- `Binary`: `Addition`, `Multiplication`, `BitAnd`, `BitOr`, `BitXor`, `And`, `Or`
+- `CsBinary`: `NullCoalescing` (right-associative — treated specially in `NeedsParentheses`)
+- All other operators → `false`
 
 #### `Parenthesize` Helper
 
@@ -100,7 +126,7 @@ static Parentheses<Expression> Parenthesize(Expression expr)
     if (expr is Parentheses<Expression> p) return p;
     return new Parentheses<Expression>(
         Guid.NewGuid(), expr.Prefix, Markers.Empty,
-        new JRightPadded<Expression>(J.SetPrefix(expr, Space.Empty), Space.Empty, Markers.Empty));
+        new JRightPadded<Expression>(expr.WithPrefix(Space.Empty), Space.Empty, Markers.Empty));
 }
 ```
 
@@ -124,10 +150,14 @@ Each follows the pattern: optionally recurse, get parent from cursor, delegate t
 - **`VisitBinary`** — binary-vs-binary precedence, binary inside unary/ternary/is
 - **`VisitCsBinary`** — `as`, `??`, pattern `and`/`or` in same contexts
 - **`VisitUnary`** — inside another unary with different operator (except `Not`+`Not` which is `!!` — valid C# null-forgiving)
-- **`VisitCsUnary`** — `not` pattern, null-forgiving `!`, `^` from-end
+- **`VisitCsUnary`** — `not` pattern, null-forgiving `!`, `^` from-end, `PointerType`, `AddressOf`, `Spread`
 - **`VisitTernary`** — inside binary or unary
 - **`VisitTypeCast`** — inside binary, unary, or `is`/`as`
 - **`VisitAssignment` / `VisitAssignmentOperation`** — inside binary, unary, or ternary
+- **`VisitIsPattern`** — `is` expression inside higher-precedence binary operators
+- **`VisitRangeExpression`** — `..` inside higher-precedence contexts
+- **`VisitSwitchExpression`** — `switch` expression (may need unconditional parens, like Java)
+- **`VisitWithExpression`** — `with` expression in operator contexts
 
 No string concatenation special-casing needed (C# uses interpolation/`string.Format`).
 
@@ -138,7 +168,7 @@ public static Expression MaybeParenthesize(Expression newTree, Cursor cursor)
 ```
 
 Same algorithm as Java:
-1. Fast exit if `newTree` is not a potentially-problematic type
+1. Fast exit if `newTree` is not a potentially-problematic type. The check must include both shared types (`Binary`, `Unary`, `Ternary`, `Assignment`, `TypeCast`) and C#-specific types (`CsBinary`, `CsUnary`, `IsPattern`, `RangeExpression`, `SwitchExpression`, `WithExpression`)
 2. Temporarily give `newTree` the original node's ID
 3. Run non-recursive visitor with parent cursor
 4. If result is `Parentheses`, reconstruct with fresh ID around original `newTree`
@@ -161,8 +191,8 @@ If the node matches scope and `IsUnwrappable` returns true:
 
 #### `IsUnwrappable(Cursor)` Static Method
 
-- **Cannot unwrap** when parent is structural: `If`, `Switch`, `While`, `DoWhile` (condition), `ForEach`, `TypeCast`, `Lock`, `Using`
-- **Cannot unwrap inside `Unary`/`CsUnary`** when inner is: `Binary`, `CsBinary`, `Assignment`, `Ternary`, `AssignmentOperation`
+- **Cannot unwrap** when parent is structural: `If`, `Switch`, `While`, `DoWhile` (condition), `ForEach`, `ForLoop`, `TypeCast`, `Lock`, `Using`, `FixedStatement`, `CheckedStatement`
+- **Cannot unwrap inside `Unary`/`CsUnary`** when inner is: `Binary`, `CsBinary`, `Assignment`, `Ternary`, `AssignmentOperation`, `IsPattern`
 - **General case**: delegates to `CSharpPrecedences.NeedsParentheses(inner, parent, isRightOperand)` — if parens are needed, can't unwrap
 
 ### 4. Template Integration
@@ -191,12 +221,17 @@ Unit tests for the precedence table using direct AST construction:
 
 #### `CSharpParenthesizeVisitorTests.cs`
 
-Round-trip tests using the "strip all parens, re-add" pattern:
+Round-trip tests using the "strip all parens, re-add" pattern (a test utility visitor strips all `Parentheses<Expression>` nodes by unconditionally unwrapping, then `CSharpParenthesizeVisitor` re-adds only the necessary ones):
 - Arithmetic: `a + b * c` stays as-is, `(a + b) * c` gets re-parenthesized
 - Logical: `a || b && c` stays, `(a || b) && c` gets parens
 - Mixed: `!(a && b)`, `(a + b) as object`, `a ?? b ? c : d`
 - Unary nesting: `!!x` no parens, `-(-x)` gets parens
 - Assignment in ternary/binary contexts
+- `is` pattern: `(x is int) == true` gets parens, `x is > 0 and < 10` no extra parens
+- Range: `a..b + c` vs `(a..b) + c`
+- Switch/with expressions in operator contexts
+- Null-coalescing right-associativity: `a ?? b ?? c` no parens
+- Lambda in binary/ternary contexts
 - `MaybeParenthesize` static method tests
 
 #### `CSharpUnwrapParenthesesTests.cs`
@@ -228,4 +263,5 @@ Round-trip tests using the "strip all parens, re-add" pattern:
 - No Java-isms: no string concatenation special-casing, no `instanceof` (C# uses `is`), separate equality/relational levels
 - `??` is right-associative — `a ?? b ?? c` is `a ?? (b ?? c)`, no parens needed
 - Pattern combinators `and`/`or`/`not` have defined precedence in C# 9+ and must be handled
-- Null-forgiving `!` (postfix) is primary-level, distinct from logical `!` (prefix unary)
+- Null-forgiving `!` (postfix, `CsUnary.SuppressNullableWarning`) is primary-level, distinct from logical `!` (prefix, `Unary.Not`)
+- `await` is not modeled as `CsUnary` in the AST — it does not need explicit handling in the precedence table
