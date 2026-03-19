@@ -108,23 +108,18 @@ public class ClasspathScanningLoader implements ResourceLoader {
             ClassGraph classGraph;
             ClassGraph yamlGraph;
 
+            String jarName = jar.toFile().getName();
+            classGraph = new ClassGraph()
+                    .overrideClasspath(jar.toString())
+                    .acceptJars(jarName)
+                    .overrideClassLoaders(classLoader);
+
             if (isDirectory(jar)) {
-                String jarName = jar.toFile().getName();
-                classGraph = new ClassGraph()
-                        .acceptJars(jarName)
-                        .ignoreParentClassLoaders()
-                        .overrideClassLoaders(classLoader);
                 yamlGraph = new ClassGraph()
-                        .acceptJars(jarName)
                         .ignoreParentClassLoaders()
                         .overrideClassLoaders(classLoader)
                         .acceptPaths("META-INF/rewrite");
             } else {
-                String jarName = jar.toFile().getName();
-                classGraph = new ClassGraph()
-                        .overrideClasspath(jar.toString())
-                        .acceptJars(jarName)
-                        .overrideClassLoaders(classLoader);
                 yamlGraph = new ClassGraph()
                         .overrideClasspath(jar.toString())
                         .acceptJars(jarName)
