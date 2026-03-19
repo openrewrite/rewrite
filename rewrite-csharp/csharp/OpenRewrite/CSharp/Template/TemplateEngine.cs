@@ -55,6 +55,8 @@ internal static class TemplateEngine
     {
         var preamble = BuildTypePreamble(captures);
         var scaffold = BuildScaffold(code, preamble, usings, context);
+        // TODO: when dependencies are provided, use DependencyWorkspace to create a
+        // project with NuGet references so Roslyn can resolve external types
         var parser = new CSharpParser();
 
         CompilationUnit cu;
