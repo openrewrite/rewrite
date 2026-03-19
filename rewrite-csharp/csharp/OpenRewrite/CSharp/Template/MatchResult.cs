@@ -31,6 +31,28 @@ public sealed class MatchResult
     }
 
     /// <summary>
+    /// Create a <see cref="MatchResult"/> from manually-assembled capture values.
+    /// This allows recipe authors to use <see cref="CSharpTemplate.Apply"/> with
+    /// substitution values that come from imperative extraction rather than
+    /// <see cref="CSharpPattern.Match"/>.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var values = MatchResult.Of(("reason", skipLiteral));
+    /// var result = template.Apply(cursor, values: values);
+    /// </code>
+    /// </example>
+    public static MatchResult Of(params (string name, J value)[] captures)
+    {
+        var dict = new Dictionary<string, object>(captures.Length);
+        foreach (var (name, value) in captures)
+        {
+            dict[name] = value;
+        }
+        return new MatchResult(dict);
+    }
+
+    /// <summary>
     /// Get a captured value by name.
     /// </summary>
     public T? Get<T>(string name) where T : class, J

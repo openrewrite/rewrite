@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
@@ -221,6 +222,18 @@ public class ScaffoldStrategyTests
         var pat = CSharpPattern.ClassMember("public void Foo() { }");
         var tree = pat.GetTree();
         Assert.IsType<MethodDeclaration>(tree);
+    }
+
+    // === MatchResult.Of ===
+
+    [Fact]
+    public void MatchResultOfCreatesManualBindings()
+    {
+        var values = MatchResult.Of(("x", new Literal(Guid.NewGuid(), Space.Empty, Markers.Empty, 42, "42", null, null)));
+        Assert.True(values.Has("x"));
+        var lit = values.Get<Literal>("x");
+        Assert.NotNull(lit);
+        Assert.Equal(42, lit!.Value);
     }
 
     // === Cache isolation ===
