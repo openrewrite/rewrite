@@ -13,8 +13,11 @@
 # limitations under the License.
 
 import ast
+import sys
 from pathlib import Path
 from typing import List, Optional, Union
+
+import pytest
 
 
 from rewrite.java import J
@@ -284,6 +287,70 @@ def test_try_except():
 def test_for_loop():
     # given
     source = "for i in range(10):\n    print(i)"
+    cu = _parse_python(source)
+    capture = TreeStructurePrintOutputCapture()
+    printer = TreeCapturingPythonPrinter()
+
+    # when
+    printer.print(cu, capture)
+
+    # then
+    assert capture.out == source
+    violations = _find_whitespace_violations(capture.root_nodes)
+    assert violations == []
+
+
+def test_if_condition():
+    # given
+    source = "if x > 0:\n    pass"
+    cu = _parse_python(source)
+    capture = TreeStructurePrintOutputCapture()
+    printer = TreeCapturingPythonPrinter()
+
+    # when
+    printer.print(cu, capture)
+
+    # then
+    assert capture.out == source
+    violations = _find_whitespace_violations(capture.root_nodes)
+    assert violations == []
+
+
+def test_while_loop():
+    # given
+    source = "while running:\n    pass"
+    cu = _parse_python(source)
+    capture = TreeStructurePrintOutputCapture()
+    printer = TreeCapturingPythonPrinter()
+
+    # when
+    printer.print(cu, capture)
+
+    # then
+    assert capture.out == source
+    violations = _find_whitespace_violations(capture.root_nodes)
+    assert violations == []
+
+
+def test_assert_statement():
+    # given
+    source = "assert x > 0"
+    cu = _parse_python(source)
+    capture = TreeStructurePrintOutputCapture()
+    printer = TreeCapturingPythonPrinter()
+
+    # when
+    printer.print(cu, capture)
+
+    # then
+    assert capture.out == source
+    violations = _find_whitespace_violations(capture.root_nodes)
+    assert violations == []
+
+
+def test_binary_expression():
+    # given
+    source = "x = a + b"
     cu = _parse_python(source)
     capture = TreeStructurePrintOutputCapture()
     printer = TreeCapturingPythonPrinter()

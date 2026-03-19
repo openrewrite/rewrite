@@ -591,15 +591,19 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_While(self, node):
+        while_prefix = self.__source_before('while')
+        condition = self.__convert(node.test)
+        ctrl_prefix = condition.prefix
+        condition = condition.replace(prefix=Space.EMPTY)
         while_ = j.WhileLoop(
             random_id(),
-            self.__source_before('while'),
+            while_prefix,
             Markers.EMPTY,
             j.ControlParentheses(
                 random_id(),
-                Space.EMPTY,
+                ctrl_prefix,
                 Markers.EMPTY,
-                self.__pad_right(self.__convert(node.test), Space.EMPTY)
+                self.__pad_right(condition, Space.EMPTY)
             ),
             self.__pad_right(self.__convert_block(node.body), Space.EMPTY)
         )
@@ -621,8 +625,11 @@ class ParserVisitor(ast.NodeVisitor):
             prefix = self.__source_before('elif')
         else:
             prefix = self.__source_before('if')
-        condition = j.ControlParentheses(random_id(), Space.EMPTY, Markers.EMPTY,
-                                         self.__pad_right(self.__convert(node.test), Space.EMPTY))
+        cond_expr = self.__convert(node.test)
+        ctrl_prefix = cond_expr.prefix
+        cond_expr = cond_expr.replace(prefix=Space.EMPTY)
+        condition = j.ControlParentheses(random_id(), ctrl_prefix, Markers.EMPTY,
+                                         self.__pad_right(cond_expr, Space.EMPTY))
         then = self.__pad_right(self.__convert_block(node.body), Space.EMPTY)
         elze = None
         if len(node.orelse) > 0:
@@ -1120,15 +1127,19 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_Match(self, node):
+        match_prefix = self.__source_before('match')
+        subject = self.__convert(node.subject)
+        ctrl_prefix = subject.prefix
+        subject = subject.replace(prefix=Space.EMPTY)
         return j.Switch(
             random_id(),
-            self.__source_before('match'),
+            match_prefix,
             Markers.EMPTY,
             j.ControlParentheses(
                 random_id(),
-                Space.EMPTY,
+                ctrl_prefix,
                 Markers.EMPTY,
-                self.__pad_right(self.__convert(node.subject), Space.EMPTY)
+                self.__pad_right(subject, Space.EMPTY)
             ),
             self.__convert_block(node.cases)
         )
