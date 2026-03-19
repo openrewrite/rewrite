@@ -147,12 +147,17 @@ tasks.withType<Test> {
 // ============================================
 
 // Generate a NuGet-compatible version
-// Snapshots use pre-release suffix with UTC timestamp: 8.73.0-snapshot.20260110143252
+// CI builds use timestamped pre-release: 8.73.0-snapshot.20260110143252
+// Local builds use stable suffix that sorts higher: 8.73.0-zlocal
 // Releases use clean version: 8.73.0
-val nugetVersion: String = project.version.toString().replace(
-    "-SNAPSHOT",
-    "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-)
+val nugetVersion: String = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "-SNAPSHOT",
+        "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+    )
+} else {
+    project.version.toString().replace("-SNAPSHOT", "-zlocal")
+}
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"
@@ -281,10 +286,19 @@ val csharpPublishLocal by tasks.registering {
                 }
             }
 
-        // Create a temp project and add packages to populate the NuGet cache
+        // Create a temp project with PackageDownload entries and restore to populate the NuGet cache
         val tempDir = temporaryDir
         tempDir.deleteRecursively()
         tempDir.mkdirs()
+
+        val packageDownloads = csharpDir.resolve("dist").listFiles()
+            ?.filter { it.name.endsWith(".nupkg") }
+            ?.joinToString("\n") { nupkg ->
+                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
+                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
+                logger.lifecycle("Installing $packageId@$nugetVersion into NuGet cache from $distDir")
+                """    <PackageDownload Include="$packageId" Version="[$nugetVersion]" />"""
+            } ?: ""
 
         val tempCsproj = tempDir.resolve("Temp.csproj")
         tempCsproj.writeText("""
@@ -292,27 +306,20 @@ val csharpPublishLocal by tasks.registering {
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
               </PropertyGroup>
+              <ItemGroup>
+            $packageDownloads
+              </ItemGroup>
             </Project>
         """.trimIndent())
 
-        csharpDir.resolve("dist").listFiles()
-            ?.filter { it.name.endsWith(".nupkg") }
-            ?.forEach { nupkg ->
-                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
-                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
-
-                logger.lifecycle("Installing $packageId@$nugetVersion into NuGet cache from $distDir")
-                // Tool packages (DotnetTool type) fail restore with NU1212 but still get
-                // installed into the NuGet cache, which is all we need for dotnet tool exec.
-                val addOutput = run(
-                    dotnet, "add", "package", packageId,
-                    "--version", nugetVersion,
-                    "--source", distDir,
-                    dir = tempDir,
-                    ignoreExitCode = true
-                )
-                logger.lifecycle(addOutput)
-            }
+        val restoreOutput = run(
+            dotnet, "restore",
+            "--source", distDir,
+            "--force",
+            dir = tempDir,
+            ignoreExitCode = true
+        )
+        logger.lifecycle(restoreOutput)
 
     }
 }
