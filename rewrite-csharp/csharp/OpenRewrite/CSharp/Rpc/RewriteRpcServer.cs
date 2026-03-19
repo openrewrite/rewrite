@@ -1522,7 +1522,10 @@ public class RewriteRpcServer
 
         var ctx = new ExecutionContext();
         if (pId != null)
+        {
             _executionContexts[pId] = ctx;
+            _localObjects[pId] = ctx;
+        }
         return ctx;
     }
 

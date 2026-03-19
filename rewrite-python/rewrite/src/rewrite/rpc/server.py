@@ -1055,6 +1055,7 @@ def handle_visit(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -1122,6 +1123,7 @@ def handle_batch_visit(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1299,6 +1301,7 @@ def handle_generate(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe
