@@ -1522,7 +1522,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeWildcardImportWithDirectImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.util.*;
@@ -2239,7 +2238,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void wildcardImportsWithConflictingNames() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.sql.*;
@@ -2348,6 +2346,69 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 Class<?> cls = TimeUnit.class;
             }
             """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6544")
+    @Test
+    void starImportWithExplicitImportsFromSamePackage() {
+        rewriteRun(
+          java(
+            """
+              package com.example.common.utils;
+
+              public class ListUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.common.utils;
+
+              public class ClassUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.common.utils;
+
+              public class StringUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.service;
+
+              import com.example.common.utils.*;
+              import com.example.common.utils.ClassUtil;
+              import com.example.common.utils.StringUtil;
+
+              public class MyService {
+                  public void init() {
+                      StringUtil.execute();
+                  }
+              }
+              """,
+            """
+              package com.example.service;
+
+              import com.example.common.utils.StringUtil;
+
+              public class MyService {
+                  public void init() {
+                      StringUtil.execute();
+                  }
+              }
+              """
           )
         );
     }
