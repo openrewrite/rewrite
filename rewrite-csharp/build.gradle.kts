@@ -68,6 +68,13 @@ val csharpBuild by tasks.registering(Exec::class) {
     workingDir = csharpDir
     commandLine(findDotnet(), "build")
 
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
+
     doFirst {
         logger.lifecycle("Building C# projects in ${csharpDir}")
     }
@@ -85,7 +92,13 @@ val csharpTest by tasks.registering(Exec::class) {
         findDotnet(), "test", "--no-build", "--verbosity", "normal",
         "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
     )
+
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files(junitXmlFile)
+    outputs.cacheIf { true }
 
     doFirst {
         logger.lifecycle("Running C# tests in ${csharpDir}")
@@ -131,6 +144,9 @@ tasks.withType<Test> {
         }
         if (!project.hasProperty("includeWorkingSetFull")) {
             excludeTags("workingSet-full")
+        }
+        if (!project.hasProperty("includeSlow")) {
+            excludeTags("slow")
         }
     }
     // Add timeout to identify hanging tests
