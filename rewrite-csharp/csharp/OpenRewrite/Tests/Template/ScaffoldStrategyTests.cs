@@ -83,6 +83,22 @@ public class ScaffoldStrategyTests
         Assert.IsType<If>(tree);
     }
 
+    [Fact]
+    public void StatementDoesNotUnwrapExpressionStatement()
+    {
+        var tmpl = CSharpTemplate.Statement("Console.WriteLine(\"hello\")");
+        var tree = tmpl.GetTree();
+        Assert.IsType<ExpressionStatement>(tree);
+    }
+
+    [Fact]
+    public void CreateAutoUnwrapsExpressionStatement()
+    {
+        var tmpl = CSharpTemplate.Create("Console.WriteLine(\"hello\")");
+        var tree = tmpl.GetTree();
+        Assert.IsType<MethodInvocation>(tree);
+    }
+
     // === Attribute ===
 
     [Fact]
