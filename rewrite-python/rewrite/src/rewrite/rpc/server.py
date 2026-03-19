@@ -1001,6 +1001,13 @@ def handle_prepare_recipe(params: dict) -> dict:
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
 
+    # If the recipe declares delegation to a Java recipe, include it in the response
+    if hasattr(recipe, 'java_recipe_name'):
+        response['delegatesTo'] = {
+            'recipeName': recipe.java_recipe_name,
+            'options': getattr(recipe, 'delegates_to_options', {}),
+        }
+
     logger.debug(f"PrepareRecipe response: {response}")
     return response
 

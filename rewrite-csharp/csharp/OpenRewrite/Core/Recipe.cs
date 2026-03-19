@@ -94,6 +94,25 @@ public abstract class Recipe
 }
 
 /// <summary>
+/// Marker interface for recipes that delegate entirely to a Java recipe.
+/// When a recipe implements this interface, the Java host loads the recipe
+/// locally instead of wrapping it in an RpcRecipe, eliminating per-file
+/// RPC round trips.
+/// </summary>
+public interface IDelegatesTo
+{
+    /// <summary>
+    /// The fully-qualified Java recipe name, e.g. "org.openrewrite.java.ChangeType".
+    /// </summary>
+    string JavaRecipeName { get; }
+
+    /// <summary>
+    /// Options to configure the Java recipe, keyed by option name.
+    /// </summary>
+    Dictionary<string, object?> Options { get; }
+}
+
+/// <summary>
 /// Non-generic interface for scanning recipes, allowing the scheduler to
 /// manage the scan/generate/edit lifecycle without knowing the accumulator type.
 /// </summary>
