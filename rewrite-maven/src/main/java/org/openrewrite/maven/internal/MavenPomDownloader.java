@@ -1247,46 +1247,29 @@ public class MavenPomDownloader {
     }
 
     /**
-     * Normalizes a potentially malformed file:// URI string into a properly
-     * percent-encoded URI. Handles raw non-ASCII characters (e.g. umlauts in
-     * usernames), already percent-encoded characters, and Windows backslashes.
+     * Normalizes a file:// URI so that non-ASCII characters are percent-encoded
+     * and Windows backslashes are converted to forward slashes. Already-encoded
+     * URIs pass through unchanged (idempotent).
      */
     static String normalizeFileUri(String uri) {
         String path;
         try {
-            // If the URI is parseable, use getPath() to get the decoded path.
-            // This correctly decodes %C3%BC → ü and passes through raw chars unchanged.
+            // getPath() decodes %C3%BC → ü, ensuring re-encoding is idempotent
             path = URI.create(uri).getPath();
         } catch (IllegalArgumentException e) {
-            // URI is malformed (e.g. Windows backslashes in path) — extract path manually
-            path = uri.substring(5); // skip "file:"
-            int i = 0;
-            while (i + 1 < path.length() && path.charAt(i) == '/' && path.charAt(i + 1) == '/') {
-                i++;
-            }
-            if (i > 0) {
-                path = path.substring(i);
-            }
+            // Malformed (e.g. Windows backslashes) — extract path manually
+            path = uri.substring(5).replaceFirst("^/+", "/");
         }
 
-        // Normalize Windows backslashes
         path = path.replace('\\', '/');
-
         boolean trailingSlash = path.endsWith("/");
-
-        // Ensure path is absolute for file URI
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
 
         try {
-            // Use multi-arg URI constructor to properly percent-encode the path.
-            // This avoids Paths.get(String) which fails on Windows with /C:/... paths.
             String normalized = new URI("file", "", path, null).toASCIIString();
-            if (trailingSlash && !normalized.endsWith("/")) {
-                normalized += "/";
-            }
-            return normalized;
+            return trailingSlash && !normalized.endsWith("/") ? normalized + "/" : normalized;
         } catch (URISyntaxException e) {
             return uri;
         }
