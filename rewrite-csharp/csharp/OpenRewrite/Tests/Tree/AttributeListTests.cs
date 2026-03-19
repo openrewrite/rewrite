@@ -272,4 +272,30 @@ public class AttributeListTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void AttributeArgumentWithTrailingComment()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [assembly: Foo("bar" /*comment*/)]
+                class Test { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeMultipleArgumentsWithTrailingComment()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [assembly: Foo("bar", "baz" /*comment*/)]
+                class Test { }
+                """
+            )
+        );
+    }
 }

@@ -1301,6 +1301,178 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
+    @Test
+    void updateWrapperVersionViaTasksPropertyAccessInGroovyDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", "bin", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          buildGradle(
+            """
+              tasks.wrapper {
+                  gradleVersion = '7.4'
+                  distributionType = Wrapper.DistributionType.ALL
+              }
+              """,
+            """
+              tasks.wrapper {
+                  gradleVersion = '7.4.2'
+                  distributionType = Wrapper.DistributionType.BIN
+              }
+              """
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateWrapperVersionViaTasksPropertyAccessInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", "bin", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          buildGradleKts(
+            """
+              tasks.wrapper {
+                  gradleVersion = "7.4"
+                  distributionType = Wrapper.DistributionType.ALL
+              }
+              """,
+            """
+              tasks.wrapper {
+                  gradleVersion = "7.4.2"
+                  distributionType = Wrapper.DistributionType.BIN
+              }
+              """
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateWrapperVersionViaTasksWithTypeInGroovyDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", "bin", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          buildGradle(
+            """
+              tasks.withType(Wrapper) {
+                  gradleVersion = '7.4'
+                  distributionType = Wrapper.DistributionType.ALL
+              }
+              """,
+            """
+              tasks.withType(Wrapper) {
+                  gradleVersion = '7.4.2'
+                  distributionType = Wrapper.DistributionType.BIN
+              }
+              """
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateWrapperVersionViaTasksWithTypeInKotlinDSL() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", "bin", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4"))),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          buildGradleKts(
+            """
+              tasks.withType<Wrapper> {
+                  gradleVersion = "7.4"
+                  distributionType = Wrapper.DistributionType.ALL
+              }
+              """,
+            """
+              tasks.withType<Wrapper> {
+                  gradleVersion = "7.4.2"
+                  distributionType = Wrapper.DistributionType.BIN
+              }
+              """
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
         return run.getChangeset().getAllResults().stream()
           .map(Result::getAfter)

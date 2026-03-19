@@ -41,7 +41,15 @@ internal class NoopVisitor<P> : ITreeVisitor<P>
 
 public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
 {
-    Tree? ITreeVisitor<P>.Visit(Tree? tree, P p) => Visit(tree, p);
+    Tree? ITreeVisitor<P>.Visit(Tree? tree, P p)
+    {
+        // If the tree is a SourceFile that doesn't match this visitor's type parameter T,
+        // pass it through unchanged. Returning null from Visit() for incompatible types
+        // would be interpreted as "delete this file" by the recipe scheduler.
+        if (tree is SourceFile && tree is not T)
+            return tree;
+        return Visit(tree, p);
+    }
     public Cursor Cursor { get; set; } = new();
     private int _visitCount;
     private bool _stopAfterPreVisit;

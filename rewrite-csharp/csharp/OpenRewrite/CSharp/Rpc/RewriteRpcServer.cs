@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -49,31 +50,31 @@ public class RewriteRpcServer
     public static void SetCurrent(RewriteRpcServer? server) => _current = server;
 
     private readonly RecipeMarketplace _marketplace;
-    private readonly Dictionary<string, Recipe> _preparedRecipes = new();
-    private readonly Dictionary<string, object?> _recipeAccumulators = new();
-    private readonly Dictionary<string, ExecutionContext> _executionContexts = new();
+    private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
+    private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
+    private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
 
     /// <summary>
     /// Objects that have been parsed locally and are available for remote access.
     /// </summary>
-    private readonly Dictionary<string, object?> _localObjects = new();
+    private readonly ConcurrentDictionary<string, object?> _localObjects = new();
 
     /// <summary>
     /// Our understanding of the remote's state of objects.
     /// </summary>
-    private readonly Dictionary<string, object?> _remoteObjects = new();
+    private readonly ConcurrentDictionary<string, object?> _remoteObjects = new();
 
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
-    private readonly Dictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+    private readonly ConcurrentDictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Refs received from the remote process (Java) for deduplication.
     /// </summary>
-    private readonly Dictionary<int, object> _remoteRefs = new();
+    private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
 
     /// <summary>
     /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
@@ -82,6 +83,7 @@ public class RewriteRpcServer
     public void Connect(JsonRpc jsonRpc)
     {
         _jsonRpc = jsonRpc;
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(this);
         jsonRpc.StartListening();
     }
@@ -1034,7 +1036,10 @@ public class RewriteRpcServer
         }
     }
 
-    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
+    private static readonly string[] Languages = [
+        "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+        "org.openrewrite.xml.tree.Xml$Document",
+    ];
 
     [JsonRpcMethod("GetLanguages")]
     public Task<string[]> GetLanguages()
@@ -1107,13 +1112,61 @@ public class RewriteRpcServer
         var id = Guid.NewGuid().ToString();
         _preparedRecipes[id] = recipe;
 
-        return Task.FromResult(new PrepareRecipeResponse
+        var response = new PrepareRecipeResponse
         {
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
             ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
-        });
+        };
+
+        if (recipe is IDelegatesTo del)
+        {
+            response.DelegatesTo = new DelegatesTo
+            {
+                RecipeName = del.JavaRecipeName,
+                Options = del.Options
+            };
+        }
+        else
+        {
+            OptimizePreconditions(recipe, response);
+        }
+
+        return Task.FromResult(response);
+    }
+
+    /// <summary>
+    /// Inspects a recipe's visitor to extract preconditions that Java can evaluate
+    /// before sending files via RPC. Also adds a FindTreesOfType precondition based
+    /// on the visitor type so Java only sends compatible files.
+    /// </summary>
+    private void OptimizePreconditions(Recipe recipe, PrepareRecipeResponse response)
+    {
+        try
+        {
+            var visitor = recipe.GetVisitor();
+
+            var innerVisitor = visitor;
+            if (visitor is Check check)
+            {
+                innerVisitor = check.Visitor;
+            }
+
+            // Add tree type precondition so Java only sends files this visitor can handle
+            if (innerVisitor is CSharpVisitor<ExecutionContext>)
+            {
+                response.EditPreconditions.Add(new Precondition
+                {
+                    VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
+                    VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
+                });
+            }
+        }
+        catch
+        {
+            // Some recipes may fail during GetVisitor() — skip precondition detection
+        }
     }
 
     private static Recipe InstantiateWithOptions(Type recipeType, Dictionary<string, object?> options)
@@ -1198,7 +1251,7 @@ public class RewriteRpcServer
         var modified = !ReferenceEquals(tree, result);
         if (result == null)
         {
-            _localObjects.Remove(request.TreeId);
+            _localObjects.TryRemove(request.TreeId, out _);
         }
         else if (modified)
         {
@@ -1313,7 +1366,7 @@ public class RewriteRpcServer
 
             if (deleted)
             {
-                _localObjects.Remove(request.TreeId);
+                _localObjects.TryRemove(request.TreeId, out _);
                 break;
             }
 
@@ -1398,6 +1451,10 @@ public class RewriteRpcServer
         var server = new RewriteRpcServer(marketplace);
         server._jsonRpc = jsonRpc;
         _current = server;
+        // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
+        // Without this, the default NonConcurrentSynchronizationContext serializes
+        // dispatch, blocking incoming GetObject requests while BatchVisit is in progress.
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(server);
         jsonRpc.StartListening();
 
@@ -1766,6 +1823,13 @@ public class PrepareRecipeResponse
     public List<Precondition> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
     public List<Precondition> ScanPreconditions { get; set; } = [];
+    public DelegatesTo? DelegatesTo { get; set; }
+}
+
+public class DelegatesTo
+{
+    public string RecipeName { get; set; } = "";
+    public Dictionary<string, object?> Options { get; set; } = new();
 }
 
 public class Precondition
