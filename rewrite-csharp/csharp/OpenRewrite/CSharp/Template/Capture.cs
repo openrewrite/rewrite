@@ -31,16 +31,19 @@ public sealed class Capture<T> where T : J
     public bool IsVariadic { get; }
     public int? MinCount { get; }
     public int? MaxCount { get; }
+    public string? Type { get; }
     public Func<T, Cursor, bool>? Constraint { get; }
 
     internal Capture(string name, bool variadic = false,
         int? minCount = null, int? maxCount = null,
+        string? type = null,
         Func<T, Cursor, bool>? constraint = null)
     {
         Name = name;
         IsVariadic = variadic;
         MinCount = minCount;
         MaxCount = maxCount;
+        Type = type;
         Constraint = constraint;
     }
 
@@ -61,9 +64,12 @@ public static class Capture
 
     /// <summary>
     /// Create a capture that matches a single AST node of type <typeparamref name="T"/>.
+    /// When <paramref name="type"/> is specified, the template engine generates a typed
+    /// variable declaration in the scaffold preamble, giving the placeholder proper type
+    /// attribution from the parser.
     /// </summary>
-    public static Capture<T> Of<T>(string? name = null) where T : J
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}");
+    public static Capture<T> Of<T>(string? name = null, string? type = null) where T : J
+        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}", type: type);
 
     /// <summary>
     /// Create a variadic capture that matches zero or more elements.
