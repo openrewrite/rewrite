@@ -39,33 +39,48 @@ public sealed class CSharpPattern
     private readonly IReadOnlyDictionary<string, object> _captures;
     private readonly IReadOnlyList<string> _usings;
     private readonly IReadOnlyList<string> _context;
+    private readonly IReadOnlyDictionary<string, string> _dependencies;
     private J? _cachedTree;
 
     private CSharpPattern(string code, Dictionary<string, object> captures,
-        IReadOnlyList<string>? usings, IReadOnlyList<string>? context)
+        IReadOnlyList<string>? usings, IReadOnlyList<string>? context,
+        IReadOnlyDictionary<string, string>? dependencies)
     {
         _code = code;
         _captures = captures;
         _usings = usings ?? [];
         _context = context ?? [];
+        _dependencies = dependencies ?? new Dictionary<string, string>();
     }
 
     /// <summary>
     /// Create a pattern from an interpolated string containing <see cref="Capture{T}"/> placeholders.
     /// </summary>
+    /// <param name="handler">The interpolated string handler that extracts captures.</param>
+    /// <param name="usings">Optional using directives for the scaffold.</param>
+    /// <param name="context">Optional context lines emitted before the scaffold class.</param>
+    /// <param name="dependencies">Optional NuGet package dependencies (package name → version)
+    /// required for import resolution and type attribution.</param>
     public static CSharpPattern Create(TemplateStringHandler handler,
-        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null)
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
     {
-        return new CSharpPattern(handler.GetCode(), handler.GetCaptures(), usings, context);
+        return new CSharpPattern(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies);
     }
 
     /// <summary>
     /// Create a pattern from a plain string (no captures — useful for exact matching).
     /// </summary>
+    /// <param name="code">The pattern code string.</param>
+    /// <param name="usings">Optional using directives for the scaffold.</param>
+    /// <param name="context">Optional context lines emitted before the scaffold class.</param>
+    /// <param name="dependencies">Optional NuGet package dependencies (package name → version)
+    /// required for import resolution and type attribution.</param>
     public static CSharpPattern Create(string code,
-        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null)
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
     {
-        return new CSharpPattern(code, new Dictionary<string, object>(), usings, context);
+        return new CSharpPattern(code, new Dictionary<string, object>(), usings, context, dependencies);
     }
 
     /// <summary>
@@ -73,7 +88,7 @@ public sealed class CSharpPattern
     /// </summary>
     public J GetTree()
     {
-        return _cachedTree ??= TemplateEngine.Parse(_code, _captures, _usings, _context);
+        return _cachedTree ??= TemplateEngine.Parse(_code, _captures, _usings, _context, _dependencies);
     }
 
     /// <summary>

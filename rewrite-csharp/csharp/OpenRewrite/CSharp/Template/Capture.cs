@@ -84,9 +84,23 @@ public static class Capture
     /// When <paramref name="type"/> is specified, the template engine generates a typed
     /// variable declaration in the scaffold preamble, giving the placeholder proper type
     /// attribution from the parser.
+    /// <para>
+    /// Prefer the position-specific factories (<see cref="Expression"/>, <see cref="Type"/>,
+    /// <see cref="Name"/>) when the capture position is known. Use <c>Of</c> as a generic
+    /// fallback for AST node types that don't have a dedicated factory.
+    /// </para>
     /// </summary>
     public static Capture<T> Of<T>(string? name = null, string? type = null) where T : J
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}", type: type);
+
+    /// <summary>
+    /// Create a capture for an expression-position node.
+    /// When <paramref name="type"/> is specified, the template engine generates a typed
+    /// field declaration in the scaffold preamble for type attribution.
+    /// </summary>
+    public static Capture<Expression> Expression(string? name = null, string? type = null)
+        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
+            type: type, kind: CaptureKind.Expression);
 
     /// <summary>
     /// Create a variadic capture that matches zero or more elements.
