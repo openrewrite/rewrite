@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Java.Search;
@@ -24,10 +25,10 @@ namespace OpenRewrite.Java.Search;
 /// </summary>
 public class Check : JavaVisitor<ExecutionContext>
 {
-    public JavaVisitor<ExecutionContext> Precondition { get; }
+    public ITreeVisitor<ExecutionContext> Precondition { get; }
     public JavaVisitor<ExecutionContext> Visitor { get; }
 
-    internal Check(JavaVisitor<ExecutionContext> precondition, JavaVisitor<ExecutionContext> visitor)
+    internal Check(ITreeVisitor<ExecutionContext> precondition, JavaVisitor<ExecutionContext> visitor)
     {
         Precondition = precondition;
         Visitor = visitor;

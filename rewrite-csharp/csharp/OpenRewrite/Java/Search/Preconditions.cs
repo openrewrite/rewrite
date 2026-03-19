@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp.Rpc;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -31,7 +32,7 @@ public static class Preconditions
     /// on files where the precondition matches.
     /// </summary>
     public static JavaVisitor<ExecutionContext> Check(
-        JavaVisitor<ExecutionContext> precondition,
+        ITreeVisitor<ExecutionContext> precondition,
         JavaVisitor<ExecutionContext> visitor)
     {
         return new Check(precondition, visitor);
@@ -41,7 +42,7 @@ public static class Preconditions
     /// Creates a UsesType precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasType. Otherwise falls back to local implementation.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
+    public static ITreeVisitor<ExecutionContext> UsesType(string fullyQualifiedTypeName)
     {
         var rpc = RewriteRpcServer.Current;
         if (rpc != null)
@@ -64,7 +65,7 @@ public static class Preconditions
     /// Creates a UsesMethod precondition. If connected to Java via RPC, delegates to
     /// Java's org.openrewrite.java.search.HasMethod.
     /// </summary>
-    public static JavaVisitor<ExecutionContext> UsesMethod(string methodPattern)
+    public static ITreeVisitor<ExecutionContext> UsesMethod(string methodPattern)
     {
         var rpc = RewriteRpcServer.Current;
         if (rpc != null)
