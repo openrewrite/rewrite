@@ -1260,8 +1260,12 @@ public class MavenPomDownloader {
         } catch (IllegalArgumentException e) {
             // URI is malformed (e.g. Windows backslashes in path) — extract path manually
             path = uri.substring(5); // skip "file:"
-            while (path.startsWith("//")) {
-                path = path.substring(1);
+            int i = 0;
+            while (i + 1 < path.length() && path.charAt(i) == '/' && path.charAt(i + 1) == '/') {
+                i++;
+            }
+            if (i > 0) {
+                path = path.substring(i);
             }
         }
 

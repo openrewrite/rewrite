@@ -226,7 +226,7 @@ public class MavenSettings {
         return mavenLocal;
     }
 
-    static String asUriString(final String pathname) {
+    private static String asUriString(final String pathname) {
         if (pathname.regionMatches(true, 0, "file:", 0, 5)) {
             return MavenPomDownloader.normalizeFileUri(pathname);
         }
