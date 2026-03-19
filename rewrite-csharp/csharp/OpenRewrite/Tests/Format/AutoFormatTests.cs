@@ -384,6 +384,35 @@ public class AutoFormatTests
     }
 
     [Fact]
+    public void FormatSubtreeDirectCall()
+    {
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        int x=1+2;\n" +
+            "    }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Find the method body block
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
+        var method = classDecl!.Body.Statements[0].Element as MethodDeclaration;
+        var body = method!.Body!;
+
+        // Structurally modify the body: strip its prefix to create a new object with the same ID
+        var modifiedBody = body.WithPrefix(Space.Empty);
+
+        // FormatSubtree should splice modifiedBody into the CU, format, and extract it
+        var formatted = RoslynFormatter.FormatSubtree(cu, body.Id, modifiedBody, stopAfter: null);
+
+        var printed = _printer.Print(formatted);
+        Assert.Contains("x = 1 + 2", printed);
+    }
+
+    [Fact]
     public void SubtreeAutoFormatWorksAfterStructuralChange()
     {
         // Source has a for loop with no braces
