@@ -57,6 +57,17 @@ public class ScaffoldStrategyTests
         Assert.IsType<Binary>(tree);
     }
 
+    [Fact]
+    public void ExpressionWithTypedCapture()
+    {
+        // Typed captures emit preamble fields (e.g., "int __plh_x__;") —
+        // ExtractExpression must find __v__ specifically, not the preamble field
+        var expr = Capture.Expression("x", type: "int");
+        var tmpl = CSharpTemplate.Expression($"1 + {expr}");
+        var tree = tmpl.GetTree();
+        Assert.IsType<Binary>(tree);
+    }
+
     // === Statement ===
 
     [Fact]

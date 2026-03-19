@@ -25,7 +25,7 @@ namespace OpenRewrite.CSharp.Template;
 /// </summary>
 internal enum ScaffoldKind
 {
-    /// <summary>Wraps as <c>class __T__ { var __e__ = &lt;code&gt;; }</c> and extracts the initializer expression.</summary>
+    /// <summary>Wraps as <c>class __T__ { object __v__ = &lt;code&gt;; }</c> and extracts the initializer expression.</summary>
     Expression,
 
     /// <summary>Wraps as <c>class __T__ { void __M__() { &lt;code&gt;; } }</c> and extracts the statement.</summary>
@@ -189,7 +189,11 @@ internal static class TemplateEngine
 
             case ScaffoldKind.ClassMember:
                 sb.Append("    ");
-                sb.AppendLine(code);
+                sb.Append(code);
+                var trimmedMember = code.TrimEnd();
+                if (trimmedMember.Length > 0 && trimmedMember[^1] != ';' && trimmedMember[^1] != '}')
+                    sb.Append(';');
+                sb.AppendLine();
                 break;
 
             case ScaffoldKind.Attribute:
@@ -297,21 +301,24 @@ internal static class TemplateEngine
     /// </summary>
     private static J ExtractExpression(ClassDeclaration classDecl)
     {
-        // The field declaration: object __v__ = <code>;
-        var varDecl = FindFirst<VariableDeclarations>(classDecl.Body.Statements
-            .Select(s => s.Element).ToList());
-        if (varDecl == null)
-            throw new InvalidOperationException("Template scaffold did not produce a field declaration");
+        // Find the scaffold field specifically: object __v__ = <code>;
+        // Must skip preamble fields (typed capture declarations like "int __plh_x__;")
+        foreach (var padded in classDecl.Body.Statements)
+        {
+            if (padded.Element is VariableDeclarations varDecl)
+            {
+                var namedVar = varDecl.Variables.FirstOrDefault()?.Element;
+                if (namedVar?.Name.SimpleName == "__v__")
+                {
+                    var initializer = namedVar.Initializer;
+                    if (initializer == null)
+                        throw new InvalidOperationException("Template scaffold field __v__ has no initializer");
+                    return StripPrefix(initializer.Element);
+                }
+            }
+        }
 
-        var namedVarPadded = varDecl.Variables.FirstOrDefault();
-        if (namedVarPadded == null)
-            throw new InvalidOperationException("Template scaffold field has no named variable");
-
-        var initializer = namedVarPadded.Element.Initializer;
-        if (initializer == null)
-            throw new InvalidOperationException("Template scaffold field has no initializer");
-
-        return StripPrefix(initializer.Element);
+        throw new InvalidOperationException("Template scaffold did not produce the __v__ field declaration");
     }
 
     /// <summary>

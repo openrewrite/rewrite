@@ -102,7 +102,7 @@ public sealed class CSharpTemplate
 
     /// <summary>
     /// Create a template that produces an expression.
-    /// Scaffolds as <c>class __T__ { var __e__ = &lt;code&gt;; }</c> and extracts the initializer.
+    /// Scaffolds as <c>class __T__ { object __v__ = &lt;code&gt;; }</c> and extracts the initializer.
     /// </summary>
     public static CSharpTemplate Expression(TemplateStringHandler handler,
         IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
