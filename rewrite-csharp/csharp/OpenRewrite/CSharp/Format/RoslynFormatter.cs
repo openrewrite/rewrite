@@ -40,7 +40,10 @@ public static class RoslynFormatter
     /// </summary>
     public static CompilationUnit Format(CompilationUnit cu, J? targetSubtree, J? stopAfter)
     {
-        // 1. Print to string
+        // 1. Ensure minimum spacing so printed output is parseable
+        cu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
+
+        // 2. Print to string
         var printer = new CSharpPrinter<int>();
         var source = printer.Print(cu);
 
