@@ -34,23 +34,29 @@ internal static class TemplateEngine
     /// The code is wrapped in a scaffold to make it parseable, then the inner
     /// expression or statement is extracted.
     /// </summary>
+    /// <param name="dependencies">NuGet package dependencies (package name → version) for type attribution.
+    /// When provided, a dependency workspace will be created so Roslyn can resolve external types.</param>
     internal static J Parse(string code, IReadOnlyDictionary<string, object> captures,
-        IReadOnlyList<string> usings, IReadOnlyList<string> context)
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies)
     {
-        var cacheKey = BuildCacheKey(code, captures, usings, context);
+        var cacheKey = BuildCacheKey(code, captures, usings, context, dependencies);
         if (GlobalCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        var result = ParseInternal(code, captures, usings, context);
+        var result = ParseInternal(code, captures, usings, context, dependencies);
         GlobalCache.TryAdd(cacheKey, result);
         return result;
     }
 
     private static J ParseInternal(string code, IReadOnlyDictionary<string, object> captures,
-        IReadOnlyList<string> usings, IReadOnlyList<string> context)
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies)
     {
         var preamble = BuildTypePreamble(captures);
         var scaffold = BuildScaffold(code, preamble, usings, context);
+        // TODO: when dependencies are provided, use DependencyWorkspace to create a
+        // project with NuGet references so Roslyn can resolve external types
         var parser = new CSharpParser();
         var cu = parser.Parse(scaffold, "__template__.cs");
 
@@ -270,7 +276,8 @@ internal static class TemplateEngine
     }
 
     private static string BuildCacheKey(string code, IReadOnlyDictionary<string, object> captures,
-        IReadOnlyList<string> usings, IReadOnlyList<string> context)
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies)
     {
         var sb = new System.Text.StringBuilder();
         sb.Append("code:");
@@ -296,6 +303,12 @@ internal static class TemplateEngine
         {
             sb.Append("|context:");
             sb.Append(string.Join(",", context));
+        }
+        if (dependencies.Count > 0)
+        {
+            sb.Append("|deps:");
+            sb.Append(string.Join(",", dependencies.OrderBy(d => d.Key)
+                .Select(d => $"{d.Key}={d.Value}")));
         }
         return sb.ToString();
     }
