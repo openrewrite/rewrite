@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using OpenRewrite.CSharp;
 
 namespace OpenRewrite.Java.Search;
 
@@ -22,7 +23,7 @@ namespace OpenRewrite.Java.Search;
 /// Used as fallback when not connected to Java via RPC.
 /// Marks the compilation unit with a SearchResult marker if the type is found.
 /// </summary>
-internal class LocalUsesType<P> : JavaVisitor<P>
+internal class LocalUsesType<P> : CSharpVisitor<P>
 {
     private readonly string _fullyQualifiedTypeName;
     private bool _found;

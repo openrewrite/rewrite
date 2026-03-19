@@ -13,34 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using OpenRewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
-namespace OpenRewrite.Java.Search;
+namespace OpenRewrite.Core;
 
 /// <summary>
 /// A visitor wrapper that runs a precondition check before the actual visitor.
 /// If the precondition modifies the tree (indicating a match), the inner visitor runs.
 /// Otherwise the tree is returned unchanged.
+///
+/// Extends TreeVisitor (not JavaVisitor) so it works with any language tree,
+/// matching how Java's Preconditions.Check works in rewrite-core.
 /// </summary>
-public class Check : JavaVisitor<ExecutionContext>
+public class Check : TreeVisitor<Tree, ExecutionContext>
 {
     public ITreeVisitor<ExecutionContext> Precondition { get; }
-    public JavaVisitor<ExecutionContext> Visitor { get; }
+    public ITreeVisitor<ExecutionContext> Visitor { get; }
 
-    internal Check(ITreeVisitor<ExecutionContext> precondition, JavaVisitor<ExecutionContext> visitor)
+    internal Check(ITreeVisitor<ExecutionContext> precondition, ITreeVisitor<ExecutionContext> visitor)
     {
         Precondition = precondition;
         Visitor = visitor;
     }
 
-    public override J? PreVisit(J tree, ExecutionContext ctx)
+    public override Tree? Visit(Tree? tree, ExecutionContext ctx)
     {
-        StopAfterPreVisit();
-        var result = Precondition.Visit(tree, ctx);
-        if (result != tree)
+        if (tree is not SourceFile || Precondition.Visit(tree, ctx) != tree)
         {
-            return (J?)Visitor.Visit(tree, ctx);
+            return Visitor.Visit(tree, ctx);
         }
         return tree;
     }
