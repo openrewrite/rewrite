@@ -1224,7 +1224,10 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             }
 
             // When the argument list is empty but has content between parens (e.g. comments),
-            // preserve it as a J.Empty element so it round-trips correctly
+            // preserve it as a J.Empty element so it round-trips correctly.
+            // This branch is mutually exclusive with the last-argument branch above:
+            // ExtractSpaceBefore is idempotent w.r.t. cursor position, and _cursor is
+            // advanced past CloseParenToken once after both branches.
             if (args.Count == 0)
             {
                 var closeParenSpace = ExtractSpaceBefore(node.ArgumentList.CloseParenToken);
