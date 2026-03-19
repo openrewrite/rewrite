@@ -49,30 +49,6 @@ public class AutoFormatVisitor<P> : CSharpVisitor<P>
         if (cu == null)
             return tree;
 
-        var formattedCu = RoslynFormatter.Format(cu, targetSubtree: tree, stopAfter: _stopAfter);
-
-        // Find the target subtree in the formatted CU by matching ID
-        return FindById(formattedCu, tree.Id) ?? tree;
-    }
-
-    private static J? FindById(J root, Guid targetId)
-    {
-        J? found = null;
-        var finder = new IdFinder(targetId, f => found = f);
-        finder.Visit(root, 0);
-        return found;
-    }
-
-    private class IdFinder(Guid targetId, Action<J> onFound) : CSharpVisitor<int>
-    {
-        protected override J? Accept(J tree, int p)
-        {
-            if (tree.Id == targetId)
-            {
-                onFound(tree);
-                return tree;
-            }
-            return base.Accept(tree, p);
-        }
+        return RoslynFormatter.FormatSubtree(cu, tree.Id, tree, _stopAfter);
     }
 }

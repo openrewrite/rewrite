@@ -32,18 +32,22 @@ import java.util.stream.Stream;
 /**
  * A parser for .csproj files that wraps XmlParser and attaches MSBuildProject markers.
  * <p>
- * If a CSharpRewriteRpc server is available (configured via {@link CSharpRewriteRpc#setFactory}),
+ * If a {@link ParseSolutionResult} is provided via the builder, uses pre-resolved
+ * project metadata from a prior {@code parseSolution()} call. Otherwise, if a
+ * CSharpRewriteRpc server is available (configured via {@link CSharpRewriteRpc#setFactory}),
  * uses real MSBuild evaluation to populate the marker with resolved metadata.
- * Otherwise, falls back to extracting declared metadata directly from the XML structure.
+ * Falls back to extracting declared metadata directly from the XML structure.
  * <p>
  * This is analogous to how MavenParser automatically attaches MavenResolutionResult
  * markers to pom.xml files during parsing.
  */
-class CsprojParser implements Parser {
+public class CsprojParser implements Parser {
     private final XmlParser xmlParser;
+    private final @Nullable ParseSolutionResult solutionResult;
 
-    CsprojParser(XmlParser xmlParser) {
+    CsprojParser(XmlParser xmlParser, @Nullable ParseSolutionResult solutionResult) {
         this.xmlParser = xmlParser;
+        this.solutionResult = solutionResult;
     }
 
     @Override
@@ -52,8 +56,10 @@ class CsprojParser implements Parser {
                 .map(sourceFile -> {
                     if (sourceFile instanceof Xml.Document) {
                         Xml.Document doc = (Xml.Document) sourceFile;
-                        // Try RPC resolution first, fall back to XML extraction
-                        MSBuildProject marker = resolveViaRpc(doc, relativeTo, ctx);
+                        MSBuildProject marker = resolveFromSolution(doc, relativeTo);
+                        if (marker == null) {
+                            marker = resolveViaRpc(doc, relativeTo, ctx);
+                        }
                         if (marker == null) {
                             marker = Assertions.extractMSBuildProjectFromXml(doc);
                         }
@@ -64,6 +70,18 @@ class CsprojParser implements Parser {
                     }
                     return sourceFile;
                 });
+    }
+
+    private @Nullable MSBuildProject resolveFromSolution(Xml.Document doc, @Nullable Path relativeTo) {
+        if (solutionResult == null || relativeTo == null) {
+            return null;
+        }
+        Path absolutePath = relativeTo.resolve(doc.getSourcePath());
+        MSBuildProject marker = solutionResult.getProject(absolutePath.toString());
+        if (marker == null) {
+            marker = solutionResult.getProject(doc.getSourcePath().toString());
+        }
+        return marker;
     }
 
     private @Nullable MSBuildProject resolveViaRpc(Xml.Document doc, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -97,18 +115,25 @@ class CsprojParser implements Parser {
         return prefix.resolve("project.csproj");
     }
 
-    static Builder builder() {
+    public static Builder builder() {
         return new Builder();
     }
 
-    static class Builder extends Parser.Builder {
+    public static class Builder extends Parser.Builder {
+        private @Nullable ParseSolutionResult solutionResult;
+
         Builder() {
             super(Xml.Document.class);
         }
 
+        public Builder solutionResult(ParseSolutionResult result) {
+            this.solutionResult = result;
+            return this;
+        }
+
         @Override
         public CsprojParser build() {
-            return new CsprojParser(XmlParser.builder().build());
+            return new CsprojParser(XmlParser.builder().build(), solutionResult);
         }
 
         @Override

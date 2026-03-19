@@ -549,16 +549,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
             else
             {
-                for (int i = 0; i < elements.Count; i++)
-                {
-                    var elem = elements[i];
-                    Visit(elem.Element, p);
-                    VisitSpace(elem.After, p);
-                    if (i < elements.Count - 1)
-                    {
-                        p.Append(',');
-                    }
-                }
+                VisitRightPadded(elements, ",", p);
             }
 
             p.Append('}');

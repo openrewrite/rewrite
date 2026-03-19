@@ -6209,17 +6209,30 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 }
 
                 Space afterSpace;
-                if (i < initializer.Expressions.Count - 1)
+                var elemMarkers = Markers.Empty;
+                var isLast = i == initializer.Expressions.Count - 1;
+                if (!isLast && i < initializer.Expressions.SeparatorCount)
                 {
+                    // Non-last element with comma separator
                     afterSpace = ExtractSpaceBefore(initializer.Expressions.GetSeparator(i));
                     _cursor = initializer.Expressions.GetSeparator(i).Span.End;
                 }
+                else if (isLast && i < initializer.Expressions.SeparatorCount)
+                {
+                    // Last element with trailing comma
+                    var sep = initializer.Expressions.GetSeparator(i);
+                    afterSpace = ExtractSpaceBefore(sep);
+                    _cursor = sep.Span.End;
+                    var suffix = ExtractSpaceBefore(initializer.CloseBraceToken);
+                    elemMarkers = elemMarkers.Add(new TrailingComma(Guid.NewGuid(), suffix));
+                }
                 else
                 {
+                    // Last element without trailing comma
                     afterSpace = ExtractSpaceBefore(initializer.CloseBraceToken);
                 }
 
-                elements.Add(new JRightPadded<Expression>(elementExpr, afterSpace, Markers.Empty));
+                elements.Add(new JRightPadded<Expression>(elementExpr, afterSpace, elemMarkers));
             }
         }
 

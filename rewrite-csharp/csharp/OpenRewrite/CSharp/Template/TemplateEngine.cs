@@ -21,6 +21,24 @@ using OpenRewrite.Java;
 namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
+/// Controls how template code is wrapped in a scaffold and how the target node is extracted.
+/// </summary>
+internal enum ScaffoldKind
+{
+    /// <summary>Wraps as <c>class __T__ { object __v__ = &lt;code&gt;; }</c> and extracts the initializer expression.</summary>
+    Expression,
+
+    /// <summary>Wraps as <c>class __T__ { void __M__() { &lt;code&gt;; } }</c> and extracts the statement.</summary>
+    Statement,
+
+    /// <summary>Wraps as <c>class __T__ { &lt;code&gt; }</c> and extracts the class body member.</summary>
+    ClassMember,
+
+    /// <summary>Wraps as <c>class __T__ { [&lt;code&gt;] void __M__() {} }</c> and extracts the Annotation.</summary>
+    Attribute,
+}
+
+/// <summary>
 /// Core template parsing and caching engine.
 /// Wraps template code in a parseable C# scaffold, parses with <see cref="CSharpParser"/>,
 /// extracts the target AST node, and caches results.
@@ -30,38 +48,112 @@ internal static class TemplateEngine
     private static readonly ConcurrentDictionary<string, J> GlobalCache = new();
 
     /// <summary>
-    /// Parse a template code string into an AST node.
-    /// The code is wrapped in a scaffold to make it parseable, then the inner
-    /// expression or statement is extracted.
+    /// Parse a template code string into an AST node using the default scaffold
+    /// (auto-detects expression vs statement).
     /// </summary>
     internal static J Parse(string code, IReadOnlyDictionary<string, object> captures,
-        IReadOnlyList<string> usings, IReadOnlyList<string> context)
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies)
     {
-        var cacheKey = BuildCacheKey(code, usings, context);
+        return Parse(code, captures, usings, context, dependencies, scaffoldKind: null);
+    }
+
+    /// <summary>
+    /// Parse a template code string into an AST node.
+    /// The code is wrapped in a scaffold controlled by <paramref name="scaffoldKind"/>,
+    /// parsed with <see cref="CSharpParser"/>, and the target node extracted.
+    /// </summary>
+    /// <param name="scaffoldKind">Controls how the code is wrapped and extracted.
+    /// When null, uses the legacy Statement scaffold with auto-unwrap of ExpressionStatements.</param>
+    /// <param name="dependencies">NuGet package dependencies (package name → version) for type attribution.</param>
+    internal static J Parse(string code, IReadOnlyDictionary<string, object> captures,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
+    {
+        var cacheKey = BuildCacheKey(code, captures, usings, context, dependencies, scaffoldKind);
         if (GlobalCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        var result = ParseInternal(code, usings, context);
+        var result = ParseInternal(code, captures, usings, context, dependencies, scaffoldKind);
         GlobalCache.TryAdd(cacheKey, result);
         return result;
     }
 
-    private static J ParseInternal(string code, IReadOnlyList<string> usings,
-        IReadOnlyList<string> context)
+    private static J ParseInternal(string code, IReadOnlyDictionary<string, object> captures,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
     {
-        var scaffold = BuildScaffold(code, usings, context);
+        var preamble = BuildTypePreamble(captures);
+        var scaffold = BuildScaffold(code, preamble, usings, context, scaffoldKind);
         var parser = new CSharpParser();
-        var cu = parser.Parse(scaffold, "__template__.cs");
 
-        return ExtractTemplateNode(cu, code);
+        CompilationUnit cu;
+        if (dependencies.Count > 0)
+        {
+            var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
+            cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
+        }
+        else
+        {
+            cu = parser.Parse(scaffold, "__template__.cs");
+        }
+
+        return ExtractTemplateNode(cu, code, scaffoldKind);
+    }
+
+    /// <summary>
+    /// Build typed field declarations for captures that have a Type.
+    /// These are emitted as class fields on the scaffold class so they are in scope
+    /// inside the method body. This avoids mixing preamble statements with the template
+    /// code, so <see cref="ExtractTemplateNode"/> doesn't need to skip anything.
+    /// Dispatches on <see cref="CaptureKind"/> to generate the right scaffold form.
+    /// </summary>
+    private static List<string> BuildTypePreamble(IReadOnlyDictionary<string, object> captures)
+    {
+        var preamble = new List<string>();
+        foreach (var kvp in captures)
+        {
+            var kind = kvp.Value.GetType().GetProperty("Kind")?.GetValue(kvp.Value);
+            var placeholder = Placeholder.ToPlaceholder(kvp.Key);
+
+            if (kind is CaptureKind captureKind)
+            {
+                switch (captureKind)
+                {
+                    case CaptureKind.Expression:
+                        var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+                        if (!string.IsNullOrEmpty(captureType))
+                        {
+                            preamble.Add($"{captureType} {placeholder};");
+                        }
+                        break;
+                    case CaptureKind.Type:
+                        // TODO: emit scaffold that places placeholder in a type position
+                        break;
+                    case CaptureKind.Name:
+                        // No preamble needed — pure identifier substitution
+                        break;
+                }
+            }
+            else
+            {
+                // Fallback for captures without Kind (shouldn't happen, but defensive)
+                var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+                if (!string.IsNullOrEmpty(captureType))
+                {
+                    preamble.Add($"{captureType} {placeholder};");
+                }
+            }
+        }
+        return preamble;
     }
 
     /// <summary>
     /// Build a parseable C# source from the template code.
-    /// Wraps the template code in: usings + class __T__ { void __M__() { code; } }
+    /// The scaffold shape is controlled by <paramref name="scaffoldKind"/>.
     /// </summary>
-    private static string BuildScaffold(string code, IReadOnlyList<string> usings,
-        IReadOnlyList<string> context)
+    private static string BuildScaffold(string code, IReadOnlyList<string> preamble,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context, ScaffoldKind? scaffoldKind)
     {
         var sb = new System.Text.StringBuilder();
 
@@ -79,15 +171,50 @@ internal static class TemplateEngine
         }
 
         sb.AppendLine("class __T__ {");
-        sb.AppendLine("    void __M__() {");
-        sb.Append("        ");
-        sb.Append(code);
-        // Add semicolon if the code doesn't already end with one or with a block
-        var trimmed = code.TrimEnd();
-        if (trimmed.Length > 0 && trimmed[^1] != ';' && trimmed[^1] != '}')
-            sb.Append(';');
-        sb.AppendLine();
-        sb.AppendLine("    }");
+
+        // Typed capture declarations as class fields — in scope for all scaffold kinds
+        foreach (var decl in preamble)
+        {
+            sb.Append("    ");
+            sb.AppendLine(decl);
+        }
+
+        switch (scaffoldKind)
+        {
+            case ScaffoldKind.Expression:
+                sb.Append("    object __v__ = ");
+                sb.Append(code);
+                sb.AppendLine(";");
+                break;
+
+            case ScaffoldKind.ClassMember:
+                sb.Append("    ");
+                sb.Append(code);
+                var trimmedMember = code.TrimEnd();
+                if (trimmedMember.Length > 0 && trimmedMember[^1] != ';' && trimmedMember[^1] != '}')
+                    sb.Append(';');
+                sb.AppendLine();
+                break;
+
+            case ScaffoldKind.Attribute:
+                sb.Append("    [");
+                sb.Append(code);
+                sb.AppendLine("]");
+                sb.AppendLine("    void __M__() {}");
+                break;
+
+            default: // null or Statement — legacy behavior
+                sb.AppendLine("    void __M__() {");
+                sb.Append("        ");
+                sb.Append(code);
+                var trimmed = code.TrimEnd();
+                if (trimmed.Length > 0 && trimmed[^1] != ';' && trimmed[^1] != '}')
+                    sb.Append(';');
+                sb.AppendLine();
+                sb.AppendLine("    }");
+                break;
+        }
+
         sb.AppendLine("}");
 
         return sb.ToString();
@@ -95,16 +222,38 @@ internal static class TemplateEngine
 
     /// <summary>
     /// Extract the template AST node from the scaffold's compilation unit.
-    /// Navigates: CompilationUnit → ClassDeclaration → Body → MethodDeclaration → Body → Statement(s)
-    /// If the statement is an ExpressionStatement, unwrap to get the Expression.
+    /// Navigation strategy depends on <paramref name="scaffoldKind"/>.
     /// </summary>
-    private static J ExtractTemplateNode(CompilationUnit cu, string originalCode)
+    private static J ExtractTemplateNode(CompilationUnit cu, string originalCode, ScaffoldKind? scaffoldKind)
     {
-        // Navigate into the class body
         var classDecl = FindFirst<ClassDeclaration>(cu.Members);
         if (classDecl == null)
             throw new InvalidOperationException("Template scaffold did not produce a class declaration");
 
+        switch (scaffoldKind)
+        {
+            case ScaffoldKind.Expression:
+                return ExtractExpression(classDecl);
+
+            case ScaffoldKind.Statement:
+                return ExtractStatementStrict(classDecl);
+
+            case ScaffoldKind.ClassMember:
+                return ExtractClassMember(classDecl);
+
+            case ScaffoldKind.Attribute:
+                return ExtractAttribute(classDecl);
+
+            default: // null — legacy behavior (auto-unwraps ExpressionStatement)
+                return ExtractStatement(classDecl);
+        }
+    }
+
+    /// <summary>
+    /// Legacy extraction: navigate into method body, auto-unwrap ExpressionStatement.
+    /// </summary>
+    private static J ExtractStatement(ClassDeclaration classDecl)
+    {
         var methodDecl = FindFirst<MethodDeclaration>(classDecl.Body.Statements
             .Select(s => s.Element).ToList());
         if (methodDecl?.Body == null)
@@ -125,6 +274,115 @@ internal static class TemplateEngine
 
         // Multiple statements: return them as a Block
         return methodDecl.Body;
+    }
+
+    /// <summary>
+    /// Explicit statement extraction: does NOT unwrap ExpressionStatement.
+    /// </summary>
+    private static J ExtractStatementStrict(ClassDeclaration classDecl)
+    {
+        var methodDecl = FindFirst<MethodDeclaration>(classDecl.Body.Statements
+            .Select(s => s.Element).ToList());
+        if (methodDecl?.Body == null)
+            throw new InvalidOperationException("Template scaffold did not produce a method declaration");
+
+        var statements = methodDecl.Body.Statements;
+        if (statements.Count == 0)
+            throw new InvalidOperationException("Template code did not produce any statements");
+
+        if (statements.Count == 1)
+            return StripPrefix(statements[0].Element);
+
+        return methodDecl.Body;
+    }
+
+    /// <summary>
+    /// Extract the initializer expression from <c>object __v__ = &lt;code&gt;;</c>.
+    /// </summary>
+    private static J ExtractExpression(ClassDeclaration classDecl)
+    {
+        // Find the scaffold field specifically: object __v__ = <code>;
+        // Must skip preamble fields (typed capture declarations like "int __plh_x__;")
+        foreach (var padded in classDecl.Body.Statements)
+        {
+            if (padded.Element is VariableDeclarations varDecl)
+            {
+                var namedVar = varDecl.Variables.FirstOrDefault()?.Element;
+                if (namedVar?.Name.SimpleName == "__v__")
+                {
+                    var initializer = namedVar.Initializer;
+                    if (initializer == null)
+                        throw new InvalidOperationException("Template scaffold field __v__ has no initializer");
+                    return StripPrefix(initializer.Element);
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Template scaffold did not produce the __v__ field declaration");
+    }
+
+    /// <summary>
+    /// Extract class body members from <c>class __T__ { &lt;code&gt; }</c>,
+    /// filtering out preamble fields (typed capture declarations).
+    /// Returns a single member if there is one, or the body block if there are multiple.
+    /// </summary>
+    private static J ExtractClassMember(ClassDeclaration classDecl)
+    {
+        var members = classDecl.Body.Statements
+            .Where(s => !IsPreambleField(s.Element))
+            .ToList();
+
+        if (members.Count == 0)
+            throw new InvalidOperationException("Template code did not produce any class members");
+
+        if (members.Count == 1)
+            return StripPrefix(members[0].Element);
+
+        // Multiple members: return the class body with preamble fields removed
+        return classDecl.Body.WithStatements(members);
+    }
+
+    /// <summary>
+    /// Extract the Annotation from <c>class __T__ { [&lt;code&gt;] void __M__() {} }</c>.
+    /// The parser wraps the annotated method in <see cref="AnnotatedStatement"/>.
+    /// </summary>
+    private static J ExtractAttribute(ClassDeclaration classDecl)
+    {
+        // Find the AnnotatedStatement wrapping __M__
+        foreach (var padded in classDecl.Body.Statements)
+        {
+            if (padded.Element is AnnotatedStatement annotated)
+            {
+                if (annotated.AttributeLists.Count == 0)
+                    throw new InvalidOperationException(
+                        "Template scaffold produced an annotated method with no attribute lists");
+
+                var attrList = annotated.AttributeLists[0];
+                if (attrList.Attributes.Count == 0)
+                    throw new InvalidOperationException(
+                        "Template scaffold produced an attribute list with no attributes");
+
+                return StripPrefix(attrList.Attributes[0].Element);
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Template scaffold did not produce an annotated method. " +
+            "Ensure the attribute syntax is valid C# (e.g., \"Test\" not \"[Test]\").");
+    }
+
+    /// <summary>
+    /// Check if a statement is a preamble field (typed capture declaration with placeholder name).
+    /// </summary>
+    private static bool IsPreambleField(Statement stmt)
+    {
+        if (stmt is VariableDeclarations varDecl)
+        {
+            var name = varDecl.Variables.FirstOrDefault()?.Element.Name;
+            if (name != null && Placeholder.FromPlaceholder(name.SimpleName) != null)
+                return true;
+        }
+        return false;
     }
 
     private static T? FindFirst<T>(IList<Statement> statements) where T : Statement
@@ -192,9 +450,10 @@ internal static class TemplateEngine
     }
 
     /// <summary>
-    /// Auto-format the template result in a scratch copy of the enclosing compilation unit.
-    /// Inserts the template result into a local copy of the CU (replacing the original node),
-    /// formats with Roslyn, and extracts the formatted result.
+    /// Auto-format the template result within the enclosing compilation unit.
+    /// Delegates to <see cref="RoslynFormatter.FormatSubtree"/> for the splice→format→extract pipeline.
+    /// The prefix set in the coordinates phase is preserved — the formatter only affects
+    /// internal whitespace (argument spacing, etc.), matching the JS/TS approach.
     /// </summary>
     internal static J AutoFormat(J tree, Cursor cursor)
     {
@@ -206,42 +465,45 @@ internal static class TemplateEngine
         if (cursor.Value is not J original)
             return tree;
 
+        // Save the prefix set by ApplyCoordinates — the formatter may override it
+        var preservedPrefix = tree.Prefix;
+
         // Assign a fresh ID so FindById targets exactly this instance,
         // not a stale node from a prior application of the same template
         tree = J.SetId(tree, Guid.NewGuid());
 
-        // Replace the original node with the template result in the CU
-        var replacer = new NodeReplacer(original.Id, tree);
-        replacer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        var modifiedCu = replacer.VisitNonNull(cu, 0) as CompilationUnit;
-        if (modifiedCu == null || ReferenceEquals(modifiedCu, cu))
-            return tree;
+        var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, tree, stopAfter: null);
 
-        // Format the modified CU, scoped to the new subtree
-        var formattedCu = RoslynFormatter.Format(modifiedCu, targetSubtree: tree, stopAfter: null);
-
-        // If formatting didn't change anything, return as-is
-        if (ReferenceEquals(formattedCu, modifiedCu))
-            return tree;
-
-        // Find the formatted tree node by ID
-        return FindById(formattedCu, tree.Id) ?? tree;
+        // Restore the coordinate-set prefix. The formatter handles internal whitespace;
+        // the prefix (indentation/newlines before the node) comes from the original tree.
+        return J.SetPrefix(formatted, preservedPrefix);
     }
 
-    private static J? FindById(J root, Guid targetId)
-    {
-        var finder = new IdFinder(targetId);
-        finder.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        finder.Visit(root, 0);
-        return finder.Result;
-    }
-
-    private static string BuildCacheKey(string code, IReadOnlyList<string> usings,
-        IReadOnlyList<string> context)
+    private static string BuildCacheKey(string code, IReadOnlyDictionary<string, object> captures,
+        IReadOnlyList<string> usings, IReadOnlyList<string> context,
+        IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind = null)
     {
         var sb = new System.Text.StringBuilder();
+        if (scaffoldKind != null)
+        {
+            sb.Append("scaffold:");
+            sb.Append(scaffoldKind);
+            sb.Append('|');
+        }
         sb.Append("code:");
         sb.Append(code);
+
+        // Include capture types in cache key so typed and untyped patterns
+        // with the same code don't collide
+        foreach (var kvp in captures.OrderBy(c => c.Key))
+        {
+            var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+            if (!string.IsNullOrEmpty(captureType))
+            {
+                sb.Append($"|type:{kvp.Key}={captureType}");
+            }
+        }
+
         if (usings.Count > 0)
         {
             sb.Append("|usings:");
@@ -252,49 +514,13 @@ internal static class TemplateEngine
             sb.Append("|context:");
             sb.Append(string.Join(",", context));
         }
+        if (dependencies.Count > 0)
+        {
+            sb.Append("|deps:");
+            sb.Append(string.Join(",", dependencies.OrderBy(d => d.Key)
+                .Select(d => $"{d.Key}={d.Value}")));
+        }
         return sb.ToString();
-    }
-
-    /// <summary>
-    /// Visitor that replaces a node by ID with a replacement node.
-    /// Short-circuits after the replacement is made to avoid visiting remaining subtrees.
-    /// </summary>
-    private class NodeReplacer(Guid targetId, J replacement) : CSharpVisitor<int>
-    {
-        private bool _found;
-
-        protected override J? Accept(J tree, int p)
-        {
-            if (_found)
-                return tree;
-            if (tree.Id == targetId)
-            {
-                _found = true;
-                return replacement;
-            }
-            return base.Accept(tree, p);
-        }
-    }
-
-    /// <summary>
-    /// Visitor that finds a node by ID in a tree.
-    /// Short-circuits after the target is found to avoid visiting remaining subtrees.
-    /// </summary>
-    private class IdFinder(Guid targetId) : CSharpVisitor<int>
-    {
-        internal J? Result { get; private set; }
-
-        protected override J? Accept(J tree, int p)
-        {
-            if (Result != null)
-                return tree;
-            if (tree.Id == targetId)
-            {
-                Result = tree;
-                return tree;
-            }
-            return base.Accept(tree, p);
-        }
     }
 }
 

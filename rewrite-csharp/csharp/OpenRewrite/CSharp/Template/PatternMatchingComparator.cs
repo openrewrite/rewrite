@@ -65,9 +65,9 @@ internal class PatternMatchingComparator
             }
         }
 
-        // Different node types don't match
+        // Different node types — check for cross-type equivalences before failing
         if (pattern.GetType() != candidate.GetType())
-            return false;
+            return MatchCrossType(pattern, candidate, cursor);
 
         // NullSafe marker must match: ?. and . are structurally different
         if (TreeHelper.HasNullSafe(pattern) != TreeHelper.HasNullSafe(candidate))
@@ -75,6 +75,28 @@ internal class PatternMatchingComparator
 
         // Generic property-based comparison: iterate all structural properties
         // and compare them recursively, skipping formatting/identity fields.
+        if (pattern is Binary patBin && candidate is Binary candBin)
+        {
+            // Save bindings so we can backtrack if direct match fails
+            var savedBindings = new Dictionary<string, object>(_bindings);
+            if (MatchProperties(pattern, candidate, cursor))
+                return true;
+
+            // Restore bindings and try commuted (swapped) operands for == and !=
+            _bindings.Clear();
+            foreach (var kvp in savedBindings)
+                _bindings[kvp.Key] = kvp.Value;
+            return MatchCommutedBinary(patBin, candBin, cursor);
+        }
+
+        return MatchProperties(pattern, candidate, cursor);
+    }
+
+    /// <summary>
+    /// Compare all structural properties of two same-type nodes.
+    /// </summary>
+    private bool MatchProperties(J pattern, J candidate, Cursor cursor)
+    {
         var properties = TreeHelper.GetStructuralProperties(pattern.GetType());
         foreach (var prop in properties)
         {
@@ -84,9 +106,96 @@ internal class PatternMatchingComparator
             if (!MatchValue(patternValue, candidateValue, cursor))
                 return false;
         }
-
         return true;
     }
+
+    /// <summary>
+    /// For Binary == and != where one side is a literal, try matching with
+    /// left and right swapped (commutative match).
+    /// </summary>
+    private bool MatchCommutedBinary(Binary pattern, Binary candidate, Cursor cursor)
+    {
+        var op = pattern.Operator.Element;
+        if (op != Binary.OperatorType.Equal && op != Binary.OperatorType.NotEqual)
+            return false;
+
+        if (!HasLiteral(pattern) && !HasLiteral(candidate))
+            return false;
+
+        // Operator must still match
+        if (!MatchPaddedElement(pattern.Operator, candidate.Operator, cursor))
+            return false;
+
+        // Try swapped: pattern.Left ↔ candidate.Right, pattern.Right ↔ candidate.Left
+        return MatchNode(pattern.Left, candidate.Right, cursor)
+            && MatchNode(pattern.Right, candidate.Left, cursor);
+    }
+
+    /// <summary>
+    /// Handle cross-type equivalences (e.g. <c>== null</c> ↔ <c>is null</c>).
+    /// Called when pattern and candidate have different node types.
+    /// </summary>
+    private bool MatchCrossType(J pattern, J candidate, Cursor cursor)
+    {
+        // Binary(expr == null) pattern ↔ IsPattern(expr is null) candidate
+        if (pattern is Binary patBin && candidate is IsPattern candIsP)
+            return MatchBinaryPatternToIsNullCandidate(patBin, candIsP, cursor);
+        // IsPattern(expr is null) pattern ↔ Binary(expr == null) candidate
+        if (pattern is IsPattern patIsP && candidate is Binary candBin)
+            return MatchIsNullPatternToBinaryCandidate(patIsP, candBin, cursor);
+
+        return false;
+    }
+
+    /// <summary>
+    /// Pattern is <c>expr == null</c> (Binary), candidate is <c>expr is null</c> (IsPattern).
+    /// Also handles commuted pattern <c>null == expr</c>.
+    /// </summary>
+    private bool MatchBinaryPatternToIsNullCandidate(Binary patternBinary, IsPattern candidateIsPattern, Cursor cursor)
+    {
+        if (patternBinary.Operator.Element != Binary.OperatorType.Equal)
+            return false;
+
+        if (candidateIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+            return false;
+
+        // pattern: {s} == null → match {s} against candidate's expression
+        if (IsNullLiteral(patternBinary.Right))
+            return MatchNode(patternBinary.Left, candidateIsPattern.Expression, cursor);
+        // pattern: null == {s} → match {s} against candidate's expression
+        if (IsNullLiteral(patternBinary.Left))
+            return MatchNode(patternBinary.Right, candidateIsPattern.Expression, cursor);
+
+        return false;
+    }
+
+    /// <summary>
+    /// Pattern is <c>expr is null</c> (IsPattern), candidate is <c>expr == null</c> (Binary).
+    /// Also handles commuted candidate <c>null == expr</c>.
+    /// </summary>
+    private bool MatchIsNullPatternToBinaryCandidate(IsPattern patternIsPattern, Binary candidateBinary, Cursor cursor)
+    {
+        if (candidateBinary.Operator.Element != Binary.OperatorType.Equal)
+            return false;
+
+        if (patternIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+            return false;
+
+        // candidate: expr == null → match pattern's expression against candidate's left
+        if (IsNullLiteral(candidateBinary.Right))
+            return MatchNode(patternIsPattern.Expression, candidateBinary.Left, cursor);
+        // candidate: null == expr → match pattern's expression against candidate's right
+        if (IsNullLiteral(candidateBinary.Left))
+            return MatchNode(patternIsPattern.Expression, candidateBinary.Right, cursor);
+
+        return false;
+    }
+
+    private static bool IsNullLiteral(J node) =>
+        node is Literal { Type: JavaType.Primitive { Kind: JavaType.PrimitiveKind.Null } };
+
+    private static bool HasLiteral(Binary binary) =>
+        binary.Left is Literal || binary.Right is Literal;
 
     /// <summary>
     /// Compare two property values, dispatching based on their type.
