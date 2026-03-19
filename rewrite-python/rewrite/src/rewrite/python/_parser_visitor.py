@@ -547,6 +547,8 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_For(self, node):
         prefix = self.__source_before('for')
         target = self.__convert(node.target)
+        control_prefix = target.prefix
+        target = target.replace(prefix=Space.EMPTY)
         # Wrap target in ExpressionStatement so it can be used as a Statement
         wrapped_target = py.ExpressionStatement(random_id(), target)
         in_prefix = self.__source_before('in')
@@ -555,7 +557,7 @@ class ParserVisitor(ast.NodeVisitor):
 
         control = j.ForEachLoop.Control(
             random_id(),
-            Space.EMPTY,  # No parentheses in Python, so no prefix space for control
+            control_prefix,
             Markers.EMPTY,
             self.__pad_right(wrapped_target, in_prefix),  # Right padding has space before 'in'
             self.__pad_right(iterable, Space.EMPTY)  # ':' comes from body's Block prefix

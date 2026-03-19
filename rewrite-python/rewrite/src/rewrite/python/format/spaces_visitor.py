@@ -319,10 +319,10 @@ class SpacesVisitor(PythonVisitor):
         control = fl.control
 
         # Set single space before loop target e.g. for    i in...: <-> for i in ...:
-        var_rp = control.padding.variable
-        var_rp = var_rp.replace(element=space_before(var_rp.element, True))
+        control = space_before(control, True)
 
         # Set single space before 'in' keyword
+        var_rp = control.padding.variable
         var_rp = space_after_right_padded(var_rp, True)
 
         # Set single space before loop iterable e.g. for i in    []: <-> for i in []:

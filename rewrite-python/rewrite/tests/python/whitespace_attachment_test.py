@@ -16,7 +16,6 @@ import ast
 from pathlib import Path
 from typing import List, Optional, Union
 
-import pytest
 
 from rewrite.java import J
 from rewrite.python.support_types import Py
@@ -282,7 +281,6 @@ def test_try_except():
     assert violations == []
 
 
-@pytest.mark.xfail(reason="Known violation: J.Control has child J.Identifier starting with whitespace")
 def test_for_loop():
     # given
     source = "for i in range(10):\n    print(i)"
