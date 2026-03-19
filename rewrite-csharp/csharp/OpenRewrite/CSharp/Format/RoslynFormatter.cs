@@ -91,14 +91,24 @@ public static class RoslynFormatter
         splicer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
         var splicedCu = splicer.VisitNonNull(cu, 0) as CompilationUnit;
 
-        if (splicedCu == null || ReferenceEquals(splicedCu, cu))
+        if (splicedCu == null)
         {
-            // Splice failed — node not found in CU (stale CU from earlier visitor changes).
+            // Splice produced a non-CU result — should not happen
+            return replacement;
+        }
+
+        if (ReferenceEquals(splicedCu, cu) && FindById(cu, nodeToReplaceId) == null)
+        {
+            // Splice was a no-op AND the node doesn't exist in the CU at all.
+            // This means the CU is stale (earlier visitor changes removed the node).
             // TODO: implement string-level indent normalization fallback
             return replacement;
         }
 
-        // 2. Format the spliced CU, scoped to the replacement subtree
+        // If splicedCu == cu, the replacement was already in the CU (same reference).
+        // Format the CU directly — the reconciler will find it via ReferenceEquals.
+
+        // 2. Format the CU, scoped to the replacement subtree
         var formattedCu = Format(splicedCu, targetSubtree: replacement, stopAfter: stopAfter);
 
         // 3. If formatting didn't change anything, return as-is
