@@ -53,17 +53,20 @@ public sealed class CSharpTemplate
     private readonly IReadOnlyList<string> _usings;
     private readonly IReadOnlyList<string> _context;
     private readonly IReadOnlyDictionary<string, string> _dependencies;
+    private readonly ScaffoldKind? _scaffoldKind;
     private J? _cachedTree;
 
     private CSharpTemplate(string code, Dictionary<string, object> captures,
         IReadOnlyList<string>? usings, IReadOnlyList<string>? context,
-        IReadOnlyDictionary<string, string>? dependencies)
+        IReadOnlyDictionary<string, string>? dependencies,
+        ScaffoldKind? scaffoldKind = null)
     {
         _code = code;
         _captures = captures;
         _usings = usings ?? [];
         _context = context ?? [];
         _dependencies = dependencies ?? new Dictionary<string, string>();
+        _scaffoldKind = scaffoldKind;
     }
 
     /// <summary>
@@ -98,11 +101,90 @@ public sealed class CSharpTemplate
     }
 
     /// <summary>
+    /// Create a template that produces an expression.
+    /// Scaffolds as <c>class __T__ { object __v__ = &lt;code&gt;; }</c> and extracts the initializer.
+    /// </summary>
+    public static CSharpTemplate Expression(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.Expression);
+    }
+
+    /// <inheritdoc cref="Expression(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpTemplate Expression(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.Expression);
+    }
+
+    /// <summary>
+    /// Create a template that produces a statement.
+    /// Scaffolds as <c>class __T__ { void __M__() { &lt;code&gt;; } }</c> and extracts the statement.
+    /// Unlike <see cref="Create(string, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>,
+    /// this does not auto-unwrap ExpressionStatements.
+    /// </summary>
+    public static CSharpTemplate Statement(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.Statement);
+    }
+
+    /// <inheritdoc cref="Statement(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpTemplate Statement(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.Statement);
+    }
+
+    /// <summary>
+    /// Create a template that produces a class member (method, field, property, etc.).
+    /// Scaffolds as <c>class __T__ { &lt;code&gt; }</c> and extracts the first body member.
+    /// </summary>
+    public static CSharpTemplate ClassMember(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.ClassMember);
+    }
+
+    /// <inheritdoc cref="ClassMember(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpTemplate ClassMember(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.ClassMember);
+    }
+
+    /// <summary>
+    /// Create a template that produces an attribute (C# <c>[Foo]</c>).
+    /// Scaffolds as <c>class __T__ { [&lt;code&gt;] void __M__() {} }</c> and extracts the
+    /// <see cref="Annotation"/> node with full type attribution.
+    /// </summary>
+    public static CSharpTemplate Attribute(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.Attribute);
+    }
+
+    /// <inheritdoc cref="Attribute(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpTemplate Attribute(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpTemplate(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.Attribute);
+    }
+
+    /// <summary>
     /// Get the parsed template tree (cached after first parse).
     /// </summary>
     public J GetTree()
     {
-        return _cachedTree ??= TemplateEngine.Parse(_code, _captures, _usings, _context, _dependencies);
+        return _cachedTree ??= TemplateEngine.Parse(_code, _captures, _usings, _context, _dependencies, _scaffoldKind);
     }
 
     /// <summary>

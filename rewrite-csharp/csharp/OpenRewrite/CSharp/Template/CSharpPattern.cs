@@ -40,17 +40,20 @@ public sealed class CSharpPattern
     private readonly IReadOnlyList<string> _usings;
     private readonly IReadOnlyList<string> _context;
     private readonly IReadOnlyDictionary<string, string> _dependencies;
+    private readonly ScaffoldKind? _scaffoldKind;
     private J? _cachedTree;
 
     private CSharpPattern(string code, Dictionary<string, object> captures,
         IReadOnlyList<string>? usings, IReadOnlyList<string>? context,
-        IReadOnlyDictionary<string, string>? dependencies)
+        IReadOnlyDictionary<string, string>? dependencies,
+        ScaffoldKind? scaffoldKind = null)
     {
         _code = code;
         _captures = captures;
         _usings = usings ?? [];
         _context = context ?? [];
         _dependencies = dependencies ?? new Dictionary<string, string>();
+        _scaffoldKind = scaffoldKind;
     }
 
     /// <summary>
@@ -84,11 +87,83 @@ public sealed class CSharpPattern
     }
 
     /// <summary>
+    /// Create a pattern that matches an expression.
+    /// </summary>
+    public static CSharpPattern Expression(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.Expression);
+    }
+
+    /// <inheritdoc cref="Expression(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpPattern Expression(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.Expression);
+    }
+
+    /// <summary>
+    /// Create a pattern that matches a statement.
+    /// </summary>
+    public static CSharpPattern Statement(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.Statement);
+    }
+
+    /// <inheritdoc cref="Statement(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpPattern Statement(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.Statement);
+    }
+
+    /// <summary>
+    /// Create a pattern that matches a class member (method, field, property, etc.).
+    /// </summary>
+    public static CSharpPattern ClassMember(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.ClassMember);
+    }
+
+    /// <inheritdoc cref="ClassMember(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpPattern ClassMember(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.ClassMember);
+    }
+
+    /// <summary>
+    /// Create a pattern that matches an attribute (C# <c>[Foo]</c>).
+    /// </summary>
+    public static CSharpPattern Attribute(TemplateStringHandler handler,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies, ScaffoldKind.Attribute);
+    }
+
+    /// <inheritdoc cref="Attribute(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    public static CSharpPattern Attribute(string code,
+        IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
+        IReadOnlyDictionary<string, string>? dependencies = null)
+    {
+        return new CSharpPattern(code, new Dictionary<string, object>(), usings, context, dependencies, ScaffoldKind.Attribute);
+    }
+
+    /// <summary>
     /// Get the parsed pattern tree (cached after first parse).
     /// </summary>
     public J GetTree()
     {
-        return _cachedTree ??= TemplateEngine.Parse(_code, _captures, _usings, _context, _dependencies);
+        return _cachedTree ??= TemplateEngine.Parse(_code, _captures, _usings, _context, _dependencies, _scaffoldKind);
     }
 
     /// <summary>
