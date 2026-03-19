@@ -2511,4 +2511,115 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeFullyQualifiedAnnotationInPackageInfo() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+              "a.Anno1",
+              "b.Anno2", true)),
+          java(
+            """
+              package a;
+              public @interface Anno1 {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public @interface Anno2 {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              @a.Anno1
+              package com.example;
+              """,
+            """
+              @Anno2
+              package com.example;
+
+              import b.Anno2;
+              """,
+            spec -> spec.path("com/example/package-info.java")
+          )
+        );
+    }
+
+    @Test
+    void changeFullyQualifiedAnnotationInPackageInfoWithAnnotationType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+              "a.Anno1",
+              "b.Anno2", true)),
+          java(
+            """
+              package a;
+              public @interface Anno1 {
+                  String value() default "";
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public @interface Anno2 {
+                  String value() default "";
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              @a.Anno1(value = "http://example.com")
+              package com.example;
+              """,
+            """
+              @Anno2(value = "http://example.com")
+              package com.example;
+
+              import b.Anno2;
+              """,
+            spec -> spec.path("com/example/package-info.java")
+          )
+        );
+    }
+
+    @Test
+    void changeImportedAnnotationInPackageInfo() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+              "a.Anno1",
+              "b.Anno2", true)),
+          java(
+            """
+              package a;
+              public @interface Anno1 {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public @interface Anno2 {}
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              @Anno1
+              package com.example;
+
+              import a.Anno1;
+              """,
+            """
+              @Anno2
+              package com.example;
+
+              import b.Anno2;
+              """,
+            spec -> spec.path("com/example/package-info.java")
+          )
+        );
+    }
 }
