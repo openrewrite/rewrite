@@ -132,6 +132,9 @@ tasks.withType<Test> {
         if (!project.hasProperty("includeWorkingSetFull")) {
             excludeTags("workingSet-full")
         }
+        if (!project.hasProperty("includeSlow")) {
+            excludeTags("slow")
+        }
     }
     // Add timeout to identify hanging tests
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
