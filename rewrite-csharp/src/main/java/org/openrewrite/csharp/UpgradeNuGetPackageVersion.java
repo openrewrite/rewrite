@@ -157,7 +157,14 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
 
                 if ("PackageReference".equals(t.getName())) {
                     String include = getAttributeValue(t, "Include");
-                    String targetVersion = include != null ? acc.resolvedVersions.get(include) : null;
+                    String resolvedVersion = include != null ? acc.resolvedVersions.get(include) : null;
+                    // Fall back to exact version when scan phase didn't populate resolved versions
+                    // (e.g., when called via RPC proxy without scan phase)
+                    if (resolvedVersion == null && include != null && matchesGlob(include, packageName)
+                            && versionComparator instanceof org.openrewrite.semver.ExactVersion) {
+                        resolvedVersion = ((org.openrewrite.semver.ExactVersion) versionComparator).getVersion();
+                    }
+                    String targetVersion = resolvedVersion;
                     if (targetVersion != null) {
                         String versionAttr = getAttributeValue(t, "Version");
                         if (versionAttr != null && !isPropertyReference(versionAttr)

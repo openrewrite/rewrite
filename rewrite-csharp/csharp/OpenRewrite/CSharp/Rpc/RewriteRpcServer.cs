@@ -1037,7 +1037,10 @@ public class RewriteRpcServer
         }
     }
 
-    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
+    private static readonly string[] Languages = [
+        "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+        "org.openrewrite.xml.tree.Xml$Document",
+    ];
 
     [JsonRpcMethod("GetLanguages")]
     public Task<string[]> GetLanguages()
@@ -1146,13 +1149,8 @@ public class RewriteRpcServer
             var visitor = recipe.GetVisitor();
 
             var innerVisitor = visitor;
-            if (visitor is Check check && check.Precondition is RpcVisitor rpcPrecondition)
+            if (visitor is Check check)
             {
-                response.EditPreconditions.Add(new Precondition
-                {
-                    VisitorName = rpcPrecondition.VisitorName,
-                    VisitorOptions = new()
-                });
                 innerVisitor = check.Visitor;
             }
 

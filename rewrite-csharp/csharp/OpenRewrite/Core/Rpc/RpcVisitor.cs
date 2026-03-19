@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 using OpenRewrite.CSharp.Rpc;
-using OpenRewrite.Java;
 
 namespace OpenRewrite.Core.Rpc;
 
 /// <summary>
 /// A visitor that delegates to a named visitor on the Java RPC peer.
-/// Mirrors TypeScript's RpcVisitor — calls StopAfterPreVisit in PreVisit,
-/// then sends the tree to Java via Visit RPC.
+/// Handles any tree type (C#, XML, etc.) by determining the correct
+/// Java source file type from the C# tree's type.
 /// </summary>
-public class RpcVisitor : JavaVisitor<ExecutionContext>
+public class RpcVisitor : TreeVisitor<Tree, ExecutionContext>
 {
     private readonly RewriteRpcServer _rpc;
     private readonly string _visitorName;
@@ -36,7 +35,7 @@ public class RpcVisitor : JavaVisitor<ExecutionContext>
         _visitorName = visitorName;
     }
 
-    public override J? PreVisit(J tree, ExecutionContext ctx)
+    public override Tree? PreVisit(Tree tree, ExecutionContext ctx)
     {
         StopAfterPreVisit();
 
@@ -46,12 +45,20 @@ public class RpcVisitor : JavaVisitor<ExecutionContext>
         var treeId = sf.Id.ToString();
         _rpc.StoreLocalObject(treeId, sf);
 
-        // Store the execution context so Java can retrieve it via GetObject
         var ctxId = Guid.NewGuid().ToString();
         _rpc.StoreLocalObject(ctxId, ctx);
 
-        var result = _rpc.VisitOnRemote(_visitorName, treeId,
-            "org.openrewrite.csharp.tree.Cs$CompilationUnit", ctxId);
-        return result as J;
+        var sourceFileType = RpcSendQueue.ToJavaTypeName(sf.GetType())
+                             ?? "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+        try
+        {
+            return _rpc.VisitOnRemote(_visitorName, treeId, sourceFileType, ctxId);
+        }
+        catch
+        {
+            // The Java-side visitor may not be able to handle this tree type
+            // (e.g., a JavaVisitor receiving an Xml.Document). Return unchanged.
+            return tree;
+        }
     }
 }
