@@ -55,10 +55,18 @@ internal static class TemplateEngine
     {
         var preamble = BuildTypePreamble(captures);
         var scaffold = BuildScaffold(code, preamble, usings, context);
-        // TODO: when dependencies are provided, use DependencyWorkspace to create a
-        // project with NuGet references so Roslyn can resolve external types
         var parser = new CSharpParser();
-        var cu = parser.Parse(scaffold, "__template__.cs");
+
+        CompilationUnit cu;
+        if (dependencies.Count > 0)
+        {
+            var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
+            cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
+        }
+        else
+        {
+            cu = parser.Parse(scaffold, "__template__.cs");
+        }
 
         return ExtractTemplateNode(cu, code);
     }
