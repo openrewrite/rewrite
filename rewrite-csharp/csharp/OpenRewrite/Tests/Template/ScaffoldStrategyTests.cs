@@ -195,4 +195,19 @@ public class ScaffoldStrategyTests
         var tree = pat.GetTree();
         Assert.IsType<MethodDeclaration>(tree);
     }
+
+    // === Cache isolation ===
+
+    [Fact]
+    public void CacheIsolatesDifferentScaffoldKinds()
+    {
+        // Same code string, different scaffold kinds — must produce different AST types
+        var exprTree = CSharpTemplate.Expression("42").GetTree();
+        var stmtTree = CSharpTemplate.Statement("42").GetTree();
+
+        Assert.IsType<Literal>(exprTree);
+        // Statement wraps "42;" in a method body — produces ExpressionStatement, not bare Literal
+        Assert.IsType<ExpressionStatement>(stmtTree);
+        Assert.NotSame(exprTree, stmtTree);
+    }
 }

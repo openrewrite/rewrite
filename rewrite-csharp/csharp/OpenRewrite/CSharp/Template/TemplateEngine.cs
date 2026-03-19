@@ -170,38 +170,36 @@ internal static class TemplateEngine
             sb.AppendLine(c);
         }
 
+        sb.AppendLine("class __T__ {");
+
+        // Typed capture declarations as class fields — in scope for all scaffold kinds
+        foreach (var decl in preamble)
+        {
+            sb.Append("    ");
+            sb.AppendLine(decl);
+        }
+
         switch (scaffoldKind)
         {
             case ScaffoldKind.Expression:
-                sb.AppendLine("class __T__ {");
-                AppendPreamble(sb, preamble);
-                sb.Append("    var __e__ = ");
+                sb.Append("    object __v__ = ");
                 sb.Append(code);
                 sb.AppendLine(";");
-                sb.AppendLine("}");
                 break;
 
             case ScaffoldKind.ClassMember:
-                sb.AppendLine("class __T__ {");
-                AppendPreamble(sb, preamble);
                 sb.Append("    ");
                 sb.AppendLine(code);
-                sb.AppendLine("}");
                 break;
 
             case ScaffoldKind.Attribute:
-                sb.AppendLine("class __T__ {");
-                AppendPreamble(sb, preamble);
                 sb.Append("    [");
                 sb.Append(code);
                 sb.AppendLine("]");
                 sb.AppendLine("    void __M__() {}");
-                sb.AppendLine("}");
                 break;
 
             default: // null or Statement — legacy behavior
-                sb.AppendLine("class __T__ {");
-                AppendPreamble(sb, preamble);
                 sb.AppendLine("    void __M__() {");
                 sb.Append("        ");
                 sb.Append(code);
@@ -210,20 +208,12 @@ internal static class TemplateEngine
                     sb.Append(';');
                 sb.AppendLine();
                 sb.AppendLine("    }");
-                sb.AppendLine("}");
                 break;
         }
 
-        return sb.ToString();
-    }
+        sb.AppendLine("}");
 
-    private static void AppendPreamble(System.Text.StringBuilder sb, IReadOnlyList<string> preamble)
-    {
-        foreach (var decl in preamble)
-        {
-            sb.Append("    ");
-            sb.AppendLine(decl);
-        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -303,42 +293,46 @@ internal static class TemplateEngine
     }
 
     /// <summary>
-    /// Extract the initializer expression from <c>var __e__ = &lt;code&gt;;</c>.
+    /// Extract the initializer expression from <c>object __v__ = &lt;code&gt;;</c>.
     /// </summary>
     private static J ExtractExpression(ClassDeclaration classDecl)
     {
-        // The variable declaration is a class field: var __e__ = <code>;
+        // The field declaration: object __v__ = <code>;
         var varDecl = FindFirst<VariableDeclarations>(classDecl.Body.Statements
             .Select(s => s.Element).ToList());
         if (varDecl == null)
-            throw new InvalidOperationException("Template scaffold did not produce a variable declaration");
+            throw new InvalidOperationException("Template scaffold did not produce a field declaration");
 
         var namedVarPadded = varDecl.Variables.FirstOrDefault();
         if (namedVarPadded == null)
-            throw new InvalidOperationException("Template scaffold variable has no named variable");
+            throw new InvalidOperationException("Template scaffold field has no named variable");
 
         var initializer = namedVarPadded.Element.Initializer;
         if (initializer == null)
-            throw new InvalidOperationException("Template scaffold variable has no initializer");
+            throw new InvalidOperationException("Template scaffold field has no initializer");
 
         return StripPrefix(initializer.Element);
     }
 
     /// <summary>
-    /// Extract the first class body member from <c>class __T__ { &lt;code&gt; }</c>.
+    /// Extract class body members from <c>class __T__ { &lt;code&gt; }</c>,
+    /// filtering out preamble fields (typed capture declarations).
+    /// Returns a single member if there is one, or the body block if there are multiple.
     /// </summary>
     private static J ExtractClassMember(ClassDeclaration classDecl)
     {
-        // Skip preamble fields (typed capture declarations) — they have placeholder names
-        var members = classDecl.Body.Statements;
-        foreach (var padded in members)
-        {
-            var member = padded.Element;
-            if (!IsPreambleField(member))
-                return StripPrefix(member);
-        }
+        var members = classDecl.Body.Statements
+            .Where(s => !IsPreambleField(s.Element))
+            .ToList();
 
-        throw new InvalidOperationException("Template code did not produce any class members");
+        if (members.Count == 0)
+            throw new InvalidOperationException("Template code did not produce any class members");
+
+        if (members.Count == 1)
+            return StripPrefix(members[0].Element);
+
+        // Multiple members: return the class body with preamble fields removed
+        return classDecl.Body.WithStatements(members);
     }
 
     /// <summary>
@@ -352,16 +346,22 @@ internal static class TemplateEngine
         {
             if (padded.Element is AnnotatedStatement annotated)
             {
-                if (annotated.AttributeLists.Count > 0)
-                {
-                    var attrList = annotated.AttributeLists[0];
-                    if (attrList.Attributes.Count > 0)
-                        return StripPrefix(attrList.Attributes[0].Element);
-                }
+                if (annotated.AttributeLists.Count == 0)
+                    throw new InvalidOperationException(
+                        "Template scaffold produced an annotated method with no attribute lists");
+
+                var attrList = annotated.AttributeLists[0];
+                if (attrList.Attributes.Count == 0)
+                    throw new InvalidOperationException(
+                        "Template scaffold produced an attribute list with no attributes");
+
+                return StripPrefix(attrList.Attributes[0].Element);
             }
         }
 
-        throw new InvalidOperationException("Template scaffold did not produce an annotated method");
+        throw new InvalidOperationException(
+            "Template scaffold did not produce an annotated method. " +
+            "Ensure the attribute syntax is valid C# (e.g., \"Test\" not \"[Test]\").");
     }
 
     /// <summary>
