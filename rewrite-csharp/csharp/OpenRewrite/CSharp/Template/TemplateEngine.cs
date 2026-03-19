@@ -62,16 +62,43 @@ internal static class TemplateEngine
     /// These are emitted as class fields on the scaffold class so they are in scope
     /// inside the method body. This avoids mixing preamble statements with the template
     /// code, so <see cref="ExtractTemplateNode"/> doesn't need to skip anything.
+    /// Dispatches on <see cref="CaptureKind"/> to generate the right scaffold form.
     /// </summary>
     private static List<string> BuildTypePreamble(IReadOnlyDictionary<string, object> captures)
     {
         var preamble = new List<string>();
         foreach (var kvp in captures)
         {
-            var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
-            if (!string.IsNullOrEmpty(captureType))
+            var kind = kvp.Value.GetType().GetProperty("Kind")?.GetValue(kvp.Value);
+            var placeholder = Placeholder.ToPlaceholder(kvp.Key);
+
+            if (kind is CaptureKind captureKind)
             {
-                preamble.Add($"{captureType} {Placeholder.ToPlaceholder(kvp.Key)};");
+                switch (captureKind)
+                {
+                    case CaptureKind.Expression:
+                        var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+                        if (!string.IsNullOrEmpty(captureType))
+                        {
+                            preamble.Add($"{captureType} {placeholder};");
+                        }
+                        break;
+                    case CaptureKind.Type:
+                        // TODO: emit scaffold that places placeholder in a type position
+                        break;
+                    case CaptureKind.Name:
+                        // No preamble needed — pure identifier substitution
+                        break;
+                }
+            }
+            else
+            {
+                // Fallback for captures without Kind (shouldn't happen, but defensive)
+                var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
+                if (!string.IsNullOrEmpty(captureType))
+                {
+                    preamble.Add($"{captureType} {placeholder};");
+                }
             }
         }
         return preamble;

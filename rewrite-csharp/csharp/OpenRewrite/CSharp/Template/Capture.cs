@@ -19,6 +19,20 @@ using OpenRewrite.Java;
 namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
+/// Describes what syntactic position a capture occupies.
+/// Used internally by the template engine to generate appropriate scaffold code.
+/// </summary>
+internal enum CaptureKind
+{
+    /// <summary>An expression-position capture (default). Scaffold emits a typed field declaration.</summary>
+    Expression,
+    /// <summary>A type-position capture (e.g., base type, generic argument). Scaffold strategy TBD.</summary>
+    Type,
+    /// <summary>A name/identifier-position capture. No preamble needed; pure identifier substitution.</summary>
+    Name,
+}
+
+/// <summary>
 /// A named placeholder for pattern matching and template substitution.
 /// When used in an interpolated string passed to <see cref="CSharpTemplate.Create"/>
 /// or <see cref="CSharpPattern.Create"/>, the <see cref="TemplateStringHandler"/>
@@ -32,11 +46,13 @@ public sealed class Capture<T> where T : J
     public int? MinCount { get; }
     public int? MaxCount { get; }
     public string? Type { get; }
+    internal CaptureKind Kind { get; }
     public Func<T, Cursor, bool>? Constraint { get; }
 
     internal Capture(string name, bool variadic = false,
         int? minCount = null, int? maxCount = null,
         string? type = null,
+        CaptureKind kind = CaptureKind.Expression,
         Func<T, Cursor, bool>? constraint = null)
     {
         Name = name;
@@ -44,6 +60,7 @@ public sealed class Capture<T> where T : J
         MinCount = minCount;
         MaxCount = maxCount;
         Type = type;
+        Kind = kind;
         Constraint = constraint;
     }
 
@@ -79,6 +96,23 @@ public static class Capture
         int? min = null, int? max = null) where T : J
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
             variadic: true, minCount: min, maxCount: max);
+
+    /// <summary>
+    /// Create a capture for a type-position node (e.g., base type, generic argument, variable type).
+    /// The template engine will use an appropriate scaffold strategy so Roslyn parses
+    /// the placeholder in a type context.
+    /// </summary>
+    public static Capture<NameTree> Type(string? name = null)
+        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
+            kind: CaptureKind.Type);
+
+    /// <summary>
+    /// Create a capture for a name/identifier-position node.
+    /// No preamble declaration is needed; the placeholder is substituted directly.
+    /// </summary>
+    public static Capture<Identifier> Name(string? name = null)
+        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
+            kind: CaptureKind.Name);
 
     /// <summary>
     /// Create a capture with a constraint predicate that must be satisfied for matching.
