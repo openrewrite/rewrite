@@ -121,6 +121,8 @@ public class RewriteRpc {
      */
     private final List<RecipeBundleResolver> resolvers = new ArrayList<>();
 
+    private final RecipeMarketplace marketplace;
+
     /**
      * Replace the resolver list. Useful when the RPC process is started before all
      * resolvers are built (e.g. the NuGet resolver starts the C# RPC during
@@ -133,6 +135,7 @@ public class RewriteRpc {
 
     public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
+        this.marketplace = marketplace;
         this.resolvers.addAll(resolvers);
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
@@ -330,12 +333,23 @@ public class RewriteRpc {
         return remoteLanguages;
     }
 
-    public RpcRecipe prepareRecipe(String id) {
+    public Recipe prepareRecipe(String id) {
         return prepareRecipe(id, emptyMap());
     }
 
-    public RpcRecipe prepareRecipe(String id, Map<String, Object> options) {
+    public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+
+        if (r.getDelegatesTo() != null) {
+            PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
+            RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
+            if (listing == null) {
+                throw new IllegalStateException(
+                        "Remote declared delegatesTo " + d.getRecipeName() +
+                        " but no recipe found in marketplace.");
+            }
+            return listing.prepare(resolvers, d.getOptions());
+        }
 
         // FIXME do this validation on the server side instead
         for (OptionDescriptor option : r.getDescriptor().getOptions()) {
