@@ -25,8 +25,6 @@ import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
-
 public class NoSystemScopeDependencies extends Recipe {
 
     @Getter
@@ -53,7 +51,8 @@ public class NoSystemScopeDependencies extends Recipe {
 
                     try {
                         MavenMetadata metadata = downloadMetadata(groupId, artifactId, ctx);
-                        if (!metadata.getVersioning().getVersions().contains(version)) {
+                        if (metadata.getVersioning() == null ||
+                                !metadata.getVersioning().getVersions().contains(version)) {
                             return super.visitTag(tag, ctx);
                         }
                     } catch (MavenDownloadingException e) {
