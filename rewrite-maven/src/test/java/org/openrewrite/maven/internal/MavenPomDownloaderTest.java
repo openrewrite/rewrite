@@ -716,67 +716,32 @@ class MavenPomDownloaderTest implements RewriteTest {
             assertThat(rawMetaData.getVersioning().getVersions()).containsExactly("1.0.0", "2.0.0");
         }
 
-        @Test
-        void normalizeFileUriEncodesNonAsciiCharacters(@TempDir Path tempDir) {
-            Path repo = tempDir.resolve("müller/.m2/repository");
-            String absPath = repo.toAbsolutePath().toString().replace('\\', '/');
-            String rawUri = "file://" + (absPath.startsWith("/") ? "" : "/") + absPath + "/";
-
-            String normalized = MavenPomDownloader.normalizeFileUri(rawUri);
-
-            // After normalization, the URI should be parseable and round-trip via Paths.get(URI)
-            assertThat(normalized).contains("m%C3%BCller");
+        @ParameterizedTest
+        @CsvSource({
+          // Already valid — idempotent
+          "'file:///tmp/repo/',                                          'file:///tmp/repo/'",
+          "'file:///tmp/repo',                                           'file:///tmp/repo'",
+          // Already percent-encoded — idempotent
+          "'file:///tmp/m%C3%BCller/repo/',                              'file:///tmp/m%C3%BCller/repo/'",
+          // Raw non-ASCII characters get encoded
+          "'file:///tmp/müller/repo/',                                   'file:///tmp/m%C3%BCller/repo/'",
+          // Spaces get encoded
+          "'file:///tmp/has space/repo/',                                'file:///tmp/has%20space/repo/'",
+          // Backslashes normalized to forward slashes
+          "'file:///tmp/path\\with\\backslashes/repo/',                  'file:///tmp/path/with/backslashes/repo/'",
+          // Windows drive letter preserved
+          "'file:///C:/Users/test/.m2/repository/',                      'file:///C:/Users/test/.m2/repository/'",
+          // Malformed Windows URI (two slashes + backslashes) normalized
+          "'file://C:\\Users\\test\\.m2\\repository/',                   'file:///C:/Users/test/.m2/repository/'",
+          // Malformed Windows URI with non-ASCII
+          "'file://C:\\Users\\müller\\.m2\\repository/',                 'file:///C:/Users/m%C3%BCller/.m2/repository/'",
+        })
+        void normalizeFileUri(String input, String expected) {
+            String normalized = MavenPomDownloader.normalizeFileUri(input);
+            assertThat(normalized).isEqualTo(expected);
             assertDoesNotThrow(() -> Paths.get(URI.create(normalized)));
         }
 
-        @Test
-        void normalizeFileUriPreservesAlreadyEncodedUri(@TempDir Path tempDir) {
-            Path repo = tempDir.resolve("müller/.m2/repository");
-            String encoded = repo.toUri().toASCIIString();
-
-            String normalized = MavenPomDownloader.normalizeFileUri(encoded);
-
-            assertThat(normalized).isEqualTo(encoded);
-        }
-
-        @Test
-        void normalizeFileUriPreservesTrailingSlash() {
-            String normalized = MavenPomDownloader.normalizeFileUri("file:///tmp/repo/");
-            assertThat(normalized).endsWith("/");
-        }
-
-        @Test
-        void normalizeFileUriHandlesWindowsStylePaths() {
-            // On non-Windows this won't produce a C: drive path, but it should
-            // at least not fail and should normalize backslashes
-            String normalized = MavenPomDownloader.normalizeFileUri("file:///tmp/path\\with\\backslashes/repo/");
-            assertThat(normalized).doesNotContain("\\");
-            assertDoesNotThrow(() -> Paths.get(URI.create(normalized)));
-        }
-
-        @Test
-        void normalizeFileUriHandlesMalformedWindowsUri() {
-            // Reproduces the exact failure from Windows CI: file:// + backslash path + non-ASCII
-            // URI.create() would throw "Illegal character in authority" on this input
-            String malformed = "file://C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\müller\\.m2\\repository/";
-            assertThatThrownBy(() -> URI.create(malformed))
-              .isInstanceOf(IllegalArgumentException.class);
-
-            // normalizeFileUri should handle it gracefully
-            String normalized = MavenPomDownloader.normalizeFileUri(malformed);
-            assertThat(normalized).doesNotContain("\\");
-            assertThat(normalized).contains("m%C3%BCller");
-            assertThat(normalized).startsWith("file:");
-            assertDoesNotThrow(() -> URI.create(normalized));
-        }
-
-        @Test
-        void normalizeFileUriHandlesWindowsDriveLetter() {
-            String normalized = MavenPomDownloader.normalizeFileUri("file:///C:/Users/test/.m2/repository/");
-            assertThat(normalized).startsWith("file:");
-            assertThat(normalized).endsWith("/");
-            assertDoesNotThrow(() -> Paths.get(URI.create(normalized)));
-        }
 
         @Test
         void deriveMetaDataFromHtmlBasedRepository() {
