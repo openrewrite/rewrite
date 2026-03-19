@@ -522,6 +522,38 @@ public class AutoFormatTests
         }
     }
 
+    [Fact]
+    public void FormatSubtreeFallsBackWhenSpliceFails()
+    {
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        int x = 1;\n" +
+            "    }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Create a simple block with a brand-new ID that doesn't exist in the CU
+        var block = new Block(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            new List<JRightPadded<Statement>>(),
+            Space.Empty
+        );
+
+        // FormatSubtree with a nonexistent nodeToReplaceId — splice will fail
+        var result = RoslynFormatter.FormatSubtree(cu, Guid.NewGuid(), block, stopAfter: null);
+
+        // Should not throw — should return the replacement unchanged
+        Assert.NotNull(result);
+        Assert.Equal(block.Id, result.Id);
+    }
+
     private class ForLoopFinder(Action<ForLoop> onFound) : CSharpVisitor<int>
     {
         public override J VisitForLoop(ForLoop forLoop, int p)
