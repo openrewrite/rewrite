@@ -108,14 +108,6 @@ public class RewriteRpc {
     }
 
     /**
-     * Creates a new RPC interface that can be used to communicate with a remote.
-     *
-     * @param marketplace The marketplace of recipes that this peer makes available.
-     *                    Even if this peer is the host process, configuring this
-     *                    marketplace allows the remote peer to discover what recipes
-     *                    the host process has available for its use in composite recipes.
-     */
-    /**
      * Mutable resolver list so it can be updated after construction
      * (e.g. when the RPC process is started eagerly before all resolvers are built).
      */
@@ -133,6 +125,15 @@ public class RewriteRpc {
         this.resolvers.addAll(resolvers);
     }
 
+    /**
+     * Creates a new RPC interface that can be used to communicate with a remote.
+     *
+     * @param marketplace The marketplace of recipes that this peer makes available.
+     *                    Even if this peer is the host process, configuring this
+     *                    marketplace allows the remote peer to discover what recipes
+     *                    the host process has available for its use in composite recipes.
+     * @param resolvers   The initial set of recipe bundle resolvers.
+     */
     public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
         this.marketplace = marketplace;
