@@ -488,7 +488,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(na, p);
 
         // Don't print "new" when inside a stackalloc expression
-        if (Cursor.GetParentTreeCursor().Value is not StackAllocExpression)
+        if (Cursor.ParentTree.Value is not StackAllocExpression)
         {
             p.Append("new");
         }
@@ -1847,7 +1847,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         // Determine brace count from parent InterpolatedString delimiter (e.g., $$""" → 2 braces)
         int braceCount = 1;
-        var parentCursor = Cursor.GetParentTreeCursor();
+        var parentCursor = Cursor.ParentTree;
         if (parentCursor.Value is InterpolatedString istr)
         {
             int dollarCount = 0;
