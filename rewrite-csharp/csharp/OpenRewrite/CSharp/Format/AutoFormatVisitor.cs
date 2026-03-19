@@ -49,10 +49,26 @@ public class AutoFormatVisitor<P> : CSharpVisitor<P>
         if (cu == null)
             return tree;
 
-        var formattedCu = RoslynFormatter.Format(cu, targetSubtree: tree, stopAfter: _stopAfter);
+        // The cursor's CU is the old tree before structural changes.
+        // Splice the modified subtree into the CU so that the print/format/reconcile
+        // pipeline sees the actual structural change (e.g. a new Block wrapping a statement).
+        var updatedCu = SpliceIntoTree(cu, tree);
+
+        var formattedCu = RoslynFormatter.Format(updatedCu, targetSubtree: tree, stopAfter: _stopAfter);
 
         // Find the target subtree in the formatted CU by matching ID
         return FindById(formattedCu, tree.Id) ?? tree;
+    }
+
+    /// <summary>
+    /// Replaces the node in <paramref name="root"/> whose ID matches <paramref name="replacement"/>
+    /// with <paramref name="replacement"/> itself. Returns the updated root.
+    /// </summary>
+    private static CompilationUnit SpliceIntoTree(CompilationUnit root, J replacement)
+    {
+        var splicer = new NodeSplicer(replacement);
+        var result = splicer.Visit(root, 0);
+        return result as CompilationUnit ?? root;
     }
 
     private static J? FindById(J root, Guid targetId)
@@ -72,6 +88,20 @@ public class AutoFormatVisitor<P> : CSharpVisitor<P>
                 onFound(tree);
                 return tree;
             }
+            return base.Accept(tree, p);
+        }
+    }
+
+    /// <summary>
+    /// Replaces a node by ID, returning the replacement (which preserves the reference
+    /// identity needed by WhitespaceReconciler's ReferenceEquals check).
+    /// </summary>
+    private class NodeSplicer(J replacement) : CSharpVisitor<int>
+    {
+        protected override J? Accept(J tree, int p)
+        {
+            if (tree.Id == replacement.Id)
+                return replacement;
             return base.Accept(tree, p);
         }
     }

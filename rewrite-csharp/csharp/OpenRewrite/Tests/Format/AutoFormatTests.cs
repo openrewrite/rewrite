@@ -384,6 +384,125 @@ public class AutoFormatTests
     }
 
     [Fact]
+    public void SubtreeAutoFormatWorksAfterStructuralChange()
+    {
+        // Source has a for loop with no braces
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        for (int i = 0; i < 10; i++)\n" +
+            "            DoWork();\n" +
+            "    }\n" +
+            "    void DoWork() { }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Find the for loop
+        ForLoop? forLoop = null;
+        new ForLoopFinder(f => forLoop = f).Visit(cu, 0);
+        Assert.NotNull(forLoop);
+
+        // Structurally modify: wrap body in a Block with empty spaces
+        var stmt = forLoop.Body.Element;
+        var stmtPadded = new JRightPadded<Statement>(stmt, Space.Empty, Markers.Empty);
+        var block = new Block(
+            Guid.NewGuid(),
+            Space.Empty,
+            Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            new List<JRightPadded<Statement>> { stmtPadded },
+            Space.Empty
+        );
+        var modifiedForLoop = forLoop.WithBody(forLoop.Body.WithElement(block));
+
+        // Build cursor: root → CU → forLoop (points to OLD forLoop in old CU)
+        var rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var cuCursor = new Cursor(rootCursor, cu);
+        var forCursor = new Cursor(cuCursor, forLoop);
+
+        // AutoFormat the modified subtree
+        var formatted = modifiedForLoop.AutoFormat(forCursor);
+
+        // The result should have properly indented braces
+        var printed = _printer.Print(formatted);
+        Assert.Contains("{\n", printed);
+        Assert.Contains("DoWork();", printed);
+        // The block should NOT be left with empty spaces (unformatted)
+        Assert.DoesNotContain("{DoWork", printed);
+    }
+
+    [Fact]
+    public void AutoFormatFromVisitorWithExplicitCursor()
+    {
+        // Verify AutoFormat works when called from inside a visitor using the
+        // extension method with the visitor's cursor, matching JS/Python pattern
+        const string source =
+            "class Foo\n" +
+            "{\n" +
+            "    void Bar()\n" +
+            "    {\n" +
+            "        for (int i = 0; i < 10; i++)\n" +
+            "            DoWork();\n" +
+            "    }\n" +
+            "    void DoWork() { }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+
+        // Run a visitor that wraps the for-loop body in a block and auto-formats
+        var visitor = new WrapForBodyInBlock();
+        var result = visitor.Visit(cu, 0)!;
+
+        var printed = _printer.Print(result);
+        // The block should be properly formatted, not left with empty spaces
+        Assert.Contains("{\n", printed);
+        Assert.DoesNotContain("{DoWork", printed);
+    }
+
+    /// <summary>
+    /// Visitor that wraps a for-loop's body in a Block and calls AutoFormat
+    /// using the extension method with an explicit cursor — the same pattern
+    /// used in JS and Python.
+    /// </summary>
+    private class WrapForBodyInBlock : CSharpVisitor<int>
+    {
+        public override J VisitForLoop(ForLoop forLoop, int p)
+        {
+            var fl = (ForLoop)base.VisitForLoop(forLoop, p);
+
+            // Only wrap if body is not already a block
+            if (fl.Body.Element is Block)
+                return fl;
+
+            var stmt = fl.Body.Element;
+            var stmtPadded = new JRightPadded<Statement>(stmt, Space.Empty, Markers.Empty);
+            var block = new Block(
+                Guid.NewGuid(),
+                Space.Empty,
+                Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                new List<JRightPadded<Statement>> { stmtPadded },
+                Space.Empty
+            );
+            var modified = fl.WithBody(fl.Body.WithElement(block));
+
+            return modified.AutoFormat(Cursor.ParentTree);
+        }
+    }
+
+    private class ForLoopFinder(Action<ForLoop> onFound) : CSharpVisitor<int>
+    {
+        public override J VisitForLoop(ForLoop forLoop, int p)
+        {
+            onFound(forLoop);
+            return forLoop;
+        }
+    }
+
+    [Fact]
     public void IntegrationAutoFormatVisitorHandlesControlFlow()
     {
         const string before = """
