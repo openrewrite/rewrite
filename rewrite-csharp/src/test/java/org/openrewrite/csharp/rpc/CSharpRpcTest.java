@@ -15,6 +15,7 @@
  */
 package org.openrewrite.csharp.rpc;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.csharp.tree.Cs;
@@ -35,6 +36,7 @@ import static org.openrewrite.csharp.Assertions.csharp;
  * Integration tests for C# RPC communication.
  * Uses rewriteRun with csharp() assertions for round-trip verification.
  */
+@Tag("slow")
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class CSharpRpcTest implements RewriteTest {
 
