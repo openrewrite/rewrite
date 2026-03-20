@@ -126,4 +126,34 @@ public class CSharpParenthesizeVisitorTests
 
         Assert.IsType<Parentheses<Expression>>(result);
     }
+
+    [Fact]
+    public void MaybeParenthesize_UnaryInsideDifferentUnary_NoParens()
+    {
+        // -placeholder => -(~x) — all prefix unary ops are same precedence, no parens needed
+        var placeholder = MakeId("placeholder");
+        var parent = MakeUnary(Unary.OperatorType.Negative, placeholder);
+        var cursor = new Cursor(new Cursor(null, "root"), parent);
+        cursor = new Cursor(cursor, placeholder);
+
+        var newExpr = MakeUnary(Unary.OperatorType.Complement, MakeId("x"));
+        var result = CSharpParenthesizeVisitor.MaybeParenthesize(newExpr, cursor);
+
+        Assert.IsType<Unary>(result);
+    }
+
+    [Fact]
+    public void MaybeParenthesize_TernaryInsideTernary_AddsParens()
+    {
+        // placeholder ? d : e => (a ? b : c) ? d : e — ternary in condition needs parens
+        var placeholder = MakeId("placeholder");
+        var parent = MakeTernary(placeholder, MakeId("d"), MakeId("e"));
+        var cursor = new Cursor(new Cursor(null, "root"), parent);
+        cursor = new Cursor(cursor, placeholder);
+
+        var newExpr = MakeTernary(MakeId("a"), MakeId("b"), MakeId("c"));
+        var result = CSharpParenthesizeVisitor.MaybeParenthesize(newExpr, cursor);
+
+        Assert.IsType<Parentheses<Expression>>(result);
+    }
 }

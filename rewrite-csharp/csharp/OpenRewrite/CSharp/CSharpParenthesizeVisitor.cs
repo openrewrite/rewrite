@@ -170,25 +170,13 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
-        // Unary inside unary: !!x is fine (same op), but -!x needs parens
-        if (parent is Unary parentUnary)
-        {
-            if (expr is Unary childUnary &&
-                childUnary.Operator.Element == parentUnary.Operator.Element)
-                return expr;
-            return CSharpPrecedences.Parenthesize(expr);
-        }
+        // All prefix unary operators are at the same precedence level (13),
+        // so a unary inside another unary is always unambiguous — no parens needed.
+        // This covers !!x, -(-x), -(~x), ~(!x), etc.
+        if (parent is Unary or CsUnary)
+            return expr;
 
-        if (parent is CsUnary parentCsUnary)
-        {
-            if (expr is CsUnary childCsUnary &&
-                childCsUnary.Operator.Element == parentCsUnary.Operator.Element)
-                return expr;
-            return CSharpPrecedences.Parenthesize(expr);
-        }
-
-        // TypeCast inside unary is handled by MaybeWrapTernaryOrCast,
-        // but unary inside binary still follows normal precedence rules
+        // Unary inside binary/other contexts follows normal precedence rules
         if (NeedsParenthesesInContext(expr))
             return CSharpPrecedences.Parenthesize(expr);
 
@@ -201,8 +189,10 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parent = parentCursor.Value;
 
         // Ternary/TypeCast always need parens when nested inside
-        // Binary, Unary, CsBinary, CsUnary, or IsPattern
-        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern)
+        // Binary, Unary, CsBinary, CsUnary, IsPattern, or another Ternary.
+        // Ternary-inside-ternary: C# parses `a ? b : c ? d : e` right-to-left,
+        // so a ternary used as the condition of another ternary needs parens.
+        if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary)
             return CSharpPrecedences.Parenthesize(expr);
 
         return expr;
