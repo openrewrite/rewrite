@@ -1022,6 +1022,173 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Commutative == and != with literals
+    // ===============================================================
+
+    [Fact]
+    public void CommutedEqualWithNullLiteral()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindBinary($"{s} == null")),
+            CSharp(
+                "class C { void M(object s) { var x = null == s; } }",
+                "class C { void M(object s) { var x = /*~~>*/null == s; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CommutedEqualWithIntLiteral()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindBinary($"{s} == 0")),
+            CSharp(
+                "class C { void M(int s) { var x = 0 == s; } }",
+                "class C { void M(int s) { var x = /*~~>*/0 == s; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CommutedNotEqualWithNullLiteral()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindBinary($"{s} != null")),
+            CSharp(
+                "class C { void M(object s) { var x = null != s; } }",
+                "class C { void M(object s) { var x = /*~~>*/null != s; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void NonCommutedEqualStillMatches()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindBinary($"{s} == null")),
+            CSharp(
+                "class C { void M(object s) { var x = s == null; } }",
+                "class C { void M(object s) { var x = /*~~>*/s == null; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CommutedDoesNotApplyToNonEqualityOperators()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindBinary($"{s} + 1")),
+            CSharp(
+                // 1 + s should NOT match {s} + 1 since + is not == or !=
+                "class C { void M(int s) { var x = 1 + s; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CommutedDoesNotApplyWithoutLiteral()
+    {
+        var a = Capture.Of<Expression>("a");
+        var b = Capture.Of<Expression>("b");
+        RewriteRun(
+            spec => spec.SetRecipe(FindBinary($"{a} == {b}")),
+            CSharp(
+                // Both sides are captures, not literals — commuted match should NOT fire
+                // because both orderings would match anyway via normal matching
+                "class C { void M(int x, int y) { var z = x == y; } }",
+                "class C { void M(int x, int y) { var z = /*~~>*/x == y; } }"
+            )
+        );
+    }
+
+    // ===============================================================
+    // == null ↔ is null equivalence
+    // ===============================================================
+
+    [Fact]
+    public void BinaryEqNullMatchesIsNull()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindNullCheck($"{s} == null")),
+            CSharp(
+                "class C { void M(object s) { var x = s is null; } }",
+                "class C { void M(object s) { var x = /*~~>*/s is null; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void IsNullMatchesBinaryEqNull()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindNullCheck($"{s} is null")),
+            CSharp(
+                "class C { void M(object s) { var x = s == null; } }",
+                "class C { void M(object s) { var x = /*~~>*/s == null; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void CommutedBinaryEqNullMatchesIsNull()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindNullCheck($"{s} == null")),
+            CSharp(
+                // null == s written as is null
+                "class C { void M(object s) { var x = s is null; } }",
+                "class C { void M(object s) { var x = /*~~>*/s is null; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void BinaryNotEqualNullDoesNotMatchIsNull()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindNullCheck($"{s} != null")),
+            CSharp(
+                // != null should NOT match is null (different semantics)
+                "class C { void M(object s) { var x = s is null; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void IsNullDoesNotMatchNonNullBinaryEq()
+    {
+        var s = Capture.Of<Expression>("s");
+        RewriteRun(
+            spec => spec.SetRecipe(FindNullCheck($"{s} is null")),
+            CSharp(
+                // s == 0 should NOT match is null
+                "class C { void M(int s) { var x = s == 0; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ExactIsNullStillMatches()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(FindIsPattern("s is null")),
+            CSharp(
+                "class C { void M(object s) { var x = s is null; } }",
+                "class C { void M(object s) { var x = /*~~>*/s is null; } }"
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
@@ -1065,6 +1232,15 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe FindIsPattern(string c) => Search<IsPattern>(c);
     private static Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
     private static Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
+
+    /// <summary>
+    /// Search for a Binary or IsPattern null-check, matching across both node types.
+    /// </summary>
+    private static Core.Recipe FindNullCheck(TemplateStringHandler h) =>
+        new NullCheckSearchRecipe(CSharpPattern.Create(h));
+
+    private static Core.Recipe FindNullCheck(string c) =>
+        new NullCheckSearchRecipe(CSharpPattern.Create(c));
 }
 
 /// <summary>
@@ -1085,6 +1261,30 @@ file class PatternSearchRecipe<T>(CSharpPattern pat) : Core.Recipe where T : J
             if (tree is T t)
             {
                 return pat.Find(t, Cursor);
+            }
+            return tree;
+        }
+    }
+}
+
+/// <summary>
+/// Search recipe that visits both Binary and IsPattern nodes to support
+/// cross-type null-check equivalence (== null ↔ is null).
+/// </summary>
+file class NullCheckSearchRecipe(CSharpPattern pat) : Core.Recipe
+{
+    public override string DisplayName => "Find null check";
+    public override string Description => "Searches for null checks matching the pattern (== null or is null).";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new SearchVisitor(pat);
+
+    private class SearchVisitor(CSharpPattern pat) : CSharpVisitor<ExecutionContext>
+    {
+        public override J? PreVisit(J tree, ExecutionContext ctx)
+        {
+            if (tree is Binary or IsPattern)
+            {
+                return pat.Find(tree, Cursor);
             }
             return tree;
         }

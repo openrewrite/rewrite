@@ -547,6 +547,8 @@ class ParserVisitor(ast.NodeVisitor):
     def visit_For(self, node):
         prefix = self.__source_before('for')
         target = self.__convert(node.target)
+        control_prefix = target.prefix
+        target = target.replace(prefix=Space.EMPTY)
         # Wrap target in ExpressionStatement so it can be used as a Statement
         wrapped_target = py.ExpressionStatement(random_id(), target)
         in_prefix = self.__source_before('in')
@@ -555,7 +557,7 @@ class ParserVisitor(ast.NodeVisitor):
 
         control = j.ForEachLoop.Control(
             random_id(),
-            Space.EMPTY,  # No parentheses in Python, so no prefix space for control
+            control_prefix,
             Markers.EMPTY,
             self.__pad_right(wrapped_target, in_prefix),  # Right padding has space before 'in'
             self.__pad_right(iterable, Space.EMPTY)  # ':' comes from body's Block prefix
@@ -589,15 +591,19 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_While(self, node):
+        while_prefix = self.__source_before('while')
+        condition = self.__convert(node.test)
+        ctrl_prefix = condition.prefix
+        condition = condition.replace(prefix=Space.EMPTY)
         while_ = j.WhileLoop(
             random_id(),
-            self.__source_before('while'),
+            while_prefix,
             Markers.EMPTY,
             j.ControlParentheses(
                 random_id(),
-                Space.EMPTY,
+                ctrl_prefix,
                 Markers.EMPTY,
-                self.__pad_right(self.__convert(node.test), Space.EMPTY)
+                self.__pad_right(condition, Space.EMPTY)
             ),
             self.__pad_right(self.__convert_block(node.body), Space.EMPTY)
         )
@@ -619,8 +625,11 @@ class ParserVisitor(ast.NodeVisitor):
             prefix = self.__source_before('elif')
         else:
             prefix = self.__source_before('if')
-        condition = j.ControlParentheses(random_id(), Space.EMPTY, Markers.EMPTY,
-                                         self.__pad_right(self.__convert(node.test), Space.EMPTY))
+        cond_expr = self.__convert(node.test)
+        ctrl_prefix = cond_expr.prefix
+        cond_expr = cond_expr.replace(prefix=Space.EMPTY)
+        condition = j.ControlParentheses(random_id(), ctrl_prefix, Markers.EMPTY,
+                                         self.__pad_right(cond_expr, Space.EMPTY))
         then = self.__pad_right(self.__convert_block(node.body), Space.EMPTY)
         elze = None
         if len(node.orelse) > 0:
@@ -1118,15 +1127,19 @@ class ParserVisitor(ast.NodeVisitor):
         )
 
     def visit_Match(self, node):
+        match_prefix = self.__source_before('match')
+        subject = self.__convert(node.subject)
+        ctrl_prefix = subject.prefix
+        subject = subject.replace(prefix=Space.EMPTY)
         return j.Switch(
             random_id(),
-            self.__source_before('match'),
+            match_prefix,
             Markers.EMPTY,
             j.ControlParentheses(
                 random_id(),
-                Space.EMPTY,
+                ctrl_prefix,
                 Markers.EMPTY,
-                self.__pad_right(self.__convert(node.subject), Space.EMPTY)
+                self.__pad_right(subject, Space.EMPTY)
             ),
             self.__convert_block(node.cases)
         )
@@ -1857,6 +1870,23 @@ class ParserVisitor(ast.NodeVisitor):
         return self.__pad_left(self.__source_before(op_str), op)
 
     @staticmethod
+    def _hoist_concat_prefix(node):
+        if not isinstance(node, py.Binary) or node.prefix != Space.EMPTY:
+            return node
+        leftmost = node
+        chain = []
+        while isinstance(leftmost.left, py.Binary):
+            chain.append(leftmost)
+            leftmost = leftmost.left
+        if leftmost.left.prefix == Space.EMPTY:
+            return node
+        prefix = leftmost.left.prefix
+        leftmost = leftmost.replace(left=leftmost.left.replace(prefix=Space.EMPTY))
+        for parent in reversed(chain):
+            leftmost = parent.replace(left=leftmost)
+        return leftmost.replace(prefix=prefix)
+
+    @staticmethod
     def _is_byte_string(tok_string: str) -> bool:
         """Check if a string token represents a byte string (has b/B in prefix)."""
         # Find where the quote starts
@@ -1927,7 +1957,7 @@ class ParserVisitor(ast.NodeVisitor):
             if idx >= len(self._tokens) - 1 and tok.type == token.ENDMARKER:
                 break
 
-        return res
+        return self._hoist_concat_prefix(res)
 
     def __map_literal_simple(self, node):
         """Map a non-string constant (numbers, None, True, False, Ellipsis)."""
@@ -2369,7 +2399,7 @@ class ParserVisitor(ast.NodeVisitor):
 
             is_first = False
 
-        return res
+        return self._hoist_concat_prefix(res)
 
     def visit_TemplateStr(self, node):
         leading_prefix = self.__whitespace()
@@ -2436,7 +2466,7 @@ class ParserVisitor(ast.NodeVisitor):
 
             is_first = False
 
-        return res
+        return self._hoist_concat_prefix(res)
 
     def visit_FormattedValue(self, node):
         raise ValueError("This method should not be called directly")
@@ -3360,7 +3390,7 @@ class ParserVisitor(ast.NodeVisitor):
                 )
             is_first = False
         assert res is not None
-        return res
+        return self._hoist_concat_prefix(res)
 
     def __map_fstring(self, node, prefix: Space, tok: TokenInfo, value_idx: int = 0, *,
                       _start=None, _middle=None, _end=None) -> \
@@ -3482,7 +3512,7 @@ class ParserVisitor(ast.NodeVisitor):
                             self._type_mapping.type(node)
                         )
 
-                    expr = self.__pad_right(nested, Space.EMPTY)
+                    expr = self.__pad_right(self._hoist_concat_prefix(nested), Space.EMPTY)
                 else:
                     expr = self.__pad_right(
                         self.__convert(value_inner),
