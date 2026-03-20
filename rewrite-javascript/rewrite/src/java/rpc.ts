@@ -47,6 +47,7 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
         await q.getAndSend(variable, v => v.owner ? asRef(v.owner) : undefined, owner => this.visit(owner, q));
         await q.getAndSend(variable, v => asRef(v.type), t => this.visit(t, q));
         await q.getAndSendList(variable, v => (v.annotations || []).map(v2 => asRef(v2)), t => Type.signature(t), a => this.visit(a, q));
+        await q.getAndSend(variable, v => v.constantValue);
         return variable;
     }
 
@@ -168,6 +169,7 @@ class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
         variable.owner = await q.receive(variable.owner, owner => this.visit(owner, q));
         variable.type = await q.receive(variable.type, t => this.visit(t, q));
         variable.annotations = await q.receiveList(variable.annotations, a => this.visit(a, q)) || [];
+        variable.constantValue = await q.receive(variable.constantValue);
         return variable;
     }
 

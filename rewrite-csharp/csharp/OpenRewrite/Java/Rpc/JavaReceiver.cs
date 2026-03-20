@@ -806,6 +806,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
                 variable.Type = q.Receive(variable.Type, t => VisitType(t, q)!);
                 variable.Annotations = (IList<JavaType.FullyQualified>?)q.ReceiveList(variable.Annotations,
                     t => (JavaType.FullyQualified)VisitType(t, q)!);
+                variable.ConstantValue = q.Receive<object?>(variable.ConstantValue);
                 break;
         }
 

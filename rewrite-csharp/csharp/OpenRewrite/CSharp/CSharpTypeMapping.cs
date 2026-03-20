@@ -313,6 +313,17 @@ internal class CSharpTypeMapping
 
         var variable = new JavaType.Variable(name, owner, type, null);
         _typeCache[symbol] = variable;
+
+        if (symbol is IFieldSymbol { HasConstantValue: true } field)
+        {
+            var val = field.ConstantValue;
+            if (val is string or bool or char or byte or sbyte or short or ushort
+                or int or uint or long or ulong or float or double or decimal)
+            {
+                variable.ConstantValue = val;
+            }
+        }
+
         return variable;
     }
 

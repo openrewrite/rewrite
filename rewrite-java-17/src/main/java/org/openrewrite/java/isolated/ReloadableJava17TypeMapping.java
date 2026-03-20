@@ -427,7 +427,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 null,
                 symbol.flags_field,
                 symbol.name.toString(),
-                null, null, null);
+                null, null, null,
+                ((Symbol.VarSymbol) symbol).getConstValue());
 
         typeCache.put(signature, variable);
 

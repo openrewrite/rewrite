@@ -790,6 +790,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                     t => VisitType(GetValueNonNull<JavaType>(t), q));
                 q.GetAndSendListAsRef(variable, v => v.Annotations,
                     t => TypeSignature(t), t => VisitType(t, q));
+                q.GetAndSend(variable, v => v.ConstantValue);
                 break;
         }
 

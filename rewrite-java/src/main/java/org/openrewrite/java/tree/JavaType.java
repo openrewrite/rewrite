@@ -1682,26 +1682,34 @@ public interface JavaType {
         @NonFinal
         FullyQualified @Nullable [] annotations;
 
+        @Getter
+        @With
+        @NonFinal
+        @Nullable
+        Object constantValue;
+
         public Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
                         @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
-            this(
-                    managedReference,
-                    flagsBitMap,
-                    name,
-                    owner,
-                    type,
-                    arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY)
-            );
+            this(managedReference, flagsBitMap, name, owner, type,
+                    arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY), null);
+        }
+
+        public Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
+                        @Nullable JavaType type, @Nullable List<FullyQualified> annotations,
+                        @Nullable Object constantValue) {
+            this(managedReference, flagsBitMap, name, owner, type,
+                    arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY), constantValue);
         }
 
         Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
-                 @Nullable JavaType type, FullyQualified @Nullable [] annotations) {
+                 @Nullable JavaType type, FullyQualified @Nullable [] annotations, @Nullable Object constantValue) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
             this.owner = owner;
             this.type = unknownIfNull(type);
             this.annotations = nullIfEmpty(annotations);
+            this.constantValue = constantValue;
         }
 
         @JsonCreator
@@ -1721,7 +1729,7 @@ public interface JavaType {
             if (Arrays.equals(annotationsArray, this.annotations)) {
                 return this;
             }
-            return new Variable(this.managedReference, this.flagsBitMap, this.name, this.owner, this.type, annotationsArray);
+            return new Variable(this.managedReference, this.flagsBitMap, this.name, this.owner, this.type, annotationsArray, this.constantValue);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -1743,11 +1751,12 @@ public interface JavaType {
         }
 
         public Variable unsafeSet(String name, JavaType owner, @Nullable JavaType type,
-                                  FullyQualified @Nullable [] annotations) {
+                                  FullyQualified @Nullable [] annotations, @Nullable Object constantValue) {
             this.name = name;
             this.owner = owner;
             this.type = unknownIfNull(type);
             this.annotations = annotations;
+            this.constantValue = constantValue;
             return this;
         }
 
