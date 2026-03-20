@@ -38,7 +38,7 @@ public class PrintOutputCapture<T>
         MarkerPrinter = markerPrinter;
     }
 
-    public PrintOutputCapture<T> Append(string? text)
+    public virtual PrintOutputCapture<T> Append(string? text)
     {
         if (text != null)
         {
@@ -47,7 +47,7 @@ public class PrintOutputCapture<T>
         return this;
     }
 
-    public PrintOutputCapture<T> Append(char c)
+    public virtual PrintOutputCapture<T> Append(char c)
     {
         _output.Append(c);
         return this;

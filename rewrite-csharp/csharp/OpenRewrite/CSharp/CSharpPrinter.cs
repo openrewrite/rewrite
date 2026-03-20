@@ -3096,7 +3096,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// <summary>
     /// Called at the start of each visit method. Handles prefix space and markers.
     /// </summary>
-    protected void BeforeSyntax(J j, PrintOutputCapture<P> p)
+    protected virtual void BeforeSyntax(J j, PrintOutputCapture<P> p)
     {
         BeforeSyntax(j.Prefix, j.Markers, p);
     }
@@ -3124,7 +3124,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// <summary>
     /// Called at the end of each visit method. Handles markers after syntax.
     /// </summary>
-    protected void AfterSyntax(J j, PrintOutputCapture<P> p)
+    protected virtual void AfterSyntax(J j, PrintOutputCapture<P> p)
     {
         AfterSyntax(j.Markers, p);
     }
