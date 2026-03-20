@@ -236,6 +236,22 @@ public class ScaffoldStrategyTests
         Assert.Equal(42, lit!.Value);
     }
 
+    [Fact]
+    public void MatchResultOfWithUnnamedCaptures()
+    {
+        var x = Capture.Expression();
+        var y = Capture.Expression();
+        var lit1 = new Literal(Guid.NewGuid(), Space.Empty, Markers.Empty, 1, "1", null, null);
+        var lit2 = new Literal(Guid.NewGuid(), Space.Empty, Markers.Empty, 2, "2", null, null);
+
+        var values = MatchResult.Of((x, lit1), (y, lit2));
+
+        Assert.True(values.Has(x));
+        Assert.True(values.Has(y));
+        Assert.Equal(1, values.Get<Literal>(x)!.Value);
+        Assert.Equal(2, values.Get<Literal>(y)!.Value);
+    }
+
     // === Cache isolation ===
 
     [Fact]

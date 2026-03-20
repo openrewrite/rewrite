@@ -33,13 +33,22 @@ internal enum CaptureKind
 }
 
 /// <summary>
+/// Non-generic interface for captures, providing access to the capture name
+/// without requiring knowledge of the captured type.
+/// </summary>
+public interface ICapture
+{
+    string Name { get; }
+}
+
+/// <summary>
 /// A named placeholder for pattern matching and template substitution.
 /// When used in an interpolated string passed to <see cref="CSharpTemplate.Create"/>
 /// or <see cref="CSharpPattern.Create"/>, the <see cref="TemplateStringHandler"/>
 /// intercepts it and registers the capture automatically.
 /// </summary>
 /// <typeparam name="T">The type of AST node this capture matches.</typeparam>
-public sealed class Capture<T> where T : J
+public sealed class Capture<T> : ICapture where T : J
 {
     public string Name { get; }
     public bool IsVariadic { get; }
