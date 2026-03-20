@@ -395,6 +395,24 @@ internal static class TemplateEngine
     }
 
     /// <summary>
+    /// Extract the J element from a JRightPadded or JLeftPadded wrapper via reflection.
+    /// Returns null if the value is not a padding wrapper or doesn't contain a J element.
+    /// </summary>
+    private static J? UnwrapPaddingElement(object? value)
+    {
+        var type = value?.GetType();
+        if (type is { IsGenericType: true })
+        {
+            var genericDef = type.GetGenericTypeDefinition();
+            if (genericDef == typeof(JRightPadded<>) || genericDef == typeof(JLeftPadded<>))
+            {
+                return type.GetProperty("Element")?.GetValue(value) as J;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Check if a statement is a preamble field (typed capture declaration with placeholder name).
     /// </summary>
     private static bool IsPreambleField(Statement stmt)
@@ -492,8 +510,10 @@ internal static class TemplateEngine
         if (cu == null)
             return tree;
 
-        // The cursor's value is the original node being replaced
-        if (cursor.Value is not J original)
+        // The cursor's value is the original node being replaced.
+        // Unwrap JRightPadded/JLeftPadded if the cursor points to a padding wrapper.
+        var original = cursor.Value as J ?? UnwrapPaddingElement(cursor.Value);
+        if (original == null)
             return tree;
 
         // Save the prefix set by ApplyCoordinates — the formatter may override it
