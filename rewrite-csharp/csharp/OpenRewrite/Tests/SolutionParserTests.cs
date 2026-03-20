@@ -41,6 +41,14 @@ public class SolutionParserTests : IDisposable
         return fullPath;
     }
 
+    private string WriteFileWithBom(string relativePath, string content)
+    {
+        var fullPath = Path.Combine(_tempDir, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+        return fullPath;
+    }
+
     [Fact]
     public async Task ParseSimpleClass()
     {
@@ -113,6 +121,37 @@ public class SolutionParserTests : IDisposable
             Path.Combine(_tempDir, "Directives.csproj"), _tempDir);
 
         Assert.Single(results);
+    }
+
+    [Fact]
+    public async Task ParseFileWithBomPreservesCharsetBomMarked()
+    {
+        WriteFile("Bom.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        WriteFileWithBom("WithBom.cs", "namespace Test { class WithBom { } }\n");
+        WriteFile("NoBom.cs", "namespace Test { class NoBom { } }\n");
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(Path.Combine(_tempDir, "Bom.csproj"));
+        var results = parser.ParseProject(solution,
+            Path.Combine(_tempDir, "Bom.csproj"), _tempDir);
+
+        Assert.Equal(2, results.Count);
+
+        var withBom = results.OfType<CompilationUnit>()
+            .Single(cu => cu.SourcePath.Contains("WithBom"));
+        var noBom = results.OfType<CompilationUnit>()
+            .Single(cu => cu.SourcePath.Contains("NoBom"));
+
+        Assert.True(withBom.CharsetBomMarked,
+            "File written with UTF-8 BOM should have CharsetBomMarked=true");
+        Assert.False(noBom.CharsetBomMarked,
+            "File written without BOM should have CharsetBomMarked=false");
     }
 
     [Fact]

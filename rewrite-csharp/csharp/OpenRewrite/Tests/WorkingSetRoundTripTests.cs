@@ -608,4 +608,40 @@ public class WorkingSetRoundTripTests
         s.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
 
     #endregion
+
+    #region BOM (Byte Order Mark) handling
+
+    [Fact]
+    public void CharsetBomMarked_SetFromParser()
+    {
+        var source = "class C { }\n";
+
+        var parser = new CSharpParser();
+        var cuWithBom = parser.Parse(source, "Test.cs", charsetBomMarked: true);
+        var cuWithoutBom = parser.Parse(source, "Test.cs", charsetBomMarked: false);
+
+        Assert.True(cuWithBom.CharsetBomMarked,
+            "Parser should propagate charsetBomMarked=true to CompilationUnit");
+        Assert.False(cuWithoutBom.CharsetBomMarked,
+            "Parser should propagate charsetBomMarked=false to CompilationUnit");
+
+        // Both should print identically (BOM is not part of the printed source)
+        var printer = new CSharpPrinter<int>();
+        Assert.Equal(source, printer.Print(cuWithBom));
+        Assert.Equal(source, printer.Print(cuWithoutBom));
+    }
+
+    [Fact]
+    public void CharsetBomMarked_PreservedWithPreprocessorDirectives()
+    {
+        var source = "#if DEBUG\nclass C { }\n#else\nclass C { }\n#endif\n";
+
+        var parser = new CSharpParser();
+        var cu = parser.Parse(source, "Test.cs", charsetBomMarked: true);
+
+        Assert.True(cu.CharsetBomMarked,
+            "charsetBomMarked should be preserved through preprocessor directive parsing");
+    }
+
+    #endregion
 }

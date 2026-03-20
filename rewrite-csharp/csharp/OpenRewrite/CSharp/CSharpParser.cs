@@ -26,9 +26,12 @@ namespace OpenRewrite.CSharp;
 /// </summary>
 public class CSharpParser
 {
+    private bool _charsetBomMarked;
+
     public CompilationUnit Parse(string source, string sourcePath = "source.cs",
-        SemanticModel? semanticModel = null)
+        SemanticModel? semanticModel = null, bool charsetBomMarked = false)
     {
+        _charsetBomMarked = charsetBomMarked;
         var symbols = PreprocessorSourceTransformer.ExtractSymbols(source);
         if (symbols.Count == 0)
             return ParseSingle(source, sourcePath, semanticModel);
@@ -44,9 +47,10 @@ public class CSharpParser
     /// define DEBUG, the #else branch would be lost.
     /// </summary>
     public CompilationUnit ParseWithConfigurations(string source, string sourcePath,
-        SemanticModel? semanticModel, List<HashSet<string>> configSymbolSets)
+        SemanticModel? semanticModel, List<HashSet<string>> configSymbolSets,
+        bool charsetBomMarked = false)
     {
-        return Parse(source, sourcePath, semanticModel);
+        return Parse(source, sourcePath, semanticModel, charsetBomMarked);
     }
 
     private CompilationUnit ParseMultiWithSymbolSets(string source, string sourcePath,
@@ -123,7 +127,7 @@ public class CSharpParser
             Markers.Empty,
             primaryCu.SourcePath,
             "UTF-8",
-            false,
+            _charsetBomMarked,
             null,
             null,
             new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
@@ -136,7 +140,7 @@ public class CSharpParser
         if (semanticModel != null)
         {
             var root = semanticModel.SyntaxTree.GetCompilationUnitRoot();
-            var visitor = new CSharpParserVisitor(source, semanticModel);
+            var visitor = new CSharpParserVisitor(source, semanticModel, _charsetBomMarked);
             var cu = visitor.VisitCompilationUnit(root);
             // Override source path since the semantic model's tree has the absolute path
             // from MSBuildWorkspace, but we want the relative path
@@ -148,7 +152,7 @@ public class CSharpParser
         {
             var syntaxTree = CSharpSyntaxTree.ParseText(source, path: sourcePath);
             var root = syntaxTree.GetCompilationUnitRoot();
-            var visitor = new CSharpParserVisitor(source);
+            var visitor = new CSharpParserVisitor(source, charsetBomMarked: _charsetBomMarked);
             return visitor.VisitCompilationUnit(root);
         }
     }
@@ -216,7 +220,7 @@ public class CSharpParser
             Markers.Empty,
             primaryCu.SourcePath,
             "UTF-8",
-            false,
+            _charsetBomMarked,
             null,
             null,
             new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
@@ -234,6 +238,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     private int _cursor;
     private readonly SemanticModel? _semanticModel;
     private readonly CSharpTypeMapping? _typeMapping;
+    private readonly bool _charsetBomMarked;
     private readonly Dictionary<string, Space> _spaceCache = new();
 
     /// <summary>
@@ -242,12 +247,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
     /// </summary>
     private Space _pendingSemicolonSpace = Space.Empty;
 
-    public CSharpParserVisitor(string source, SemanticModel? semanticModel = null)
+    public CSharpParserVisitor(string source, SemanticModel? semanticModel = null,
+        bool charsetBomMarked = false)
     {
         _source = source;
         _cursor = 0;
         _semanticModel = semanticModel;
         _typeMapping = semanticModel != null ? new CSharpTypeMapping(semanticModel) : null;
+        _charsetBomMarked = charsetBomMarked;
     }
 
     /// <summary>
@@ -381,7 +388,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             Markers.Empty,
             node.SyntaxTree.FilePath ?? "source.cs",
             "UTF-8",
-            false,
+            _charsetBomMarked,
             null,
             null,
             members,
