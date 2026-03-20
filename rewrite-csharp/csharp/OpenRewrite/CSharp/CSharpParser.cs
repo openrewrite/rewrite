@@ -7443,8 +7443,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         {
             case TypeConstraintSyntax typeConstraint:
             {
-                // TypeTree types (Identifier, ParameterizedType, etc.) implement Expression
-                return (Expression)Visit(typeConstraint.Type)!;
+                // Use VisitType instead of Visit to handle types like NullableTypeSyntax
+                // that don't have a dedicated Roslyn visitor override
+                return (Expression)VisitType(typeConstraint.Type)!;
             }
 
             case ClassOrStructConstraintSyntax classOrStruct:

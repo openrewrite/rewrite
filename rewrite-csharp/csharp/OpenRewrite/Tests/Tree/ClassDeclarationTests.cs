@@ -1561,4 +1561,48 @@ public class ClassDeclarationTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void ConstraintNullableInterfaceType()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                interface IComparable<T> { }
+                class Foo<T> where T : IComparable<T>? { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintNullableInterfaceTypeOnMethod()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+                class Foo
+                {
+                    void Bar<T>(T input, T rangeFrom, T rangeTo) where T : IComparable<T>?
+                    {
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintStructAndNullableInterface()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+                class Foo<T> where T : struct, IComparable<T>? { }
+                """
+            )
+        );
+    }
 }
