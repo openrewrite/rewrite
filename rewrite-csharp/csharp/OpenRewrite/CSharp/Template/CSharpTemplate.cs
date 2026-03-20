@@ -198,6 +198,9 @@ public sealed class CSharpTemplate
     public J? Apply(Cursor cursor, MatchResult? values = null,
         CSharpCoordinates? coordinates = null)
     {
+        // Unwrap JRightPadded/JLeftPadded to get the J element if the cursor
+        // points to a padding wrapper (common when replacing padded children)
+        var cursorJ = UnwrapCursorValue(cursor.Value);
         var tree = GetTree();
 
         // Phase 1: placeholder substitution
@@ -207,7 +210,7 @@ public sealed class CSharpTemplate
         }
 
         // Phase 1.5: auto-parenthesization after substitution
-        if (tree is Expression expr && cursor.Value is J)
+        if (tree is Expression expr && cursorJ != null)
         {
             tree = CSharpParenthesizeVisitor.MaybeParenthesize(expr, cursor);
         }
@@ -217,15 +220,38 @@ public sealed class CSharpTemplate
         {
             tree = TemplateEngine.ApplyCoordinates(tree, cursor, coordinates);
         }
-        else if (cursor.Value is J cursorValue)
+        else if (cursorJ != null)
         {
             tree = TemplateEngine.ApplyCoordinates(tree, cursor,
-                CSharpCoordinates.Replace(cursorValue));
+                CSharpCoordinates.Replace(cursorJ));
         }
 
         // Phase 3: auto-format within the enclosing compilation unit
         tree = TemplateEngine.AutoFormat(tree, cursor);
 
         return tree;
+    }
+
+    /// <summary>
+    /// Extract the J element from a cursor value, unwrapping JRightPadded/JLeftPadded
+    /// wrappers if present. Returns null if the value is not a J or padding wrapper.
+    /// </summary>
+    private static J? UnwrapCursorValue(object? value)
+    {
+        if (value is J j) return j;
+
+        // JRightPadded<T> and JLeftPadded<T> are generic, so use reflection
+        // to extract the Element property
+        var type = value?.GetType();
+        if (type is { IsGenericType: true })
+        {
+            var genericDef = type.GetGenericTypeDefinition();
+            if (genericDef == typeof(JRightPadded<>) || genericDef == typeof(JLeftPadded<>))
+            {
+                return type.GetProperty("Element")?.GetValue(value) as J;
+            }
+        }
+
+        return null;
     }
 }
