@@ -129,6 +129,12 @@ public class RpcSendQueue {
             Map<Object, Integer> beforeIdx = putListPositions(after, before, id);
 
             for (T anAfter : after) {
+                if (anAfter == null) {
+                    // Null list elements (e.g. catch clauses without 'when' filters)
+                    // carry no data — send NO_CHANGE so the receiver preserves null.
+                    put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
+                    continue;
+                }
                 Integer beforePos = beforeIdx.get(id.apply(anAfter));
                 Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
                 if (beforePos == null) {
