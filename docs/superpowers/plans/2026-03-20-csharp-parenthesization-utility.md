@@ -182,6 +182,19 @@ public class CSharpPrecedencesTests
     }
 
     [Fact]
+    public void GetPrecedence_Ternary_WithNullCoalescingMarker()
+    {
+        // ?? is parsed as Ternary with NullCoalescing marker, not CsBinary
+        var expr = new Ternary(Guid.NewGuid(), Space.Empty,
+            Markers.Build([NullCoalescing.Instance]),
+            MakeId("a"),
+            new JLeftPadded<Expression>(Space.Empty, new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty)),
+            new JLeftPadded<Expression>(Space.Empty, MakeId("b")),
+            null);
+        Assert.Equal(0, CSharpPrecedences.GetPrecedence(expr));
+    }
+
+    [Fact]
     public void GetPrecedence_CsBinary_As()
     {
         var expr = MakeCsBinary(CsBinary.OperatorType.As, MakeId("a"), MakeId("b"));
@@ -283,8 +296,17 @@ public class CSharpPrecedencesTests
     public void NeedsParentheses_NullCoalescingRightAssociative_NoParens()
     {
         // a ?? b as right operand of ?? → no parens (right-associative)
-        var child = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("b"), MakeId("c"));
-        var parent = MakeCsBinary(CsBinary.OperatorType.NullCoalescing, MakeId("a"), child);
+        // ?? is parsed as Ternary with NullCoalescing marker
+        Ternary MakeNullCoalescing(Expression left, Expression right) =>
+            new(Guid.NewGuid(), Space.Empty,
+                Markers.Build([NullCoalescing.Instance]),
+                left,
+                new JLeftPadded<Expression>(Space.Empty, new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty)),
+                new JLeftPadded<Expression>(Space.Empty, right),
+                null);
+
+        var child = MakeNullCoalescing(MakeId("b"), MakeId("c"));
+        var parent = MakeNullCoalescing(MakeId("a"), child);
         Assert.False(CSharpPrecedences.NeedsParentheses(child, parent, isRightOperand: true));
     }
 
@@ -459,6 +481,8 @@ internal static class CSharpPrecedences
         SwitchExpression => 11,
         WithExpression => 11,
 
+        // ?? is modeled as Ternary with NullCoalescing marker, not CsBinary
+        Ternary t when t.Markers.MarkerList.Any(m => m is NullCoalescing) => 0,
         Ternary => -1,
         Assignment => -2,
         AssignmentOperation => -2,
@@ -519,12 +543,16 @@ internal static class CSharpPrecedences
             Binary.OperatorType.BitXor or
             Binary.OperatorType.And or
             Binary.OperatorType.Or,
+        // ?? is modeled as Ternary with NullCoalescing marker
+        Ternary t when t.Markers.MarkerList.Any(m => m is NullCoalescing) => true,
         CsBinary csb => csb.Operator.Element is CsBinary.OperatorType.NullCoalescing,
         _ => false
     };
 
     private static bool IsRightAssociative(Expression expr) => expr switch
     {
+        // ?? is modeled as Ternary with NullCoalescing marker
+        Ternary t when t.Markers.MarkerList.Any(m => m is NullCoalescing) => true,
         CsBinary csb => csb.Operator.Element is CsBinary.OperatorType.NullCoalescing,
         Assignment => true,
         AssignmentOperation => true,
