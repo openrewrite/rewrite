@@ -49,10 +49,16 @@ public class NoSystemScopeDependencies extends Recipe {
                         return super.visitTag(tag, ctx);
                     }
 
+                    // Resolve property placeholders (e.g. ${some.version}) against the POM
+                    String resolvedVersion = getResolutionResult().getPom().getValue(version);
+                    if (resolvedVersion == null) {
+                        return super.visitTag(tag, ctx);
+                    }
+
                     try {
                         MavenMetadata metadata = downloadMetadata(groupId, artifactId, ctx);
                         if (metadata.getVersioning() == null ||
-                                !metadata.getVersioning().getVersions().contains(version)) {
+                                !metadata.getVersioning().getVersions().contains(resolvedVersion)) {
                             return super.visitTag(tag, ctx);
                         }
                     } catch (MavenDownloadingException e) {

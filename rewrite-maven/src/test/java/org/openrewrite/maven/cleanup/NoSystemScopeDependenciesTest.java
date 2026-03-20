@@ -143,6 +143,51 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     }
 
     @Test
+    void removesSystemScopeWhenVersionIsProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new NoSystemScopeDependencies()),
+          pomXml(
+            """
+              <project>
+                <groupId>test</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <guava.version>29.0-jre</guava.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>${guava.version}</version>
+                    <scope>system</scope>
+                    <systemPath>${project.basedir}/lib/guava-29.0-jre.jar</systemPath>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>test</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <properties>
+                  <guava.version>29.0-jre</guava.version>
+                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>${guava.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void doesNotRemoveSystemScopeWhenNotInRepo() {
         rewriteRun(
           spec -> spec.recipe(new NoSystemScopeDependencies()),
