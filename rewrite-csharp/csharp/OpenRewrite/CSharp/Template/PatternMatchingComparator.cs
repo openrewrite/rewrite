@@ -156,8 +156,9 @@ internal class PatternMatchingComparator
             && IsStatic(patType) && IsStatic(candType)
             && patDecl.FullyQualifiedName == candDecl.FullyQualifiedName)
         {
-            // Declaring type and method name match — skip Select, compare arguments
+            // Declaring type and method name match — skip Select, compare the rest
             return MatchNode(pattern.Name, candidate.Name, cursor)
+                && MatchValue(pattern.TypeParameters, candidate.TypeParameters, cursor)
                 && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
         }
 
@@ -168,6 +169,7 @@ internal class PatternMatchingComparator
         if (IsImplicitThisPair(patSelect, candSelect))
         {
             return MatchNode(pattern.Name, candidate.Name, cursor)
+                && MatchValue(pattern.TypeParameters, candidate.TypeParameters, cursor)
                 && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
         }
 
@@ -208,7 +210,7 @@ internal class PatternMatchingComparator
         // Static field/variable: Math.PI ↔ PI
         if (pattern.Name.Element.FieldType is JavaType.Variable patVar
             && candidate.FieldType is JavaType.Variable candVar
-            && IsStatic(patVar)
+            && IsStatic(patVar) && IsStatic(candVar)
             && patVar.Name == candVar.Name
             && patVar.Owner is JavaType.Class patOwner
             && candVar.Owner is JavaType.Class candOwner
