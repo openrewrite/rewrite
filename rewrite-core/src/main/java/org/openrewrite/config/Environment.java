@@ -182,6 +182,14 @@ public class Environment {
             }
         }
         if (recipe == null) {
+            for (ResourceLoader loader : dependencyResourceLoaders) {
+                recipe = loader.loadRecipe(recipeName, details);
+                if (recipe != null) {
+                    break;
+                }
+            }
+        }
+        if (recipe == null) {
             return null;
         }
 
