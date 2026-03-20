@@ -88,8 +88,10 @@ internal static class TemplateEngine
         var parser = new CSharpParser();
 
         CompilationUnit cu;
-        if (dependencies.Count > 0)
+        if (dependencies.Count > 0 || usings.Count > 0)
         {
+            // When usings or dependencies are provided, create a semantic model
+            // so the scaffold gets type attribution (needed for semantic matching).
             var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
             cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
         }
