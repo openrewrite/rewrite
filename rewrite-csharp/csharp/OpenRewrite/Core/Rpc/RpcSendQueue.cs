@@ -176,13 +176,21 @@ public class RpcSendQueue
 
             foreach (var anAfter in after)
             {
+                if (anAfter == null)
+                {
+                    // Null list elements (e.g. catch clauses without 'when' filters)
+                    // carry no data — send NO_CHANGE so the receiver preserves null.
+                    Put(new RpcObjectData { State = NO_CHANGE });
+                    continue;
+                }
+
                 var itemId = id(anAfter);
                 var beforePos = beforeIdx.GetValueOrDefault(itemId, -1);
                 Action? onChangeRun = onChange == null ? null : () => onChange(anAfter);
 
                 if (!beforeIdx.ContainsKey(itemId))
                 {
-                    Add(asRef ? Reference.AsRef(anAfter) : anAfter!, onChangeRun);
+                    Add(asRef ? Reference.AsRef(anAfter) : anAfter, onChangeRun);
                 }
                 else
                 {
@@ -191,9 +199,9 @@ public class RpcSendQueue
                     {
                         Put(new RpcObjectData { State = NO_CHANGE });
                     }
-                    else if (aBefore == null || anAfter!.GetType() != aBefore.GetType())
+                    else if (aBefore == null || anAfter.GetType() != aBefore.GetType())
                     {
-                        Add(asRef ? Reference.AsRef(anAfter) : anAfter!, onChangeRun);
+                        Add(asRef ? Reference.AsRef(anAfter) : anAfter, onChangeRun);
                     }
                     else
                     {
@@ -203,7 +211,7 @@ public class RpcSendQueue
                             ValueType = GetValueType(anAfter)
                         });
                         DoChange(anAfter, aBefore, onChangeRun,
-                                 GetCodecFor(anAfter!));
+                                 GetCodecFor(anAfter));
                     }
                 }
             }
