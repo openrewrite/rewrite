@@ -150,11 +150,12 @@ internal class PatternMatchingComparator
 
         // If both have type info, same method name, and the method is static,
         // compare by declaring type instead of by receiver syntax
-        if (patType?.DeclaringType is JavaType.Class patDecl
-            && candType?.DeclaringType is JavaType.Class candDecl
+        if (patType != null && candType != null
             && patType.Name == candType.Name
             && IsStatic(patType) && IsStatic(candType)
-            && patDecl.FullyQualifiedName == candDecl.FullyQualifiedName)
+            && GetDeclaringTypeFqn(patType) is { } patFqn
+            && GetDeclaringTypeFqn(candType) is { } candFqn
+            && patFqn == candFqn)
         {
             // Declaring type and method name match — skip Select, compare the rest
             return MatchNode(pattern.Name, candidate.Name, cursor)
@@ -482,6 +483,19 @@ internal class PatternMatchingComparator
 
     private static bool IsThis(J? node) =>
         node is Identifier { SimpleName: "this" };
+
+    /// <summary>
+    /// Get the FQN of a method's declaring type, unwrapping Parameterized if needed.
+    /// <c>List&lt;int&gt;.Contains</c> has declaring type <c>Parameterized(List)</c> —
+    /// we need the underlying <c>Class.FullyQualifiedName</c>.
+    /// </summary>
+    private static string? GetDeclaringTypeFqn(JavaType.Method method) =>
+        method.DeclaringType switch
+        {
+            JavaType.Class cls => cls.FullyQualifiedName,
+            JavaType.Parameterized { Type: JavaType.Class cls } => cls.FullyQualifiedName,
+            _ => null
+        };
 
     /// <summary>Flag.Static bit value (from Java's Flag enum).</summary>
     private const long FlagStatic = 8;

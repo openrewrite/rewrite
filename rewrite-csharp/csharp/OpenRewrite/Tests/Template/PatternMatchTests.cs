@@ -1233,21 +1233,23 @@ public class PatternMatchTests : RewriteTest
     }
 
     [Fact]
-    public void StaticMethodSemanticMatchDoesNotApplyToInstanceMethods()
+    public void InstanceMethodWithReceiverDoesNotMatchWithoutReceiver()
     {
-        // "hello".Contains("e") is an instance method — even though the declaring type
-        // is the same, the pattern should NOT match a bare Contains() call inside string
-        var expr = Capture.Of<Expression>("expr");
+        // Pattern: list.Contains(1) with explicit receiver (typed capture gives scaffold type info)
+        // Candidate: Contains(1) without receiver (implicit this, inside a List<int> subclass)
+        // Both resolve to List<int>.Contains — same declaring type and method name —
+        // but the method is NOT static, so the semantic shortcut must not fire.
+        // Without the IsStatic guard, this would incorrectly match.
+        var list = Capture.Expression("list", type: "List<int>");
         RewriteRun(
             spec => spec
-                .SetRecipe(FindMethodInvocation($"\"hello\".Contains({expr})", ["System"]))
+                .SetRecipe(FindMethodInvocation($"{list}.Contains(1)",
+                    ["System.Collections.Generic"]))
                 .SetReferenceAssemblies(Assemblies.Net90),
             CSharp(
                 """
-                class C : System.IFormattable {
-                    string s = "hello";
-                    void M() { s.Contains("e"); }
-                }
+                using System.Collections.Generic;
+                class C : List<int> { void M() { Contains(1); } }
                 """
             )
         );
