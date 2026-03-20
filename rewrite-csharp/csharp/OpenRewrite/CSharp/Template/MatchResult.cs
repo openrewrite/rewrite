@@ -53,6 +53,31 @@ public sealed class MatchResult
     }
 
     /// <summary>
+    /// Create a <see cref="MatchResult"/> from <see cref="ICapture"/> keys.
+    /// This allows using unnamed captures (with auto-generated names) as keys,
+    /// avoiding the need to manually synchronize string names between template
+    /// creation and value binding.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var left = Capture.Expression();
+    /// var right = Capture.Expression();
+    /// var template = CSharpTemplate.Expression($"{left} &amp;&amp; {right}");
+    /// var values = MatchResult.Of((left, outerCond), (right, innerCond));
+    /// var result = template.Apply(cursor, values: values);
+    /// </code>
+    /// </example>
+    public static MatchResult Of(params (ICapture capture, J value)[] captures)
+    {
+        var dict = new Dictionary<string, object>(captures.Length);
+        foreach (var (capture, value) in captures)
+        {
+            dict[capture.Name] = value;
+        }
+        return new MatchResult(dict);
+    }
+
+    /// <summary>
     /// Get a captured value by name.
     /// </summary>
     public T? Get<T>(string name) where T : class, J
@@ -62,6 +87,13 @@ public sealed class MatchResult
     /// Get a captured value by its <see cref="Capture{T}"/> object.
     /// </summary>
     public T? Get<T>(Capture<T> capture) where T : class, J
+        => Get<T>(capture.Name);
+
+    /// <summary>
+    /// Get a captured value by its <see cref="ICapture"/> object.
+    /// Useful when the capture's type parameter doesn't match the desired return type.
+    /// </summary>
+    public T? Get<T>(ICapture capture) where T : class, J
         => Get<T>(capture.Name);
 
     /// <summary>
@@ -83,6 +115,11 @@ public sealed class MatchResult
     /// Check if a capture with the given name was bound.
     /// </summary>
     public bool Has(string name) => _captures.ContainsKey(name);
+
+    /// <summary>
+    /// Check if a capture was bound.
+    /// </summary>
+    public bool Has(ICapture capture) => _captures.ContainsKey(capture.Name);
 
     internal Dictionary<string, object> AsDict() => _captures;
 }
