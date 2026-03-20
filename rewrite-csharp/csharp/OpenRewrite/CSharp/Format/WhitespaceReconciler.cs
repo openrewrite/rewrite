@@ -82,10 +82,6 @@ public class WhitespaceReconciler
             return original;
         }
 
-        // Skip JavaType and subtypes — keep original types
-        if (original is JavaType)
-            return original;
-
         // Space — copy from formatted when reconciling
         if (original is Space)
         {
@@ -337,11 +333,17 @@ public class WhitespaceReconciler
         return newList;
     }
 
+    private static bool IsJavaType(Type type)
+    {
+        var t = Nullable.GetUnderlyingType(type) ?? type;
+        return typeof(JavaType).IsAssignableFrom(t);
+    }
+
     private static PropertyInfo[] GetReconcilableProperties(Type type)
     {
         return PropertyCache.GetOrAdd(type, t =>
             t.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && !SkipProperties.Contains(p.Name))
+                .Where(p => p.CanRead && !SkipProperties.Contains(p.Name) && !IsJavaType(p.PropertyType))
                 .ToArray());
     }
 
