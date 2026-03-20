@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -29,6 +30,17 @@ namespace OpenRewrite.Test;
 /// </summary>
 public abstract class RewriteTest
 {
+    private static readonly ConcurrentDictionary<ReferenceAssemblies, ImmutableArray<MetadataReference>>
+        ResolvedAssembliesCache = new();
+
+    private static ImmutableArray<MetadataReference> ResolveAssemblies(ReferenceAssemblies assemblies)
+    {
+        return ResolvedAssembliesCache.GetOrAdd(assemblies, a =>
+            a.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
+                .GetAwaiter()
+                .GetResult());
+    }
+
     protected void RewriteRun(params SourceSpec[] specs)
     {
         RewriteRun(_ => { }, specs);
@@ -44,10 +56,7 @@ public abstract class RewriteTest
 
         // Resolve metadata references if ReferenceAssemblies is configured
         ImmutableArray<MetadataReference>? metadataReferences = recipeSpec.ReferenceAssemblies != null
-            ? recipeSpec.ReferenceAssemblies
-                .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
-                .GetAwaiter()
-                .GetResult()
+            ? ResolveAssemblies(recipeSpec.ReferenceAssemblies)
             : null;
 
         // 1. Parse all sources and validate round-trip
@@ -132,7 +141,7 @@ public record SourceSpec(string Before, string? After = null);
 public class RecipeSpec
 {
     public Recipe? Recipe { get; private set; }
-    public ReferenceAssemblies? ReferenceAssemblies { get; private set; }
+    public ReferenceAssemblies? ReferenceAssemblies { get; private set; } = Assemblies.Net90;
 
     public RecipeSpec SetRecipe(Recipe recipe)
     {
@@ -140,7 +149,7 @@ public class RecipeSpec
         return this;
     }
 
-    public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies referenceAssemblies)
+    public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies? referenceAssemblies)
     {
         ReferenceAssemblies = referenceAssemblies;
         return this;
