@@ -693,7 +693,7 @@ public class ChangeType extends Recipe {
                 }
             }
             //noinspection ConstantConditions
-            return pkg;
+            return super.visitPackage(pkg, ctx);
         }
 
         @Override

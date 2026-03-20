@@ -413,6 +413,26 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void fullyQualifiedAnnotationOnPackageDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+          java("package a.b.c;\npublic @interface A1 {}"),
+          java("package a.b.d;\npublic @interface A2 {}"),
+          java(
+            """
+              @a.b.c.A1 package foo;
+              """,
+            """
+              @A2 package foo;
+
+              import a.b.d.A2;
+              """,
+            spec -> spec.path("foo/package-info.java")
+          )
+        );
+    }
+
+    @Test
     void array2() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("com.acme.product.Pojo", "com.acme.product.v2.Pojo", true)),
