@@ -60,17 +60,16 @@ internal static class CSharpPrecedences
         _ => int.MaxValue
     };
 
-    public static bool NeedsParentheses(Expression child, object parent, bool isRightOperand)
+    public static bool NeedsParentheses(Expression child, Expression parent, bool isRightOperand)
     {
-        if (parent is not Expression parentExpr) return false;
         int childPrec = GetPrecedence(child);
-        int parentPrec = GetPrecedence(parentExpr);
+        int parentPrec = GetPrecedence(parent);
         if (childPrec > parentPrec) return false;
         if (childPrec < parentPrec) return true;
-        if (isRightOperand && IsRightAssociative(child)) return false;
-        if (IsSameOperator(child, parentExpr) && IsAssociative(child)) return false;
-        if (IsInSameMathGroup(child, parentExpr)) return isRightOperand;
-        return !IsSameOperator(child, parentExpr);
+        if (isRightOperand && IsRightAssociative(child) && IsRightAssociative(parent)) return false;
+        if (IsSameOperator(child, parent) && IsAssociative(child)) return false;
+        if (IsInSameMathGroup(child, parent)) return isRightOperand;
+        return !IsSameOperator(child, parent);
     }
 
     public static Parentheses<Expression> Parenthesize(Expression expr)

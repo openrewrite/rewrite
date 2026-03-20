@@ -93,19 +93,27 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
     public override J VisitTernary(Ternary ternary, P p)
     {
         var t = _recursive ? (Ternary)base.VisitTernary(ternary, p) : ternary;
-        return MaybeWrapTernaryOrCast(t);
+        return MaybeWrapTernary(t);
     }
 
     public override J VisitTypeCast(TypeCast cast, P p)
     {
         var c = _recursive ? (TypeCast)base.VisitTypeCast(cast, p) : cast;
-        return MaybeWrapTernaryOrCast(c);
+        // TypeCast is precedence 13 (unary level), so it only needs parens
+        // when the parent binds tighter — use normal precedence comparison
+        return MaybeWrapBinaryLike(c);
     }
 
     public override J VisitAssignment(Assignment assignment, P p)
     {
         var a = _recursive ? (Assignment)base.VisitAssignment(assignment, p) : assignment;
         return MaybeWrapAssignment(a);
+    }
+
+    public override J VisitLambda(Lambda lambda, P p)
+    {
+        var l = _recursive ? (Lambda)base.VisitLambda(lambda, p) : lambda;
+        return MaybeWrapAssignment(l);
     }
 
     // -----------------------------------------------------------------------
@@ -183,13 +191,12 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         return expr;
     }
 
-    private J MaybeWrapTernaryOrCast(Expression expr)
+    private J MaybeWrapTernary(Expression expr)
     {
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
-        // Ternary/TypeCast always need parens when nested inside
-        // Binary, Unary, CsBinary, CsUnary, IsPattern, or another Ternary.
+        // Ternary (prec -1) needs parens inside most expression contexts.
         // Ternary-inside-ternary: C# parses `a ? b : c ? d : e` right-to-left,
         // so a ternary used as the condition of another ternary needs parens.
         if (parent is Binary or Unary or CsBinary or CsUnary or IsPattern or Ternary)
@@ -203,8 +210,8 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
         var parentCursor = Cursor.ParentTree;
         var parent = parentCursor.Value;
 
-        // Assignment/AssignmentOperation need parens inside Binary, Unary, Ternary, CsBinary, CsUnary
-        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary)
+        // Assignment/AssignmentOperation/Lambda need parens inside Binary, Unary, Ternary, CsBinary, CsUnary, IsPattern
+        if (parent is Binary or Unary or Ternary or CsBinary or CsUnary or IsPattern)
             return CSharpPrecedences.Parenthesize(expr);
 
         return expr;
@@ -232,7 +239,7 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
 
         if (parent is IsPattern)
         {
-            return expr is Binary or CsBinary or Ternary or Assignment or AssignmentOperation;
+            return expr is Binary or CsBinary or Ternary or Assignment or AssignmentOperation or Lambda;
         }
 
         return false;
