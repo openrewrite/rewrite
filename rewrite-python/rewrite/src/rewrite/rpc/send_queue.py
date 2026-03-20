@@ -178,6 +178,11 @@ class RpcSendQueue:
 
             # Send each item
             for item in after:
+                if item is None:
+                    # Null list elements carry no data — send NO_CHANGE so the
+                    # receiver preserves None.
+                    self.put({'state': RpcObjectState.NO_CHANGE})
+                    continue
                 item_id = id_getter(item)
                 before_pos = before_idx.get(item_id)
                 # Wrap on_change to capture current item

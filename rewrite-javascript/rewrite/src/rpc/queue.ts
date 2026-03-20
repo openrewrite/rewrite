@@ -183,6 +183,12 @@ export class RpcSendQueue {
             const beforeIdx = this.putListPositions(after, before, id);
 
             for (const anAfter of after) {
+                if (anAfter === undefined || anAfter === null) {
+                    // Null/undefined list elements carry no data — send NO_CHANGE
+                    // so the receiver preserves the null value.
+                    this.put({state: RpcObjectState.NO_CHANGE});
+                    continue;
+                }
                 const beforePos = beforeIdx.get(id(anAfter));
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
                 if (!beforePos) {
