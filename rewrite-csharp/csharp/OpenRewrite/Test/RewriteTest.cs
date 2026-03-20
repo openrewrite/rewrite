@@ -132,7 +132,7 @@ public record SourceSpec(string Before, string? After = null);
 public class RecipeSpec
 {
     public Recipe? Recipe { get; private set; }
-    public ReferenceAssemblies? ReferenceAssemblies { get; private set; }
+    public ReferenceAssemblies? ReferenceAssemblies { get; private set; } = Assemblies.Net90;
 
     public RecipeSpec SetRecipe(Recipe recipe)
     {
@@ -140,7 +140,7 @@ public class RecipeSpec
         return this;
     }
 
-    public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies referenceAssemblies)
+    public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies? referenceAssemblies)
     {
         ReferenceAssemblies = referenceAssemblies;
         return this;
