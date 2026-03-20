@@ -28,7 +28,6 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.SocketTimeoutException;
@@ -108,7 +107,7 @@ public class MavenArtifactDownloader {
             if (uri.startsWith("~")) {
                 bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
             } else if ("file".equals(URI.create(uri).getScheme())) {
-                bodyStream = Files.newInputStream(new File(URI.create(uri)).toPath());
+                bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
             } else {
                 HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
