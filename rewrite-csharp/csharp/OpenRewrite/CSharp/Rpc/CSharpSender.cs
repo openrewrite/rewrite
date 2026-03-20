@@ -1021,7 +1021,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         q.GetAndSend(eft, e => (J)e.Try, el => Visit(el, q));
         q.GetAndSendList(eft, e => e.CatchFilters,
-            el => el != null ? (object)el.Element.Id : null,
+            el => el != null ? el.Element.Id : (object)Guid.Empty,
             el => { if (el != null) VisitLeftPadded(el, q); });
         return eft;
     }
