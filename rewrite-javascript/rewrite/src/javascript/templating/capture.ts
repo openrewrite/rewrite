@@ -87,7 +87,7 @@ export class CaptureImpl<T = any> implements Capture<T> {
     [CAPTURE_TYPE_SYMBOL]: string | Type | undefined;
     [CAPTURE_KIND_SYMBOL]: CaptureKind;
 
-    constructor(name: string, options?: CaptureOptions<T>, capturing: boolean = true, kind: CaptureKind = CaptureKind.Expression) {
+    constructor(name: string, options?: CaptureOptions<T> & { type?: string | Type }, capturing: boolean = true, kind: CaptureKind = CaptureKind.Expression) {
         this.name = name;
         this[CAPTURE_NAME_SYMBOL] = name;
         this[CAPTURE_CAPTURING_SYMBOL] = capturing;
@@ -110,7 +110,7 @@ export class CaptureImpl<T = any> implements Capture<T> {
             this[CAPTURE_CONSTRAINT_SYMBOL] = options.constraint;
         }
 
-        // Store type if provided
+        // Store type if provided (only meaningful for Expression kind)
         if (options?.type) {
             this[CAPTURE_TYPE_SYMBOL] = options.type;
         }
@@ -604,15 +604,45 @@ export function raw(code: string): RawCode {
 }
 
 /**
+ * Options specific to expression captures, extending CaptureOptions with type attribution.
+ */
+export interface ExprCaptureOptions<T = any> extends CaptureOptions<T> {
+    /**
+     * Type annotation for this expression capture. When provided, the template engine
+     * generates a preamble declaring the capture identifier with this type annotation,
+     * allowing the TypeScript parser/compiler to produce a properly type-attributed AST.
+     *
+     * Can be specified as:
+     * - A string type annotation (e.g., "boolean", "number", "Promise<any>")
+     * - A Type instance from the AST
+     *
+     * @example
+     * ```typescript
+     * const chain = expr({ name: 'chain', type: 'Promise<any>' });
+     * pattern`${chain}.catch(err => console.log(err))`
+     *
+     * const items = expr({ name: 'items', type: 'number[]' });
+     * pattern`${items}.map(x => x * 2)`
+     * ```
+     */
+    type?: string | Type;
+}
+
+/**
  * Creates an expression capture. This is the most common capture kind.
+ * Only expression captures support the `type` option for type attribution.
  *
  * @example
  * const e = expr('x');
  * pattern`foo(${e})`
+ *
+ * @example
+ * const e = expr({ name: 'x', type: 'boolean' });
+ * pattern`${e} || false`
  */
 export function expr<T = any>(name?: string): Capture<T> & T;
-export function expr<T = any>(options: CaptureOptions<T>): Capture<T> & T;
-export function expr<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+export function expr<T = any>(options: ExprCaptureOptions<T>): Capture<T> & T;
+export function expr<T = any>(nameOrOptions?: string | ExprCaptureOptions<T>): Capture<T> & T {
     return createKindCapture(CaptureKind.Expression, nameOrOptions);
 }
 
@@ -658,9 +688,9 @@ export function stmt<T = any>(nameOrOptions?: string | CaptureOptions<T>): Captu
 /**
  * Internal helper for kind-specific capture factory functions.
  */
-function createKindCapture<T>(kind: CaptureKind, nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+function createKindCapture<T>(kind: CaptureKind, nameOrOptions?: string | ExprCaptureOptions<T>): Capture<T> & T {
     let name: string | undefined;
-    let options: CaptureOptions<T> | undefined;
+    let options: ExprCaptureOptions<T> | undefined;
 
     if (typeof nameOrOptions === 'string') {
         name = nameOrOptions;

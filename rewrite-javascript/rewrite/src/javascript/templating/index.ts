@@ -33,6 +33,8 @@ export type {
     MatchAttemptResult
 } from './types';
 
+export type { ExprCaptureOptions } from './capture';
+
 // Export capture functionality
 export {
     and,

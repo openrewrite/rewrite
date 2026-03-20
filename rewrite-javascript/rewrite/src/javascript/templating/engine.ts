@@ -18,7 +18,8 @@ import {emptySpace, J, Statement, Type} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
 import {CaptureMarker, PlaceholderUtils, WRAPPER_FUNCTION_NAME} from './utils';
-import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
+import {CAPTURE_KIND_SYMBOL, CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
+import {CaptureKind} from './types';
 import {PlaceholderReplacementVisitor} from './placeholder-replacement';
 import {JavaCoordinates} from './template';
 import {maybeAutoFormat} from '../format';
@@ -269,7 +270,8 @@ export class TemplateEngine {
     }
 
     /**
-     * Generates type preamble declarations for captures/parameters with type annotations.
+     * Generates type preamble declarations for expression captures/parameters with type annotations.
+     * Only expression captures get preamble declarations — identifiers, types, and statements don't.
      *
      * @param parameters The parameters
      * @returns Array of preamble statements
@@ -288,6 +290,11 @@ export class TemplateEngine {
             const isTreeArray = Array.isArray(param) && param.length > 0 && isTree(param[0]);
 
             if (isCapture) {
+                // Only expression captures get preamble declarations
+                const captureKind = param[CAPTURE_KIND_SYMBOL];
+                if (captureKind !== undefined && captureKind !== CaptureKind.Expression) {
+                    continue;
+                }
                 const captureType = param[CAPTURE_TYPE_SYMBOL];
                 if (captureType) {
                     const typeString = typeof captureType === 'string'
@@ -429,11 +436,17 @@ export class TemplateEngine {
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {}
     ): Promise<J> {
-        // Generate type preamble for captures with types (skip RawCode)
+        // Generate type preamble for expression captures with types (skip RawCode and non-expression captures)
         const preamble: string[] = [];
         for (const capture of captures) {
             // Skip raw code - it's not a capture
             if (capture instanceof RawCode || (capture && typeof capture === 'object' && (capture as any)[RAW_CODE_SYMBOL])) {
+                continue;
+            }
+
+            // Only expression captures get preamble declarations
+            const captureKind = (capture as any)[CAPTURE_KIND_SYMBOL];
+            if (captureKind !== undefined && captureKind !== CaptureKind.Expression) {
                 continue;
             }
 
@@ -450,7 +463,6 @@ export class TemplateEngine {
                     preamble.push(`let ${placeholder}: ${typeString};`);
                 }
             }
-            // Don't add preamble declarations without types - they don't provide type attribution
         }
 
         // Build the template string with placeholders for captures and raw code
