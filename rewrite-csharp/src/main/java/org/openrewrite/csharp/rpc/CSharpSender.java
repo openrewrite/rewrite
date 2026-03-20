@@ -168,15 +168,14 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitConditionalDirective(Cs.ConditionalDirective conditionalDirective, RpcSendQueue q) {
-        List<Cs.DirectiveLine> directiveLines = conditionalDirective.getDirectiveLines();
-        q.getAndSend(conditionalDirective, c -> directiveLines.size());
-        for (Cs.DirectiveLine dl : directiveLines) {
-            q.getAndSend(conditionalDirective, c -> dl.getLineNumber());
-            q.getAndSend(conditionalDirective, c -> dl.getText());
-            q.getAndSend(conditionalDirective, c -> dl.getKind().ordinal());
-            q.getAndSend(conditionalDirective, c -> dl.getGroupId());
-            q.getAndSend(conditionalDirective, c -> dl.getActiveBranchIndex());
-        }
+        q.getAndSendList(conditionalDirective, Cs.ConditionalDirective::getDirectiveLines,
+                dl -> dl.getLineNumber(), dl -> {
+                    q.getAndSend(dl, Cs.DirectiveLine::getLineNumber);
+                    q.getAndSend(dl, Cs.DirectiveLine::getText);
+                    q.getAndSend(dl, d -> d.getKind().ordinal());
+                    q.getAndSend(dl, Cs.DirectiveLine::getGroupId);
+                    q.getAndSend(dl, Cs.DirectiveLine::getActiveBranchIndex);
+                });
         q.getAndSendList(conditionalDirective, c -> c.getPadding().getBranches(), el -> el.getElement().getId(), el -> visitRightPadded(el, q));
         return conditionalDirective;
     }
