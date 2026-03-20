@@ -399,7 +399,9 @@ export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Ca
 // Static counter for generating unique IDs for unnamed captures
 capture.nextUnnamedId = 1;
 
-// Type declarations for namespace properties on capture
+// Type-only declarations so TypeScript recognizes the runtime properties
+// attached to the capture function (nextUnnamedId, expr, ident, typeRef, stmt).
+// The actual values are assigned imperatively below the factory definitions.
 export namespace capture {
     export let nextUnnamedId: number;
     export let expr: typeof import('./capture').expr;
@@ -655,21 +657,14 @@ export function stmt<T = any>(nameOrOptions?: string | CaptureOptions<T>): Captu
 
 /**
  * Internal helper for kind-specific capture factory functions.
+ * Delegates to capture() with the kind option set, avoiding duplication
+ * of name-resolution and option-handling logic.
  */
 function createKindCapture<T>(kind: CaptureKind, nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
-    let name: string | undefined;
-    let options: CaptureOptions<T> | undefined;
-
     if (typeof nameOrOptions === 'string') {
-        name = nameOrOptions;
-    } else {
-        options = nameOrOptions;
-        name = options?.name;
+        return capture<T>({ name: nameOrOptions, kind } as CaptureOptions<T>);
     }
-
-    const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
-    const impl = new CaptureImpl<T>(captureName, options, true, kind);
-    return createCaptureProxy(impl);
+    return capture<T>({ ...nameOrOptions, kind } as CaptureOptions<T>);
 }
 
 // Attach kind-specific factories to capture for namespace-qualified access

@@ -64,8 +64,8 @@ describe('Variadic Capture Constraints', () => {
             const pat = pattern`foo(${args})`;
 
             // Should match - empty array
-            const expr0 = await parseExpression('foo()');
-            const match = await pat.match(expr0, undefined!);
+            const parsed = await parseExpression('foo()');
+            const match = await pat.match(parsed, undefined!);
             expect(match).toBeDefined();
             expect((match?.get(args) as unknown as J[]).length).toBe(0);
         });
