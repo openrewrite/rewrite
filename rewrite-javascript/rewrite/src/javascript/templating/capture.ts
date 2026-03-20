@@ -91,7 +91,7 @@ export class CaptureImpl<T = any> implements Capture<T> {
         this.name = name;
         this[CAPTURE_NAME_SYMBOL] = name;
         this[CAPTURE_CAPTURING_SYMBOL] = capturing;
-        this[CAPTURE_KIND_SYMBOL] = options?.kind ?? kind;
+        this[CAPTURE_KIND_SYMBOL] = kind;
 
         // Normalize variadic options
         if (options?.variadic) {
@@ -657,14 +657,21 @@ export function stmt<T = any>(nameOrOptions?: string | CaptureOptions<T>): Captu
 
 /**
  * Internal helper for kind-specific capture factory functions.
- * Delegates to capture() with the kind option set, avoiding duplication
- * of name-resolution and option-handling logic.
  */
 function createKindCapture<T>(kind: CaptureKind, nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    let name: string | undefined;
+    let options: CaptureOptions<T> | undefined;
+
     if (typeof nameOrOptions === 'string') {
-        return capture<T>({ name: nameOrOptions, kind } as CaptureOptions<T>);
+        name = nameOrOptions;
+    } else {
+        options = nameOrOptions;
+        name = options?.name;
     }
-    return capture<T>({ ...nameOrOptions, kind } as CaptureOptions<T>);
+
+    const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
+    const impl = new CaptureImpl<T>(captureName, options, true, kind);
+    return createCaptureProxy(impl);
 }
 
 // Attach kind-specific factories to capture for namespace-qualified access

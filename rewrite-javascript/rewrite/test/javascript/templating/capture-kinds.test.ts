@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 import {
-    capture, expr, ident, typeRef, stmt, any, CaptureKind,
+    capture, expr, ident, typeRef, stmt, any,
     Pattern, pattern
 } from "../../../src/javascript";
 import {
-    CAPTURE_KIND_SYMBOL, CAPTURE_NAME_SYMBOL
+    CAPTURE_KIND_SYMBOL
 } from "../../../src/javascript/templating/capture";
+import { CaptureKind } from "../../../src/javascript/templating/types";
 
 describe('capture kinds', () => {
     describe('CaptureKind enum', () => {
@@ -98,11 +99,6 @@ describe('capture kinds', () => {
             const c = capture({ name: 'x' });
             expect((c as any)[CAPTURE_KIND_SYMBOL]).toBe(CaptureKind.Expression);
         });
-
-        test('capture() can override kind via options', () => {
-            const c = capture({ name: 'x', kind: CaptureKind.Identifier });
-            expect((c as any)[CAPTURE_KIND_SYMBOL]).toBe(CaptureKind.Identifier);
-        });
     });
 
     describe('namespace access on capture', () => {
@@ -131,15 +127,10 @@ describe('capture kinds', () => {
         });
     });
 
-    describe('any() with kinds', () => {
+    describe('any() defaults', () => {
         test('any() defaults to Expression kind', () => {
             const a = any();
             expect((a as any)[CAPTURE_KIND_SYMBOL]).toBe(CaptureKind.Expression);
-        });
-
-        test('any() can specify kind via options', () => {
-            const a = any({ kind: CaptureKind.Identifier });
-            expect((a as any)[CAPTURE_KIND_SYMBOL]).toBe(CaptureKind.Identifier);
         });
     });
 

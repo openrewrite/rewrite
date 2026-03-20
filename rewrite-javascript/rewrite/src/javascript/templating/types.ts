@@ -115,11 +115,6 @@ export interface CaptureOptions<T = any> {
     name?: string;
     variadic?: boolean | VariadicOptions;
     /**
-     * The syntactic kind of this capture. Defaults to {@link CaptureKind.Expression}.
-     * Used by the template engine to generate the correct scaffold placeholder.
-     */
-    kind?: CaptureKind;
-    /**
      * Optional constraint function that validates whether a captured node should be accepted.
      * The function receives:
      * - node: The captured node (or array of nodes for variadic captures)

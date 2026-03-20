@@ -33,10 +33,6 @@ export type {
     MatchAttemptResult
 } from './types';
 
-export {
-    CaptureKind
-} from './types';
-
 // Export capture functionality
 export {
     and,
