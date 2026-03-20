@@ -68,9 +68,9 @@ val csharpBuild by tasks.registering(Exec::class) {
     workingDir = csharpDir
     commandLine(findDotnet(), "build")
 
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
@@ -95,9 +95,9 @@ val csharpTest by tasks.registering(Exec::class) {
         "--logger", "junit;LogFilePath=${relativeJunitPath}"
     )
 
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files(junitXmlFile)
     outputs.cacheIf { true }

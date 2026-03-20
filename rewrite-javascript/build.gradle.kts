@@ -112,7 +112,8 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
 val npmInstall = tasks.named("npmInstall")
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
-    inputs.files(npmInstall)
+    dependsOn(npmInstall)
+    inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
         include("*.json")
