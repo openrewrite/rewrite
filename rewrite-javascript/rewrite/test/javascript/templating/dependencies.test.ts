@@ -17,7 +17,7 @@
  */
 import {
     _,
-    capture,
+    expr,
     JavaScriptParser,
     JavaScriptVisitor,
     MethodMatcher,
@@ -302,7 +302,7 @@ describe('template dependencies integration', () => {
         // This builds on the existing functionality to ensure our semantic equality checking works
         const spec = new RecipeSpec();
         const swapOperands = rewrite(() => {
-            const {left, right} = {left: capture(), right: capture()};
+            const {left, right} = {left: expr(), right: expr()};
             return {
                 before: pattern`${left} + ${right}`,
                 after: template`${right} + ${left}`
@@ -348,7 +348,7 @@ describe('template dependencies integration', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 // Create rewrite rules fresh for each invocation
-                const arg = capture();
+                const arg = expr();
                 const replaceUtilIsArray = rewrite(() => ({
                     before: pattern`util.isArray(${arg})`.configure({
                         context: ["import * as util from 'util'"],
@@ -450,7 +450,7 @@ describe('template dependencies integration', () => {
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
-                const dateArg = capture('dateArg');
+                const dateArg = expr('dateArg');
                 // Single pattern that matches both isDate(x) and util.isDate(x) via type attribution
                 const replaceIsDate = rewrite(() => ({
                     before: pattern`isDate(${dateArg})`.configure({

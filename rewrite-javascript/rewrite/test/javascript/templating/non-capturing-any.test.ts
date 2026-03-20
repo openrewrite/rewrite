@@ -16,7 +16,7 @@
 import { Cursor } from "../../../src";
 import {
     any,
-    capture,
+    expr,
     JavaScriptParser,
     JavaScriptVisitor,
     pattern,
@@ -174,11 +174,11 @@ describe('Non-Capturing any() Function', () => {
 
     describe('Mixed captures and any()', () => {
         test('captures important value, ignores others', async () => {
-            const important = capture('important');
+            const important = expr('important');
             const pat = pattern`compute(${any()}, ${important}, ${any()})`;
 
-            const expr = await parseExpression('compute(10, 20, 30)');
-            const match = await pat.match(expr, new Cursor(expr, undefined));
+            const parsed = await parseExpression('compute(10, 20, 30)');
+            const match = await pat.match(parsed, new Cursor(parsed, undefined));
 
             expect(match).toBeDefined();
             // Only the middle value should be captured
@@ -191,12 +191,12 @@ describe('Non-Capturing any() Function', () => {
         });
 
         test('first capture, rest any()', async () => {
-            const first = capture('first');
+            const first = expr('first');
             const rest = any({ variadic: true });
             const pat = pattern`foo(${first}, ${rest})`;
 
-            const expr = await parseExpression('foo(1, 2, 3, 4)');
-            const match = await pat.match(expr, new Cursor(expr, undefined));
+            const parsed = await parseExpression('foo(1, 2, 3, 4)');
+            const match = await pat.match(parsed, new Cursor(parsed, undefined));
 
             expect(match).toBeDefined();
             // First should be captured
@@ -234,7 +234,7 @@ describe('Non-Capturing any() Function', () => {
         test('mix captures and any() in rewrite', async () => {
             spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
                 override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                    const value = capture<Expression>('value');
+                    const value = expr<Expression>('value');
                     return await rewrite(() => ({
                         before: pattern`process(${any<Expression>()}, ${value})`,
                         after: template`process(${value})`

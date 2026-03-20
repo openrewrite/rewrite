@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JS, pattern} from "../../../src/javascript";
+import {expr, JavaScriptParser, JS, pattern} from "../../../src/javascript";
 
 describe('variadic pattern matching against real code', () => {
     const parser = new JavaScriptParser();
@@ -34,7 +34,7 @@ describe('variadic pattern matching against real code', () => {
     }
 
     test('variadic capture matches 0, 1, or many arguments', async () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         // Zero arguments
@@ -63,8 +63,8 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('required first argument + variadic rest', async () => {
-        const first = capture('first');
-        const rest = capture({ variadic: true });
+        const first = expr('first');
+        const rest = expr({ variadic: true });
         const pat = pattern`foo(${first}, ${rest})`;
 
         // Should NOT match foo() - missing required first
@@ -88,7 +88,7 @@ describe('variadic pattern matching against real code', () => {
 
     test('variadic with min, max, and min+max constraints', async () => {
         // Test 1: min constraint
-        const args1 = capture({ variadic: { min: 2 } });
+        const args1 = expr({ variadic: { min: 2 } });
         const pat1 = pattern`foo(${args1})`;
 
         expect(await pat1.match(await parseExpr('foo()'), undefined!)).toBeUndefined();  // min not satisfied
@@ -97,7 +97,7 @@ describe('variadic pattern matching against real code', () => {
         expect(await pat1.match(await parseExpr('foo(1, 2, 3)'), undefined!)).toBeDefined();    // more than min
 
         // Test 2: max constraint
-        const args2 = capture({ variadic: { max: 2 } });
+        const args2 = expr({ variadic: { max: 2 } });
         const pat2 = pattern`foo(${args2})`;
 
         expect(await pat2.match(await parseExpr('foo()'), undefined!)).toBeDefined();    // within max
@@ -105,7 +105,7 @@ describe('variadic pattern matching against real code', () => {
         expect(await pat2.match(await parseExpr('foo(1, 2, 3)'), undefined!)).toBeUndefined();  // exceeds max
 
         // Test 3: min and max constraints
-        const args3 = capture({ variadic: { min: 1, max: 2 } });
+        const args3 = expr({ variadic: { min: 1, max: 2 } });
         const pat3 = pattern`foo(${args3})`;
 
         expect(await pat3.match(await parseExpr('foo()'), undefined!)).toBeUndefined();  // below min
@@ -115,9 +115,9 @@ describe('variadic pattern matching against real code', () => {
     });
 
     test('pattern with regular captures and variadic', async () => {
-        const first = capture('first');
-        const middle = capture({ variadic: true });
-        const last = capture('last');
+        const first = expr('first');
+        const middle = expr({ variadic: true });
+        const last = expr('last');
         const pat = pattern`foo(${first}, ${middle}, ${last})`;
 
         // Should match foo(1, 2) - first=1, middle=[], last=2

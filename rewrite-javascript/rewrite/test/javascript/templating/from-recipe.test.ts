@@ -15,7 +15,7 @@
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {
-    capture,
+    expr,
     fromRecipe,
     JavaScriptVisitor,
     pattern,
@@ -88,8 +88,8 @@ describe('fromRecipe', () => {
 
         // Rule: Swap operands
         const swapRule = rewrite(() => ({
-            before: pattern`${capture('a')} + ${capture('b')}`,
-            after: template`${capture('b')} + ${capture('a')}`
+            before: pattern`${expr('a')} + ${expr('b')}`,
+            after: template`${expr('b')} + ${expr('a')}`
         }));
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {

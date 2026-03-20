@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, pattern} from "../../../src/javascript";
+import {expr, pattern} from "../../../src/javascript";
 
 describe('variadic marker attachment', () => {
     test('regular capture does not have variadic marker', () => {
-        const arg = capture('arg');
+        const arg = expr('arg');
         const pat = pattern`foo(${arg})`;
 
         // Verify the capture object itself
@@ -26,7 +26,7 @@ describe('variadic marker attachment', () => {
     });
 
     test('variadic capture stores options in capture object', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         const pat = pattern`foo(${args})`;
 
         // Verify the capture object itself
@@ -35,7 +35,7 @@ describe('variadic marker attachment', () => {
     });
 
     test('variadic capture with custom options stores them correctly', () => {
-        const args = capture({
+        const args = expr({
             variadic: {
                 min: 1,
                 max: 3
@@ -49,7 +49,7 @@ describe('variadic marker attachment', () => {
     });
 
     test('pattern captures array includes variadic capture', () => {
-        const args = capture({ name: 'args', variadic: true });
+        const args = expr({ name: 'args', variadic: true });
         const pat = pattern`foo(${args})`;
 
         // Pattern should have the captures array

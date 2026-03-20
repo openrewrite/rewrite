@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
+import {expr, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {create as produce} from "mutative";
 import {produceAsync} from "../../../src";
@@ -93,7 +93,7 @@ describe('template2 replace', () => {
                     });
 
                     // Use capture for late binding - myValue capture is looked up in the values map
-                    const myValue = capture();
+                    const myValue = expr();
                     return template`${myValue}`.apply(literal, this.cursor, {values: new Map([[myValue, replacement]])});
                 }
                 return literal;
@@ -106,7 +106,7 @@ describe('template2 replace', () => {
     });
 
     test('scalar capture preserves trailing semicolon', () => {
-        const arg = capture();
+        const arg = expr();
         const pat = pattern`foo(${arg})`;
         const tmpl = template`bar(${arg})`;
 
@@ -129,7 +129,7 @@ describe('template2 replace', () => {
     });
 
     test('scalar capture preserves comments', () => {
-        const arg = capture();
+        const arg = expr();
         const pat = pattern`oldFunc(${arg})`;
         const tmpl = template`newFunc(${arg})`;
 
@@ -155,7 +155,7 @@ describe('template2 replace', () => {
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if ((method.name as J.Identifier).simpleName === 'oldMethod' && method.select) {
-                    const select = capture();
+                    const select = expr();
                     return await template`${select}.newMethod()`.apply(
                         method,
                         this.cursor,

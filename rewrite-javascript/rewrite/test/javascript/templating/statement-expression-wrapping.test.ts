@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from '../../../src/javascript';
+import {expr, stmt, JavaScriptParser, JavaScriptVisitor, JS, pattern, template, typescript} from '../../../src/javascript';
 import {J} from '../../../src/java';
 import {Cursor} from '../../../src';
 import {fromVisitor, RecipeSpec} from '../../../src/test';
@@ -39,7 +39,7 @@ describe('Statement Expression Wrapping', () => {
         const initializerCursor = new Cursor(initializer, varDeclCursor);
 
         // Pattern to match the 'x' identifier
-        const pat = pattern`${capture('expr')}`;
+        const pat = pattern`${expr('expr')}`;
         const match = await pat.match(initializer, initializerCursor);
         expect(match).toBeTruthy();
 
@@ -69,7 +69,7 @@ describe('Statement Expression Wrapping', () => {
         const stmtCursor = new Cursor(exprStmt, cuCursor);
 
         // Pattern to match the statement
-        const pat = pattern`${capture('stmt')};`;
+        const pat = pattern`${stmt('stmt')};`;
         const match = await pat.match(exprStmt, stmtCursor);
         expect(match).toBeTruthy();
 
@@ -96,7 +96,7 @@ describe('Statement Expression Wrapping', () => {
         const initializerCursor = new Cursor(initializer);
 
         // Pattern to match the 'x' identifier
-        const pat = pattern`${capture('expr')}`;
+        const pat = pattern`${expr('expr')}`;
         const match = await pat.match(initializer, initializerCursor);
         expect(match).toBeTruthy();
 
@@ -126,7 +126,7 @@ describe('Statement Expression Wrapping', () => {
         const initializerCursor = new Cursor(initializer, varDeclCursor);
 
         // Pattern to match the method invocation
-        const pat = pattern`${capture('call')}`;
+        const pat = pattern`${expr('call')}`;
         const match = await pat.match(initializer, initializerCursor);
         expect(match).toBeTruthy();
 

@@ -19,15 +19,15 @@ import {typescript} from "../../../src/javascript";
 import {ExecutionContext} from "../../../src";
 import {JavaScriptVisitor} from "../../../src/javascript/visitor";
 import {J} from "../../../src/java";
-import {rewrite, pattern, template, capture, flattenBlock} from "../../../src/javascript/templating";
+import {rewrite, pattern, template, expr, flattenBlock} from "../../../src/javascript/templating";
 
 describe('flattenBlock', () => {
     test('flattens block statements into parent block', async () => {
         const spec = new RecipeSpec();
 
-        const cond = capture('cond');
-        const arr = capture('arr');
-        const cb = capture('cb');
+        const cond = expr('cond');
+        const arr = expr('arr');
+        const cb = expr('cb');
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
             override async visitReturn(ret: J.Return, ctx: ExecutionContext): Promise<J | undefined> {
@@ -74,9 +74,9 @@ describe('flattenBlock', () => {
     test('does not affect non-matching returns', async () => {
         const spec = new RecipeSpec();
 
-        const cond = capture('cond');
-        const arr = capture('arr');
-        const cb = capture('cb');
+        const cond = expr('cond');
+        const arr = expr('arr');
+        const cb = expr('cb');
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<ExecutionContext> {
             override async visitReturn(ret: J.Return, ctx: ExecutionContext): Promise<J | undefined> {

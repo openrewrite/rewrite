@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture} from "../../../src/javascript";
+import {expr} from "../../../src/javascript";
 
 describe('variadic capture basic functionality', () => {
     test('regular capture is not variadic', () => {
-        const arg = capture('arg');
+        const arg = expr('arg');
         expect(arg.isVariadic()).toBe(false);
         expect(arg.getVariadicOptions()).toBeUndefined();
     });
 
     test('variadic: true creates variadic capture with defaults', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         expect(args.isVariadic()).toBe(true);
 
         const options = args.getVariadicOptions();
@@ -33,7 +33,7 @@ describe('variadic capture basic functionality', () => {
     });
 
     test('variadic with min/max bounds', () => {
-        const args = capture({ variadic: { min: 1, max: 3 } });
+        const args = expr({ variadic: { min: 1, max: 3 } });
         expect(args.isVariadic()).toBe(true);
 
         const options = args.getVariadicOptions();
@@ -42,7 +42,7 @@ describe('variadic capture basic functionality', () => {
     });
 
     test('variadic with all options', () => {
-        const args = capture({ name: 'args',
+        const args = expr({ name: 'args',
             variadic: { min: 2, max: 5 }
         });
 
@@ -52,7 +52,7 @@ describe('variadic capture basic functionality', () => {
     });
 
     test('unnamed variadic capture', () => {
-        const args = capture({ variadic: true });
+        const args = expr({ variadic: true });
         expect(args.isVariadic()).toBe(true);
         expect(args.getName()).toMatch(/^unnamed_\d+$/);
     });

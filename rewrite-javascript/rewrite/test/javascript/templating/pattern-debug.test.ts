@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
+import {expr, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
 import {J} from '../../../src/java';
 
 /**
@@ -35,7 +35,7 @@ describe('Pattern Debugging', () => {
     }
 
     test('successful match returns matched=true with result', async () => {
-        const x = capture('x');
+        const x = expr('x');
         const pat = pattern`console.log(${x})`;
         const node = await parseExpression('console.log(42)');
 
@@ -63,7 +63,7 @@ describe('Pattern Debugging', () => {
     });
 
     test('constraint failure provides detailed explanation', async () => {
-        const value = capture({
+        const value = expr({
             constraint: (node: J) => {
                 // This constraint will fail
                 return false;
@@ -81,7 +81,7 @@ describe('Pattern Debugging', () => {
     });
 
     test('debug log contains constraint evaluation entries', async () => {
-        const value = capture({
+        const value = expr({
             constraint: (node: J) => true
         });
         const pat = pattern`${value}`;
@@ -144,7 +144,7 @@ describe('Pattern Debugging', () => {
     });
 
     test('variadic constraint failure is logged in debug', async () => {
-        const args = capture({
+        const args = expr({
             variadic: true,
             constraint: (nodes: J[]) => {
                 // Require exactly 2 arguments
@@ -244,7 +244,7 @@ describe('Pattern Debugging', () => {
     });
 
     test('path tracking includes intermediate steps for object destructuring', async () => {
-        const name = capture();
+        const name = expr();
         const pat = pattern`const {${name}} = obj;`;
 
         // Target has two variables, pattern expects one
