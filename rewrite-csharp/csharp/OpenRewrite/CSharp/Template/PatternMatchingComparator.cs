@@ -73,6 +73,11 @@ internal class PatternMatchingComparator
         if (TreeHelper.HasNullSafe(pattern) != TreeHelper.HasNullSafe(candidate))
             return false;
 
+        // Semantic matching for method invocations: when both resolve to the same
+        // static method (same declaring type + name), skip receiver comparison.
+        if (pattern is MethodInvocation patMethod && candidate is MethodInvocation candMethod)
+            return MatchMethodInvocation(patMethod, candMethod, cursor);
+
         // Generic property-based comparison: iterate all structural properties
         // and compare them recursively, skipping formatting/identity fields.
         if (pattern is Binary patBin && candidate is Binary candBin)
@@ -132,7 +137,50 @@ internal class PatternMatchingComparator
     }
 
     /// <summary>
-    /// Handle cross-type equivalences (e.g. <c>== null</c> ↔ <c>is null</c>).
+    /// Semantic matching for method invocations. When both sides have a MethodType
+    /// that is static and shares the same declaring type FQN and method name,
+    /// skip comparing the receiver (Select) — the method is the same regardless
+    /// of whether it's called as <c>Math.Abs(x)</c> or <c>Abs(x)</c> via using static.
+    /// Falls back to structural matching otherwise.
+    /// </summary>
+    private bool MatchMethodInvocation(MethodInvocation pattern, MethodInvocation candidate, Cursor cursor)
+    {
+        var patType = pattern.MethodType;
+        var candType = candidate.MethodType;
+
+        // If both have type info, same method name, and the method is static,
+        // compare by declaring type instead of by receiver syntax
+        if (patType != null && candType != null
+            && patType.Name == candType.Name
+            && IsStatic(patType) && IsStatic(candType)
+            && GetDeclaringTypeFqn(patType) is { } patFqn
+            && GetDeclaringTypeFqn(candType) is { } candFqn
+            && patFqn == candFqn)
+        {
+            // Declaring type and method name match — skip Select, compare the rest
+            return MatchNode(pattern.Name, candidate.Name, cursor)
+                && MatchValue(pattern.TypeParameters, candidate.TypeParameters, cursor)
+                && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
+        }
+
+        // Implicit this: Foo() ↔ this.Foo()
+        // When one side has no Select and the other's Select is "this", they are equivalent
+        var patSelect = pattern.Select != null ? TreeHelper.UnwrapPadded(pattern.Select) as J : null;
+        var candSelect = candidate.Select != null ? TreeHelper.UnwrapPadded(candidate.Select) as J : null;
+        if (IsImplicitThisPair(patSelect, candSelect))
+        {
+            return MatchNode(pattern.Name, candidate.Name, cursor)
+                && MatchValue(pattern.TypeParameters, candidate.TypeParameters, cursor)
+                && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
+        }
+
+        // Fall back to structural matching
+        return MatchProperties(pattern, candidate, cursor);
+    }
+
+    /// <summary>
+    /// Handle cross-type equivalences (e.g. <c>== null</c> ↔ <c>is null</c>,
+    /// <c>Identifier</c> ↔ <c>FieldAccess</c> for static members).
     /// Called when pattern and candidate have different node types.
     /// </summary>
     private bool MatchCrossType(J pattern, J candidate, Cursor cursor)
@@ -144,7 +192,53 @@ internal class PatternMatchingComparator
         if (pattern is IsPattern patIsP && candidate is Binary candBin)
             return MatchIsNullPatternToBinaryCandidate(patIsP, candBin, cursor);
 
+        // Identifier ↔ FieldAccess for static members and type references
+        if (pattern is FieldAccess patFA && candidate is Identifier candId)
+            return MatchFieldAccessToIdentifier(patFA, candId);
+        if (pattern is Identifier patId2 && candidate is FieldAccess candFA)
+            return MatchIdentifierToFieldAccess(patId2, candFA);
+
         return false;
+    }
+
+    /// <summary>
+    /// Pattern is a FieldAccess (e.g. <c>Math.PI</c>), candidate is an Identifier
+    /// (e.g. <c>PI</c> via using static). Match if both reference the same static
+    /// variable (same owner FQN and name) or the same fully qualified type.
+    /// </summary>
+    private static bool MatchFieldAccessToIdentifier(FieldAccess pattern, Identifier candidate)
+    {
+        // Static field/variable: Math.PI ↔ PI
+        if (pattern.Name.Element.FieldType is JavaType.Variable patVar
+            && candidate.FieldType is JavaType.Variable candVar
+            && IsStatic(patVar) && IsStatic(candVar)
+            && patVar.Name == candVar.Name
+            && patVar.Owner is JavaType.Class patOwner
+            && candVar.Owner is JavaType.Class candOwner
+            && patOwner.FullyQualifiedName == candOwner.FullyQualifiedName)
+        {
+            return true;
+        }
+
+        // Type reference: System.Console ↔ Console (same FullyQualified type)
+        if (pattern.Type is JavaType.Class patTypeFq
+            && candidate.Type is JavaType.Class candTypeFq
+            && patTypeFq.FullyQualifiedName == candTypeFq.FullyQualifiedName
+            && candidate.FieldType == null && pattern.Name.Element.FieldType == null)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Pattern is an Identifier (e.g. <c>PI</c> via using static), candidate is
+    /// a FieldAccess (e.g. <c>Math.PI</c>). Symmetric to <see cref="MatchFieldAccessToIdentifier"/>.
+    /// </summary>
+    private static bool MatchIdentifierToFieldAccess(Identifier pattern, FieldAccess candidate)
+    {
+        return MatchFieldAccessToIdentifier(candidate, pattern);
     }
 
     /// <summary>
@@ -377,5 +471,39 @@ internal class PatternMatchingComparator
         var max = maxProp?.GetValue(captureObj) as int? ?? int.MaxValue;
         return (min, max);
     }
+
+    /// <summary>
+    /// Check if one side is null (no receiver / implicit this) and the other is
+    /// an explicit <c>this</c> identifier. Handles both directions.
+    /// </summary>
+    private static bool IsImplicitThisPair(J? a, J? b)
+    {
+        return (a == null && IsThis(b)) || (b == null && IsThis(a));
+    }
+
+    private static bool IsThis(J? node) =>
+        node is Identifier { SimpleName: "this" };
+
+    /// <summary>
+    /// Get the FQN of a method's declaring type, unwrapping Parameterized if needed.
+    /// <c>List&lt;int&gt;.Contains</c> has declaring type <c>Parameterized(List)</c> —
+    /// we need the underlying <c>Class.FullyQualifiedName</c>.
+    /// </summary>
+    private static string? GetDeclaringTypeFqn(JavaType.Method method) =>
+        method.DeclaringType switch
+        {
+            JavaType.Class cls => cls.FullyQualifiedName,
+            JavaType.Parameterized { Type: JavaType.Class cls } => cls.FullyQualifiedName,
+            _ => null
+        };
+
+    /// <summary>Flag.Static bit value (from Java's Flag enum).</summary>
+    private const long FlagStatic = 8;
+
+    private static bool IsStatic(JavaType.Method method) =>
+        (method.FlagsBitMap & FlagStatic) != 0;
+
+    private static bool IsStatic(JavaType.Variable variable) =>
+        (variable.FlagsBitMap & FlagStatic) != 0;
 
 }

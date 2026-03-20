@@ -1189,6 +1189,225 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Semantic matching — static methods with using static
+    // ===============================================================
+
+    [Fact]
+    public void StaticMethodPatternWithReceiverMatchesCandidateWithUsingStatic()
+    {
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation("Math.Abs(-1)", ["System"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using static System.Math;
+                class C { void M() { var x = Abs(-1); } }
+                """,
+                """
+                using static System.Math;
+                class C { void M() { var x = /*~~>*/Abs(-1); } }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void StaticMethodPatternWithoutReceiverMatchesCandidateWithReceiver()
+    {
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation("Abs(-1)", ["static System.Math"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System;
+                class C { void M() { var x = Math.Abs(-1); } }
+                """,
+                """
+                using System;
+                class C { void M() { var x = /*~~>*/Math.Abs(-1); } }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void InstanceMethodWithReceiverDoesNotMatchWithoutReceiver()
+    {
+        // Pattern: list.Contains(1) with explicit receiver (typed capture gives scaffold type info)
+        // Candidate: Contains(1) without receiver (implicit this, inside a List<int> subclass)
+        // Both resolve to List<int>.Contains — same declaring type and method name —
+        // but the method is NOT static, so the semantic shortcut must not fire.
+        // Without the IsStatic guard, this would incorrectly match.
+        var list = Capture.Expression("list", type: "List<int>");
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation($"{list}.Contains(1)",
+                    ["System.Collections.Generic"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class C : List<int> { void M() { Contains(1); } }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
+    // Semantic matching — Identifier ↔ FieldAccess for static members
+    // ===============================================================
+
+    [Fact]
+    public void StaticFieldPatternWithReceiverMatchesIdentifierWithUsingStatic()
+    {
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindStaticMember("Math.PI", ["System"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using static System.Math;
+                class C { void M() { var x = PI; } }
+                """,
+                """
+                using static System.Math;
+                class C { void M() { var x = /*~~>*/PI; } }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void StaticFieldIdentifierWithUsingStaticMatchesPatternWithReceiver()
+    {
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindStaticMember("PI", ["static System.Math"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System;
+                class C { void M() { var x = Math.PI; } }
+                """,
+                """
+                using System;
+                class C { void M() { var x = /*~~>*/Math.PI; } }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
+    // Semantic matching — type references (short name ↔ fully qualified)
+    // ===============================================================
+
+    [Fact]
+    public void TypeReferenceMatchesAcrossQualificationLevels()
+    {
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation("Console.WriteLine(\"hi\")", ["System"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                class C { void M() { System.Console.WriteLine("hi"); } }
+                """,
+                """
+                class C { void M() { /*~~>*/System.Console.WriteLine("hi"); } }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
+    // Semantic matching — implicit this (foo ↔ this.foo)
+    // ===============================================================
+
+    [Fact]
+    public void ImplicitThisIdentifierMatchesExplicitThisFieldAccess()
+    {
+        // Pattern: Foo() (Identifier select) should match this.Foo() (FieldAccess select with this target)
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("Foo()")),
+            CSharp(
+                """
+                class C { void Foo() {} void M() { this.Foo(); } }
+                """,
+                """
+                class C { void Foo() {} void M() { /*~~>*/this.Foo(); } }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ExplicitThisFieldAccessMatchesImplicitThisIdentifier()
+    {
+        // Pattern: this.Foo() (FieldAccess select) should match Foo() (no select)
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("this.Foo()")),
+            CSharp(
+                """
+                class C { void Foo() {} void M() { Foo(); } }
+                """,
+                """
+                class C { void Foo() {} void M() { /*~~>*/Foo(); } }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
+    // Semantic matching — using aliases
+    // ===============================================================
+
+    [Fact]
+    public void UsingAliasMatchesOriginalType()
+    {
+        // Pattern uses short name, candidate uses alias — both resolve
+        // to the same declaring type via MethodType
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation("Console.WriteLine(\"hi\")", ["System"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using Con = System.Console;
+                class C { void M() { Con.WriteLine("hi"); } }
+                """,
+                """
+                using Con = System.Console;
+                class C { void M() { /*~~>*/Con.WriteLine("hi"); } }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void UsingAliasInPatternMatchesOriginalInCandidate()
+    {
+        // Reverse: pattern uses alias, candidate uses original
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation("Con.WriteLine(\"hi\")",
+                    ["Con = System.Console"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System;
+                class C { void M() { Console.WriteLine("hi"); } }
+                """,
+                """
+                using System;
+                class C { void M() { /*~~>*/Console.WriteLine("hi"); } }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
@@ -1198,10 +1417,23 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe Search<T>(string code) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(code));
 
+    private static Core.Recipe Search<T>(TemplateStringHandler handler, IReadOnlyList<string> usings) where T : J =>
+        new PatternSearchRecipe<T>(CSharpPattern.Create(handler, usings: usings));
+
+    private static Core.Recipe Search<T>(string code, IReadOnlyList<string> usings) where T : J =>
+        new PatternSearchRecipe<T>(CSharpPattern.Create(code, usings: usings));
+
     private static Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
     private static Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
+    private static Core.Recipe FindMethodInvocation(TemplateStringHandler h, IReadOnlyList<string> usings) => Search<MethodInvocation>(h, usings);
+    private static Core.Recipe FindMethodInvocation(string c, IReadOnlyList<string> usings) => Search<MethodInvocation>(c, usings);
     private static Core.Recipe FindFieldAccess(TemplateStringHandler h) => Search<FieldAccess>(h);
     private static Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
+    private static Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
+    private static Core.Recipe FindStaticMember(string c) =>
+        new StaticMemberSearchRecipe(CSharpPattern.Create(c));
+    private static Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
+        new StaticMemberSearchRecipe(CSharpPattern.Create(c, usings: usings));
     private static Core.Recipe FindLiteral(string c) => Search<Literal>(c);
     private static Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
     private static Core.Recipe FindUnary(TemplateStringHandler h) => Search<Unary>(h);
@@ -1283,6 +1515,36 @@ file class NullCheckSearchRecipe(CSharpPattern pat) : Core.Recipe
         public override J? PreVisit(J tree, ExecutionContext ctx)
         {
             if (tree is Binary or IsPattern)
+            {
+                return pat.Find(tree, Cursor);
+            }
+            return tree;
+        }
+    }
+}
+
+/// <summary>
+/// Search recipe that visits both FieldAccess and Identifier nodes to support
+/// cross-type semantic matching for static members (e.g. Math.PI ↔ PI with using static).
+/// </summary>
+file class StaticMemberSearchRecipe(CSharpPattern pat) : Core.Recipe
+{
+    public override string DisplayName => "Find static member";
+    public override string Description => "Searches for static member references matching the pattern (FieldAccess or Identifier).";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new SearchVisitor(pat);
+
+    private class SearchVisitor(CSharpPattern pat) : CSharpVisitor<ExecutionContext>
+    {
+        public override J? PreVisit(J tree, ExecutionContext ctx)
+        {
+            if (tree is FieldAccess)
+            {
+                return pat.Find(tree, Cursor);
+            }
+            // Only match top-level identifiers — skip Identifiers that are the name part
+            // of a FieldAccess, since the FieldAccess visit handles cross-type matching
+            if (tree is Identifier && Cursor.ParentTree.Value is not FieldAccess)
             {
                 return pat.Find(tree, Cursor);
             }

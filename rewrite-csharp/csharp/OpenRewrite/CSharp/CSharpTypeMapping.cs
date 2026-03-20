@@ -311,7 +311,10 @@ internal class CSharpTypeMapping
         if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Variable v)
             return v;
 
-        var variable = new JavaType.Variable(name, owner, type, null);
+        var variable = new JavaType.Variable(name, owner, type, null)
+        {
+            FlagsBitMap = MapFlags(symbol)
+        };
         _typeCache[symbol] = variable;
         return variable;
     }
