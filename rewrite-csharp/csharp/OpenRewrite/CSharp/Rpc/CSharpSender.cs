@@ -1020,10 +1020,9 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcSendQueue q)
     {
         q.GetAndSend(eft, e => (J)e.Try, el => Visit(el, q));
-        foreach (var filter in eft.CatchFilters)
-        {
-            q.GetAndSend(eft, _ => (object?)filter, el => VisitLeftPadded((JLeftPadded<ControlParentheses<Expression>>)el!, q));
-        }
+        q.GetAndSendList(eft, e => e.CatchFilters,
+            el => el != null ? (object)el.Element.Id : null,
+            el => { if (el != null) VisitLeftPadded(el, q); });
         return eft;
     }
 

@@ -872,16 +872,9 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     public J visitExceptionFilteredTry(Cs.ExceptionFilteredTry exceptionFilteredTry, RpcReceiveQueue q) {
         exceptionFilteredTry = exceptionFilteredTry
                 .withATry(q.receive(exceptionFilteredTry.getATry(), el -> (J.Try) visitNonNull(el, q)));
-        // catchFilters parallels aTry.catches — one filter per catch clause.
-        // On first receive (ADD), catchFilters is null but we know the count from the catches.
-        List<JLeftPadded<J.ControlParentheses<Expression>>> existing = exceptionFilteredTry.getCatchFilters();
-        int filterCount = existing != null ? existing.size() : exceptionFilteredTry.getATry().getCatches().size();
-        List<JLeftPadded<J.ControlParentheses<Expression>>> filters = new ArrayList<>(filterCount);
-        for (int i = 0; i < filterCount; i++) {
-            JLeftPadded<J.ControlParentheses<Expression>> before = existing != null ? existing.get(i) : null;
-            filters.add(q.receive(before, el -> visitLeftPadded(el, q)));
-        }
-        return exceptionFilteredTry.withCatchFilters(filters);
+        return exceptionFilteredTry.withCatchFilters(
+                q.receiveList(exceptionFilteredTry.getCatchFilters(),
+                        el -> el != null ? visitLeftPadded(el, q) : null));
     }
 
     // Delegate methods to JavaReceiver

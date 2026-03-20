@@ -941,12 +941,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcReceiveQueue q)
     {
         var @try = q.Receive((J)eft.Try, el => (J)VisitNonNull(el, q));
-        var catchFilters = new List<JLeftPadded<ControlParentheses<Expression>>?>(eft.CatchFilters.Count);
-        foreach (var filter in eft.CatchFilters)
-        {
-            catchFilters.Add(q.Receive(filter, el => _delegate.VisitLeftPadded(el!, q)));
-        }
-        return eft.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTry((Try)@try!).WithCatchFilters(catchFilters);
+        var catchFilters = q.ReceiveList(eft.CatchFilters,
+            el => el != null ? _delegate.VisitLeftPadded(el, q) : null);
+        return eft.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTry((Try)@try!).WithCatchFilters(catchFilters!);
     }
 
     // ---- LINQ ----
