@@ -349,6 +349,27 @@ public class TemplateApplyTests : RewriteTest
     }
 
     // ===============================================================
+    // Auto-parenthesization
+    // ===============================================================
+
+    [Fact]
+    public void AutoParenthesizesWhenSubstitutionNeedsParens()
+    {
+        // Replace a + b with a - b; when the result sits inside x * _, it needs parens
+        var lhs = Capture.Of<Expression>("lhs");
+        var rhs = Capture.Of<Expression>("rhs");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{lhs} + {rhs}",
+                $"{lhs} - {rhs}")),
+            CSharp(
+                "class C { void M() { var x = 2 * (1 + 3); } }",
+                "class C { void M() { var x = 2 * (1 - 3); } }"
+            )
+        );
+    }
+
+    // ===============================================================
     // Auto-formatting
     // ===============================================================
 

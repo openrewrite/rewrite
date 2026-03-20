@@ -206,6 +206,12 @@ public sealed class CSharpTemplate
             tree = TemplateEngine.ApplySubstitutions(tree, values);
         }
 
+        // Phase 1.5: auto-parenthesization after substitution
+        if (tree is Expression expr && cursor.Value is J)
+        {
+            tree = CSharpParenthesizeVisitor.MaybeParenthesize(expr, cursor);
+        }
+
         // Phase 2: coordinate application (prefix preservation)
         if (coordinates != null)
         {
