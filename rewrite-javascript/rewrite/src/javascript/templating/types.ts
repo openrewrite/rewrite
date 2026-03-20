@@ -20,6 +20,21 @@ import type {Template} from "./template";
 import type {CaptureValue, RawCode} from "./capture";
 
 /**
+ * The kind of syntactic element a capture represents.
+ * Used by the template engine to generate appropriate scaffold placeholders.
+ */
+export enum CaptureKind {
+    /** An expression (the default). */
+    Expression = 'expression',
+    /** An identifier / name. */
+    Identifier = 'identifier',
+    /** A type reference. */
+    TypeReference = 'type-reference',
+    /** A statement. */
+    Statement = 'statement',
+}
+
+/**
  * Options for variadic captures that match zero or more nodes in a sequence.
  */
 export interface VariadicOptions {
@@ -99,6 +114,11 @@ export type ConstraintFunction<T> = (node: T, context: CaptureConstraintContext)
 export interface CaptureOptions<T = any> {
     name?: string;
     variadic?: boolean | VariadicOptions;
+    /**
+     * The syntactic kind of this capture. Defaults to {@link CaptureKind.Expression}.
+     * Used by the template engine to generate the correct scaffold placeholder.
+     */
+    kind?: CaptureKind;
     /**
      * Optional constraint function that validates whether a captured node should be accepted.
      * The function receives:

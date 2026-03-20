@@ -15,7 +15,7 @@
  */
 import {Cursor} from '../..';
 import {J, Type} from '../../java';
-import {Any, Capture, CaptureConstraintContext, CaptureOptions, ConstraintFunction, TemplateParam, VariadicOptions} from './types';
+import {Any, Capture, CaptureConstraintContext, CaptureKind, CaptureOptions, ConstraintFunction, TemplateParam, VariadicOptions} from './types';
 
 /**
  * Combines multiple constraints with AND logic.
@@ -73,6 +73,8 @@ export const CAPTURE_CONSTRAINT_SYMBOL = Symbol('captureConstraint');
 export const CAPTURE_CAPTURING_SYMBOL = Symbol('captureCapturing');
 // Symbol to access type information without triggering Proxy
 export const CAPTURE_TYPE_SYMBOL = Symbol('captureType');
+// Symbol to access capture kind without triggering Proxy
+export const CAPTURE_KIND_SYMBOL = Symbol('captureKind');
 // Symbol to identify RawCode instances
 export const RAW_CODE_SYMBOL = Symbol('rawCode');
 
@@ -83,11 +85,13 @@ export class CaptureImpl<T = any> implements Capture<T> {
     [CAPTURE_CONSTRAINT_SYMBOL]: ConstraintFunction<T> | undefined;
     [CAPTURE_CAPTURING_SYMBOL]: boolean;
     [CAPTURE_TYPE_SYMBOL]: string | Type | undefined;
+    [CAPTURE_KIND_SYMBOL]: CaptureKind;
 
-    constructor(name: string, options?: CaptureOptions<T>, capturing: boolean = true) {
+    constructor(name: string, options?: CaptureOptions<T>, capturing: boolean = true, kind: CaptureKind = CaptureKind.Expression) {
         this.name = name;
         this[CAPTURE_NAME_SYMBOL] = name;
         this[CAPTURE_CAPTURING_SYMBOL] = capturing;
+        this[CAPTURE_KIND_SYMBOL] = options?.kind ?? kind;
 
         // Normalize variadic options
         if (options?.variadic) {
@@ -134,6 +138,10 @@ export class CaptureImpl<T = any> implements Capture<T> {
 
     getType(): string | Type | undefined {
         return this[CAPTURE_TYPE_SYMBOL];
+    }
+
+    getKind(): CaptureKind {
+        return this[CAPTURE_KIND_SYMBOL];
     }
 }
 
@@ -309,6 +317,9 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
             if (prop === CAPTURE_TYPE_SYMBOL) {
                 return target[CAPTURE_TYPE_SYMBOL];
             }
+            if (prop === CAPTURE_KIND_SYMBOL) {
+                return target[CAPTURE_KIND_SYMBOL];
+            }
 
             // Support using Capture as object key via computed properties {[x]: value}
             if (prop === Symbol.toPrimitive || prop === 'toString' || prop === 'valueOf') {
@@ -316,7 +327,7 @@ function createCaptureProxy<T>(impl: CaptureImpl<T>): any {
             }
 
             // Allow methods to be called directly on the target
-            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing' || prop === 'getType') {
+            if (prop === 'getName' || prop === 'isVariadic' || prop === 'getVariadicOptions' || prop === 'getConstraint' || prop === 'isCapturing' || prop === 'getType' || prop === 'getKind') {
                 return target[prop].bind(target);
             }
 
@@ -387,6 +398,15 @@ export function capture<T = any>(nameOrOptions?: string | CaptureOptions<T>): Ca
 
 // Static counter for generating unique IDs for unnamed captures
 capture.nextUnnamedId = 1;
+
+// Type declarations for namespace properties on capture
+export namespace capture {
+    export let nextUnnamedId: number;
+    export let expr: typeof import('./capture').expr;
+    export let ident: typeof import('./capture').ident;
+    export let typeRef: typeof import('./capture').typeRef;
+    export let stmt: typeof import('./capture').stmt;
+}
 
 /**
  * Creates a non-capturing pattern match for use in patterns.
@@ -580,6 +600,83 @@ export class RawCode {
 export function raw(code: string): RawCode {
     return new RawCode(code);
 }
+
+/**
+ * Creates an expression capture. This is the most common capture kind.
+ *
+ * @example
+ * const e = expr('x');
+ * pattern`foo(${e})`
+ */
+export function expr<T = any>(name?: string): Capture<T> & T;
+export function expr<T = any>(options: CaptureOptions<T>): Capture<T> & T;
+export function expr<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    return createKindCapture(CaptureKind.Expression, nameOrOptions);
+}
+
+/**
+ * Creates an identifier/name capture.
+ *
+ * @example
+ * const n = ident('method');
+ * pattern`${n}()`
+ */
+export function ident<T = any>(name?: string): Capture<T> & T;
+export function ident<T = any>(options: CaptureOptions<T>): Capture<T> & T;
+export function ident<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    return createKindCapture(CaptureKind.Identifier, nameOrOptions);
+}
+
+/**
+ * Creates a type reference capture.
+ *
+ * @example
+ * const t = typeRef('ret');
+ * pattern`function foo(): ${t}`
+ */
+export function typeRef<T = any>(name?: string): Capture<T> & T;
+export function typeRef<T = any>(options: CaptureOptions<T>): Capture<T> & T;
+export function typeRef<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    return createKindCapture(CaptureKind.TypeReference, nameOrOptions);
+}
+
+/**
+ * Creates a statement capture.
+ *
+ * @example
+ * const s = stmt('body');
+ * pattern`if (cond) ${s}`
+ */
+export function stmt<T = any>(name?: string): Capture<T> & T;
+export function stmt<T = any>(options: CaptureOptions<T>): Capture<T> & T;
+export function stmt<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    return createKindCapture(CaptureKind.Statement, nameOrOptions);
+}
+
+/**
+ * Internal helper for kind-specific capture factory functions.
+ */
+function createKindCapture<T>(kind: CaptureKind, nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
+    let name: string | undefined;
+    let options: CaptureOptions<T> | undefined;
+
+    if (typeof nameOrOptions === 'string') {
+        name = nameOrOptions;
+    } else {
+        options = nameOrOptions;
+        name = options?.name;
+    }
+
+    const captureName = name || `unnamed_${capture.nextUnnamedId++}`;
+    const impl = new CaptureImpl<T>(captureName, options, true, kind);
+    return createCaptureProxy(impl);
+}
+
+// Attach kind-specific factories to capture for namespace-qualified access
+capture.expr = expr;
+capture.ident = ident;
+capture.typeRef = typeRef;
+capture.stmt = stmt;
 
 /**
  * Concise alias for `capture`. Works well for inline captures in patterns and templates.

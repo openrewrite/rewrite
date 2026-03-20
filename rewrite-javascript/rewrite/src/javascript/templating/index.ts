@@ -33,6 +33,10 @@ export type {
     MatchAttemptResult
 } from './types';
 
+export {
+    CaptureKind
+} from './types';
+
 // Export capture functionality
 export {
     and,
@@ -42,7 +46,11 @@ export {
     any,
     param,
     raw,
-    _
+    _,
+    expr,
+    ident,
+    typeRef,
+    stmt
 } from './capture';
 
 // Export pattern functionality
