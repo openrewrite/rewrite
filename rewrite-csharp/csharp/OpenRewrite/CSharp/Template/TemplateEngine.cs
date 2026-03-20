@@ -70,20 +70,21 @@ internal static class TemplateEngine
         IReadOnlyList<string> usings, IReadOnlyList<string> context,
         IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
     {
-        var cacheKey = BuildCacheKey(code, captures, usings, context, dependencies, scaffoldKind);
+        // Compute preamble first — it affects the scaffold shape and must be part of the cache key
+        var preamble = BuildTypePreamble(captures);
+        var cacheKey = BuildCacheKey(code, preamble, usings, context, dependencies, scaffoldKind);
         if (GlobalCache.TryGetValue(cacheKey, out var cached))
             return cached;
 
-        var result = ParseInternal(code, captures, usings, context, dependencies, scaffoldKind);
+        var result = ParseInternal(code, preamble, usings, context, dependencies, scaffoldKind);
         GlobalCache.TryAdd(cacheKey, result);
         return result;
     }
 
-    private static J ParseInternal(string code, IReadOnlyDictionary<string, object> captures,
+    private static J ParseInternal(string code, IReadOnlyList<string> preamble,
         IReadOnlyList<string> usings, IReadOnlyList<string> context,
         IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
     {
-        var preamble = BuildTypePreamble(captures);
         var scaffold = BuildScaffold(code, preamble, usings, context, scaffoldKind);
         var parser = new CSharpParser();
 
@@ -100,7 +101,18 @@ internal static class TemplateEngine
             cu = parser.Parse(scaffold, "__template__.cs");
         }
 
-        return ExtractTemplateNode(cu, code, scaffoldKind);
+        var result = ExtractTemplateNode(cu, code, scaffoldKind);
+
+        // When the legacy scaffold (scaffoldKind == null) produces a VariableDeclarations,
+        // C#'s parser likely misparsed an expression like `a * b` as a pointer declaration.
+        // Re-parse using the Expression scaffold where the code appears in an initializer
+        // context (`object __v__ = a * b;`) and the expression is unambiguous.
+        if (scaffoldKind == null && result is VariableDeclarations)
+        {
+            return ParseInternal(code, preamble, usings, context, dependencies, ScaffoldKind.Expression);
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -112,10 +124,15 @@ internal static class TemplateEngine
     /// </summary>
     private static List<string> BuildTypePreamble(IReadOnlyDictionary<string, object> captures)
     {
+        const System.Reflection.BindingFlags bindingFlags =
+            System.Reflection.BindingFlags.Instance |
+            System.Reflection.BindingFlags.Public |
+            System.Reflection.BindingFlags.NonPublic;
+
         var preamble = new List<string>();
         foreach (var kvp in captures)
         {
-            var kind = kvp.Value.GetType().GetProperty("Kind")?.GetValue(kvp.Value);
+            var kind = kvp.Value.GetType().GetProperty("Kind", bindingFlags)?.GetValue(kvp.Value);
             var placeholder = Placeholder.ToPlaceholder(kvp.Key);
 
             if (kind is CaptureKind captureKind)
@@ -124,10 +141,10 @@ internal static class TemplateEngine
                 {
                     case CaptureKind.Expression:
                         var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
-                        if (!string.IsNullOrEmpty(captureType))
-                        {
-                            preamble.Add($"{captureType} {placeholder};");
-                        }
+                        // Always emit a field declaration for expression captures so Roslyn
+                        // knows the placeholder is a variable, not a type. Without this,
+                        // `__plh_x__ * __plh_y__` is misparsed as a pointer declaration.
+                        preamble.Add($"{(string.IsNullOrEmpty(captureType) ? "object" : captureType)} {placeholder};");
                         break;
                     case CaptureKind.Type:
                         // TODO: emit scaffold that places placeholder in a type position
@@ -253,6 +270,9 @@ internal static class TemplateEngine
 
     /// <summary>
     /// Legacy extraction: navigate into method body, auto-unwrap ExpressionStatement.
+    /// Falls back to Expression scaffold when the statement is a VariableDeclarations,
+    /// which can happen when Roslyn misparsed an expression like <c>a * b</c> as a
+    /// pointer declaration.
     /// </summary>
     private static J ExtractStatement(ClassDeclaration classDecl)
     {
@@ -271,6 +291,7 @@ internal static class TemplateEngine
             // Unwrap ExpressionStatement to get the inner expression
             if (stmt is ExpressionStatement es)
                 return StripPrefix(es.Expression);
+
             return StripPrefix(stmt);
         }
 
@@ -426,7 +447,15 @@ internal static class TemplateEngine
     {
         var visitor = new SubstitutionVisitor(values);
         visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        return visitor.VisitNonNull(tree, 0);
+        tree = visitor.VisitNonNull(tree, 0);
+
+        // Auto-parenthesize substituted expressions that may need parens in their
+        // new context within the template (e.g., a || b substituted into && position)
+        var parenthesizer = new CSharpParenthesizeVisitor<int>();
+        parenthesizer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        tree = parenthesizer.VisitNonNull(tree, 0);
+
+        return tree;
     }
 
     /// <summary>
@@ -481,7 +510,7 @@ internal static class TemplateEngine
         return J.SetPrefix(formatted, preservedPrefix);
     }
 
-    private static string BuildCacheKey(string code, IReadOnlyDictionary<string, object> captures,
+    private static string BuildCacheKey(string code, IReadOnlyList<string> preamble,
         IReadOnlyList<string> usings, IReadOnlyList<string> context,
         IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind = null)
     {
@@ -495,15 +524,10 @@ internal static class TemplateEngine
         sb.Append("code:");
         sb.Append(code);
 
-        // Include capture types in cache key so typed and untyped patterns
-        // with the same code don't collide
-        foreach (var kvp in captures.OrderBy(c => c.Key))
+        if (preamble.Count > 0)
         {
-            var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
-            if (!string.IsNullOrEmpty(captureType))
-            {
-                sb.Append($"|type:{kvp.Key}={captureType}");
-            }
+            sb.Append("|preamble:");
+            sb.Append(string.Join(",", preamble));
         }
 
         if (usings.Count > 0)

@@ -369,6 +369,58 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void AutoParenthesizesCaptureInsideHigherPrecedenceBinary()
+    {
+        // Pattern: {left} - {right} captures left = 1 + 2
+        // Template: {left} * {right} — should produce (1 + 2) * 3, not 1 + 2 * 3
+        var left = Capture.Of<Expression>("left");
+        var right = Capture.Of<Expression>("right");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{left} - {right}",
+                $"{left} * {right}")),
+            CSharp(
+                "class C { int M() { return 1 + 2 - 3; } }",
+                "class C { int M() { return (1 + 2) * 3; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void AutoParenthesizesCaptureOrInsideAnd()
+    {
+        // {left} || {right} where left = true, right = false — replace with &&
+        // Use a custom recipe to only match the outermost || in: true || false || true
+        // left = Binary(||, true, false), right = true
+        // Template {left} && {right} should produce (true || false) && true
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceOutermostOrWithAndRecipe()),
+            CSharp(
+                "class C { void M() { var x = true || false || true; } }",
+                "class C { void M() { var x = (true || false) && true; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void NoCaptureParenthesizationWhenUnnecessary()
+    {
+        // Pattern: {left} - {right} captures left = 2 * 3 (higher prec than -)
+        // Template: {left} + {right} — should produce 2 * 3 + 4 (no parens needed)
+        var left = Capture.Of<Expression>("left");
+        var right = Capture.Of<Expression>("right");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{left} - {right}",
+                $"{left} + {right}")),
+            CSharp(
+                "class C { void M() { var x = 2 * 3 - 4; } }",
+                "class C { void M() { var x = 2 * 3 + 4; } }"
+            )
+        );
+    }
+
     // ===============================================================
     // Auto-formatting
     // ===============================================================
@@ -520,6 +572,43 @@ file class ReplaceWithIfBlockRecipe : Core.Recipe
                 return (J)tmpl.Apply(Cursor)!;
             }
             return es;
+        }
+    }
+}
+
+/// <summary>
+/// Replaces only the outermost || binary with &&, avoiding double-matching of inner || nodes.
+/// </summary>
+file class ReplaceOutermostOrWithAndRecipe : Core.Recipe
+{
+    public override string DisplayName => "Replace outermost || with &&";
+    public override string Description => "Replaces the outermost || with &&.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitBinary(Binary binary, ExecutionContext ctx)
+        {
+            binary = (Binary)base.VisitBinary(binary, ctx);
+            if (binary.Operator.Element != Binary.OperatorType.Or)
+                return binary;
+
+            // Only match the outermost ||
+            if (Cursor.ParentTree.Value is Binary parentBin &&
+                parentBin.Operator.Element == Binary.OperatorType.Or)
+                return binary;
+
+            var left = Capture.Of<Expression>("left");
+            var right = Capture.Of<Expression>("right");
+            var pat = CSharpPattern.Create($"{left} || {right}");
+            var tmpl = CSharpTemplate.Create($"{left} && {right}");
+
+            if (pat.Match(binary, Cursor) is { } match)
+            {
+                return (J)tmpl.Apply(Cursor, values: match)!;
+            }
+            return binary;
         }
     }
 }
