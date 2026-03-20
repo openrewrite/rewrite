@@ -1020,6 +1020,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcSendQueue q)
     {
         q.GetAndSend(eft, e => (J)e.Try, el => Visit(el, q));
+        // Null entries represent catch clauses without a 'when' filter.
+        // Guid.Empty is used as a sentinel ID since C# Dictionary doesn't allow null keys
+        // (Java's IdentityHashMap does). Collisions between multiple null entries are harmless
+        // because null == null always produces NO_CHANGE in the list protocol.
         q.GetAndSendList(eft, e => e.CatchFilters,
             el => el != null ? el.Element.Id : (object)Guid.Empty,
             el => { if (el != null) VisitLeftPadded(el, q); });
