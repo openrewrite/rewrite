@@ -1320,6 +1320,92 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Semantic matching — implicit this (foo ↔ this.foo)
+    // ===============================================================
+
+    [Fact]
+    public void ImplicitThisIdentifierMatchesExplicitThisFieldAccess()
+    {
+        // Pattern: Foo() (Identifier select) should match this.Foo() (FieldAccess select with this target)
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("Foo()")),
+            CSharp(
+                """
+                class C { void Foo() {} void M() { this.Foo(); } }
+                """,
+                """
+                class C { void Foo() {} void M() { /*~~>*/this.Foo(); } }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ExplicitThisFieldAccessMatchesImplicitThisIdentifier()
+    {
+        // Pattern: this.Foo() (FieldAccess select) should match Foo() (no select)
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("this.Foo()")),
+            CSharp(
+                """
+                class C { void Foo() {} void M() { Foo(); } }
+                """,
+                """
+                class C { void Foo() {} void M() { /*~~>*/Foo(); } }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
+    // Semantic matching — using aliases
+    // ===============================================================
+
+    [Fact]
+    public void UsingAliasMatchesOriginalType()
+    {
+        // Pattern uses short name, candidate uses alias — both resolve
+        // to the same declaring type via MethodType
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation("Console.WriteLine(\"hi\")", ["System"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using Con = System.Console;
+                class C { void M() { Con.WriteLine("hi"); } }
+                """,
+                """
+                using Con = System.Console;
+                class C { void M() { /*~~>*/Con.WriteLine("hi"); } }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void UsingAliasInPatternMatchesOriginalInCandidate()
+    {
+        // Reverse: pattern uses alias, candidate uses original
+        RewriteRun(
+            spec => spec
+                .SetRecipe(FindMethodInvocation("Con.WriteLine(\"hi\")",
+                    ["Con = System.Console"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System;
+                class C { void M() { Console.WriteLine("hi"); } }
+                """,
+                """
+                using System;
+                class C { void M() { /*~~>*/Console.WriteLine("hi"); } }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
@@ -1342,6 +1428,8 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe FindFieldAccess(TemplateStringHandler h) => Search<FieldAccess>(h);
     private static Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
     private static Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
+    private static Core.Recipe FindStaticMember(string c) =>
+        new StaticMemberSearchRecipe(CSharpPattern.Create(c));
     private static Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
         new StaticMemberSearchRecipe(CSharpPattern.Create(c, usings: usings));
     private static Core.Recipe FindLiteral(string c) => Search<Literal>(c);

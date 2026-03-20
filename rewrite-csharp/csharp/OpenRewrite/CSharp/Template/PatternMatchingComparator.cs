@@ -161,6 +161,16 @@ internal class PatternMatchingComparator
                 && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
         }
 
+        // Implicit this: Foo() ↔ this.Foo()
+        // When one side has no Select and the other's Select is "this", they are equivalent
+        var patSelect = pattern.Select != null ? TreeHelper.UnwrapPadded(pattern.Select) as J : null;
+        var candSelect = candidate.Select != null ? TreeHelper.UnwrapPadded(candidate.Select) as J : null;
+        if (IsImplicitThisPair(patSelect, candSelect))
+        {
+            return MatchNode(pattern.Name, candidate.Name, cursor)
+                && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
+        }
+
         // Fall back to structural matching
         return MatchProperties(pattern, candidate, cursor);
     }
@@ -458,6 +468,18 @@ internal class PatternMatchingComparator
         var max = maxProp?.GetValue(captureObj) as int? ?? int.MaxValue;
         return (min, max);
     }
+
+    /// <summary>
+    /// Check if one side is null (no receiver / implicit this) and the other is
+    /// an explicit <c>this</c> identifier. Handles both directions.
+    /// </summary>
+    private static bool IsImplicitThisPair(J? a, J? b)
+    {
+        return (a == null && IsThis(b)) || (b == null && IsThis(a));
+    }
+
+    private static bool IsThis(J? node) =>
+        node is Identifier { SimpleName: "this" };
 
     /// <summary>Flag.Static bit value (from Java's Flag enum).</summary>
     private const long FlagStatic = 8;
