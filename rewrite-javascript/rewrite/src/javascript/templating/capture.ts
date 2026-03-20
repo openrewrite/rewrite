@@ -641,7 +641,8 @@ export interface ExprCaptureOptions<T = any> extends CaptureOptions<T> {
  * pattern`${e} || false`
  */
 export function expr<T = any>(name?: string): Capture<T> & T;
-export function expr<T = any>(options: ExprCaptureOptions<T>): Capture<T> & T;
+export function expr<T = any>(options: ExprCaptureOptions<T> & { variadic?: never }): Capture<T> & T;
+export function expr<T = any>(options: ExprCaptureOptions<T> & { variadic: true | VariadicOptions }): Capture<T[]> & T[];
 export function expr<T = any>(nameOrOptions?: string | ExprCaptureOptions<T>): Capture<T> & T {
     return createKindCapture(CaptureKind.Expression, nameOrOptions);
 }
@@ -654,7 +655,8 @@ export function expr<T = any>(nameOrOptions?: string | ExprCaptureOptions<T>): C
  * pattern`${n}()`
  */
 export function ident<T = any>(name?: string): Capture<T> & T;
-export function ident<T = any>(options: CaptureOptions<T>): Capture<T> & T;
+export function ident<T = any>(options: CaptureOptions<T> & { variadic?: never }): Capture<T> & T;
+export function ident<T = any>(options: CaptureOptions<T> & { variadic: true | VariadicOptions }): Capture<T[]> & T[];
 export function ident<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
     return createKindCapture(CaptureKind.Identifier, nameOrOptions);
 }
@@ -667,7 +669,8 @@ export function ident<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capt
  * pattern`function foo(): ${t}`
  */
 export function typeRef<T = any>(name?: string): Capture<T> & T;
-export function typeRef<T = any>(options: CaptureOptions<T>): Capture<T> & T;
+export function typeRef<T = any>(options: CaptureOptions<T> & { variadic?: never }): Capture<T> & T;
+export function typeRef<T = any>(options: CaptureOptions<T> & { variadic: true | VariadicOptions }): Capture<T[]> & T[];
 export function typeRef<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
     return createKindCapture(CaptureKind.TypeReference, nameOrOptions);
 }
@@ -680,7 +683,8 @@ export function typeRef<T = any>(nameOrOptions?: string | CaptureOptions<T>): Ca
  * pattern`if (cond) ${s}`
  */
 export function stmt<T = any>(name?: string): Capture<T> & T;
-export function stmt<T = any>(options: CaptureOptions<T>): Capture<T> & T;
+export function stmt<T = any>(options: CaptureOptions<T> & { variadic?: never }): Capture<T> & T;
+export function stmt<T = any>(options: CaptureOptions<T> & { variadic: true | VariadicOptions }): Capture<T[]> & T[];
 export function stmt<T = any>(nameOrOptions?: string | CaptureOptions<T>): Capture<T> & T {
     return createKindCapture(CaptureKind.Statement, nameOrOptions);
 }
