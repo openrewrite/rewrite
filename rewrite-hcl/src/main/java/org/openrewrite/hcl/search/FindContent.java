@@ -36,15 +36,9 @@ public class FindContent extends Recipe {
     )
     String contentPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Find content";
-    }
+    String displayName = "Find content";
 
-    @Override
-    public String getDescription() {
-        return "Find HCL content by path.";
-    }
+    String description = "Find HCL content by path.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

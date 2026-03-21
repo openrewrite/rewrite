@@ -58,20 +58,14 @@ public class RemoveDependency extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove a Gradle dependency";
-    }
+    String displayName = "Remove a Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a single dependency from the dependencies section of the `build.gradle`.";
-    }
+    String description = "Removes a single dependency from the dependencies section of the `build.gradle`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

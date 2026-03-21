@@ -99,6 +99,14 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
                 getCursor().putMessage("lastIndent", indent + style.getIndentSize());
             } else {
                 y = y.withPrefix(indentComments(y.getPrefix(), indent));
+                // For entries following literal/folded scalars (whose prefix has no line break
+                // because the newline is at the end of the scalar value), we still need to
+                // update lastIndent for any nested content. The entry's actual indent is
+                // computed from its prefix.
+                int entryIndent = findIndent(y.getPrefix());
+                if (entryIndent > 0) {
+                    getCursor().putMessage("lastIndent", entryIndent);
+                }
             }
         } else if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
             int indentValue = indent;

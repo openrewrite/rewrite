@@ -33,8 +33,9 @@ import java.util.Properties;
 @EqualsAndHashCode(callSuper = false)
 public class AutoFormat extends Recipe {
 
-    @Option(displayName = "Style",
-            description = "See https://docs.openrewrite.org/concepts-and-explanations/styles for a description on styles.",
+    @Option(displayName = "Style YAML",
+            description = "An OpenRewrite [style](https://docs.openrewrite.org/concepts-and-explanations/styles) formatted in YAML.",
+            //language=yaml
             example = "type: specs.openrewrite.org/v1beta/style\n" +
                     "name: com.yourorg.YesTabsNoStarImports\n" +
                     "styleConfigs:\n" +
@@ -44,15 +45,13 @@ public class AutoFormat extends Recipe {
     @Nullable
     String style;
 
-    @Override
-    public String getDisplayName() {
-        return "Format Java code";
+    public AutoFormat(@Nullable String style) {
+        this.style = style;
     }
 
-    @Override
-    public String getDescription() {
-        return "Format Java code using a standard comprehensive set of Java formatting recipes.";
-    }
+    String displayName = "Format Java code";
+
+    String description = "Format Java code using a standard comprehensive set of Java formatting recipes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -64,6 +63,8 @@ public class AutoFormat extends Recipe {
             return new NamedStyles[0];
         }
 
-        return new YamlResourceLoader(new ByteArrayInputStream(style.getBytes()), URI.create("AutoFormat$style"), new Properties()).listStyles().toArray(new NamedStyles[0]);
+        return new YamlResourceLoader(new ByteArrayInputStream(style.getBytes()),
+                URI.create("AutoFormat$style"),
+                new Properties()).listStyles().toArray(new NamedStyles[0]);
     }
 }

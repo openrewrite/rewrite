@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.Serializable;
 
 @Value
-public class OpenRewriteModelImpl implements Serializable {
+public class OpenRewriteModelImpl implements OpenRewriteModelProxy, Serializable {
     byte[] gradleProjectBytes;
 
     byte @Nullable [] gradleSettingsBytes;

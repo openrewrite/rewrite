@@ -113,15 +113,9 @@ public class AddRepository extends Recipe {
         return type == null ? Type.Repository : type;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add repository";
-    }
+    String displayName = "Add repository";
 
-    @Override
-    public String getDescription() {
-        return "Adds a new Maven Repository or updates a matching repository.";
-    }
+    String description = "Adds a new Maven Repository or updates a matching repository.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

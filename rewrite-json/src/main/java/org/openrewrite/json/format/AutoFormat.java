@@ -15,19 +15,16 @@
  */
 package org.openrewrite.json.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 
 public class AutoFormat extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Format JSON";
-    }
+    @Getter
+    final String displayName = "Format JSON";
 
-    @Override
-    public String getDescription() {
-        return "Format JSON code using a standard comprehensive set of JSON formatting recipes.";
-    }
+    @Getter
+    final String description = "Format JSON code using a standard comprehensive set of JSON formatting recipes.";
 
     @Override
     public AutoFormatVisitor<ExecutionContext> getVisitor() {

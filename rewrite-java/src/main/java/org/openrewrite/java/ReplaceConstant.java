@@ -42,15 +42,9 @@ public class ReplaceConstant extends Recipe {
             example = "UTF_8")
     String literalValue;
 
-    @Override
-    public String getDisplayName() {
-        return "Replace constant with literal value";
-    }
+    String displayName = "Replace constant with literal value";
 
-    @Override
-    public String getDescription() {
-        return "Replace a named constant with a literal value when you wish to remove the old constant. A `String` literal must include escaped quotes.";
-    }
+    String description = "Replace a named constant with a literal value when you wish to remove the old constant. A `String` literal must include escaped quotes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

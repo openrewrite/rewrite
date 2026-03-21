@@ -36,9 +36,9 @@ class PrimitiveTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration foo = (J.MethodDeclaration) cu.getStatements().getFirst();
-                J.VariableDeclarations bar = (J.VariableDeclarations) foo.getBody().getStatements().getFirst();
-                J.Literal zero = (J.Literal) bar.getVariables().getFirst().getInitializer();
+                var foo = (J.MethodDeclaration) cu.getStatements().getFirst();
+                var bar = (J.VariableDeclarations) foo.getBody().getStatements().getFirst();
+                var zero = (J.Literal) bar.getVariables().getFirst().getInitializer();
                 assertThat(zero.getType().getKeyword()).isEqualTo("int");
                 assertThat(zero.getValue()).isInstanceOf(Integer.class);
             })
@@ -57,9 +57,9 @@ class PrimitiveTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration foo = (J.MethodDeclaration) cu.getStatements().getFirst();
-                J.VariableDeclarations bar = (J.VariableDeclarations) foo.getBody().getStatements().getFirst();
-                J.Literal zero = (J.Literal) bar.getVariables().getFirst().getInitializer();
+                var foo = (J.MethodDeclaration) cu.getStatements().getFirst();
+                var bar = (J.VariableDeclarations) foo.getBody().getStatements().getFirst();
+                var zero = (J.Literal) bar.getVariables().getFirst().getInitializer();
                 assertThat(zero.getType().getKeyword()).isEqualTo("long");
                 assertThat(zero.getValue()).isInstanceOf(Long.class);
             })

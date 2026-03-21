@@ -33,14 +33,11 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the accumulator where scanning data is held until the transformation phase.
  */
+@SuppressWarnings("ALL")
 public abstract class ScanningRecipe<T> extends Recipe {
-    @Nullable
-    private String recipeAccMessage;
+    private String recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
 
-    private String getRecipeAccMessage() {
-        if (recipeAccMessage == null) {
-            recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
-        }
+    String getRecipeAccMessage() {
         return recipeAccMessage;
     }
 
@@ -127,5 +124,12 @@ public abstract class ScanningRecipe<T> extends Recipe {
                 return delegate(ctx).visit(tree, ctx);
             }
         };
+    }
+
+    @Override
+    public ScanningRecipe<T> clone() {
+        ScanningRecipe<T> cloned = (ScanningRecipe<T>) super.clone();
+        cloned.recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
+        return cloned;
     }
 }

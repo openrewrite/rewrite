@@ -53,15 +53,9 @@ public class RemoveRedundantProperties extends Recipe {
     @Nullable
     Boolean onlyIfValuesMatch;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove redundant properties";
-    }
+    String displayName = "Remove redundant properties";
 
-    @Override
-    public String getDescription() {
-        return "Remove properties when a parent POM specifies the same property.";
-    }
+    String description = "Remove properties when a parent POM specifies the same property.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

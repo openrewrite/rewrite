@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class AddBuildPluginTest implements RewriteTest {
@@ -254,4 +255,36 @@ class AddBuildPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPluginAfterBuildscriptBlockKotlin() {
+        rewriteRun(
+          spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null, null)),
+          buildGradleKts(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              
+              val myProperty = "test"
+              """,
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              
+              plugins {
+                  id("com.jfrog.bintray") version "1.0"
+              }
+              
+              val myProperty = "test"
+              """
+          )
+        );
+    }
+
 }

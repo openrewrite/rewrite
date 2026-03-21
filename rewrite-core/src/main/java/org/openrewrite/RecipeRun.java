@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
+import org.apache.commons.text.StringEscapeUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
@@ -79,7 +80,7 @@ public class RecipeRun {
 
     private static void exportCsv(DataTable<?> dataTable, File csv, boolean writeHeader, List<?> rows, ExecutionContext ctx) {
         try (PrintWriter printWriter = new PrintWriter(new FileOutputStream(csv, !writeHeader))) {
-            Consumer<String> output = printWriter::println;
+            Consumer<String> output = s -> { printWriter.print(s); printWriter.print('\n'); };
             DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
             List<String> fieldNames = new ArrayList<>();
             List<String> fieldTitles = new ArrayList<>();
@@ -117,7 +118,7 @@ public class RecipeRun {
     private static String formatForCsv(@Nullable Object data) {
         if (data != null) {
             // Assume every column value is printable with toString
-            return String.format("\"%s\"", data.toString().replace("\"", "\"\""));
+            return StringEscapeUtils.escapeCsv(String.valueOf(data));
         } else {
             return "\"\"";
         }

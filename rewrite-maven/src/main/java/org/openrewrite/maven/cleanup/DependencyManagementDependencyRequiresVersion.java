@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.cleanup;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -24,15 +25,11 @@ import org.openrewrite.xml.tree.Xml;
 
 public class DependencyManagementDependencyRequiresVersion extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Dependency management dependencies should have a version";
-    }
+    @Getter
+    final String displayName = "Dependency management dependencies should have a version";
 
-    @Override
-    public String getDescription() {
-        return "If they don't have a version, they can't possibly affect dependency resolution anywhere, and can be safely removed.";
-    }
+    @Getter
+    final String description = "If they don't have a version, they can't possibly affect dependency resolution anywhere, and can be safely removed.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

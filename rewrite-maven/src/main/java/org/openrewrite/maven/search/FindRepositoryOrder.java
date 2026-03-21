@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.search;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -36,15 +37,11 @@ import static java.util.stream.Collectors.toList;
 public class FindRepositoryOrder extends Recipe {
     transient MavenRepositoryOrder repositoryOrder = new MavenRepositoryOrder(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Maven repository order";
-    }
+    @Getter
+    final String displayName = "Maven repository order";
 
-    @Override
-    public String getDescription() {
-        return "Determine the order in which dependencies will be resolved for each `pom.xml` based on its defined repositories and effective `settings.xml`.";
-    }
+    @Getter
+    final String description = "Determine the order in which dependencies will be resolved for each `pom.xml` based on its defined repositories and effective `settings.xml`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

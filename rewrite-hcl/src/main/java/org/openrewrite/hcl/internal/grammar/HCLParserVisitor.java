@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/kbrockhoff/git/kbrockhoff/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
+// Generated from rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -243,6 +243,12 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitFunctionCall(HCLParser.FunctionCallContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link HCLParser#functionName}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFunctionName(HCLParser.FunctionNameContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link HCLParser#arguments}.
 	 * @param ctx the parse tree

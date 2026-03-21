@@ -30,20 +30,14 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = false)
 public class ModuleHasPlugin extends ScanningRecipe<ModuleHasPlugin.Accumulator> {
 
-    @Override
-    public String getDisplayName() {
-        return "Module has plugin";
-    }
+    String displayName = "Module has plugin";
 
-    @Override
-    public String getDescription() {
-        return "Searches for Gradle Projects (modules) that have a plugin matching the specified id or implementing class. " +
+    String description = "Searches for Gradle Projects (modules) that have a plugin matching the specified id or implementing class. " +
                "Places a `SearchResult` marker on all sources within a project with a matching plugin. " +
                "This recipe is intended to be used as a precondition for other recipes. " +
                "For example this could be used to limit the application of a spring boot migration to only projects " +
                "that apply the spring dependency management plugin, limiting unnecessary upgrading. " +
                "If the search result you want is instead just the build.gradle(.kts) file applying the plugin, use the `FindPlugins` recipe instead.";
-    }
 
     @Option(displayName = "Plugin id",
             description = "The unique identifier used to apply a plugin in the `plugins` block. " +

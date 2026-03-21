@@ -15,31 +15,25 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.style.Style;
 
 import static java.util.Objects.requireNonNull;
 
 public class NormalizeTabsOrSpaces extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Normalize to tabs or spaces";
-    }
+    @Getter
+    final String displayName = "Normalize to tabs or spaces";
 
-    @Override
-    public String getDescription() {
-        return "Consistently use either tabs or spaces in indentation.";
-    }
+    @Getter
+    final String description = "Consistently use either tabs or spaces in indentation.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -51,8 +45,7 @@ public class NormalizeTabsOrSpaces extends Recipe {
         public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
-                return new NormalizeTabsOrSpacesVisitor<>(style).visit(cu, ctx);
+                return new NormalizeTabsOrSpacesVisitor<>(cu, null).visit(cu, ctx);
             }
             return (J) tree;
         }

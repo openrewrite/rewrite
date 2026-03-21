@@ -34,9 +34,8 @@ java {
 tasks.named("licenseFormat") { enabled = false }
 
 tasks.withType<JavaCompile>().configureEach {
-    // Allow non-LTS versions before Java 25 to use this parser
-    sourceCompatibility = JavaVersion.VERSION_21.toString()
-    targetCompatibility = JavaVersion.VERSION_21.toString()
+    sourceCompatibility = JavaVersion.VERSION_25.toString()
+    targetCompatibility = JavaVersion.VERSION_25.toString()
 
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(

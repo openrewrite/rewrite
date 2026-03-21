@@ -100,21 +100,15 @@ public class ChangeManagedDependency extends Recipe {
     transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new HashMap<>();
     transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new HashMap<>();
 
-    @Override
-    public String getDisplayName() {
-        return "Change Gradle managed dependency";
-    }
+    String displayName = "Change Gradle managed dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", oldGroupId, oldArtifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a Gradle managed dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.\n" +
+    String description = "Change a Gradle managed dependency coordinates. The `newGroupId` or `newArtifactId` **MUST** be different from before.\n" +
                 "For now, only Spring Dependency Management Plugin entries are supported and no other forms of managed dependencies (yet).";
-    }
 
     @Override
     public Validated<Object> validate() {

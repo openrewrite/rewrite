@@ -58,16 +58,10 @@ public class ReplaceAnnotation extends Recipe {
     @Nullable
     String classpathResourceName;
 
-    @Override
-    public String getDisplayName() {
-        return "Replace annotation";
-    }
+    String displayName = "Replace annotation";
 
-    @Override
-    public String getDescription() {
-        return "Replace an Annotation with another one if the annotation pattern matches. " +
+    String description = "Replace an Annotation with another one if the annotation pattern matches. " +
                 "Only fixed parameters can be set in the replacement.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

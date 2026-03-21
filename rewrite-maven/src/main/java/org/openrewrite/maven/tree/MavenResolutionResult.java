@@ -60,6 +60,7 @@ public class MavenResolutionResult implements Marker {
     List<MavenResolutionResult> modules;
 
     @Nullable
+    @With
     MavenResolutionResult parent;
 
     @With
@@ -180,7 +181,7 @@ public class MavenResolutionResult implements Marker {
     private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
 
     public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
+        Map<Scope, List<ResolvedDependency>> dependencies = new LinkedHashMap<>();
         MavenDownloadingExceptions exceptions = null;
 
         Map<GroupArtifact, Set<GroupArtifactVersion>> exceptionsInLowerScopes = new HashMap<>();
@@ -206,7 +207,9 @@ public class MavenResolutionResult implements Marker {
     }
 
     public Map<Path, Pom> getProjectPoms() {
-        return getProjectPomsRecursive(new HashMap<>());
+        Map<Path, Pom> projectPoms = new HashMap<>();
+        getProjectPomsRecursive(projectPoms);
+        return projectPoms;
     }
 
     /**
@@ -229,7 +232,7 @@ public class MavenResolutionResult implements Marker {
         return getPom().getSubprojects() == null || !getPom().getSubprojects().isEmpty();
     }
 
-    private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
+    private void getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
         // Strange edge case: Some projects specify a <relativePath> to their parent in the maven local directory
         // e.g.: ../../../.m2/repository/
         // This is bizarre and generally pointless, but not technically disallowed by Maven
@@ -248,6 +251,5 @@ public class MavenResolutionResult implements Marker {
                 module.getProjectPomsRecursive(projectPoms);
             }
         }
-        return projectPoms;
     }
 }

@@ -1,11 +1,11 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("org.openrewrite.build.language-library")
-    kotlin("jvm") version "1.9.25"
+    kotlin("jvm") version "2.2.21"
 }
 
-val kotlinVersion = "1.9.25"
+val kotlinVersion = "2.2.0"
 
 dependencies {
     compileOnly(project(":rewrite-core"))
@@ -13,9 +13,9 @@ dependencies {
 
     implementation(project(":rewrite-java"))
 
-    implementation(platform(kotlin("bom", kotlinVersion)))
-    implementation(kotlin("compiler-embeddable"))
-    implementation(kotlin("stdlib"))
+    implementation(kotlin("compiler-embeddable", kotlinVersion))
+    implementation(kotlin("reflect", kotlinVersion))
+    implementation(kotlin("stdlib", kotlinVersion))
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))
@@ -34,6 +34,14 @@ java {
     }
 }
 
-tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions.jvmTarget = if (name.contains("Test")) "21" else "1.8"
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_1_8)
+    }
+}
+
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
+    }
 }

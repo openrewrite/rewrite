@@ -77,7 +77,7 @@ public interface JavaSourceFile extends J, SourceFile {
             } else if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new JavaNamingService();
             } else if (SourcePositionService.class.getName().equals(service.getName())) {
-                return (T) new SourcePositionService();
+                return (T) service.getConstructor().newInstance();
             } else {
                 throw new UnsupportedOperationException("Service " + service + " not supported");
             }

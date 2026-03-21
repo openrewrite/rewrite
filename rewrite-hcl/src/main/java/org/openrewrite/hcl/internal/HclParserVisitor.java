@@ -338,7 +338,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitFunctionCall(HCLParser.FunctionCallContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            Hcl.Identifier name = visitIdentifier(ctx.Identifier());
+            Hcl.Identifier name = visitFunctionName(ctx.functionName());
 
             Space argPrefix = sourceBefore("(");
             List<HclRightPadded<Expression>> mappedArgs = new ArrayList<>();
@@ -357,6 +357,32 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             return new Hcl.FunctionCall(randomId(), Space.format(prefix), Markers.EMPTY, name,
                     HclContainer.build(argPrefix, mappedArgs, Markers.EMPTY));
         });
+    }
+
+    @Override
+    public Hcl.Identifier visitFunctionName(HCLParser.FunctionNameContext ctx) {
+        List<TerminalNode> identifiers = ctx.Identifier();
+        if (identifiers.size() == 1) {
+            return visitIdentifier(identifiers.get(0));
+        }
+
+        // Build the provider-scoped function name (e.g., "provider::test::count_e")
+        StringBuilder nameBuilder = new StringBuilder();
+        for (int i = 0; i < identifiers.size(); i++) {
+            if (i > 0) {
+                skip(ctx.DOUBLE_COLON(i - 1));
+                nameBuilder.append("::");
+            }
+            nameBuilder.append(identifiers.get(i).getText());
+            skip(identifiers.get(i));
+        }
+
+        return new Hcl.Identifier(
+            randomId(),
+            Space.format(prefix(ctx)),
+            Markers.EMPTY,
+            nameBuilder.toString()
+        );
     }
 
     @Override

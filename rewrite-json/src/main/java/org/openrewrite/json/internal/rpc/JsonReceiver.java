@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.internal.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
@@ -34,7 +33,7 @@ import static java.util.Objects.requireNonNull;
 public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
-    public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
+    public Json preVisit(Json j, RpcReceiveQueue q) {
         j = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
         j = j.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
         return j.withMarkers(q.receive(j.getMarkers()));

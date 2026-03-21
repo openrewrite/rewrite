@@ -18,7 +18,6 @@ package org.openrewrite.gradle.toolingapi;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.gradle.UpdateGradleWrapper;
 import org.openrewrite.gradle.marker.GradleBuildscript;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
@@ -44,7 +43,6 @@ import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class Assertions {
@@ -134,14 +132,14 @@ public class Assertions {
                                  "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
                         Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
-                        Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")), gradleSh);
+                        Files.copy(gradleWrapper.gradlew().getInputStream(), gradleSh);
                         OperatingSystemProvenance current = OperatingSystemProvenance.current();
                         if (current.isLinux() || current.isMacOsX()) {
                             Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(gradleSh);
                             permissions.add(PosixFilePermission.OWNER_EXECUTE);
                             Files.setPosixFilePermissions(gradleSh, permissions);
                         }
-                        Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")), projectDir.resolve(GradleWrapper.WRAPPER_BATCH_LOCATION));
+                        Files.copy(gradleWrapper.gradlewBat().getInputStream(), projectDir.resolve(GradleWrapper.WRAPPER_BATCH_LOCATION));
                     }
 
                     Set<org.openrewrite.maven.tree.MavenRepository> allRepositories = new LinkedHashSet<>();

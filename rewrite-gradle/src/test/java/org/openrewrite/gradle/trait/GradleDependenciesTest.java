@@ -37,7 +37,7 @@ class GradleDependenciesTest implements RewriteTest {
           .recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                  var mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                   Optional<GradleDependencies> meybeDependenciesBlock = new GradleDependencies.Matcher().get(mi, getCursor().getParent());
 
                   if (meybeDependenciesBlock.isPresent()) {

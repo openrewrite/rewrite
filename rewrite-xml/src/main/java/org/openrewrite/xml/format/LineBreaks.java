@@ -15,19 +15,16 @@
  */
 package org.openrewrite.xml.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 
 public class LineBreaks extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Blank lines";
-    }
+    @Getter
+    final String displayName = "Blank lines";
 
-    @Override
-    public String getDescription() {
-        return "Add line breaks at appropriate places between XML syntax elements.";
-    }
+    @Getter
+    final String description = "Add line breaks at appropriate places between XML syntax elements.";
 
     @Override
     public LineBreaksVisitor<ExecutionContext> getVisitor() {

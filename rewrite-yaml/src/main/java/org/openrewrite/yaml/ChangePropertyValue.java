@@ -68,20 +68,14 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Change YAML property";
-    }
+    String displayName = "Change YAML property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", propertyKey, newValue);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a YAML property. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
-    }
+    String description = "Change a YAML property. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
 
     @Override
     public Validated<Object> validate() {
@@ -92,12 +86,16 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        NameCaseConvention.Compiled keyMatcher = (!Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.LOWER_CAMEL :
+                NameCaseConvention.EXACT).compile(propertyKey);
+
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
-                if (matchesPropertyKey(prop) && matchesOldValue(e.getValue())) {
+                if (keyMatcher.matchesGlob(prop) && matchesOldValue(e.getValue())) {
                     Yaml.Block updatedValue = updateValue(e.getValue());
                     if (updatedValue != null) {
                         e = e.withValue(updatedValue);
@@ -130,12 +128,6 @@ public class ChangePropertyValue extends Recipe {
             }));
         }
         return null;
-    }
-
-    private boolean matchesPropertyKey(String prop) {
-        return !Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
-                StringUtils.matchesGlob(prop, propertyKey);
     }
 
     private boolean matchesOldValue(Yaml.Block value) {

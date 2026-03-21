@@ -28,10 +28,14 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.javascript.style.Autodetect;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,6 +51,7 @@ import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
+@SuppressWarnings("JSUnusedLocalSymbols")
 class JavaScriptRewriteRpcTest implements RewriteTest {
     @TempDir
     Path tempDir;
@@ -58,7 +63,6 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .metricsCsv(tempDir.resolve("rpc.csv"))
           .log(tempDir.resolve("rpc.log"))
           .traceRpcMessages()
-//          .inspectBrk()
         );
     }
 
@@ -160,7 +164,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void printJava() {
-        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
+        assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")).getRecipesInstalled())
           .isEqualTo(1);
         Recipe modifyAll = client().prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 
@@ -173,7 +177,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J preVisit(J tree, ExecutionContext ctx) {
-                  SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
+                  var t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                   assertThat(t.printAll()).isEqualTo(java.trim());
                   stopAfterPreVisit();
                   return tree;
@@ -187,13 +191,10 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void installRecipesFromNpm() {
-        assertThat(client().installRecipes("@openrewrite/recipes-npm")).isEqualTo(1);
-        assertThat(client().getRecipes()).satisfiesExactly(
+        assertThat(client().installRecipes("@openrewrite/recipes-npm").getRecipesInstalled()).isEqualTo(1);
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null)).getAllRecipes()).satisfiesExactly(
           d -> {
               assertThat(d.getDisplayName()).isEqualTo("Change version in `package.json`");
-              assertThat(d.getOptions()).satisfiesExactly(
-                o -> assertThat(o.isRequired()).isTrue()
-              );
           }
         );
     }
@@ -201,7 +202,8 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     @Test
     void getRecipes() {
         installRecipes();
-        assertThat(client().getRecipes()).isNotEmpty();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+          .getAllRecipes()).isNotEmpty();
     }
 
     @Test
@@ -210,6 +212,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         Recipe recipe = client().prepareRecipe("org.openrewrite.example.npm.change-version",
           Map.of("version", "1.0.0"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
+        assertThat(recipe.getDescriptor().getOptions().size()).isEqualTo(1);
     }
 
     @SuppressWarnings("JSUnusedLocalSymbols")
@@ -335,10 +338,184 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void runScanningRecipeThatEdits() {
+        // This test verifies that the accumulator from the scanning phase
+        // is correctly passed to the editor phase over RPC.
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.text.scanning-editor", Map.of()))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          text("file1", "file1 (count: 2)"),
+          text("file2", "file2 (count: 2)")
+        );
+    }
+
+    @Test
+    void environmentVariableIsSetRemotely() {
+        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder()
+          .recipeInstallDir(tempDir)
+          .environment(Map.of("HTTPS_PROXY", "http://unused:3128"))
+        );
+        installRecipes();
+
+        rewriteRun(spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.replace-assignment",
+              Map.of("variable", "HTTPS_PROXY"))),
+          javascript(
+            "const v = 'value'",
+            "const v = 'http://unused:3128'"
+          )
+        );
+    }
+
+    @Test
+    void parseProject(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
+        Files.writeString(projectDir.resolve("other.js"), "const y = 2;");
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        assertThat(sourceFiles).hasSize(3);
+
+        List<String> paths = sourceFiles.stream()
+          .map(sf -> sf.getSourcePath().toString())
+          .toList();
+        assertThat(paths).containsExactlyInAnyOrder("package.json", "index.js", "other.js");
+
+        // Verify content is parseable and printable
+        for (SourceFile sf : sourceFiles) {
+            assertThat(sf).isNotInstanceOf(ParseError.class);
+            assertThat(client().print(sf)).isNotEmpty();
+        }
+
+        // Verify that both JS files share the same Autodetect marker instance (deduplication)
+        SourceFile indexJs = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().equals("index.js"))
+          .findFirst().orElseThrow();
+        SourceFile otherJs = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().equals("other.js"))
+          .findFirst().orElseThrow();
+
+        Autodetect indexAutodetect = indexJs.getMarkers().findFirst(Autodetect.class).orElseThrow();
+        Autodetect otherAutodetect = otherJs.getMarkers().findFirst(Autodetect.class).orElseThrow();
+
+        assertThat(indexAutodetect).isSameAs(otherAutodetect);
+    }
+
+    @Test
+    void parseProjectWithExclusions(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        Files.writeString(projectDir.resolve("index.js"), "const x = 1;");
+        Files.createDirectories(projectDir.resolve("vendor"));
+        Files.writeString(projectDir.resolve("vendor/external.js"), "const y = 2;");
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, List.of("**/vendor/**"), new InMemoryExecutionContext())
+          .toList();
+
+        assertThat(sourceFiles).hasSize(2);
+
+        List<String> paths = sourceFiles.stream()
+          .map(sf -> sf.getSourcePath().toString())
+          .toList();
+        assertThat(paths)
+          .containsExactlyInAnyOrder("package.json", "index.js")
+          .noneMatch(p -> p.contains("vendor"));
+    }
+
+    @Test
+    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        // Reproduces the pattern from GitHub Actions workflow files like:
+        //   on: { push: {}, pull_request: {} }
+        // where nested flow mappings caused "Yaml.Mapping may not have a non-empty prefix"
+        // during RPC deserialization on the Java side.
+        Files.createDirectories(projectDir.resolve(".github/workflows"));
+        Files.writeString(projectDir.resolve(".github/workflows/ci.yml"), """
+          name: CI
+          on: { push: {}, pull_request: {} }
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile yamlFile = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith("ci.yml"))
+          .findFirst().orElseThrow();
+
+        assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
+        assertThat(yamlFile).isNotInstanceOf(ParseError.class);
+        assertThat(client().print(yamlFile)).isNotEmpty();
+    }
+
+    /**
+     * Tests that a JavaScript recipe can delegate to a Java recipe via RPC.
+     * This validates the "npm ecosystem" use case where JS code can invoke Java recipes.
+     * Flow: Java test -> JS recipe (JavaChangeMethodName) -> Java recipe (ChangeMethodName) -> result
+     */
+    @SuppressWarnings({"TypeScriptCheckImport", "JSUnusedLocalSymbols"})
+    @Test
+    void jsRecipeDelegatingToJavaRecipe(@TempDir Path projectDir) {
+        installRecipes();
+        rewriteRun(
+          spec -> spec.recipe(client().prepareRecipe(
+            "org.openrewrite.example.java.change-method-name",
+            Map.of(
+              "methodPattern", "_.LoDashStatic max(..)",
+              "newMethodName", "maximum"
+            ))),
+          npm(
+            projectDir,
+            typescript(
+              """
+                import _ from 'lodash';
+                const result = _.max(1, 2);
+                """,
+              """
+                import _ from 'lodash';
+                const result = _.maximum(1, 2);
+                """
+            ),
+            packageJson(
+              """
+                {
+                  "name": "test-project",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "lodash": "^4.17.21"
+                  },
+                  "devDependencies": {
+                    "@types/lodash": "^4.14.195"
+                  }
+                }
+                """
+            )
+          )
+        );
+    }
+
     private void installRecipes() {
         File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();
-        assertThat(client().installRecipes(exampleRecipes)).isGreaterThan(0);
+        assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
     }
 
     private JavaScriptRewriteRpc client() {

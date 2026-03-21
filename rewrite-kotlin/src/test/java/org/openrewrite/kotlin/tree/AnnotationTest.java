@@ -18,8 +18,10 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -28,6 +30,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier", "UnusedReceiverParameter", "SortModifiers", "TrailingComma", "RedundantGetter", "RedundantSetter"})
 class AnnotationTest implements RewriteTest {
@@ -109,7 +112,7 @@ class AnnotationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations v = (J.VariableDeclarations) ((J.ClassDeclaration) cu.getStatements().get(2)).getBody().getStatements().getFirst();
+                var v = (J.VariableDeclarations) ((J.ClassDeclaration) cu.getStatements().get(2)).getBody().getStatements().getFirst();
                 assertThat(v.getLeadingAnnotations()).hasSize(2);
             })
           )
@@ -396,7 +399,7 @@ class AnnotationTest implements RewriteTest {
               @A open  @B   internal    @C @LAST  class Foo
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.ClassDeclaration last = (J.ClassDeclaration) cu.getStatements().get(cu.getStatements().size() - 1);
+                var last = (J.ClassDeclaration) cu.getStatements().get(cu.getStatements().size() - 1);
                 List<J.Annotation> annotationList = last.getPadding().getKind().getAnnotations();
                 assertThat(annotationList).hasSize(2);
                 assertThat(annotationList.getFirst().getSimpleName()).isEqualTo("C");
@@ -777,6 +780,42 @@ class AnnotationTest implements RewriteTest {
               annotation class Anno
               fun method ( ) {
                   val lambda : suspend (   @Anno Int ) -> Int = { number : Int -> number * number }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6868")
+    @Test
+    void visitAnnotatedExpressionTraversesInnerExpression() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if ("foo".equals(method.getSimpleName())) {
+                        return method.withName(method.getName().withSimpleName("bar"));
+                    }
+                    return super.visitMethodInvocation(method, ctx);
+                }
+            }))
+            .typeValidationOptions(TypeValidation.none()),
+          kotlin(
+            """
+              fun main() {
+                  @Suppress("UNCHECKED_CAST")
+                  try {
+                      foo()
+                  } catch (e: Exception) {}
+              }
+              """,
+            """
+              fun main() {
+                  @Suppress("UNCHECKED_CAST")
+                  try {
+                      bar()
+                  } catch (e: Exception) {}
               }
               """
           )

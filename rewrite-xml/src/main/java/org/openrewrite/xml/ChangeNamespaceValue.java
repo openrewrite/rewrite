@@ -43,15 +43,9 @@ public class ChangeNamespaceValue extends Recipe {
     private static final String SCHEMA_LOCATION_MATCH_PATTERN = "(?m)(.*)(%s)(\\s+)(.*)";
     private static final String SCHEMA_LOCATION_REPLACEMENT_PATTERN = "$1%s$3%s";
 
-    @Override
-    public String getDisplayName() {
-        return "Change XML attribute of a specific resource version";
-    }
+    String displayName = "Change XML attribute of a specific resource version";
 
-    @Override
-    public String getDescription() {
-        return "Alters XML Attribute value within specified element of a specific resource versions.";
-    }
+    String description = "Alters XML Attribute value within specified element of a specific resource versions.";
 
     @Nullable
     @Option(displayName = "Element name",

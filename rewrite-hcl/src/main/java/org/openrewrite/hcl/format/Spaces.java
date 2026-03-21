@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -25,15 +26,11 @@ import org.openrewrite.style.Style;
 
 public class Spaces extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Spaces";
-    }
+    @Getter
+    final String displayName = "Spaces";
 
-    @Override
-    public String getDescription() {
-        return "Format whitespace in HCL code.";
-    }
+    @Getter
+    final String description = "Format whitespace in HCL code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

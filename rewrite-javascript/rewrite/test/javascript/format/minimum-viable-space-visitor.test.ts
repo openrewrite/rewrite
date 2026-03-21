@@ -13,12 +13,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * Tests for MinimumViableSpacingVisitor - ensures minimum required spacing exists.
+ *
+ * GUIDELINES FOR TEST AUTHORS:
+ *
+ * 1. COMPACT TESTS: Prefer fewer, more comprehensive tests over many small focused tests.
+ *    Since test output shows the full source diff, it's more efficient to combine related
+ *    spacing scenarios into a single test with multiple variations in the source text.
+ *
+ * 2. SCOPE: This file should contain tests specific to MinimumViableSpacingVisitor behavior.
+ *    For full formatter integration tests, use format.test.ts.
+ */
+
 import {fromVisitor, RecipeSpec, SourceSpec} from "../../../src/test";
 import {MinimumViableSpacingVisitor} from "../../../src/javascript/format";
 import {JavaScriptParser, JavaScriptVisitor, JS, typescript} from "../../../src/javascript";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {mapAsync, ParserInput, SourceFile} from "../../../src";
 import {J} from "../../../src/java";
+
+class RemoveSpacesVisitor<P> extends JavaScriptVisitor<P> {
+    override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
+        const ret = await super.visitSpace(space, p) as J.Space;
+        return ret && produce(ret, draft => {
+            draft.whitespace = "";
+        });
+    }
+}
 
 describe('MinimumViableSpacingVisitor', () => {
     const spec = new RecipeSpec()
@@ -32,17 +55,8 @@ describe('MinimumViableSpacingVisitor', () => {
                 super({});
             }
 
-            static RemoveSpaces = class <P> extends JavaScriptVisitor<P> {
-                override async visitSpace(space: J.Space, p: P): Promise<J.Space> {
-                    const ret = await super.visitSpace(space, p) as J.Space;
-                    return ret && produce(ret, draft => {
-                        draft.whitespace = "";
-                    });
-                }
-            }
-
             override async *parse(...inputs: ParserInput[]): AsyncGenerator<JS.CompilationUnit> {
-                const removeSpaces = new JavaScriptParserWithSpacesRemoved.RemoveSpaces();
+                const removeSpaces = new RemoveSpacesVisitor();
 
                 for await (const file of super.parse(...inputs)) {
                     yield (await removeSpaces.visit<JS.CompilationUnit>(file, undefined))!;

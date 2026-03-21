@@ -55,20 +55,14 @@ public class ChangeDependencyScope extends Recipe {
     @Nullable
     String newScope;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven dependency scope";
-    }
+    String displayName = "Change Maven dependency scope";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("for `%s:%s` to `%s`", groupId, artifactId, newScope);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add or alter the scope of the specified dependency.";
-    }
+    String description = "Add or alter the scope of the specified dependency.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

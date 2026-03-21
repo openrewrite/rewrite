@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.table.ParseFailures;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -66,6 +67,37 @@ class RecipeRunTest implements RewriteTest {
               ~~>world
               """,
             spec -> spec.path("file2.txt")
+          )
+        );
+    }
+
+    @Test
+    void exportDataTableRowWithMultilineValue(@TempDir Path tempDir) {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipes(new FindParseFailures(null, null, null, null))
+            .afterRecipe(recipeRun -> {
+                recipeRun.exportDatatablesToCsv(tempDir, new InMemoryExecutionContext());
+
+                // Verify that CSV file was created
+                Path csvFile = tempDir.resolve(ParseFailures.class.getName() + ".csv");
+                //language=csv
+                assertThat(csvFile).content().isEqualTo("""
+                  Parser,Source path,Exception type,Tree type,Snippet,Stack trace
+                  The parser implementation that failed.,The file that failed to parse.,The class name of the exception that produce the parse failure.,The type of the tree element that was being parsed when the failure occurred. This can refer either to the intended target OpenRewrite Tree type or a parser or compiler internal tree type that we couldn't determine how to map.,The code snippet that the failure occurred on. Omitted when the parser fails on the whole file.,The stack trace of the failure.
+                  parserType,file.txt,exceptionType,"","","multiline
+                  message"
+                  """);
+            }),
+          text(
+            """
+              hello
+              """,
+            """
+              ~~(multiline
+              message)~~>hello
+              """,
+            spec -> spec.markers(new ParseExceptionResult(
+              Tree.randomId(), "parserType", "exceptionType", "multiline\nmessage", null))
           )
         );
     }

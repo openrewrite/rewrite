@@ -15,20 +15,21 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
-import {Recipe, RecipeDescriptor, RecipeRegistry, ScanningRecipe} from "../../recipe";
+import {Recipe, RecipeDescriptor, ScanningRecipe} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {Check} from "../../preconditions";
 import {RpcRecipe} from "../recipe";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics} from "./metrics";
+import {RecipeMarketplace} from "../../marketplace";
 
 export class PrepareRecipe {
     constructor(private readonly id: string, private readonly options?: any) {
     }
 
     static handle(connection: MessageConnection,
-                  registry: RecipeRegistry,
+                  marketplace: RecipeMarketplace,
                   preparedRecipes: Map<String, Recipe>,
                   metricsCsv?: string) {
         const snowflake = SnowflakeId();
@@ -40,11 +41,14 @@ export class PrepareRecipe {
                 (context) => async (request) => {
                     context.target = request.id;
                     const id = snowflake.generate();
-                    const recipeCtor = registry.all.get(request.id);
+                    const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {
                         throw new Error(`Could not find recipe with id ${request.id}`);
                     }
-                    let recipe = new recipeCtor(request.options);
+                    if (!recipeCtor[1]) {
+                        throw new Error(`Recipe ${request.id} was installed without a constructor`);
+                    }
+                    let recipe = new recipeCtor[1](request.options);
 
                     const editPreconditions: Precondition[] = [];
                     recipe = await this.optimizePreconditions(recipe, "edit", editPreconditions);
@@ -54,7 +58,9 @@ export class PrepareRecipe {
 
                     preparedRecipes.set(id, recipe);
 
-                    const result = {
+                    await this.installSubRecipes(recipe, marketplace);
+
+                    const result: PrepareRecipeResponse = {
                         id: id,
                         descriptor: await recipe.descriptor(),
                         editVisitor: `edit:${id}`,
@@ -63,10 +69,26 @@ export class PrepareRecipe {
                         scanPreconditions: scanPreconditions
                     };
 
+                    if ('javaRecipeName' in recipe) {
+                        result.delegatesTo = {
+                            recipeName: (recipe as any).javaRecipeName,
+                            options: (recipe as any).delegatesToOptions ?? {}
+                        };
+                    }
+
                     return result;
                 }
             )
         );
+    }
+
+    private static async installSubRecipes(recipe: Recipe, marketplace: RecipeMarketplace) {
+        for (const subRecipe of await recipe.recipeList()) {
+            if (!marketplace.findRecipe(subRecipe.name)) {
+                await marketplace.install(subRecipe.constructor as any, []);
+                await this.installSubRecipes(subRecipe, marketplace);
+            }
+        }
     }
 
     /**
@@ -106,21 +128,23 @@ export class PrepareRecipe {
                         }
                 )
             }
-            this.visitorTypePrecondition(preconditions, visitor.v);
+            await this.visitorTypePrecondition(preconditions, visitor.v);
         } else {
-            this.visitorTypePrecondition(preconditions, visitor!);
+            await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
     }
 
-    private static visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Precondition[] {
+    private static async visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Promise<Precondition[]> {
         let treeType: string | undefined;
-        
-        // Use CommonJS require to defer loading and avoid circular dependencies
-        const {JsonVisitor} = require("../../json");
-        const {JavaScriptVisitor} = require("../../javascript");
-        const {JavaVisitor} = require("../../java");
-        
+
+        // Use dynamic import to defer loading and avoid circular dependencies
+        const {JsonVisitor} = await import("../../json/index.js");
+        const {JavaScriptVisitor} = await import("../../javascript/index.js");
+        const {JavaVisitor} = await import("../../java/index.js");
+        const {PlainTextVisitor} = await import("../../text/index.js");
+        const {YamlVisitor} = await import("../../yaml/index.js");
+
         if (v instanceof JsonVisitor) {
             treeType = "org.openrewrite.json.tree.Json";
         } else if (v instanceof JavaScriptVisitor) {
@@ -129,6 +153,10 @@ export class PrepareRecipe {
             treeType = "org.openrewrite.javascript.tree.JS";
         } else if (v instanceof JavaVisitor) {
             treeType = "org.openrewrite.java.tree.J";
+        } else if (v instanceof PlainTextVisitor) {
+            treeType = "org.openrewrite.text.PlainText";
+        } else if (v instanceof YamlVisitor) {
+            treeType = "org.openrewrite.yaml.tree.Yaml";
         }
         if (treeType) {
             preconditions.push({
@@ -140,6 +168,11 @@ export class PrepareRecipe {
     }
 }
 
+export interface DelegatesTo {
+    recipeName: string
+    options: Record<string, any>
+}
+
 export interface PrepareRecipeResponse {
     id: string
     descriptor: RecipeDescriptor
@@ -147,6 +180,7 @@ export interface PrepareRecipeResponse {
     editPreconditions: Precondition[]
     scanVisitor?: string
     scanPreconditions: Precondition[]
+    delegatesTo?: DelegatesTo
 }
 
 export interface Precondition {

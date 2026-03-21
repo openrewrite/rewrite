@@ -125,6 +125,7 @@ public class TypeParameter {
                     .map(e -> toJavaType(e, genericTypesMap))
                     .collect(toList());
             if (!bounds.isEmpty()) {
+                //noinspection ResultOfMethodCallIgnored
                 genericType.unsafeSet(name, JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
             }
         }

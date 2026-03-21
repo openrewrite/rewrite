@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
@@ -114,7 +113,6 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
     String because;
 
     @Deprecated
-    @InlineMe(replacement = "this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null)")
     public AddManagedDependency(String groupId,
                                 String artifactId,
                                 String version,
@@ -172,20 +170,14 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add managed Maven dependency";
-    }
+    String displayName = "Add managed Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a managed Maven dependency to a `pom.xml` file.";
-    }
+    String description = "Add a managed Maven dependency to a `pom.xml` file.";
 
     public static class Scanned {
         boolean usingType;

@@ -29,15 +29,9 @@ public class RemoveSettingsPlugin extends Recipe {
     )
     String pluginId;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Gradle settings plugin";
-    }
+    String displayName = "Remove Gradle settings plugin";
 
-    @Override
-    public String getDescription() {
-        return "Remove plugin from Gradle settings file `plugins` block by id.";
-    }
+    String description = "Remove plugin from Gradle settings file `plugins` block by id.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

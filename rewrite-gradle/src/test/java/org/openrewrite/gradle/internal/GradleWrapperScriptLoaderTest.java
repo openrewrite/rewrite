@@ -19,22 +19,29 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class GradleWrapperScriptLoaderTest {
+class GradleWrapperScriptLoaderTest {
+
+    private final GradleWrapperScriptLoader loader = new GradleWrapperScriptLoader();
 
     @Test
-    void nearestVersion() {
-        GradleWrapperScriptLoader.Nearest nearest = new GradleWrapperScriptLoader().findNearest("6.9.100");
-        String v = nearest.getResolved().getVersion();
-        assertThat(v).startsWith("6.9.");
-
-        // this version doesn't exist, so we should get the nearest instead
-        assertThat(v).isNotEqualTo("6.9.100");
+    void exactMatchReturnsRequestedVersion() {
+        GradleWrapperScriptLoader.Nearest nearest = loader.findNearest("8.0");
+        assertThat(nearest.getResolved().getVersion()).isEqualTo("8.0");
     }
 
     @Test
-    void lastVersion() {
-        GradleWrapperScriptLoader.Nearest nearest = new GradleWrapperScriptLoader().findNearest(null);
-        String v = nearest.getResolved().getVersion();
-        assertThat(Integer.parseInt(v.split("\\.")[0])).isGreaterThanOrEqualTo(8);
+    void unmappedVersionFallsBackToNearest() {
+        GradleWrapperScriptLoader.Nearest nearest = loader.findNearest("99.0");
+        // Should resolve to the latest known version rather than failing
+        assertThat(nearest.getResolved()).isNotNull();
+        assertThat(nearest.getResolved().getVersion()).isNotEqualTo("99.0");
+    }
+
+    @Test
+    void unmappedPatchVersionFallsBackToNearestBelow() {
+        // Request a version between two known versions; should get the one just below
+        GradleWrapperScriptLoader.Nearest nearest = loader.findNearest("8.0.9");
+        assertThat(nearest.getResolved()).isNotNull();
+        assertThat(nearest.getResolved().getVersion()).isEqualTo("8.0.2");
     }
 }

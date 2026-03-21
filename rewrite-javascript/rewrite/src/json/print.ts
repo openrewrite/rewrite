@@ -125,7 +125,7 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         }
     }
 
-    private jsonMarkerWrapper = (out: string): string => `/*~~${out}${out ? "~~" : ""}*/`;
+    private jsonMarkerWrapper = (out: string): string => `/*~~${out}${out ? "~~" : ""}>*/`;
 }
 
 TreePrinters.register(Json.Kind.Document, () => new JsonPrinter());

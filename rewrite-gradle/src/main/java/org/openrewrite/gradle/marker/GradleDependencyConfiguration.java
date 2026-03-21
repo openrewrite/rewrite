@@ -110,10 +110,10 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
      * The list of all dependencies resolved for this configuration, including transitive dependencies.
      */
     public List<ResolvedDependency> getResolved() {
-        List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
-        Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
-        resolveTransitiveDependencies(resolved, alreadyResolved);
-        return new ArrayList<>(alreadyResolved.values());
+        if (resolutionContext.isResolveRequired()) {
+            resolutionContext.resolve();
+        }
+        return resolutionContext.getResolved();
     }
 
     /**
@@ -122,6 +122,12 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     @Nullable
     @NonFinal
     String exceptionType;
+    public @Nullable String getExceptionType() {
+        if (resolutionContext.isResolveRequired()) {
+            resolutionContext.resolve();
+        }
+        return exceptionType;
+    }
 
     /**
      * The message of the exception thrown when attempting to resolve this configuration. null if no exception was thrown.
@@ -129,6 +135,12 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     @Nullable
     @NonFinal
     String message;
+    public @Nullable String getExceptionMessage() {
+        if (resolutionContext.isResolveRequired()) {
+            resolutionContext.resolve();
+        }
+        return message;
+    }
 
     /**
      * Lists the constraints applied to manage the versions of transitive dependencies.
@@ -141,6 +153,9 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
     List<GradleDependencyConstraint> constraints;
 
     public List<GradleDependencyConstraint> getConstraints() {
+        if (resolutionContext.isResolveRequired()) {
+            resolutionContext.resolve();
+        }
         return constraints != null ? constraints : emptyList();
     }
 
@@ -149,6 +164,9 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
 
     @Override
     public Map<String, String> getAttributes() {
+        if (resolutionContext.isResolveRequired()) {
+            resolutionContext.resolve();
+        }
         return attributes != null ? attributes : emptyMap();
     }
 
@@ -162,12 +180,11 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         return this;
     }
     private class LazyResolutionContext {
-        @Getter
-        private boolean resolveRequired;
-        @Nullable
-        private List<MavenRepository> repositories;
-        @Nullable
-        private ExecutionContext ctx;
+        private @Getter boolean resolveRequired;
+        private @Nullable List<MavenRepository> repositories;
+        private @Nullable ExecutionContext ctx;
+        private @Nullable List<ResolvedDependency> resolved;
+
         public void markForReResolution(List<MavenRepository> repositories, ExecutionContext ctx) {
             this.repositories = repositories;
             this.resolveRequired = true;
@@ -216,7 +233,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                             m = ((MavenDownloadingExceptions) e).getExceptions().get(0);
                         }
                         exceptionType = m.getClass().getName();
-                        message = e.getMessage();
+                        message = m.getMessage();
                         // There are some dependencies that we cannot resolve with a maven resolver
                         // Perhaps these come from non-maven repositories (ivy, flat directory, gcp, etc.)
                         // Since we do not support all possible repositories, fall back on leaving the original resolved dependency in place
@@ -233,10 +250,22 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                     }
                 }
                 unsafeSetDirectResolved(newResolved);
+                resolved = null;
             }
             resolveRequired = false;
             repositories = null;
             ctx = null;
+        }
+
+        public List<ResolvedDependency> getResolved() {
+            if (resolved == null) {
+                List<ResolvedDependency> newResolved = new ArrayList<>(getDirectResolved());
+                Map<GroupArtifact, ResolvedDependency> alreadyResolved = new HashMap<>();
+                Map<String, Version> versionCache = new HashMap<>();
+                resolveTransitiveDependencies(newResolved, alreadyResolved, versionCache);
+                resolved = new ArrayList<>(alreadyResolved.values());
+            }
+            return resolved;
         }
     }
 
@@ -381,20 +410,24 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
         this.directResolved = directResolved;
     }
 
-    private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved) {
+    private static void resolveTransitiveDependencies(List<ResolvedDependency> resolved, Map<GroupArtifact, ResolvedDependency> alreadyResolved, Map<String, Version> versionCache) {
         for (ResolvedDependency dependency : resolved) {
             GroupArtifact ga = dependency.getGav().asGroupArtifact();
             if (alreadyResolved.containsKey(ga)) {
                 ResolvedDependency alreadyPresent = alreadyResolved.get(ga);
-                Version newVersion = new Version(dependency.getVersion());
-                Version presentVersion = new Version(alreadyPresent.getVersion());
+                if (alreadyPresent.getVersion().equals(dependency.getVersion()) && alreadyPresent.getDependencies().size() == dependency.getDependencies().size()) {
+                    continue;
+                }
+
+                Version newVersion = versionCache.computeIfAbsent(dependency.getVersion(), Version::new);
+                Version presentVersion = versionCache.computeIfAbsent(alreadyPresent.getVersion(), Version::new);
                 int compared = presentVersion.compareTo(newVersion);
                 if (compared > 0 || (compared == 0 && alreadyPresent.getDependencies().size() == dependency.getDependencies().size())) {
                     continue;
                 }
             }
             alreadyResolved.put(ga, dependency);
-            resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved);
+            resolveTransitiveDependencies(dependency.getDependencies(), alreadyResolved, versionCache);
         }
     }
 
@@ -436,6 +469,22 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
                 }
             }
             return d;
+        }, repositories, ctx);
+    }
+
+    public GradleDependencyConfiguration removeConstraints(
+            Collection<GroupArtifact> gas,
+            List<MavenRepository> repositories,
+            ExecutionContext ctx
+    ) {
+        return mapConstraints(c -> {
+            for (GroupArtifact ga : gas) {
+                if (Objects.equals(c.getGroupId(), ga.getGroupId()) &&
+                    Objects.equals(c.getArtifactId(), ga.getArtifactId())) {
+                    return null;
+                }
+            }
+            return c;
         }, repositories, ctx);
     }
 
@@ -503,7 +552,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             List<MavenRepository> repositories,
             ExecutionContext ctx
     ) {
-        List<GradleDependencyConstraint> newConstraints = ListUtils.map(constraints, mapping::apply);
+        List<GradleDependencyConstraint> newConstraints = ListUtils.map(constraints, mapping);
         if (constraints == newConstraints) {
             return this;
         }
@@ -574,7 +623,7 @@ public class GradleDependencyConfiguration implements Serializable, Attributed {
             List<MavenRepository> repositories,
             ExecutionContext ctx
     ) {
-        List<Dependency> newRequested = ListUtils.map(requested, mapping::apply);
+        List<Dependency> newRequested = ListUtils.map(requested, mapping);
         if (requested == newRequested) {
             return this;
         }

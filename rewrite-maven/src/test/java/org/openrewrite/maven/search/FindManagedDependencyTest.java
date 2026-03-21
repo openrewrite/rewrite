@@ -198,4 +198,80 @@ class FindManagedDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void versionInProperties() {
+        rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "2.1.2", null)),
+          pomXml(
+            """
+        <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>org.sample</groupId>
+          <artifactId>sample</artifactId>
+          <version>1.0.0</version>
+          <properties>
+              <activation.version>2.1.2</activation.version>
+          </properties>
+          <dependencyManagement>
+            <dependencies>
+              <dependency>
+                <groupId>jakarta.activation</groupId>
+                <artifactId>jakarta.activation-api</artifactId>
+                <version>${activation.version}</version>
+              </dependency>
+            </dependencies>
+          </dependencyManagement>
+        </project>
+        """,
+            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>1.0.0</version>
+              <properties>
+                  <activation.version>2.1.2</activation.version>
+              </properties>
+              <dependencyManagement>
+                <dependencies>
+                  <!--~~>--><dependency>
+                    <groupId>jakarta.activation</groupId>
+                    <artifactId>jakarta.activation-api</artifactId>
+                    <version>${activation.version}</version>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void wrongVersionInProperties() {
+        rewriteRun(spec -> spec.recipe(new FindManagedDependency("jakarta.activation", "jakarta.activation-api", "1.0.0", null)),
+          pomXml(
+            """
+        <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>org.sample</groupId>
+          <artifactId>sample</artifactId>
+          <version>1.0.0</version>
+          <properties>
+              <activation.version>2.1.2</activation.version>
+          </properties>
+          <dependencyManagement>
+            <dependencies>
+              <dependency>
+                <groupId>jakarta.activation</groupId>
+                <artifactId>jakarta.activation-api</artifactId>
+                <version>${activation.version}</version>
+              </dependency>
+            </dependencies>
+          </dependencyManagement>
+        </project>
+        """
+          )
+        );
+    }
 }

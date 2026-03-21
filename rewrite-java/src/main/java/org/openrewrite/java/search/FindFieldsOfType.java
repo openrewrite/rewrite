@@ -50,20 +50,14 @@ public class FindFieldsOfType extends Recipe {
 
     private final transient FieldsOfTypeUses fieldsOfTypeUses = new FieldsOfTypeUses(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find fields of type";
-    }
+    String displayName = "Find fields of type";
 
     @Override
     public String getInstanceNameSuffix() {
         return "on types `" + fullyQualifiedTypeName + "`";
     }
 
-    @Override
-    public String getDescription() {
-        return "Finds declared fields matching a particular class name.";
-    }
+    String description = "Finds declared fields matching a particular class name.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -139,7 +133,7 @@ public class FindFieldsOfType extends Recipe {
                                           boolean matchOverrides) {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName, matchOverrides);
-        } else if (type instanceof JavaType.FullyQualified) {
+        } else if (type instanceof JavaType.FullyQualified || type instanceof JavaType.Primitive) {
             return new TypeMatcher(fullyQualifiedName, matchOverrides).matches(type);
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;

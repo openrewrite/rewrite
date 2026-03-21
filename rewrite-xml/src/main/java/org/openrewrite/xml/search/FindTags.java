@@ -35,15 +35,9 @@ public class FindTags extends Recipe {
             example = "//dependencies/dependency")
     String xPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Find XML tags";
-    }
+    String displayName = "Find XML tags";
 
-    @Override
-    public String getDescription() {
-        return "Find XML tags by XPath expression.";
-    }
+    String description = "Find XML tags by XPath expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

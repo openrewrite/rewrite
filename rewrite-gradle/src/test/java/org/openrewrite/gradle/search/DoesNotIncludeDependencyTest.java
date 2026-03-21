@@ -38,7 +38,11 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
     }
 
     private Recipe defaultRecipeWithConfiguration(@Nullable String configuration) {
-        return new DoesNotIncludeDependency("org.springframework", "spring-beans", configuration);
+        return new DoesNotIncludeDependency("org.springframework", "spring-beans", null, configuration);
+    }
+
+    private Recipe defaultRecipeWithVersion(@Nullable String version) {
+        return new DoesNotIncludeDependency("org.springframework", "spring-beans", version, null);
     }
 
     @Test
@@ -87,7 +91,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(
-                      directDependencyTemplate.formatted(existingConfiguration),
+                directDependencyTemplate.formatted(existingConfiguration),
                 String.format(marker + directDependencyTemplate, existingConfiguration)
               )
             );
@@ -105,6 +109,24 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(directDependencyTemplate.formatted(existingConfiguration))
+            );
+        }
+
+        @Test
+        void withMatchingVersionNotMarked() {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithVersion("6.0.0")),
+              buildGradle(directDependencyTemplate.formatted("api"))
+            );
+        }
+
+        @Test
+        void withNonMatchingVersionMarked() {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithVersion("5.x")),
+              buildGradle(
+                directDependencyTemplate.formatted("api"),
+                String.format(marker + directDependencyTemplate, "api"))
             );
         }
     }
@@ -143,7 +165,7 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(
-                      transitiveDependencyTemplate.formatted(existingConfiguration),
+                transitiveDependencyTemplate.formatted(existingConfiguration),
                 String.format(marker + transitiveDependencyTemplate, existingConfiguration)
               )
             );
@@ -161,6 +183,24 @@ class DoesNotIncludeDependencyTest implements RewriteTest {
             rewriteRun(
               spec -> spec.recipe(defaultRecipeWithConfiguration(searchingConfiguration)),
               buildGradle(transitiveDependencyTemplate.formatted(existingConfiguration))
+            );
+        }
+
+        @Test
+        void withMatchingVersionNotMarked() {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithVersion("6.0.2")),
+              buildGradle(transitiveDependencyTemplate.formatted("api"))
+            );
+        }
+
+        @Test
+        void withNonMatchingVersionMarked() {
+            rewriteRun(
+              spec -> spec.recipe(defaultRecipeWithVersion("5.x")),
+              buildGradle(
+                transitiveDependencyTemplate.formatted("api"),
+                String.format(marker + transitiveDependencyTemplate, "api"))
             );
         }
     }

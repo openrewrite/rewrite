@@ -15,20 +15,17 @@
  */
 package org.openrewrite.groovy.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
 public class AutoFormat extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Format Groovy code";
-    }
+    @Getter
+    final String displayName = "Format Groovy code";
 
-    @Override
-    public String getDescription() {
-        return "Format Groovy code using a standard comprehensive set of Groovy formatting recipes.";
-    }
+    @Getter
+    final String description = "Format Groovy code using a standard comprehensive set of Groovy formatting recipes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

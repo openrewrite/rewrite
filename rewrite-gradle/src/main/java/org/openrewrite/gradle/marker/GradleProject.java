@@ -215,6 +215,13 @@ public class GradleProject implements Marker, Serializable {
         );
     }
 
+    public GradleProject removeConstraints(Collection<GroupArtifact> gas, ExecutionContext ctx) {
+        return mapConfigurations(
+                conf -> conf.removeConstraints(gas, getMavenRepositories(), ctx),
+                ctx
+        );
+    }
+
     /**
      * Upgrade the specified dependency within all configurations.
      */

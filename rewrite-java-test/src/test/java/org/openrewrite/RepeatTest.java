@@ -98,7 +98,7 @@ class RepeatTest implements RewriteTest {
               java("class A {}")
             ));
         assertThat(assertionError).cause().isInstanceOf(RecipeRunException.class);
-        RecipeRunException e = (RecipeRunException) assertionError.getCause();
+        var e = (RecipeRunException) assertionError.getCause();
         assertThat(e.getMessage())
           .contains(
             "Repeat visitor called on a non-source file tree without a cursor pointing to the root of the tree. " +

@@ -1017,4 +1017,65 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mavenBomWithUnresolvedVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id("org.springframework.boot") version "3.5.6"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+
+              ext {
+                  springCloudVersion = '2024.0.1'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+                  }
+              }
+
+              dependencies {
+                  implementation('org.springframework.boot:spring-boot')
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id("org.springframework.boot") version "3.5.6"
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+
+              ext {
+                  springCloudVersion = '2024.0.1'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+                  }
+              }
+
+              dependencies {
+                  implementation('org.springframework.boot:spring-boot')
+                  implementation("org.apache.commons:commons-lang3")
+              }
+              """
+          )
+        );
+    }
 }

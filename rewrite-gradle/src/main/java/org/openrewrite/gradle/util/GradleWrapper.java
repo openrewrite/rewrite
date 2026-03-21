@@ -37,6 +37,7 @@ import org.openrewrite.semver.VersionComparator;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -50,8 +51,9 @@ import static org.openrewrite.internal.StringUtils.formatUriForPropertiesFile;
 
 @Value
 public class GradleWrapper {
+    private static final String GRADLE_DOWNLOADS_URL = "https://downloads.gradle.org";
+    private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_DOWNLOADS_URL + "/distributions";
     private static final String GRADLE_SERVICES_URL = "https://services.gradle.org";
-    private static final String GRADLE_DISTRIBUTIONS_URL = GRADLE_SERVICES_URL + "/distributions";
     private static final String GRADLE_VERSIONS_ALL_URL = GRADLE_SERVICES_URL + "/versions/all";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
@@ -68,7 +70,7 @@ public class GradleWrapper {
 
     /**
      * Construct a Gradle wrapper from a distribution type and version.
-     * Used in contexts where services.gradle.org is available.
+     * Used in contexts where downloads.gradle.org is available.
      */
     public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
         return create(null, distributionTypeName, version, ctx);
@@ -76,10 +78,17 @@ public class GradleWrapper {
 
     public static GradleWrapper create(@Nullable String currentDistributionUrl, @Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
         String normalizedCurrentDistributionUrl = currentDistributionUrl == null ? null : currentDistributionUrl.replace("\\", "");
-        DistributionType distributionType = Arrays.stream(DistributionType.values())
-                .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
-                .findAny()
-                .orElse(DistributionType.Bin);
+        DistributionType distributionType;
+        if (distributionTypeName != null) {
+            distributionType = Arrays.stream(DistributionType.values())
+                    .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
+                    .findAny()
+                    .orElse(DistributionType.Bin);
+        } else if (normalizedCurrentDistributionUrl != null && normalizedCurrentDistributionUrl.endsWith("-all.zip")) {
+            distributionType = DistributionType.All;
+        } else {
+            distributionType = DistributionType.Bin;
+        }
         VersionComparator versionComparator = StringUtils.isBlank(version) ?
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
@@ -95,7 +104,7 @@ public class GradleWrapper {
 
     private static GradleVersion determineGradleVersion(@Nullable String currentDistributionUrl, @Nullable String version, VersionComparator versionComparator,
                                                         DistributionType distributionType, ExecutionContext ctx) {
-        if (currentDistributionUrl == null || currentDistributionUrl.startsWith(GRADLE_SERVICES_URL)) {
+        if (currentDistributionUrl == null || currentDistributionUrl.startsWith(GRADLE_DOWNLOADS_URL) || currentDistributionUrl.startsWith(GRADLE_SERVICES_URL)) {
             // Only list all versions via services endpoint if a wildcard notation was requested or null, e.g. 8.x
             if (!(versionComparator instanceof ExactVersion)) {
                 List<GradleVersion> allVersions = listAllPublicVersions(ctx);
@@ -103,7 +112,7 @@ public class GradleWrapper {
                         .filter(v -> versionComparator.isValid(null, v.version))
                         .filter(v -> v.distributionType == distributionType)
                         .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                        .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_SERVICES_URL)));
+                        .orElseThrow(() -> new IllegalStateException(String.format("Expected to find at least one Gradle wrapper version to select from %s.", GRADLE_DOWNLOADS_URL)));
             }
 
             return new GradleVersion(version,
@@ -149,19 +158,22 @@ public class GradleWrapper {
                         });
                 List<GradleVersion> allGradleVersions = new ArrayList<>(gradleVersions.size() * 2);
                 for (GradleVersion gradleVersion : gradleVersions) {
+                    String downloadUrl = migrateToDownloadsUrl(gradleVersion.downloadUrl);
+                    String checksumUrl = migrateToDownloadsUrl(gradleVersion.checksumUrl);
+                    String wrapperChecksumUrl = migrateToDownloadsUrl(gradleVersion.wrapperChecksumUrl);
                     allGradleVersions.add(new GradleVersion(
                             gradleVersion.version,
-                            gradleVersion.downloadUrl,
+                            downloadUrl,
                             DistributionType.Bin,
-                            gradleVersion.checksumUrl,
-                            gradleVersion.wrapperChecksumUrl
+                            checksumUrl,
+                            wrapperChecksumUrl
                     ));
                     allGradleVersions.add(new GradleVersion(
                             gradleVersion.version,
-                            gradleVersion.downloadUrl.replace("-bin.zip", "-all.zip"),
+                            downloadUrl.replace("-bin.zip", "-all.zip"),
                             DistributionType.All,
-                            gradleVersion.checksumUrl == null ? null : gradleVersion.checksumUrl.replace("-bin.zip", "-all.zip"),
-                            gradleVersion.wrapperChecksumUrl
+                            checksumUrl == null ? null : checksumUrl.replace("-bin.zip", "-all.zip"),
+                            wrapperChecksumUrl
                     ));
                 }
                 return allGradleVersions;
@@ -199,11 +211,15 @@ public class GradleWrapper {
         }
     }
 
+    private static @Nullable String migrateToDownloadsUrl(@Nullable String url) {
+        return url == null ? null : url.replace(GRADLE_SERVICES_URL, GRADLE_DOWNLOADS_URL);
+    }
+
     private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
 
     /**
      * Construct a Gradle wrapper from a URI.
-     * Can be used in contexts where services.gradle.org, normally used for version lookups, is unavailable.
+     * Can be used in contexts where downloads.gradle.org, normally used for version lookups, is unavailable.
      */
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
         String version = "";
@@ -230,11 +246,13 @@ public class GradleWrapper {
 
     public RemoteArchive wrapperJar() {
         return Remote.builder(WRAPPER_JAR_LOCATION)
+                .charset(StandardCharsets.ISO_8859_1)
                 .build(URI.create(distributionInfos.getDownloadUrl()), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 
     public RemoteArchive wrapperJar(SourceFile before) {
         return Remote.builder(before)
+                .charset(StandardCharsets.ISO_8859_1)
                 .build(URI.create(distributionInfos.getDownloadUrl()), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 

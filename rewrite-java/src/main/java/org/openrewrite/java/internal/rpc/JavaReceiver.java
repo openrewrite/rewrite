@@ -335,7 +335,11 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return literal
                 .withValue(q.receive(literal.getValue()))
                 .withValueSource(q.receive(literal.getValueSource()))
-                .withUnicodeEscapes(q.receiveList(literal.getUnicodeEscapes(), s -> s))
+                .withUnicodeEscapes(q.receiveList(literal.getUnicodeEscapes(), s -> {
+                    int valueSourceIndex = q.receive(s != null ? s.getValueSourceIndex() : 0);
+                    String codePoint = q.receive(s != null ? s.getCodePoint() : null);
+                    return new J.Literal.UnicodeEscape(valueSourceIndex, codePoint);
+                }))
                 .withType(q.receive(literal.getType(), t -> (JavaType.Primitive) visitType(t, q)));
     }
 
@@ -455,7 +459,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitPrimitive(J.Primitive primitive, RpcReceiveQueue q) {
         return primitive
-                .withType(q.receive(primitive.getType()));
+                .withType(q.receive(primitive.getType(), t -> (JavaType.Primitive) visitType(t, q)));
     }
 
     @Override
@@ -647,17 +651,18 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
+        T element = q.receive(right.getElement(), t -> {
+            if (t instanceof J) {
+                //noinspection unchecked
+                return (T) visitNonNull((J) t, q);
+            } else if (t instanceof Space) {
+                //noinspection unchecked
+                return (T) visitSpace((Space) t, q);
+            }
+            return t;
+        });
         return right
-                .withElement(q.receive(right.getElement(), t -> {
-                    if (t instanceof J) {
-                        //noinspection unchecked
-                        return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
-                        //noinspection unchecked
-                        return (T) visitSpace((Space) t, q);
-                    }
-                    return t;
-                }))
+                .withElement(element)
                 .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
                 .withMarkers(q.receive(right.getMarkers()));
     }

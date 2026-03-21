@@ -94,7 +94,7 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, RpcReceiveQueue q) {
         String name = q.receive(generic.getName());
         JavaType.GenericTypeVariable.Variance variance = q.receiveAndGet(generic.getVariance(),
-                v -> JavaType.GenericTypeVariable.Variance.valueOf(v.toString()));
+                v -> JavaType.GenericTypeVariable.Variance.valueOf(v.toString().toUpperCase()));
         List<JavaType> bounds = q.receiveList(generic.getBounds(), v -> visit(v, q));
         return generic.unsafeSet(name, variance, bounds);
     }
@@ -128,7 +128,7 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
         List<JavaType.FullyQualified> annotations = q.receiveList(method.getAnnotations(), v -> (JavaType.FullyQualified) visit(v, q));
         List<String> defaultValue = q.receiveList(method.getDefaultValue(), null);
         List<String> declaredFormalTypeNames = q.receiveList(method.getDeclaredFormalTypeNames(), null);
-        method.unsafeSet(
+        return method.unsafeSet(
                 name, flags,
                 declaringType,
                 returnType,
@@ -139,7 +139,6 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
                 defaultValue,
                 arrayOrNullIfEmpty(declaredFormalTypeNames, EMPTY_STRING_ARRAY)
         );
-        return method;
     }
 
     @Override

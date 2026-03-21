@@ -46,15 +46,9 @@ public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance
     @Nullable
     String fromDate;
 
-    @Override
-    public String getDisplayName() {
-        return "Find committers on repositories";
-    }
+    String displayName = "Find committers on repositories";
 
-    @Override
-    public String getDescription() {
-        return "List the committers on a repository.";
-    }
+    String description = "List the committers on a repository.";
 
     @Override
     public int maxCycles() {

@@ -1,0 +1,280 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.AddAptGetCleanup
+examples:
+- description: '`AddAptGetCleanupTest#addCleanupToSimpleInstall`'
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      RUN apt-get update && apt-get install -y curl
+    after: |
+      FROM ubuntu:22.04
+      RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.AddOciLabels
+examples:
+- description: '`AddOciLabelsTest#addTitleAndVersion`'
+  parameters:
+  - MyApplication
+  - 'null'
+  - 1.0.0
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+    after: |
+      FROM ubuntu:22.04
+      LABEL org.opencontainers.image.title=MyApplication
+      LABEL org.opencontainers.image.version=1.0.0
+      RUN apt-get update
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.AddOrUpdateLabel
+examples:
+- description: '`AddOrUpdateLabelTest#addNewLabel`'
+  parameters:
+  - version
+  - 1.0.0
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+    after: |
+      FROM ubuntu:22.04
+      LABEL version=1.0.0
+      RUN apt-get update
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.AddUserInstruction
+examples:
+- description: '`AddUserInstructionTest#addUserToFinalStage`'
+  parameters:
+  - appuser
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+    after: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+      USER appuser
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.ChangeFrom
+examples:
+- description: '`ChangeFromTest#changeSimpleBaseImage`'
+  parameters:
+  - ubuntu
+  - '20.04'
+  - 'null'
+  - 'null'
+  - ubuntu
+  - '22.04'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:20.04
+      RUN apt-get update
+    after: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.CombineRunInstructions
+examples:
+- description: '`CombineRunInstructionsTest#combineTwoRunInstructions`'
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+      RUN apt-get install -y curl
+    after: |
+      FROM ubuntu:22.04
+      RUN apt-get update && apt-get install -y curl
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.DockerBestPractices
+examples:
+- description: '`DockerBestPracticesTest#appliesBestPractices`'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      ADD app.jar /app/
+      RUN apt-get update
+      RUN apt-get install -y curl
+      ENTRYPOINT /app/start.sh
+    after: |
+      ~~(EOL: ubuntu:22.04 (ended 2024-09-30, suggest noble (24.04)))~~>~~(Missing HEALTHCHECK instruction)~~>FROM ubuntu:22.04
+      COPY app.jar /app/
+      RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+      ENTRYPOINT ["/app/start.sh"]
+      USER appuser
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.NormalizeDockerHubImageName
+examples:
+- description: '`NormalizeDockerHubImageNameTest#normalizeDockerIoLibraryPrefix`'
+  sources:
+  - before: |
+      FROM docker.io/library/ubuntu:22.04
+      RUN apt-get update
+    after: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.ReplaceAddWithCopy
+examples:
+- description: '`ReplaceAddWithCopyTest#replaceSimpleAdd`'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      ADD app.jar /app/
+    after: |
+      FROM ubuntu:22.04
+      COPY app.jar /app/
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.UseExecFormEntrypoint
+examples:
+- description: '`UseExecFormEntrypointTest#convertSimpleEntrypoint`'
+  parameters:
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      ENTRYPOINT /app/server
+    after: |
+      FROM ubuntu:22.04
+      ENTRYPOINT ["/app/server"]
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.search.FindBaseImages
+examples:
+- description: '`FindBaseImagesTest#findAllBaseImages`'
+  parameters:
+  - 'null'
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+    after: |
+      ~~(ubuntu:22.04)~~>FROM ubuntu:22.04
+      RUN apt-get update
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.search.FindEndOfLifeImages
+examples:
+- description: '`FindEndOfLifeImagesTest#detectDebianBuster`'
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      FROM debian:buster
+      RUN apt-get update
+    after: |
+      ~~(EOL: debian:buster (ended 2024-06-30, suggest trixie (13) or bookworm (12)))~~>FROM debian:buster
+      RUN apt-get update
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.search.FindExposedPorts
+examples:
+- description: '`FindExposedPortsTest#findSinglePort`'
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      FROM nginx:latest
+      EXPOSE 80
+    after: |
+      FROM nginx:latest
+      ~~(80)~~>EXPOSE 80
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.search.FindMissingHealthcheck
+examples:
+- description: '`FindMissingHealthcheckTest#detectMissingHealthcheck`'
+  sources:
+  - before: |
+      FROM alpine:3.18
+      CMD ["./app"]
+    after: |
+      ~~(Missing HEALTHCHECK instruction)~~>FROM alpine:3.18
+      CMD ["./app"]
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.search.FindRootUser
+examples:
+- description: '`FindRootUserTest#detectMissingUser`'
+  parameters:
+  - 'null'
+  sources:
+  - before: |
+      FROM ubuntu:22.04
+      RUN apt-get update
+    after: |
+      ~~(No USER instruction, runs as root)~~>FROM ubuntu:22.04
+      RUN apt-get update
+    language: docker
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.docker.search.FindUnpinnedBaseImages
+examples:
+- description: '`FindUnpinnedBaseImagesTest#detectLatestTag`'
+  sources:
+  - before: |
+      FROM ubuntu:latest
+      RUN apt-get update
+    after: |
+      ~~(Uses 'latest' tag)~~>FROM ubuntu:latest
+      RUN apt-get update
+    language: docker

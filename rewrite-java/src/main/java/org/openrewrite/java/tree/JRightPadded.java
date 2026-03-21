@@ -128,27 +128,29 @@ public class JRightPadded<T> {
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> withElements(List<JRightPadded<J2>> before, List<J2> elements) {
-        // a cheaper check for the most common case when there are no changes
-        if (elements.size() == before.size()) {
-            boolean hasChanges = false;
-            for (int i = 0; i < before.size(); i++) {
-                if (before.get(i).getElement() != elements.get(i)) {
-                    hasChanges = true;
-                    break;
-                }
-            }
-            if (!hasChanges) {
-                return before;
-            }
-        } else if (elements.isEmpty()) {
-            return emptyList();
-        }
-
-        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
         Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(elements.size() / 0.75));
-        for (JRightPadded<J2> j : before) {
-            if (beforeById.put(j.getElement().getId(), j) != null) {
-                throw new IllegalStateException("Duplicate key");
+        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
+        if (before != null) {
+            // a cheaper check for the most common case when there are no changes
+            if (elements.size() == before.size()) {
+                boolean hasChanges = false;
+                for (int i = 0; i < before.size(); i++) {
+                    if (before.get(i).getElement() != elements.get(i)) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+                if (!hasChanges) {
+                    return before;
+                }
+            } else if (elements.isEmpty()) {
+                return emptyList();
+            }
+
+            for (JRightPadded<J2> j : before) {
+                if (beforeById.put(j.getElement().getId(), j) != null) {
+                    throw new IllegalStateException("Duplicate key");
+                }
             }
         }
 

@@ -17,6 +17,8 @@ package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.toml.Assertions.toml;
@@ -238,6 +240,45 @@ class ChangeValueTest implements RewriteTest {
               # The package version
               version = "2.0.0" # inline comment
               name = "test"
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6418")
+    @Test
+    void chainedChangeValueRecipes() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeValue("server.port", "8080"),
+            new ChangeValue("server.port", "9090")
+          ).expectedCyclesThatMakeChanges(2),
+          toml(
+            """
+              [server]
+              port = 3000
+              """,
+            """
+              [server]
+              port = 9090
+              """
+          )
+        );
+    }
+
+    @Test
+    void sameRecipeDoesNotChangeValueTwice() {
+        Recipe recipe = new ChangeValue("server.port", "8080");
+        rewriteRun(
+          spec -> spec.recipes(recipe, recipe),
+          toml(
+            """
+              [server]
+              port = 3000
+              """,
+            """
+              [server]
+              port = 8080
               """
           )
         );

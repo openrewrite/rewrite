@@ -56,10 +56,7 @@ public class FindDeprecatedClasses extends Recipe {
     @Nullable
     Boolean ignoreDeprecatedScopes;
 
-    @Override
-    public String getDisplayName() {
-        return "Find uses of deprecated classes";
-    }
+    String displayName = "Find uses of deprecated classes";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -69,10 +66,7 @@ public class FindDeprecatedClasses extends Recipe {
         return super.getInstanceNameSuffix();
     }
 
-    @Override
-    public String getDescription() {
-        return "Find uses of deprecated classes, optionally ignoring those classes that are inside deprecated scopes.";
-    }
+    String description = "Find uses of deprecated classes, optionally ignoring those classes that are inside deprecated scopes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

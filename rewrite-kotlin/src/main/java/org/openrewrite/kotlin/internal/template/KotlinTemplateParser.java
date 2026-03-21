@@ -31,7 +31,7 @@ public class KotlinTemplateParser extends JavaTemplateParser {
                 imports,
                 contextSensitive,
                 new KotlinBlockStatementTemplateGenerator(imports, contextSensitive),
-                new AnnotationTemplateGenerator(imports)
+                new KotlinAnnotationTemplateGenerator(imports)
         );
     }
 }

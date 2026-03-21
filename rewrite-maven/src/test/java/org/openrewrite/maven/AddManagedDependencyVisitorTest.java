@@ -17,8 +17,10 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -114,6 +116,118 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
                             <version>2.17.2</version>
                             <type>pom</type>
                             <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleDependenciesWithBecauseComments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new MavenIsoVisitor<>() {
+              @Override
+              public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                  doAfterVisit(new AddManagedDependencyVisitor("org.apache.commons", "commons-compress", "1.26.0",
+                    null, null, null, "CVE-2023-42503"));
+                  doAfterVisit(new AddManagedDependencyVisitor("org.jetbrains.kotlin", "kotlin-stdlib", "1.6.21",
+                    null, null, null, "CVE-2022-24329"));
+                  doAfterVisit(new AddManagedDependencyVisitor("org.xerial.snappy", "snappy-java", "1.1.10.4",
+                    null, null, null, "CVE-2023-34455"));
+                  return document;
+              }
+          })),
+          pomXml(
+            """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            </project>
+            """,
+            """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <!-- CVE-2023-42503 -->
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-compress</artifactId>
+                            <version>1.26.0</version>
+                        </dependency>
+                        <!-- CVE-2022-24329 -->
+                        <dependency>
+                            <groupId>org.jetbrains.kotlin</groupId>
+                            <artifactId>kotlin-stdlib</artifactId>
+                            <version>1.6.21</version>
+                        </dependency>
+                        <!-- CVE-2023-34455 -->
+                        <dependency>
+                            <groupId>org.xerial.snappy</groupId>
+                            <artifactId>snappy-java</artifactId>
+                            <version>1.1.10.4</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleDependenciesWithBecauseCommentsSortedAlphabetically() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new MavenIsoVisitor<>() {
+              @Override
+              public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                  doAfterVisit(new AddManagedDependencyVisitor("org.xerial.snappy", "snappy-java", "1.1.10.4",
+                    null, null, null, "CVE-2023-34455"));
+                  doAfterVisit(new AddManagedDependencyVisitor("org.apache.commons", "commons-compress", "1.26.0",
+                    null, null, null, "CVE-2023-42503"));
+                  doAfterVisit(new AddManagedDependencyVisitor("org.jetbrains.kotlin", "kotlin-stdlib", "1.6.21",
+                    null, null, null, "CVE-2022-24329"));
+                  return document;
+              }
+          })),
+          pomXml(
+            """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            </project>
+            """,
+            """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <!-- CVE-2023-42503 -->
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-compress</artifactId>
+                            <version>1.26.0</version>
+                        </dependency>
+                        <!-- CVE-2022-24329 -->
+                        <dependency>
+                            <groupId>org.jetbrains.kotlin</groupId>
+                            <artifactId>kotlin-stdlib</artifactId>
+                            <version>1.6.21</version>
+                        </dependency>
+                        <!-- CVE-2023-34455 -->
+                        <dependency>
+                            <groupId>org.xerial.snappy</groupId>
+                            <artifactId>snappy-java</artifactId>
+                            <version>1.1.10.4</version>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>

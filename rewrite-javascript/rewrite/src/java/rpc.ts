@@ -477,7 +477,10 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
     protected async visitLiteral(literal: J.Literal, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(literal, l => l.value);
         await q.getAndSend(literal, l => l.valueSource);
-        await q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex + e.codePoint);
+        await q.getAndSendList(literal, l => l.unicodeEscapes, e => e.valueSourceIndex + e.codePoint, async (e) => {
+            await q.getAndSend(e, u => u.valueSourceIndex);
+            await q.getAndSend(e, u => u.codePoint);
+        });
         await q.getAndSend(literal, l => asRef(l.type), type => this.visitType(type, q));
         return literal;
     }
@@ -1131,7 +1134,10 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         const updates = {
             value: await q.receive(literal.value),
             valueSource: await q.receive(literal.valueSource),
-            unicodeEscapes: await q.receiveList(literal.unicodeEscapes),
+            unicodeEscapes: await q.receiveList(literal.unicodeEscapes, async (e) => ({
+                valueSourceIndex: await q.receive(e?.valueSourceIndex),
+                codePoint: await q.receive(e?.codePoint),
+            })),
             type: await q.receive(literal.type, type => this.visitType(type, q) as unknown as Type.Primitive)
         };
         return updateIfChanged(literal, updates);

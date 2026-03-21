@@ -14,10 +14,8 @@
  * limitations under the License.
  */
 import {Cursor, rootCursor} from "../tree";
-import {mapAsync} from "../util";
+import {mapAsync, updateIfChanged} from "../util";
 import {Type} from "./type";
-import {createDraft, Draft, finishDraft} from "immer";
-import {produceAsync, ValidImmerRecipeReturnType} from "../visitor";
 
 export class TypeVisitor<P> {
     protected cursor: Cursor = rootCursor();
@@ -115,65 +113,71 @@ export class TypeVisitor<P> {
     }
 
     protected async visitUnion(union: Type.Union, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Union>(union, p, async draft => {
-            draft.bounds = await mapAsync(union.bounds || [], b => this.visit(b, p)) as Type[];
+        return updateIfChanged(union, {
+            bounds: await mapAsync(union.bounds || [], b => this.visit(b, p)) as Type[],
         });
     }
 
     protected async visitAnnotation(annotation: Type.Annotation, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Annotation>(annotation, p, async draft => {
-            draft.type = await this.visit(annotation.type, p) as Type.FullyQualified;
-            // Note: values contain element values which themselves contain Type references
-            draft.values = await mapAsync(annotation.values || [], async v => {
-                const draftValue = createDraft(v);
-                draftValue.element = await this.visit(v.element, p) as Type;
-                if (v.kind === Type.Kind.SingleElementValue) {
-                    const single = v as Type.Annotation.SingleElementValue;
-                    if (single.referenceValue) {
-                        (draftValue as Draft<Type.Annotation.SingleElementValue>).referenceValue = await this.visit(single.referenceValue, p);
-                    }
-                } else if (v.kind === Type.Kind.ArrayElementValue) {
-                    const array = v as Type.Annotation.ArrayElementValue;
-                    if (array.referenceValues) {
-                        (draftValue as Draft<Type.Annotation.ArrayElementValue>).referenceValues = await mapAsync(
-                            array.referenceValues,
-                            rv => this.visit(rv, p)
-                        ) as Type[];
-                    }
-                }
-                return finishDraft(draftValue);
-            });
+        const newType = await this.visit(annotation.type, p) as Type.FullyQualified;
+        // Note: values contain element values which themselves contain Type references
+        const newValues = await mapAsync(annotation.values || [], async v => {
+            const newElement = await this.visit(v.element, p);
+            if (v.kind === Type.Kind.SingleElementValue) {
+                const single = v as Type.Annotation.SingleElementValue;
+                const newReferenceValue = single.referenceValue
+                    ? await this.visit(single.referenceValue, p)
+                    : undefined;
+                return updateIfChanged(v, {
+                    element: newElement,
+                    referenceValue: newReferenceValue,
+                });
+            } else if (v.kind === Type.Kind.ArrayElementValue) {
+                const array = v as Type.Annotation.ArrayElementValue;
+                const newReferenceValues = array.referenceValues
+                    ? await mapAsync(array.referenceValues, rv => this.visit(rv, p)) as Type[]
+                    : undefined;
+                return updateIfChanged(v, {
+                    element: newElement,
+                    referenceValues: newReferenceValues,
+                });
+            }
+            return updateIfChanged(v, {element: newElement});
+        });
+        return updateIfChanged(annotation, {
+            type: newType,
+            values: newValues,
         });
     }
 
     protected async visitArray(array: Type.Array, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Array>(array, p, async draft => {
-            draft.elemType = await this.visit(array.elemType, p) as Type;
-            draft.annotations = await this.visitList(array.annotations, p) as Type.Annotation[] || [];
+        return updateIfChanged(array, {
+            elemType: await this.visit(array.elemType, p),
+            annotations: await this.visitList(array.annotations, p) || [],
         });
     }
 
     protected async visitClass(aClass: Type.Class, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Class>(aClass, p, async draft => {
-            draft.supertype = await this.visit(aClass.supertype, p) as Type.Class | undefined;
-            draft.owningClass = await this.visit(aClass.owningClass, p) as Type.Class | undefined;
-            draft.annotations = await mapAsync(aClass.annotations || [], a => this.visit(a, p) as Promise<Type.Annotation>);
-            draft.interfaces = await mapAsync(aClass.interfaces || [], i => this.visit(i, p) as Promise<Type.Class>);
-            draft.members = await mapAsync(aClass.members || [], m => this.visit(m, p) as Promise<Type.Variable>);
-            draft.methods = await mapAsync(aClass.methods || [], m => this.visit(m, p) as Promise<Type.Method>);
-            draft.typeParameters = await this.visitList(aClass.typeParameters, p) as Type[] || [];
+        return updateIfChanged(aClass, {
+            supertype: await this.visit(aClass.supertype, p),
+            owningClass: await this.visit(aClass.owningClass, p),
+            annotations: await mapAsync(aClass.annotations || [], a => this.visit(a, p)),
+            interfaces: await mapAsync(aClass.interfaces || [], i => this.visit(i, p)),
+            members: await mapAsync(aClass.members || [], m => this.visit(m, p)),
+            methods: await mapAsync(aClass.methods || [], m => this.visit(m, p)),
+            typeParameters: await this.visitList(aClass.typeParameters, p) || [],
         });
     }
 
     protected async visitGenericTypeVariable(generic: Type.GenericTypeVariable, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.GenericTypeVariable>(generic, p, async draft => {
-            draft.bounds = await mapAsync(generic.bounds || [], b => this.visit(b, p)) as Type[];
+        return updateIfChanged(generic, {
+            bounds: await mapAsync(generic.bounds || [], b => this.visit(b, p)),
         });
     }
 
     protected async visitIntersection(intersection: Type.Intersection, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Intersection>(intersection, p, async draft => {
-            draft.bounds = await mapAsync(intersection.bounds || [], b => this.visit(b, p)) as Type[];
+        return updateIfChanged(intersection, {
+            bounds: await mapAsync(intersection.bounds || [], b => this.visit(b, p)),
         });
     }
 
@@ -185,19 +189,19 @@ export class TypeVisitor<P> {
      * @return A method
      */
     protected async visitMethod(method: Type.Method, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Method>(method, p, async draft => {
-            draft.declaringType = await this.visit(method.declaringType, p) as Type.FullyQualified;
-            draft.returnType = await this.visit(method.returnType, p) as Type;
-            draft.parameterTypes = await mapAsync(method.parameterTypes || [], pt => this.visit(pt, p)) as Type[];
-            draft.thrownExceptions = await mapAsync(method.thrownExceptions || [], t => this.visit(t, p)) as Type[];
-            draft.annotations = await mapAsync(method.annotations || [], a => this.visit(a, p) as Promise<Type.Annotation>);
+        return updateIfChanged(method, {
+            declaringType: await this.visit(method.declaringType, p),
+            returnType: await this.visit(method.returnType, p),
+            parameterTypes: await mapAsync(method.parameterTypes || [], pt => this.visit(pt, p)),
+            thrownExceptions: await mapAsync(method.thrownExceptions || [], t => this.visit(t, p)),
+            annotations: await mapAsync(method.annotations || [], a => this.visit(a, p)),
         });
     }
 
     protected async visitParameterized(parameterized: Type.Parameterized, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Parameterized>(parameterized, p, async draft => {
-            draft.type = await this.visit(parameterized.type, p) as Type.FullyQualified;
-            draft.typeParameters = await mapAsync(parameterized.typeParameters || [], t => this.visit(t, p)) as Type[];
+        return updateIfChanged(parameterized, {
+            type: await this.visit(parameterized.type, p),
+            typeParameters: await mapAsync(parameterized.typeParameters || [], t => this.visit(t, p)),
         });
     }
 
@@ -214,28 +218,15 @@ export class TypeVisitor<P> {
      * @return A variable
      */
     protected async visitVariable(variable: Type.Variable, p: P): Promise<Type | undefined> {
-        return this.produceType<Type.Variable>(variable, p, async draft => {
-            draft.owner = await this.visit(variable.owner, p);
-            draft.type = await this.visit(variable.type, p) as Type;
-            draft.annotations = await mapAsync(variable.annotations || [], a => this.visit(a, p) as Promise<Type.Annotation>);
+        return updateIfChanged(variable, {
+            owner: await this.visit(variable.owner, p),
+            type: await this.visit(variable.type, p),
+            annotations: await mapAsync(variable.annotations || [], a => this.visit(a, p)),
         });
     }
 
     protected async visitUnknown(unknown: Type, p: P): Promise<Type | undefined> {
         // Unknown types have no properties to visit
         return unknown;
-    }
-
-    protected async produceType<T extends Type>(
-        before: T,
-        p: P,
-        recipe?: (draft: Draft<T>) =>
-            ValidImmerRecipeReturnType<Draft<T>> |
-            PromiseLike<ValidImmerRecipeReturnType<Draft<T>>>
-    ): Promise<T> {
-        if (recipe) {
-            return produceAsync<T>(before, recipe);
-        }
-        return before;
     }
 }

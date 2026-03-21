@@ -195,6 +195,64 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
+    void appendMultiLineYamlMapping() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.items",
+              "name: new-item\nversion: 1.0",
+              null,
+              null
+            )),
+          yaml(
+            """
+              things:
+                items:
+                  - name: existing
+                    version: 0.1
+              """,
+            """
+              things:
+                items:
+                  - name: existing
+                    version: 0.1
+                  - name: new-item
+                    version: 1.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultiLineYamlMappingWithIndentation() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.items",
+              "item:\n  name: new-item",
+              null,
+              null
+            )),
+          yaml(
+            """
+              things:
+                items:
+                  - item:
+                      name: existing
+              """,
+            """
+              things:
+                items:
+                  - item:
+                      name: existing
+                  - item:
+                      name: new-item
+              """
+          )
+        );
+    }
+
+    @Test
     void appendToSequenceOfNameValuePairMatchExistingValuesInAnyOrder() {
         rewriteRun(
           spec -> spec

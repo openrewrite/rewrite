@@ -55,20 +55,14 @@ public class FindRepository extends Recipe {
     @Nullable
     Purpose purpose;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle repository";
-    }
+    String displayName = "Find Gradle repository";
 
-    @Override
-    public String getDescription() {
-        return "Find a Gradle repository by url.";
-    }
+    String description = "Find a Gradle repository by url.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher pluginManagementMatcher = new MethodMatcher("RewriteSettings pluginManagement(..)");
-        MethodMatcher buildscriptMatcher = new MethodMatcher("RewriteGradleProject buildscript(..)");
+        MethodMatcher pluginManagementMatcher = new MethodMatcher("org.gradle.api.initialization.Settings pluginManagement(..)", true);
+        MethodMatcher buildscriptMatcher = new MethodMatcher("org.gradle.api.Project buildscript(..)", true);
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

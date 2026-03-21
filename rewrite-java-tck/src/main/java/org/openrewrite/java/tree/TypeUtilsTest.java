@@ -25,7 +25,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.EnumSet;
-import java.util.List;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptyList;
@@ -273,8 +272,8 @@ class TypeUtilsTest implements RewriteTest {
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
                     J.VariableDeclarations.NamedVariable li = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(0)).getVariables().get(0);
                     J.VariableDeclarations.NamedVariable lo = ((J.VariableDeclarations) classDecl.getBody().getStatements().get(1)).getVariables().get(0);
-                    JavaType.Parameterized listIntegerType = ((JavaType.Parameterized) li.getVariableType().getType());
-                    JavaType.Parameterized listObjectType = ((JavaType.Parameterized) lo.getVariableType().getType());
+                    var listIntegerType = ((JavaType.Parameterized) li.getVariableType().getType());
+                    var listObjectType = ((JavaType.Parameterized) lo.getVariableType().getType());
 
                     assertThat(TypeUtils.isAssignableTo(listIntegerType.getType(), listIntegerType)).isTrue();
                     assertThat(TypeUtils.isAssignableTo(listObjectType, listIntegerType)).isFalse();
@@ -298,9 +297,9 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    JavaType.Parameterized wildcardList = (JavaType.Parameterized) variable.getVariableType().getType();
+                    var wildcardList = (JavaType.Parameterized) variable.getVariableType().getType();
                     JavaType.FullyQualified rawList = wildcardList.getType();
-                    JavaType.Parameterized stringArrayList = (JavaType.Parameterized) variable.getInitializer().getType();
+                    var stringArrayList = (JavaType.Parameterized) variable.getInitializer().getType();
                     assertThat(TypeUtils.isAssignableTo(wildcardList, stringArrayList)).isTrue();
                     assertThat(TypeUtils.isAssignableTo(wildcardList, stringArrayList)).isTrue();
                     assertThat(TypeUtils.isAssignableTo(wildcardList, rawList)).isTrue();
@@ -390,8 +389,8 @@ class TypeUtilsTest implements RewriteTest {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
                     if ("test".equals(method.getSimpleName())) {
-                        J.Return return_ = (J.Return) method.getBody().getStatements().get(0);
-                        J.TypeCast cast = (J.TypeCast) return_.getExpression();
+                        var return_ = (J.Return) method.getBody().getStatements().get(0);
+                        var cast = (J.TypeCast) return_.getExpression();
                         assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), BOUND)).isFalse();
                         assertThat(TypeUtils.isAssignableTo(cast.getType(), cast.getExpression().getType(), INFER)).isTrue();
                     }
@@ -432,8 +431,8 @@ class TypeUtilsTest implements RewriteTest {
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
                     if ("test".equals(method.getSimpleName())) {
                         J.Block block = getCursor().getParentTreeCursor().getValue();
-                        J.MethodDeclaration consumeClass = (J.MethodDeclaration) block.getStatements().get(0);
-                        J.MethodDeclaration consumeMethod = (J.MethodDeclaration) block.getStatements().get(1);
+                        var consumeClass = (J.MethodDeclaration) block.getStatements().get(0);
+                        var consumeMethod = (J.MethodDeclaration) block.getStatements().get(1);
                         J.VariableDeclarations.NamedVariable list = ((J.VariableDeclarations) method.getBody().getStatements().get(0)).getVariables().get(0);
                         JavaType consumeClassParamType = ((J.VariableDeclarations) consumeClass.getParameters().get(0)).getVariables().get(0).getType();
                         JavaType consumeMethodParamType = ((J.VariableDeclarations) consumeMethod.getParameters().get(0)).getVariables().get(0).getType();
@@ -584,10 +583,10 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<ExecutionContext>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    J.VariableDeclarations o = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
-                    J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
-                    J.VariableDeclarations sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(2);
-                    J.VariableDeclarations ia = (J.VariableDeclarations) classDecl.getBody().getStatements().get(3);
+                    var o = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
+                    var oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
+                    var sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(2);
+                    var ia = (J.VariableDeclarations) classDecl.getBody().getStatements().get(3);
                     JavaType object = o.getType();
                     JavaType objectArray = oa.getType();
                     JavaType stringArray = sa.getType();
@@ -655,8 +654,8 @@ class TypeUtilsTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
-                    J.VariableDeclarations oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
-                    J.VariableDeclarations sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
+                    var oa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(0);
+                    var sa = (J.VariableDeclarations) classDecl.getBody().getStatements().get(1);
                     JavaType objectArray = oa.getType();
                     JavaType stringArray = sa.getType();
                     assertTrue(TypeUtils.isAssignableTo(objectArray, objectArray));
@@ -689,7 +688,7 @@ class TypeUtilsTest implements RewriteTest {
                       type -> assertThat(type).isInstanceOf(JavaType.Class.class),
                       type -> assertThat(((JavaType.Class) type).getFullyQualifiedName()).isEqualTo("java.lang.Object")
                     );
-                    J.TypeCast typeCast = (J.TypeCast) variable.getInitializer();
+                    var typeCast = (J.TypeCast) variable.getInitializer();
                     assertThat(typeCast.getType()).satisfies(
                       type -> assertThat(type).isInstanceOf(JavaType.Intersection.class),
                       type -> assertThat(((JavaType.Intersection) type).getBounds()).satisfiesExactly(

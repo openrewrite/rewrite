@@ -20,13 +20,14 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.InlineMe;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 import static java.util.stream.Collectors.toCollection;
@@ -38,18 +39,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade transitive Maven dependencies";
-    }
+    String displayName = "Upgrade transitive Maven dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Upgrades the version of a transitive dependency in a Maven pom file. " +
+    String description = "Upgrades the version of a transitive dependency in a Maven pom file. " +
                "Leaves direct dependencies unmodified. " +
                "Can be paired with the regular Upgrade Dependency Version recipe to upgrade a dependency everywhere, " +
                "regardless of whether it is direct or transitive.";
-    }
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.apache.logging.log4j:ARTIFACT_ID:VERSION'.",
@@ -124,7 +119,6 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     String because;
 
     @Deprecated
-    @InlineMe(replacement = "this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null)")
     public UpgradeTransitiveDependencyVersion(String groupId,
                                               String artifactId,
                                               String version,
@@ -190,6 +184,25 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
                 if (matchingDependencies.isEmpty()) {
                     return document;
                 }
+
+                // Skip transitive dependencies that a project parent also has,
+                // since the parent will get the managed dependency and children will inherit it
+                MavenResolutionResult current = getResolutionResult();
+                while (current.parentPomIsProjectPom()) {
+                    MavenResolutionResult parentResult = current.getParent();
+                    List<ResolvedDependency> parentTransitiveDeps = parentResult.findDependencies(groupId, artifactId, null);
+                    matchingDependencies.removeIf(dep ->
+                            parentTransitiveDeps.stream().anyMatch(pd ->
+                                    pd.isTransitive() &&
+                                    pd.getGroupId().equals(dep.getGroupId()) &&
+                                    pd.getArtifactId().equals(dep.getArtifactId())));
+                    current = parentResult;
+                }
+
+                if (matchingDependencies.isEmpty()) {
+                    return document;
+                }
+
                 Xml.Document d = document;
                 for (ResolvedDependency matchingDependency : matchingDependencies) {
                     d = (Xml.Document) addManagedDependency(matchingDependency.getGroupId(), matchingDependency.getArtifactId())

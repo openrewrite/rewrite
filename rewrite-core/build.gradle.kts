@@ -15,6 +15,9 @@ dependencies {
 
     api("org.jspecify:jspecify:latest.release")
 
+    // Recipe marketplace
+    implementation("com.univocity:univocity-parsers:latest.release")
+
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
@@ -43,5 +46,5 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/RpcObjectData.java")
+    exclude("**/RpcObjectData.java", "**/RecipeDescriptor.java")
 }

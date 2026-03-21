@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -23,25 +24,18 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.Style;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 @SuppressWarnings("unused")
 public class NormalizeLineBreaks extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Normalize line breaks";
-    }
+    @Getter
+    final String displayName = "Normalize line breaks";
 
-    @Override
-    public String getDescription() {
-        return "Consistently use either Windows style (CRLF) or Linux style (LF) line breaks. " +
-               "If no `GeneralFormatStyle` is specified this will use whichever style of line endings are more common.";
-    }
+    @Getter
+    final String description = "Consistently use either Windows style (CRLF) or Linux style (LF) line breaks. " +
+        "If no `GeneralFormatStyle` is specified this will use whichever style of line endings are more common.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -53,8 +47,7 @@ public class NormalizeLineBreaks extends Recipe {
         public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, cu, () -> autodetectGeneralFormatStyle(cu));
-                doAfterVisit(new NormalizeLineBreaksVisitor<>(generalFormatStyle));
+                doAfterVisit(new NormalizeLineBreaksVisitor<>(cu, null));
             }
             return (J) tree;
         }

@@ -26,9 +26,9 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.config.CategoryTreeTest.Group.Group1;
-import static org.openrewrite.config.CategoryTreeTest.Group.Group2;
 
+@SuppressWarnings("DataFlowIssue")
+@Deprecated
 class CategoryTreeTest {
     private final Environment env = Environment.builder()
       .scanRuntimeClasspath()
@@ -44,8 +44,8 @@ class CategoryTreeTest {
 
     private CategoryTree.Root<Group> categoryTree() {
         return CategoryTree.<Group>build()
-          .putAll(Group1, env)
-          .putAll(Group2, custom);
+          .putAll(Group.Group1, env)
+          .putAll(Group.Group2, custom);
     }
 
     /**
@@ -81,10 +81,10 @@ class CategoryTreeTest {
         CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
           .putRecipes(0, recipeDescriptor("org.openrewrite.test"))
           .putCategories(1, descriptor)
-          .putCategories(2, descriptor.withDisplayName("new display name"));
+          .putCategories(2, descriptor.withDisplayName("New display name"));
 
         CategoryTree<Integer> found = requireNonNull(categoryTree.getCategory("org.openrewrite.test"));
-        assertThat(found.getDescriptor().getDisplayName()).isEqualTo("new display name");
+        assertThat(found.getDescriptor().getDisplayName()).isEqualTo("New display name");
         assertThat(found.getRecipes()).hasSize(1);
 
         categoryTree.removeAll(2);
@@ -112,13 +112,13 @@ class CategoryTreeTest {
     private static RecipeDescriptor recipeDescriptor(String packageName) {
         return new RecipeDescriptor(packageName + ".MyRecipe",
           "My recipe", "", "", emptySet(), null, emptyList(),
-          emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), URI.create("https://openrewrite.org"));
+          emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), null);
     }
 
     @Test
     void removeCategory() {
         CategoryTree.Root<Group> ct = categoryTree();
-        ct.removeAll(Group2);
+        ct.removeAll(Group.Group2);
         assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
           .doesNotContain("io.moderne.rewrite", "io.moderne.cloud", "io.moderne");
     }
@@ -168,7 +168,7 @@ class CategoryTreeTest {
     @Test
     void getRecipeGroup() {
         assertThat(categoryTree().getRecipeGroup("org.openrewrite.DeleteSourceFiles"))
-          .isEqualTo(Group1);
+          .isEqualTo(Group.Group1);
     }
 
     private static CategoryDescriptor categoryDescriptor(String packageName) {

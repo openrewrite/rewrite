@@ -55,15 +55,9 @@ public class AddCommentToMavenDependency extends Recipe {
             example = "This is excluded due to CVE <X> and will be removed when we upgrade the next version is available.")
     String commentText;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a comment to a `Maven` dependency";
-    }
+    String displayName = "Add a comment to a `Maven` dependency or plugin";
 
-    @Override
-    public String getDescription() {
-        return "Adds a comment as the first element in a `Maven` dependency.";
-    }
+    String description = "Adds a comment as the first element in a `Maven` dependency or plugin.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -73,21 +67,21 @@ public class AddCommentToMavenDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (matcher.matches(getCursor()) && this.isDependencyTag(groupId, artifactId)) {
-                    if (tag.getContent() != null) {
+                if (matcher.matches(getCursor()) &&
+                        (isDependencyTag(groupId, artifactId) || isPluginTag(groupId, artifactId))
+                        && tag.getContent() != null) {
+                    boolean containsComment = tag.getContent().stream()
+                            .anyMatch(c -> c instanceof Xml.Comment &&
+                                    commentText.equals(((Xml.Comment) c).getText()));
+                    if (!containsComment) {
                         List<Content> contents = new ArrayList<>(tag.getContent());
-                        boolean containsComment = contents.stream()
-                                .anyMatch(c -> c instanceof Xml.Comment &&
-                                        commentText.equals(((Xml.Comment) c).getText()));
-                        if (!containsComment) {
-                            int insertPos = 0;
-                            Xml.Comment customComment = new Xml.Comment(randomId(),
-                                    contents.get(insertPos).getPrefix(),
-                                    Markers.EMPTY,
-                                    commentText);
-                            contents.add(insertPos, customComment);
-                            t = t.withContent(contents);
-                        }
+                        Xml.Comment customComment = new Xml.Comment(
+                                randomId(),
+                                contents.get(0).getPrefix(),
+                                Markers.EMPTY,
+                                commentText);
+                        contents.add(0, customComment);
+                        return t.withContent(contents);
                     }
                 }
                 return t;

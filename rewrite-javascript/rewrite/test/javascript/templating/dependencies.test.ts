@@ -3,11 +3,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,8 +39,8 @@ describe('template dependencies integration', () => {
     test('pattern with dependencies has proper type attribution in AST', async () => {
         // Create a pattern that uses uuid with proper dependencies
         const pat = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v4 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         // Parse some code with the parser (to trigger template parsing internally)
@@ -64,7 +64,7 @@ describe('template dependencies integration', () => {
         let foundMatch = false;
         await (new class extends JavaScriptVisitor<any> {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                const match = await pat.match(method);
+                const match = await pat.match(method, this.cursor);
                 if (match && method.name.simpleName === 'v4') {
                     foundMatch = true;
                     // The match succeeded, which means the pattern's AST was properly parsed
@@ -79,8 +79,8 @@ describe('template dependencies integration', () => {
     test('template with dependencies generates AST with type attribution', async () => {
         // Create a template with dependencies
         const tmpl = template`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v1 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         // Parse some test code to get a cursor context
@@ -95,7 +95,7 @@ describe('template dependencies integration', () => {
             override async visitVariable(variable: any, p: any): Promise<any> {
                 if (!replacementFound) {
                     // Apply the template to replace the initializer
-                    const replacement = await tmpl.apply(this.cursor, variable, new Map());
+                    const replacement = await tmpl.apply(variable, this.cursor, { values: new Map() });
                     replacementFound = true;
 
                     // Verify the replacement was created
@@ -111,18 +111,18 @@ describe('template dependencies integration', () => {
     test('multiple patterns with same dependencies share workspace', async () => {
         // Create multiple patterns with identical dependencies
         const pat1 = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v4 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         const pat2 = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v4 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         const pat3 = pattern`v4()`.configure({
-            imports: ['import { v4 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v4 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         // Parse test code with v4() call
@@ -141,9 +141,9 @@ describe('template dependencies integration', () => {
             override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
                 if (method.name.simpleName === 'v4') {
                     // Try all three patterns
-                    const match1 = await pat1.match(method);
-                    const match2 = await pat2.match(method);
-                    const match3 = await pat3.match(method);
+                    const match1 = await pat1.match(method, this.cursor);
+                    const match2 = await pat2.match(method, this.cursor);
+                    const match3 = await pat3.match(method, this.cursor);
 
                     if (match1) matchCount++;
                     if (match2) matchCount++;
@@ -160,8 +160,8 @@ describe('template dependencies integration', () => {
     test('template with dependencies provides type attribution verified by MethodMatcher', async () => {
         // Create a pattern that matches v1() with dependencies
         const pat = pattern`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v1 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         // Parse test code with v1() call using a workspace with dependencies
@@ -171,7 +171,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code (so it has type attribution)
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({ '@types/uuid': '^9.0.0' });
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -186,7 +186,7 @@ describe('template dependencies integration', () => {
             override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
                 if (method.name.simpleName === 'v1') {
                     // The pattern should match (which implicitly uses its typed internal AST)
-                    const match = await pat.match(method);
+                    const match = await pat.match(method, this.cursor);
                     expect(match).toBeDefined();
 
                     // Verify the method has proper type attribution from dependencies
@@ -209,8 +209,8 @@ describe('template dependencies integration', () => {
     test('pattern with dependencies does not match when types differ', async () => {
         // Create a pattern that matches v1() from uuid with proper dependencies
         const pat = pattern`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v1 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         // Parse test code that has a v1() call from a DIFFERENT type (custom class)
@@ -225,7 +225,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({ '@types/uuid': '^9.0.0' });
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -239,7 +239,7 @@ describe('template dependencies integration', () => {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;
                     // The pattern should NOT match because the types are different
-                    const match = await pat.match(method);
+                    const match = await pat.match(method, this.cursor);
                     if (match) {
                         patternMatched = true;
                     }
@@ -257,8 +257,8 @@ describe('template dependencies integration', () => {
     test('pattern with dependencies matches when types are correct', async () => {
         // Create a pattern that matches v1() from uuid with proper dependencies
         const pat = pattern`v1()`.configure({
-            imports: ['import { v1 } from "uuid"'],
-            dependencies: { '@types/uuid': '^9.0.0' }
+            context: ['import { v1 } from "uuid"'],
+            dependencies: {'@types/uuid': '^9.0.0'}
         });
 
         // Parse test code that has a v1() call from the CORRECT type (uuid module)
@@ -268,7 +268,7 @@ describe('template dependencies integration', () => {
         `;
 
         // Create workspace for parsing the test code
-        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({ '@types/uuid': '^9.0.0' });
+        const workspaceDir = await DependencyWorkspace.getOrCreateWorkspace({dependencies: {'@types/uuid': '^9.0.0'}});
 
         const parser = new JavaScriptParser({relativeTo: workspaceDir});
         const parseGen = parser.parse({text: testCode, sourcePath: 'test.ts'});
@@ -282,7 +282,7 @@ describe('template dependencies integration', () => {
                 if (method.name.simpleName === 'v1') {
                     foundV1Call = true;
                     // The pattern SHOULD match because the types are the same
-                    const match = await pat.match(method);
+                    const match = await pat.match(method, this.cursor);
                     if (match) {
                         patternMatched = true;
                     }
@@ -301,18 +301,22 @@ describe('template dependencies integration', () => {
         // Simple test showing rewrite() with type-aware patterns
         // This builds on the existing functionality to ensure our semantic equality checking works
         const spec = new RecipeSpec();
+        const swapOperands = rewrite(() => {
+            const {left, right} = {left: capture(), right: capture()};
+            return {
+                before: pattern`${left} + ${right}`,
+                after: template`${right} + ${left}`
+            };
+        });
 
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
-                const swapOperands = rewrite(() => ({
-                    before: pattern`${capture('left')} + ${capture('right')}`,
-                    after: template`${capture('right')} + ${capture('left')}`
-                }));
-                return await swapOperands.tryOn(this.cursor, binary);
+                return await swapOperands.tryOn(this.cursor, binary) || binary;
             }
         });
 
         return spec.rewriteRun(
+            //language=typescript
             typescript('const result = 1 + 2;', 'const result = 2 + 1;')
         );
     }, 60000);
@@ -347,7 +351,7 @@ describe('template dependencies integration', () => {
                 const arg = capture();
                 const replaceUtilIsArray = rewrite(() => ({
                     before: pattern`util.isArray(${arg})`.configure({
-                        imports: ["import * as util from 'util'"],
+                        context: ["import * as util from 'util'"],
                         dependencies: {'@types/node': '^20.0.0'}
                     }),
                     after: template`Array.isArray(${arg})`
@@ -355,15 +359,15 @@ describe('template dependencies integration', () => {
 
                 const replaceUtilIsBoolean = rewrite(() => ({
                     before: pattern`util.isBoolean(${arg})`.configure({
-                        imports: ["import * as util from 'util'"],
+                        context: ["import * as util from 'util'"],
                         dependencies: {'@types/node': '^20.0.0'}
                     }),
                     after: template`typeof ${arg} === 'boolean'`
                 }));
 
                 return await replaceUtilIsArray.tryOn(this.cursor, method) ||
-                       await replaceUtilIsBoolean.tryOn(this.cursor, method) ||
-                       method;
+                    await replaceUtilIsBoolean.tryOn(this.cursor, method) ||
+                    method;
             }
         });
 
@@ -380,56 +384,58 @@ describe('template dependencies integration', () => {
                 // language=typescript
                 typescript(
                     `
-                    import * as util from 'util';
+                        import * as util from 'util';
 
-                    class CustomUtil {
-                        isArray(value: any) {
-                            return 'custom';
+                        class CustomUtil {
+                            isArray(value: any) {
+                                return 'custom';
+                            }
+
+                            isBoolean(value: any) {
+                                return 'custom';
+                            }
                         }
-                        isBoolean(value: any) {
-                            return 'custom';
-                        }
-                    }
 
-                    const customUtil = new CustomUtil();
-                    const arr = [1, 2, 3];
-                    const bool = true;
+                        const customUtil = new CustomUtil();
+                        const arr = [1, 2, 3];
+                        const bool = true;
 
-                    // These should be replaced (from util module)
-                    const check1 = util.isArray(arr);
-                    const check2 = util.isBoolean(bool);
-                    const check3 = util.isArray([]);
-                    const check4 = util.isBoolean(false);
+                        // These should be replaced (from util module)
+                        const check1 = util.isArray(arr);
+                        const check2 = util.isBoolean(bool);
+                        const check3 = util.isArray([]);
+                        const check4 = util.isBoolean(false);
 
-                    // These should NOT be replaced (custom methods)
-                    const custom1 = customUtil.isArray(arr);
-                    const custom2 = customUtil.isBoolean(bool);
+                        // These should NOT be replaced (custom methods)
+                        const custom1 = customUtil.isArray(arr);
+                        const custom2 = customUtil.isBoolean(bool);
                     `,
                     `
-                    import * as util from 'util';
+                        import * as util from 'util';
 
-                    class CustomUtil {
-                        isArray(value: any) {
-                            return 'custom';
+                        class CustomUtil {
+                            isArray(value: any) {
+                                return 'custom';
+                            }
+
+                            isBoolean(value: any) {
+                                return 'custom';
+                            }
                         }
-                        isBoolean(value: any) {
-                            return 'custom';
-                        }
-                    }
 
-                    const customUtil = new CustomUtil();
-                    const arr = [1, 2, 3];
-                    const bool = true;
+                        const customUtil = new CustomUtil();
+                        const arr = [1, 2, 3];
+                        const bool = true;
 
-                    // These should be replaced (from util module)
-                    const check1 = Array.isArray(arr);
-                    const check2 = typeof bool === 'boolean';
-                    const check3 = Array.isArray([]);
-                    const check4 = typeof false === 'boolean';
+                        // These should be replaced (from util module)
+                        const check1 = Array.isArray(arr);
+                        const check2 = typeof bool === 'boolean';
+                        const check3 = Array.isArray([]);
+                        const check4 = typeof false === 'boolean';
 
-                    // These should NOT be replaced (custom methods)
-                    const custom1 = customUtil.isArray(arr);
-                    const custom2 = customUtil.isBoolean(bool);
+                        // These should NOT be replaced (custom methods)
+                        const custom1 = customUtil.isArray(arr);
+                        const custom2 = customUtil.isBoolean(bool);
                     `
                 )
             )
@@ -448,8 +454,8 @@ describe('template dependencies integration', () => {
                 // Single pattern that matches both isDate(x) and util.isDate(x) via type attribution
                 const replaceIsDate = rewrite(() => ({
                     before: pattern`isDate(${dateArg})`.configure({
-                        imports: ['import { isDate } from "util"'],
-                        dependencies: { '@types/node': '^20.0.0' }
+                        context: ['import { isDate } from "util"'],
+                        dependencies: {'@types/node': '^20.0.0'}
                     }),
                     after: template`${dateArg} instanceof Date`
                 }));
@@ -471,48 +477,48 @@ describe('template dependencies integration', () => {
                 // language=typescript
                 typescript(
                     `
-                    import { isDate } from 'util';
-                    import * as util from 'util';
+                        import {isDate} from 'util';
+                        import * as util from 'util';
 
-                    class CustomValidator {
-                        isDate(value: any) {
-                            return typeof value === 'string';
+                        class CustomValidator {
+                            isDate(value: any) {
+                                return typeof value === 'string';
+                            }
                         }
-                    }
 
-                    const validator = new CustomValidator();
-                    const value = new Date();
+                        const validator = new CustomValidator();
+                        const value = new Date();
 
-                    // This should be replaced (from util module via named import)
-                    const isRealDate1 = isDate(value);
+                        // This should be replaced (from util module via named import)
+                        const isRealDate1 = isDate(value);
 
-                    // This should be replaced (from util module via namespace import)
-                    const isRealDate2 = util.isDate(new Date());
+                        // This should be replaced (from util module via namespace import)
+                        const isRealDate2 = util.isDate(new Date());
 
-                    // This should NOT be replaced (custom method)
-                    const isCustomDate = validator.isDate(value);
+                        // This should NOT be replaced (custom method)
+                        const isCustomDate = validator.isDate(value);
                     `,
                     `
-                    import { isDate } from 'util';
-                    import * as util from 'util';
+                        import {isDate} from 'util';
+                        import * as util from 'util';
 
-                    class CustomValidator {
-                        isDate(value: any) {
-                            return typeof value === 'string';
+                        class CustomValidator {
+                            isDate(value: any) {
+                                return typeof value === 'string';
+                            }
                         }
-                    }
 
-                    const validator = new CustomValidator();
-                    const value = new Date();
+                        const validator = new CustomValidator();
+                        const value = new Date();
 
-                    // This should be replaced (from util module via named import)
-                    const isRealDate1 = value instanceof Date;
+                        // This should be replaced (from util module via named import)
+                        const isRealDate1 = value instanceof Date;
 
-                    // This should be replaced (from util module via namespace import)
-                    const isRealDate2 = new Date() instanceof Date;
+                        // This should be replaced (from util module via namespace import)
+                        const isRealDate2 = new Date() instanceof Date;
 
-                    // This should NOT be replaced (custom method)
-                    const isCustomDate = validator.isDate(value);
+                        // This should NOT be replaced (custom method)
+                        const isCustomDate = validator.isDate(value);
                     `
                 )
             )

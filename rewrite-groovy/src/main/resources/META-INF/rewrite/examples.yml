@@ -15,7 +15,7 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.groovy.format.AutoFormat
 examples:
-- description: ''
+- description: '`AutoFormatVisitorTest#keepMaximumBetweenHeaderAndPackage`'
   sources:
   - before: |
       /*
@@ -44,7 +44,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.groovy.format.GStringCurlyBraces
 examples:
-- description: ''
+- description: '`GStringCurlyBracesTest#basic`'
   sources:
   - before: |
       def name = 'world'
@@ -57,7 +57,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangePackage
 examples:
-- description: ''
+- description: '`ChangePackageAdaptabilityTest#changePackage`'
   parameters:
   - a.b
   - x.y
@@ -87,7 +87,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ChangeType
 examples:
-- description: ''
+- description: '`ChangeTypeAdaptabilityTest#changeDefinition`'
   parameters:
   - file
   - newFile
@@ -104,7 +104,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.ShortenFullyQualifiedTypeReferences
 examples:
-- description: ''
+- description: '`ShortenFullyQualifiedTypeReferencesAdaptabilityTest#importWithLeadingComment`'
   sources:
   - before: |
       package foo
@@ -128,9 +128,52 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.SimplifyMethodChain
+examples:
+- description: '`SimplifyMethodChainTest#simplify`'
+  parameters:
+  - List.of("A b()", "B c()")
+  - c2
+  - 'false'
+  sources:
+  - before: |
+      class A {
+          static B b() { return new B() }
+          static C c2() { return new C() }
+      }
+
+      class B {
+          C c() { return new C() }
+      }
+
+      class C {
+      }
+
+      class Test {
+          C c = A.b().c()
+      }
+    after: |
+      class A {
+          static B b() { return new B() }
+          static C c2() { return new C() }
+      }
+
+      class B {
+          C c() { return new C() }
+      }
+
+      class C {
+      }
+
+      class Test {
+          C c = A.c2()
+      }
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindTypes
 examples:
-- description: ''
+- description: '`GroovyTypeAttributionTest#typeFromClasspathResources`'
   parameters:
   - org.junit.jupiter.api.Test
   - 'null'

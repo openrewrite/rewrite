@@ -36,16 +36,10 @@ import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 @EqualsAndHashCode(callSuper = false)
 public class DeleteProperty extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Delete property by key";
-    }
+    String displayName = "Delete property by key";
 
-    @Override
-    public String getDescription() {
-        return "Deletes key/value pairs from properties files, as well as any comments that immediately precede the key/value pair. " +
-                "Comments separated by two or more newlines from the deleted key/value pair are preserved." ;
-    }
+    String description = "Deletes key/value pairs from properties files, as well as any comments that immediately precede the key/value pair. " +
+                "Comments separated by two or more newlines from the deleted key/value pair are preserved.";
 
     @Option(displayName = "Property key matcher",
             description = "The key(s) to be deleted. This is a glob expression.",

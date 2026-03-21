@@ -106,30 +106,27 @@ public class JavaTypeVisitor<P> {
     }
 
     public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, P p) {
-        multiCatch.unsafeSet(
+        return multiCatch.unsafeSet(
                 visit(multiCatch.getThrowableTypes(), p)
         );
-        return multiCatch;
     }
 
     public JavaType visitAnnotation(JavaType.Annotation annotation, P p) {
-        annotation.unsafeSet(
+        return annotation.unsafeSet(
                 (JavaType.FullyQualified) visit(annotation.getType(), p),
                 arrayOrNullIfEmpty(annotation.getValues(), JavaType.EMPTY_ANNOTATION_VALUE_ARRAY)
         );
-        return annotation;
     }
 
     public JavaType visitArray(JavaType.Array array, P p) {
-        array.unsafeSet(
+        return array.unsafeSet(
                 visit(array.getElemType(), p),
                 arrayOrNullIfEmpty(visit(array.getAnnotations(), p), JavaType.EMPTY_FULLY_QUALIFIED_ARRAY)
         );
-        return array;
     }
 
     public JavaType visitClass(JavaType.Class aClass, P p) {
-        aClass.unsafeSet(
+        return aClass.unsafeSet(
                 visit(aClass.getTypeParameters(), p),
                 (JavaType.FullyQualified) visit(aClass.getSupertype(), p),
                 (JavaType.FullyQualified) visit(aClass.getOwningClass(), p),
@@ -138,23 +135,20 @@ public class JavaTypeVisitor<P> {
                 ListUtils.map(aClass.getMembers(), m -> (JavaType.Variable) visit(m, p)),
                 ListUtils.map(aClass.getMethods(), m -> (JavaType.Method) visit(m, p))
         );
-        return aClass;
     }
 
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, P p) {
-        generic.unsafeSet(
+        return generic.unsafeSet(
                 generic.getName(),
                 generic.getVariance(),
                 visit(generic.getBounds(), p)
         );
-        return generic;
     }
 
     public JavaType visitIntersection(JavaType.Intersection intersection, P p) {
-        intersection.unsafeSet(
+        return intersection.unsafeSet(
                 visit(intersection.getBounds(), p)
         );
-        return intersection;
     }
 
     /**
@@ -165,22 +159,20 @@ public class JavaTypeVisitor<P> {
      * @return A method
      */
     public JavaType visitMethod(JavaType.Method method, P p) {
-        method.unsafeSet(
+        return method.unsafeSet(
                 (JavaType.FullyQualified) visit(method.getDeclaringType(), p),
                 visit(method.getReturnType(), p),
                 visit(method.getParameterTypes(), p),
                 visit(method.getThrownExceptions(), p),
                 ListUtils.map(method.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p))
         );
-        return method;
     }
 
     public JavaType visitParameterized(JavaType.Parameterized parameterized, P p) {
-        parameterized.unsafeSet(
+        return parameterized.unsafeSet(
                 (JavaType.FullyQualified) visit(parameterized.getType(), p),
                 visit(parameterized.getTypeParameters(), p)
         );
-        return parameterized;
     }
 
     public JavaType visitPrimitive(JavaType.Primitive primitive, P p) {
@@ -199,11 +191,10 @@ public class JavaTypeVisitor<P> {
      * @return A variable
      */
     public JavaType visitVariable(JavaType.Variable variable, P p) {
-        variable.unsafeSet(
+        return variable.unsafeSet(
                 visit(variable.getOwner(), p),
                 visit(variable.getType(), p),
                 ListUtils.map(variable.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p))
         );
-        return variable;
     }
 }

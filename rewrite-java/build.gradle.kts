@@ -19,6 +19,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = antlrGeneration
+
+    finalizedBy("licenseFormat")
 }
 
 // Only need checkstyle for the classes that we use to load its configuration files
@@ -47,7 +49,6 @@ dependencies {
     }
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api")
-    compileOnly("org.assertj:assertj-core:latest.release")
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
@@ -75,6 +76,12 @@ dependencies {
     testRuntimeOnly("jakarta.validation:jakarta.validation-api:3.1.1")
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
@@ -86,7 +93,7 @@ tasks.withType<Javadoc>().configureEach {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java")
+    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java", "**/ImportLayoutStyle**")
 }
 
 tasks.named<ShadowJar>("shadowJar").configure {

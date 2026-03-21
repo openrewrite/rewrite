@@ -88,13 +88,13 @@ class RenameVariableTest implements RewriteTest {
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
-                          classDecl.getBody().getStatements().stream()
+                            classDecl.getBody().getStatements().stream()
                             .filter(J.MethodDeclaration.class::isInstance)
                             .map(J.MethodDeclaration.class::cast)
                             .flatMap(it -> it.getParameters().stream())
                             .filter(J.VariableDeclarations.class::isInstance)
                             .map(J.VariableDeclarations.class::cast)
-                            .collect(toList())
+                            .toList()
                         );
                     }
 
@@ -1512,24 +1512,24 @@ class RenameVariableTest implements RewriteTest {
           ),
           java(
             """
-                public class Bar {
-                  private static final Foo foo = new Foo();
+              public class Bar {
+                private static final Foo foo = new Foo();
 
-                  public void bar() {
-                    foo.baz = (a, b) -> true;
-                    foo.baz2 = "hello";
-                  }
+                public void bar() {
+                  foo.baz = (a, b) -> true;
+                  foo.baz2 = "hello";
                 }
+              }
               """,
             """
-                public class Bar {
-                  private static final Foo FOO = new Foo();
+              public class Bar {
+                private static final Foo FOO = new Foo();
 
-                  public void bar() {
-                    FOO.baz = (a, b) -> true;
-                    FOO.baz2 = "hello";
-                  }
+                public void bar() {
+                  FOO.baz = (a, b) -> true;
+                  FOO.baz2 = "hello";
                 }
+              }
               """
           )
         );

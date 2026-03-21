@@ -44,15 +44,9 @@ public class FindMavenSettings extends Recipe {
 
     transient EffectiveMavenSettings settings = new EffectiveMavenSettings(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find effective maven settings";
-    }
+    String displayName = "Find effective maven settings";
 
-    @Override
-    public String getDescription() {
-        return "List the effective maven settings file for the current project.";
-    }
+    String description = "List the effective maven settings file for the current project.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

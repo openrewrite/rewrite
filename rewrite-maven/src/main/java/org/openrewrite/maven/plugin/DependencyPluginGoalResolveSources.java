@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.plugin;
 
+import lombok.Getter;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -30,15 +31,11 @@ import static java.util.Objects.requireNonNull;
 
 @SuppressWarnings("ALL")
 public class DependencyPluginGoalResolveSources extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Migrate to `maven-dependency-plugin` goal `resolve-sources`";
-    }
+    @Getter
+    final String displayName = "Migrate to `maven-dependency-plugin` goal `resolve-sources`";
 
-    @Override
-    public String getDescription() {
-        return "Migrate from `sources` to `resolve-sources` for the `maven-dependency-plugin`.";
-    }
+    @Getter
+    final String description = "Migrate from `sources` to `resolve-sources` for the `maven-dependency-plugin`.";
 
     private static final XPathMatcher xPathMatcher = new XPathMatcher("//plugin[artifactId='maven-dependency-plugin']/executions/execution/goals[goal='sources']/goal");
     private static final String minimumVersion = "3.7.0";

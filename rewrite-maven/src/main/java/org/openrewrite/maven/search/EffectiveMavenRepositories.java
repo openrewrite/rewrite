@@ -44,17 +44,11 @@ import static org.openrewrite.PathUtils.separatorsToUnix;
 @EqualsAndHashCode(callSuper = false)
 public class EffectiveMavenRepositories extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "List effective Maven repositories";
-    }
+    String displayName = "List effective Maven repositories";
 
-    @Override
-    public String getDescription() {
-        return "Lists the Maven repositories that would be used for dependency resolution, in order of precedence. " +
+    String description = "Lists the Maven repositories that would be used for dependency resolution, in order of precedence. " +
                "This includes Maven repositories defined in the Maven settings file (and those contributed by active profiles) as " +
                "determined when the LST was produced.";
-    }
 
     @Option(displayName = "Use markers",
             description = "Whether to add markers for each effective Maven repository to the POM. Default `false`.",

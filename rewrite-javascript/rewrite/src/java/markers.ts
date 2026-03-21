@@ -16,7 +16,7 @@
 import {Marker} from "../markers";
 import {J} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
-import {createDraft, finishDraft} from "immer";
+import {updateIfChanged} from "../util";
 // The `RpcCodec` for `J.Space` is registered in the `rpc` module.
 import "./rpc";
 
@@ -53,10 +53,10 @@ export interface OmitParentheses extends Marker {
 // Register codecs for all Java markers with additional properties
 RpcCodecs.registerCodec(J.Markers.TrailingComma, {
     async rpcReceive(before: TrailingComma, q: RpcReceiveQueue): Promise<TrailingComma> {
-        const draft = createDraft(before);
-        draft.id = await q.receive(before.id);
-        draft.suffix = await q.receive(before.suffix)
-        return finishDraft(draft);
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            suffix: await q.receive(before.suffix),
+        });
     },
 
     async rpcSend(after: TrailingComma, q: RpcSendQueue): Promise<void> {
@@ -73,9 +73,9 @@ export function registerMarkerCodec<M extends Marker>(
 ) {
     RpcCodecs.registerCodec(kind, {
         async rpcReceive(before: M, q: RpcReceiveQueue): Promise<M> {
-            const draft = createDraft(before);
-            draft.id = await q.receive(before.id);
-            return finishDraft(draft) as M;
+            return updateIfChanged(before, {
+                id: await q.receive(before.id),
+            } as Partial<M>);
         },
 
         async rpcSend(after: M, q: RpcSendQueue): Promise<void> {

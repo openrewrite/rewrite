@@ -24,6 +24,7 @@ import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
@@ -91,8 +92,9 @@ public class Visit implements RpcRequest {
                     // removed from OpenRewrite in the future.
                     WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
                     ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
-                            new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
-                            new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
+                            new RecipeRunStats(Recipe.noop()), new SearchResults(Recipe.noop()),
+                            new SourcesFileResults(Recipe.noop()), new SourcesFileErrors(Recipe.noop()),
+                            LargeSourceSet::edit));
                     ctx.putCurrentRecipe(recipe);
                     return ctx;
                 }

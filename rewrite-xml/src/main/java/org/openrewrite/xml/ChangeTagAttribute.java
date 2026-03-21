@@ -31,15 +31,9 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 public class ChangeTagAttribute extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Change XML attribute";
-    }
+    String displayName = "Change XML attribute";
 
-    @Override
-    public String getDescription() {
-        return "Alters XML attribute value on a specified element.";
-    }
+    String description = "Alters XML attribute value on a specified element.";
 
     @Option(displayName = "Element name",
             description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath expression.",
@@ -82,7 +76,7 @@ public class ChangeTagAttribute extends Recipe {
                 return t;
             }
 
-            public  Xml.@Nullable Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
+            public Xml.@Nullable Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
                 if (!attribute.getKeyAsString().equals(attributeName)) {
                     return attribute;
                 }
@@ -92,13 +86,12 @@ public class ChangeTagAttribute extends Recipe {
                     if (Boolean.TRUE.equals(regex) && !Pattern.matches(oldValue, stringValue)) {
                         return attribute;
                     }
-                    if ((regex == null || Boolean.FALSE.equals(regex)) && !stringValue.startsWith(oldValue)) {
+                    if ((regex == null || !regex) && !stringValue.startsWith(oldValue)) {
                         return attribute;
                     }
                 }
 
                 if (newValue == null) {
-                    //noinspection DataFlowIssue
                     return null;
                 }
 

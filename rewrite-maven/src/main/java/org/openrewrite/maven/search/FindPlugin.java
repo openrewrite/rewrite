@@ -53,20 +53,14 @@ public class FindPlugin extends Recipe {
         return ds;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Find Maven plugin";
-    }
+    String displayName = "Find Maven plugin";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Finds a Maven plugin within a pom.xml.";
-    }
+    String description = "Finds a Maven plugin within a pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

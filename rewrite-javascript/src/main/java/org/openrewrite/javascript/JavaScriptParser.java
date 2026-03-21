@@ -116,7 +116,7 @@ public class JavaScriptParser implements Parser {
             // Many minified/bundled files have license headers followed by very long minified lines
             try (InputStream is = input.getSource(new InMemoryExecutionContext())) {
                 final int sampleSize = 10 * 1024; // Read up to 10KB sample
-                final int longLineThreshold = 1000; // Lines > 1000 chars indicate minification
+                final int longLineThreshold = 4000; // Lines > 4000 chars indicate minification
                 int currentLineLength = 0;
                 int totalCharsRead = 0;
                 int ch;

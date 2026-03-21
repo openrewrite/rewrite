@@ -49,15 +49,9 @@ public class SimplifyMethodChain extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Simplify a call chain";
-    }
+    String displayName = "Simplify a call chain";
 
-    @Override
-    public String getDescription() {
-        return "Simplify `a.b().c()` to `a.d()`.";
-    }
+    String description = "Simplify `a.b().c()` to `a.d()`.";
 
     @Override
     public Validated<Object> validate() {
@@ -72,16 +66,11 @@ public class SimplifyMethodChain extends Recipe {
                 .map(matcher -> new MethodMatcher(matcher, matchOverrides))
                 .collect(toList());
         reverse(matchers);
-
-        return Preconditions.check(new JavaVisitor<ExecutionContext>() {
-            @Override
-            public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                for (String method : methodPatternChain) {
-                    doAfterVisit(new UsesMethod<>(method, matchOverrides));
-                }
-                return cu;
-            }
-        }, new JavaIsoVisitor<ExecutionContext>() {
+        @SuppressWarnings("unchecked")
+        TreeVisitor<?, ExecutionContext> allMethods = Preconditions.and(matchers.stream()
+                .<TreeVisitor<?, ExecutionContext>>map(UsesMethod::new)
+                .toArray(TreeVisitor[]::new));
+        return Preconditions.check(allMethods, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);

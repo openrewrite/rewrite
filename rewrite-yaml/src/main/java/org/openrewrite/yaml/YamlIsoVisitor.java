@@ -62,4 +62,9 @@ public class YamlIsoVisitor<P> extends YamlVisitor<P> {
     public Yaml.Tag visitTag(Yaml.Tag tag, P p) {
         return (Yaml.Tag) super.visitTag(tag, p);
     }
+
+    @Override
+    public Yaml.Directive visitDirective(Yaml.Directive directive, P p) {
+        return (Yaml.Directive) super.visitDirective(directive, p);
+    }
 }

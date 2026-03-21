@@ -15,31 +15,31 @@
  */
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {PlainText} from "./tree";
-import {createDraft, Draft, finishDraft} from "immer";
+import {updateIfChanged} from "../util";
 
 async function receiveSnippet(before: PlainText.Snippet, q: RpcReceiveQueue): Promise<PlainText.Snippet | undefined> {
-    const draft: Draft<PlainText.Snippet> = createDraft(before);
-    draft.id = await q.receive(before.id);
-    draft.markers = await q.receive(before.markers);
-    draft.text = await q.receive(before.text);
-    return finishDraft(draft);
+    return updateIfChanged(before, {
+        id: await q.receive(before.id),
+        markers: await q.receive(before.markers),
+        text: await q.receive(before.text),
+    });
 }
 
-// Register codec for all Java AST node types
+// Register codec for all PlainText AST node types
 for (const kind of Object.values(PlainText.Kind)) {
     RpcCodecs.registerCodec(kind as string, {
         async rpcReceive(before: PlainText, q: RpcReceiveQueue): Promise<PlainText> {
-            const draft: Draft<PlainText> = createDraft(before);
-            draft.id = await q.receive(before.id);
-            draft.markers = await q.receive(before.markers);
-            draft.sourcePath = await q.receive(before.sourcePath);
-            draft.charsetName = await q.receive(before.charsetName);
-            draft.charsetBomMarked = await q.receive(before.charsetBomMarked);
-            draft.checksum = await q.receive(before.checksum);
-            draft.fileAttributes = await q.receive(before.fileAttributes);
-            draft.text = await q.receive(before.text);
-            draft.snippets = (await q.receiveList(before.snippets, snippet => receiveSnippet(snippet, q)))!;
-            return finishDraft(draft);
+            return updateIfChanged(before, {
+                id: await q.receive(before.id),
+                markers: await q.receive(before.markers),
+                sourcePath: await q.receive(before.sourcePath),
+                charsetName: await q.receive(before.charsetName),
+                charsetBomMarked: await q.receive(before.charsetBomMarked),
+                checksum: await q.receive(before.checksum),
+                fileAttributes: await q.receive(before.fileAttributes),
+                text: await q.receive(before.text),
+                snippets: (await q.receiveList(before.snippets, snippet => receiveSnippet(snippet, q)))!,
+            });
         },
 
         async rpcSend(after: PlainText, q: RpcSendQueue): Promise<void> {

@@ -57,15 +57,9 @@ public class FindMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Find method usages";
-    }
+    String displayName = "Find method usages";
 
-    @Override
-    public String getDescription() {
-        return "Find method calls by pattern.";
-    }
+    String description = "Find method calls by pattern.";
 
     @Override
     public String getInstanceName() {

@@ -366,6 +366,75 @@ class ResolvedPomTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6391")
+    @Test
+    void propertyWithNullValue() {
+        rewriteRun(
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>artifact</artifactId>
+                  <version>${revision}${sha1}${changelist}</version>
+                  <properties>
+                      <revision>1.2.3</revision>
+                      <changelist>-SNAPSHOT</changelist>
+                      <sha1 />
+                  </properties>
+              </project>
+              """,
+            spec -> spec.afterRecipe(doc ->
+              assertThat(doc.getMarkers().findFirst(MavenResolutionResult.class))
+                .map(MavenResolutionResult::getPom)
+                .map(ResolvedPom::getVersion)
+                .contains("1.2.3-SNAPSHOT")
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6391")
+    @Test
+    void resolveParentWithPropertiesFromParent() {
+        rewriteRun(
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>${revision}${sha1}${changelist}</version>
+                  <properties>
+                      <revision>1.2.3</revision>
+                      <changelist>-SNAPSHOT</changelist>
+                      <sha1 />
+                  </properties>
+            </project>
+            """
+          ),
+          pomXml(
+            //language=pom
+            """
+              <project>
+                  <artifactId>child</artifactId>
+                  <parent>
+                      <groupId>org.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>${revision}${sha1}${changelist}</version>
+                  </parent>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml").afterRecipe(doc ->
+              assertThat(doc.getMarkers().findFirst(MavenResolutionResult.class))
+                .map(MavenResolutionResult::getPom)
+                .map(ResolvedPom::getVersion)
+                .contains("1.2.3-SNAPSHOT")
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4687")
     @Nested
     class TolerateMissingPom {
@@ -452,99 +521,90 @@ class ResolvedPomTest implements RewriteTest {
         @Test
         void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws Exception {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
-            createJarFile(localRepository);
-            createJarFile(localRepository, "org.openrewrite.test", "lib", "1.0");
+            createJarFile(localRepository, "com.some", "some-artifact", "1");
 
-            List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
-            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
-            ctx.setRepositories(List.of(mavenLocal));
-            ctx.setResolutionListener(new ResolutionEventListener() {
-                @Override
-                public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
-                    List<Object> list = new ArrayList<>();
-                    list.add(gav);
-                    list.add(attemptedUris);
-                    list.add(containing);
-                    downloadErrorArgs.add(list);
-                }
-            });
-
-            String father = """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.example</groupId>
-                <artifactId>father</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-                <packaging>pom</packaging>
-                <modules>
-                  <module>childA</module>
-                  <module>childB</module>
-                </modules>
-                <dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>com.some</groupId>
-                          <artifactId>some-artifact</artifactId>
-                          <version>1</version>
-                      </dependency>
-                  </dependencies>
-                </dependencyManagement>
-              </project>
-              """;
-            String childA = """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <parent>
-                  <groupId>org.example</groupId>
-                  <artifactId>father</artifactId>
-                  <version>1.0.0-SNAPSHOT</version>
-                </parent>
-                <artifactId>childA</artifactId>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.openrewrite.test</groupId>
-                            <artifactId>lib</artifactId>
-                            <version>1.0</version>
-                            <type>pom</type>
-                            <scope>import</scope>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                      <groupId>com.some</groupId>
-                      <artifactId>some-artifact</artifactId>
-                    </dependency>
-                </dependencies>
-              </project>
-              """;
-            String childB = """
-              <project>
-                <modelVersion>4.0.0</modelVersion>
-                <parent>
-                  <groupId>org.example</groupId>
-                  <artifactId>father</artifactId>
-                  <version>1.0.0-SNAPSHOT</version>
-                </parent>
-                <artifactId>childB</artifactId>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.some</groupId>
-                            <artifactId>some-artifact</artifactId>
-                            <scope>compile</scope>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-              </project>
-              """;
+            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setRepositories(List.of(mavenLocal));
 
             rewriteRun(
               spec -> spec.executionContext(ctx),
-              pomXml(father, spec -> spec.path("pom.xml")),
-              pomXml(childA, spec -> spec.path("childA/pom.xml")),
-              pomXml(childB, spec -> spec.path("childB/pom.xml").afterRecipe(doc -> {
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1.0.0-SNAPSHOT</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                      <module>lib</module>
+                      <module>app</module>
+                    </modules>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.some</groupId>
+                          <artifactId>some-artifact</artifactId>
+                          <version>1</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """
+              ),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>lib</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.some</groupId>
+                                <artifactId>some-artifact</artifactId>
+                                <scope>compile</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                spec -> spec.path("lib/pom.xml")
+              ),
+              pomXml(
+                """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>app</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.example</groupId>
+                                <artifactId>lib</artifactId>
+                                <version>1.0.0-SNAPSHOT</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                          <groupId>com.some</groupId>
+                          <artifactId>some-artifact</artifactId>
+                        </dependency>
+                    </dependencies>
+                  </project>
+                  """,
+                spec -> spec.path("app/pom.xml").afterRecipe(doc -> {
                     ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
                     String version = pom.getManagedVersion("com.some", "some-artifact", null, null);
                     // Assert that version is not null!
@@ -792,7 +852,6 @@ class ResolvedPomTest implements RewriteTest {
                   <artifactId>api-parent</artifactId>
                   <version>1.0.0-SNAPSHOT</version>
                   <packaging>pom</packaging>
-
                   <modules>
                       <module>api-definitions</module>
                       <module>api-codegen</module>
@@ -806,7 +865,6 @@ class ResolvedPomTest implements RewriteTest {
                 <project>
                     <artifactId>api-definitions</artifactId>
                     <packaging>tgz</packaging>
-
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
@@ -823,14 +881,12 @@ class ResolvedPomTest implements RewriteTest {
             pomXml("""
                 <project>
                     <artifactId>api-codegen</artifactId>
-
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>api-parent</artifactId>
                         <version>1.0.0-SNAPSHOT</version>
                         <relativePath>../pom.xml</relativePath>
                     </parent>
-
                     <dependencies>
                         <dependency>
                             <groupId>org.example</groupId>

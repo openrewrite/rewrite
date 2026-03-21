@@ -44,17 +44,11 @@ public class AddOrUpdateChildTag extends Recipe {
     @Nullable
     Boolean replaceExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Add or update child tag";
-    }
+    String displayName = "Add or update child tag";
 
-    @Override
-    public String getDescription() {
-        return "Adds or updates a child element below the parent(s) matching the provided `parentXPath` expression. " +
+    String description = "Adds or updates a child element below the parent(s) matching the provided `parentXPath` expression. " +
                "If a child with the same name already exists, it will be replaced by default. Otherwise, a new child will be added. " +
                "This ensures idempotent behaviour.";
-    }
 
     @Override
     public Validated<Object> validate() {
@@ -62,7 +56,7 @@ public class AddOrUpdateChildTag extends Recipe {
                 .and(Validated.notBlank("parentXPath", parentXPath))
                 .and(Validated.notBlank("newChildTag", newChildTag));
         try {
-            Xml.Tag.build(newChildTag);
+            Xml unused = Xml.Tag.build(newChildTag);
         } catch (Exception e) {
             validated = validated.and(Validated.invalid("newChildTag", newChildTag, "Invalid XML for child tag", e));
         }

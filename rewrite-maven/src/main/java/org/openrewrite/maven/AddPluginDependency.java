@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -34,7 +33,6 @@ import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddPluginDependency extends Recipe {
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
 
     @Option(displayName = "Plugin group",
             description = "Group ID of the plugin to which the dependency will be added. " +
@@ -64,15 +62,9 @@ public class AddPluginDependency extends Recipe {
     @Nullable
     String version;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven plugin dependencies";
-    }
+    String displayName = "Add Maven plugin dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
-    }
+    String description = "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
