@@ -2562,104 +2562,108 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
     Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DocCommentTree commentTree) {
         Space fmt = format(prefix);
-        if (commentTree != null) {
-            List<Comment> comments = fmt.getComments();
+        if (commentTree == null) {
+            return fmt;
+        }
 
-            // Check if this is a markdown-style (///) doc comment
-            boolean isMarkdown = commentTree instanceof DCTree.DCDocComment dcDoc &&
-                    dcDoc.comment.getStyle() == Tokens.Comment.CommentStyle.JAVADOC_LINE;
+        // Check if this is a markdown-style (///) doc comment
+        boolean isMarkdown = commentTree instanceof DCTree.DCDocComment dcDoc &&
+                dcDoc.comment.getStyle() == Tokens.Comment.CommentStyle.JAVADOC_LINE;
+        if (isMarkdown) {
+            return formatWithMarkdownJavaDoc(tree, commentTree, fmt.getComments(), fmt);
+        }
+        return formatWithTraditionalJavaDoc(tree, commentTree, fmt.getComments(), fmt);
+    }
 
-            if (isMarkdown) {
-                // Find the last consecutive group of single-line comments starting with '/'
-                // (these are the /// lines parsed by Space.format() as TextComments)
-                int last = -1;
-                for (int k = comments.size() - 1; k >= 0; k--) {
-                    Comment c = comments.get(k);
-                    if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
-                        if (last == -1) {
-                            last = k;
-                        }
-                    } else if (last != -1) {
-                        break;
-                    }
-                }
+    private Space formatWithMarkdownJavaDoc(JCTree tree, DocCommentTree commentTree, List<Comment> comments, Space fmt) {
+        // Find the last consecutive group of single-line comments starting with '/'
+        // (these are the /// lines parsed by Space.format() as TextComments)
+        int last = -1;
+        for (int k = comments.size() - 1; k >= 0; k--) {
+            Comment c = comments.get(k);
+            if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
                 if (last == -1) {
-                    return fmt;
+                    last = k;
                 }
-                int first = last;
-                for (int k = last - 1; k >= 0; k--) {
-                    Comment c = comments.get(k);
-                    if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
-                        first = k;
-                    } else {
-                        break;
-                    }
-                }
-
-                // Reconstruct the source: "//" + text gives "///" + content for each line
-                StringBuilder src = new StringBuilder();
-                src.append("//").append(((TextComment) comments.get(first)).getText());
-                for (int k = first + 1; k <= last; k++) {
-                    src.append(comments.get(k - 1).getSuffix());
-                    src.append("//").append(((TextComment) comments.get(k)).getText());
-                }
-
-                String lastSuffix = comments.get(last).getSuffix();
-                Javadoc.DocComment javadoc = (Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
-                        context,
-                        getCurrentPath(),
-                        typeMapping,
-                        src.toString(),
-                        tree,
-                        true
-                ).scan(commentTree, new ArrayList<>(1));
-                javadoc = javadoc.withMarkers(javadoc.getMarkers().addIfAbsent(new LineComment(randomId())));
-                javadoc = javadoc.withSuffix(lastSuffix);
-
-                int firstIdx = first;
-                int lastIdx = last;
-                Javadoc.DocComment finalJavadoc = javadoc;
-                List<Comment> newComments = new ArrayList<>();
-                for (int k = 0; k < comments.size(); k++) {
-                    if (k == firstIdx) {
-                        newComments.add(finalJavadoc);
-                    } else if (k < firstIdx || k > lastIdx) {
-                        newComments.add(comments.get(k));
-                    }
-                    // skip k > firstIdx && k <= lastIdx (merged into the javadoc)
-                }
-                return fmt.withComments(newComments);
+            } else if (last != -1) {
+                break;
+            }
+        }
+        if (last == -1) {
+            return fmt;
+        }
+        int first = last;
+        for (int k = last - 1; k >= 0; k--) {
+            Comment c = comments.get(k);
+            if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
+                first = k;
             } else {
-                // Traditional /** ... */ javadoc
-                int i;
-                for (i = comments.size() - 1; i >= 0; i--) {
-                    Comment comment = comments.get(i);
-                    if (comment.isMultiline() && ((TextComment) comment).getText().startsWith("*")) {
-                        break;
-                    }
-                }
-
-                AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
-                for (int j = 0; j < comments.size(); j++) {
-                    if (i == j) {
-                        javadoc.set((Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
-                                context,
-                                getCurrentPath(),
-                                typeMapping,
-                                "/*" + ((TextComment) comments.get(j)).getText(),
-                                tree
-                        ).scan(commentTree, new ArrayList<>(1)));
-                        break;
-                    }
-                }
-
-                int javadocIndex = i;
-                return fmt.withComments(ListUtils.map(fmt.getComments(), (j, c) ->
-                        j == javadocIndex ? javadoc.get().withSuffix(c.getSuffix()) : c));
+                break;
             }
         }
 
-        return fmt;
+        // Reconstruct the source: "//" + text gives "///" + content for each line
+        StringBuilder src = new StringBuilder();
+        src.append("//").append(((TextComment) comments.get(first)).getText());
+        for (int k = first + 1; k <= last; k++) {
+            src.append(comments.get(k - 1).getSuffix());
+            src.append("//").append(((TextComment) comments.get(k)).getText());
+        }
+
+        String lastSuffix = comments.get(last).getSuffix();
+        Javadoc.DocComment javadoc = (Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
+                context,
+                getCurrentPath(),
+                typeMapping,
+                src.toString(),
+                tree,
+                true
+        ).scan(commentTree, new ArrayList<>(1));
+        javadoc = javadoc.withMarkers(javadoc.getMarkers().addIfAbsent(new LineComment(randomId())));
+        javadoc = javadoc.withSuffix(lastSuffix);
+
+        int firstIdx = first;
+        int lastIdx = last;
+        Javadoc.DocComment finalJavadoc = javadoc;
+        List<Comment> newComments = new ArrayList<>();
+        for (int k = 0; k < comments.size(); k++) {
+            if (k == firstIdx) {
+                newComments.add(finalJavadoc);
+            } else if (k < firstIdx || k > lastIdx) {
+                newComments.add(comments.get(k));
+            }
+            // skip k > firstIdx && k <= lastIdx (merged into the javadoc)
+        }
+        return fmt.withComments(newComments);
+    }
+
+    private Space formatWithTraditionalJavaDoc(JCTree tree, DocCommentTree commentTree, List<Comment> comments, Space fmt) {
+        // Traditional /** ... */ javadoc
+        int i;
+        for (i = comments.size() - 1; i >= 0; i--) {
+            Comment comment = comments.get(i);
+            if (comment.isMultiline() && ((TextComment) comment).getText().startsWith("*")) {
+                break;
+            }
+        }
+
+        AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
+        for (int j = 0; j < comments.size(); j++) {
+            if (i == j) {
+                javadoc.set((Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
+                        context,
+                        getCurrentPath(),
+                        typeMapping,
+                        "/*" + ((TextComment) comments.get(j)).getText(),
+                        tree
+                ).scan(commentTree, new ArrayList<>(1)));
+                break;
+            }
+        }
+
+        int javadocIndex = i;
+        return fmt.withComments(ListUtils.map(fmt.getComments(), (j, c) ->
+                j == javadocIndex ? javadoc.get().withSuffix(c.getSuffix()) : c));
     }
 
     private void addPossibleEmptyStatementsBeforeClosingBrace(List<JRightPadded<Statement>> converted) {
