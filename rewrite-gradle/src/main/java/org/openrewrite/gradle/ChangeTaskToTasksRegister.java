@@ -92,26 +92,28 @@ public class ChangeTaskToTasksRegister extends Recipe {
 
             Expression taskType = null;
             J.Lambda taskLambda = null;
-            if (innerArgs.get(0) instanceof G.MapEntry) {
-                G.MapEntry mapEntry = (G.MapEntry) innerArgs.get(0);
-                Expression key = mapEntry.getKey();
-                String keyName = null;
-                if (key instanceof G.Literal) {
-                    Object value = ((G.Literal) key).getValue();
-                    if (value instanceof String) {
-                        keyName = (String) value;
+            for (Expression innerArg : innerArgs) {
+                if (innerArg instanceof G.MapEntry) {
+                    G.MapEntry mapEntry = (G.MapEntry) innerArg;
+                    Expression key = mapEntry.getKey();
+                    String keyName = null;
+                    if (key instanceof G.Literal) {
+                        Object value = ((G.Literal) key).getValue();
+                        if (value instanceof String) {
+                            keyName = (String) value;
+                        }
                     }
-                }
 
-                if ("type".equals(keyName)) {
-                    taskType = mapEntry.getValue();
+                    if ("type".equals(keyName)) {
+                        taskType = mapEntry.getValue();
+                    } else {
+                        // Unsupported map entry (e.g. dependsOn, group, overwrite);
+                        // cannot be translated to tasks.register() arguments
+                        return m;
+                    }
+                } else if (innerArg instanceof J.Lambda) {
+                    taskLambda = (J.Lambda) innerArg;
                 }
-
-                if (innerArgs.size() > 1 && innerArgs.get(1) instanceof J.Lambda) {
-                    taskLambda = (J.Lambda) innerArgs.get(1);
-                }
-            } else if (innerArgs.get(0) instanceof J.Lambda) {
-                taskLambda = (J.Lambda) innerArgs.get(0);
             }
 
             StringBuilder template = new StringBuilder();
