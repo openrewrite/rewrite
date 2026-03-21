@@ -15,8 +15,11 @@
  */
 package org.openrewrite.config;
 
+import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.NlsRewrite;
 
 import java.util.List;
@@ -31,9 +34,24 @@ public class DataTableDescriptor {
     @NlsRewrite.DisplayName
     String displayName;
 
+    @Getter(AccessLevel.NONE)
+    @Nullable
+    String instanceName;
+
     @NlsRewrite.Description
     String description;
 
+    @Nullable
+    String group;
+
     @EqualsAndHashCode.Include
     List<ColumnDescriptor> columns;
+
+    /**
+     * The instance name for this data table. Falls back to {@link #displayName}
+     * when not explicitly set.
+     */
+    public String getInstanceName() {
+        return instanceName != null ? instanceName : displayName;
+    }
 }

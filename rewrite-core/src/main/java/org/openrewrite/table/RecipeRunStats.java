@@ -21,7 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -72,18 +74,15 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                     timers.edit.getTotalNs(),
                     timers.edit.getMaxNs()
             );
-            addRowToDataTable(ctx, row);
+            insertRow(ctx, row);
         }
     }
 
-    private void addRowToDataTable(ExecutionContext ctx, Row row) {
-        //noinspection DuplicatedCode
-        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
-            //noinspection unchecked
-            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
-            dataTablesOfType.add(row);
-            return allDataTables;
-        });
+    @Override
+    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
+        // RecipeRunStats.flush() is called once after all cycles complete.
+        // It must always be allowed to write.
+        return true;
     }
 
     @Value
