@@ -324,6 +324,20 @@ class ChangeTaskToTasksRegisterTest implements RewriteTest {
     }
 
     @Test
+    void groovyTaskWithMultipleMapEntriesShouldNotDropParameters() {
+        rewriteRun(
+          buildGradle(
+            """
+              task taskName(type: Copy, dependsOn: 'otherTask') {
+                  from 'src/main/resources'
+                  into 'build/generated-resources'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void kotlinTaskWithClosure() {
         rewriteRun(
           buildGradleKts(
