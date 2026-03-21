@@ -22,6 +22,7 @@ recipeList:
   - org.openrewrite.gradle.MigrateToGradle9
   - org.openrewrite.gradle.EnableGradleBuildCache
   - org.openrewrite.gradle.EnableGradleParallelExecution
+  - org.openrewrite.gradle.ChangeTaskToTasksRegister
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleBuildCache
