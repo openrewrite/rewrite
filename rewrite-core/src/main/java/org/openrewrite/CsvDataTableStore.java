@@ -101,7 +101,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     private static OutputStream defaultOutputStream(Path path) {
         try {
             return Files.newOutputStream(path);
-        } catch (FileNotFoundException e) {
+        } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
@@ -154,18 +154,26 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         headers.addAll(suffixColumns.keySet());
 
         OutputStream os = outputStreamFactory.apply(path);
-        CsvWriterSettings settings = new CsvWriterSettings();
-        settings.setHeaderWritingEnabled(true);
-        settings.getFormat().setComment('#');
-        CsvWriter csvWriter = new CsvWriter(os, settings);
+        try {
+            CsvWriterSettings settings = new CsvWriterSettings();
+            settings.setHeaderWritingEnabled(true);
+            settings.getFormat().setComment('#');
+            CsvWriter csvWriter = new CsvWriter(os, settings);
 
-        // Write metadata as comments
-        csvWriter.commentRow(" @name " + dataTable.getName());
-        csvWriter.commentRow(" @instanceName " + dataTable.getInstanceName());
-        csvWriter.commentRow(" @group " + (dataTable.getGroup() != null ? dataTable.getGroup() : ""));
-        csvWriter.writeHeaders(headers);
+            // Write metadata as comments
+            csvWriter.commentRow(" @name " + dataTable.getName());
+            csvWriter.commentRow(" @instanceName " + dataTable.getInstanceName());
+            csvWriter.commentRow(" @group " + (dataTable.getGroup() != null ? dataTable.getGroup() : ""));
+            csvWriter.writeHeaders(headers);
 
-        return new BucketWriter(dataTable, csvWriter, os, fieldNames, headers.size());
+            return new BucketWriter(dataTable, csvWriter, os, fieldNames, headers.size());
+        } catch (Exception e) {
+            try {
+                os.close();
+            } catch (IOException ignored) {
+            }
+            throw e;
+        }
     }
 
     private class BucketWriter {
