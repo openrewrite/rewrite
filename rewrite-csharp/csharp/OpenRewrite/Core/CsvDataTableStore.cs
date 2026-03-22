@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using System.Reflection;
+using System.Text;
 
 namespace OpenRewrite.Core;
 
