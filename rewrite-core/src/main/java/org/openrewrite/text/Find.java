@@ -39,7 +39,6 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class Find extends Recipe {
-    transient TextMatches textMatches = new TextMatches(this);
 
     String displayName = "Find text";
 
@@ -103,6 +102,13 @@ public class Find extends Recipe {
             example = "50")
     @Nullable
     Integer contextSize;
+
+    transient TextMatches textMatches = new TextMatches(this)
+            .withInstanceName(this::dataTableInstanceName);
+
+    private String dataTableInstanceName() {
+        return "Text matches for `" + find + "`";
+    }
 
     @Override
     public String getInstanceName() {

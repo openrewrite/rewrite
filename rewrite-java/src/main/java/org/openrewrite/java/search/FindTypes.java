@@ -36,7 +36,6 @@ import static java.util.stream.Collectors.toSet;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindTypes extends Recipe {
-    transient TypeUses typeUses = new TypeUses(this);
 
     @Option(displayName = "Fully-qualified type name",
             description = "A fully-qualified type name, that is used to find matching type references. " +
@@ -49,6 +48,13 @@ public class FindTypes extends Recipe {
             required = false)
     @Nullable
     Boolean checkAssignability;
+
+    transient TypeUses typeUses = new TypeUses(this)
+            .withInstanceName(this::dataTableInstanceName);
+
+    private String dataTableInstanceName() {
+        return "Type uses of `" + fullyQualifiedTypeName + "`";
+    }
 
     String displayName = "Find types";
 

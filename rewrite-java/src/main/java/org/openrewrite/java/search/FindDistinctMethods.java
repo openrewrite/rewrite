@@ -37,7 +37,6 @@ import static java.util.stream.Collectors.joining;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
-    transient MethodCalls methodCalls = new MethodCalls(this);
 
     /**
      * A method pattern that is used to find matching method invocations.
@@ -55,6 +54,13 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
             required = false)
     @Nullable
     Boolean matchOverrides;
+
+    transient MethodCalls methodCalls = new MethodCalls(this)
+            .withInstanceName(this::dataTableInstanceName);
+
+    private String dataTableInstanceName() {
+        return methodPattern != null ? "Distinct method calls matching `" + methodPattern + "`" : "Distinct method calls";
+    }
 
     String displayName = "Find distinct methods in use";
 
