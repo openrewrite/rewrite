@@ -100,7 +100,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
 
     private static OutputStream defaultOutputStream(Path path) {
         try {
-            return new FileOutputStream(path.toFile());
+            return Files.newOutputStream(path);
         } catch (FileNotFoundException e) {
             throw new UncheckedIOException(e);
         }
