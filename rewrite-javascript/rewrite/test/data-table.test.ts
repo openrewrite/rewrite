@@ -29,22 +29,12 @@ describe("data tables", () => {
             displayName: "Replaced text",
             description: "Text that was replaced.",
             columns: [
-                {
-                    name: "sourcePath",
-                    displayName: "Source Path",
-                    description: "The path of the file that was changed.",
-                },
-                {
-                    name: "text",
-                    displayName: "Text",
-                    description: "The text that was replaced.",
-                }
-            ],
+                {name: "sourcePath", displayName: "Source Path", description: "Source path of the file"},
+                {name: "text", displayName: "Text", description: "The replaced text"}
+            ]
         });
     });
-});
 
-describe("CsvDataTableStore", () => {
     let tmpDir: string;
 
     beforeEach(() => {
@@ -55,29 +45,30 @@ describe("CsvDataTableStore", () => {
         fs.rmSync(tmpDir, {recursive: true, force: true});
     });
 
-    test("writes CSV file with header and data rows", () => {
+    test("writes CSV file with comments, header and data rows", () => {
         const store = new CsvDataTableStore(tmpDir);
         const ctx = new ExecutionContext();
         ctx.messages[DATA_TABLE_STORE] = store;
 
-        store.acceptRows(true);
-
-        // Insert rows using the data table
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "old text"));
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/bar.ts", "another"));
 
-        // Verify CSV was created
-        const csvPath = path.join(tmpDir, "org.openrewrite.text.replaced-text.csv");
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        const csvPath = path.join(tmpDir, fileKey + ".csv");
         expect(fs.existsSync(csvPath)).toBe(true);
 
         const content = fs.readFileSync(csvPath, 'utf8');
         const lines = content.split('\n');
 
+        // Comment rows
+        expect(lines[0]).toMatch(/^# @name /);
+        expect(lines[1]).toMatch(/^# @instanceName /);
+        expect(lines[2]).toMatch(/^# @group/);
         // Header row
-        expect(lines[0]).toBe('Source Path,Text');
+        expect(lines[3]).toBe('Source Path,Text');
         // Data rows
-        expect(lines[1]).toBe('src/foo.ts,old text');
-        expect(lines[2]).toBe('src/bar.ts,another');
+        expect(lines[4]).toBe('src/foo.ts,old text');
+        expect(lines[5]).toBe('src/bar.ts,another');
     });
 
     test("escapes values containing commas", () => {
@@ -85,15 +76,15 @@ describe("CsvDataTableStore", () => {
         const ctx = new ExecutionContext();
         ctx.messages[DATA_TABLE_STORE] = store;
 
-        store.acceptRows(true);
-
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/file.ts", "hello, world"));
 
-        const csvPath = path.join(tmpDir, "org.openrewrite.text.replaced-text.csv");
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        const csvPath = path.join(tmpDir, fileKey + ".csv");
         const content = fs.readFileSync(csvPath, 'utf8');
         const lines = content.split('\n');
 
-        expect(lines[1]).toBe('src/file.ts,"hello, world"');
+        // Data row is after 3 comment lines + 1 header line
+        expect(lines[4]).toBe('src/file.ts,"hello, world"');
     });
 
     test("escapes values containing quotes", () => {
@@ -101,15 +92,14 @@ describe("CsvDataTableStore", () => {
         const ctx = new ExecutionContext();
         ctx.messages[DATA_TABLE_STORE] = store;
 
-        store.acceptRows(true);
-
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/file.ts", 'say "hello"'));
 
-        const csvPath = path.join(tmpDir, "org.openrewrite.text.replaced-text.csv");
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        const csvPath = path.join(tmpDir, fileKey + ".csv");
         const content = fs.readFileSync(csvPath, 'utf8');
         const lines = content.split('\n');
 
-        expect(lines[1]).toBe('src/file.ts,"say ""hello"""');
+        expect(lines[4]).toBe('src/file.ts,"say ""hello"""');
     });
 
     test("escapes values containing newlines", () => {
@@ -117,42 +107,39 @@ describe("CsvDataTableStore", () => {
         const ctx = new ExecutionContext();
         ctx.messages[DATA_TABLE_STORE] = store;
 
-        store.acceptRows(true);
-
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/file.ts", "line1\nline2"));
 
-        const csvPath = path.join(tmpDir, "org.openrewrite.text.replaced-text.csv");
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        const csvPath = path.join(tmpDir, fileKey + ".csv");
         const content = fs.readFileSync(csvPath, 'utf8');
 
-        // The CSV contains embedded newline within quotes, so check the full content
         expect(content).toContain('src/file.ts,"line1\nline2"');
     });
 
-    test("does not write rows when acceptRows is false", () => {
+    test("always writes rows (no acceptRows gating)", () => {
         const store = new CsvDataTableStore(tmpDir);
         const ctx = new ExecutionContext();
         ctx.messages[DATA_TABLE_STORE] = store;
 
-        // acceptRows defaults to false
-        ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "ignored"));
+        ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "written"));
 
-        const csvPath = path.join(tmpDir, "org.openrewrite.text.replaced-text.csv");
-        expect(fs.existsSync(csvPath)).toBe(false);
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        const csvPath = path.join(tmpDir, fileKey + ".csv");
+        expect(fs.existsSync(csvPath)).toBe(true);
     });
 
-    test("tracks row counts and table names", () => {
+    test("tracks row counts and table keys", () => {
         const store = new CsvDataTableStore(tmpDir);
         const ctx = new ExecutionContext();
         ctx.messages[DATA_TABLE_STORE] = store;
-
-        store.acceptRows(true);
 
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/foo.ts", "text1"));
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/bar.ts", "text2"));
         ReplacedText.dataTable.insertRow(ctx, new ReplacedText("src/baz.ts", "text3"));
 
-        expect(store.tableNames).toEqual(["org.openrewrite.text.replaced-text"]);
-        expect(store.rowCounts).toEqual({"org.openrewrite.text.replaced-text": 3});
+        const fileKey = CsvDataTableStore.fileKey(ReplacedText.dataTable);
+        expect(store.tableKeys).toEqual([fileKey]);
+        expect(store.rowCounts).toEqual({[fileKey]: 3});
     });
 
     test("creates output directory if it does not exist", () => {
