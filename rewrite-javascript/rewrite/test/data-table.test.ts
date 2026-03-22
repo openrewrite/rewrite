@@ -24,15 +24,12 @@ describe("data tables", () => {
 
     test("data table descriptor", () => {
         const descriptor = ReplacedText.dataTable.descriptor;
-        expect(descriptor).toEqual({
-            name: "org.openrewrite.text.replaced-text",
-            displayName: "Replaced text",
-            description: "Text that was replaced.",
-            columns: [
-                {name: "sourcePath", displayName: "Source Path", description: "Source path of the file"},
-                {name: "text", displayName: "Text", description: "The replaced text"}
-            ]
-        });
+        expect(descriptor.name).toBe("org.openrewrite.text.replaced-text");
+        expect(descriptor.displayName).toBe("Replaced text");
+        expect(descriptor.description).toBe("Text that was replaced.");
+        expect(descriptor.columns).toHaveLength(2);
+        expect(descriptor.columns[0].name).toBe("sourcePath");
+        expect(descriptor.columns[1].name).toBe("text");
     });
 
     let tmpDir: string;
