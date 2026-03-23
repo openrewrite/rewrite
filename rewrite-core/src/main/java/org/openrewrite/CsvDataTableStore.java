@@ -242,11 +242,19 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
      */
     public static String fileKey(DataTable<?> dataTable) {
         String group = dataTable.getGroup();
-        String suffix = group != null ? group : dataTable.getInstanceName();
-        if (suffix.equals(dataTable.getName())) {
+        if (group != null) {
+            if (group.equals(dataTable.getName())) {
+                return dataTable.getName();
+            }
+            return dataTable.getName() + "--" + sanitize(group);
+        }
+        // Only add a suffix when the instance name was explicitly customized
+        // (i.e. differs from the default display name)
+        String instanceName = dataTable.getInstanceName();
+        if (instanceName.equals(dataTable.getDisplayName())) {
             return dataTable.getName();
         }
-        return dataTable.getName() + "--" + sanitize(suffix);
+        return dataTable.getName() + "--" + sanitize(instanceName);
     }
 
     /**
