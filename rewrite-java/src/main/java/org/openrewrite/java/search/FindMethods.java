@@ -56,8 +56,7 @@ public class FindMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    transient MethodCalls methodCalls = new MethodCalls(this)
-            .withInstanceName(this::dataTableInstanceName);
+    transient MethodCalls methodCalls = new MethodCalls(this);
 
     private String dataTableInstanceName() {
         return "Method calls matching `" + methodPattern + "`";

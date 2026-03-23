@@ -288,7 +288,7 @@ class CSharpParseProjectTest implements RewriteTest {
             CSharpRewriteRpc.shutdownCurrent();
             CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
-            InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            var ctx = new InMemoryExecutionContext(t -> {
                 System.err.println("  Execution error: " + t.getMessage());
                 t.printStackTrace(System.err);
             });

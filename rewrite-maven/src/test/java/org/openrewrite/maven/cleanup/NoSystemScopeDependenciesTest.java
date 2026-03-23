@@ -16,16 +16,23 @@
 package org.openrewrite.maven.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class NoSystemScopeDependenciesTest implements RewriteTest {
 
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new NoSystemScopeDependencies());
+    }
+
+
     @Test
     void removesSystemScopeAndSystemPath() {
         rewriteRun(
-          spec -> spec.recipe(new NoSystemScopeDependencies()),
           pomXml(
             """
               <project>
@@ -64,7 +71,6 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     @Test
     void removesSystemScopeWithoutSystemPath() {
         rewriteRun(
-          spec -> spec.recipe(new NoSystemScopeDependencies()),
           pomXml(
             """
               <project>
@@ -102,7 +108,6 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     @Test
     void removesSystemScopeInDependencyManagement() {
         rewriteRun(
-          spec -> spec.recipe(new NoSystemScopeDependencies()),
           pomXml(
             """
               <project>
@@ -145,7 +150,6 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     @Test
     void removesSystemScopeWhenVersionIsProperty() {
         rewriteRun(
-          spec -> spec.recipe(new NoSystemScopeDependencies()),
           pomXml(
             """
               <project>
@@ -190,7 +194,6 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     @Test
     void doesNotRemoveSystemScopeWhenNotInRepo() {
         rewriteRun(
-          spec -> spec.recipe(new NoSystemScopeDependencies()),
           pomXml(
             """
               <project>
@@ -215,7 +218,6 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     @Test
     void doesNotModifyNonSystemScope() {
         rewriteRun(
-          spec -> spec.recipe(new NoSystemScopeDependencies()),
           pomXml(
             """
               <project>
@@ -239,7 +241,6 @@ class NoSystemScopeDependenciesTest implements RewriteTest {
     @Test
     void doesNotModifyDependencyWithoutScope() {
         rewriteRun(
-          spec -> spec.recipe(new NoSystemScopeDependencies()),
           pomXml(
             """
               <project>
