@@ -404,6 +404,35 @@ describe("change-import", () => {
                 );
             }, { unsafeCleanup: true });
         });
+
+        test("does not rename if member is local alias only", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                             import { flatten as extend } from 'lodash';
+                             `
+                        ),
+                        packageJson(`{
+                             "name": "test",
+                             "dependencies": {
+                                 "lodash": "^4.17.21"
+                             }
+                         }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
     });
 
     describe("TSX files", () => {
