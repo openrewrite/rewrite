@@ -16,15 +16,15 @@
 package org.openrewrite.yaml;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.util.Collections.singletonList;
 
@@ -100,13 +100,8 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         this(oldKeyPath, oldFilePath, newKey, newFilePath, null);
     }
 
-    @Data
     public static class Accumulator {
-        @Language("yml")
-        @Nullable
-        String snippet;
-
-        Path path;
+        final Map<Path, String> snippetsByPath = new HashMap<>();
     }
 
 
@@ -121,19 +116,11 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             final JsonPathMatcher oldPathMatcher = new JsonPathMatcher(oldKeyPath);
 
             @Override
-            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                if (acc.snippet == null) {
-                    return super.visitDocuments(documents, ctx);
-                }
-                return documents;
-            }
-
-            @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry source = super.visitMappingEntry(entry, ctx);
                 if (oldPathMatcher.matches(getCursor())) {
-                    acc.snippet = entry.getValue().print(getCursor());
-                    acc.path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                    Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                    acc.snippetsByPath.putIfAbsent(path, entry.getValue().print(getCursor()));
                 }
                 return source;
             }
@@ -147,19 +134,44 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.snippet == null) {
+        if (acc.snippetsByPath.isEmpty()) {
             return TreeVisitor.noop();
         }
-        return Preconditions.check(
-                new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new YamlIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                        doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
-                        return (Yaml.Documents) new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys)
-                                .getVisitor()
-                                .visitNonNull(documents, ctx);
-                    }
-                });
+
+        if (newFilePath != null) {
+            // When targeting a specific file, use the first scanned snippet
+            String snippet = acc.snippetsByPath.values().iterator().next();
+            return Preconditions.check(
+                    new FindSourceFiles(newFilePath),
+                    mergeVisitor(snippet));
+        }
+
+        // When no target file is specified, copy within each source file independently
+        return new YamlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                Path sourcePath = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                String snippet = acc.snippetsByPath.get(sourcePath);
+                if (snippet == null) {
+                    return documents;
+                }
+                doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
+                return (Yaml.Documents) new MergeYaml(newKey, snippet, false, null, null, null, null, createNewKeys)
+                        .getVisitor()
+                        .visitNonNull(documents, ctx);
+            }
+        };
+    }
+
+    private YamlIsoVisitor<ExecutionContext> mergeVisitor(String snippet) {
+        return new YamlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
+                return (Yaml.Documents) new MergeYaml(newKey, snippet, false, null, null, null, null, createNewKeys)
+                        .getVisitor()
+                        .visitNonNull(documents, ctx);
+            }
+        };
     }
 }
