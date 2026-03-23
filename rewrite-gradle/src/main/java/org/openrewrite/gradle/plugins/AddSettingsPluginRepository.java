@@ -117,48 +117,56 @@ public class AddSettingsPluginRepository extends Recipe {
             }
 
             private List<Statement> addPluginManagementRepos(List<Statement> statements, J pluginManagement) {
-                Statement statement = statements.get(0);
+                int pluginManagementIndex = -1;
                 J.MethodInvocation existingPluginManagement = null;
-                if (statement instanceof J.MethodInvocation &&
-                        "pluginManagement".equals(((J.MethodInvocation) statement).getSimpleName())) {
-                    existingPluginManagement = (J.MethodInvocation) statement;
-                } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
-                        "pluginManagement".equals(((J.MethodInvocation) ((J.Return) statement).getExpression()).getSimpleName())) {
-                    existingPluginManagement = (J.MethodInvocation) ((J.Return) statement).getExpression();
+                for (int i = 0; i < statements.size(); i++) {
+                    Statement statement = statements.get(i);
+                    if (statement instanceof J.MethodInvocation &&
+                            "pluginManagement".equals(((J.MethodInvocation) statement).getSimpleName())) {
+                        existingPluginManagement = (J.MethodInvocation) statement;
+                        pluginManagementIndex = i;
+                        break;
+                    } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
+                            "pluginManagement".equals(((J.MethodInvocation) ((J.Return) statement).getExpression()).getSimpleName())) {
+                        existingPluginManagement = (J.MethodInvocation) ((J.Return) statement).getExpression();
+                        pluginManagementIndex = i;
+                        break;
+                    }
                 }
                 if (existingPluginManagement != null) {
+                    Statement originalStatement = statements.get(pluginManagementIndex);
                     J.MethodInvocation m = existingPluginManagement;
                     m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                        if (arg instanceof J.Lambda && ((J.Lambda) arg).getBody() instanceof J.Block) {
-                            J.Lambda lambda = (J.Lambda) arg;
-                            J.Block block = (J.Block) lambda.getBody();
-                            return lambda.withBody(block.withStatements(ListUtils.map(block.getStatements(), statement2 -> {
-                                if ((statement2 instanceof J.MethodInvocation && "repositories".equals(((J.MethodInvocation) statement2).getSimpleName())) ||
-                                        (statement2 instanceof J.Return && ((J.Return) statement2).getExpression() instanceof J.MethodInvocation && "repositories".equals(((J.MethodInvocation) ((J.Return) statement2).getExpression()).getSimpleName()))) {
-                                    J.MethodInvocation m2 = (J.MethodInvocation) (statement2 instanceof J.Return ? ((J.Return) statement2).getExpression() : statement2);
-                                    m2 = m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg2 -> {
-                                        if (arg2 instanceof J.Lambda && ((J.Lambda) arg2).getBody() instanceof J.Block) {
-                                            J.Lambda lambda2 = (J.Lambda) arg2;
-                                            J.Block block2 = (J.Block) lambda2.getBody();
-                                            Statement lastStatement = block2.getStatements().get(block2.getStatements().size() - 1);
-                                            return lambda2.withBody(block2.withStatements(ListUtils.concat(ListUtils.mapLast(block2.getStatements(), s -> s instanceof J.Return ? ((J.Return) s).getExpression().withPrefix(lastStatement.getPrefix()) : s), (Statement) (lastStatement instanceof J.Return ? ((J.Return) lastStatement).withExpression(extractRepository(pluginManagement).withPrefix(Space.EMPTY)) : extractRepository(pluginManagement).withPrefix(lastStatement.getPrefix())).withComments(emptyList()))));
-                                        }
-                                        return arg2;
-                                    }));
-                                    if (statement2 instanceof J.Return) {
-                                        return ((J.Return) statement2).withExpression(m2);
-                                    }
-                                    return m2;
-                                }
-                                return statement2;
-                            })));
+                        if (!(arg instanceof J.Lambda) || !(((J.Lambda) arg).getBody() instanceof J.Block)) {
+                            return arg;
                         }
-                        return arg;
+                        J.Lambda lambda = (J.Lambda) arg;
+                        J.Block block = (J.Block) lambda.getBody();
+                        return lambda.withBody(block.withStatements(ListUtils.map(block.getStatements(), statement2 -> {
+                            if ((statement2 instanceof J.MethodInvocation && "repositories".equals(((J.MethodInvocation) statement2).getSimpleName())) ||
+                                    (statement2 instanceof J.Return && ((J.Return) statement2).getExpression() instanceof J.MethodInvocation && "repositories".equals(((J.MethodInvocation) ((J.Return) statement2).getExpression()).getSimpleName()))) {
+                                J.MethodInvocation m2 = (J.MethodInvocation) (statement2 instanceof J.Return ? ((J.Return) statement2).getExpression() : statement2);
+                                m2 = m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg2 -> {
+                                    if (!(arg2 instanceof J.Lambda) || !(((J.Lambda) arg2).getBody() instanceof J.Block)) {
+                                        return arg2;
+                                    }
+                                    J.Lambda lambda2 = (J.Lambda) arg2;
+                                    J.Block block2 = (J.Block) lambda2.getBody();
+                                    Statement lastStatement = block2.getStatements().get(block2.getStatements().size() - 1);
+                                    return lambda2.withBody(block2.withStatements(ListUtils.concat(ListUtils.mapLast(block2.getStatements(), s -> s instanceof J.Return ? ((J.Return) s).getExpression().withPrefix(lastStatement.getPrefix()) : s), (Statement) (lastStatement instanceof J.Return ? ((J.Return) lastStatement).withExpression(extractRepository(pluginManagement).withPrefix(Space.EMPTY)) : extractRepository(pluginManagement).withPrefix(lastStatement.getPrefix())).withComments(emptyList()))));
+                                }));
+                                if (statement2 instanceof J.Return) {
+                                    return ((J.Return) statement2).withExpression(m2);
+                                }
+                                return m2;
+                            }
+                            return statement2;
+                        })));
                     }));
-                    if (statement instanceof J.Return) {
-                        statements.set(0, ((J.Return) statement).withExpression(m));
+                    if (originalStatement instanceof J.Return) {
+                        statements.set(pluginManagementIndex, ((J.Return) originalStatement).withExpression(m));
                     } else {
-                        statements.set(0, m);
+                        statements.set(pluginManagementIndex, m);
                     }
                 } else {
                     Statement pluginManagementStatement = pluginManagement instanceof J.Block ?
