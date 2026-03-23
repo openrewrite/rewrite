@@ -2812,7 +2812,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void bomUpgradeSkipsSnapshotVersions() throws Exception {
-        try (MockWebServer mockRepo = new MockWebServer()) {
+        try (var mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {

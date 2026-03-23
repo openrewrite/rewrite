@@ -72,7 +72,7 @@ class KotlinTemplateTest implements RewriteTest {
             .recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  J.MethodDeclaration m = (J.MethodDeclaration) super.visitMethodDeclaration(method, ctx);
+                  var m = (J.MethodDeclaration) super.visitMethodDeclaration(method, ctx);
                   if (m.getSimpleName().equals("configure")) {
                       List<Statement> statements = m.getBody().getStatements();
                       if (statements.stream().noneMatch(s -> s.toString().contains("println"))) {

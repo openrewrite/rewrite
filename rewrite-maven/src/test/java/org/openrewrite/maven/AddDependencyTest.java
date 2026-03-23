@@ -238,7 +238,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependencyWithClassifier() {
-        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
+        var addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
           "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
@@ -1117,7 +1117,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void testScopedDependencyNotAddedWhenTypeOnlyInMainSources() {
+    void scopedDependencyNotAddedWhenTypeOnlyInMainSources() {
         rewriteRun(
           spec -> spec.recipe(addDependency(
             "com.fasterxml.jackson.core:jackson-core:2.12.0",
@@ -1149,7 +1149,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void testScopedDependencyAddedWhenTypeInTestSources() {
+    void scopedDependencyAddedWhenTypeInTestSources() {
         rewriteRun(
           spec -> spec.recipe(addDependency(
             "com.fasterxml.jackson.core:jackson-core:2.12.0",
