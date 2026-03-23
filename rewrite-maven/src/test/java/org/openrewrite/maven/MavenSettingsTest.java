@@ -1011,4 +1011,41 @@ class MavenSettingsTest {
             </settingsSecurity>
             """.formatted(MASTER_PASS_ENCRYPTED));
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/543")
+    void parseProxies() {
+        MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+          //language=xml
+          """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+                <proxies>
+                    <proxy>
+                        <id>my-proxy</id>
+                        <active>true</active>
+                        <protocol>https</protocol>
+                        <host>proxy.example.com</host>
+                        <port>8080</port>
+                        <username>proxyuser</username>
+                        <password>proxypass</password>
+                        <nonProxyHosts>localhost|*.example.com</nonProxyHosts>
+                    </proxy>
+                </proxies>
+            </settings>
+            """), ctx);
+
+        assertThat(settings).isNotNull();
+        assertThat(settings.getProxies()).isNotNull();
+        assertThat(settings.getProxies().getProxies()).hasSize(1);
+
+        MavenSettings.Proxy proxy = settings.getProxies().getProxies().get(0);
+        assertThat(proxy.getId()).isEqualTo("my-proxy");
+        assertThat(proxy.getActive()).isTrue();
+        assertThat(proxy.getProtocol()).isEqualTo("https");
+        assertThat(proxy.getHost()).isEqualTo("proxy.example.com");
+        assertThat(proxy.getPort()).isEqualTo(8080);
+        assertThat(proxy.getUsername()).isEqualTo("proxyuser");
+        assertThat(proxy.getPassword()).isEqualTo("proxypass");
+        assertThat(proxy.getNonProxyHosts()).isEqualTo("localhost|*.example.com");
+    }
 }
