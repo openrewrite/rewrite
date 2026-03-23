@@ -247,6 +247,31 @@ class DataTableStoreTest {
     }
 
     // =========================================================================
+    // CsvDataTableStore.fileKey
+    // =========================================================================
+
+    @Test
+    void fileKeyNoSuffixWhenInstanceNameNotCustomized() {
+        TestTable table = new TestTable(Recipe.noop());
+        assertThat(CsvDataTableStore.fileKey(table)).isEqualTo(TestTable.class.getName());
+    }
+
+    @Test
+    void fileKeySuffixWhenInstanceNameCustomized() {
+        TestTable table = new TestTable(Recipe.noop())
+                .withInstanceName(() -> "custom instance");
+        String key = CsvDataTableStore.fileKey(table);
+        assertThat(key).startsWith(TestTable.class.getName() + "--");
+    }
+
+    @Test
+    void fileKeySuffixFromGroup() {
+        TestTable table = new TestTable(Recipe.noop()).withGroup("my-group");
+        String key = CsvDataTableStore.fileKey(table);
+        assertThat(key).startsWith(TestTable.class.getName() + "--");
+    }
+
+    // =========================================================================
     // CsvDataTableStore.sanitize
     // =========================================================================
 
