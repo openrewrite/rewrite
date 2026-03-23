@@ -501,7 +501,6 @@ public class MavenSettings {
     @Data
     @With
     public static class Proxy {
-        @Nullable
         String id;
 
         @Nullable
