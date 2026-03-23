@@ -466,6 +466,46 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiComponentVariableReferenceWithExtraProperties() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
     void mapNotationGStringInterpolation(String stringInterpolationReference) {
