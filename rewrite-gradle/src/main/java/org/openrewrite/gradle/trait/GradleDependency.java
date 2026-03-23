@@ -439,12 +439,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
             // Multi-component form: ("group", "artifact", "version") or ("group", "artifact", versionVar)
             if (isMultiComponentDefinition(depArgs) && depArgs.size() >= 3) {
-                Expression versionArg = depArgs.get(2);
-                if (versionArg instanceof J.Literal) {
-                    return (String) ((J.Literal) versionArg).getValue();
-                } else if (versionArg instanceof J.Identifier) {
-                    return ((J.Identifier) versionArg).getSimpleName();
-                }
+                return extractValueAsString(depArgs.get(2));
             }
             return null;
         }
@@ -653,7 +648,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         }
 
         // Handle multi-component definition with variable reference: ("group", "artifact", versionVar)
-        if (isMultiComponentDefinition(depArgs) && depArgs.size() >= 3 && depArgs.get(2) instanceof J.Identifier) {
+        if (depArgs.size() >= 3 && depArgs.get(2) instanceof J.Identifier && isMultiComponentDefinition(depArgs)) {
             return ((J.Identifier) depArgs.get(2)).getSimpleName();
         }
 
@@ -1677,17 +1672,10 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
         if (arguments.size() < 2 || arguments.size() > 4) {
             return false;
         }
-        // Group and artifact must be string literals
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < arguments.size(); i++) {
             Expression arg = arguments.get(i);
-            if (!(arg instanceof J.Literal) || !(((J.Literal) arg).getValue() instanceof String)) {
-                return false;
-            }
-        }
-        // Version (3rd arg) and classifier (4th arg) can be string literals or identifiers (variable references)
-        for (int i = 2; i < arguments.size(); i++) {
-            Expression arg = arguments.get(i);
-            if (arg instanceof J.Identifier) {
+            // Version (3rd) and classifier (4th) args can also be variable references
+            if (i >= 2 && arg instanceof J.Identifier) {
                 continue;
             }
             if (!(arg instanceof J.Literal) || !(((J.Literal) arg).getValue() instanceof String)) {
