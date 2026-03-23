@@ -878,7 +878,7 @@ class TypeTableTest implements RewriteTest {
 
             // Set the isolated classloader as the TCCL
             ClassLoader originalTccl = Thread.currentThread().getContextClassLoader();
-            try {
+            try (isolatedLoader) {
                 Thread.currentThread().setContextClassLoader(isolatedLoader);
 
                 // TypeTable.fromClasspath should find the resource via TCCL
@@ -889,7 +889,6 @@ class TypeTableTest implements RewriteTest {
                 assertThat(loaded).isNotNull();
             } finally {
                 Thread.currentThread().setContextClassLoader(originalTccl);
-                isolatedLoader.close();
             }
         }
     }

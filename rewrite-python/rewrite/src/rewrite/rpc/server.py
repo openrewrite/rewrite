@@ -1001,6 +1001,13 @@ def handle_prepare_recipe(params: dict) -> dict:
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
 
+    # If the recipe declares delegation to a Java recipe, include it in the response
+    if hasattr(recipe, 'java_recipe_name'):
+        response['delegatesTo'] = {
+            'recipeName': recipe.java_recipe_name,
+            'options': getattr(recipe, 'delegates_to_options', {}),
+        }
+
     logger.debug(f"PrepareRecipe response: {response}")
     return response
 
@@ -1055,6 +1062,7 @@ def handle_visit(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -1122,6 +1130,7 @@ def handle_batch_visit(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1299,6 +1308,7 @@ def handle_generate(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe

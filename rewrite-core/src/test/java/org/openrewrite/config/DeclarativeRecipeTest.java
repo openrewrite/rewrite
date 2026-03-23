@@ -38,6 +38,10 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -365,6 +369,90 @@ class DeclarativeRecipeTest implements RewriteTest {
         dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
         dr.initialize(List.of());
         assertThat(dr.getDataTableDescriptors()).anyMatch(it -> "org.openrewrite.table.TextMatches".equals(it.getName()));
+    }
+
+    @Test
+    void getDataTableDescriptorsThreadSafe() throws Exception {
+        DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.ConcurrentTest", "concurrent test",
+          "test", emptySet(), null, URI.create("dummy"), true, emptyList());
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
+        dr.initialize(List.of());
+
+        int threadCount = 10;
+        int iterations = 100;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            final int threadIdx = i;
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    for (int j = 0; j < iterations; j++) {
+                        if (threadIdx % 2 == 0) {
+                            // Reader threads: iterate via getDataTableDescriptors and getDescriptor
+                            dr.getDataTableDescriptors();
+                            dr.getDescriptor();
+                        } else {
+                            // Writer threads: re-initialize to modify recipeList concurrently
+                            dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
+                            dr.initialize(List.of());
+                        }
+                    }
+                } catch (Throwable t) {
+                    errors.add(t);
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        doneLatch.await();
+        executor.shutdown();
+
+        assertThat(errors).as("Concurrent access to getDataTableDescriptors/getDescriptor should not throw").isEmpty();
+    }
+
+    @Test
+    void concurrentInitializeDoesNotDuplicateRecipes() throws Exception {
+        DeclarativeRecipe dr = new DeclarativeRecipe("org.openrewrite.ConcurrentInitTest", "concurrent init test",
+          "test", emptySet(), null, URI.create("dummy"), true, emptyList());
+        dr.addUninitialized(new Find("sam", null, null, null, null, null, null, null));
+        dr.addUninitialized(new ChangeText("hello"));
+        dr.initialize(List.of());
+
+        int expectedSize = dr.getRecipeList().size();
+
+        int threadCount = 20;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch doneLatch = new CountDownLatch(threadCount);
+        ConcurrentLinkedQueue<Throwable> errors = new ConcurrentLinkedQueue<>();
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+                    for (int j = 0; j < 50; j++) {
+                        dr.initialize(List.of());
+                    }
+                } catch (Throwable t) {
+                    errors.add(t);
+                } finally {
+                    doneLatch.countDown();
+                }
+            });
+        }
+
+        startLatch.countDown();
+        doneLatch.await();
+        executor.shutdown();
+
+        assertThat(errors).as("Concurrent initialize() should not throw").isEmpty();
+        assertThat(dr.getRecipeList()).as("Concurrent initialize() should not duplicate recipes").hasSize(expectedSize);
     }
 
     @Test

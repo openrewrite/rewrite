@@ -63,4 +63,15 @@ class KotlinParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiDollarStringInterpolation() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = $$"$something"
+              """
+          )
+        );
+    }
+
 }

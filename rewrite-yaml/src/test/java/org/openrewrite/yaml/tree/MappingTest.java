@@ -19,8 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml.Scalar;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -500,5 +505,28 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml("escaped-value: " + str)
         );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2045")
+    @Test
+    void complexMappingKeyDoesNotCrash() {
+        // Complex YAML keys (mappings/sequences as keys) are not fully supported
+        // by the YamlKey model, but should not cause NPE or ClassCastException.
+        // They gracefully degrade to ParseError.
+        List<SourceFile> sources = YamlParser.builder().build()
+                .parse("? key1: val1\n: value\n")
+                .toList();
+        assertThat(sources).hasSize(1);
+        assertThat(sources.get(0)).isInstanceOf(ParseError.class);
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2045")
+    @Test
+    void complexSequenceKeyDoesNotCrash() {
+        List<SourceFile> sources = YamlParser.builder().build()
+                .parse("? - item1\n  - item2\n: value\n")
+                .toList();
+        assertThat(sources).hasSize(1);
+        assertThat(sources.get(0)).isInstanceOf(ParseError.class);
     }
 }

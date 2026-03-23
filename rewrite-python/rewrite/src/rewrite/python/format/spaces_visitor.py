@@ -107,8 +107,13 @@ class SpacesVisitor(PythonVisitor):
 
     def visit_control_parentheses(self, control_parens: ControlParentheses[J2], p: P) -> J:
         cp = cast(ControlParentheses[J2], super().visit_control_parentheses(control_parens, p))
-        cp = space_before(cp, False)
-        cp = cp.padding.replace(tree=cp.padding.tree.replace(element=space_before(cp.tree, True)))
+        parent = self.cursor.parent_tree_cursor()
+        if parent is not None and isinstance(parent.value, Try.Catch):
+            cp = space_before(cp, False)
+            cp = cp.padding.replace(tree=cp.padding.tree.replace(element=space_before(cp.tree, True)))
+        else:
+            cp = space_before(cp, True)
+            cp = cp.padding.replace(tree=cp.padding.tree.replace(element=space_before(cp.tree, False)))
         return cp
 
     def visit_named_argument(self, named: NamedArgument, p: P) -> J:
@@ -319,10 +324,10 @@ class SpacesVisitor(PythonVisitor):
         control = fl.control
 
         # Set single space before loop target e.g. for    i in...: <-> for i in ...:
-        var_rp = control.padding.variable
-        var_rp = var_rp.replace(element=space_before(var_rp.element, True))
+        control = space_before(control, True)
 
         # Set single space before 'in' keyword
+        var_rp = control.padding.variable
         var_rp = space_after_right_padded(var_rp, True)
 
         # Set single space before loop iterable e.g. for i in    []: <-> for i in []:

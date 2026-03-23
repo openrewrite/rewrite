@@ -238,6 +238,36 @@ public class NewClassTests : RewriteTest
     }
 
     [Fact]
+    public void ImplicitNewNoSpace()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class Foo {
+                    List<int> x = new();
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ImplicitNewWithSpace()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class Foo {
+                    List<int> x = new ();
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void QualifiedConstructor()
     {
         RewriteRun(

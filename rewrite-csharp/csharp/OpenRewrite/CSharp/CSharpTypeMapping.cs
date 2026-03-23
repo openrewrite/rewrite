@@ -311,7 +311,10 @@ internal class CSharpTypeMapping
         if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Variable v)
             return v;
 
-        var variable = new JavaType.Variable(name, owner, type, null);
+        var variable = new JavaType.Variable(name, owner, type, null)
+        {
+            FlagsBitMap = MapFlags(symbol)
+        };
         _typeCache[symbol] = variable;
         return variable;
     }
@@ -348,6 +351,8 @@ internal class CSharpTypeMapping
         if (symbol.IsStatic) flags |= 8;     // Flag.Static
         if (symbol.IsAbstract) flags |= 1024; // Flag.Abstract
         if (symbol.IsSealed) flags |= 16;     // Flag.Final (sealed ~ final)
+        // C#-specific: mark extension methods (bit 20, not used by Java Flag enum)
+        if (symbol is IMethodSymbol { IsExtensionMethod: true }) flags |= 1L << 20;
         return flags;
     }
 

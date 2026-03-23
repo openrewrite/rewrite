@@ -36,6 +36,7 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="JunitXml.TestLogger" Version="4.0.254" />
   </ItemGroup>
 
   <ItemGroup>

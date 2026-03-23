@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -49,31 +50,31 @@ public class RewriteRpcServer
     public static void SetCurrent(RewriteRpcServer? server) => _current = server;
 
     private readonly RecipeMarketplace _marketplace;
-    private readonly Dictionary<string, Recipe> _preparedRecipes = new();
-    private readonly Dictionary<string, object?> _recipeAccumulators = new();
-    private readonly Dictionary<string, ExecutionContext> _executionContexts = new();
+    private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
+    private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
+    private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
 
     /// <summary>
     /// Objects that have been parsed locally and are available for remote access.
     /// </summary>
-    private readonly Dictionary<string, object?> _localObjects = new();
+    private readonly ConcurrentDictionary<string, object?> _localObjects = new();
 
     /// <summary>
     /// Our understanding of the remote's state of objects.
     /// </summary>
-    private readonly Dictionary<string, object?> _remoteObjects = new();
+    private readonly ConcurrentDictionary<string, object?> _remoteObjects = new();
 
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
-    private readonly Dictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+    private readonly ConcurrentDictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Refs received from the remote process (Java) for deduplication.
     /// </summary>
-    private readonly Dictionary<int, object> _remoteRefs = new();
+    private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
 
     /// <summary>
     /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
@@ -82,6 +83,7 @@ public class RewriteRpcServer
     public void Connect(JsonRpc jsonRpc)
     {
         _jsonRpc = jsonRpc;
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(this);
         jsonRpc.StartListening();
     }
@@ -178,19 +180,34 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Linq$GroupClause");
         RpcSendQueue.RegisterJavaTypeName(typeof(QueryContinuation),
             "org.openrewrite.csharp.tree.Linq$QueryContinuation");
+
+        RpcSendQueue.RegisterJavaTypeName(typeof(ParseError),
+            "org.openrewrite.tree.ParseError");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ParseExceptionResult),
+            "org.openrewrite.ParseExceptionResult");
     }
 
     [JsonRpcMethod("ParseSolution", UseSingleObjectParameterDeserialization = true)]
-    public async Task<List<ParseSolutionResponseItem>> ParseSolution(ParseSolutionRequest request)
+    public async Task<ParseSolutionResponse> ParseSolution(ParseSolutionRequest request)
     {
         Log.Debug("RPC ParseSolution: received request path={Path} rootDir={RootDir}", request.Path, request.RootDir);
         var solutionParser = new SolutionParser();
         var path = ResolvePath(request.Path);
         var rootDir = ResolvePath(request.RootDir);
 
+        var requirePrintEqualsInput = true;
+        if (request.Options?.TryGetValue("org.openrewrite.requirePrintEqualsInput", out var val) == true)
+        {
+            // StreamJsonRpc with Newtonsoft.Json may deliver values as JToken wrappers
+            if (val is JToken jt)
+                requirePrintEqualsInput = jt.Value<bool>();
+            else
+                requirePrintEqualsInput = Convert.ToBoolean(val);
+        }
+
         var solution = await solutionParser.LoadAsync(path, CancellationToken.None);
 
-        var items = new List<ParseSolutionResponseItem>();
+        var response = new ParseSolutionResponse();
         var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var projectList = solution.Projects.Where(p => p.FilePath != null).ToList();
         Log.Debug("RPC ParseSolution: {ProjectCount} projects to parse", projectList.Count);
@@ -205,10 +222,11 @@ public class RewriteRpcServer
             Log.Debug("RPC ParseSolution: parsing project [{ProjectIndex}/{ProjectCount}] {ProjectName}",
                 projectIndex, projectList.Count, Path.GetFileNameWithoutExtension(project.FilePath));
 
-            List<CompilationUnit> results;
+            List<SourceFile> sourceFiles;
             try
             {
-                results = solutionParser.ParseProject(solution, project.FilePath!, rootDir);
+                sourceFiles = solutionParser.ParseProject(solution, project.FilePath!, rootDir,
+                    requirePrintEqualsInput);
             }
             catch (Exception ex)
             {
@@ -217,21 +235,307 @@ public class RewriteRpcServer
                 throw;
             }
 
-            foreach (var cu in results)
+            foreach (var sourceFile in sourceFiles)
             {
-                var id = cu.Id.ToString();
-                _localObjects[id] = cu;
-                items.Add(new ParseSolutionResponseItem
+                var id = sourceFile.Id.ToString();
+                var sourceFileType = sourceFile is ParseError
+                    ? "org.openrewrite.tree.ParseError"
+                    : "org.openrewrite.csharp.tree.Cs$CompilationUnit";
+
+                _localObjects[id] = sourceFile;
+                response.Items.Add(new ParseSolutionResponseItem
                 {
                     Id = id,
-                    SourceFileType = "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+                    SourceFileType = sourceFileType,
                     ProjectPath = project.FilePath!
                 });
             }
+
+            // Extract MSBuild project metadata from .csproj
+            try
+            {
+                var metadata = ExtractProjectMetadata(project.FilePath!, rootDir);
+                response.Projects.Add(metadata);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("RPC ParseSolution: failed to extract metadata for {ProjectPath}: {ExType}: {ExMessage}",
+                    project.FilePath, ex.GetType().Name, ex.Message);
+            }
         }
 
-        Log.Debug("RPC ParseSolution: completed, {ItemCount} compilation units total", items.Count);
-        return items;
+        Log.Debug("RPC ParseSolution: completed, {ItemCount} source files, {ProjectCount} project metadata",
+            response.Items.Count, response.Projects.Count);
+        return response;
+    }
+
+    /// <summary>
+    /// Extracts MSBuild project metadata from a .csproj file by parsing its XML
+    /// and reading the resolved dependency tree from project.assets.json.
+    /// </summary>
+    private static ProjectMetadata ExtractProjectMetadata(string projectPath, string rootDir)
+    {
+        var doc = XDocument.Load(projectPath);
+        var root = doc.Root!;
+        var ns = root.Name.Namespace;
+
+        var relativePath = Path.GetRelativePath(rootDir, projectPath);
+
+        var metadata = new ProjectMetadata
+        {
+            ProjectPath = relativePath,
+            Sdk = root.Attribute("Sdk")?.Value
+        };
+
+        // Extract TargetFramework(s)
+        var tfmElement = root.Descendants(ns + "TargetFramework").FirstOrDefault();
+        var tfmsElement = root.Descendants(ns + "TargetFrameworks").FirstOrDefault();
+
+        var frameworks = new List<string>();
+        if (tfmsElement != null)
+        {
+            foreach (var tfm in tfmsElement.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                frameworks.Add(tfm);
+        }
+        else if (tfmElement != null)
+        {
+            frameworks.Add(tfmElement.Value.Trim());
+        }
+
+        // Extract PackageReferences
+        var packageRefs = root.Descendants(ns + "PackageReference")
+            .Select(e => new PackageReferenceEntry
+            {
+                Include = e.Attribute("Include")?.Value ?? "",
+                RequestedVersion = e.Attribute("Version")?.Value,
+                ResolvedVersion = e.Attribute("Version")?.Value // raw = resolved in XML context
+            })
+            .Where(r => !string.IsNullOrEmpty(r.Include))
+            .ToList();
+
+        // Extract ProjectReferences
+        var projectRefs = root.Descendants(ns + "ProjectReference")
+            .Select(e => new ProjectReferenceEntry
+            {
+                Include = e.Attribute("Include")?.Value ?? ""
+            })
+            .Where(r => !string.IsNullOrEmpty(r.Include))
+            .ToList();
+
+        // Read resolved packages from project.assets.json
+        var assetsPath = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json");
+        var resolvedByTfm = new Dictionary<string, List<ResolvedPackageEntry>>();
+        if (File.Exists(assetsPath))
+        {
+            try
+            {
+                resolvedByTfm = ReadResolvedPackages(assetsPath);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("Failed to read project.assets.json at {Path}: {Ex}", assetsPath, ex.Message);
+            }
+        }
+
+        // Extract properties with provenance
+        foreach (var propGroup in root.Descendants(ns + "PropertyGroup"))
+        {
+            foreach (var prop in propGroup.Elements())
+            {
+                var propName = prop.Name.LocalName;
+                if (!metadata.Properties.ContainsKey(propName))
+                {
+                    metadata.Properties[propName] = new PropertyEntry
+                    {
+                        Value = prop.Value,
+                        DefinedIn = relativePath
+                    };
+                }
+            }
+        }
+
+        // Discover NuGet package sources from nuget.config files
+        metadata.PackageSources = FindNuGetPackageSources(projectPath, rootDir);
+
+        // Build per-TFM metadata
+        foreach (var tfm in frameworks)
+        {
+            resolvedByTfm.TryGetValue(tfm, out var resolved);
+            metadata.TargetFrameworks.Add(new TargetFrameworkEntry
+            {
+                TargetFramework = tfm,
+                PackageReferences = packageRefs,
+                ResolvedPackages = resolved ?? new List<ResolvedPackageEntry>(),
+                ProjectReferences = projectRefs
+            });
+        }
+
+        // If no frameworks found, still include a default entry
+        if (frameworks.Count == 0)
+        {
+            metadata.TargetFrameworks.Add(new TargetFrameworkEntry
+            {
+                PackageReferences = packageRefs,
+                ProjectReferences = projectRefs
+            });
+        }
+
+        return metadata;
+    }
+
+    /// <summary>
+    /// Discovers NuGet package sources by walking up from the project directory
+    /// to the repository root looking for nuget.config files.
+    /// NuGet resolves sources hierarchically — closest config wins.
+    /// </summary>
+    private static List<PackageSourceEntry> FindNuGetPackageSources(string projectPath, string rootDir)
+    {
+        var sources = new List<PackageSourceEntry>();
+        var dir = Path.GetDirectoryName(projectPath);
+
+        while (dir != null && dir.StartsWith(rootDir, StringComparison.OrdinalIgnoreCase))
+        {
+            var configPath = Path.Combine(dir, "nuget.config");
+            // Case-insensitive check (NuGet.Config, nuget.config, NuGet.config all valid)
+            if (!File.Exists(configPath))
+            {
+                configPath = Path.Combine(dir, "NuGet.Config");
+                if (!File.Exists(configPath))
+                {
+                    configPath = Path.Combine(dir, "NuGet.config");
+                }
+            }
+
+            if (File.Exists(configPath))
+            {
+                try
+                {
+                    var configDoc = XDocument.Load(configPath);
+                    var packageSources = configDoc.Root?
+                        .Element("packageSources")?
+                        .Elements("add");
+
+                    if (packageSources != null)
+                    {
+                        foreach (var source in packageSources)
+                        {
+                            var key = source.Attribute("key")?.Value;
+                            var url = source.Attribute("value")?.Value;
+                            if (key != null && url != null &&
+                                !sources.Any(s => s.Key == key))
+                            {
+                                sources.Add(new PackageSourceEntry
+                                {
+                                    Key = key,
+                                    Url = url
+                                });
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Debug("Failed to parse nuget.config at {Path}: {Ex}", configPath, ex.Message);
+                }
+                // NuGet uses the closest config — stop walking up once we find one
+                break;
+            }
+
+            if (dir == rootDir) break;
+            dir = Path.GetDirectoryName(dir);
+        }
+
+        // Default to nuget.org if no sources found
+        if (sources.Count == 0)
+        {
+            sources.Add(new PackageSourceEntry
+            {
+                Key = "nuget.org",
+                Url = "https://api.nuget.org/v3/index.json"
+            });
+        }
+
+        return sources;
+    }
+
+    /// <summary>
+    /// Reads the resolved dependency tree from project.assets.json.
+    /// Returns a dictionary keyed by target framework moniker.
+    /// </summary>
+    private static Dictionary<string, List<ResolvedPackageEntry>> ReadResolvedPackages(string assetsPath)
+    {
+        var result = new Dictionary<string, List<ResolvedPackageEntry>>();
+        var json = JObject.Parse(File.ReadAllText(assetsPath));
+        var targets = json["targets"] as JObject;
+        if (targets == null) return result;
+
+        foreach (var (tfmKey, tfmValue) in targets)
+        {
+            // tfmKey is like "net8.0" or ".NETCoreApp,Version=v8.0"
+            var tfm = tfmKey.Contains(',')
+                ? NormalizeTfm(tfmKey)
+                : tfmKey;
+
+            var packages = new List<ResolvedPackageEntry>();
+            if (tfmValue is JObject tfmObj)
+            {
+                foreach (var (pkgKey, pkgValue) in tfmObj)
+                {
+                    // pkgKey is "PackageName/Version"
+                    var parts = pkgKey.Split('/', 2);
+                    if (parts.Length != 2) continue;
+
+                    var type = pkgValue?["type"]?.Value<string>();
+                    if (type != "package") continue;
+
+                    var deps = new List<ResolvedPackageEntry>();
+                    var dependencies = pkgValue?["dependencies"] as JObject;
+                    if (dependencies != null)
+                    {
+                        foreach (var (depName, depVersion) in dependencies)
+                        {
+                            deps.Add(new ResolvedPackageEntry
+                            {
+                                Name = depName,
+                                ResolvedVersion = depVersion?.Value<string>() ?? "",
+                                Depth = 1
+                            });
+                        }
+                    }
+
+                    packages.Add(new ResolvedPackageEntry
+                    {
+                        Name = parts[0],
+                        ResolvedVersion = parts[1],
+                        Dependencies = deps,
+                        Depth = 0
+                    });
+                }
+            }
+
+            result[tfm] = packages;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Normalizes a full framework identifier like ".NETCoreApp,Version=v8.0" to "net8.0".
+    /// </summary>
+    private static string NormalizeTfm(string fullTfm)
+    {
+        // Simple heuristic: extract the version part
+        if (fullTfm.StartsWith(".NETCoreApp,Version=v") || fullTfm.StartsWith(".NETCoreApp,Version=V"))
+        {
+            var version = fullTfm.Substring(".NETCoreApp,Version=v".Length);
+            return "net" + version;
+        }
+        if (fullTfm.StartsWith(".NETStandard,Version=v") || fullTfm.StartsWith(".NETStandard,Version=V"))
+        {
+            var version = fullTfm.Substring(".NETStandard,Version=v".Length);
+            return "netstandard" + version;
+        }
+        return fullTfm;
     }
 
     /// <summary>
@@ -732,7 +1036,10 @@ public class RewriteRpcServer
         }
     }
 
-    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
+    private static readonly string[] Languages = [
+        "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+        "org.openrewrite.xml.tree.Xml$Document",
+    ];
 
     [JsonRpcMethod("GetLanguages")]
     public Task<string[]> GetLanguages()
@@ -805,13 +1112,61 @@ public class RewriteRpcServer
         var id = Guid.NewGuid().ToString();
         _preparedRecipes[id] = recipe;
 
-        return Task.FromResult(new PrepareRecipeResponse
+        var response = new PrepareRecipeResponse
         {
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
             ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
-        });
+        };
+
+        if (recipe is IDelegatesTo del)
+        {
+            response.DelegatesTo = new DelegatesTo
+            {
+                RecipeName = del.JavaRecipeName,
+                Options = del.Options
+            };
+        }
+        else
+        {
+            OptimizePreconditions(recipe, response);
+        }
+
+        return Task.FromResult(response);
+    }
+
+    /// <summary>
+    /// Inspects a recipe's visitor to extract preconditions that Java can evaluate
+    /// before sending files via RPC. Also adds a FindTreesOfType precondition based
+    /// on the visitor type so Java only sends compatible files.
+    /// </summary>
+    private void OptimizePreconditions(Recipe recipe, PrepareRecipeResponse response)
+    {
+        try
+        {
+            var visitor = recipe.GetVisitor();
+
+            var innerVisitor = visitor;
+            if (visitor is Check check)
+            {
+                innerVisitor = check.Visitor;
+            }
+
+            // Add tree type precondition so Java only sends files this visitor can handle
+            if (innerVisitor is CSharpVisitor<ExecutionContext>)
+            {
+                response.EditPreconditions.Add(new Precondition
+                {
+                    VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
+                    VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
+                });
+            }
+        }
+        catch
+        {
+            // Some recipes may fail during GetVisitor() — skip precondition detection
+        }
     }
 
     private static Recipe InstantiateWithOptions(Type recipeType, Dictionary<string, object?> options)
@@ -896,7 +1251,7 @@ public class RewriteRpcServer
         var modified = !ReferenceEquals(tree, result);
         if (result == null)
         {
-            _localObjects.Remove(request.TreeId);
+            _localObjects.TryRemove(request.TreeId, out _);
         }
         else if (modified)
         {
@@ -1011,7 +1366,7 @@ public class RewriteRpcServer
 
             if (deleted)
             {
-                _localObjects.Remove(request.TreeId);
+                _localObjects.TryRemove(request.TreeId, out _);
                 break;
             }
 
@@ -1096,6 +1451,10 @@ public class RewriteRpcServer
         var server = new RewriteRpcServer(marketplace);
         server._jsonRpc = jsonRpc;
         _current = server;
+        // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
+        // Without this, the default NonConcurrentSynchronizationContext serializes
+        // dispatch, blocking incoming GetObject requests while BatchVisit is in progress.
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(server);
         jsonRpc.StartListening();
 
@@ -1214,7 +1573,10 @@ public class RewriteRpcServer
 
         var ctx = new ExecutionContext();
         if (pId != null)
+        {
             _executionContexts[pId] = ctx;
+            _localObjects[pId] = ctx;
+        }
         return ctx;
     }
 
@@ -1239,16 +1601,21 @@ public class RewriteRpcServer
         public static readonly TreeCodec Instance = new();
         public void RpcSend(object after, RpcSendQueue q)
         {
-            if (after is OpenRewrite.Xml.Xml xml)
-                new OpenRewrite.Xml.Rpc.XmlSender().Visit(xml, q);
-            else
-                new CSharpSender().Visit((J)after, q);
+            switch (after)
+            {
+                case ParseError pe: pe.RpcSend(pe, q); break;
+                case OpenRewrite.Xml.Xml xml: new OpenRewrite.Xml.Rpc.XmlSender().Visit(xml, q); break;
+                default: new CSharpSender().Visit((J)after, q); break;
+            }
         }
         public object RpcReceive(object before, RpcReceiveQueue q)
         {
-            if (before is OpenRewrite.Xml.Xml xml)
-                return new OpenRewrite.Xml.Rpc.XmlReceiver().Visit(xml, q)!;
-            return new CSharpReceiver().Visit((J)before, q)!;
+            return before switch
+            {
+                ParseError pe => pe.RpcReceive(pe, q),
+                OpenRewrite.Xml.Xml xml => new OpenRewrite.Xml.Rpc.XmlReceiver().Visit(xml, q)!,
+                _ => new CSharpReceiver().Visit((J)before, q)!
+            };
         }
     }
 }
@@ -1282,6 +1649,13 @@ public class ParseSolutionRequest
 {
     public string Path { get; set; } = "";
     public string RootDir { get; set; } = "";
+    public Dictionary<string, object>? Options { get; set; }
+}
+
+public class ParseSolutionResponse
+{
+    public List<ParseSolutionResponseItem> Items { get; set; } = new();
+    public List<ProjectMetadata> Projects { get; set; } = new();
 }
 
 public class ParseSolutionResponseItem
@@ -1289,6 +1663,55 @@ public class ParseSolutionResponseItem
     public string Id { get; set; } = "";
     public string SourceFileType { get; set; } = "";
     public string ProjectPath { get; set; } = "";
+}
+
+public class ProjectMetadata
+{
+    public string ProjectPath { get; set; } = "";
+    public string? Sdk { get; set; }
+    public Dictionary<string, PropertyEntry> Properties { get; set; } = new();
+    public List<TargetFrameworkEntry> TargetFrameworks { get; set; } = new();
+    public List<PackageSourceEntry> PackageSources { get; set; } = new();
+}
+
+public class PackageSourceEntry
+{
+    public string Key { get; set; } = "";
+    public string Url { get; set; } = "";
+}
+
+public class PropertyEntry
+{
+    public string Value { get; set; } = "";
+    public string? DefinedIn { get; set; }
+}
+
+public class TargetFrameworkEntry
+{
+    public string TargetFramework { get; set; } = "";
+    public List<PackageReferenceEntry> PackageReferences { get; set; } = new();
+    public List<ResolvedPackageEntry> ResolvedPackages { get; set; } = new();
+    public List<ProjectReferenceEntry> ProjectReferences { get; set; } = new();
+}
+
+public class PackageReferenceEntry
+{
+    public string Include { get; set; } = "";
+    public string? RequestedVersion { get; set; }
+    public string? ResolvedVersion { get; set; }
+}
+
+public class ResolvedPackageEntry
+{
+    public string Name { get; set; } = "";
+    public string ResolvedVersion { get; set; } = "";
+    public List<ResolvedPackageEntry> Dependencies { get; set; } = new();
+    public int Depth { get; set; }
+}
+
+public class ProjectReferenceEntry
+{
+    public string Include { get; set; } = "";
 }
 
 public class GetObjectRequest
@@ -1403,6 +1826,13 @@ public class PrepareRecipeResponse
     public List<Precondition> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
     public List<Precondition> ScanPreconditions { get; set; } = [];
+    public DelegatesTo? DelegatesTo { get; set; }
+}
+
+public class DelegatesTo
+{
+    public string RecipeName { get; set; } = "";
+    public Dictionary<string, object?> Options { get; set; } = new();
 }
 
 public class Precondition

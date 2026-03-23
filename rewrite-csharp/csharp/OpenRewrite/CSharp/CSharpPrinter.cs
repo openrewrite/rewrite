@@ -92,6 +92,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 p.Append(';');
                 break;
 
+            // EnumDeclaration: trailing semicolon after closing brace (enum Color { ... };)
+            case EnumDeclaration ed when ed.Markers.FindFirst<Semicolon>() != null:
+                p.Append(';');
+                break;
+
             // PropertyDeclaration ends with ';' when it has expression body or initializer
             case PropertyDeclaration pd when pd.ExpressionBody != null || pd.Initializer != null:
                 p.Append(';');
@@ -483,7 +488,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         BeforeSyntax(na, p);
 
         // Don't print "new" when inside a stackalloc expression
-        if (Cursor.GetParentTreeCursor().Value is not StackAllocExpression)
+        if (Cursor.ParentTree.Value is not StackAllocExpression)
         {
             p.Append("new");
         }
@@ -544,16 +549,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             }
             else
             {
-                for (int i = 0; i < elements.Count; i++)
-                {
-                    var elem = elements[i];
-                    Visit(elem.Element, p);
-                    VisitSpace(elem.After, p);
-                    if (i < elements.Count - 1)
-                    {
-                        p.Append(',');
-                    }
-                }
+                VisitRightPadded(elements, ",", p);
             }
 
             p.Append('}');
@@ -1842,7 +1838,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         // Determine brace count from parent InterpolatedString delimiter (e.g., $$""" → 2 braces)
         int braceCount = 1;
-        var parentCursor = Cursor.GetParentTreeCursor();
+        var parentCursor = Cursor.ParentTree;
         if (parentCursor.Value is InterpolatedString istr)
         {
             int dollarCount = 0;
@@ -3100,7 +3096,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// <summary>
     /// Called at the start of each visit method. Handles prefix space and markers.
     /// </summary>
-    protected void BeforeSyntax(J j, PrintOutputCapture<P> p)
+    protected virtual void BeforeSyntax(J j, PrintOutputCapture<P> p)
     {
         BeforeSyntax(j.Prefix, j.Markers, p);
     }
@@ -3128,7 +3124,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// <summary>
     /// Called at the end of each visit method. Handles markers after syntax.
     /// </summary>
-    protected void AfterSyntax(J j, PrintOutputCapture<P> p)
+    protected virtual void AfterSyntax(J j, PrintOutputCapture<P> p)
     {
         AfterSyntax(j.Markers, p);
     }

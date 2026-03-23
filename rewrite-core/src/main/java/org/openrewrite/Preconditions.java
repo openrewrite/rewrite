@@ -19,7 +19,6 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public class Preconditions {
@@ -162,8 +161,9 @@ public class Preconditions {
     }
 
     /**
-     * An ExecutionContext view that suppresses writes to the DATA_TABLES key.
-     * This is used to prevent precondition visitors from emitting data table rows.
+     * An ExecutionContext view that suppresses data table row insertion.
+     * Installs a no-op {@link DataTableStore} that silently drops inserts
+     * while delegating reads to the real store.
      */
     private static class DataTableSuppressingExecutionContextView extends DelegatingExecutionContext {
         private DataTableSuppressingExecutionContextView(ExecutionContext delegate) {
@@ -178,19 +178,12 @@ public class Preconditions {
         }
 
         @Override
-        public void putMessage(String key, @Nullable Object value) {
-            if (!ExecutionContext.DATA_TABLES.equals(key)) {
-                super.putMessage(key, value);
+        @SuppressWarnings("unchecked")
+        public <T> @Nullable T getMessage(String key) {
+            if (DataTableExecutionContextView.DATA_TABLE_STORE.equals(key)) {
+                return (T) DataTableStore.noop();
             }
-        }
-
-        @Override
-        public <V, T> T computeMessage(String key, @Nullable V value, Supplier<T> defaultValue, BiFunction<@Nullable V, ? super T, ? extends T> remappingFunction) {
-            if (ExecutionContext.DATA_TABLES.equals(key)) {
-                // Return the default value without actually computing or storing anything
-                return defaultValue.get();
-            }
-            return super.computeMessage(key, value, defaultValue, remappingFunction);
+            return super.getMessage(key);
         }
     }
 }

@@ -21,7 +21,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
@@ -120,26 +119,29 @@ public class CSharpRewriteRpc extends RewriteRpc {
      * @param ctx     Execution context for parsing
      * @return Stream of parsed source files
      */
-    public Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
+    public ParseSolutionResult parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
-        return StreamSupport.stream(new Spliterator<SourceFile>() {
+        Map<String, Object> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true));
+
+        // Phase 1: Eager RPC call to get lightweight response (IDs + metadata)
+        parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
+        ParseSolutionResponse response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
+        parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.itemCount()));
+
+        // Phase 2: Lazy stream that retrieves full ASTs one at a time via getObject()
+        Stream<SourceFile> sourceFiles = StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
-            private @Nullable ParseSolutionResponse response;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                if (response == null) {
-                    parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
-                    response = send("ParseSolution", new ParseSolution(path, rootDir), ParseSolutionResponse.class);
-                    parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
-                }
-
-                if (index >= response.size()) {
+                if (index >= response.itemCount()) {
                     return false;
                 }
 
-                ParseSolutionResponse.Item item = response.get(index);
+                ParseSolutionResponse.Item item = response.getItem(index);
                 index++;
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
@@ -156,14 +158,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             @Override
             public long estimateSize() {
-                return response == null ? Long.MAX_VALUE : response.size() - index;
+                return response.itemCount() - index;
             }
 
             @Override
             public int characteristics() {
-                return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
+                return ORDERED | SIZED | SUBSIZED;
             }
         }, false);
+
+        return new ParseSolutionResult(sourceFiles, response.projects);
     }
 
     public static Builder builder() {
@@ -319,6 +323,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
 
@@ -359,12 +364,24 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
 
         private Stream<@Nullable String> buildToolExecCommand(String version) {
+            // When the tool package exists in the NuGet global cache (e.g. from pTML),
+            // add it as a source so dotnet tool exec can resolve it without remote feeds
+            Path globalCachePath = Paths.get(System.getProperty("user.home"),
+                    ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
+            String addSource = Files.isDirectory(globalCachePath) ? globalCachePath.toString() : null;
+
             return Stream.of(
                     dotnetPath.toString(),
                     "tool", "exec",
                     NUGET_PACKAGE_ID + "@" + version,
                     "-y",
                     "--allow-roll-forward",
+                    addSource != null ? "--add-source" : null,
+                    addSource,
+                    "--ignore-failed-sources",
+                    // Suppress NuGet informational messages (e.g. "Skipping NuGet package
+                    // signature verification") that would corrupt the RPC stdout channel.
+                    "-v", "q",
                     "--",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null

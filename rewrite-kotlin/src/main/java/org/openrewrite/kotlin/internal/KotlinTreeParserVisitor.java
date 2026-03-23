@@ -3132,7 +3132,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private static String getString(KtStringTemplateExpression expression, StringBuilder valueSb) {
-        PsiElement openQuote = expression.getFirstChild();
+        PsiElement openQuote;
+        String prefix;
+        if (expression.getInterpolationPrefix() == null) {
+            openQuote = expression.getFirstChild();
+            prefix = "";
+        } else {
+            openQuote = expression.getFirstChild().getNextSibling();
+            prefix = expression.getInterpolationPrefix().getInterpolationPrefix();
+        }
+
         PsiElement closingQuota = expression.getLastChild();
         if (openQuote == null || closingQuota == null ||
             openQuote.getNode().getElementType() != KtTokens.OPEN_QUOTE ||
@@ -3140,7 +3149,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("This should never happen");
         }
 
-        return openQuote.getText() + valueSb + closingQuota.getText();
+        return prefix + openQuote.getText() + valueSb + closingQuota.getText();
     }
 
     @Override

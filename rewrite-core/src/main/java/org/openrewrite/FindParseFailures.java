@@ -58,7 +58,12 @@ public class FindParseFailures extends Recipe {
     @Nullable
     String createdAfter;
 
-    transient ParseFailures failures = new ParseFailures(this);
+    transient ParseFailures failures = new ParseFailures(this)
+            .withInstanceName(this::dataTableInstanceName);
+
+    private String dataTableInstanceName() {
+        return parserType != null ? "Parse failures for " + parserType : "Parse failures";
+    }
 
     String displayName = "Find source files with `ParseExceptionResult` markers";
 

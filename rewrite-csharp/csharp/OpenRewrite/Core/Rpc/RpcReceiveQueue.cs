@@ -30,12 +30,12 @@ namespace OpenRewrite.Core.Rpc;
 public class RpcReceiveQueue
 {
     private readonly Queue<RpcObjectData> _batch = new();
-    private readonly Dictionary<int, object> _refs;
+    private readonly IDictionary<int, object> _refs;
     private readonly Func<List<RpcObjectData>>? _pull;
     private readonly string? _sourceFileType;
     private readonly IRpcCodec? _treeCodec;
 
-    public RpcReceiveQueue(List<RpcObjectData> data, Dictionary<int, object> refs,
+    public RpcReceiveQueue(List<RpcObjectData> data, IDictionary<int, object> refs,
                            string? sourceFileType, IRpcCodec? treeCodec = null)
     {
         foreach (var item in data) _batch.Enqueue(item);
@@ -44,7 +44,7 @@ public class RpcReceiveQueue
         _treeCodec = treeCodec;
     }
 
-    public RpcReceiveQueue(Dictionary<int, object> refs, Func<List<RpcObjectData>> pull,
+    public RpcReceiveQueue(IDictionary<int, object> refs, Func<List<RpcObjectData>> pull,
                            string? sourceFileType, IRpcCodec? treeCodec = null)
     {
         _refs = refs;
@@ -488,6 +488,11 @@ public class RpcReceiveQueue
                 typeof(PointerMemberAccess),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters" =>
                 typeof(ImplicitTypeParameters),
+
+            "org.openrewrite.ParseExceptionResult" =>
+                typeof(ParseExceptionResult),
+            "org.openrewrite.tree.ParseError" =>
+                typeof(ParseError),
 
             _ => FromJavaTypeNameByConvention(javaTypeName)
         };

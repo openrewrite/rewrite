@@ -1,5 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.LicenseExtension
@@ -66,10 +68,19 @@ val csharpBuild by tasks.registering(Exec::class) {
     workingDir = csharpDir
     commandLine(findDotnet(), "build")
 
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
+
     doFirst {
         logger.lifecycle("Building C# projects in ${csharpDir}")
     }
 }
+
+val junitXmlFile = csharpDir.resolve("build/test-results/xunit/junit.xml")
 
 val csharpTest by tasks.registering(Exec::class) {
     group = "csharp"
@@ -77,12 +88,24 @@ val csharpTest by tasks.registering(Exec::class) {
     dependsOn(csharpBuild)
 
     workingDir = csharpDir
-    commandLine(findDotnet(), "test", "--no-build", "--verbosity", "normal")
+    commandLine(
+        findDotnet(), "test", "--no-build", "--verbosity", "normal",
+        "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
+    )
+
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.files(junitXmlFile)
+    outputs.cacheIf { true }
 
     doFirst {
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
 }
+
+ImportJUnitXmlReports.register(tasks, csharpTest, JUnitXmlDialect.GENERIC)
 
 tasks.named("check") {
     dependsOn(csharpTest)
@@ -122,6 +145,9 @@ tasks.withType<Test> {
         if (!project.hasProperty("includeWorkingSetFull")) {
             excludeTags("workingSet-full")
         }
+        if (!project.hasProperty("includeSlow")) {
+            excludeTags("slow")
+        }
     }
     // Add timeout to identify hanging tests
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
@@ -137,12 +163,17 @@ tasks.withType<Test> {
 // ============================================
 
 // Generate a NuGet-compatible version
-// Snapshots use pre-release suffix with UTC timestamp: 8.73.0-snapshot.20260110143252
+// CI builds use timestamped pre-release: 8.73.0-snapshot.20260110143252
+// Local builds use stable suffix that sorts higher: 8.73.0-zlocal
 // Releases use clean version: 8.73.0
-val nugetVersion: String = project.version.toString().replace(
-    "-SNAPSHOT",
-    "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-)
+val nugetVersion: String = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "-SNAPSHOT",
+        "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+    )
+} else {
+    project.version.toString().replace("-SNAPSHOT", "-zlocal")
+}
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"
@@ -226,6 +257,9 @@ val csharpPublishLocal by tasks.registering {
     dependsOn(csharpPack)
 
     doLast {
+        val localFeed = file("${System.getProperty("user.home")}/.nuget/local-feed")
+        localFeed.mkdirs()
+
         val dotnet = findDotnet()
         val distDir = csharpDir.resolve("dist").absolutePath
 
@@ -246,14 +280,11 @@ val csharpPublishLocal by tasks.registering {
         val localsOutput = run(dotnet, "nuget", "locals", "global-packages", "--list")
         val cachePath = localsOutput.trim().substringAfter("global-packages: ")
 
-        // Clear stale entries from all NuGet caches for each package
+        // Clear stale entries from NuGet caches for each package
         csharpDir.resolve("dist").listFiles()
             ?.filter { it.name.endsWith(".nupkg") }
             ?.forEach { nupkg ->
-                // Extract package ID and version from filename (e.g. OpenRewrite.CSharp.8.76.0-snapshot.20260311.nupkg)
                 val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
-                // NuGet package filenames are PackageId.Version.nupkg
-                // Find the version part by matching the nugetVersion suffix
                 val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
 
                 // Clear the specific version from global packages cache
@@ -263,18 +294,23 @@ val csharpPublishLocal by tasks.registering {
                     packageCacheDir.deleteRecursively()
                 }
 
-                // Clear any globally installed tool versions (used by `dotnet tool install -g`)
-                val toolStoreDir = file("${System.getProperty("user.home")}/.dotnet/tools/.store/${packageId.lowercase()}")
-                if (toolStoreDir.exists()) {
-                    logger.lifecycle("Clearing tool store: ${toolStoreDir.absolutePath}")
-                    toolStoreDir.deleteRecursively()
-                }
+                nupkg.copyTo(localFeed.resolve(nupkg.name), overwrite = true)
+                logger.lifecycle("Published $packageId@$nugetVersion to ${localFeed.absolutePath}")
             }
 
-        // Create a temp project and add packages to populate the NuGet cache
+        // Create a temp project with PackageDownload entries and restore to populate the NuGet cache
         val tempDir = temporaryDir
         tempDir.deleteRecursively()
         tempDir.mkdirs()
+
+        val packageDownloads = csharpDir.resolve("dist").listFiles()
+            ?.filter { it.name.endsWith(".nupkg") }
+            ?.joinToString("\n") { nupkg ->
+                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
+                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
+                logger.lifecycle("Installing $packageId@$nugetVersion into NuGet cache from $distDir")
+                """    <PackageDownload Include="$packageId" Version="[$nugetVersion]" />"""
+            } ?: ""
 
         val tempCsproj = tempDir.resolve("Temp.csproj")
         tempCsproj.writeText("""
@@ -282,28 +318,20 @@ val csharpPublishLocal by tasks.registering {
               <PropertyGroup>
                 <TargetFramework>net10.0</TargetFramework>
               </PropertyGroup>
+              <ItemGroup>
+            $packageDownloads
+              </ItemGroup>
             </Project>
         """.trimIndent())
 
-        csharpDir.resolve("dist").listFiles()
-            ?.filter { it.name.endsWith(".nupkg") }
-            ?.forEach { nupkg ->
-                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
-                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
-
-                logger.lifecycle("Installing $packageId@$nugetVersion into NuGet cache from $distDir")
-                // Tool packages (DotnetTool type) fail restore with NU1212 but still get
-                // installed into the NuGet cache, which is all we need for dotnet tool exec.
-                val addOutput = run(
-                    dotnet, "add", "package", packageId,
-                    "--version", nugetVersion,
-                    "--source", distDir,
-                    dir = tempDir,
-                    ignoreExitCode = true
-                )
-                logger.lifecycle(addOutput)
-            }
-
+        val restoreOutput = run(
+            dotnet, "restore",
+            "--source", distDir,
+            "--force",
+            dir = tempDir,
+            ignoreExitCode = true
+        )
+        logger.lifecycle(restoreOutput)
     }
 }
 

@@ -217,4 +217,36 @@ public class ArrayTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void ArrayInitializerWithTrailingComma()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar() {
+                        int[] arr = new int[] { 1, 2, 3, };
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ImplicitArrayWithTrailingComma()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                class Foo {
+                    void Bar() {
+                        var arr = new[] { 1, 2, 3, };
+                    }
+                }
+                """
+            )
+        );
+    }
 }

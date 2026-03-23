@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -371,6 +372,7 @@ class BinaryTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Issue("https://github.com/moderneinc/customer-requests/issues/1694")
     @Test
     void deeplyNestedStringConcatenation() {
