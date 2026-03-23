@@ -65,6 +65,44 @@ class JavaTemplateTest8Test implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceNewClassInsideReturn() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate t = JavaTemplate.builder("new StringBuilder(#{any(String)})")
+                .build();
+
+              @Override
+              public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                  newClass = super.visitNewClass(newClass, ctx);
+                  if (newClass.getClazz() != null &&
+                      newClass.getClazz().toString().equals("StringBuffer") &&
+                      newClass.getArguments().size() == 1) {
+                      return t.apply(getCursor(), newClass.getCoordinates().replace(),
+                        newClass.getArguments().get(0));
+                  }
+                  return newClass;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  CharSequence test(String s) {
+                      return new StringBuffer(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  CharSequence test(String s) {
+                      return new StringBuilder(s);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void parameterizedMatch() {
