@@ -435,12 +435,32 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     }
                     return m;
                 }
+                if (loc == STATEMENT_PREFIX && isScope(method) &&
+                    !(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
+                    // Method invocation is used as an expression (e.g., inside return, assignment),
+                    // not as a standalone statement in a block. Parse as expression replacement.
+                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                                    getCursor(),
+                                    substitutedTemplate,
+                                    substitutions.getTypeVariables(),
+                                    loc))
+                            .withPrefix(method.getPrefix()), integer);
+                }
                 return maybeReplaceStatement(method, J.class, 0);
             }
 
             @Override
             public J visitNewClass(J.NewClass newClass, Integer p) {
                 if (isScope(newClass)) {
+                    if (loc == STATEMENT_PREFIX &&
+                        !(getCursor().getParentTreeCursor().getValue() instanceof J.Block)) {
+                        return autoFormat(unsubstitute(templateParser.parseExpression(
+                                        getCursor(),
+                                        substitutedTemplate,
+                                        substitutions.getTypeVariables(),
+                                        loc))
+                                .withPrefix(newClass.getPrefix()), p);
+                    }
                     // allow a `J.NewClass` to also be replaced by an expression
                     return maybeReplaceStatement(newClass, J.class, p);
                 }
