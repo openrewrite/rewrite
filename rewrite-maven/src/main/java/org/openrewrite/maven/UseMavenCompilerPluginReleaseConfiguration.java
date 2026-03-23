@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
 
@@ -101,7 +102,7 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
         }
     }
 
-    private static @org.jspecify.annotations.Nullable String getExistingPropertyReference(
+    private static @Nullable String getExistingPropertyReference(
             @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String>... configs) {
         for (Optional<String> config : configs) {
             if (config.isPresent()) {
