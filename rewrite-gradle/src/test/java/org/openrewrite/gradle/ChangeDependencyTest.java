@@ -1072,11 +1072,11 @@ class ChangeDependencyTest implements RewriteTest {
 
     @Test
     void isAcceptable() {
-        ChangeDependency recipe = new ChangeDependency(
+        var recipe = new ChangeDependency(
                 "org.old", "artifact", "org.new", "artifact", null, null, null
         );
         @SuppressWarnings("unchecked")
-        TreeVisitor<?, ExecutionContext> visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
 
         SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
                 .findFirst().orElseThrow()
@@ -1086,11 +1086,11 @@ class ChangeDependencyTest implements RewriteTest {
 
     @Test
     void isNotAcceptableForPlainTextWithGradleProjectMarker() {
-        ChangeDependency recipe = new ChangeDependency(
+        var recipe = new ChangeDependency(
                 "org.old", "artifact", "org.new", "artifact", null, null, null
         );
         @SuppressWarnings("unchecked")
-        TreeVisitor<?, ExecutionContext> visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
 
         SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
                 .findFirst().orElseThrow()

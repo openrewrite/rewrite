@@ -378,7 +378,7 @@ class BinaryTest implements RewriteTest {
     void deeplyNestedStringConcatenation() {
         // Test parsing deeply nested string concatenations (many + operations)
         // K1's FIR builder caused a StackOverflowError at this depth; K2 handles it successfully
-        StringBuilder sb = new StringBuilder();
+        var sb = new StringBuilder();
         sb.append("val s = ");
         for (int i = 0; i < 2000; i++) {
             sb.append("\"line").append(i).append("\\n\" + ");

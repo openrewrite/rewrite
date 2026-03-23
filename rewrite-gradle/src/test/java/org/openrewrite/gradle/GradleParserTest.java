@@ -277,7 +277,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -299,7 +299,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInSingleSingleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -321,7 +321,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInTripleDoubleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -346,7 +346,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInTripleSingleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -389,7 +389,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -406,7 +406,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -423,7 +423,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParameters() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
           // lang=groovy
           """
@@ -443,7 +443,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParameters() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
           // lang=groovy
           """
@@ -461,7 +461,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParametersAndClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -485,7 +485,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParametersAndClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -512,7 +512,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParametersComplicated() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -536,7 +536,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParametersComplicated() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -561,7 +561,7 @@ class GradleParserTest implements RewriteTest {
     @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
     @ParameterizedTest
     void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(
           Parser.Input.fromString(groovy)
         ), null, new InMemoryExecutionContext());

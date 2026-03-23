@@ -410,16 +410,16 @@ class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class RecipeWithNoOptions extends Recipe {
     String displayName = "Recipe with no options";
     String description = "Has no configurable options at all.";
 }
 
-@Value
-@NullMarked
 @EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
 class RecipeWithRequiredOptionValidateNoBlank extends Recipe {
     String displayName = "Recipe with required option";
     String description = "Has a single required parameter.";
@@ -435,9 +435,9 @@ class RecipeWithRequiredOptionValidateNoBlank extends Recipe {
     }
 }
 
-@Value
-@NullMarked
 @EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
 class RecipeWithOptionalOrValidation extends Recipe {
     String displayName = "Recipe with optional OR validation";
     String description = "Has two optional parameters where at least one must be set.";
