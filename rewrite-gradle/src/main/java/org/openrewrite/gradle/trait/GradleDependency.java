@@ -232,7 +232,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (dep != null) {
                 return dep.getGroupId();
             }
-            // Multi-component literal form: ("group", "artifact", "version")
+            // Multi-component form: ("group", "artifact", "version")
             if (isMultiComponentDefinition(depArgs)) {
                 return (String) ((J.Literal) arg).getValue();
             }
@@ -338,7 +338,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             if (dep != null) {
                 return dep.getArtifactId();
             }
-            // Multi-component literal form: ("group", "artifact", "version")
+            // Multi-component form: ("group", "artifact", "version")
             if (isMultiComponentDefinition(depArgs) && depArgs.size() >= 2) {
                 return (String) ((J.Literal) depArgs.get(1)).getValue();
             }
@@ -481,14 +481,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
      * Handles literals, identifiers, field access, method invocations, and GStrings.
      */
     private @Nullable String extractValueAsString(Expression value) {
-        Expression v = value.withMarkers(Markers.EMPTY);
-        if (v instanceof J.Literal) {
-            Object literalValue = ((J.Literal) v).getValue();
+        if (value instanceof J.Literal) {
+            Object literalValue = ((J.Literal) value).getValue();
             return literalValue instanceof String ? (String) literalValue : null;
         }
-        if (v instanceof J.Identifier) {
-            return ((J.Identifier) v).getSimpleName();
+        if (value instanceof J.Identifier) {
+            return ((J.Identifier) value).getSimpleName();
         }
+        // Normalize markers only for branches that use printTrimmed
+        Expression v = value.withMarkers(Markers.EMPTY);
         if (v instanceof J.FieldAccess) {
             return v.printTrimmed(cursor);
         }
@@ -869,7 +870,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                             ChangeStringLiteral.withStringValue(l, DependencyNotation.toStringNotation(dep.withGav(dep.getGav().withVersion(null))))
                     ));
                 } else if (isMultiComponentDefinition(m.getArguments()) && m.getArguments().size() >= 3) {
-                    // Multi-component literal form: remove the version (3rd) argument
+                    // Multi-component form: remove the version (3rd) argument
                     List<Expression> newArgs = new ArrayList<>(m.getArguments().subList(0, 2));
                     if (m.getArguments().size() > 3) {
                         newArgs.addAll(m.getArguments().subList(3, m.getArguments().size()));
@@ -949,7 +950,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 } else if (dep == null && isMultiComponentDefinition(m.getArguments())) {
-                    // Multi-component literal form: ("group", "artifact", "version")
+                    // Multi-component form: ("group", "artifact", "version")
                     String currentGroup = (String) ((J.Literal) firstArg).getValue();
                     if (!newGroupId.equals(currentGroup)) {
                         updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
@@ -1094,7 +1095,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 } else if (dep == null && isMultiComponentDefinition(m.getArguments()) && m.getArguments().size() >= 2) {
-                    // Multi-component literal form: ("group", "artifact", "version")
+                    // Multi-component form: ("group", "artifact", "version")
                     String currentArtifact = (String) ((J.Literal) m.getArguments().get(1)).getValue();
                     if (!newArtifactId.equals(currentArtifact)) {
                         updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
@@ -1239,8 +1240,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     updated = m.withArguments(ListUtils.mapFirst(m.getArguments(),
                             arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, DependencyNotation.toStringNotation(updatedDep))));
                 } else if (dep == null && isMultiComponentDefinition(m.getArguments())) {
-                    // Multi-component literal form: ("group", "artifact", "version")
-                    if (m.getArguments().size() >= 3) {
+                    // Multi-component form: update literal version; variable versions are handled by UpdateProperties/UpdateVariable
+                    if (m.getArguments().size() >= 3 && m.getArguments().get(2) instanceof J.Literal) {
                         String currentVersion = (String) ((J.Literal) m.getArguments().get(2)).getValue();
                         if (!newVersion.equals(currentVersion)) {
                             updated = m.withArguments(ListUtils.map(m.getArguments(), (i, arg) ->
@@ -1556,7 +1557,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 if (dep != null) {
                     return dep;
                 }
-                // Multi-component literal form: ("group", "artifact") or ("group", "artifact", "version")
+                // Multi-component form: ("group", "artifact") or ("group", "artifact", "version")
                 if (isMultiComponentDefinition(arguments)) {
                     return parseMultiComponentLiterals(arguments);
                 }
