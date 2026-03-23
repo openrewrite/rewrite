@@ -80,10 +80,10 @@ class RenameVariableTest implements RewriteTest {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if ("A".equals(classDecl.getSimpleName())) {
-                    List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
+                    List<J.VariableDeclarations> variableDecls = new ArrayList<>(classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)
-                      .toList();
+                      .toList());
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
