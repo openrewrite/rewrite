@@ -55,8 +55,7 @@ public class FindDistinctMethods extends ScanningRecipe<Map<String, UUID>> {
     @Nullable
     Boolean matchOverrides;
 
-    transient MethodCalls methodCalls = new MethodCalls(this)
-            .withInstanceName(this::dataTableInstanceName);
+    transient MethodCalls methodCalls = new MethodCalls(this);
 
     private String dataTableInstanceName() {
         return methodPattern != null ? "Distinct method calls matching `" + methodPattern + "`" : "Distinct method calls";

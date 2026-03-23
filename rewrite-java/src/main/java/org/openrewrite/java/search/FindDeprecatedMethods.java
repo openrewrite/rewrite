@@ -51,8 +51,7 @@ public class FindDeprecatedMethods extends Recipe {
     @Nullable
     Boolean ignoreDeprecatedScopes;
 
-    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this)
-            .withInstanceName(this::dataTableInstanceName);
+    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
 
     private String dataTableInstanceName() {
         return methodPattern != null ? "Deprecated method calls matching `" + methodPattern + "`" : "Deprecated method calls";
