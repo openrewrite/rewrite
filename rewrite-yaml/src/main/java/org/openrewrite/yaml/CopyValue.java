@@ -23,6 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -138,39 +139,27 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             return TreeVisitor.noop();
         }
 
-        if (newFilePath != null) {
-            // When targeting a specific file, use the first scanned snippet
-            String snippet = acc.snippetsByPath.values().iterator().next();
-            return Preconditions.check(
-                    new FindSourceFiles(newFilePath),
-                    mergeVisitor(snippet));
-        }
-
-        // When no target file is specified, copy within each source file independently
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                Path sourcePath = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
-                String snippet = acc.snippetsByPath.get(sourcePath);
-                if (snippet == null) {
-                    return documents;
+                Path currentPath = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                Yaml.Documents d = documents;
+                boolean changed = false;
+                for (Map.Entry<Path, String> entry : acc.snippetsByPath.entrySet()) {
+                    Path targetPath = newFilePath != null
+                            ? Paths.get(newFilePath)
+                            : entry.getKey();
+                    if (currentPath.equals(targetPath)) {
+                        d = (Yaml.Documents) new MergeYaml(newKey, entry.getValue(), false, null, null, null, null, createNewKeys)
+                                .getVisitor()
+                                .visitNonNull(d, ctx);
+                        changed = true;
+                    }
                 }
-                doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
-                return (Yaml.Documents) new MergeYaml(newKey, snippet, false, null, null, null, null, createNewKeys)
-                        .getVisitor()
-                        .visitNonNull(documents, ctx);
-            }
-        };
-    }
-
-    private YamlIsoVisitor<ExecutionContext> mergeVisitor(String snippet) {
-        return new YamlIsoVisitor<ExecutionContext>() {
-            @Override
-            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
-                return (Yaml.Documents) new MergeYaml(newKey, snippet, false, null, null, null, null, createNewKeys)
-                        .getVisitor()
-                        .visitNonNull(documents, ctx);
+                if (changed) {
+                    doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
+                }
+                return d;
             }
         };
     }
