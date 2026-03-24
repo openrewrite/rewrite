@@ -921,7 +921,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureMatchesZeroArguments()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -934,7 +934,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureInNonTrailingPosition()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         var last = Capture.Of<Expression>("last");
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args}, {last})")),
@@ -948,7 +948,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMinBoundRejectsFewerArgs()
     {
-        var args = Capture.Variadic<Expression>("args", min: 2);
+        var args = Capture.Expression("args", variadic: new(Min: 2));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -961,7 +961,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMaxBoundRejectsMoreArgs()
     {
-        var args = Capture.Variadic<Expression>("args", max: 1);
+        var args = Capture.Expression("args", variadic: new(Max: 1));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -1403,6 +1403,181 @@ public class PatternMatchTests : RewriteTest
                 using System;
                 class C { void M() { /*~~>*/Console.WriteLine("hi"); } }
                 """
+            )
+        );
+    }
+
+    // ===============================================================
+    // Capture constraints
+    // ===============================================================
+
+    [Fact]
+    public void ConstraintThatReturnsTrueAllowsMatch()
+    {
+        var expr = Capture.Expression("expr", constraint: (_, _) => true);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintThatReturnsFalseBlocksMatch()
+    {
+        var expr = Capture.Expression("expr", constraint: (_, _) => false);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintReceivesCapturedNode()
+    {
+        // Constraint that only accepts Literal nodes with value "42"
+        var expr = Capture.Expression("expr",
+            constraint: (node, _) => node is Literal { ValueSource: "42" });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintRejectsMismatchedNode()
+    {
+        // Constraint that only accepts Literal nodes with value "99"
+        var expr = Capture.Expression("expr",
+            constraint: (node, _) => node is Literal { ValueSource: "99" });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintReceivesCursorPositionedAtNode()
+    {
+        CaptureConstraintContext? capturedCtx = null;
+        var expr = Capture.Expression("expr", constraint: (_, ctx) =>
+        {
+            capturedCtx = ctx;
+            return true;
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+        // The context passed to the constraint should contain the cursor from the visitor
+        Assert.NotNull(capturedCtx);
+        Assert.NotNull(capturedCtx!.Cursor);
+    }
+
+    [Fact]
+    public void ConstraintReceivesPreviouslyBoundCaptures()
+    {
+        // First capture binds with no constraint, second uses dependent constraint
+        var a = Capture.Of<Expression>("a");
+        var b = Capture.Expression("b", constraint: (node, ctx) =>
+        {
+            // The constraint on 'b' can read the already-bound value of 'a'
+            return ctx.Captures.ContainsKey("a")
+                && ctx.Captures["a"] is Literal { ValueSource: "1" };
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Math.Max({a}, {b})")),
+            CSharp(
+                "class C { void M() { Math.Max(1, 2); } }",
+                "class C { void M() { /*~~>*/Math.Max(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void DependentConstraintRejectsWhenPreviousCaptureDoesNotMatch()
+    {
+        var a = Capture.Of<Expression>("a");
+        var b = Capture.Expression("b", constraint: (node, ctx) =>
+        {
+            // Require 'a' to have been bound to a literal "99" — which it won't be
+            return ctx.Captures.ContainsKey("a")
+                && ctx.Captures["a"] is Literal { ValueSource: "99" };
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Math.Max({a}, {b})")),
+            CSharp(
+                "class C { void M() { Math.Max(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintReceivesCapturedList()
+    {
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 2));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2); } }",
+                "class C { void M() { /*~~>*/Foo(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintThatReturnsFalseBlocksMatch()
+    {
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 3));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // 2 args — constraint requires 3
+                "class C { void M() { Foo(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintCanInspectElements()
+    {
+        // Only match when all captured args are Literal nodes
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { /*~~>*/Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintRejectsNonMatchingElements()
+    {
+        // Only match when all captured args are Literal nodes
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // x is an Identifier, not a Literal — should fail
+                "class C { void M() { Foo(1, x, 3); } }"
             )
         );
     }

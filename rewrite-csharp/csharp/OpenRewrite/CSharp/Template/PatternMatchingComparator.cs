@@ -60,6 +60,9 @@ internal class PatternMatchingComparator
                     // Already bound — check consistency
                     return MatchValue(existing, candidate, cursor);
                 }
+                // Evaluate constraint before binding
+                if (!EvaluateConstraint(_captures[captureName], candidate, cursor))
+                    return false;
                 _bindings[captureName] = candidate;
                 return true;
             }
@@ -413,6 +416,10 @@ internal class PatternMatchingComparator
                         captured.Add(innerCandidate);
                     }
 
+                    // Evaluate variadic constraint before binding
+                    if (!EvaluateVariadicConstraint(captureObj, captured.AsReadOnly(), cursor))
+                        continue;
+
                     // Save bindings for backtracking
                     var savedBindings = new Dictionary<string, object>(_bindings);
                     _bindings[captureName] = captured.AsReadOnly();
@@ -456,20 +463,14 @@ internal class PatternMatchingComparator
         return true;
     }
 
-    private static bool IsVariadic(object captureObj)
-    {
-        var prop = captureObj.GetType().GetProperty("IsVariadic");
-        return prop != null && (bool)(prop.GetValue(captureObj) ?? false);
-    }
+    private static bool IsVariadic(object captureObj) =>
+        captureObj is ICapture capture && capture.IsVariadic;
 
     private static (int min, int max) GetVariadicBounds(object captureObj)
     {
-        var type = captureObj.GetType();
-        var minProp = type.GetProperty("MinCount");
-        var maxProp = type.GetProperty("MaxCount");
-        var min = minProp?.GetValue(captureObj) as int? ?? 0;
-        var max = maxProp?.GetValue(captureObj) as int? ?? int.MaxValue;
-        return (min, max);
+        if (captureObj is not ICapture capture)
+            return (0, int.MaxValue);
+        return (capture.MinCount ?? 0, capture.MaxCount ?? int.MaxValue);
     }
 
     /// <summary>
@@ -505,5 +506,14 @@ internal class PatternMatchingComparator
 
     private static bool IsStatic(JavaType.Variable variable) =>
         (variable.FlagsBitMap & FlagStatic) != 0;
+
+    private CaptureConstraintContext BuildConstraintContext(Cursor cursor) =>
+        new(cursor, new Dictionary<string, object>(_bindings));
+
+    private bool EvaluateConstraint(object captureObj, object candidate, Cursor cursor) =>
+        captureObj is not ICapture capture || capture.EvaluateConstraint(candidate, BuildConstraintContext(cursor));
+
+    private bool EvaluateVariadicConstraint(object captureObj, IReadOnlyList<object> captured, Cursor cursor) =>
+        captureObj is not ICapture capture || capture.EvaluateVariadicConstraint(captured, BuildConstraintContext(cursor));
 
 }
