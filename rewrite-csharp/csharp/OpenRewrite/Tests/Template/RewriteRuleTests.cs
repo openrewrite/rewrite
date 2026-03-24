@@ -324,6 +324,117 @@ public class RewriteRuleTests : RewriteTest
         );
     }
     // ===============================================================
+    // ToVisitor — eliminates the need for a manual Visitor class
+    // ===============================================================
+
+    [Fact]
+    public void ToVisitorAppliesRuleToBinaryNodes()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ToVisitorBinaryRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        var x = 1 + 2;
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    void M()
+                    {
+                        var x = 2 + 1;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ToVisitorAppliesRuleToMethodInvocations()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ToVisitorMethodInvocationRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        Console.Write(42);
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    void M()
+                    {
+                        Console.WriteLine(42);
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ToVisitorWithOrElse()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ToVisitorOrElseRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        var a = x == null;
+                        var b = y != null;
+                        var c = z == 1;
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    void M()
+                    {
+                        var a = x is null;
+                        var b = y is not null;
+                        var c = z == 1;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ToVisitorNoMatchLeavesUnchanged()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ToVisitorBinaryRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M()
+                    {
+                        var x = 1 - 2;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
     // FlattenBlock — multi-statement template spliced into parent
     // ===============================================================
 
@@ -591,5 +702,46 @@ class LogBeforeReturnRecipe : Core.Recipe
             }
             return result ?? ret;
         }
+    }
+}
+
+class ToVisitorBinaryRecipe : Core.Recipe
+{
+    public override string DisplayName => "ToVisitor binary swap";
+    public override string Description => "Swaps binary operands using ToVisitor().";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var left = Capture.Expression("left");
+        var right = Capture.Expression("right");
+        return RewriteRule.Rewrite($"{left} + {right}", $"{right} + {left}")
+            .ToVisitor();
+    }
+}
+
+class ToVisitorMethodInvocationRecipe : Core.Recipe
+{
+    public override string DisplayName => "ToVisitor method invocation";
+    public override string Description => "Replaces Console.Write with Console.WriteLine using ToVisitor().";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var expr = Capture.Expression("expr");
+        return RewriteRule.Rewrite($"Console.Write({expr})", $"Console.WriteLine({expr})")
+            .ToVisitor();
+    }
+}
+
+class ToVisitorOrElseRecipe : Core.Recipe
+{
+    public override string DisplayName => "ToVisitor with OrElse";
+    public override string Description => "Replaces == null / != null with is null / is not null using ToVisitor().";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var x = Capture.Expression("x");
+        return RewriteRule.Rewrite($"{x} == null", $"{x} is null")
+            .OrElse(RewriteRule.Rewrite($"{x} != null", $"{x} is not null"))
+            .ToVisitor();
     }
 }
