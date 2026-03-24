@@ -33,12 +33,27 @@ internal enum CaptureKind
 }
 
 /// <summary>
-/// Non-generic interface for captures, providing access to the capture name
-/// without requiring knowledge of the captured type.
+/// Non-generic interface for captures, providing access to capture metadata
+/// and constraint evaluation without requiring knowledge of the captured type.
 /// </summary>
 public interface ICapture
 {
     string Name { get; }
+    bool IsVariadic { get; }
+    int? MinCount { get; }
+    int? MaxCount { get; }
+
+    /// <summary>
+    /// Evaluate the single-node constraint (if any) against a candidate.
+    /// Returns true when there is no constraint or when the constraint passes.
+    /// </summary>
+    bool EvaluateConstraint(object candidate, CaptureConstraintContext context);
+
+    /// <summary>
+    /// Evaluate the variadic constraint (if any) against a list of captured elements.
+    /// Returns true when there is no constraint or when the constraint passes.
+    /// </summary>
+    bool EvaluateVariadicConstraint(IReadOnlyList<object> captured, CaptureConstraintContext context);
 }
 
 /// <summary>
@@ -56,13 +71,15 @@ public sealed class Capture<T> : ICapture where T : J
     public int? MaxCount { get; }
     public string? Type { get; }
     internal CaptureKind Kind { get; }
-    public Func<T, Cursor, bool>? Constraint { get; }
+    public Func<T, CaptureConstraintContext, bool>? Constraint { get; }
+    public Func<IReadOnlyList<T>, CaptureConstraintContext, bool>? VariadicConstraint { get; }
 
     internal Capture(string name, bool variadic = false,
         int? minCount = null, int? maxCount = null,
         string? type = null,
         CaptureKind kind = CaptureKind.Expression,
-        Func<T, Cursor, bool>? constraint = null)
+        Func<T, CaptureConstraintContext, bool>? constraint = null,
+        Func<IReadOnlyList<T>, CaptureConstraintContext, bool>? variadicConstraint = null)
     {
         Name = name;
         IsVariadic = variadic;
@@ -71,6 +88,7 @@ public sealed class Capture<T> : ICapture where T : J
         Type = type;
         Kind = kind;
         Constraint = constraint;
+        VariadicConstraint = variadicConstraint;
     }
 
     /// <summary>
@@ -79,6 +97,23 @@ public sealed class Capture<T> : ICapture where T : J
     /// fallback when used in a plain string interpolation.
     /// </summary>
     public override string ToString() => Placeholder.ToPlaceholder(Name);
+
+    /// <inheritdoc />
+    public bool EvaluateConstraint(object candidate, CaptureConstraintContext context)
+    {
+        if (Constraint == null) return true;
+        return candidate is T typed && Constraint(typed, context);
+    }
+
+    /// <inheritdoc />
+    public bool EvaluateVariadicConstraint(IReadOnlyList<object> captured, CaptureConstraintContext context)
+    {
+        if (VariadicConstraint == null) return true;
+        // IReadOnlyList<T> is covariant and T is a reference type (constrained to J),
+        // so we can cast IReadOnlyList<object> → IReadOnlyList<T> via an adapter.
+        var typed = captured.Select(x => (T)x).ToList().AsReadOnly();
+        return VariadicConstraint(typed, context);
+    }
 }
 
 /// <summary>
@@ -99,48 +134,48 @@ public static class Capture
     /// fallback for AST node types that don't have a dedicated factory.
     /// </para>
     /// </summary>
-    public static Capture<T> Of<T>(string? name = null, string? type = null) where T : J
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}", type: type);
+    public static Capture<T> Of<T>(string? name = null, string? type = null,
+        Func<T, CaptureConstraintContext, bool>? constraint = null) where T : J
+        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
+            type: type, constraint: constraint);
 
     /// <summary>
     /// Create a capture for an expression-position node.
     /// When <paramref name="type"/> is specified, the template engine generates a typed
     /// field declaration in the scaffold preamble for type attribution.
     /// </summary>
-    public static Capture<Expression> Expression(string? name = null, string? type = null)
+    public static Capture<Expression> Expression(string? name = null, string? type = null,
+        Func<Expression, CaptureConstraintContext, bool>? constraint = null)
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            type: type, kind: CaptureKind.Expression);
+            type: type, kind: CaptureKind.Expression, constraint: constraint);
 
     /// <summary>
     /// Create a variadic capture that matches zero or more elements.
     /// Useful for matching argument lists, statement sequences, etc.
     /// </summary>
     public static Capture<T> Variadic<T>(string? name = null,
-        int? min = null, int? max = null) where T : J
+        int? min = null, int? max = null,
+        Func<IReadOnlyList<T>, CaptureConstraintContext, bool>? constraint = null) where T : J
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            variadic: true, minCount: min, maxCount: max);
+            variadic: true, minCount: min, maxCount: max,
+            variadicConstraint: constraint);
 
     /// <summary>
     /// Create a capture for a type-position node (e.g., base type, generic argument, variable type).
     /// The template engine will use an appropriate scaffold strategy so Roslyn parses
     /// the placeholder in a type context.
     /// </summary>
-    public static Capture<NameTree> Type(string? name = null)
+    public static Capture<NameTree> Type(string? name = null,
+        Func<NameTree, CaptureConstraintContext, bool>? constraint = null)
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            kind: CaptureKind.Type);
+            kind: CaptureKind.Type, constraint: constraint);
 
     /// <summary>
     /// Create a capture for a name/identifier-position node.
     /// No preamble declaration is needed; the placeholder is substituted directly.
     /// </summary>
-    public static Capture<Identifier> Name(string? name = null)
+    public static Capture<Identifier> Name(string? name = null,
+        Func<Identifier, CaptureConstraintContext, bool>? constraint = null)
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            kind: CaptureKind.Name);
-
-    /// <summary>
-    /// Create a capture with a constraint predicate that must be satisfied for matching.
-    /// </summary>
-    public static Capture<T> WithConstraint<T>(string name,
-        Func<T, Cursor, bool> constraint) where T : J
-        => new(name, constraint: constraint);
+            kind: CaptureKind.Name, constraint: constraint);
 }
