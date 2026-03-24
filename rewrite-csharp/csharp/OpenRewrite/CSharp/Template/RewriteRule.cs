@@ -21,14 +21,30 @@ namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
 /// A declarative rewrite rule that pairs structural pattern matching with template application.
-/// Rules can be composed with <see cref="AndThen"/> (sequential pipeline) and
+/// Create rules with <see cref="RewriteRule.Rewrite(TemplateStringHandler, TemplateStringHandler)"/>
+/// and compose them with <see cref="AndThen"/> (sequential pipeline) and
 /// <see cref="OrElse"/> (fallback).
 /// </summary>
+/// <example>
+/// <code>
+/// // Simple: match Console.Write(expr) → replace with Console.WriteLine(expr)
+/// var expr = Capture.Expression("expr");
+/// var rule = RewriteRule.Rewrite($"Console.Write({expr})", $"Console.WriteLine({expr})");
+///
+/// // In a visitor method:
+/// return rule.TryOn(Cursor, node) ?? node;
+///
+/// // Composition:
+/// var combined = rule1.AndThen(rule2);   // apply rule2 to rule1's output
+/// var either   = rule1.OrElse(rule2);    // try rule1 first, fall back to rule2
+/// </code>
+/// </example>
 public interface IRewriteRule
 {
     /// <summary>
     /// Try to apply this rule to the given node. Returns the transformed node if the
     /// rule's pattern matches and all predicates pass, or <c>null</c> if the rule does not apply.
+    /// The typical calling convention is <c>rule.TryOn(Cursor, node) ?? node</c>.
     /// </summary>
     J? TryOn(Cursor cursor, J node);
 
@@ -54,8 +70,23 @@ public interface IRewriteRule
 
 /// <summary>
 /// Configuration for a rewrite rule, returned by the builder function passed to
-/// <see cref="RewriteRule.Rewrite(Func{RewriteConfig})"/>.
+/// <see cref="RewriteRule.Rewrite(Func{RewriteConfig})"/>. Used for advanced scenarios
+/// that the simple two-argument <see cref="RewriteRule.Rewrite(TemplateStringHandler, TemplateStringHandler)"/>
+/// overload cannot express: multiple before patterns, dynamic template selection,
+/// or pre/post-match filtering.
 /// </summary>
+/// <example>
+/// <code>
+/// var expr = Capture.Expression("expr");
+/// var rule = RewriteRule.Rewrite(() => new RewriteConfig
+/// {
+///     Before = CSharpPattern.Expression($"Console.Write({expr})"),
+///     After = CSharpTemplate.Expression($"Console.WriteLine({expr})"),
+///     PreMatch = (_, cursor) =>
+///         cursor.FirstEnclosing&lt;MethodDeclaration&gt;()?.Name.SimpleName == "Target"
+/// });
+/// </code>
+/// </example>
 public sealed class RewriteConfig
 {
     private CSharpPattern? _singleBefore;
@@ -104,8 +135,11 @@ public sealed class RewriteConfig
     }
 
     /// <summary>
-    /// A dynamic template factory called with the match result, allowing different
-    /// templates based on what was captured. Mutually exclusive with <see cref="After"/>.
+    /// A dynamic template factory called with the match result, allowing selection of
+    /// different templates based on what was captured. Use instead of <see cref="After"/>
+    /// when the replacement depends on the matched values — e.g., choosing between
+    /// different method names based on a captured argument type.
+    /// Mutually exclusive with <see cref="After"/>.
     /// </summary>
     public Func<MatchResult, CSharpTemplate> AfterFactory
     {
@@ -118,16 +152,32 @@ public sealed class RewriteConfig
     }
 
     /// <summary>
-    /// Optional predicate evaluated before any structural matching.
-    /// Receives the candidate node and cursor. Return <c>false</c> to skip this rule entirely.
+    /// Optional predicate evaluated <em>before</em> any structural matching is attempted.
+    /// Use for cheap context-based filtering — e.g., "only apply inside methods named X"
+    /// or "skip test files." If this returns <c>false</c>, the rule is skipped entirely
+    /// without parsing any patterns.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// PreMatch = (_, cursor) =>
+    ///     cursor.FirstEnclosing&lt;MethodDeclaration&gt;()?.Name.SimpleName == "Target"
+    /// </code>
+    /// </example>
     public Func<J, Cursor, bool>? PreMatch { get; set; }
 
     /// <summary>
-    /// Optional predicate evaluated after a successful structural match.
-    /// Receives the candidate node, cursor, and the captures from the match.
-    /// Return <c>false</c> to reject the match and continue to the next pattern.
+    /// Optional predicate evaluated <em>after</em> a structural pattern match succeeds.
+    /// Receives the matched captures, allowing semantic validation of what was captured —
+    /// e.g., "only apply if the captured right operand is the literal 0."
+    /// If this returns <c>false</c>, the match is rejected and the next pattern in
+    /// <see cref="Befores"/> is tried.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// PostMatch = (_, _, captures) =>
+    ///     captures.Get(right) is Literal { ValueSource: "0" }
+    /// </code>
+    /// </example>
     public Func<J, Cursor, MatchResult, bool>? PostMatch { get; set; }
 
     internal CSharpPattern[] GetBeforePatterns()
@@ -198,13 +248,22 @@ public static class RewriteRule
         new RecipeRuleAdapter(recipe, ctx);
 
     /// <summary>
-    /// Creates a visitor that, when run as an after-visitor, splices the statements of
-    /// <paramref name="block"/> into its parent block. Use from within a visitor method:
-    /// <code>
-    /// DoAfterVisit(RewriteRule.CreateBlockFlattener&lt;ExecutionContext&gt;(block));
-    /// return block;
-    /// </code>
+    /// Creates a visitor that splices the statements of <paramref name="block"/> into its
+    /// parent block. Use when a multi-statement <see cref="CSharpTemplate.Statement"/> produces
+    /// a <see cref="Block"/> that should replace a single statement — the flattener runs as an
+    /// after-visitor and inlines the block's statements into the enclosing block.
     /// </summary>
+    /// <example>
+    /// <code>
+    /// var result = rule.TryOn(Cursor, ret);
+    /// if (result is Block block)
+    /// {
+    ///     DoAfterVisit(RewriteRule.CreateBlockFlattener&lt;ExecutionContext&gt;(block));
+    ///     return block;
+    /// }
+    /// return result ?? ret;
+    /// </code>
+    /// </example>
     public static CSharpVisitor<P> CreateBlockFlattener<P>(Block block) => new BlockFlattener<P>(block);
 
     // ===============================================================
