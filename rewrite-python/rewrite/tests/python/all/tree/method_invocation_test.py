@@ -256,15 +256,12 @@ def test_constructor_call_name_identifier_has_type():
                 if method.name.simple_name != 'OrderedDict':
                     return method
 
-                # given: a constructor call OrderedDict() with method_type set
                 if method.method_type is None:
                     errors.append("MethodInvocation.method_type is None for OrderedDict()")
                     return method
 
-                # when: we inspect the name Identifier's type
                 name_type = method.name.type
 
-                # then: it should match the method_type (as it does in Java)
                 if name_type is None:
                     errors.append(
                         "MethodInvocation.name.type is None for OrderedDict() — "
