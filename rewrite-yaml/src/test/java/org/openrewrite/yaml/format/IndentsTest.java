@@ -178,6 +178,28 @@ class IndentsTest implements RewriteTest {
     }
 
     @Test
+    void sameColumnSequenceEntriesNormalizedToIndented() {
+        rewriteRun(
+          yaml(
+                """
+              fruit:
+              - name: apple
+                color: red
+              - name: banana
+                color: yellow
+              """,
+            """
+              fruit:
+                - name: apple
+                  color: red
+                - name: banana
+                  color: yellow
+              """
+          )
+        );
+    }
+
+    @Test
     void indentRootComments() {
         rewriteRun(
           yaml(
