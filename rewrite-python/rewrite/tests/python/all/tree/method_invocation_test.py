@@ -238,6 +238,58 @@ def test_generic_call_site_return_type():
     assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
 
 
+def test_constructor_call_name_identifier_has_type():
+    """Verify that the name Identifier inside a MethodInvocation for a constructor call has type attribution.
+
+    In Java, m.getName().getType() is always the same as m.getMethodType(). In Python, constructor
+    calls like OrderedDict() produce a MethodInvocation whose name Identifier is missing its type.
+    """
+    errors = []
+
+    def check_types(source_file):
+        assert isinstance(source_file, CompilationUnit)
+
+        class TypeChecker(PythonVisitor):
+            def visit_method_invocation(self, method, p):
+                if not isinstance(method, MethodInvocation):
+                    return method
+                if method.name.simple_name != 'OrderedDict':
+                    return method
+
+                # given: a constructor call OrderedDict() with method_type set
+                if method.method_type is None:
+                    errors.append("MethodInvocation.method_type is None for OrderedDict()")
+                    return method
+
+                # when: we inspect the name Identifier's type
+                name_type = method.name.type
+
+                # then: it should match the method_type (as it does in Java)
+                if name_type is None:
+                    errors.append(
+                        "MethodInvocation.name.type is None for OrderedDict() — "
+                        "expected it to match method_type"
+                    )
+                elif name_type != method.method_type:
+                    errors.append(
+                        f"MethodInvocation.name.type ({name_type}) does not match "
+                        f"method_type ({method.method_type})"
+                    )
+                return method
+
+        TypeChecker().visit(source_file, None)
+
+    # language=python
+    RecipeSpec(type_attribution=True).rewrite_run(python(
+        """\
+        from collections import OrderedDict
+        x = OrderedDict()
+        """,
+        after_recipe=check_types,
+    ))
+    assert not errors, "Type attribution errors:\n" + "\n".join(f"  - {e}" for e in errors)
+
+
 def test_bare_function_declaring_type_has_module():
     """Verify that a bare function call imported from a module gets a declaring type with the module name."""
     errors = []
