@@ -620,7 +620,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     private void installRecipes() {
-        File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
     }

@@ -23,7 +23,7 @@ namespace OpenRewrite.CSharp.Template;
 /// <example>
 /// <code>
 /// // Splice a method name from a recipe option
-/// var tmpl = CSharpTemplate.Create($"logger.{Raw.Code(Level)}({msg})");
+/// var tmpl = CSharpTemplate.Expression($"logger.{Raw.Code(Level)}({msg})");
 /// </code>
 /// </example>
 public sealed class Raw

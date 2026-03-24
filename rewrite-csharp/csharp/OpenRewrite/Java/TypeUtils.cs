@@ -38,14 +38,52 @@ public static class TypeUtils
     {
         if (type == null) return false;
 
-        // Primitive(String) is assignable to "System.String" but has no Class representation
-        if (type is JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.String })
-            return string.Equals("System.String", fullyQualifiedName, StringComparison.Ordinal);
+        // Primitives (int, bool, string, etc.) have no Class representation —
+        // map to their .NET FQN and compare directly
+        if (type is JavaType.Primitive prim)
+        {
+            var primFqn = PrimitiveToFqn(prim.Kind);
+            return primFqn != null && string.Equals(primFqn, fullyQualifiedName, StringComparison.Ordinal);
+        }
 
         var cls = AsClass(type);
         if (cls == null) return false;
 
         return IsAssignableToInternal(cls, fullyQualifiedName, new HashSet<string>());
+    }
+
+    /// <summary>
+    /// Check if a type is assignable to the target type, where the target is specified
+    /// as a <see cref="JavaType"/> rather than a string FQN. This is the preferred overload
+    /// when the target type comes from a parsed AST (e.g., a typed capture's scaffold).
+    /// <para>
+    /// When the target is a <see cref="JavaType.Parameterized"/> type with
+    /// <see cref="JavaType.GenericTypeVariable"/> type parameters, those positions are treated
+    /// as wildcards: any concrete type argument satisfies an unbounded type variable, and
+    /// bounded type variables check that the candidate's type argument satisfies the bound.
+    /// Concrete type parameters require an exact FQN match.
+    /// </para>
+    /// </summary>
+    public static bool IsAssignableTo(JavaType? type, JavaType? targetType)
+    {
+        if (type == null || targetType == null) return false;
+
+        // Both primitives: same kind means match
+        if (type is JavaType.Primitive candPrim && targetType is JavaType.Primitive targetPrim)
+            return candPrim.Kind == targetPrim.Kind;
+
+        // When target is parameterized with type parameters, do parameter-aware matching.
+        // This handles both open generics (with GenericTypeVariable wildcards) and concrete
+        // generics (where all type args must match exactly).
+        if (targetType is JavaType.Parameterized targetParam
+            && targetParam.TypeParameters is { Count: > 0 })
+            return IsAssignableToParameterized(type, targetParam);
+
+        // Fall back to raw FQN comparison
+        var targetFqn = GetFullyQualifiedName(targetType);
+        if (targetFqn == null) return false;
+
+        return IsAssignableTo(type, targetFqn);
     }
 
     /// <summary>
@@ -55,9 +93,12 @@ public static class TypeUtils
     {
         if (type == null) return false;
 
-        // Primitive(String) is assignable to "System.String" but has no Class representation
-        if (type is JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.String })
-            return fullyQualifiedNames.Contains("System.String");
+        // Primitives have no Class representation — map to FQN and check
+        if (type is JavaType.Primitive prim2)
+        {
+            var primFqn = PrimitiveToFqn(prim2.Kind);
+            return primFqn != null && fullyQualifiedNames.Contains(primFqn);
+        }
 
         var cls = AsClass(type);
         if (cls == null) return false;
@@ -250,6 +291,215 @@ public static class TypeUtils
 
         return false;
     }
+
+    /// <summary>
+    /// Check if <paramref name="type"/> is assignable to a parameterized target type.
+    /// Walks the candidate's supertype/interface chain looking for a
+    /// <see cref="JavaType.Parameterized"/> whose raw type matches, then compares type
+    /// arguments position-by-position.
+    /// </summary>
+    private static bool IsAssignableToParameterized(JavaType type, JavaType.Parameterized target)
+    {
+        var targetFqn = GetFullyQualifiedName(target.Type);
+        if (targetFqn == null) return false;
+
+        // Collect all parameterized types in the candidate's hierarchy that match the target FQN
+        var matching = new List<JavaType.Parameterized>();
+        CollectParameterizedMatches(type, targetFqn, matching, new HashSet<string>());
+
+        // Check if any matching parameterized type satisfies the type argument constraints
+        foreach (var match in matching)
+        {
+            if (TypeParametersMatch(match.TypeParameters, target.TypeParameters))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Recursively collect <see cref="JavaType.Parameterized"/> types in the hierarchy
+    /// of <paramref name="type"/> whose raw FQN matches <paramref name="targetFqn"/>.
+    /// When walking from a <see cref="JavaType.Parameterized"/> type, resolves
+    /// <see cref="JavaType.GenericTypeVariable"/> entries in supertypes/interfaces by
+    /// substituting the actual type arguments (mirroring Java's <c>maybeResolveParameters</c>).
+    /// </summary>
+    private static void CollectParameterizedMatches(JavaType? type, string targetFqn,
+        List<JavaType.Parameterized> results, HashSet<string> seen)
+    {
+        if (type == null) return;
+
+        if (type is JavaType.Parameterized param)
+        {
+            var rawFqn = GetFullyQualifiedName(param.Type);
+            if (rawFqn != null)
+            {
+                if (string.Equals(rawFqn, targetFqn, StringComparison.Ordinal))
+                    results.Add(param);
+
+                // Continue walking the underlying class's hierarchy, resolving
+                // type parameters in supertypes/interfaces using the actual type args
+                if (param.Type is JavaType.Class cls && seen.Add(cls.FullyQualifiedName))
+                {
+                    var resolved = MaybeResolveParameters(param, cls.Supertype as JavaType.FullyQualified);
+                    CollectParameterizedMatches(resolved ?? cls.Supertype, targetFqn, results, seen);
+                    if (cls.Interfaces != null)
+                    {
+                        foreach (var iface in cls.Interfaces)
+                        {
+                            resolved = MaybeResolveParameters(param, iface);
+                            CollectParameterizedMatches(resolved ?? iface, targetFqn, results, seen);
+                        }
+                    }
+                }
+            }
+        }
+        else if (type is JavaType.Class cls)
+        {
+            if (!seen.Add(cls.FullyQualifiedName)) return;
+
+            CollectParameterizedMatches(cls.Supertype, targetFqn, results, seen);
+            if (cls.Interfaces != null)
+            {
+                foreach (var iface in cls.Interfaces)
+                    CollectParameterizedMatches(iface, targetFqn, results, seen);
+            }
+        }
+    }
+
+    /// <summary>
+    /// When a <see cref="JavaType.Parameterized"/> type (e.g., <c>Dictionary&lt;string, int&gt;</c>)
+    /// has a supertype or interface that is also parameterized (e.g., <c>IDictionary&lt;TKey, TValue&gt;</c>),
+    /// resolve the target's type parameters by substituting the source's actual type arguments
+    /// for the formal type parameters.
+    /// <para>
+    /// Mirrors Java's <c>TypeUtils.maybeResolveParameters</c>.
+    /// </para>
+    /// </summary>
+    private static JavaType.Parameterized? MaybeResolveParameters(
+        JavaType.Parameterized source, JavaType.FullyQualified? target)
+    {
+        if (target is not JavaType.Parameterized targetParam)
+            return null;
+
+        var sourceClass = source.Type as JavaType.Class;
+        if (sourceClass?.TypeParameters == null || source.TypeParameters == null)
+            return null;
+
+        if (sourceClass.TypeParameters.Count != source.TypeParameters.Count)
+            return null;
+
+        // Build substitution map: formal type param → actual type arg
+        var map = new Dictionary<string, JavaType>();
+        for (int i = 0; i < sourceClass.TypeParameters.Count; i++)
+        {
+            if (sourceClass.TypeParameters[i] is JavaType.GenericTypeVariable gtv)
+                map[gtv.Name] = source.TypeParameters[i];
+        }
+
+        if (map.Count == 0 || targetParam.TypeParameters == null)
+            return null;
+
+        // Apply substitution to the target's type parameters
+        var resolved = new List<JavaType>(targetParam.TypeParameters.Count);
+        bool changed = false;
+        foreach (var tp in targetParam.TypeParameters)
+        {
+            var sub = SubstituteTypeParam(tp, map);
+            resolved.Add(sub);
+            if (!ReferenceEquals(sub, tp)) changed = true;
+        }
+
+        return changed ? new JavaType.Parameterized(targetParam.Type, resolved) : targetParam;
+    }
+
+    /// <summary>
+    /// Replace a <see cref="JavaType.GenericTypeVariable"/> with its substitution
+    /// from the map. For <see cref="JavaType.Parameterized"/> types, recursively
+    /// substitute type parameters.
+    /// </summary>
+    private static JavaType SubstituteTypeParam(JavaType type, Dictionary<string, JavaType> map)
+    {
+        if (type is JavaType.GenericTypeVariable gtv && map.TryGetValue(gtv.Name, out var replacement))
+            return replacement;
+
+        if (type is JavaType.Parameterized param && param.TypeParameters != null)
+        {
+            var substituted = new List<JavaType>(param.TypeParameters.Count);
+            bool changed = false;
+            foreach (var tp in param.TypeParameters)
+            {
+                var sub = SubstituteTypeParam(tp, map);
+                substituted.Add(sub);
+                if (!ReferenceEquals(sub, tp)) changed = true;
+            }
+            if (changed)
+                return new JavaType.Parameterized(param.Type, substituted);
+        }
+
+        return type;
+    }
+
+    /// <summary>
+    /// Compare type parameter lists position-by-position. A <see cref="JavaType.GenericTypeVariable"/>
+    /// in the target acts as a wildcard (any concrete type matches). If the variable has bounds,
+    /// the candidate's type argument must be assignable to all bounds.
+    /// Concrete type parameters require exact FQN match.
+    /// </summary>
+    private static bool TypeParametersMatch(IList<JavaType>? candidateParams, IList<JavaType>? targetParams)
+    {
+        if (targetParams == null || targetParams.Count == 0) return true;
+        if (candidateParams == null || candidateParams.Count != targetParams.Count) return false;
+
+        for (int i = 0; i < targetParams.Count; i++)
+        {
+            var targetParam = targetParams[i];
+            var candidateParam = candidateParams[i];
+
+            if (targetParam is JavaType.GenericTypeVariable gtv)
+            {
+                // Unbounded type variable — any type matches
+                if (gtv.Bounds == null || gtv.Bounds.Count == 0)
+                    continue;
+
+                // Bounded — candidate must be assignable to all bounds
+                foreach (var bound in gtv.Bounds)
+                {
+                    var boundFqn = GetFullyQualifiedName(bound);
+                    if (boundFqn != null && !IsAssignableTo(candidateParam, boundFqn))
+                        return false;
+                }
+            }
+            else
+            {
+                // Concrete type parameter — require exact FQN match
+                var targetFqn = GetFullyQualifiedName(targetParam);
+                var candidateFqn = GetFullyQualifiedName(candidateParam);
+                if (targetFqn == null || candidateFqn == null ||
+                    !string.Equals(targetFqn, candidateFqn, StringComparison.Ordinal))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Map a <see cref="JavaType.Primitive.PrimitiveKind"/> to its .NET fully-qualified type name.
+    /// Returns null for non-value primitives (Null, None, Void).
+    /// </summary>
+    private static string? PrimitiveToFqn(JavaType.Primitive.PrimitiveKind kind) => kind switch
+    {
+        JavaType.Primitive.PrimitiveKind.Boolean => "System.Boolean",
+        JavaType.Primitive.PrimitiveKind.Byte => "System.Byte",
+        JavaType.Primitive.PrimitiveKind.Char => "System.Char",
+        JavaType.Primitive.PrimitiveKind.Double => "System.Double",
+        JavaType.Primitive.PrimitiveKind.Float => "System.Single",
+        JavaType.Primitive.PrimitiveKind.Int => "System.Int32",
+        JavaType.Primitive.PrimitiveKind.Long => "System.Int64",
+        JavaType.Primitive.PrimitiveKind.Short => "System.Int16",
+        JavaType.Primitive.PrimitiveKind.String => "System.String",
+        _ => null
+    };
 
     private static JavaType? TryGetTypeDynamic(Expression expr)
     {

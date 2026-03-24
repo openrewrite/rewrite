@@ -60,6 +60,10 @@ internal class PatternMatchingComparator
                     // Already bound — check consistency
                     return MatchValue(existing, candidate, cursor);
                 }
+                // Evaluate constraint before binding — pass the pattern placeholder's
+                // resolved type so typed captures can compare JavaType-to-JavaType
+                if (!EvaluateConstraint(_captures[captureName], candidate, cursor, patternId.Type))
+                    return false;
                 _bindings[captureName] = candidate;
                 return true;
             }
@@ -183,6 +187,20 @@ internal class PatternMatchingComparator
     /// <c>Identifier</c> ↔ <c>FieldAccess</c> for static members).
     /// Called when pattern and candidate have different node types.
     /// </summary>
+    /// <summary>
+    /// Returns <c>true</c> when the two node types form a pair that
+    /// <see cref="MatchCrossType"/> knows how to compare. Used by
+    /// <see cref="CSharpPattern.Match"/> to avoid rejecting these pairs
+    /// in its fast-reject check.
+    /// </summary>
+    internal static bool HasCrossTypeEquivalence(J pattern, J candidate)
+    {
+        return (pattern is Binary && candidate is IsPattern)
+            || (pattern is IsPattern && candidate is Binary)
+            || (pattern is FieldAccess && candidate is Identifier)
+            || (pattern is Identifier && candidate is FieldAccess);
+    }
+
     private bool MatchCrossType(J pattern, J candidate, Cursor cursor)
     {
         // Binary(expr == null) pattern ↔ IsPattern(expr is null) candidate
@@ -300,9 +318,14 @@ internal class PatternMatchingComparator
         // Both null
         if (patternValue == null && candidateValue == null)
             return true;
-        // One null
+        // One null — but a pattern container with only zero-min variadic captures
+        // can match a null candidate (e.g., pattern `Fact({args})` vs `[Fact]` with no parens)
         if (patternValue == null || candidateValue == null)
+        {
+            if (patternValue != null && candidateValue == null && TreeHelper.IsContainer(patternValue))
+                return MatchContainerAgainstNull(patternValue, cursor);
             return false;
+        }
 
         // J tree nodes — recursive structural match
         if (patternValue is J pj && candidateValue is J cj)
@@ -350,6 +373,39 @@ internal class PatternMatchingComparator
             return patternElements == null && candidateElements == null;
 
         return MatchPaddedList(patternElements, candidateElements, cursor);
+    }
+
+    /// <summary>
+    /// Match a pattern container against a null candidate. Succeeds only when every
+    /// element in the container is a variadic capture placeholder with min == 0,
+    /// binding each to an empty list.
+    /// </summary>
+    private bool MatchContainerAgainstNull(object patternContainer, Cursor cursor)
+    {
+        var patternElements = TreeHelper.GetContainerElements(patternContainer);
+        if (patternElements == null || patternElements.Count == 0)
+            return true;
+
+        foreach (var el in patternElements)
+        {
+            var inner = TreeHelper.UnwrapPadded(el) ?? el;
+            if (inner is Identifier id)
+            {
+                var captureName = Placeholder.FromPlaceholder(id.SimpleName);
+                if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
+                    && IsVariadic(captureObj))
+                {
+                    var (min, _) = GetVariadicBounds(captureObj);
+                    if (min == 0)
+                    {
+                        _bindings[captureName] = new List<object>().AsReadOnly();
+                        continue;
+                    }
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -413,6 +469,10 @@ internal class PatternMatchingComparator
                         captured.Add(innerCandidate);
                     }
 
+                    // Evaluate variadic constraint before binding
+                    if (!EvaluateVariadicConstraint(captureObj, captured.AsReadOnly(), cursor))
+                        continue;
+
                     // Save bindings for backtracking
                     var savedBindings = new Dictionary<string, object>(_bindings);
                     _bindings[captureName] = captured.AsReadOnly();
@@ -456,20 +516,14 @@ internal class PatternMatchingComparator
         return true;
     }
 
-    private static bool IsVariadic(object captureObj)
-    {
-        var prop = captureObj.GetType().GetProperty("IsVariadic");
-        return prop != null && (bool)(prop.GetValue(captureObj) ?? false);
-    }
+    private static bool IsVariadic(object captureObj) =>
+        captureObj is ICapture capture && capture.IsVariadic;
 
     private static (int min, int max) GetVariadicBounds(object captureObj)
     {
-        var type = captureObj.GetType();
-        var minProp = type.GetProperty("MinCount");
-        var maxProp = type.GetProperty("MaxCount");
-        var min = minProp?.GetValue(captureObj) as int? ?? 0;
-        var max = maxProp?.GetValue(captureObj) as int? ?? int.MaxValue;
-        return (min, max);
+        if (captureObj is not ICapture capture)
+            return (0, int.MaxValue);
+        return (capture.MinCount ?? 0, capture.MaxCount ?? int.MaxValue);
     }
 
     /// <summary>
@@ -505,5 +559,14 @@ internal class PatternMatchingComparator
 
     private static bool IsStatic(JavaType.Variable variable) =>
         (variable.FlagsBitMap & FlagStatic) != 0;
+
+    private CaptureConstraintContext BuildConstraintContext(Cursor cursor, JavaType? patternType = null) =>
+        new(cursor, new Dictionary<string, object>(_bindings), patternType);
+
+    private bool EvaluateConstraint(object captureObj, object candidate, Cursor cursor, JavaType? patternType = null) =>
+        captureObj is not ICapture capture || capture.EvaluateConstraint(candidate, BuildConstraintContext(cursor, patternType));
+
+    private bool EvaluateVariadicConstraint(object captureObj, IReadOnlyList<object> captured, Cursor cursor) =>
+        captureObj is not ICapture capture || capture.EvaluateVariadicConstraint(captured, BuildConstraintContext(cursor));
 
 }

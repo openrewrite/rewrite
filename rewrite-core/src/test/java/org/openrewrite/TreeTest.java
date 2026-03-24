@@ -63,7 +63,7 @@ class TreeTest implements RewriteTest {
     })
     @ParameterizedTest
     void printBomHandling(boolean charsetBomMarked, String expected) {
-        PlainText sourceFile = new PlainText(
+        var sourceFile = new PlainText(
             Tree.randomId(),
             Paths.get("test.txt"),
             Markers.EMPTY,
@@ -82,7 +82,7 @@ class TreeTest implements RewriteTest {
 
     @Test
     void printQuarkDoesNotThrowOnBomRestoration() {
-        Quark quark = new Quark(
+        var quark = new Quark(
             Tree.randomId(),
             Paths.get("unknown.file"),
             Markers.EMPTY,

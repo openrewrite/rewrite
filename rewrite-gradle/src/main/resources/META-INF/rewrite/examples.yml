@@ -873,6 +873,38 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeTaskToTasksRegister
+examples:
+- description: ''
+  sources:
+  - before: |
+      task exampleName(type: Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    after: |
+      tasks.register("exampleName", Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    path: build.gradle
+    language: groovy
+- description: ''
+  sources:
+  - before: |
+      task<Copy>("exampleName") {
+          from("src")
+          into("dest")
+      }
+    after: |
+      tasks.register<Copy>("exampleName") {
+          from("src")
+          into("dest")
+      }
+    path: build.gradle.kts
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.gradle8.JacocoReportDeprecations
 examples:
 - description: '`JacocoReportDeprecationsTest#deprecationsInNormalSyntax`'

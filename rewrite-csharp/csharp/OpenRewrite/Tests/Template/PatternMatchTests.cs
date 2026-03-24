@@ -921,7 +921,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureMatchesZeroArguments()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -934,7 +934,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureInNonTrailingPosition()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         var last = Capture.Of<Expression>("last");
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args}, {last})")),
@@ -948,7 +948,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMinBoundRejectsFewerArgs()
     {
-        var args = Capture.Variadic<Expression>("args", min: 2);
+        var args = Capture.Expression("args", variadic: new(Min: 2));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -961,12 +961,50 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMaxBoundRejectsMoreArgs()
     {
-        var args = Capture.Variadic<Expression>("args", max: 1);
+        var args = Capture.Expression("args", variadic: new(Max: 1));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
                 // 3 args — max is 1, should NOT match
                 "class C { void M() { Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    // ===============================================================
+    // Variadic captures in attribute arguments
+    // ===============================================================
+
+    [Fact]
+    public void VariadicAttributeCaptureMatchesNoParens()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(FindAnnotation($"Fact({args})")),
+            CSharp(
+                """
+                class C { [Fact] void M() {} }
+                """,
+                """
+                class C { [/*~~>*/Fact] void M() {} }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicAttributeCaptureMatchesWithArguments()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(FindAnnotation($"Fact({args})")),
+            CSharp(
+                """
+                class C { [Fact(DisplayName = "test")] void M() {} }
+                """,
+                """
+                class C { [/*~~>*/Fact(DisplayName = "test")] void M() {} }
+                """
             )
         );
     }
@@ -1408,9 +1446,185 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Capture constraints
+    // ===============================================================
+
+    [Fact]
+    public void ConstraintThatReturnsTrueAllowsMatch()
+    {
+        var expr = Capture.Expression("expr", constraint: (_, _) => true);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintThatReturnsFalseBlocksMatch()
+    {
+        var expr = Capture.Expression("expr", constraint: (_, _) => false);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintReceivesCapturedNode()
+    {
+        // Constraint that only accepts Literal nodes with value "42"
+        var expr = Capture.Expression("expr",
+            constraint: (node, _) => node is Literal { ValueSource: "42" });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintRejectsMismatchedNode()
+    {
+        // Constraint that only accepts Literal nodes with value "99"
+        var expr = Capture.Expression("expr",
+            constraint: (node, _) => node is Literal { ValueSource: "99" });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintReceivesCursorPositionedAtNode()
+    {
+        CaptureConstraintContext? capturedCtx = null;
+        var expr = Capture.Expression("expr", constraint: (_, ctx) =>
+        {
+            capturedCtx = ctx;
+            return true;
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+        // The context passed to the constraint should contain the cursor from the visitor
+        Assert.NotNull(capturedCtx);
+        Assert.NotNull(capturedCtx!.Cursor);
+    }
+
+    [Fact]
+    public void ConstraintReceivesPreviouslyBoundCaptures()
+    {
+        // First capture binds with no constraint, second uses dependent constraint
+        var a = Capture.Of<Expression>("a");
+        var b = Capture.Expression("b", constraint: (node, ctx) =>
+        {
+            // The constraint on 'b' can read the already-bound value of 'a'
+            return ctx.Captures.ContainsKey("a")
+                && ctx.Captures["a"] is Literal { ValueSource: "1" };
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Math.Max({a}, {b})")),
+            CSharp(
+                "class C { void M() { Math.Max(1, 2); } }",
+                "class C { void M() { /*~~>*/Math.Max(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void DependentConstraintRejectsWhenPreviousCaptureDoesNotMatch()
+    {
+        var a = Capture.Of<Expression>("a");
+        var b = Capture.Expression("b", constraint: (node, ctx) =>
+        {
+            // Require 'a' to have been bound to a literal "99" — which it won't be
+            return ctx.Captures.ContainsKey("a")
+                && ctx.Captures["a"] is Literal { ValueSource: "99" };
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Math.Max({a}, {b})")),
+            CSharp(
+                "class C { void M() { Math.Max(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintReceivesCapturedList()
+    {
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 2));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2); } }",
+                "class C { void M() { /*~~>*/Foo(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintThatReturnsFalseBlocksMatch()
+    {
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 3));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // 2 args — constraint requires 3
+                "class C { void M() { Foo(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintCanInspectElements()
+    {
+        // Only match when all captured args are Literal nodes
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { /*~~>*/Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintRejectsNonMatchingElements()
+    {
+        // Only match when all captured args are Literal nodes
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // x is an Identifier, not a Literal — should fail
+                "class C { void M() { Foo(1, x, 3); } }"
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
+#pragma warning disable CS0618
     private static Core.Recipe Search<T>(TemplateStringHandler handler) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(handler));
 
@@ -1422,6 +1636,7 @@ public class PatternMatchTests : RewriteTest
 
     private static Core.Recipe Search<T>(string code, IReadOnlyList<string> usings) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(code, usings: usings));
+#pragma warning restore CS0618
 
     private static Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
     private static Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
@@ -1431,9 +1646,9 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
     private static Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
     private static Core.Recipe FindStaticMember(string c) =>
-        new StaticMemberSearchRecipe(CSharpPattern.Create(c));
+        new StaticMemberSearchRecipe(CSharpPattern.Expression(c));
     private static Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
-        new StaticMemberSearchRecipe(CSharpPattern.Create(c, usings: usings));
+        new StaticMemberSearchRecipe(CSharpPattern.Expression(c, usings: usings));
     private static Core.Recipe FindLiteral(string c) => Search<Literal>(c);
     private static Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
     private static Core.Recipe FindUnary(TemplateStringHandler h) => Search<Unary>(h);
@@ -1465,14 +1680,17 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
     private static Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
 
+    private static Core.Recipe FindAnnotation(TemplateStringHandler h) =>
+        new PatternSearchRecipe<Annotation>(CSharpPattern.Attribute(h));
+
     /// <summary>
     /// Search for a Binary or IsPattern null-check, matching across both node types.
     /// </summary>
     private static Core.Recipe FindNullCheck(TemplateStringHandler h) =>
-        new NullCheckSearchRecipe(CSharpPattern.Create(h));
+        new NullCheckSearchRecipe(CSharpPattern.Expression(h));
 
     private static Core.Recipe FindNullCheck(string c) =>
-        new NullCheckSearchRecipe(CSharpPattern.Create(c));
+        new NullCheckSearchRecipe(CSharpPattern.Expression(c));
 }
 
 /// <summary>

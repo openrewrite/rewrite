@@ -49,8 +49,7 @@ public class FindTypes extends Recipe {
     @Nullable
     Boolean checkAssignability;
 
-    transient TypeUses typeUses = new TypeUses(this)
-            .withInstanceName(this::dataTableInstanceName);
+    transient TypeUses typeUses = new TypeUses(this);
 
     private String dataTableInstanceName() {
         return "Type uses of `" + fullyQualifiedTypeName + "`";

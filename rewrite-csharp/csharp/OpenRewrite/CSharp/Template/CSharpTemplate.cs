@@ -26,21 +26,21 @@ namespace OpenRewrite.CSharp.Template;
 /// <example>
 /// <code>
 /// // Simple template (no captures)
-/// var tmpl = CSharpTemplate.Create($"Console.WriteLine(\"hello\")");
+/// var tmpl = CSharpTemplate.Expression($"Console.WriteLine(\"hello\")");
 /// var result = tmpl.Apply(cursor);
 ///
 /// // Template with captures from pattern match
 /// var expr = Capture.Of&lt;Expression&gt;("expr");
-/// var tmpl = CSharpTemplate.Create($"Console.WriteLine({expr})");
+/// var tmpl = CSharpTemplate.Expression($"Console.WriteLine({expr})");
 /// var result = tmpl.Apply(cursor, values: match);
 ///
 /// // Template with usings
-/// var tmpl = CSharpTemplate.Create(
+/// var tmpl = CSharpTemplate.Expression(
 ///     $"JsonSerializer.Serialize({expr})",
 ///     usings: ["System.Text.Json"]);
 ///
 /// // Template with NuGet dependencies for type attribution
-/// var tmpl = CSharpTemplate.Create(
+/// var tmpl = CSharpTemplate.Expression(
 ///     $"JsonConvert.SerializeObject({expr})",
 ///     usings: ["Newtonsoft.Json"],
 ///     dependencies: new Dictionary&lt;string, string&gt; { ["Newtonsoft.Json"] = "13.*" });
@@ -70,14 +70,11 @@ public sealed class CSharpTemplate
     }
 
     /// <summary>
-    /// Create a template from an interpolated string containing <see cref="Capture{T}"/>
-    /// and/or <see cref="Raw"/> placeholders.
+    /// Create a template with auto-detected scaffold kind.
+    /// Prefer <see cref="Expression"/>, <see cref="Statement"/>,
+    /// <see cref="ClassMember"/>, or <see cref="Attribute"/> for explicit scaffold control.
     /// </summary>
-    /// <param name="handler">The interpolated string handler that extracts captures.</param>
-    /// <param name="usings">Optional using directives for the scaffold.</param>
-    /// <param name="context">Optional context lines emitted before the scaffold class.</param>
-    /// <param name="dependencies">Optional NuGet package dependencies (package name → version)
-    /// required for import resolution and type attribution.</param>
+    [Obsolete("Use Expression(), Statement(), ClassMember(), or Attribute() for explicit scaffold control.")]
     public static CSharpTemplate Create(TemplateStringHandler handler,
         IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
         IReadOnlyDictionary<string, string>? dependencies = null)
@@ -85,14 +82,8 @@ public sealed class CSharpTemplate
         return new CSharpTemplate(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies);
     }
 
-    /// <summary>
-    /// Create a template from a plain string (no captures).
-    /// </summary>
-    /// <param name="code">The template code string.</param>
-    /// <param name="usings">Optional using directives for the scaffold.</param>
-    /// <param name="context">Optional context lines emitted before the scaffold class.</param>
-    /// <param name="dependencies">Optional NuGet package dependencies (package name → version)
-    /// required for import resolution and type attribution.</param>
+    /// <inheritdoc cref="Create(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    [Obsolete("Use Expression(), Statement(), ClassMember(), or Attribute() for explicit scaffold control.")]
     public static CSharpTemplate Create(string code,
         IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
         IReadOnlyDictionary<string, string>? dependencies = null)

@@ -83,7 +83,7 @@ class KTSTest implements RewriteTest {
             }
             """,
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicInteger count = new AtomicInteger();
+                    var count = new AtomicInteger();
                     new KotlinIsoVisitor<AtomicInteger>() {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicInteger i) {

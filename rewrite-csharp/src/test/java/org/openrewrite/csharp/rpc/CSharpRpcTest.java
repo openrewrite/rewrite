@@ -434,7 +434,7 @@ class CSharpRpcTest implements RewriteTest {
 
     @Test
     void getMarketplace() {
-        RecipeBundle bundle = new RecipeBundle("nuget", "test-recipes",
+        var bundle = new RecipeBundle("nuget", "test-recipes",
                 null, null, null);
         RecipeMarketplace marketplace = CSharpRewriteRpc.getOrStart().getMarketplace(bundle);
         assertThat(marketplace).isNotNull();
@@ -1625,19 +1625,25 @@ class CSharpRpcTest implements RewriteTest {
         if (tree instanceof Cs.CompilationUnit cu) {
             for (Statement member : cu.getMembers()) {
                 T result = findFirst(member, type);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.ClassDeclaration cd) {
             for (Statement stmt : cd.getBody().getStatements()) {
                 T result = findFirst(stmt, type);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof Cs.NamespaceDeclaration ns) {
             for (var member : ns.getMembers()) {
                 T result = findFirst(member, type);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         return null;
