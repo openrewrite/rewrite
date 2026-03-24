@@ -487,11 +487,19 @@ public class MavenSettings {
 
         public Proxies merge(@Nullable Proxies proxies) {
             final Map<String, Proxy> merged = new LinkedHashMap<>();
+            int nullIndex = 0;
             for (Proxy proxy : this.proxies) {
-                merged.put(proxy.id, proxy);
+                String key = proxy.id != null ? proxy.id : "__null_" + nullIndex++;
+                merged.put(key, proxy);
             }
             if (proxies != null) {
-                proxies.getProxies().forEach(proxy -> merged.putIfAbsent(proxy.getId(), proxy));
+                for (Proxy proxy : proxies.getProxies()) {
+                    if (proxy.getId() != null) {
+                        merged.putIfAbsent(proxy.getId(), proxy);
+                    } else {
+                        merged.put("__null_" + nullIndex++, proxy);
+                    }
+                }
             }
             return new Proxies(new ArrayList<>(merged.values()));
         }
@@ -501,6 +509,7 @@ public class MavenSettings {
     @Data
     @With
     public static class Proxy {
+        @Nullable
         String id;
 
         @Nullable
@@ -511,7 +520,8 @@ public class MavenSettings {
 
         String host;
 
-        int port;
+        @Nullable
+        Integer port;
 
         @Nullable
         String username;
