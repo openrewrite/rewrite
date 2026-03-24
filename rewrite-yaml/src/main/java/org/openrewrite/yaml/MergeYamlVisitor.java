@@ -364,25 +364,89 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private Yaml.Sequence.Entry reindentEntry(Yaml.Sequence.Entry entry, String sequenceEntryIndent) {
         String prefix = entry.getPrefix();
         String targetIndent = sequenceEntryIndent.replaceFirst("^\n", "");
+
+        // Compute how much autoFormat over- or under-indented relative to the target
+        String actualIndent = prefix.substring(prefix.lastIndexOf('\n') + 1);
+        int delta = targetIndent.length() - actualIndent.length();
+
+        // Fix the entry prefix
         String[] lines = LINE_BREAK.split(prefix, -1);
+        String fixedPrefix;
         if (lines.length <= 1) {
-            return entry.withPrefix(sequenceEntryIndent);
-        }
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < lines.length; i++) {
-            if (i > 0) {
-                sb.append(linebreak());
+            fixedPrefix = sequenceEntryIndent;
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < lines.length; i++) {
+                if (i > 0) {
+                    sb.append(linebreak());
+                }
+                String trimmed = lines[i].replaceAll("^\\s+", "");
+                if (i == lines.length - 1) {
+                    sb.append(targetIndent);
+                } else if (trimmed.isEmpty()) {
+                    sb.append(lines[i]);
+                } else {
+                    sb.append(targetIndent).append(trimmed);
+                }
             }
-            String trimmed = lines[i].replaceAll("^\\s+", "");
-            if (i == lines.length - 1) {
-                sb.append(targetIndent);
-            } else if (trimmed.isEmpty()) {
-                sb.append(lines[i]);
-            } else {
-                sb.append(targetIndent).append(trimmed);
-            }
+            fixedPrefix = sb.toString();
         }
-        return entry.withPrefix(sb.toString());
+        entry = entry.withPrefix(fixedPrefix);
+
+        // If there is an indentation delta, shift all prefixes inside the entry's block
+        // so that nested content (mapping entries, inner sequences) is also corrected.
+        // Note: this shifts uniformly, so it cannot fix style differences between
+        // same-column and indented sequence layouts — only the absolute column offset.
+        if (delta != 0) {
+            entry = entry.withBlock((Yaml.Block) new ShiftIndentVisitor(delta).visit(entry.getBlock(), 0));
+        }
+        return entry;
+    }
+
+    /**
+     * Shifts indentation of all YAML nodes by a fixed column delta.
+     * Positive delta adds spaces; negative delta removes spaces from the last line
+     * of each prefix (the indentation line). Inline prefixes (no newline) are left unchanged.
+     */
+    private class ShiftIndentVisitor extends YamlVisitor<Integer> {
+        private final int delta;
+
+        ShiftIndentVisitor(int delta) {
+            this.delta = delta;
+        }
+
+        @Override
+        public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Integer p) {
+            return super.visitMappingEntry(entry.withPrefix(shiftPrefix(entry.getPrefix())), p);
+        }
+
+        @Override
+        public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, Integer p) {
+            return super.visitSequenceEntry(entry.withPrefix(shiftPrefix(entry.getPrefix())), p);
+        }
+
+        @Override
+        public Yaml visitScalar(Yaml.Scalar scalar, Integer p) {
+            return super.visitScalar(scalar.withPrefix(shiftPrefix(scalar.getPrefix())), p);
+        }
+
+        @Override
+        public Yaml visitSequence(Yaml.Sequence sequence, Integer p) {
+            return super.visitSequence(sequence.withPrefix(shiftPrefix(sequence.getPrefix())), p);
+        }
+
+        private String shiftPrefix(String prefix) {
+            int lastNewline = prefix.lastIndexOf('\n');
+            if (lastNewline < 0) {
+                return prefix;
+            }
+            String beforeIndent = prefix.substring(0, lastNewline + 1);
+            String indent = prefix.substring(lastNewline + 1);
+            int newLen = Math.max(0, indent.length() + delta);
+            char[] spaces = new char[newLen];
+            Arrays.fill(spaces, ' ');
+            return beforeIndent + new String(spaces);
+        }
     }
 
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {

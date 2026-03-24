@@ -3506,6 +3506,50 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/discussions/7107")
     @Test
+    void mergeComplexEntryIntoSequenceWithObjectIdentifyingProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              fruit:
+              - name: blueberry
+                specs:
+                - id: 2
+              """,
+            null,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )).expectedCyclesThatMakeChanges(2),
+          yaml(
+            """
+              ---
+              fruit:
+              - name: apple
+                specs:
+                - id: 1
+              """,
+            // autoFormat indents nested sequence entries by indentSize relative to the parent key,
+            // even when the existing document uses same-column style — the result is still valid YAML
+            """
+              ---
+              fruit:
+              - name: apple
+                specs:
+                - id: 1
+              - name: blueberry
+                specs:
+                  - id: 2
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/discussions/7107")
+    @Test
     void mergeNewEntryIntoSequenceWithObjectIdentifyingProperty() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
