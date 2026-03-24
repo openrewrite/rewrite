@@ -921,7 +921,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureMatchesZeroArguments()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -934,7 +934,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureInNonTrailingPosition()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         var last = Capture.Of<Expression>("last");
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args}, {last})")),
@@ -948,7 +948,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMinBoundRejectsFewerArgs()
     {
-        var args = Capture.Variadic<Expression>("args", min: 2);
+        var args = Capture.Expression("args", variadic: new(Min: 2));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -961,7 +961,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMaxBoundRejectsMoreArgs()
     {
-        var args = Capture.Variadic<Expression>("args", max: 1);
+        var args = Capture.Expression("args", variadic: new(Max: 1));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -1527,8 +1527,8 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicConstraintReceivesCapturedList()
     {
-        var args = Capture.Variadic<Expression>("args",
-            constraint: (items, _) => items.Count == 2);
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 2));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -1541,8 +1541,8 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicConstraintThatReturnsFalseBlocksMatch()
     {
-        var args = Capture.Variadic<Expression>("args",
-            constraint: (items, _) => items.Count == 3);
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 3));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -1556,8 +1556,8 @@ public class PatternMatchTests : RewriteTest
     public void VariadicConstraintCanInspectElements()
     {
         // Only match when all captured args are Literal nodes
-        var args = Capture.Variadic<Expression>("args",
-            constraint: (items, _) => items.All(item => item is Literal));
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -1571,8 +1571,8 @@ public class PatternMatchTests : RewriteTest
     public void VariadicConstraintRejectsNonMatchingElements()
     {
         // Only match when all captured args are Literal nodes
-        var args = Capture.Variadic<Expression>("args",
-            constraint: (items, _) => items.All(item => item is Literal));
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(

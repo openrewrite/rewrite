@@ -200,7 +200,7 @@ public class TemplateApplyTests : RewriteTest
     [Fact]
     public void SubstitutesVariadicArgs()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Foo({args})",
@@ -216,7 +216,7 @@ public class TemplateApplyTests : RewriteTest
     public void SubstitutesMethodNameAndVariadicArgs()
     {
         var method = Capture.Of<Identifier>("method");
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"new Random().{method}({args})",
@@ -232,7 +232,7 @@ public class TemplateApplyTests : RewriteTest
     public void SubstitutesMethodNameAndVariadicArgsWithZeroArgs()
     {
         var method = Capture.Of<Identifier>("method");
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"new Random().{method}({args})",
@@ -247,7 +247,7 @@ public class TemplateApplyTests : RewriteTest
     [Fact]
     public void SubstitutesVariadicArgsInNonTrailingPosition()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         var last = Capture.Of<Expression>("last");
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(

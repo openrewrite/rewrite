@@ -57,6 +57,17 @@ public interface ICapture
 }
 
 /// <summary>
+/// Options for variadic captures that match zero or more elements.
+/// Bundles min/max bounds and a list-level constraint.
+/// </summary>
+/// <typeparam name="T">The element type this variadic capture matches.</typeparam>
+public sealed record VariadicOptions<T>(
+    int? Min = null,
+    int? Max = null,
+    Func<IReadOnlyList<T>, CaptureConstraintContext, bool>? Constraint = null
+) where T : J;
+
+/// <summary>
 /// A named placeholder for pattern matching and template substitution.
 /// When used in an interpolated string passed to <see cref="CSharpTemplate.Expression"/>
 /// or <see cref="CSharpPattern.Expression"/>, the <see cref="TemplateStringHandler"/>
@@ -66,29 +77,30 @@ public interface ICapture
 public sealed class Capture<T> : ICapture where T : J
 {
     public string Name { get; }
-    public bool IsVariadic { get; }
-    public int? MinCount { get; }
-    public int? MaxCount { get; }
+    public bool IsVariadic => Variadic != null;
+    public int? MinCount => Variadic?.Min;
+    public int? MaxCount => Variadic?.Max;
     public string? Type { get; }
     internal CaptureKind Kind { get; }
     public Func<T, CaptureConstraintContext, bool>? Constraint { get; }
-    public Func<IReadOnlyList<T>, CaptureConstraintContext, bool>? VariadicConstraint { get; }
+    public VariadicOptions<T>? Variadic { get; }
 
-    internal Capture(string name, bool variadic = false,
-        int? minCount = null, int? maxCount = null,
+    internal Capture(string name,
         string? type = null,
         CaptureKind kind = CaptureKind.Expression,
         Func<T, CaptureConstraintContext, bool>? constraint = null,
-        Func<IReadOnlyList<T>, CaptureConstraintContext, bool>? variadicConstraint = null)
+        VariadicOptions<T>? variadic = null)
     {
+        if (constraint != null && variadic != null)
+            throw new ArgumentException(
+                "A capture cannot have both a single-node constraint and variadic options. " +
+                "Use VariadicOptions.Constraint for list-level constraints.");
+
         Name = name;
-        IsVariadic = variadic;
-        MinCount = minCount;
-        MaxCount = maxCount;
         Type = type;
         Kind = kind;
         Constraint = constraint;
-        VariadicConstraint = variadicConstraint;
+        Variadic = variadic;
     }
 
     /// <summary>
@@ -110,10 +122,10 @@ public sealed class Capture<T> : ICapture where T : J
     /// <inheritdoc />
     public bool EvaluateVariadicConstraint(IReadOnlyList<object> captured, CaptureConstraintContext context)
     {
-        if (VariadicConstraint == null) return true;
+        if (Variadic?.Constraint == null) return true;
         var typed = captured.OfType<T>().ToList();
         if (typed.Count != captured.Count) return false;
-        return VariadicConstraint(typed.AsReadOnly(), context);
+        return Variadic.Constraint(typed.AsReadOnly(), context);
     }
 }
 
@@ -136,9 +148,10 @@ public static class Capture
     /// </para>
     /// </summary>
     public static Capture<T> Of<T>(string? name = null, string? type = null,
-        Func<T, CaptureConstraintContext, bool>? constraint = null) where T : J
+        Func<T, CaptureConstraintContext, bool>? constraint = null,
+        VariadicOptions<T>? variadic = null) where T : J
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            type: type, constraint: constraint);
+            type: type, constraint: constraint, variadic: variadic);
 
     /// <summary>
     /// Create a capture for an expression-position node.
@@ -146,20 +159,11 @@ public static class Capture
     /// field declaration in the scaffold preamble for type attribution.
     /// </summary>
     public static Capture<Expression> Expression(string? name = null, string? type = null,
-        Func<Expression, CaptureConstraintContext, bool>? constraint = null)
+        Func<Expression, CaptureConstraintContext, bool>? constraint = null,
+        VariadicOptions<Expression>? variadic = null)
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            type: type, kind: CaptureKind.Expression, constraint: constraint);
-
-    /// <summary>
-    /// Create a variadic capture that matches zero or more elements.
-    /// Useful for matching argument lists, statement sequences, etc.
-    /// </summary>
-    public static Capture<T> Variadic<T>(string? name = null,
-        int? min = null, int? max = null,
-        Func<IReadOnlyList<T>, CaptureConstraintContext, bool>? constraint = null) where T : J
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            variadic: true, minCount: min, maxCount: max,
-            variadicConstraint: constraint);
+            type: type, kind: CaptureKind.Expression, constraint: constraint,
+            variadic: variadic);
 
     /// <summary>
     /// Create a capture for a type-position node (e.g., base type, generic argument, variable type).
@@ -167,16 +171,18 @@ public static class Capture
     /// the placeholder in a type context.
     /// </summary>
     public static Capture<NameTree> Type(string? name = null,
-        Func<NameTree, CaptureConstraintContext, bool>? constraint = null)
+        Func<NameTree, CaptureConstraintContext, bool>? constraint = null,
+        VariadicOptions<NameTree>? variadic = null)
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            kind: CaptureKind.Type, constraint: constraint);
+            kind: CaptureKind.Type, constraint: constraint, variadic: variadic);
 
     /// <summary>
     /// Create a capture for a name/identifier-position node.
     /// No preamble declaration is needed; the placeholder is substituted directly.
     /// </summary>
     public static Capture<Identifier> Name(string? name = null,
-        Func<Identifier, CaptureConstraintContext, bool>? constraint = null)
+        Func<Identifier, CaptureConstraintContext, bool>? constraint = null,
+        VariadicOptions<Identifier>? variadic = null)
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            kind: CaptureKind.Name, constraint: constraint);
+            kind: CaptureKind.Name, constraint: constraint, variadic: variadic);
 }
