@@ -1,0 +1,264 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.golang.internal.rpc;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
+import org.openrewrite.java.internal.rpc.JavaSender;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.golang.GolangVisitor;
+import org.openrewrite.golang.tree.G;
+import org.openrewrite.rpc.RpcSendQueue;
+
+import static org.openrewrite.rpc.Reference.getValueNonNull;
+
+public class GolangSender extends GolangVisitor<RpcSendQueue> {
+    private final GolangSenderDelegate delegate = new GolangSenderDelegate(this);
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p) {
+        if (tree instanceof G) {
+            return super.visit(tree, p);
+        }
+        return delegate.visit(tree, p);
+    }
+
+    @Override
+    public J preVisit(J j, RpcSendQueue q) {
+        q.getAndSend(j, Tree::getId);
+        q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
+        q.getAndSend(j, Tree::getMarkers);
+        return j;
+    }
+
+    @Override
+    public J visitGoCompilationUnit(G.CompilationUnit cu, RpcSendQueue q) {
+        q.getAndSend(cu, c -> c.getSourcePath().toString());
+        q.getAndSend(cu, c -> c.getCharset().name());
+        q.getAndSend(cu, G.CompilationUnit::isCharsetBomMarked);
+        q.getAndSend(cu, G.CompilationUnit::getChecksum);
+        q.getAndSend(cu, G.CompilationUnit::getFileAttributes);
+        q.getAndSend(cu, c -> c.getPadding().getPackageDecl(), el -> visitRightPadded(el, q));
+        q.getAndSendList(cu, c -> c.getPadding().getImports(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
+        q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
+        q.getAndSend(cu, G.CompilationUnit::getEof, space -> visitSpace(space, q));
+        return cu;
+    }
+
+    @Override
+    public J visitGoStatement(G.GoStatement goStmt, RpcSendQueue q) {
+        q.getAndSend(goStmt, G.GoStatement::getExpression, el -> visit(el, q));
+        return goStmt;
+    }
+
+    @Override
+    public J visitDefer(G.Defer defer, RpcSendQueue q) {
+        q.getAndSend(defer, G.Defer::getExpression, el -> visit(el, q));
+        return defer;
+    }
+
+    @Override
+    public J visitSend(G.Send send, RpcSendQueue q) {
+        q.getAndSend(send, G.Send::getChannelExpr, el -> visit(el, q));
+        q.getAndSend(send, s -> s.getPadding().getArrow(), el -> visitLeftPadded(el, q));
+        return send;
+    }
+
+    @Override
+    public J visitGoto(G.Goto gotoStmt, RpcSendQueue q) {
+        q.getAndSend(gotoStmt, G.Goto::getLabelIdent, el -> visit(el, q));
+        return gotoStmt;
+    }
+
+    @Override
+    public J visitFallthrough(G.Fallthrough fallthrough, RpcSendQueue q) {
+        return fallthrough;
+    }
+
+    @Override
+    public J visitComposite(G.Composite composite, RpcSendQueue q) {
+        q.getAndSend(composite, G.Composite::getTypeExpr, el -> visit(el, q));
+        q.getAndSend(composite, c -> c.getPadding().getElements(), el -> visitContainer(el, q));
+        return composite;
+    }
+
+    @Override
+    public J visitKeyValue(G.KeyValue keyValue, RpcSendQueue q) {
+        q.getAndSend(keyValue, G.KeyValue::getKeyExpr, el -> visit(el, q));
+        q.getAndSend(keyValue, kv -> kv.getPadding().getValue(), el -> visitLeftPadded(el, q));
+        return keyValue;
+    }
+
+    @Override
+    public J visitSliceExpr(G.SliceExpr slice, RpcSendQueue q) {
+        q.getAndSend(slice, G.SliceExpr::getIndexed, el -> visit(el, q));
+        q.getAndSend(slice, G.SliceExpr::getOpenBracket, space -> visitSpace(space, q));
+        q.getAndSend(slice, s -> s.getPadding().getLow(), el -> visitRightPadded(el, q));
+        q.getAndSend(slice, s -> s.getPadding().getHigh(), el -> visitRightPadded(el, q));
+        q.getAndSend(slice, G.SliceExpr::getMax, el -> visit(el, q));
+        q.getAndSend(slice, G.SliceExpr::getCloseBracket, space -> visitSpace(space, q));
+        return slice;
+    }
+
+    @Override
+    public J visitMapType(G.MapType mapType, RpcSendQueue q) {
+        q.getAndSend(mapType, G.MapType::getOpenBracket, space -> visitSpace(space, q));
+        q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));
+        q.getAndSend(mapType, G.MapType::getValue, el -> visit(el, q));
+        return mapType;
+    }
+
+    @Override
+    public J visitChannel(G.Channel channel, RpcSendQueue q) {
+        q.getAndSend(channel, c -> c.getDir().name());
+        q.getAndSend(channel, G.Channel::getValue, el -> visit(el, q));
+        return channel;
+    }
+
+    @Override
+    public J visitFuncType(G.FuncType funcType, RpcSendQueue q) {
+        q.getAndSend(funcType, f -> f.getPadding().getParameters(), el -> visitContainer(el, q));
+        q.getAndSend(funcType, G.FuncType::getReturnType, el -> visit(el, q));
+        return funcType;
+    }
+
+    @Override
+    public J visitStructType(G.StructType structType, RpcSendQueue q) {
+        q.getAndSend(structType, G.StructType::getBody, el -> visit(el, q));
+        return structType;
+    }
+
+    @Override
+    public J visitInterfaceType(G.InterfaceType interfaceType, RpcSendQueue q) {
+        q.getAndSend(interfaceType, G.InterfaceType::getBody, el -> visit(el, q));
+        return interfaceType;
+    }
+
+    @Override
+    public J visitTypeList(G.TypeList typeList, RpcSendQueue q) {
+        q.getAndSend(typeList, t -> t.getPadding().getTypes(), el -> visitContainer(el, q));
+        return typeList;
+    }
+
+    @Override
+    public J visitTypeDecl(G.TypeDecl typeDecl, RpcSendQueue q) {
+        q.getAndSend(typeDecl, G.TypeDecl::getName, el -> visit(el, q));
+        q.getAndSend(typeDecl, t -> t.getPadding().getAssign(), el -> visitLeftPadded(el, q));
+        q.getAndSend(typeDecl, G.TypeDecl::getDefinition, el -> visit(el, q));
+        q.getAndSend(typeDecl, t -> t.getPadding().getSpecs(), el -> visitContainer(el, q));
+        return typeDecl;
+    }
+
+    @Override
+    public J visitMultiAssignment(G.MultiAssignment multiAssignment, RpcSendQueue q) {
+        q.getAndSendList(multiAssignment, m -> m.getPadding().getVariables(), v -> v.getElement().getId(), v -> visitRightPadded(v, q));
+        q.getAndSend(multiAssignment, m -> m.getPadding().getOperator(), el -> visitLeftPadded(el, q));
+        q.getAndSendList(multiAssignment, m -> m.getPadding().getValues(), v -> v.getElement().getId(), v -> visitRightPadded(v, q));
+        return multiAssignment;
+    }
+
+    @Override
+    public J visitCommClause(G.CommClause commClause, RpcSendQueue q) {
+        q.getAndSend(commClause, G.CommClause::getComm, el -> visit(el, q));
+        q.getAndSend(commClause, G.CommClause::getColon, space -> visitSpace(space, q));
+        q.getAndSendList(commClause, c -> c.getPadding().getBody(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
+        return commClause;
+    }
+
+    @Override
+    public J visitIndexList(G.IndexList indexList, RpcSendQueue q) {
+        q.getAndSend(indexList, G.IndexList::getTarget, el -> visit(el, q));
+        q.getAndSend(indexList, i -> i.getPadding().getIndices(), el -> visitContainer(el, q));
+        return indexList;
+    }
+
+    // Delegation methods to JavaSender for RPC-specific visit methods
+    public <T> void visitLeftPadded(JLeftPadded<T> left, RpcSendQueue q) {
+        delegate.visitLeftPadded(left, q);
+    }
+
+    public <T> void visitRightPadded(JRightPadded<T> right, RpcSendQueue q) {
+        delegate.visitRightPadded(right, q);
+    }
+
+    public <J2 extends J> void visitContainer(JContainer<J2> container, RpcSendQueue q) {
+        delegate.visitContainer(container, q);
+    }
+
+    public void visitSpace(Space space, RpcSendQueue q) {
+        delegate.visitSpace(space, q);
+    }
+
+    @Override
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcSendQueue q) {
+        return delegate.visitType(javaType, q);
+    }
+
+    private static class GolangSenderDelegate extends JavaSender {
+        private final GolangSender delegate;
+
+        public GolangSenderDelegate(GolangSender delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p) {
+            if (tree instanceof G) {
+                return delegate.visit(tree, p);
+            }
+            return super.visit(tree, p);
+        }
+
+        @Override
+        public J visitForEachControl(J.ForEachLoop.Control control, RpcSendQueue q) {
+            // Send in Go's format: key (right-padded), value (right-padded), operator (left-padded string), iterable
+            // Extract key identifier from variable declarations
+            Statement varStmt = control.getVariable();
+            JRightPadded<Expression> key = null;
+            if (varStmt instanceof J.VariableDeclarations) {
+                J.VariableDeclarations varDecls = (J.VariableDeclarations) varStmt;
+                if (!varDecls.getVariables().isEmpty()) {
+                    J.VariableDeclarations.NamedVariable nv = varDecls.getVariables().get(0);
+                    key = JRightPadded.<Expression>build(nv.getName()).withAfter(control.getPadding().getVariable().getAfter());
+                }
+            }
+            final JRightPadded<Expression> finalKey = key;
+            // key
+            q.getAndSend(control, c -> finalKey, el -> visitRightPadded(el, q));
+            // value (null for Go's single-variable range)
+            q.getAndSend(control, c -> (JRightPadded<Expression>) null, el -> visitRightPadded(el, q));
+            // operator (left-padded string - ":=")
+            q.getAndSend(control, c -> JLeftPadded.build(":=").withBefore(Space.EMPTY));
+            // iterable
+            q.getAndSend(control, c -> c.getIterable(), el -> visit(el, q));
+            return control;
+        }
+
+        @Override
+        public J visitImport(J.Import importStmt, RpcSendQueue q) {
+            q.getAndSend(importStmt, i -> i.getPadding().getStatic(), s -> visitLeftPadded(s, q));
+            // Convert FieldAccess qualid to Literal for Go
+            q.getAndSend(importStmt, i -> {
+                J.FieldAccess fa = i.getQualid();
+                String name = fa.getSimpleName();
+                return new J.Literal(fa.getId(), fa.getPrefix(), fa.getMarkers(),
+                        name, "\"" + name + "\"", null, JavaType.Primitive.String);
+            }, id -> visit(id, q));
+            q.getAndSend(importStmt, i -> i.getPadding().getAlias(), alias -> visitLeftPadded(alias, q));
+            return importStmt;
+        }
+    }
+}
