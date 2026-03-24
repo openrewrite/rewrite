@@ -462,12 +462,14 @@ public class TemplateApplyTests : RewriteTest
     // Recipe factories
     // ===============================================================
 
+#pragma warning disable CS0618
     private static Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
         where T : J =>
         new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
 
     private static Core.Recipe Replace<T>(string pattern, string template) where T : J =>
         new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
+#pragma warning restore CS0618
 }
 
 /// <summary>
@@ -504,8 +506,8 @@ file class RawSpliceRecipe(Capture<Expression> expr, string level) : Core.Recipe
 
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
-        var pat = CSharpPattern.Create($"logger.Debug({expr})");
-        var tmpl = CSharpTemplate.Create($"logger.{Raw.Code(level)}({expr})");
+        var pat = CSharpPattern.Expression($"logger.Debug({expr})");
+        var tmpl = CSharpTemplate.Expression($"logger.{Raw.Code(level)}({expr})");
         return new ReplaceVisitor(pat, tmpl);
     }
 
@@ -568,7 +570,7 @@ file class ReplaceWithIfBlockRecipe : Core.Recipe
             {
                 // Multi-line template with 0-based indentation.
                 // Auto-format should fix internal indentation to match the target context.
-                var tmpl = CSharpTemplate.Create("if (true)\n{\n    Console.WriteLine(42);\n}");
+                var tmpl = CSharpTemplate.Statement("if (true)\n{\n    Console.WriteLine(42);\n}");
                 return (J)tmpl.Apply(Cursor)!;
             }
             return es;
@@ -601,8 +603,8 @@ file class ReplaceOutermostOrWithAndRecipe : Core.Recipe
 
             var left = Capture.Of<Expression>("left");
             var right = Capture.Of<Expression>("right");
-            var pat = CSharpPattern.Create($"{left} || {right}");
-            var tmpl = CSharpTemplate.Create($"{left} && {right}");
+            var pat = CSharpPattern.Expression($"{left} || {right}");
+            var tmpl = CSharpTemplate.Expression($"{left} && {right}");
 
             if (pat.Match(binary, Cursor) is { } match)
             {

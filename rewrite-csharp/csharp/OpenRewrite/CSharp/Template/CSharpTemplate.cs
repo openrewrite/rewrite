@@ -26,21 +26,21 @@ namespace OpenRewrite.CSharp.Template;
 /// <example>
 /// <code>
 /// // Simple template (no captures)
-/// var tmpl = CSharpTemplate.Create($"Console.WriteLine(\"hello\")");
+/// var tmpl = CSharpTemplate.Expression($"Console.WriteLine(\"hello\")");
 /// var result = tmpl.Apply(cursor);
 ///
 /// // Template with captures from pattern match
 /// var expr = Capture.Of&lt;Expression&gt;("expr");
-/// var tmpl = CSharpTemplate.Create($"Console.WriteLine({expr})");
+/// var tmpl = CSharpTemplate.Expression($"Console.WriteLine({expr})");
 /// var result = tmpl.Apply(cursor, values: match);
 ///
 /// // Template with usings
-/// var tmpl = CSharpTemplate.Create(
+/// var tmpl = CSharpTemplate.Expression(
 ///     $"JsonSerializer.Serialize({expr})",
 ///     usings: ["System.Text.Json"]);
 ///
 /// // Template with NuGet dependencies for type attribution
-/// var tmpl = CSharpTemplate.Create(
+/// var tmpl = CSharpTemplate.Expression(
 ///     $"JsonConvert.SerializeObject({expr})",
 ///     usings: ["Newtonsoft.Json"],
 ///     dependencies: new Dictionary&lt;string, string&gt; { ["Newtonsoft.Json"] = "13.*" });

@@ -30,7 +30,7 @@ public class DependencyWorkspaceTests : RewriteTest
     [Fact]
     public void TemplateWithDependencyHasTypeAttribution()
     {
-        var tmpl = CSharpTemplate.Create(
+        var tmpl = CSharpTemplate.Expression(
             "Newtonsoft.Json.JsonConvert.SerializeObject(\"hello\")",
             usings: ["Newtonsoft.Json"],
             dependencies: NewtonsoftDep);
@@ -48,7 +48,7 @@ public class DependencyWorkspaceTests : RewriteTest
     public void TemplateWithoutDependencyLacksTypeAttribution()
     {
         // Same code but no dependencies — parser can't resolve the type
-        var tmpl = CSharpTemplate.Create(
+        var tmpl = CSharpTemplate.Expression(
             "Newtonsoft.Json.JsonConvert.SerializeObject(\"hello\")",
             usings: ["Newtonsoft.Json"]);
 
@@ -65,7 +65,7 @@ public class DependencyWorkspaceTests : RewriteTest
         // The placeholder argument prevents full overload resolution,
         // but the parse should still succeed and recognize the method invocation
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create(
+        var pat = CSharpPattern.Expression(
             $"Newtonsoft.Json.JsonConvert.SerializeObject({expr})",
             usings: ["Newtonsoft.Json"],
             dependencies: NewtonsoftDep);
@@ -80,7 +80,7 @@ public class DependencyWorkspaceTests : RewriteTest
         // A typed capture gives the placeholder proper type attribution,
         // enabling Roslyn to resolve the method overload
         var expr = Capture.Expression("expr", type: "object");
-        var pat = CSharpPattern.Create(
+        var pat = CSharpPattern.Expression(
             $"Newtonsoft.Json.JsonConvert.SerializeObject({expr})",
             usings: ["Newtonsoft.Json"],
             dependencies: NewtonsoftDep);
@@ -95,7 +95,7 @@ public class DependencyWorkspaceTests : RewriteTest
     [Fact]
     public void TemplateWithoutDependenciesStillWorks()
     {
-        var tmpl = CSharpTemplate.Create("1 + 2");
+        var tmpl = CSharpTemplate.Expression("1 + 2");
         var tree = tmpl.GetTree();
         Assert.IsType<Binary>(tree);
     }

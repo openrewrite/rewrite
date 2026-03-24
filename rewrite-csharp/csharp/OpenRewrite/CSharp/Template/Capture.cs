@@ -58,8 +58,8 @@ public interface ICapture
 
 /// <summary>
 /// A named placeholder for pattern matching and template substitution.
-/// When used in an interpolated string passed to <see cref="CSharpTemplate.Create"/>
-/// or <see cref="CSharpPattern.Create"/>, the <see cref="TemplateStringHandler"/>
+/// When used in an interpolated string passed to <see cref="CSharpTemplate.Expression"/>
+/// or <see cref="CSharpPattern.Expression"/>, the <see cref="TemplateStringHandler"/>
 /// intercepts it and registers the capture automatically.
 /// </summary>
 /// <typeparam name="T">The type of AST node this capture matches.</typeparam>

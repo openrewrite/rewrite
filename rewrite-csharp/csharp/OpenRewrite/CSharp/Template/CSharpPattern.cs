@@ -25,7 +25,7 @@ namespace OpenRewrite.CSharp.Template;
 /// <example>
 /// <code>
 /// var expr = Capture.Of&lt;Expression&gt;("expr");
-/// var pat = CSharpPattern.Create($"Console.Write({expr})");
+/// var pat = CSharpPattern.Expression($"Console.Write({expr})");
 ///
 /// if (pat.Match(methodInvocation, cursor) is { } match)
 /// {
