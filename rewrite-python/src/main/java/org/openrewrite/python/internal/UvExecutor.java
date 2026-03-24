@@ -26,7 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -45,18 +44,6 @@ public class UvExecutor {
         int exitCode;
         String stdout;
         String stderr;
-    }
-
-    /**
-     * Run a uv command in the given directory.
-     *
-     * @param workDir   the working directory
-     * @param uvPath    the path to the uv executable
-     * @param args      the arguments to pass to uv
-     * @return the run result
-     */
-    public static RunResult run(Path workDir, String uvPath, String... args) throws IOException, InterruptedException {
-        return run(workDir, uvPath, Collections.emptyMap(), args);
     }
 
     /**
