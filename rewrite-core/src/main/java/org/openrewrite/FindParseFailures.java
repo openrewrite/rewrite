@@ -58,8 +58,7 @@ public class FindParseFailures extends Recipe {
     @Nullable
     String createdAfter;
 
-    transient ParseFailures failures = new ParseFailures(this)
-            .withInstanceName(this::dataTableInstanceName);
+    transient ParseFailures failures = new ParseFailures(this);
 
     private String dataTableInstanceName() {
         return parserType != null ? "Parse failures for " + parserType : "Parse failures";

@@ -987,7 +987,7 @@ class MavenParserTest implements RewriteTest {
         // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
         var username = "admin";
         var password = "password";
-        try (MockWebServer mockRepo = new MockWebServer()) {
+        try (var mockRepo = new MockWebServer()) {
             // TLS server setup based on https://github.com/square/okhttp/blob/master/okhttp-tls/README.md
             String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
             HeldCertificate localhostCertificate = new HeldCertificate.Builder()
@@ -1001,7 +1001,7 @@ class MavenParserTest implements RewriteTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
-                    MockResponse resp = new MockResponse();
+                    var resp = new MockResponse();
                     if (!Objects.equals(
                       request.getHeader("Authorization"),
                       "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))) {

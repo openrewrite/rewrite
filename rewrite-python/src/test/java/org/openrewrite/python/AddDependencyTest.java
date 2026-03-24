@@ -70,7 +70,7 @@ class AddDependencyTest implements RewriteTest {
           ]
           """;
 
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(new CompositeRecipe(List.of(
             new AddDependency("flask", ">=2.0", null, null),
@@ -343,7 +343,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void validateRequiresGroupName() {
-        AddDependency recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
+        var recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
         assertThat(recipe.validate().isValid()).isFalse();
     }
 }
