@@ -22,7 +22,7 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Template;
 
-public class RewriteRuleTests : RewriteTest
+public class RewriterTests : RewriteTest
 {
     [Fact]
     public void SimpleBeforeAfterReplacement()
@@ -559,19 +559,18 @@ class SwapBinaryOperandsRecipe : Core.Recipe
     {
         var left = Capture.Expression("left");
         var right = Capture.Expression("right");
-        var rule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"{left} + {right}"),
-            CSharpTemplate.Expression($"{right} + {left}"));
+        var rewriter = CSharpPattern.Expression($"{left} + {right}")
+            .RewriteTo(CSharpTemplate.Expression($"{right} + {left}"));
 
-        return new Visitor(rule);
+        return new Visitor(rewriter);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(Rewriter rewriter) : CSharpVisitor<ExecutionContext>
     {
         public override J VisitBinary(Binary binary, ExecutionContext ctx)
         {
             binary = (Binary)base.VisitBinary(binary, ctx);
-            return rule.TryOn(Cursor, binary) ?? binary;
+            return rewriter.TryOn(Cursor, binary) ?? binary;
         }
     }
 }
@@ -608,24 +607,22 @@ class NormalizeConsoleOutputRecipe : Core.Recipe
 class MigrateAndRedirectRecipe : Core.Recipe
 {
     public override string DisplayName => "Migrate and redirect";
-    public override string Description => "Chains two rules: Write→WriteLine, then WriteLine→Error.WriteLine.";
+    public override string Description => "Chains two rewriters: Write→WriteLine, then WriteLine→Error.WriteLine.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr1 = Capture.Expression("expr");
-        var migrateRule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"Console.Write({expr1})"),
-            CSharpTemplate.Expression($"Console.WriteLine({expr1})"));
+        var migrate = CSharpPattern.Expression($"Console.Write({expr1})")
+            .RewriteTo(CSharpTemplate.Expression($"Console.WriteLine({expr1})"));
 
         var expr2 = Capture.Expression("expr");
-        var redirectRule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"Console.WriteLine({expr2})"),
-            CSharpTemplate.Expression($"Console.Error.WriteLine({expr2})"));
+        var redirect = CSharpPattern.Expression($"Console.WriteLine({expr2})")
+            .RewriteTo(CSharpTemplate.Expression($"Console.Error.WriteLine({expr2})"));
 
-        return new Visitor(migrateRule, redirectRule);
+        return new Visitor(migrate, redirect);
     }
 
-    private class Visitor(IRewriteRule migrate, IRewriteRule redirect)
+    private class Visitor(Rewriter migrate, Rewriter redirect)
         : CSharpVisitor<ExecutionContext>
     {
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
@@ -642,24 +639,22 @@ class MigrateAndRedirectRecipe : Core.Recipe
 class MigrateWithFallbackRecipe : Core.Recipe
 {
     public override string DisplayName => "Migrate with fallback";
-    public override string Description => "Tries primary then fallback rule.";
+    public override string Description => "Tries primary then fallback rewriter.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr1 = Capture.Expression("expr");
-        var primaryRule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"Console.Write({expr1})"),
-            CSharpTemplate.Expression($"Console.WriteLine({expr1})"));
+        var primary = CSharpPattern.Expression($"Console.Write({expr1})")
+            .RewriteTo(CSharpTemplate.Expression($"Console.WriteLine({expr1})"));
 
         var expr2 = Capture.Expression("expr");
-        var fallbackRule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"Console.Error.Write({expr2})"),
-            CSharpTemplate.Expression($"Console.Error.WriteLine({expr2})"));
+        var fallback = CSharpPattern.Expression($"Console.Error.Write({expr2})")
+            .RewriteTo(CSharpTemplate.Expression($"Console.Error.WriteLine({expr2})"));
 
-        return new Visitor(primaryRule, fallbackRule);
+        return new Visitor(primary, fallback);
     }
 
-    private class Visitor(IRewriteRule primary, IRewriteRule fallback)
+    private class Visitor(Rewriter primary, Rewriter fallback)
         : CSharpVisitor<ExecutionContext>
     {
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
@@ -679,21 +674,20 @@ class PreMatchFilteredRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        var rule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"Console.Write({expr})"),
-            CSharpTemplate.Expression($"Console.WriteLine({expr})"));
+        var rewriter = CSharpPattern.Expression($"Console.Write({expr})")
+            .RewriteTo(CSharpTemplate.Expression($"Console.WriteLine({expr})"));
 
-        return new Visitor(rule);
+        return new Visitor(rewriter);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(Rewriter rewriter) : CSharpVisitor<ExecutionContext>
     {
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
             if (Cursor.FirstEnclosing<MethodDeclaration>()?.Name.SimpleName != "Target")
                 return mi;
-            return (MethodInvocation)(rule.TryOn(Cursor, mi) ?? mi);
+            return (MethodInvocation)(rewriter.TryOn(Cursor, mi) ?? mi);
         }
     }
 }
@@ -708,19 +702,18 @@ class CaptureConstraintFilteredRecipe : Core.Recipe
         var left = Capture.Expression("left");
         var right = Capture.Expression("right",
             constraint: (node, _) => node is Literal { ValueSource: "0" });
-        var rule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"{left} + {right}"),
-            CSharpTemplate.Expression($"{left}"));
+        var rewriter = CSharpPattern.Expression($"{left} + {right}")
+            .RewriteTo(CSharpTemplate.Expression($"{left}"));
 
-        return new Visitor(rule);
+        return new Visitor(rewriter);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(Rewriter rewriter) : CSharpVisitor<ExecutionContext>
     {
         public override J VisitBinary(Binary binary, ExecutionContext ctx)
         {
             binary = (Binary)base.VisitBinary(binary, ctx);
-            return rule.TryOn(Cursor, binary) ?? binary;
+            return rewriter.TryOn(Cursor, binary) ?? binary;
         }
     }
 }
@@ -733,26 +726,25 @@ class CaptureFlowRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        var rule = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"Console.Write({expr})"),
-            CSharpTemplate.Expression($"Console.WriteLine({expr})"));
+        var rewriter = CSharpPattern.Expression($"Console.Write({expr})")
+            .RewriteTo(CSharpTemplate.Expression($"Console.WriteLine({expr})"));
 
-        return new Visitor(rule);
+        return new Visitor(rewriter);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(Rewriter rewriter) : CSharpVisitor<ExecutionContext>
     {
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
-            return (MethodInvocation)(rule.TryOn(Cursor, mi) ?? mi);
+            return (MethodInvocation)(rewriter.TryOn(Cursor, mi) ?? mi);
         }
     }
 }
 
 /// <summary>
 /// Expands "return expr" into "Console.WriteLine(expr); return expr;" — two statements.
-/// Exercises multi-statement templates and RewriteRule.CreateBlockFlattener.
+/// Exercises multi-statement templates and Rewriter.CreateBlockFlattener.
 /// </summary>
 class LogBeforeReturnRecipe : Core.Recipe
 {
@@ -762,24 +754,22 @@ class LogBeforeReturnRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        var pat = CSharpPattern.Statement($"return {expr}");
-        var tmpl = CSharpTemplate.Statement($"Console.WriteLine({expr});\nreturn {expr};");
+        var rewriter = CSharpPattern.Statement($"return {expr}")
+            .RewriteTo(CSharpTemplate.Statement($"Console.WriteLine({expr});\nreturn {expr};"));
 
-        var rule = RewriteRule.Rewrite(pat, tmpl);
-
-        return new Visitor(rule);
+        return new Visitor(rewriter);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(Rewriter rewriter) : CSharpVisitor<ExecutionContext>
     {
         public override J VisitReturn(Return ret, ExecutionContext ctx)
         {
             ret = (Return)base.VisitReturn(ret, ctx);
-            var result = rule.TryOn(Cursor, ret);
+            var result = rewriter.TryOn(Cursor, ret);
             if (result is Block { Markers: var m } block &&
                 m.FindFirst<SyntheticBlockContainer>() != null)
             {
-                MaybeDoAfterVisit(RewriteRule.CreateBlockFlattener<ExecutionContext>());
+                MaybeDoAfterVisit(Rewriter.CreateBlockFlattener<ExecutionContext>());
                 return block;
             }
             return result ?? ret;
@@ -796,9 +786,8 @@ class ToVisitorBinaryRecipe : Core.Recipe
     {
         var left = Capture.Expression("left");
         var right = Capture.Expression("right");
-        return RewriteRule.Rewrite(
-                CSharpPattern.Expression($"{left} + {right}"),
-                CSharpTemplate.Expression($"{right} + {left}"))
+        return CSharpPattern.Expression($"{left} + {right}")
+            .RewriteTo(CSharpTemplate.Expression($"{right} + {left}"))
             .ToVisitor();
     }
 }
@@ -811,9 +800,8 @@ class ToVisitorMethodInvocationRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        return RewriteRule.Rewrite(
-                CSharpPattern.Expression($"Console.Write({expr})"),
-                CSharpTemplate.Expression($"Console.WriteLine({expr})"))
+        return CSharpPattern.Expression($"Console.Write({expr})")
+            .RewriteTo(CSharpTemplate.Expression($"Console.WriteLine({expr})"))
             .ToVisitor();
     }
 }
@@ -827,10 +815,9 @@ class UseContainsKeyRecipe : Core.Recipe
     {
         var dict = Capture.Expression(type: "IDictionary<TKey, TValue>", typeParameters: ["TKey", "TValue"]);
         var key = Capture.Expression();
-        return RewriteRule.Rewrite(
-                CSharpPattern.Expression($"{dict}.Keys.Contains({key})",
-                    usings: ["System.Collections.Generic"]),
-                CSharpTemplate.Expression($"{dict}.ContainsKey({key})"))
+        return CSharpPattern.Expression($"{dict}.Keys.Contains({key})",
+                usings: ["System.Collections.Generic"])
+            .RewriteTo(CSharpTemplate.Expression($"{dict}.ContainsKey({key})"))
             .ToVisitor();
     }
 }
@@ -844,10 +831,9 @@ class UseElementAtRecipe : Core.Recipe
     {
         var expr = Capture.Expression("expr", type: "IEnumerable<T>", typeParameters: ["T"]);
         var idx = Capture.Expression("idx", type: "int");
-        return RewriteRule.Rewrite(
-                CSharpPattern.Expression($"{expr}.ElementAt({idx})",
-                    usings: ["System.Collections.Generic", "System.Linq"]),
-                CSharpTemplate.Expression($"{expr}[{idx}]"))
+        return CSharpPattern.Expression($"{expr}.ElementAt({idx})",
+                usings: ["System.Collections.Generic", "System.Linq"])
+            .RewriteTo(CSharpTemplate.Expression($"{expr}[{idx}]"))
             .ToVisitor();
     }
 }
@@ -860,17 +846,15 @@ class FallbackWithManualVisitorRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var x = Capture.Expression("x");
-        var isNull = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"{x} == null"),
-            CSharpTemplate.Expression($"{x} is null"));
-        var isNotNull = RewriteRule.Rewrite(
-            CSharpPattern.Expression($"{x} != null"),
-            CSharpTemplate.Expression($"{x} is not null"));
+        var isNull = CSharpPattern.Expression($"{x} == null")
+            .RewriteTo(CSharpTemplate.Expression($"{x} is null"));
+        var isNotNull = CSharpPattern.Expression($"{x} != null")
+            .RewriteTo(CSharpTemplate.Expression($"{x} is not null"));
 
         return new Visitor(isNull, isNotNull);
     }
 
-    private class Visitor(IRewriteRule isNull, IRewriteRule isNotNull)
+    private class Visitor(Rewriter isNull, Rewriter isNotNull)
         : CSharpVisitor<ExecutionContext>
     {
         public override J VisitBinary(Binary binary, ExecutionContext ctx)

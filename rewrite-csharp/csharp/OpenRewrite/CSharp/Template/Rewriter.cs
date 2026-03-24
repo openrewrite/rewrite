@@ -20,73 +20,66 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
-/// A declarative rewrite rule that pairs structural pattern matching with template application.
-/// Create rules with <see cref="RewriteRule.Rewrite(CSharpPattern, CSharpTemplate)"/>.
+/// A declarative rewriter that pairs structural pattern matching with template application.
+/// Create instances via <see cref="CSharpPattern.RewriteTo"/>.
 /// </summary>
 /// <example>
 /// <code>
 /// var expr = Capture.Expression("expr");
-/// var rule = RewriteRule.Rewrite(
-///     CSharpPattern.Expression($"Console.Write({expr})"),
-///     CSharpTemplate.Expression($"Console.WriteLine({expr})"));
+/// var rewriter = CSharpPattern.Expression($"Console.Write({expr})")
+///     .RewriteTo(CSharpTemplate.Expression($"Console.WriteLine({expr})"));
 ///
 /// // In a visitor method:
-/// return rule.TryOn(Cursor, node) ?? node;
+/// return rewriter.TryOn(Cursor, node) ?? node;
 /// </code>
 /// </example>
-public interface IRewriteRule
+public sealed class Rewriter
 {
-    /// <summary>
-    /// Try to apply this rule to the given node. Returns the transformed node if the
-    /// rule's pattern matches, or <c>null</c> if the rule does not apply.
-    /// The typical calling convention is <c>rule.TryOn(Cursor, node) ?? node</c>.
-    /// </summary>
-    J? TryOn(Cursor cursor, J node);
+    private readonly CSharpPattern _before;
+    private readonly CSharpTemplate _after;
+
+    internal Rewriter(CSharpPattern before, CSharpTemplate after)
+    {
+        _before = before;
+        _after = after;
+    }
 
     /// <summary>
-    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that applies this rule to every
+    /// Try to apply this rewriter to the given node. Returns the transformed node if the
+    /// pattern matches, or <c>null</c> if the rewriter does not apply.
+    /// The typical calling convention is <c>rewriter.TryOn(Cursor, node) ?? node</c>.
+    /// </summary>
+    public J? TryOn(Cursor cursor, J node)
+    {
+        var match = _before.Match(node, cursor);
+        if (match == null) return null;
+        return _after.Apply(cursor, values: match);
+    }
+
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that applies this rewriter to every
     /// visited node via <see cref="TreeVisitor{T,P}.PostVisit"/>. The pattern's fast-reject
     /// in <see cref="CSharpPattern.Match"/> ensures only nodes whose type matches the pattern
     /// root are fully compared, so iterating over all nodes is cheap.
     /// <para>
     /// This is a convenience method for the common case where a recipe only matches a pattern
-    /// and applies a template. For more complex scenarios — such as combining multiple rules,
-    /// cursor-based filtering, or using <see cref="RewriteRule.CreateBlockFlattener{P}"/> —
+    /// and applies a template. For more complex scenarios — such as combining multiple rewriters,
+    /// cursor-based filtering, or using <see cref="CreateBlockFlattener{P}"/> —
     /// create a custom visitor and call <see cref="TryOn"/> directly.
     /// </para>
     /// </summary>
     /// <example>
     /// <code>
-    /// public override ITreeVisitor&lt;ExecutionContext&gt; GetVisitor()
+    /// public override JavaVisitor&lt;ExecutionContext&gt; GetVisitor()
     /// {
     ///     var x = Capture.Expression("x");
-    ///     return RewriteRule.Rewrite(
-    ///             CSharpPattern.Expression($"Console.Write({x})"),
-    ///             CSharpTemplate.Expression($"Console.WriteLine({x})"))
+    ///     return CSharpPattern.Expression($"Console.Write({x})")
+    ///         .RewriteTo(CSharpTemplate.Expression($"Console.WriteLine({x})"))
     ///         .ToVisitor();
     /// }
     /// </code>
     /// </example>
-    CSharpVisitor<ExecutionContext> ToVisitor() => new RewriteRule.RewriteRuleVisitor(this);
-}
-
-/// <summary>
-/// Factory methods for creating <see cref="IRewriteRule"/> instances.
-/// </summary>
-public static class RewriteRule
-{
-    /// <summary>
-    /// Create a rewrite rule from a <see cref="CSharpPattern"/> and <see cref="CSharpTemplate"/>.
-    /// <para>
-    /// When using typed captures with <c>typeParameters</c>, the pattern's <c>usings</c> must
-    /// include the namespaces needed for the capture type to resolve (e.g.,
-    /// <c>"System.Collections.Generic"</c> for <c>IDictionary&lt;TKey, TValue&gt;</c>).
-    /// Without proper usings, the scaffold has no semantic model and type constraints
-    /// fall back to string matching, which cannot handle generic types.
-    /// </para>
-    /// </summary>
-    public static IRewriteRule Rewrite(CSharpPattern before, CSharpTemplate after) =>
-        new RewriteRuleImpl(before, after);
+    public CSharpVisitor<ExecutionContext> ToVisitor() => new RewriterVisitor(this);
 
     /// <summary>
     /// Creates a visitor that splices statements from any <see cref="Block"/> marked with
@@ -96,10 +89,10 @@ public static class RewriteRule
     /// </summary>
     /// <example>
     /// <code>
-    /// var result = rule.TryOn(Cursor, ret);
+    /// var result = rewriter.TryOn(Cursor, ret);
     /// if (result is Block block &amp;&amp; block.Markers.FindFirst&lt;SyntheticBlockContainer&gt;() != null)
     /// {
-    ///     MaybeDoAfterVisit(RewriteRule.CreateBlockFlattener&lt;ExecutionContext&gt;());
+    ///     MaybeDoAfterVisit(Rewriter.CreateBlockFlattener&lt;ExecutionContext&gt;());
     ///     return block;
     /// }
     /// return result ?? ret;
@@ -118,21 +111,11 @@ public static class RewriteRule
     // Implementation
     // ===============================================================
 
-    private sealed class RewriteRuleImpl(CSharpPattern before, CSharpTemplate after) : IRewriteRule
-    {
-        public J? TryOn(Cursor cursor, J node)
-        {
-            var match = before.Match(node, cursor);
-            if (match == null) return null;
-            return after.Apply(cursor, values: match);
-        }
-    }
-
-    internal sealed class RewriteRuleVisitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    internal sealed class RewriterVisitor(Rewriter rewriter) : CSharpVisitor<ExecutionContext>
     {
         public override J? PostVisit(J tree, ExecutionContext ctx)
         {
-            return rule.TryOn(Cursor, tree) ?? tree;
+            return rewriter.TryOn(Cursor, tree) ?? tree;
         }
     }
 

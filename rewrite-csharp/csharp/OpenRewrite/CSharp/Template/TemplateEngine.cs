@@ -24,7 +24,7 @@ namespace OpenRewrite.CSharp.Template;
 /// Marker placed on a <see cref="Block"/> that is a synthetic container for multiple statements
 /// produced by a multi-statement template, rather than a real block in the source code.
 /// Used by <see cref="TemplateEngine.AutoFormat"/> to format each statement at the parent level,
-/// and by <see cref="RewriteRule.CreateBlockFlattener{P}"/> to identify blocks to splice.
+/// and by <see cref="Rewriter.CreateBlockFlattener{P}"/> to identify blocks to splice.
 /// </summary>
 public sealed class SyntheticBlockContainer : Marker
 {

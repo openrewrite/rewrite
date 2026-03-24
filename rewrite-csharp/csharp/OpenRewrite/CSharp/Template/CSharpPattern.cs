@@ -151,6 +151,12 @@ public sealed class CSharpPattern
     }
 
     /// <summary>
+    /// Create a <see cref="Rewriter"/> that rewrites nodes matching this pattern
+    /// to the given template.
+    /// </summary>
+    public Rewriter RewriteTo(CSharpTemplate template) => new Rewriter(this, template);
+
+    /// <summary>
     /// Get the parsed pattern tree (cached after first parse).
     /// </summary>
     public J GetTree()
