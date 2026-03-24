@@ -347,8 +347,19 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     /**
      * Re-indent a sequence entry prefix to match existing sibling entries.
-     * autoFormat may produce incorrect indentation when the merge happens
-     * through nested MergeYamlVisitor calls with stale cursor context.
+     * <p>
+     * {@code autoFormat} delegates to {@link IndentsVisitor}, which computes indentation
+     * from cursor messages ({@code lastIndent}) and a single {@code indentSize}. When called
+     * from {@code mergeSequence}, two things conspire to produce wrong indentation:
+     * <ol>
+     *   <li>{@link AutoFormatVisitor} forks the cursor, discarding all messages</li>
+     *   <li>{@code IndentsVisitor} has no concept of sequence-specific indent — it cannot
+     *       distinguish a sequence whose entries sit at the same column as the parent key
+     *       from one whose entries are indented by {@code indentSize}</li>
+     * </ol>
+     * Fixing this in {@code IndentsVisitor} or {@code IndentsStyle} would affect all YAML
+     * autoformatting. Instead we correct the result here, where the sibling entries provide
+     * an authoritative reference for the expected indentation.
      */
     private Yaml.Sequence.Entry reindentEntry(Yaml.Sequence.Entry entry, String sequenceEntryIndent) {
         String prefix = entry.getPrefix();
