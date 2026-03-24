@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 
-namespace OpenRewrite.Tests.Java;
+namespace OpenRewrite.Tests.CSharp;
 
 public class TypeUtilsTests
 {

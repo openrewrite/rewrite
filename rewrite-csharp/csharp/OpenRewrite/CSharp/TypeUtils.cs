@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-namespace OpenRewrite.Java;
+using OpenRewrite.Java;
+
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Utility methods for working with <see cref="JavaType"/> instances.

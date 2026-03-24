@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 using System.Text.RegularExpressions;
+using OpenRewrite.Java;
 
-namespace OpenRewrite.Java;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Matches method invocations and declarations against AspectJ-style method patterns.
