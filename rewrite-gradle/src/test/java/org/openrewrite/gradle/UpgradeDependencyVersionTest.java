@@ -428,6 +428,125 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiComponentVariableReferenceNotation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceWithExtraProperties() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceSharedAcrossMultipleDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.awspring.cloud", "*", "3.4.2", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val awsVersion = "3.3.1"
+
+              dependencies {
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter", awsVersion)
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter-sqs", awsVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val awsVersion = "3.4.2"
+
+              dependencies {
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter", awsVersion)
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter-sqs", awsVersion)
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
     void mapNotationGStringInterpolation(String stringInterpolationReference) {
