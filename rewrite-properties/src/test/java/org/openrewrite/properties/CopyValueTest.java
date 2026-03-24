@@ -168,6 +168,35 @@ class CopyValueTest implements RewriteTest {
     }
 
     @Test
+    void copyValueInMultipleFiles() {
+        rewriteRun(
+          spec -> spec.recipe(new CopyValue("source.key", null, "destination.key", null, null, null)),
+          properties(
+            """
+              source.key=valueA
+              destination.key=original
+              """,
+            """
+              source.key=valueA
+              destination.key=valueA
+              """,
+            spec -> spec.path("a.properties")
+          ),
+          properties(
+            """
+              source.key=valueB
+              destination.key=original
+              """,
+            """
+              source.key=valueB
+              destination.key=valueB
+              """,
+            spec -> spec.path("b.properties")
+          )
+        );
+    }
+
+    @Test
     void exactMatchingDisablesRelaxedBinding() {
         rewriteRun(
           spec -> spec.recipe(new CopyValue("my-source-key", null, "destination.key", null, null, false)),

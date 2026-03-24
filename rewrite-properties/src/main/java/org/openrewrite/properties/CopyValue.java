@@ -22,13 +22,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -93,11 +93,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Data
     public static class Accumulator {
-        @Nullable
-        String value;
-
-        @Nullable
-        Path path;
+        Map<Path, String> valuesByPath = new HashMap<>();
     }
 
     @Override
@@ -114,9 +110,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         TreeVisitor<?, ExecutionContext> visitor = new PropertiesIsoVisitor<ExecutionContext>() {
             @Override
             public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                if (acc.value == null && keyMatcher.matchesGlob(entry.getKey())) {
-                    acc.value = entry.getValue().getText();
-                    acc.path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                if (keyMatcher.matchesGlob(entry.getKey())) {
+                    Path sourcePath = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                    acc.valuesByPath.putIfAbsent(sourcePath, entry.getValue().getText());
                 }
                 return super.visitEntry(entry, ctx);
             }
@@ -131,42 +127,64 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.value == null) {
+        if (acc.valuesByPath.isEmpty()) {
             return TreeVisitor.noop();
         }
 
-        return Preconditions.check(
-                new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new PropertiesIsoVisitor<ExecutionContext>() {
-                    boolean found;
+        TreeVisitor<?, ExecutionContext> visitor = new PropertiesIsoVisitor<ExecutionContext>() {
+            boolean found;
 
-                    @Override
-                    public Properties.File visitFile(Properties.File file, ExecutionContext ctx) {
-                        found = false;
-                        Properties.File f = super.visitFile(file, ctx);
-                        if (!found && !Boolean.FALSE.equals(createNewKeys)) {
-                            Properties.Value propertyValue = new Properties.Value(randomId(), "", Markers.EMPTY, acc.value);
-                            Properties.Entry newEntry = new Properties.Entry(
-                                    randomId(), "\n", Markers.EMPTY,
-                                    newPropertyKey, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
+            @Override
+            public Properties.File visitFile(Properties.File file, ExecutionContext ctx) {
+                Path sourcePath = file.getSourcePath();
+                String value = resolveValue(sourcePath, acc);
+                if (value == null) {
+                    return file;
+                }
 
-                            List<Properties.Content> newContent = new ArrayList<>(f.getContent());
-                            newContent.add(newEntry);
-                            f = f.withContent(newContent);
+                found = false;
+                Properties.File f = super.visitFile(file, ctx);
+                if (!found && !Boolean.FALSE.equals(createNewKeys)) {
+                    Properties.Value propertyValue = new Properties.Value(randomId(), "", Markers.EMPTY, value);
+                    Properties.Entry newEntry = new Properties.Entry(
+                            randomId(), "\n", Markers.EMPTY,
+                            newPropertyKey, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
+
+                    List<Properties.Content> newContent = new ArrayList<>(f.getContent());
+                    newContent.add(newEntry);
+                    f = f.withContent(newContent);
+                }
+                return f;
+            }
+
+            @Override
+            public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+                if (entry.getKey().equals(newPropertyKey)) {
+                    Path sourcePath = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                    String value = resolveValue(sourcePath, acc);
+                    if (value != null) {
+                        found = true;
+                        if (!entry.getValue().getText().equals(value)) {
+                            return entry.withValue(entry.getValue().withText(value));
                         }
-                        return f;
                     }
+                }
+                return super.visitEntry(entry, ctx);
+            }
 
-                    @Override
-                    public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                        if (entry.getKey().equals(newPropertyKey)) {
-                            found = true;
-                            if (!entry.getValue().getText().equals(acc.value)) {
-                                return entry.withValue(entry.getValue().withText(acc.value));
-                            }
-                        }
-                        return super.visitEntry(entry, ctx);
-                    }
-                });
+            private @Nullable String resolveValue(Path sourcePath, Accumulator acc) {
+                if (newFilePath != null) {
+                    // When a specific destination file is set, use the first scanned value
+                    return acc.valuesByPath.values().iterator().next();
+                }
+                // When no destination file is set, copy within the same file
+                return acc.valuesByPath.get(sourcePath);
+            }
+        };
+
+        if (newFilePath != null) {
+            return Preconditions.check(new FindSourceFiles(newFilePath), visitor);
+        }
+        return visitor;
     }
 }
