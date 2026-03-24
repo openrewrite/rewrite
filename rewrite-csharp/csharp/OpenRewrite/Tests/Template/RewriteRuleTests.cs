@@ -323,6 +323,7 @@ public class RewriteRuleTests : RewriteTest
             )
         );
     }
+
     // ===============================================================
     // ToVisitor — eliminates the need for a manual Visitor class
     // ===============================================================
@@ -670,7 +671,7 @@ class CaptureFlowRecipe : Core.Recipe
 
 /// <summary>
 /// Expands "return expr" into "Console.WriteLine(expr); return expr;" — two statements.
-/// Exercises multi-statement templates and CreateBlockFlattener.
+/// Exercises multi-statement templates and RewriteRule.CreateBlockFlattener.
 /// </summary>
 class LogBeforeReturnRecipe : Core.Recipe
 {

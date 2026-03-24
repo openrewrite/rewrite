@@ -81,7 +81,7 @@ public interface IRewriteRule
     /// </summary>
     /// <example>
     /// <code>
-    /// public override JavaVisitor&lt;ExecutionContext&gt; GetVisitor()
+    /// public override ITreeVisitor&lt;ExecutionContext&gt; GetVisitor()
     /// {
     ///     var x = Capture.Expression("x");
     ///     return RewriteRule.Rewrite($"{x} == null", $"{x} is null")
