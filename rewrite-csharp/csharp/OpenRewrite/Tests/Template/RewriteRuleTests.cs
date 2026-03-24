@@ -436,6 +436,82 @@ public class RewriteRuleTests : RewriteTest
     }
 
     // ===============================================================
+    // ToVisitor with typed captures
+    // ===============================================================
+
+    [Fact]
+    public void TypedCaptureWithTypeParametersMatchesDictionary()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new UseContainsKeyRecipe())
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Collections.Generic;
+
+                class Test
+                {
+                    void M()
+                    {
+                        var dict = new Dictionary<string, int>();
+                        bool has = dict.Keys.Contains("key");
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+
+                class Test
+                {
+                    void M()
+                    {
+                        var dict = new Dictionary<string, int>();
+                        bool has = dict.ContainsKey("key");
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void TypedCaptureWithTypeParametersMatchesEnumerable()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new UseElementAtRecipe())
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+
+                class Test
+                {
+                    void M()
+                    {
+                        var list = new List<string>();
+                        var item = list.ElementAt(0);
+                    }
+                }
+                """,
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+
+                class Test
+                {
+                    void M()
+                    {
+                        var list = new List<string>();
+                        var item = list[0];
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
     // FlattenBlock — multi-statement template spliced into parent
     // ===============================================================
 
@@ -483,7 +559,9 @@ class SwapBinaryOperandsRecipe : Core.Recipe
     {
         var left = Capture.Expression("left");
         var right = Capture.Expression("right");
-        var rule = RewriteRule.Rewrite($"{left} + {right}", $"{right} + {left}");
+        var rule = RewriteRule.Rewrite(
+            CSharpPattern.Expression($"{left} + {right}"),
+            CSharpTemplate.Expression($"{right} + {left}"));
 
         return new Visitor(rule);
     }
@@ -536,11 +614,13 @@ class MigrateAndRedirectRecipe : Core.Recipe
     {
         var expr1 = Capture.Expression("expr");
         var migrateRule = RewriteRule.Rewrite(
-            $"Console.Write({expr1})", $"Console.WriteLine({expr1})");
+            CSharpPattern.Expression($"Console.Write({expr1})"),
+            CSharpTemplate.Expression($"Console.WriteLine({expr1})"));
 
         var expr2 = Capture.Expression("expr");
         var redirectRule = RewriteRule.Rewrite(
-            $"Console.WriteLine({expr2})", $"Console.Error.WriteLine({expr2})");
+            CSharpPattern.Expression($"Console.WriteLine({expr2})"),
+            CSharpTemplate.Expression($"Console.Error.WriteLine({expr2})"));
 
         return new Visitor(migrateRule, redirectRule);
     }
@@ -568,11 +648,13 @@ class MigrateWithFallbackRecipe : Core.Recipe
     {
         var expr1 = Capture.Expression("expr");
         var primaryRule = RewriteRule.Rewrite(
-            $"Console.Write({expr1})", $"Console.WriteLine({expr1})");
+            CSharpPattern.Expression($"Console.Write({expr1})"),
+            CSharpTemplate.Expression($"Console.WriteLine({expr1})"));
 
         var expr2 = Capture.Expression("expr");
         var fallbackRule = RewriteRule.Rewrite(
-            $"Console.Error.Write({expr2})", $"Console.Error.WriteLine({expr2})");
+            CSharpPattern.Expression($"Console.Error.Write({expr2})"),
+            CSharpTemplate.Expression($"Console.Error.WriteLine({expr2})"));
 
         return new Visitor(primaryRule, fallbackRule);
     }
@@ -598,7 +680,8 @@ class PreMatchFilteredRecipe : Core.Recipe
     {
         var expr = Capture.Expression("expr");
         var rule = RewriteRule.Rewrite(
-            $"Console.Write({expr})", $"Console.WriteLine({expr})");
+            CSharpPattern.Expression($"Console.Write({expr})"),
+            CSharpTemplate.Expression($"Console.WriteLine({expr})"));
 
         return new Visitor(rule);
     }
@@ -625,7 +708,9 @@ class CaptureConstraintFilteredRecipe : Core.Recipe
         var left = Capture.Expression("left");
         var right = Capture.Expression("right",
             constraint: (node, _) => node is Literal { ValueSource: "0" });
-        var rule = RewriteRule.Rewrite($"{left} + {right}", $"{left}");
+        var rule = RewriteRule.Rewrite(
+            CSharpPattern.Expression($"{left} + {right}"),
+            CSharpTemplate.Expression($"{left}"));
 
         return new Visitor(rule);
     }
@@ -648,7 +733,9 @@ class CaptureFlowRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        var rule = RewriteRule.Rewrite($"Console.Write({expr})", $"Console.WriteLine({expr})");
+        var rule = RewriteRule.Rewrite(
+            CSharpPattern.Expression($"Console.Write({expr})"),
+            CSharpTemplate.Expression($"Console.WriteLine({expr})"));
 
         return new Visitor(rule);
     }
@@ -709,7 +796,9 @@ class ToVisitorBinaryRecipe : Core.Recipe
     {
         var left = Capture.Expression("left");
         var right = Capture.Expression("right");
-        return RewriteRule.Rewrite($"{left} + {right}", $"{right} + {left}")
+        return RewriteRule.Rewrite(
+                CSharpPattern.Expression($"{left} + {right}"),
+                CSharpTemplate.Expression($"{right} + {left}"))
             .ToVisitor();
     }
 }
@@ -722,7 +811,43 @@ class ToVisitorMethodInvocationRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        return RewriteRule.Rewrite($"Console.Write({expr})", $"Console.WriteLine({expr})")
+        return RewriteRule.Rewrite(
+                CSharpPattern.Expression($"Console.Write({expr})"),
+                CSharpTemplate.Expression($"Console.WriteLine({expr})"))
+            .ToVisitor();
+    }
+}
+
+class UseContainsKeyRecipe : Core.Recipe
+{
+    public override string DisplayName => "Use ContainsKey";
+    public override string Description => "Replace dict.Keys.Contains(key) with dict.ContainsKey(key).";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var dict = Capture.Expression(type: "IDictionary<TKey, TValue>", typeParameters: ["TKey", "TValue"]);
+        var key = Capture.Expression();
+        return RewriteRule.Rewrite(
+                CSharpPattern.Expression($"{dict}.Keys.Contains({key})",
+                    usings: ["System.Collections.Generic"]),
+                CSharpTemplate.Expression($"{dict}.ContainsKey({key})"))
+            .ToVisitor();
+    }
+}
+
+class UseElementAtRecipe : Core.Recipe
+{
+    public override string DisplayName => "Use element access";
+    public override string Description => "Replace ElementAt with indexer.";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var expr = Capture.Expression("expr", type: "IEnumerable<T>", typeParameters: ["T"]);
+        var idx = Capture.Expression("idx", type: "int");
+        return RewriteRule.Rewrite(
+                CSharpPattern.Expression($"{expr}.ElementAt({idx})",
+                    usings: ["System.Collections.Generic", "System.Linq"]),
+                CSharpTemplate.Expression($"{expr}[{idx}]"))
             .ToVisitor();
     }
 }
@@ -735,8 +860,12 @@ class FallbackWithManualVisitorRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var x = Capture.Expression("x");
-        var isNull = RewriteRule.Rewrite($"{x} == null", $"{x} is null");
-        var isNotNull = RewriteRule.Rewrite($"{x} != null", $"{x} is not null");
+        var isNull = RewriteRule.Rewrite(
+            CSharpPattern.Expression($"{x} == null"),
+            CSharpTemplate.Expression($"{x} is null"));
+        var isNotNull = RewriteRule.Rewrite(
+            CSharpPattern.Expression($"{x} != null"),
+            CSharpTemplate.Expression($"{x} is not null"));
 
         return new Visitor(isNull, isNotNull);
     }

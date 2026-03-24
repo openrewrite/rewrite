@@ -21,13 +21,14 @@ namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
 /// A declarative rewrite rule that pairs structural pattern matching with template application.
-/// Create rules with <see cref="RewriteRule.Rewrite(TemplateStringHandler, TemplateStringHandler)"/>
-/// or <see cref="RewriteRule.Rewrite(CSharpPattern, CSharpTemplate)"/>.
+/// Create rules with <see cref="RewriteRule.Rewrite(CSharpPattern, CSharpTemplate)"/>.
 /// </summary>
 /// <example>
 /// <code>
 /// var expr = Capture.Expression("expr");
-/// var rule = RewriteRule.Rewrite($"Console.Write({expr})", $"Console.WriteLine({expr})");
+/// var rule = RewriteRule.Rewrite(
+///     CSharpPattern.Expression($"Console.Write({expr})"),
+///     CSharpTemplate.Expression($"Console.WriteLine({expr})"));
 ///
 /// // In a visitor method:
 /// return rule.TryOn(Cursor, node) ?? node;
@@ -59,7 +60,9 @@ public interface IRewriteRule
     /// public override ITreeVisitor&lt;ExecutionContext&gt; GetVisitor()
     /// {
     ///     var x = Capture.Expression("x");
-    ///     return RewriteRule.Rewrite($"Console.Write({x})", $"Console.WriteLine({x})")
+    ///     return RewriteRule.Rewrite(
+    ///             CSharpPattern.Expression($"Console.Write({x})"),
+    ///             CSharpTemplate.Expression($"Console.WriteLine({x})"))
     ///         .ToVisitor();
     /// }
     /// </code>
@@ -73,24 +76,14 @@ public interface IRewriteRule
 public static class RewriteRule
 {
     /// <summary>
-    /// Create a rewrite rule from interpolated strings. Uses <see cref="ScaffoldKind.Expression"/>
-    /// scaffolding — suitable for matching within expression-level visitor methods.
-    /// </summary>
-    /// <example>
-    /// <code>
-    /// using static OpenRewrite.CSharp.Template.RewriteRule;
-    ///
-    /// var expr = Capture.Expression("expr");
-    /// var rule = Rewrite($"Console.Write({expr})", $"Console.WriteLine({expr})");
-    /// return rule.TryOn(cursor, node) ?? node;
-    /// </code>
-    /// </example>
-    public static IRewriteRule Rewrite(TemplateStringHandler before, TemplateStringHandler after) =>
-        Rewrite(CSharpPattern.Expression(before), CSharpTemplate.Expression(after));
-
-    /// <summary>
     /// Create a rewrite rule from a <see cref="CSharpPattern"/> and <see cref="CSharpTemplate"/>.
-    /// Use this when you need explicit scaffold control (e.g., <see cref="CSharpPattern.Statement"/>).
+    /// <para>
+    /// When using typed captures with <c>typeParameters</c>, the pattern's <c>usings</c> must
+    /// include the namespaces needed for the capture type to resolve (e.g.,
+    /// <c>"System.Collections.Generic"</c> for <c>IDictionary&lt;TKey, TValue&gt;</c>).
+    /// Without proper usings, the scaffold has no semantic model and type constraints
+    /// fall back to string matching, which cannot handle generic types.
+    /// </para>
     /// </summary>
     public static IRewriteRule Rewrite(CSharpPattern before, CSharpTemplate after) =>
         new RewriteRuleImpl(before, after);
