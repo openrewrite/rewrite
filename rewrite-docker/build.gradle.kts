@@ -24,6 +24,8 @@ tasks.register<JavaExec>("syncEolImages") {
     classpath = sourceSets.test.get().runtimeClasspath + sourceSets.test.get().output
     mainClass = "org.openrewrite.docker.internal.EolImageDataGenerator"
     workingDir = project.rootDir
+
+    finalizedBy("licenseFormat")
 }
 
 dependencies {
