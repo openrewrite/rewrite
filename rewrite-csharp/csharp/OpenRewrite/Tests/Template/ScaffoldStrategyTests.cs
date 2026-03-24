@@ -106,7 +106,7 @@ public class ScaffoldStrategyTests
     [Fact]
     public void CreateAutoUnwrapsExpressionStatement()
     {
-        var tmpl = CSharpTemplate.Create("Console.WriteLine(\"hello\")");
+        var tmpl = CSharpTemplate.Expression("Console.WriteLine(\"hello\")");
         var tree = tmpl.GetTree();
         Assert.IsType<MethodInvocation>(tree);
     }

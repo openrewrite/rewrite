@@ -51,7 +51,7 @@ public class TypedCaptureTests : RewriteTest
         // With a typed capture, `{s}.Length` should parse correctly because
         // the parser knows __plh_s__ is a string and .Length is a valid member
         var s = Capture.Of<Expression>("s", type: "string");
-        var pat = CSharpPattern.Create($"{s}.Length");
+        var pat = CSharpPattern.Expression($"{s}.Length");
         var tree = pat.GetTree();
         Assert.IsType<FieldAccess>(tree);
     }
@@ -61,7 +61,7 @@ public class TypedCaptureTests : RewriteTest
     {
         // With a typed capture, `{s}.ToUpper()` should parse correctly
         var s = Capture.Of<Expression>("s", type: "string");
-        var pat = CSharpPattern.Create($"{s}.ToUpper()");
+        var pat = CSharpPattern.Expression($"{s}.ToUpper()");
         var tree = pat.GetTree();
         Assert.IsType<MethodInvocation>(tree);
     }
@@ -110,7 +110,7 @@ public class TypedCaptureTests : RewriteTest
     public void TypedCaptureWithIntType()
     {
         var n = Capture.Of<Expression>("n", type: "int");
-        var pat = CSharpPattern.Create($"{n}.ToString()");
+        var pat = CSharpPattern.Expression($"{n}.ToString()");
         var tree = pat.GetTree();
         Assert.IsType<MethodInvocation>(tree);
     }
@@ -120,7 +120,7 @@ public class TypedCaptureTests : RewriteTest
     {
         var s = Capture.Of<Expression>("s", type: "string");
         var n = Capture.Of<Expression>("n", type: "int");
-        var pat = CSharpPattern.Create($"{s}.Substring({n})");
+        var pat = CSharpPattern.Expression($"{s}.Substring({n})");
         var tree = pat.GetTree();
         Assert.IsType<MethodInvocation>(tree);
     }
@@ -130,10 +130,10 @@ public class TypedCaptureTests : RewriteTest
     // ===============================================================
 
     private static Core.Recipe FindExpression(TemplateStringHandler handler)
-        => new TypedPatternSearchRecipe(CSharpPattern.Create(handler));
+        => new TypedPatternSearchRecipe(CSharpPattern.Expression(handler));
 
     private static Core.Recipe FindExpression(string code)
-        => new TypedPatternSearchRecipe(CSharpPattern.Create(code));
+        => new TypedPatternSearchRecipe(CSharpPattern.Expression(code));
 }
 
 file class TypedPatternSearchRecipe(CSharpPattern pat) : Core.Recipe

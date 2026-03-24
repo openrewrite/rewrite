@@ -257,8 +257,8 @@ class MigrateConsoleWriteRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"Console.Write({expr})");
-        var tmpl = CSharpTemplate.Create($"Console.WriteLine({expr})");
+        var pat = CSharpPattern.Expression($"Console.Write({expr})");
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({expr})");
 
         return new MigrateVisitor(pat, tmpl);
     }
@@ -290,7 +290,7 @@ class FindConsoleWriteRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"Console.Write({expr})");
+        var pat = CSharpPattern.Expression($"Console.Write({expr})");
 
         return new FindVisitor(pat);
     }
@@ -313,7 +313,7 @@ class FindConsoleWriteWithDescriptionRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"Console.Write({expr})");
+        var pat = CSharpPattern.Expression($"Console.Write({expr})");
 
         return new FindVisitor(pat);
     }
@@ -337,7 +337,7 @@ class FindBinaryAddRecipe : Core.Recipe
     {
         var lhs = Capture.Of<Expression>("lhs");
         var rhs = Capture.Of<Expression>("rhs");
-        var pat = CSharpPattern.Create($"{lhs} + {rhs}");
+        var pat = CSharpPattern.Expression($"{lhs} + {rhs}");
 
         return new FindVisitor(pat);
     }
@@ -360,7 +360,7 @@ class FindThrowExceptionRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var msg = Capture.Of<Expression>("msg");
-        var pat = CSharpPattern.Create($"throw new Exception({msg})");
+        var pat = CSharpPattern.Statement($"throw new Exception({msg})");
 
         return new FindVisitor(pat);
     }

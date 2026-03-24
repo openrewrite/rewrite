@@ -1411,6 +1411,7 @@ public class PatternMatchTests : RewriteTest
     // Recipe factories
     // ===============================================================
 
+#pragma warning disable CS0618
     private static Core.Recipe Search<T>(TemplateStringHandler handler) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(handler));
 
@@ -1422,6 +1423,7 @@ public class PatternMatchTests : RewriteTest
 
     private static Core.Recipe Search<T>(string code, IReadOnlyList<string> usings) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(code, usings: usings));
+#pragma warning restore CS0618
 
     private static Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
     private static Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
@@ -1431,9 +1433,9 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
     private static Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
     private static Core.Recipe FindStaticMember(string c) =>
-        new StaticMemberSearchRecipe(CSharpPattern.Create(c));
+        new StaticMemberSearchRecipe(CSharpPattern.Expression(c));
     private static Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
-        new StaticMemberSearchRecipe(CSharpPattern.Create(c, usings: usings));
+        new StaticMemberSearchRecipe(CSharpPattern.Expression(c, usings: usings));
     private static Core.Recipe FindLiteral(string c) => Search<Literal>(c);
     private static Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
     private static Core.Recipe FindUnary(TemplateStringHandler h) => Search<Unary>(h);
@@ -1469,10 +1471,10 @@ public class PatternMatchTests : RewriteTest
     /// Search for a Binary or IsPattern null-check, matching across both node types.
     /// </summary>
     private static Core.Recipe FindNullCheck(TemplateStringHandler h) =>
-        new NullCheckSearchRecipe(CSharpPattern.Create(h));
+        new NullCheckSearchRecipe(CSharpPattern.Expression(h));
 
     private static Core.Recipe FindNullCheck(string c) =>
-        new NullCheckSearchRecipe(CSharpPattern.Create(c));
+        new NullCheckSearchRecipe(CSharpPattern.Expression(c));
 }
 
 /// <summary>
