@@ -120,7 +120,7 @@ public class AddSettingsPluginRepository extends Recipe {
 
             private List<Statement> addPluginManagementRepos(List<Statement> statements, J pluginManagement) {
                 List<Statement> mapped = ListUtils.map(statements, statement -> {
-                    J.MethodInvocation existing = unwrapPluginManagement(statement);
+                    J.MethodInvocation existing = unwrapMethodCall(statement, "pluginManagement");
                     if (existing == null) {
                         return statement;
                     }
@@ -133,10 +133,7 @@ public class AddSettingsPluginRepository extends Recipe {
                         return lambda.withBody(block.withStatements(ListUtils.map(block.getStatements(), stmt ->
                                 addRepoToRepositoriesBlock(stmt, pluginManagement))));
                     }));
-                    if (statement instanceof J.Return) {
-                        return ((J.Return) statement).withExpression(m);
-                    }
-                    return m;
+                    return rewrap(statement, m);
                 });
                 if (mapped != statements) {
                     return mapped;
@@ -149,28 +146,31 @@ public class AddSettingsPluginRepository extends Recipe {
                 return ListUtils.map(result, (i, s) -> i == 1 ? s.withPrefix(Space.format("\n\n")) : s);
             }
 
-            private J.@Nullable MethodInvocation unwrapPluginManagement(Statement statement) {
+            private J.@Nullable MethodInvocation unwrapMethodCall(Statement statement, String methodName) {
                 if (statement instanceof J.MethodInvocation &&
-                        "pluginManagement".equals(((J.MethodInvocation) statement).getSimpleName())) {
+                        methodName.equals(((J.MethodInvocation) statement).getSimpleName())) {
                     return (J.MethodInvocation) statement;
                 }
                 if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
-                        "pluginManagement".equals(((J.MethodInvocation) ((J.Return) statement).getExpression()).getSimpleName())) {
+                        methodName.equals(((J.MethodInvocation) ((J.Return) statement).getExpression()).getSimpleName())) {
                     return (J.MethodInvocation) ((J.Return) statement).getExpression();
                 }
                 return null;
             }
 
+            private Statement rewrap(Statement original, J.MethodInvocation updated) {
+                if (original instanceof J.Return) {
+                    return ((J.Return) original).withExpression(updated);
+                }
+                return updated;
+            }
+
             private Statement addRepoToRepositoriesBlock(Statement statement, J pluginManagement) {
-                J.MethodInvocation repos;
-                if (statement instanceof J.MethodInvocation && "repositories".equals(((J.MethodInvocation) statement).getSimpleName())) {
-                    repos = (J.MethodInvocation) statement;
-                } else if (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation &&
-                        "repositories".equals(((J.MethodInvocation) ((J.Return) statement).getExpression()).getSimpleName())) {
-                    repos = (J.MethodInvocation) ((J.Return) statement).getExpression();
-                } else {
+                J.MethodInvocation repos = unwrapMethodCall(statement, "repositories");
+                if (repos == null) {
                     return statement;
                 }
+                J.MethodInvocation repoToAdd = extractRepository(pluginManagement);
                 J.MethodInvocation m2 = repos.withArguments(ListUtils.mapFirst(repos.getArguments(), arg2 -> {
                     if (!(arg2 instanceof J.Lambda) || !(((J.Lambda) arg2).getBody() instanceof J.Block)) {
                         return arg2;
@@ -182,14 +182,11 @@ public class AddSettingsPluginRepository extends Recipe {
                             ListUtils.mapLast(block2.getStatements(), s ->
                                     s instanceof J.Return ? ((J.Return) s).getExpression().withPrefix(lastStatement.getPrefix()) : s),
                             (Statement) (lastStatement instanceof J.Return ?
-                                    ((J.Return) lastStatement).withExpression(extractRepository(pluginManagement).withPrefix(Space.EMPTY)) :
-                                    extractRepository(pluginManagement).withPrefix(lastStatement.getPrefix()))
+                                    ((J.Return) lastStatement).withExpression(repoToAdd.withPrefix(Space.EMPTY)) :
+                                    repoToAdd.withPrefix(lastStatement.getPrefix()))
                                     .withComments(emptyList()))));
                 }));
-                if (statement instanceof J.Return) {
-                    return ((J.Return) statement).withExpression(m2);
-                }
-                return m2;
+                return rewrap(statement, m2);
             }
 
             private <T extends JavaSourceFile> J generatePluginManagementBlock(Class<T> compilationUnitClass, Function<T, J> methodExtractor, ExecutionContext ctx) {
