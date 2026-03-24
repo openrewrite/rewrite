@@ -260,6 +260,76 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    // ===============================================================
+    // Attribute variadic captures
+    // ===============================================================
+
+    [Fact]
+    public void SubstitutesVariadicArgsInAttribute()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(ReplaceAnnotation(
+                $"Fact({args})",
+                $"Test({args})")),
+            CSharp(
+                """
+                class C { [Fact(DisplayName = "test")] void M() {} }
+                """,
+                """
+                class C { [Test(DisplayName = "test")] void M() {} }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesEmptyVariadicArgsInAttribute()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(ReplaceAnnotation(
+                $"Fact({args})",
+                $"Test({args})")),
+            CSharp(
+                """
+                class C { [Fact] void M() {} }
+                """,
+                """
+                class C { [Test] void M() {} }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeRenameViaRewriteRule()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        var rule = RewriteRule.Rewrite(
+            CSharpPattern.Attribute($"Fact({args})"),
+            CSharpTemplate.Attribute($"Test({args})"));
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteRuleRecipe(rule)),
+            CSharp(
+                """
+                class C
+                {
+                    [Fact] void M1() {}
+                    [Fact(DisplayName = "test")] void M2() {}
+                }
+                """,
+                """
+                class C
+                {
+                    [Test] void M1() {}
+                    [Test(DisplayName = "test")] void M2() {}
+                }
+                """
+            )
+        );
+    }
+
     [Fact]
     public void SubstitutesFieldNameCapture()
     {
@@ -462,6 +532,9 @@ public class TemplateApplyTests : RewriteTest
     // Recipe factories
     // ===============================================================
 
+    private static Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
+        new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));
+
 #pragma warning disable CS0618
     private static Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
         where T : J =>
@@ -652,4 +725,12 @@ file class UseRethrowRecipe : Core.Recipe
             return throwStmt;
         }
     }
+}
+
+file class RewriteRuleRecipe(IRewriteRule rule) : Core.Recipe
+{
+    public override string DisplayName => "RewriteRule";
+    public override string Description => "Applies a RewriteRule via ToVisitor().";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => rule.ToVisitor();
 }
