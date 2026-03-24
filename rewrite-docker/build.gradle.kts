@@ -20,6 +20,12 @@ tasks.register<JavaExec>("generateAntlrSources") {
     finalizedBy("licenseFormat")
 }
 
+tasks.register<JavaExec>("syncEolImages") {
+    classpath = sourceSets.test.get().runtimeClasspath + sourceSets.test.get().output
+    mainClass = "org.openrewrite.docker.internal.EolImageDataGenerator"
+    workingDir = project.rootDir
+}
+
 dependencies {
     implementation(project(":rewrite-core"))
     implementation("org.antlr:antlr4-runtime:4.13.2")
