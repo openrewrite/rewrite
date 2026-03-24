@@ -83,7 +83,7 @@ internal static class TemplateEngine
         IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
     {
         // Compute preamble first — it affects the scaffold shape and must be part of the cache key
-        var preamble = BuildTypePreamble(captures);
+        var preamble = BuildScaffoldPreamble(captures);
         var cacheKey = BuildCacheKey(code, preamble, usings, context, dependencies, scaffoldKind);
         if (GlobalCache.TryGetValue(cacheKey, out var cached))
             return cached;
@@ -93,7 +93,7 @@ internal static class TemplateEngine
         return result;
     }
 
-    private static J ParseInternal(string code, IReadOnlyList<string> preamble,
+    private static J ParseInternal(string code, ScaffoldPreamble preamble,
         IReadOnlyList<string> usings, IReadOnlyList<string> context,
         IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind)
     {
@@ -128,24 +128,73 @@ internal static class TemplateEngine
     }
 
     /// <summary>
-    /// Build typed field declarations for captures that have a Type.
-    /// These are emitted as class fields on the scaffold class so they are in scope
-    /// inside the method body. This avoids mixing preamble statements with the template
-    /// code, so <see cref="ExtractTemplateNode"/> doesn't need to skip anything.
-    /// Dispatches on <see cref="CaptureKind"/> to generate the right scaffold form.
+    /// Collects field declarations, type parameters, and where clauses from captures
+    /// for scaffold generation.
     /// </summary>
-    private static List<string> BuildTypePreamble(IReadOnlyDictionary<string, object> captures)
+    private sealed record ScaffoldPreamble(
+        IReadOnlyList<string> Fields,
+        IReadOnlyList<string> TypeParameterNames,
+        IReadOnlyList<string> WhereClauses);
+
+    /// <summary>
+    /// Build the scaffold preamble from captures: field declarations for expression captures,
+    /// type parameter names and where clauses from captures with <see cref="ICapture.TypeParameters"/>.
+    /// </summary>
+    private static ScaffoldPreamble BuildScaffoldPreamble(IReadOnlyDictionary<string, object> captures)
     {
         const System.Reflection.BindingFlags bindingFlags =
             System.Reflection.BindingFlags.Instance |
             System.Reflection.BindingFlags.Public |
             System.Reflection.BindingFlags.NonPublic;
 
-        var preamble = new List<string>();
+        var fields = new List<string>();
+        var typeParamNames = new List<string>();
+        var whereClauses = new List<string>();
+        // Track bounds per type parameter name for conflict detection
+        var typeParamBounds = new Dictionary<string, string?>();
+
         foreach (var kvp in captures)
         {
             var kind = kvp.Value.GetType().GetProperty("Kind", bindingFlags)?.GetValue(kvp.Value);
             var placeholder = Placeholder.ToPlaceholder(kvp.Key);
+
+            // Collect type parameters from captures that declare them
+            if (kvp.Value is ICapture { TypeParameters: { } typeParams })
+            {
+                foreach (var tp in typeParams)
+                {
+                    // Each entry is either "TName" (unbounded) or "TName : Bound1, Bound2"
+                    var colonIdx = tp.IndexOf(':');
+                    string name;
+                    string? bounds;
+                    if (colonIdx >= 0)
+                    {
+                        name = tp[..colonIdx].Trim();
+                        bounds = tp[(colonIdx + 1)..].Trim();
+                    }
+                    else
+                    {
+                        name = tp.Trim();
+                        bounds = null;
+                    }
+
+                    if (typeParamBounds.TryGetValue(name, out var existingBounds))
+                    {
+                        // Same name already declared — check for conflicts
+                        if (!string.Equals(existingBounds, bounds, StringComparison.Ordinal))
+                            throw new InvalidOperationException(
+                                $"Conflicting bounds for type parameter '{name}': " +
+                                $"'{existingBounds ?? "(none)"}' vs '{bounds ?? "(none)"}'");
+                    }
+                    else
+                    {
+                        typeParamBounds[name] = bounds;
+                        typeParamNames.Add(name);
+                        if (bounds != null)
+                            whereClauses.Add($"where {name} : {bounds}");
+                    }
+                }
+            }
 
             if (kind is CaptureKind captureKind)
             {
@@ -156,7 +205,7 @@ internal static class TemplateEngine
                         // Always emit a field declaration for expression captures so Roslyn
                         // knows the placeholder is a variable, not a type. Without this,
                         // `__plh_x__ * __plh_y__` is misparsed as a pointer declaration.
-                        preamble.Add($"{(string.IsNullOrEmpty(captureType) ? "object" : captureType)} {placeholder};");
+                        fields.Add($"{(string.IsNullOrEmpty(captureType) ? "object" : captureType)} {placeholder};");
                         break;
                     case CaptureKind.Type:
                         // TODO: emit scaffold that places placeholder in a type position
@@ -172,18 +221,18 @@ internal static class TemplateEngine
                 var captureType = kvp.Value.GetType().GetProperty("Type")?.GetValue(kvp.Value) as string;
                 if (!string.IsNullOrEmpty(captureType))
                 {
-                    preamble.Add($"{captureType} {placeholder};");
+                    fields.Add($"{captureType} {placeholder};");
                 }
             }
         }
-        return preamble;
+        return new ScaffoldPreamble(fields, typeParamNames, whereClauses);
     }
 
     /// <summary>
     /// Build a parseable C# source from the template code.
     /// The scaffold shape is controlled by <paramref name="scaffoldKind"/>.
     /// </summary>
-    private static string BuildScaffold(string code, IReadOnlyList<string> preamble,
+    private static string BuildScaffold(string code, ScaffoldPreamble preamble,
         IReadOnlyList<string> usings, IReadOnlyList<string> context, ScaffoldKind? scaffoldKind)
     {
         var sb = new System.Text.StringBuilder();
@@ -201,10 +250,23 @@ internal static class TemplateEngine
             sb.AppendLine(c);
         }
 
-        sb.AppendLine("class __T__ {");
+        // Emit class declaration with type parameters if any captures declare them
+        sb.Append("class __T__");
+        if (preamble.TypeParameterNames.Count > 0)
+        {
+            sb.Append('<');
+            sb.Append(string.Join(", ", preamble.TypeParameterNames));
+            sb.Append('>');
+        }
+        if (preamble.WhereClauses.Count > 0)
+        {
+            sb.Append(' ');
+            sb.Append(string.Join(" ", preamble.WhereClauses));
+        }
+        sb.AppendLine(" {");
 
         // Typed capture declarations as class fields — in scope for all scaffold kinds
-        foreach (var decl in preamble)
+        foreach (var decl in preamble.Fields)
         {
             sb.Append("    ");
             sb.AppendLine(decl);
@@ -575,7 +637,7 @@ internal static class TemplateEngine
         return blk.WithStatements(formattedStmts).WithPrefix(preservedBlockPrefix);
     }
 
-    private static string BuildCacheKey(string code, IReadOnlyList<string> preamble,
+    private static string BuildCacheKey(string code, ScaffoldPreamble preamble,
         IReadOnlyList<string> usings, IReadOnlyList<string> context,
         IReadOnlyDictionary<string, string> dependencies, ScaffoldKind? scaffoldKind = null)
     {
@@ -589,10 +651,22 @@ internal static class TemplateEngine
         sb.Append("code:");
         sb.Append(code);
 
-        if (preamble.Count > 0)
+        if (preamble.Fields.Count > 0)
         {
             sb.Append("|preamble:");
-            sb.Append(string.Join(",", preamble));
+            sb.Append(string.Join(",", preamble.Fields));
+        }
+
+        if (preamble.TypeParameterNames.Count > 0)
+        {
+            sb.Append("|typeParams:");
+            sb.Append(string.Join(",", preamble.TypeParameterNames));
+        }
+
+        if (preamble.WhereClauses.Count > 0)
+        {
+            sb.Append("|where:");
+            sb.Append(string.Join(",", preamble.WhereClauses));
         }
 
         if (usings.Count > 0)

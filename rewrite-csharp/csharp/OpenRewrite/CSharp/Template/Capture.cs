@@ -42,6 +42,7 @@ public interface ICapture
     bool IsVariadic { get; }
     int? MinCount { get; }
     int? MaxCount { get; }
+    IReadOnlyList<string>? TypeParameters { get; }
 
     /// <summary>
     /// Evaluate the single-node constraint (if any) against a candidate.
@@ -81,12 +82,14 @@ public sealed class Capture<T> : ICapture where T : J
     public int? MinCount => Variadic?.Min;
     public int? MaxCount => Variadic?.Max;
     public string? Type { get; }
+    public IReadOnlyList<string>? TypeParameters { get; }
     internal CaptureKind Kind { get; }
     public Func<T, CaptureConstraintContext, bool>? Constraint { get; }
     public VariadicOptions<T>? Variadic { get; }
 
     internal Capture(string name,
         string? type = null,
+        IReadOnlyList<string>? typeParameters = null,
         CaptureKind kind = CaptureKind.Expression,
         Func<T, CaptureConstraintContext, bool>? constraint = null,
         VariadicOptions<T>? variadic = null)
@@ -98,6 +101,7 @@ public sealed class Capture<T> : ICapture where T : J
 
         Name = name;
         Type = type;
+        TypeParameters = typeParameters;
         Kind = kind;
         Constraint = constraint;
         Variadic = variadic;
@@ -120,7 +124,7 @@ public sealed class Capture<T> : ICapture where T : J
         if (Type != null && candidate is Expression { Type: not null } expr)
         {
             // Prefer the Roslyn-resolved type from the pattern scaffold when available.
-            // This handles generics (IDictionary<object, object> resolves to its FQN)
+            // This handles generics (IDictionary<TKey, TValue> with GenericTypeVariable entries)
             // and primitives (int resolves to System.Int32) correctly without string parsing.
             var matched = context.PatternType != null
                 ? TypeUtils.IsAssignableTo(expr.Type, context.PatternType)
@@ -188,21 +192,29 @@ public static class Capture
     /// </para>
     /// </summary>
     public static Capture<T> Of<T>(string? name = null, string? type = null,
+        IReadOnlyList<string>? typeParameters = null,
         Func<T, CaptureConstraintContext, bool>? constraint = null,
         VariadicOptions<T>? variadic = null) where T : J
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            type: type, constraint: constraint, variadic: variadic);
+            type: type, typeParameters: typeParameters,
+            constraint: constraint, variadic: variadic);
 
     /// <summary>
     /// Create a capture for an expression-position node.
     /// When <paramref name="type"/> is specified, the template engine generates a typed
     /// field declaration in the scaffold preamble for type attribution.
+    /// When <paramref name="typeParameters"/> is specified, the listed names are treated
+    /// as generic type parameters on the scaffold class, allowing the capture to match
+    /// any instantiation of the generic type. Each entry is either a bare name (unbounded)
+    /// or <c>"Name : Bound1, Bound2"</c> (with constraints), following C# where-clause syntax.
     /// </summary>
     public static Capture<Expression> Expression(string? name = null, string? type = null,
+        IReadOnlyList<string>? typeParameters = null,
         Func<Expression, CaptureConstraintContext, bool>? constraint = null,
         VariadicOptions<Expression>? variadic = null)
         => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            type: type, kind: CaptureKind.Expression, constraint: constraint,
+            type: type, typeParameters: typeParameters,
+            kind: CaptureKind.Expression, constraint: constraint,
             variadic: variadic);
 
     /// <summary>

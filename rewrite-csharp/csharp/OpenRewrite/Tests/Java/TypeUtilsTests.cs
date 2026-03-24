@@ -330,17 +330,17 @@ public class TypeUtilsTests
     [Fact]
     public void IsAssignableTo_JavaType_SamePrimitive()
     {
-        var candidateType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
-        var targetType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
-        Assert.True(TypeUtils.IsAssignableTo(candidateType, targetType));
+        var from = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var to = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        Assert.True(TypeUtils.IsAssignableTo(from, to));
     }
 
     [Fact]
     public void IsAssignableTo_JavaType_DifferentPrimitive()
     {
-        var candidateType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
-        var targetType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.String);
-        Assert.False(TypeUtils.IsAssignableTo(candidateType, targetType));
+        var from = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var to = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.String);
+        Assert.False(TypeUtils.IsAssignableTo(from, to));
     }
 
     [Fact]
@@ -353,9 +353,9 @@ public class TypeUtilsTests
     }
 
     [Fact]
-    public void IsAssignableTo_JavaType_ParameterizedTarget()
+    public void IsAssignableTo_JavaType_ParameterizedTarget_RawFqnMatch()
     {
-        // Target is Parameterized(IDictionary) — should compare by base FQN
+        // Target is Parameterized(IDictionary) with no type params — should match by base FQN
         var idict = MakeClass("System.Collections.Generic.IDictionary");
         var dict = MakeClass("System.Collections.Generic.Dictionary", interfaces: [idict]);
         var target = new JavaType.Parameterized
@@ -370,6 +370,156 @@ public class TypeUtilsTests
     {
         var cls = MakeClass("System.String");
         Assert.False(TypeUtils.IsAssignableTo(cls, (JavaType?)null));
+    }
+
+    // =============================================================
+    // IsAssignableTo — GenericTypeVariable (open generic matching)
+    // =============================================================
+
+    [Fact]
+    public void IsAssignableTo_GenericTypeVariable_UnboundedMatchesAny()
+    {
+        // Target: IDictionary<TKey, TValue> (both unbounded GenericTypeVariables)
+        var idictClass = MakeClass("System.Collections.Generic.IDictionary");
+        var target = new JavaType.Parameterized(
+            idictClass,
+            [
+                new JavaType.GenericTypeVariable("TKey", JavaType.GenericTypeVariable.VarianceKind.Invariant, null),
+                new JavaType.GenericTypeVariable("TValue", JavaType.GenericTypeVariable.VarianceKind.Invariant, null)
+            ]);
+
+        // Candidate: Dictionary<string, int> implementing IDictionary<string, int>
+        var idictStringInt = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IDictionary"),
+            [MakeClass("System.String"), MakeClass("System.Int32")]);
+        var dictClass = MakeClass("System.Collections.Generic.Dictionary",
+            interfaces: [idictStringInt]);
+        var candidate = new JavaType.Parameterized(
+            dictClass,
+            [MakeClass("System.String"), MakeClass("System.Int32")]);
+
+        Assert.True(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_PartialGeneric_FixedFirstParam()
+    {
+        // Target: IDictionary<string, TValue> — first param fixed, second open
+        var idictClass = MakeClass("System.Collections.Generic.IDictionary");
+        var target = new JavaType.Parameterized(
+            idictClass,
+            [
+                MakeClass("System.String"),
+                new JavaType.GenericTypeVariable("TValue", JavaType.GenericTypeVariable.VarianceKind.Invariant, null)
+            ]);
+
+        // Candidate: Dictionary<string, int> implementing IDictionary<string, int> — should match
+        var idictStringInt = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IDictionary"),
+            [MakeClass("System.String"), MakeClass("System.Int32")]);
+        var dictClass = MakeClass("System.Collections.Generic.Dictionary",
+            interfaces: [idictStringInt]);
+        var candidate = new JavaType.Parameterized(
+            dictClass,
+            [MakeClass("System.String"), MakeClass("System.Int32")]);
+
+        Assert.True(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_PartialGeneric_FixedParamMismatch()
+    {
+        // Target: IDictionary<string, TValue> — first param must be string
+        var idictClass = MakeClass("System.Collections.Generic.IDictionary");
+        var target = new JavaType.Parameterized(
+            idictClass,
+            [
+                MakeClass("System.String"),
+                new JavaType.GenericTypeVariable("TValue", JavaType.GenericTypeVariable.VarianceKind.Invariant, null)
+            ]);
+
+        // Candidate: Dictionary<int, string> implementing IDictionary<int, string> — should NOT match
+        var idictIntString = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IDictionary"),
+            [MakeClass("System.Int32"), MakeClass("System.String")]);
+        var dictClass = MakeClass("System.Collections.Generic.Dictionary",
+            interfaces: [idictIntString]);
+        var candidate = new JavaType.Parameterized(
+            dictClass,
+            [MakeClass("System.Int32"), MakeClass("System.String")]);
+
+        Assert.False(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_GenericTypeVariable_WithBound()
+    {
+        // Target: IEnumerable<T> where T : IComparable
+        var ienumClass = MakeClass("System.Collections.Generic.IEnumerable");
+        var icomparable = MakeClass("System.IComparable");
+        var target = new JavaType.Parameterized(
+            ienumClass,
+            [new JavaType.GenericTypeVariable("T", JavaType.GenericTypeVariable.VarianceKind.Invariant,
+                [icomparable])]);
+
+        // Candidate: List<string> implementing IEnumerable<string>
+        // string implements IComparable → should match
+        var stringClass = MakeClass("System.String", interfaces: [MakeClass("System.IComparable")]);
+        var ienumString = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IEnumerable"),
+            [stringClass]);
+        var listClass = MakeClass("System.Collections.Generic.List",
+            interfaces: [ienumString]);
+        var candidate = new JavaType.Parameterized(listClass, [stringClass]);
+
+        Assert.True(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_GenericTypeVariable_BoundNotSatisfied()
+    {
+        // Target: IEnumerable<T> where T : IComparable
+        var ienumClass = MakeClass("System.Collections.Generic.IEnumerable");
+        var icomparable = MakeClass("System.IComparable");
+        var target = new JavaType.Parameterized(
+            ienumClass,
+            [new JavaType.GenericTypeVariable("T", JavaType.GenericTypeVariable.VarianceKind.Invariant,
+                [icomparable])]);
+
+        // Candidate: List<object> implementing IEnumerable<object>
+        // object does NOT implement IComparable → should NOT match
+        var objectClass = MakeClass("System.Object");
+        var ienumObject = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IEnumerable"),
+            [objectClass]);
+        var listClass = MakeClass("System.Collections.Generic.List",
+            interfaces: [ienumObject]);
+        var candidate = new JavaType.Parameterized(listClass, [objectClass]);
+
+        Assert.False(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_ConcreteGeneric_StillRequiresExactTypeArgs()
+    {
+        // Target: IDictionary<string, string> — NO GenericTypeVariables, all concrete
+        var idictClass = MakeClass("System.Collections.Generic.IDictionary");
+        var target = new JavaType.Parameterized(
+            idictClass,
+            [MakeClass("System.String"), MakeClass("System.String")]);
+
+        // Candidate: Dictionary<string, int> implementing IDictionary<string, int>
+        // Type args don't match → should NOT match
+        var idictStringInt = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IDictionary"),
+            [MakeClass("System.String"), MakeClass("System.Int32")]);
+        var dictClass = MakeClass("System.Collections.Generic.Dictionary",
+            interfaces: [idictStringInt]);
+        var candidate = new JavaType.Parameterized(
+            dictClass,
+            [MakeClass("System.String"), MakeClass("System.Int32")]);
+
+        Assert.False(TypeUtils.IsAssignableTo(candidate, target));
     }
 
     // =============================================================

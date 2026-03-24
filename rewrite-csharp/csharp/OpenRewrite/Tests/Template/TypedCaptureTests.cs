@@ -168,7 +168,9 @@ public class TypedCaptureTests : RewriteTest
     [Fact]
     public void TypedCaptureMatchesGenericInterfaceImplementation()
     {
-        var dict = Capture.Expression("dict", type: "IDictionary<object, object>");
+        var dict = Capture.Expression("dict",
+            type: "IDictionary<TKey, TValue>",
+            typeParameters: ["TKey", "TValue"]);
         var key = Capture.Expression("key");
         var pat = CSharpPattern.Expression($"{dict}.Keys.Contains({key})",
             usings: ["System.Collections.Generic"]);
@@ -244,6 +246,200 @@ public class TypedCaptureTests : RewriteTest
     }
 
     // ===============================================================
+    // Open generic captures
+    // ===============================================================
+
+    [Fact]
+    public void OpenGenericCapture_MatchesAnyDictionary()
+    {
+        var dict = Capture.Expression("dict",
+            type: "IDictionary<TKey, TValue>",
+            typeParameters: ["TKey", "TValue"]);
+        var pat = CSharpPattern.Expression($"{dict}.Count",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var d = new Dictionary<string, int>();
+                        var n = d.Count;
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var d = new Dictionary<string, int>();
+                        var n = /*~~>*/d.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void OpenGenericCapture_PartialFixedFirstParam()
+    {
+        var dict = Capture.Expression("dict",
+            type: "IDictionary<string, TValue>",
+            typeParameters: ["TValue"]);
+        var pat = CSharpPattern.Expression($"{dict}.Count",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                // Dictionary<string, int> — first param is string → should match
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var d = new Dictionary<string, int>();
+                        var n = d.Count;
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var d = new Dictionary<string, int>();
+                        var n = /*~~>*/d.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void OpenGenericCapture_PartialFixedFirstParam_Rejects()
+    {
+        var dict = Capture.Expression("dict",
+            type: "IDictionary<string, TValue>",
+            typeParameters: ["TValue"]);
+        var pat = CSharpPattern.Expression($"{dict}.Count",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                // Dictionary<int, string> — first param is int, not string → no match
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var d = new Dictionary<int, string>();
+                        var n = d.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void OpenGenericCapture_WithBound()
+    {
+        var list = Capture.Expression("list",
+            type: "IEnumerable<T>",
+            typeParameters: ["T : IComparable"]);
+        var pat = CSharpPattern.Expression($"{list}.Count()",
+            usings: ["System.Collections.Generic", "System.Linq"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                // List<string> — string implements IComparable → should match
+                """
+                using System.Collections.Generic;
+                using System.Linq;
+                class Test
+                {
+                    void M()
+                    {
+                        var list = new List<string>();
+                        var n = list.Count();
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+                using System.Linq;
+                class Test
+                {
+                    void M()
+                    {
+                        var list = new List<string>();
+                        var n = /*~~>*/list.Count();
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void OpenGenericCapture_StoresTypeParameters()
+    {
+        var cap = Capture.Expression("x",
+            type: "IDictionary<TKey, TValue>",
+            typeParameters: ["TKey", "TValue"]);
+        Assert.NotNull(cap.TypeParameters);
+        Assert.Equal(2, cap.TypeParameters!.Count);
+        Assert.Equal("TKey", cap.TypeParameters[0]);
+        Assert.Equal("TValue", cap.TypeParameters[1]);
+    }
+
+    [Fact]
+    public void ConcreteGenericCapture_StillMatchesExact()
+    {
+        // No typeParameters → concrete generic, should only match exact type args
+        var dict = Capture.Expression("dict", type: "Dictionary<string, string>");
+        var pat = CSharpPattern.Expression($"{dict}.Count",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                // Dictionary<string, int> — type args don't match → no match
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var d = new Dictionary<string, int>();
+                        var n = d.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
@@ -252,6 +448,9 @@ public class TypedCaptureTests : RewriteTest
 
     private static Core.Recipe FindExpression(string code)
         => new TypedPatternSearchRecipe(CSharpPattern.Expression(code));
+
+    private static Core.Recipe FindExpression(CSharpPattern pat)
+        => new TypedPatternSearchRecipe(pat);
 
     private static Core.Recipe FindMethodInvocation(TemplateStringHandler handler, IReadOnlyList<string> usings)
         => new MethodInvocationSearchRecipe(CSharpPattern.Expression(handler, usings: usings));
