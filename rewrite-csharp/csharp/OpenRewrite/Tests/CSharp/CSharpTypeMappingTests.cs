@@ -265,4 +265,29 @@ public class CSharpTypeMappingTests : RewriteTest
         var formal1 = Assert.IsType<JavaType.GenericTypeVariable>(dictClass.TypeParameters[1]);
         Assert.Equal("TValue", formal1.Name);
     }
+
+    [Fact]
+    public void StringTypeArgument_IsMappedAsClass()
+    {
+        // System.String should be mapped as JavaType.Class (not Primitive) when used
+        // as a type argument, so TypeUtils.IsAssignableTo can walk its interface chain.
+        var cu = ParseWithSemanticModel("""
+            using System.Collections.Generic;
+            class Test
+            {
+                void M()
+                {
+                    List<string> items = new List<string>();
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "items");
+        Assert.NotNull(varDecl);
+
+        var paramType = Assert.IsType<JavaType.Parameterized>(varDecl!.TypeExpression?.Type);
+        Assert.NotNull(paramType.TypeParameters);
+        var stringArg = Assert.IsType<JavaType.Class>(Assert.Single(paramType.TypeParameters!));
+        Assert.Equal("System.String", stringArg.FullyQualifiedName);
+    }
 }
