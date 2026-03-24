@@ -186,6 +186,20 @@ internal class PatternMatchingComparator
     /// <c>Identifier</c> ↔ <c>FieldAccess</c> for static members).
     /// Called when pattern and candidate have different node types.
     /// </summary>
+    /// <summary>
+    /// Returns <c>true</c> when the two node types form a pair that
+    /// <see cref="MatchCrossType"/> knows how to compare. Used by
+    /// <see cref="CSharpPattern.Match"/> to avoid rejecting these pairs
+    /// in its fast-reject check.
+    /// </summary>
+    internal static bool HasCrossTypeEquivalence(J pattern, J candidate)
+    {
+        return (pattern is Binary && candidate is IsPattern)
+            || (pattern is IsPattern && candidate is Binary)
+            || (pattern is FieldAccess && candidate is Identifier)
+            || (pattern is Identifier && candidate is FieldAccess);
+    }
+
     private bool MatchCrossType(J pattern, J candidate, Cursor cursor)
     {
         // Binary(expr == null) pattern ↔ IsPattern(expr is null) candidate

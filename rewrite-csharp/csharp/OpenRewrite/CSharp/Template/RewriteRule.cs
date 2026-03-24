@@ -66,6 +66,31 @@ public interface IRewriteRule
     /// Otherwise the alternative is tried on the original node.
     /// </summary>
     IRewriteRule OrElse(IRewriteRule alternative) => new RewriteRule.OrElseRule(this, alternative);
+
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that applies this rule to every
+    /// visited node via <see cref="TreeVisitor{T,P}.PostVisit"/>. The pattern's fast-reject
+    /// in <see cref="CSharpPattern.Match"/> ensures only nodes whose type matches the pattern
+    /// root are fully compared, so iterating over all nodes is cheap.
+    /// <para>
+    /// This is a convenience method for the common case where the visitor only needs to
+    /// apply a rule. For more complex scenarios — such as combining rule results with
+    /// manual AST construction, using <see cref="RewriteRule.CreateBlockFlattener{P}"/>,
+    /// or applying additional logic before/after the rule — create a custom visitor instead.
+    /// </para>
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// public override ITreeVisitor&lt;ExecutionContext&gt; GetVisitor()
+    /// {
+    ///     var x = Capture.Expression("x");
+    ///     return RewriteRule.Rewrite($"{x} == null", $"{x} is null")
+    ///         .OrElse(RewriteRule.Rewrite($"{x} != null", $"{x} is not null"))
+    ///         .ToVisitor();
+    /// }
+    /// </code>
+    /// </example>
+    CSharpVisitor<ExecutionContext> ToVisitor() => new RewriteRule.RewriteRuleVisitor(this);
 }
 
 /// <summary>
@@ -356,6 +381,14 @@ public static class RewriteRule
             if (result is not J j || ReferenceEquals(result, node))
                 return null;
             return j;
+        }
+    }
+
+    internal sealed class RewriteRuleVisitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    {
+        public override J? PostVisit(J tree, ExecutionContext ctx)
+        {
+            return rule.TryOn(Cursor, tree) ?? tree;
         }
     }
 
