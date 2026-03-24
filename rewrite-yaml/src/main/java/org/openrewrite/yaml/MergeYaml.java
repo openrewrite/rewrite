@@ -103,19 +103,17 @@ public class MergeYaml extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return super.validate()
-                .and(Validated.test("yaml", "Must be valid YAML",
-                        yaml, y -> {
-                            if (yaml == null) {
-                                return false;
-                            }
-                            try {
-                                incoming = MergeYaml.parse(yaml);
-                                return true;
-                            } catch (IllegalArgumentException e) {
-                                return false;
-                            }
-                        }))
+        Validated<Object> validated = super.validate();
+        if (yaml != null) {
+            Validated<Yaml> parsed = validateParseable(yaml);
+            if (parsed.isValid()) {
+                incoming = parsed.getValue();
+            }
+            validated = validated.and(parsed);
+        } else {
+            validated = validated.and(Validated.invalid("yaml", null, "Must be valid YAML"));
+        }
+        return validated
                 .and(Validated.required("key", key))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
@@ -259,26 +257,41 @@ public class MergeYaml extends Recipe {
         });
     }
 
-    static Yaml parse(@Language("yml") String yaml) {
+    private static Validated<Yaml> validateParseable(@Language("yml") String yaml) {
         SourceFile sourceFile = new YamlParser().parse(yaml)
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML:\n" + yaml));
+                .orElse(null);
         if (sourceFile instanceof Yaml.Documents) {
             // Any comments will have been put on the parent Document node, preserve by copying to the mapping
             Yaml.Document doc = ((Yaml.Documents) sourceFile).getDocuments().get(0);
             if (doc.getBlock() instanceof Yaml.Mapping) {
                 Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
-                return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                return Validated.valid("yaml", m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix()))));
             } else if (doc.getBlock() instanceof Yaml.Sequence) {
                 Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
-                return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                return Validated.valid("yaml", s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix()))));
             }
-            return doc.getBlock().withPrefix(doc.getPrefix());
+            return Validated.valid("yaml", doc.getBlock().withPrefix(doc.getPrefix()));
         }
-        String message = sourceFile.getMarkers()
-                .findFirst(ParseExceptionResult.class)
-                .map(ParseExceptionResult::getMessage)
-                .orElse("unknown error");
-        throw new IllegalArgumentException("Could not parse as YAML: " + message + "\n" + yaml);
+        if (sourceFile != null) {
+            String message = sourceFile.getMarkers()
+                    .findFirst(ParseExceptionResult.class)
+                    .map(ParseExceptionResult::getMessage)
+                    .orElse("unknown error");
+            return Validated.invalid("yaml", yaml, "Could not parse as YAML: " + message);
+        }
+        return Validated.invalid("yaml", yaml, "Could not parse as YAML");
+    }
+
+    static Yaml parse(@Language("yml") String yaml) {
+        Validated<Yaml> result = validateParseable(yaml);
+        if (result.isValid()) {
+            return result.getValue();
+        }
+        String message = result.failures().stream()
+                .map(Validated.Invalid::getMessage)
+                .findFirst()
+                .orElse("Could not parse as YAML");
+        throw new IllegalArgumentException(message + "\n" + yaml);
     }
 }
