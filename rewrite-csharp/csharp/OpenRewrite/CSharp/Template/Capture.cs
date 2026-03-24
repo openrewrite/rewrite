@@ -39,6 +39,7 @@ internal enum CaptureKind
 public interface ICapture
 {
     string Name { get; }
+    bool IsCapturing { get; }
 }
 
 /// <summary>
@@ -51,6 +52,7 @@ public interface ICapture
 public sealed class Capture<T> : ICapture where T : J
 {
     public string Name { get; }
+    public bool IsCapturing { get; }
     public bool IsVariadic { get; }
     public int? MinCount { get; }
     public int? MaxCount { get; }
@@ -62,9 +64,11 @@ public sealed class Capture<T> : ICapture where T : J
         int? minCount = null, int? maxCount = null,
         string? type = null,
         CaptureKind kind = CaptureKind.Expression,
-        Func<T, Cursor, bool>? constraint = null)
+        Func<T, Cursor, bool>? constraint = null,
+        bool capturing = true)
     {
         Name = name;
+        IsCapturing = capturing;
         IsVariadic = variadic;
         MinCount = minCount;
         MaxCount = maxCount;
@@ -98,49 +102,69 @@ public static class Capture
     /// <see cref="Name"/>) when the capture position is known. Use <c>Of</c> as a generic
     /// fallback for AST node types that don't have a dedicated factory.
     /// </para>
+    /// <para>
+    /// When <paramref name="capturing"/> is <c>false</c>, the placeholder matches
+    /// structurally but the matched value is not stored in the result bindings.
+    /// Useful for "don't care" positions in patterns.
+    /// </para>
     /// </summary>
-    public static Capture<T> Of<T>(string? name = null, string? type = null) where T : J
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}", type: type);
+    public static Capture<T> Of<T>(string? name = null, string? type = null,
+        bool capturing = true) where T : J
+        => new(name ?? AutoName(capturing), type: type, capturing: capturing);
 
     /// <summary>
     /// Create a capture for an expression-position node.
     /// When <paramref name="type"/> is specified, the template engine generates a typed
     /// field declaration in the scaffold preamble for type attribution.
     /// </summary>
-    public static Capture<Expression> Expression(string? name = null, string? type = null)
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            type: type, kind: CaptureKind.Expression);
+    public static Capture<Expression> Expression(string? name = null, string? type = null,
+        Func<Expression, Cursor, bool>? constraint = null,
+        bool capturing = true)
+        => new(name ?? AutoName(capturing),
+            type: type, kind: CaptureKind.Expression,
+            constraint: constraint, capturing: capturing);
 
     /// <summary>
     /// Create a variadic capture that matches zero or more elements.
     /// Useful for matching argument lists, statement sequences, etc.
     /// </summary>
     public static Capture<T> Variadic<T>(string? name = null,
-        int? min = null, int? max = null) where T : J
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            variadic: true, minCount: min, maxCount: max);
+        int? min = null, int? max = null,
+        Func<T, Cursor, bool>? constraint = null,
+        bool capturing = true) where T : J
+        => new(name ?? AutoName(capturing),
+            variadic: true, minCount: min, maxCount: max,
+            constraint: constraint, capturing: capturing);
 
     /// <summary>
     /// Create a capture for a type-position node (e.g., base type, generic argument, variable type).
     /// The template engine will use an appropriate scaffold strategy so Roslyn parses
     /// the placeholder in a type context.
     /// </summary>
-    public static Capture<NameTree> Type(string? name = null)
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            kind: CaptureKind.Type);
+    public static Capture<NameTree> Type(string? name = null,
+        bool capturing = true)
+        => new(name ?? AutoName(capturing),
+            kind: CaptureKind.Type, capturing: capturing);
 
     /// <summary>
     /// Create a capture for a name/identifier-position node.
     /// No preamble declaration is needed; the placeholder is substituted directly.
     /// </summary>
-    public static Capture<Identifier> Name(string? name = null)
-        => new(name ?? $"_capture_{Interlocked.Increment(ref _counter)}",
-            kind: CaptureKind.Name);
+    public static Capture<Identifier> Name(string? name = null,
+        bool capturing = true)
+        => new(name ?? AutoName(capturing),
+            kind: CaptureKind.Name, capturing: capturing);
 
     /// <summary>
     /// Create a capture with a constraint predicate that must be satisfied for matching.
     /// </summary>
     public static Capture<T> WithConstraint<T>(string name,
-        Func<T, Cursor, bool> constraint) where T : J
-        => new(name, constraint: constraint);
+        Func<T, Cursor, bool> constraint,
+        bool capturing = true) where T : J
+        => new(name, constraint: constraint, capturing: capturing);
+
+    private static string AutoName(bool capturing) =>
+        capturing
+            ? $"_capture_{Interlocked.Increment(ref _counter)}"
+            : $"_anon_{Interlocked.Increment(ref _counter)}";
 }

@@ -1408,6 +1408,212 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Non-capturing captures
+    // ===============================================================
+
+    [Fact]
+    public void NonCapturingMatchesStructurallyButDoesNotBind()
+    {
+        var ignored = Capture.Expression(capturing: false);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({ignored})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void NonCapturingDoesNotAppearInBindings()
+    {
+        var ignored = Capture.Expression(capturing: false);
+        var pat = CSharpPattern.Expression($"Console.WriteLine({ignored})");
+        var tree = TemplateEngine.Parse(
+            "Console.WriteLine(42)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+        Assert.NotNull(result);
+        Assert.False(result!.Has(ignored));
+    }
+
+    [Fact]
+    public void NonCapturingWithConstraintStillEvaluatesConstraint()
+    {
+        // Constraint requires the literal value to be the integer 42
+        var constrained = Capture.Expression(
+            constraint: (expr, _) => expr is Literal { Value: 42 },
+            capturing: false);
+        var pat = CSharpPattern.Expression($"Console.WriteLine({constrained})");
+        var tree = TemplateEngine.Parse(
+            "Console.WriteLine(42)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+
+        // Should match: constraint passes
+        var result = pat.Match(tree, new Cursor(null!, tree));
+        Assert.NotNull(result);
+        Assert.False(result!.Has(constrained));
+    }
+
+    [Fact]
+    public void NonCapturingWithFailingConstraintDoesNotMatch()
+    {
+        // Constraint requires value > 100 — will fail for 42
+        var constrained = Capture.Expression(
+            constraint: (expr, _) => expr is Literal { Value: int v } && v > 100,
+            capturing: false);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({constrained})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+                // No after = no match expected
+            )
+        );
+    }
+
+    [Fact]
+    public void MixedCapturingAndNonCapturing()
+    {
+        var important = Capture.Expression("important");
+        var ignored = Capture.Expression(capturing: false);
+        var pat = CSharpPattern.Expression($"Math.Max({ignored}, {important})");
+        var tree = TemplateEngine.Parse(
+            "Math.Max(1, 2)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+
+        Assert.NotNull(result);
+        // The capturing one should be bound
+        Assert.True(result!.Has(important));
+        Assert.NotNull(result.Get<Literal>("important"));
+        // The non-capturing one should NOT be bound
+        Assert.False(result.Has(ignored));
+    }
+
+    [Fact]
+    public void NonCapturingVariadicMatchesMultipleArgs()
+    {
+        var ignored = Capture.Variadic<Expression>(capturing: false);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({ignored})")),
+            CSharp(
+                "class C { void Foo(int a, int b, int c) {} void M() { Foo(1, 2, 3); } }",
+                "class C { void Foo(int a, int b, int c) {} void M() { /*~~>*/Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void NonCapturingVariadicDoesNotAppearInBindings()
+    {
+        var ignored = Capture.Variadic<Expression>(capturing: false);
+        var pat = CSharpPattern.Expression($"Foo({ignored})");
+        var tree = TemplateEngine.Parse(
+            "Foo(1, 2, 3)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+        Assert.NotNull(result);
+        Assert.False(result!.Has(ignored));
+    }
+
+    [Fact]
+    public void CaptureFirstArgIgnoreRest()
+    {
+        var first = Capture.Expression("first");
+        var rest = Capture.Variadic<Expression>(capturing: false);
+        var pat = CSharpPattern.Expression($"Foo({first}, {rest})");
+        var tree = TemplateEngine.Parse(
+            "Foo(1, 2, 3)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+
+        Assert.NotNull(result);
+        Assert.True(result!.Has(first));
+        Assert.NotNull(result.Get<Literal>("first"));
+        Assert.False(result.Has(rest));
+    }
+
+    [Fact]
+    public void ConsistentNonCapturingBindingBothMatch()
+    {
+        // Same named non-capturing capture used twice — both positions must match structurally
+        var same = Capture.Of<Expression>("same", capturing: false);
+        var pat = CSharpPattern.Expression($"Math.Max({same}, {same})");
+        var tree = TemplateEngine.Parse(
+            "Math.Max(1, 1)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+
+        Assert.NotNull(result);
+        Assert.False(result!.Has(same)); // non-capturing: not in bindings
+    }
+
+    [Fact]
+    public void ConsistentNonCapturingBindingFailsWhenDifferent()
+    {
+        // Same named non-capturing capture — values differ, should fail
+        var same = Capture.Of<Expression>("same", capturing: false);
+        var pat = CSharpPattern.Expression($"Math.Max({same}, {same})");
+        var tree = TemplateEngine.Parse(
+            "Math.Max(1, 2)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+
+        Assert.Null(result); // inconsistent — match fails
+    }
+
+    // ===============================================================
+    // Captures with constraints
+    // ===============================================================
+
+    [Fact]
+    public void CapturingWithConstraintEvaluatesConstraint()
+    {
+        var expr = Capture.WithConstraint<Literal>("lit",
+            (lit, _) => lit.Value is 42);
+        var pat = CSharpPattern.Expression($"Console.WriteLine({expr})");
+        var tree = TemplateEngine.Parse(
+            "Console.WriteLine(42)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+
+        Assert.NotNull(result);
+        Assert.True(result!.Has(expr));
+        Assert.NotNull(result.Get<Literal>(expr));
+    }
+
+    [Fact]
+    public void CapturingWithConstraintRejectsOnConstraintFailure()
+    {
+        var expr = Capture.WithConstraint<Literal>("lit",
+            (lit, _) => lit.Value is int v && v > 100);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+                // No after = no match expected
+            )
+        );
+    }
+
+    [Fact]
+    public void NonCapturingVariadicWithConstraintRejectsOnFailure()
+    {
+        // All elements must be integer literals
+        var args = Capture.Variadic<Literal>(
+            constraint: (lit, _) => lit.Value is int,
+            capturing: false);
+        var pat = CSharpPattern.Expression($"Foo({args})");
+
+        // "hello" is not an int literal — should fail
+        var tree = TemplateEngine.Parse(
+            "Foo(1, \"hello\", 3)", new Dictionary<string, object>(),
+            [], [], new Dictionary<string, string>(), ScaffoldKind.Expression);
+        var result = pat.Match(tree, new Cursor(null!, tree));
+        Assert.Null(result);
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 

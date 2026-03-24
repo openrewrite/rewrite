@@ -43,7 +43,21 @@ internal class PatternMatchingComparator
     public Dictionary<string, object>? Match(J pattern, J candidate, Cursor cursor)
     {
         _bindings.Clear();
-        return MatchNode(pattern, candidate, cursor) ? new Dictionary<string, object>(_bindings) : null;
+        if (!MatchNode(pattern, candidate, cursor))
+            return null;
+
+        // Filter out non-capturing bindings before returning.
+        // Non-capturing captures are stored during matching (for consistency checking
+        // when the same placeholder appears in multiple positions) but should not
+        // be visible to the caller.
+        var result = new Dictionary<string, object>(_bindings.Count);
+        foreach (var kvp in _bindings)
+        {
+            if (_captures.TryGetValue(kvp.Key, out var captureObj) && !IsCapturing(captureObj))
+                continue;
+            result[kvp.Key] = kvp.Value;
+        }
+        return result;
     }
 
     private bool MatchNode(J pattern, J candidate, Cursor cursor)
@@ -52,9 +66,15 @@ internal class PatternMatchingComparator
         if (pattern is Identifier patternId)
         {
             var captureName = Placeholder.FromPlaceholder(patternId.SimpleName);
-            if (captureName != null && _captures.ContainsKey(captureName))
+            if (captureName != null && _captures.TryGetValue(captureName, out var captureObj))
             {
-                // This is a capture placeholder — bind the candidate
+                // Evaluate constraint if present
+                if (!EvaluateConstraint(captureObj, candidate, cursor))
+                    return false;
+
+                // This is a capture placeholder — bind the candidate.
+                // Always store (even for non-capturing) so consistency checking works
+                // when the same placeholder appears in multiple positions.
                 if (_bindings.TryGetValue(captureName, out var existing))
                 {
                     // Already bound — check consistency
@@ -406,12 +426,22 @@ internal class PatternMatchingComparator
                 for (var consume = maxPossible; consume >= min; consume--)
                 {
                     var captured = new List<object>();
+                    var constraintFailed = false;
                     for (var k = 0; k < consume; k++)
                     {
                         var candidateEl = candidateElements[ci + k];
                         var innerCandidate = TreeHelper.UnwrapPadded(candidateEl) ?? candidateEl;
+                        // Evaluate per-element constraint if present
+                        if (innerCandidate is J candidateJ
+                            && !EvaluateConstraint(captureObj, candidateJ, cursor))
+                        {
+                            constraintFailed = true;
+                            break;
+                        }
                         captured.Add(innerCandidate);
                     }
+                    if (constraintFailed)
+                        continue;
 
                     // Save bindings for backtracking
                     var savedBindings = new Dictionary<string, object>(_bindings);
@@ -454,6 +484,34 @@ internal class PatternMatchingComparator
                 return false;
         }
         return true;
+    }
+
+    private static bool IsCapturing(object captureObj)
+    {
+        var prop = captureObj.GetType().GetProperty("IsCapturing");
+        return prop == null || (bool)(prop.GetValue(captureObj) ?? true);
+    }
+
+    /// <summary>
+    /// Evaluate a capture's constraint predicate against the candidate node.
+    /// Uses reflection to invoke the generic Func&lt;T, Cursor, bool&gt; constraint.
+    /// Returns true if no constraint is set or if the constraint passes.
+    /// </summary>
+    private static bool EvaluateConstraint(object captureObj, J candidate, Cursor cursor)
+    {
+        var prop = captureObj.GetType().GetProperty("Constraint");
+        if (prop?.GetValue(captureObj) is not Delegate constraint)
+            return true;
+        try
+        {
+            var result = constraint.DynamicInvoke(candidate, cursor);
+            return result is true;
+        }
+        catch
+        {
+            // Type mismatch (candidate doesn't match T) — constraint fails
+            return false;
+        }
     }
 
     private static bool IsVariadic(object captureObj)
