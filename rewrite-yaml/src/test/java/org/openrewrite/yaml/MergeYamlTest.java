@@ -3503,4 +3503,42 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/discussions/7107")
+    @Test
+    void mergeNewEntryIntoSequenceWithObjectIdentifyingProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              fruit:
+              - name: blueberry
+              """,
+            null,
+            "name",
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              ---
+              fruit:
+              - name: apple
+                specs:
+                - id: 1
+              """,
+            """
+              ---
+              fruit:
+              - name: apple
+                specs:
+                - id: 1
+              - name: blueberry
+              """
+          )
+        );
+    }
 }

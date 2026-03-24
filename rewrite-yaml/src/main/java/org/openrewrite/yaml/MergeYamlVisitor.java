@@ -330,9 +330,45 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return entry;
         });
 
+        // Determine the indentation from existing sequence entries to fix auto-format indentation
+        String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
+        String sequenceEntryIndent = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
+
         List<Yaml.Sequence.Entry> entries = concatAll(
                 filter(s1.getEntries(), it -> !mutatedEntries.contains(it)),
-                map(mutatedEntries, it -> autoFormat(it, p, cursor)),
+                map(mutatedEntries, it -> {
+                    Yaml.Sequence.Entry formatted = autoFormat(it, p, cursor);
+                    // autoFormat may produce incorrect indentation when the merge
+                    // happens through nested MergeYamlVisitor calls. Re-indent
+                    // the prefix to match existing sequence entries, preserving
+                    // comments and blank lines.
+                    String formattedPrefix = formatted.getPrefix();
+                    String targetIndent = sequenceEntryIndent.replaceFirst("^\n", "");
+                    String[] lines = LINE_BREAK.split(formattedPrefix, -1);
+                    if (lines.length > 1) {
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < lines.length; i++) {
+                            if (i > 0) {
+                                sb.append(linebreak());
+                            }
+                            String trimmed = lines[i].replaceAll("^\\s+", "");
+                            if (i == lines.length - 1) {
+                                // Last line is the indentation before the sequence entry dash
+                                sb.append(targetIndent);
+                            } else if (trimmed.isEmpty()) {
+                                // Preserve truly blank lines (empty content) as-is
+                                sb.append(lines[i]);
+                            } else {
+                                // Re-indent comment lines
+                                sb.append(targetIndent).append(trimmed);
+                            }
+                        }
+                        formatted = formatted.withPrefix(sb.toString());
+                    } else {
+                        formatted = formatted.withPrefix(sequenceEntryIndent);
+                    }
+                    return formatted;
+                }),
                 it -> {
                     Yaml.Mapping.Entry entry = ((Yaml.Mapping) it.getBlock()).getEntries().get(0);
                     return entry.getKey().getValue() + ": " + ((Yaml.Scalar) entry.getValue()).getValue();
