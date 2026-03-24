@@ -324,6 +324,15 @@ public class MethodMatcher
             {
                 if (_pattern.IsMatch(fqn)) return true;
                 if (_fqnPattern != null && _fqnPattern.IsMatch(fqn)) return true;
+
+                // Match the simple name (last segment) against the pattern.
+                // This allows patterns like "String" to match "System.String".
+                var lastDot = fqn.LastIndexOf('.');
+                if (lastDot >= 0)
+                {
+                    var simpleName = fqn[(lastDot + 1)..];
+                    if (_pattern.IsMatch(simpleName)) return true;
+                }
             }
 
             // Also match simple name for primitives/keywords

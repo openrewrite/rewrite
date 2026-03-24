@@ -211,4 +211,28 @@ public class MethodMatcherTests
             parameterTypes: [MakeClass("System.String"), MakeClass("System.StringComparison")]);
         Assert.False(mm.Matches(method));
     }
+
+    // =============================================================
+    // Short name matching (e.g., "String" matches "System.String")
+    // =============================================================
+
+    [Fact]
+    public void MatchesShortNameArgAgainstClassType()
+    {
+        // Pattern uses "String" (short name), param type is JavaType.Class("System.String")
+        var mm = new MethodMatcher("System.Security.Cryptography.Aes Create(String)");
+        var method = MakeMethod("System.Security.Cryptography.Aes", "Create",
+            parameterTypes: [MakeClass("System.String")]);
+        Assert.True(mm.Matches(method));
+    }
+
+    [Fact]
+    public void MatchesKeywordArgAgainstClassType()
+    {
+        // Pattern uses "string" (C# keyword), param type is JavaType.Class("System.String")
+        var mm = new MethodMatcher("System.Security.Cryptography.Aes Create(string)");
+        var method = MakeMethod("System.Security.Cryptography.Aes", "Create",
+            parameterTypes: [MakeClass("System.String")]);
+        Assert.True(mm.Matches(method));
+    }
 }
