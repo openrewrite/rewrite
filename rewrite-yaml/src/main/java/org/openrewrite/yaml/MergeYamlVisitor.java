@@ -336,45 +336,42 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
         List<Yaml.Sequence.Entry> entries = concatAll(
                 filter(s1.getEntries(), it -> !mutatedEntries.contains(it)),
-                map(mutatedEntries, it -> {
-                    Yaml.Sequence.Entry formatted = autoFormat(it, p, cursor);
-                    // autoFormat may produce incorrect indentation when the merge
-                    // happens through nested MergeYamlVisitor calls. Re-indent
-                    // the prefix to match existing sequence entries, preserving
-                    // comments and blank lines.
-                    String formattedPrefix = formatted.getPrefix();
-                    String targetIndent = sequenceEntryIndent.replaceFirst("^\n", "");
-                    String[] lines = LINE_BREAK.split(formattedPrefix, -1);
-                    if (lines.length > 1) {
-                        StringBuilder sb = new StringBuilder();
-                        for (int i = 0; i < lines.length; i++) {
-                            if (i > 0) {
-                                sb.append(linebreak());
-                            }
-                            String trimmed = lines[i].replaceAll("^\\s+", "");
-                            if (i == lines.length - 1) {
-                                // Last line is the indentation before the sequence entry dash
-                                sb.append(targetIndent);
-                            } else if (trimmed.isEmpty()) {
-                                // Preserve truly blank lines (empty content) as-is
-                                sb.append(lines[i]);
-                            } else {
-                                // Re-indent comment lines
-                                sb.append(targetIndent).append(trimmed);
-                            }
-                        }
-                        formatted = formatted.withPrefix(sb.toString());
-                    } else {
-                        formatted = formatted.withPrefix(sequenceEntryIndent);
-                    }
-                    return formatted;
-                }),
+                map(mutatedEntries, it -> reindentEntry(autoFormat(it, p, cursor), sequenceEntryIndent)),
                 it -> {
                     Yaml.Mapping.Entry entry = ((Yaml.Mapping) it.getBlock()).getEntries().get(0);
                     return entry.getKey().getValue() + ": " + ((Yaml.Scalar) entry.getValue()).getValue();
                 }).ls;
 
         return s1.withEntries(entries);
+    }
+
+    /**
+     * Re-indent a sequence entry prefix to match existing sibling entries.
+     * autoFormat may produce incorrect indentation when the merge happens
+     * through nested MergeYamlVisitor calls with stale cursor context.
+     */
+    private Yaml.Sequence.Entry reindentEntry(Yaml.Sequence.Entry entry, String sequenceEntryIndent) {
+        String prefix = entry.getPrefix();
+        String targetIndent = sequenceEntryIndent.replaceFirst("^\n", "");
+        String[] lines = LINE_BREAK.split(prefix, -1);
+        if (lines.length <= 1) {
+            return entry.withPrefix(sequenceEntryIndent);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            if (i > 0) {
+                sb.append(linebreak());
+            }
+            String trimmed = lines[i].replaceAll("^\\s+", "");
+            if (i == lines.length - 1) {
+                sb.append(targetIndent);
+            } else if (trimmed.isEmpty()) {
+                sb.append(lines[i]);
+            } else {
+                sb.append(targetIndent).append(trimmed);
+            }
+        }
+        return entry.withPrefix(sb.toString());
     }
 
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
