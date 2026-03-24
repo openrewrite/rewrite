@@ -200,6 +200,67 @@ public sealed class CSharpPattern
     /// </summary>
     public T Find<T>(T tree, Cursor cursor, string? description = null) where T : J
     {
-        return Match(tree, cursor) != null ? SearchResult.Found(tree, description) : tree;
+        return Find(tree, cursor, (T t, Cursor _, MatchResult _) => SearchResult.Found(t, description));
+    }
+
+    /// <summary>
+    /// If this pattern matches the given tree node, call <paramref name="annotator"/> with
+    /// the matched node, cursor, and match result, returning the annotated node.
+    /// If the pattern does not match, returns the node unchanged.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// return pat.Find(mi, Cursor, (node, _, _) => Markup.CreateWarn(node, "Avoid this API"));
+    /// </code>
+    /// </example>
+    public T Find<T>(T tree, Cursor cursor, Func<T, Cursor, MatchResult, T> annotator) where T : J
+    {
+        var match = Match(tree, cursor);
+        return match != null ? annotator(tree, cursor, match) : tree;
+    }
+
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that visits every node and
+    /// adds a <see cref="SearchResult"/> marker to matches. The pattern's fast-reject in
+    /// <see cref="Match"/> ensures only nodes whose type matches the pattern root are fully
+    /// compared, so iterating over all nodes is cheap.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// public override JavaVisitor&lt;ExecutionContext&gt; GetVisitor() =>
+    ///     CSharpPattern.Expression("Console.WriteLine(\"hello\")")
+    ///         .ToFindVisitor("found it");
+    /// </code>
+    /// </example>
+    public CSharpVisitor<Core.ExecutionContext> ToFindVisitor(string? description = null)
+    {
+        return ToFindVisitor((node, _, _) => SearchResult.Found(node, description));
+    }
+
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that visits every node and
+    /// calls <paramref name="annotator"/> on matches. Use this to produce visitors that mark
+    /// matches with custom markers (e.g. <see cref="Markup.CreateWarn{T}"/>).
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// public override JavaVisitor&lt;ExecutionContext&gt; GetVisitor() =>
+    ///     CSharpPattern.Expression($"new BinaryFormatter({args})")
+    ///         .ToFindVisitor((node, _, _) => Markup.CreateWarn(node, "BinaryFormatter is obsolete"));
+    /// </code>
+    /// </example>
+    public CSharpVisitor<Core.ExecutionContext> ToFindVisitor(Func<J, Cursor, MatchResult, J> annotator)
+    {
+        return new FindVisitor(this, annotator);
+    }
+
+    private sealed class FindVisitor(CSharpPattern pattern, Func<J, Cursor, MatchResult, J> annotator)
+        : CSharpVisitor<Core.ExecutionContext>
+    {
+        public override J? PostVisit(J tree, Core.ExecutionContext ctx)
+        {
+            var match = pattern.Match(tree, Cursor);
+            return match != null ? annotator(tree, Cursor, match) : tree;
+        }
     }
 }
