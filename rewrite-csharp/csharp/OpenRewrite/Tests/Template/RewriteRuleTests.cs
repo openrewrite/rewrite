@@ -267,10 +267,10 @@ public class RewriteRuleTests : RewriteTest
     }
 
     [Fact]
-    public void PostMatchFiltersOnCapturedValues()
+    public void CaptureConstraintFiltersOnCapturedValues()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new PostMatchFilteredRecipe()),
+            spec => spec.SetRecipe(new CaptureConstraintFilteredRecipe()),
             CSharp(
                 """
                 class C
@@ -385,10 +385,10 @@ public class RewriteRuleTests : RewriteTest
     }
 
     [Fact]
-    public void ToVisitorWithOrElse()
+    public void FallbackWithManualVisitor()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new ToVisitorOrElseRecipe()),
+            spec => spec.SetRecipe(new FallbackWithManualVisitorRecipe()),
             CSharp(
                 """
                 class C
@@ -506,24 +506,23 @@ class NormalizeConsoleOutputRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        var rule = RewriteRule.Rewrite(() => new RewriteConfig
-        {
-            Befores = [
-                CSharpPattern.Expression($"Console.Write({expr})"),
-                CSharpPattern.Expression($"Console.Error.Write({expr})")
-            ],
-            After = CSharpTemplate.Expression($"Console.WriteLine({expr})")
-        });
+        var pat1 = CSharpPattern.Expression($"Console.Write({expr})");
+        var pat2 = CSharpPattern.Expression($"Console.Error.Write({expr})");
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({expr})");
 
-        return new Visitor(rule);
+        return new Visitor(pat1, pat2, tmpl);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(CSharpPattern pat1, CSharpPattern pat2, CSharpTemplate tmpl)
+        : CSharpVisitor<ExecutionContext>
     {
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
-            return (MethodInvocation)(rule.TryOn(Cursor, mi) ?? mi);
+            var match = pat1.Match(mi, Cursor) ?? pat2.Match(mi, Cursor);
+            if (match != null)
+                return (J)tmpl.Apply(Cursor, values: match)!;
+            return mi;
         }
     }
 }
@@ -543,15 +542,19 @@ class MigrateAndRedirectRecipe : Core.Recipe
         var redirectRule = RewriteRule.Rewrite(
             $"Console.WriteLine({expr2})", $"Console.Error.WriteLine({expr2})");
 
-        return new Visitor(migrateRule.AndThen(redirectRule));
+        return new Visitor(migrateRule, redirectRule);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(IRewriteRule migrate, IRewriteRule redirect)
+        : CSharpVisitor<ExecutionContext>
     {
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
-            return (MethodInvocation)(rule.TryOn(Cursor, mi) ?? mi);
+            var result = migrate.TryOn(Cursor, mi);
+            if (result != null)
+                result = redirect.TryOn(Cursor, result) ?? result;
+            return (MethodInvocation)(result ?? mi);
         }
     }
 }
@@ -559,7 +562,7 @@ class MigrateAndRedirectRecipe : Core.Recipe
 class MigrateWithFallbackRecipe : Core.Recipe
 {
     public override string DisplayName => "Migrate with fallback";
-    public override string Description => "Uses OrElse to try primary then fallback rule.";
+    public override string Description => "Tries primary then fallback rule.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
@@ -571,15 +574,17 @@ class MigrateWithFallbackRecipe : Core.Recipe
         var fallbackRule = RewriteRule.Rewrite(
             $"Console.Error.Write({expr2})", $"Console.Error.WriteLine({expr2})");
 
-        return new Visitor(primaryRule.OrElse(fallbackRule));
+        return new Visitor(primaryRule, fallbackRule);
     }
 
-    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    private class Visitor(IRewriteRule primary, IRewriteRule fallback)
+        : CSharpVisitor<ExecutionContext>
     {
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
-            return (MethodInvocation)(rule.TryOn(Cursor, mi) ?? mi);
+            return (MethodInvocation)(primary.TryOn(Cursor, mi)
+                ?? fallback.TryOn(Cursor, mi) ?? mi);
         }
     }
 }
@@ -592,13 +597,8 @@ class PreMatchFilteredRecipe : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Expression("expr");
-        var rule = RewriteRule.Rewrite(() => new RewriteConfig
-        {
-            Before = CSharpPattern.Expression($"Console.Write({expr})"),
-            After = CSharpTemplate.Expression($"Console.WriteLine({expr})"),
-            PreMatch = (_, cursor) =>
-                cursor.FirstEnclosing<MethodDeclaration>()?.Name.SimpleName == "Target"
-        });
+        var rule = RewriteRule.Rewrite(
+            $"Console.Write({expr})", $"Console.WriteLine({expr})");
 
         return new Visitor(rule);
     }
@@ -608,30 +608,24 @@ class PreMatchFilteredRecipe : Core.Recipe
         public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
+            if (Cursor.FirstEnclosing<MethodDeclaration>()?.Name.SimpleName != "Target")
+                return mi;
             return (MethodInvocation)(rule.TryOn(Cursor, mi) ?? mi);
         }
     }
 }
 
-class PostMatchFilteredRecipe : Core.Recipe
+class CaptureConstraintFilteredRecipe : Core.Recipe
 {
-    public override string DisplayName => "PostMatch filtered";
-    public override string Description => "Simplifies x + 0 to x using postMatch.";
+    public override string DisplayName => "Capture constraint filtered";
+    public override string Description => "Simplifies x + 0 to x using a capture constraint.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var left = Capture.Expression("left");
-        var right = Capture.Expression("right");
-        var rule = RewriteRule.Rewrite(() => new RewriteConfig
-        {
-            Before = CSharpPattern.Expression($"{left} + {right}"),
-            AfterFactory = _ => CSharpTemplate.Expression($"{left}"),
-            PostMatch = (_, _, captures) =>
-            {
-                var r = captures.Get(right);
-                return r is Literal { ValueSource: "0" };
-            }
-        });
+        var right = Capture.Expression("right",
+            constraint: (node, _) => node is Literal { ValueSource: "0" });
+        var rule = RewriteRule.Rewrite($"{left} + {right}", $"{left}");
 
         return new Visitor(rule);
     }
@@ -733,16 +727,28 @@ class ToVisitorMethodInvocationRecipe : Core.Recipe
     }
 }
 
-class ToVisitorOrElseRecipe : Core.Recipe
+class FallbackWithManualVisitorRecipe : Core.Recipe
 {
-    public override string DisplayName => "ToVisitor with OrElse";
-    public override string Description => "Replaces == null / != null with is null / is not null using ToVisitor().";
+    public override string DisplayName => "Fallback with manual visitor";
+    public override string Description => "Replaces == null / != null with is null / is not null.";
 
     public override ITreeVisitor<ExecutionContext> GetVisitor()
     {
         var x = Capture.Expression("x");
-        return RewriteRule.Rewrite($"{x} == null", $"{x} is null")
-            .OrElse(RewriteRule.Rewrite($"{x} != null", $"{x} is not null"))
-            .ToVisitor();
+        var isNull = RewriteRule.Rewrite($"{x} == null", $"{x} is null");
+        var isNotNull = RewriteRule.Rewrite($"{x} != null", $"{x} is not null");
+
+        return new Visitor(isNull, isNotNull);
+    }
+
+    private class Visitor(IRewriteRule isNull, IRewriteRule isNotNull)
+        : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitBinary(Binary binary, ExecutionContext ctx)
+        {
+            binary = (Binary)base.VisitBinary(binary, ctx);
+            return isNull.TryOn(Cursor, binary)
+                ?? isNotNull.TryOn(Cursor, binary) ?? binary;
+        }
     }
 }
