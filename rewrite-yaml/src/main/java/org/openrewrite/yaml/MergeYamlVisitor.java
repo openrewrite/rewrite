@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.yaml.MergeYaml.InsertMode;
@@ -363,7 +364,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
      */
     private Yaml.Sequence.Entry reindentEntry(Yaml.Sequence.Entry entry, String sequenceEntryIndent) {
         String prefix = entry.getPrefix();
-        String targetIndent = sequenceEntryIndent.replaceFirst("^\n", "");
+        String targetIndent = sequenceEntryIndent.startsWith("\n") ?
+                sequenceEntryIndent.substring(1) : sequenceEntryIndent;
 
         // Compute how much autoFormat over- or under-indented relative to the target
         String actualIndent = prefix.substring(prefix.lastIndexOf('\n') + 1);
@@ -380,7 +382,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (i > 0) {
                     sb.append(linebreak());
                 }
-                String trimmed = lines[i].replaceAll("^\\s+", "");
+                int nonWs = StringUtils.indexOfNonWhitespace(lines[i]);
+                String trimmed = nonWs < 0 ? "" : lines[i].substring(nonWs);
                 if (i == lines.length - 1) {
                     sb.append(targetIndent);
                 } else if (trimmed.isEmpty()) {
@@ -442,10 +445,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
             String beforeIndent = prefix.substring(0, lastNewline + 1);
             String indent = prefix.substring(lastNewline + 1);
-            int newLen = Math.max(0, indent.length() + delta);
-            char[] spaces = new char[newLen];
-            Arrays.fill(spaces, ' ');
-            return beforeIndent + new String(spaces);
+            return beforeIndent + StringUtils.repeat(" ", Math.max(0, indent.length() + delta));
         }
     }
 
