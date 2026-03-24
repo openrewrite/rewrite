@@ -57,13 +57,11 @@ public sealed class CSharpPattern
     }
 
     /// <summary>
-    /// Create a pattern from an interpolated string containing <see cref="Capture{T}"/> placeholders.
+    /// Create a pattern with auto-detected scaffold kind.
+    /// Prefer <see cref="Expression"/>, <see cref="Statement"/>,
+    /// <see cref="ClassMember"/>, or <see cref="Attribute"/> for explicit scaffold control.
     /// </summary>
-    /// <param name="handler">The interpolated string handler that extracts captures.</param>
-    /// <param name="usings">Optional using directives for the scaffold.</param>
-    /// <param name="context">Optional context lines emitted before the scaffold class.</param>
-    /// <param name="dependencies">Optional NuGet package dependencies (package name → version)
-    /// required for import resolution and type attribution.</param>
+    [Obsolete("Use Expression(), Statement(), ClassMember(), or Attribute() for explicit scaffold control.")]
     public static CSharpPattern Create(TemplateStringHandler handler,
         IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
         IReadOnlyDictionary<string, string>? dependencies = null)
@@ -71,14 +69,8 @@ public sealed class CSharpPattern
         return new CSharpPattern(handler.GetCode(), handler.GetCaptures(), usings, context, dependencies);
     }
 
-    /// <summary>
-    /// Create a pattern from a plain string (no captures — useful for exact matching).
-    /// </summary>
-    /// <param name="code">The pattern code string.</param>
-    /// <param name="usings">Optional using directives for the scaffold.</param>
-    /// <param name="context">Optional context lines emitted before the scaffold class.</param>
-    /// <param name="dependencies">Optional NuGet package dependencies (package name → version)
-    /// required for import resolution and type attribution.</param>
+    /// <inheritdoc cref="Create(TemplateStringHandler, IReadOnlyList{string}?, IReadOnlyList{string}?, IReadOnlyDictionary{string, string}?)"/>
+    [Obsolete("Use Expression(), Statement(), ClassMember(), or Attribute() for explicit scaffold control.")]
     public static CSharpPattern Create(string code,
         IReadOnlyList<string>? usings = null, IReadOnlyList<string>? context = null,
         IReadOnlyDictionary<string, string>? dependencies = null)
