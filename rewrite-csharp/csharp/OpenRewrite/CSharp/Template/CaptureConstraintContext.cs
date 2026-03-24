@@ -22,22 +22,11 @@ namespace OpenRewrite.CSharp.Template;
 /// Provides the cursor positioned at the captured node and a read-only view
 /// of all captures that have been bound so far, enabling dependent constraints.
 /// </summary>
-public sealed class CaptureConstraintContext
-{
-    /// <summary>
-    /// The cursor from the visitor, positioned at the node being matched.
-    /// </summary>
-    public Cursor Cursor { get; }
-
-    /// <summary>
-    /// Read-only snapshot of captures already bound at the point this constraint is evaluated.
-    /// Enables dependent constraints where one capture's validity depends on another's value.
-    /// </summary>
-    public IReadOnlyDictionary<string, object> Captures { get; }
-
-    public CaptureConstraintContext(Cursor cursor, IReadOnlyDictionary<string, object> captures)
-    {
-        Cursor = cursor;
-        Captures = captures;
-    }
-}
+/// <param name="Cursor">The cursor from the visitor, positioned at the node being matched.</param>
+/// <param name="Captures">Read-only snapshot of captures already bound at the point this
+/// constraint is evaluated. Enables dependent constraints where one capture's validity
+/// depends on another's value.</param>
+public sealed record CaptureConstraintContext(
+    Cursor Cursor,
+    IReadOnlyDictionary<string, object> Captures
+);

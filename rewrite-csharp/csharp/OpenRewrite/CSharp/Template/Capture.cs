@@ -102,6 +102,8 @@ public sealed class Capture<T> : ICapture where T : J
     public bool EvaluateConstraint(object candidate, CaptureConstraintContext context)
     {
         if (Constraint == null) return true;
+        // The `is T` check acts as an implicit type guard: if the candidate is not
+        // assignable to T, the constraint fails without invoking the delegate.
         return candidate is T typed && Constraint(typed, context);
     }
 
@@ -109,10 +111,9 @@ public sealed class Capture<T> : ICapture where T : J
     public bool EvaluateVariadicConstraint(IReadOnlyList<object> captured, CaptureConstraintContext context)
     {
         if (VariadicConstraint == null) return true;
-        // IReadOnlyList<T> is covariant and T is a reference type (constrained to J),
-        // so we can cast IReadOnlyList<object> → IReadOnlyList<T> via an adapter.
-        var typed = captured.Select(x => (T)x).ToList().AsReadOnly();
-        return VariadicConstraint(typed, context);
+        var typed = captured.OfType<T>().ToList();
+        if (typed.Count != captured.Count) return false;
+        return VariadicConstraint(typed.AsReadOnly(), context);
     }
 }
 
