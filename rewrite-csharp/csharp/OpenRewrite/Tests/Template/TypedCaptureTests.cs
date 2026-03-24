@@ -125,8 +125,48 @@ public class TypedCaptureTests : RewriteTest
         Assert.IsType<MethodInvocation>(tree);
     }
 
+    [Fact]
+    public void TypedCaptureRejectsIncompatibleType()
+    {
+        var target = Capture.Expression("target", type: "System.IO.BinaryReader");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"{target}.ReadString()", ["System.IO"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                // MyReader.ReadString() should NOT match — MyReader is not BinaryReader
+                """
+                class MyReader
+                {
+                    public string ReadString() => "hello";
+                }
+                class Test
+                {
+                    void M(MyReader reader)
+                    {
+                        var text = reader.ReadString();
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void TypedCaptureMatchesCompatibleType()
+    {
+        var target = Capture.Expression("target", type: "System.IO.BinaryReader");
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"{target}.ReadString()", ["System.IO"]))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                "using System.IO; class Test { void M(BinaryReader r) { r.ReadString(); } }",
+                "using System.IO; class Test { void M(BinaryReader r) { /*~~>*/r.ReadString(); } }"
+            )
+        );
+    }
+
     // ===============================================================
-    // Recipe factory
+    // Recipe factories
     // ===============================================================
 
     private static Core.Recipe FindExpression(TemplateStringHandler handler)
@@ -134,6 +174,9 @@ public class TypedCaptureTests : RewriteTest
 
     private static Core.Recipe FindExpression(string code)
         => new TypedPatternSearchRecipe(CSharpPattern.Expression(code));
+
+    private static Core.Recipe FindMethodInvocation(TemplateStringHandler handler, IReadOnlyList<string> usings)
+        => new MethodInvocationSearchRecipe(CSharpPattern.Expression(handler, usings: usings));
 }
 
 file class TypedPatternSearchRecipe(CSharpPattern pat) : Core.Recipe
@@ -150,6 +193,26 @@ file class TypedPatternSearchRecipe(CSharpPattern pat) : Core.Recipe
             if (tree is Expression e)
             {
                 return pat.Find(e, Cursor);
+            }
+            return tree;
+        }
+    }
+}
+
+file class MethodInvocationSearchRecipe(CSharpPattern pat) : Core.Recipe
+{
+    public override string DisplayName => "Find method invocation";
+    public override string Description => "Searches for method invocations matching the pattern.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new SearchVisitor(pat);
+
+    private class SearchVisitor(CSharpPattern pat) : CSharpVisitor<ExecutionContext>
+    {
+        public override J? PreVisit(J tree, ExecutionContext ctx)
+        {
+            if (tree is MethodInvocation m)
+            {
+                return pat.Find(m, Cursor);
             }
             return tree;
         }

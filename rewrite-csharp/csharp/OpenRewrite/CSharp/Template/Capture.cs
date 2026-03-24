@@ -113,11 +113,44 @@ public sealed class Capture<T> : ICapture where T : J
     /// <inheritdoc />
     public bool EvaluateConstraint(object candidate, CaptureConstraintContext context)
     {
+        // When the capture declares a type constraint and the candidate has type
+        // attribution, verify the candidate's semantic type is assignable to it.
+        // If the candidate has no type info (expr.Type == null), skip the check —
+        // type attribution may be unavailable when reference assemblies aren't provided.
+        if (Type != null && candidate is Expression { Type: not null } expr
+            && !TypeUtils.IsAssignableTo(expr.Type, ResolveCSharpAlias(Type)))
+            return false;
+
         if (Constraint == null) return true;
         // The `is T` check acts as an implicit type guard: if the candidate is not
         // assignable to T, the constraint fails without invoking the delegate.
         return candidate is T typed && Constraint(typed, context);
     }
+
+    /// <summary>
+    /// Resolve C# keyword aliases (e.g. <c>string</c>, <c>int</c>) to their
+    /// fully-qualified .NET type names for use with <see cref="TypeUtils.IsAssignableTo"/>.
+    /// Returns the input unchanged if it is not a keyword alias.
+    /// </summary>
+    private static string ResolveCSharpAlias(string type) => type switch
+    {
+        "bool" => "System.Boolean",
+        "byte" => "System.Byte",
+        "sbyte" => "System.SByte",
+        "char" => "System.Char",
+        "decimal" => "System.Decimal",
+        "double" => "System.Double",
+        "float" => "System.Single",
+        "int" => "System.Int32",
+        "uint" => "System.UInt32",
+        "long" => "System.Int64",
+        "ulong" => "System.UInt64",
+        "short" => "System.Int16",
+        "ushort" => "System.UInt16",
+        "string" => "System.String",
+        "object" => "System.Object",
+        _ => type
+    };
 
     /// <inheritdoc />
     public bool EvaluateVariadicConstraint(IReadOnlyList<object> captured, CaptureConstraintContext context)
