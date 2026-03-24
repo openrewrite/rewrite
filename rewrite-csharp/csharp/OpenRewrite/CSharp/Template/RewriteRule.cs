@@ -96,12 +96,6 @@ public static class RewriteRule
         new RewriteRuleImpl(before, after);
 
     /// <summary>
-    /// Wrap a <see cref="Recipe"/> as an <see cref="IRewriteRule"/>.
-    /// </summary>
-    public static IRewriteRule FromRecipe(Recipe recipe, ExecutionContext ctx) =>
-        new RecipeRuleAdapter(recipe, ctx);
-
-    /// <summary>
     /// Creates a visitor that splices statements from any <see cref="Block"/> marked with
     /// <see cref="SyntheticBlockContainer"/> into its parent block. Register once via
     /// <see cref="TreeVisitor{T,P}.DoAfterVisit"/> — a single instance handles all
@@ -138,25 +132,6 @@ public static class RewriteRule
             var match = before.Match(node, cursor);
             if (match == null) return null;
             return after.Apply(cursor, values: match);
-        }
-    }
-
-    private sealed class RecipeRuleAdapter(Recipe recipe, ExecutionContext ctx) : IRewriteRule
-    {
-        public J? TryOn(Cursor cursor, J node)
-        {
-            var visitor = recipe.GetVisitor();
-            Tree? result;
-            if (visitor is TreeVisitor<J, ExecutionContext> tv)
-                result = tv.Visit(node, ctx, cursor);
-            else
-                // Fallback for non-generic visitors: cursor is not propagated.
-                // Recipes relying on cursor ancestry will not work through this path.
-                result = visitor.Visit(node, ctx);
-
-            if (result is not J j || ReferenceEquals(result, node))
-                return null;
-            return j;
         }
     }
 
