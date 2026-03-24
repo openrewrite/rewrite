@@ -323,6 +323,39 @@ public class RewriteRuleTests : RewriteTest
             )
         );
     }
+    // ===============================================================
+    // FlattenBlock — multi-statement template spliced into parent
+    // ===============================================================
+
+    [Fact]
+    public void FlattenBlockSplicesStatementsIntoParent()
+    {
+        // return expr;  →  Console.WriteLine(expr); return expr;
+        RewriteRun(
+            spec => spec.SetRecipe(new LogBeforeReturnRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    int M()
+                    {
+                        return 42;
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    int M()
+                    {
+                            Console.WriteLine(42);
+                            return 42;
+                    }
+                }
+                """
+            )
+        );
+    }
 }
 
 // ===============================================================
@@ -527,6 +560,42 @@ class CaptureFlowRecipe : Core.Recipe
         {
             mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
             return (MethodInvocation)(rule.TryOn(Cursor, mi) ?? mi);
+        }
+    }
+}
+
+/// <summary>
+/// Expands "return expr" into "Console.WriteLine(expr); return expr;" — two statements.
+/// Exercises multi-statement templates and CreateBlockFlattener.
+/// </summary>
+class LogBeforeReturnRecipe : Core.Recipe
+{
+    public override string DisplayName => "Log before return";
+    public override string Description => "Adds Console.WriteLine before return statements.";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var expr = Capture.Expression("expr");
+        var pat = CSharpPattern.Statement($"return {expr}");
+        var tmpl = CSharpTemplate.Statement($"Console.WriteLine({expr});\nreturn {expr};");
+
+        var rule = RewriteRule.Rewrite(pat, tmpl);
+
+        return new Visitor(rule);
+    }
+
+    private class Visitor(IRewriteRule rule) : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitReturn(Return ret, ExecutionContext ctx)
+        {
+            ret = (Return)base.VisitReturn(ret, ctx);
+            var result = rule.TryOn(Cursor, ret);
+            if (result is Block block)
+            {
+                DoAfterVisit(RewriteRule.CreateBlockFlattener<ExecutionContext>(block));
+                return block;
+            }
+            return result ?? ret;
         }
     }
 }
