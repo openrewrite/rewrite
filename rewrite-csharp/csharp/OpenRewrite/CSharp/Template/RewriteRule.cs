@@ -248,23 +248,30 @@ public static class RewriteRule
         new RecipeRuleAdapter(recipe, ctx);
 
     /// <summary>
-    /// Creates a visitor that splices the statements of <paramref name="block"/> into its
-    /// parent block. Use when a multi-statement <see cref="CSharpTemplate.Statement"/> produces
-    /// a <see cref="Block"/> that should replace a single statement — the flattener runs as an
-    /// after-visitor and inlines the block's statements into the enclosing block.
+    /// Creates a visitor that splices statements from any <see cref="Block"/> marked with
+    /// <see cref="SyntheticBlockContainer"/> into its parent block. Register once via
+    /// <see cref="TreeVisitor{T,P}.DoAfterVisit"/> — a single instance handles all
+    /// synthetic blocks produced during the visit.
     /// </summary>
     /// <example>
     /// <code>
     /// var result = rule.TryOn(Cursor, ret);
-    /// if (result is Block block)
+    /// if (result is Block block &amp;&amp; block.Markers.FindFirst&lt;SyntheticBlockContainer&gt;() != null)
     /// {
-    ///     DoAfterVisit(RewriteRule.CreateBlockFlattener&lt;ExecutionContext&gt;(block));
+    ///     MaybeDoAfterVisit(RewriteRule.CreateBlockFlattener&lt;ExecutionContext&gt;());
     ///     return block;
     /// }
     /// return result ?? ret;
     /// </code>
     /// </example>
-    public static CSharpVisitor<P> CreateBlockFlattener<P>(Block block) => new BlockFlattener<P>(block);
+    public static CSharpVisitor<P> CreateBlockFlattener<P>() => new BlockFlattener<P>();
+
+    /// <summary>
+    /// Overload accepting a block for backwards compatibility. The block parameter is ignored;
+    /// the flattener identifies targets by the <see cref="SyntheticBlockContainer"/> marker.
+    /// </summary>
+    [Obsolete("Use the parameterless overload. The block parameter is no longer needed.")]
+    public static CSharpVisitor<P> CreateBlockFlattener<P>(Block block) => new BlockFlattener<P>();
 
     // ===============================================================
     // Implementation
@@ -352,8 +359,11 @@ public static class RewriteRule
         }
     }
 
-    private sealed class BlockFlattener<P>(Block target) : CSharpVisitor<P>
+    private sealed class BlockFlattener<P> : CSharpVisitor<P>, IEquatable<BlockFlattener<P>>
     {
+        public bool Equals(BlockFlattener<P>? other) => other is not null;
+        public override bool Equals(object? obj) => obj is BlockFlattener<P>;
+        public override int GetHashCode() => typeof(BlockFlattener<P>).GetHashCode();
         public override J VisitBlock(Block block, P ctx)
         {
             block = (Block)base.VisitBlock(block, ctx);
@@ -365,7 +375,7 @@ public static class RewriteRule
             foreach (var stmt in statements)
             {
                 if (stmt.Element is Block inner &&
-                    (ReferenceEquals(inner, target) || inner.Id == target.Id))
+                    inner.Markers.FindFirst<SyntheticBlockContainer>() != null)
                 {
                     // Splice inner block's statements into the parent.
                     // An empty inner block is intentionally dropped — flattening a block
@@ -375,7 +385,11 @@ public static class RewriteRule
                     {
                         var s = innerStmts[i];
                         if (i == 0)
-                            s = s.WithElement(J.SetPrefix(s.Element, stmt.Element.Prefix));
+                        {
+                            // Transfer the original statement's prefix (comments, blank lines)
+                            // to the first spliced statement.
+                            s = s.WithElement(SetStatementPrefix(s.Element, stmt.Element.Prefix));
+                        }
                         newStatements.Add(s);
                     }
                     changed = true;
@@ -387,6 +401,17 @@ public static class RewriteRule
             }
 
             return changed ? block.WithStatements(newStatements) : block;
+        }
+
+        /// <summary>
+        /// Sets the prefix on a statement, handling <see cref="ExpressionStatement"/> which
+        /// delegates its prefix to its inner expression and has no <c>WithPrefix</c> method.
+        /// </summary>
+        private static Statement SetStatementPrefix(Statement stmt, Space prefix)
+        {
+            if (stmt is ExpressionStatement es)
+                return es.WithExpression(J.SetPrefix(es.Expression, prefix));
+            return (Statement)J.SetPrefix(stmt, prefix);
         }
     }
 }
