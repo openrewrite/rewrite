@@ -229,10 +229,21 @@ internal class CSharpTypeMapping
             ? symbol.Interfaces.Select(i => (JavaType.FullyQualified)MapType(i)!).ToList()
             : null;
 
-        // For now, skip members and methods to avoid excessive traversal
-        // These can be populated lazily or in a future enhancement
+        var members = symbol.GetMembers()
+            .OfType<IFieldSymbol>()
+            .Where(f => !f.IsImplicitlyDeclared)
+            .Select(f => MapVariable(f, f.Name, cls, MapType(f.Type)))
+            .ToList();
+        var methods = symbol.GetMembers()
+            .OfType<IMethodSymbol>()
+            .Where(m => m.MethodKind is MethodKind.Ordinary or MethodKind.Constructor)
+            .Select(MapMethod)
+            .ToList();
+
         cls.UnsafeSet(flags, kind, fqn, typeParameters, supertype, owningClass,
-            null, interfaces, null, null);
+            null, interfaces,
+            members.Count > 0 ? members : null,
+            methods.Count > 0 ? methods : null);
 
         return cls;
     }
