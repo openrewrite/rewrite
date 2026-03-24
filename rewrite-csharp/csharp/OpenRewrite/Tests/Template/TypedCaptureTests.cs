@@ -165,6 +165,84 @@ public class TypedCaptureTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void TypedCaptureMatchesGenericInterfaceImplementation()
+    {
+        var dict = Capture.Expression("dict", type: "IDictionary<object, object>");
+        var key = Capture.Expression("key");
+        var pat = CSharpPattern.Expression($"{dict}.Keys.Contains({key})",
+            usings: ["System.Collections.Generic"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var dict = new Dictionary<string, int>();
+                        bool has = dict.Keys.Contains("key");
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var dict = new Dictionary<string, int>();
+                        bool has = /*~~>*/dict.Keys.Contains("key");
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void TypedCaptureMatchesPrimitiveInt()
+    {
+        var expr = Capture.Expression("expr");
+        var idx = Capture.Expression("idx", type: "int");
+        var pat = CSharpPattern.Expression($"{expr}.ElementAt({idx})",
+            usings: ["System.Linq"]);
+
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation(pat))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var list = new List<string>();
+                        var item = list.ElementAt(0);
+                    }
+                }
+                """,
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M()
+                    {
+                        var list = new List<string>();
+                        var item = /*~~>*/list.ElementAt(0);
+                    }
+                }
+                """
+            )
+        );
+    }
+
     // ===============================================================
     // Recipe factories
     // ===============================================================
@@ -177,6 +255,9 @@ public class TypedCaptureTests : RewriteTest
 
     private static Core.Recipe FindMethodInvocation(TemplateStringHandler handler, IReadOnlyList<string> usings)
         => new MethodInvocationSearchRecipe(CSharpPattern.Expression(handler, usings: usings));
+
+    private static Core.Recipe FindMethodInvocation(CSharpPattern pat)
+        => new MethodInvocationSearchRecipe(pat);
 }
 
 file class TypedPatternSearchRecipe(CSharpPattern pat) : Core.Recipe

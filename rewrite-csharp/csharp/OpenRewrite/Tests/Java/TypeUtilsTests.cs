@@ -292,6 +292,87 @@ public class TypeUtilsTests
     }
 
     // =============================================================
+    // IsAssignableTo — primitives beyond String
+    // =============================================================
+
+    [Fact]
+    public void IsAssignableTo_PrimitiveInt()
+    {
+        var prim = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        Assert.True(TypeUtils.IsAssignableTo(prim, "System.Int32"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_PrimitiveBool()
+    {
+        var prim = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Boolean);
+        Assert.True(TypeUtils.IsAssignableTo(prim, "System.Boolean"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_PrimitiveDouble()
+    {
+        var prim = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Double);
+        Assert.True(TypeUtils.IsAssignableTo(prim, "System.Double"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_PrimitiveInt_NotAssignableToOther()
+    {
+        var prim = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        Assert.False(TypeUtils.IsAssignableTo(prim, "System.String"));
+    }
+
+    // =============================================================
+    // IsAssignableTo — JavaType target overload
+    // =============================================================
+
+    [Fact]
+    public void IsAssignableTo_JavaType_SamePrimitive()
+    {
+        var candidateType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var targetType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        Assert.True(TypeUtils.IsAssignableTo(candidateType, targetType));
+    }
+
+    [Fact]
+    public void IsAssignableTo_JavaType_DifferentPrimitive()
+    {
+        var candidateType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var targetType = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.String);
+        Assert.False(TypeUtils.IsAssignableTo(candidateType, targetType));
+    }
+
+    [Fact]
+    public void IsAssignableTo_JavaType_ClassTarget()
+    {
+        var iface = MakeClass("System.IDisposable");
+        var candidate = MakeClass("MyClass", interfaces: [iface]);
+        var target = MakeClass("System.IDisposable");
+        Assert.True(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_JavaType_ParameterizedTarget()
+    {
+        // Target is Parameterized(IDictionary) — should compare by base FQN
+        var idict = MakeClass("System.Collections.Generic.IDictionary");
+        var dict = MakeClass("System.Collections.Generic.Dictionary", interfaces: [idict]);
+        var target = new JavaType.Parameterized
+        {
+            Type = MakeClass("System.Collections.Generic.IDictionary")
+        };
+        Assert.True(TypeUtils.IsAssignableTo(dict, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_JavaType_NullTarget()
+    {
+        var cls = MakeClass("System.String");
+        Assert.False(TypeUtils.IsAssignableTo(cls, (JavaType?)null));
+    }
+
+    // =============================================================
     // Cycle protection
     // =============================================================
 

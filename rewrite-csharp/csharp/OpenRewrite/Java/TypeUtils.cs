@@ -38,14 +38,40 @@ public static class TypeUtils
     {
         if (type == null) return false;
 
-        // Primitive(String) is assignable to "System.String" but has no Class representation
-        if (type is JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.String })
-            return string.Equals("System.String", fullyQualifiedName, StringComparison.Ordinal);
+        // Primitives (int, bool, string, etc.) have no Class representation —
+        // map to their .NET FQN and compare directly
+        if (type is JavaType.Primitive prim)
+        {
+            var primFqn = PrimitiveToFqn(prim.Kind);
+            return primFqn != null && string.Equals(primFqn, fullyQualifiedName, StringComparison.Ordinal);
+        }
 
         var cls = AsClass(type);
         if (cls == null) return false;
 
         return IsAssignableToInternal(cls, fullyQualifiedName, new HashSet<string>());
+    }
+
+    /// <summary>
+    /// Check if a type is assignable to the target type, where the target is specified
+    /// as a <see cref="JavaType"/> rather than a string FQN. This is the preferred overload
+    /// when the target type comes from a parsed AST (e.g., a typed capture's scaffold).
+    /// For parameterized targets like <c>IDictionary&lt;object, object&gt;</c>, the generic
+    /// type arguments are ignored — only the base type definition is checked.
+    /// </summary>
+    public static bool IsAssignableTo(JavaType? type, JavaType? targetType)
+    {
+        if (type == null || targetType == null) return false;
+
+        // Both primitives: same kind means match
+        if (type is JavaType.Primitive candPrim && targetType is JavaType.Primitive targetPrim)
+            return candPrim.Kind == targetPrim.Kind;
+
+        // Extract the base FQN from the target, stripping generic type parameters
+        var targetFqn = GetFullyQualifiedName(targetType);
+        if (targetFqn == null) return false;
+
+        return IsAssignableTo(type, targetFqn);
     }
 
     /// <summary>
@@ -55,9 +81,12 @@ public static class TypeUtils
     {
         if (type == null) return false;
 
-        // Primitive(String) is assignable to "System.String" but has no Class representation
-        if (type is JavaType.Primitive { Kind: JavaType.Primitive.PrimitiveKind.String })
-            return fullyQualifiedNames.Contains("System.String");
+        // Primitives have no Class representation — map to FQN and check
+        if (type is JavaType.Primitive prim)
+        {
+            var primFqn = PrimitiveToFqn(prim.Kind);
+            return primFqn != null && fullyQualifiedNames.Contains(primFqn);
+        }
 
         var cls = AsClass(type);
         if (cls == null) return false;
@@ -250,6 +279,24 @@ public static class TypeUtils
 
         return false;
     }
+
+    /// <summary>
+    /// Map a <see cref="JavaType.PrimitiveKind"/> to its .NET fully-qualified type name.
+    /// Returns null for non-value primitives (Null, None, Void).
+    /// </summary>
+    private static string? PrimitiveToFqn(JavaType.PrimitiveKind kind) => kind switch
+    {
+        JavaType.PrimitiveKind.Boolean => "System.Boolean",
+        JavaType.PrimitiveKind.Byte => "System.Byte",
+        JavaType.PrimitiveKind.Char => "System.Char",
+        JavaType.PrimitiveKind.Double => "System.Double",
+        JavaType.PrimitiveKind.Float => "System.Single",
+        JavaType.PrimitiveKind.Int => "System.Int32",
+        JavaType.PrimitiveKind.Long => "System.Int64",
+        JavaType.PrimitiveKind.Short => "System.Int16",
+        JavaType.PrimitiveKind.String => "System.String",
+        _ => null
+    };
 
     private static JavaType? TryGetTypeDynamic(Expression expr)
     {
