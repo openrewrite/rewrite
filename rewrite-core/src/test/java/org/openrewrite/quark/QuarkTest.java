@@ -18,14 +18,33 @@ package org.openrewrite.quark;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.nio.file.Paths;
+import java.util.UUID;
+
 import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.other;
 
 class QuarkTest implements RewriteTest {
+
+    @Test
+    void unchangedQuarkHasNoChanges() {
+        Quark before = new Quark(UUID.randomUUID(), Paths.get("file.jks"), Markers.EMPTY, null, null);
+        Quark after = new Quark(UUID.randomUUID(), Paths.get("file.jks"), Markers.EMPTY, null, null);
+        assertThat(Result.isLocalAndHasNoChanges(before, after)).isTrue();
+    }
+
+    @Test
+    void quarkWithDifferentPathHasChanges() {
+        Quark before = new Quark(UUID.randomUUID(), Paths.get("old.jks"), Markers.EMPTY, null, null);
+        Quark after = new Quark(UUID.randomUUID(), Paths.get("new.jks"), Markers.EMPTY, null, null);
+        assertThat(Result.isLocalAndHasNoChanges(before, after)).isFalse();
+    }
 
     @DocumentExample
     @Test
