@@ -485,14 +485,7 @@ class PreMatchFilteredRecipe : Core.Recipe
             Before = CSharpPattern.Expression($"Console.Write({expr})"),
             After = CSharpTemplate.Expression($"Console.WriteLine({expr})"),
             PreMatch = (_, cursor) =>
-            {
-                for (var c = cursor; c.Parent != null; c = c.Parent)
-                {
-                    if (c.Value is MethodDeclaration md)
-                        return md.Name.SimpleName == "Target";
-                }
-                return false;
-            }
+                cursor.FirstEnclosing<MethodDeclaration>()?.Name.SimpleName == "Target"
         });
 
         return new Visitor(rule);
