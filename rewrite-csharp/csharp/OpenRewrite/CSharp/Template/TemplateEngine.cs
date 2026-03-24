@@ -642,6 +642,13 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         return base.VisitIdentifier(identifier, p);
     }
 
+    public override J VisitAnnotation(Annotation annotation, int p)
+    {
+        annotation = (Annotation)base.VisitAnnotation(annotation, p);
+        annotation = ExpandVariadicAnnotationArgs(annotation);
+        return annotation;
+    }
+
     public override J VisitMethodInvocation(MethodInvocation mi, int p)
     {
         mi = (MethodInvocation)base.VisitMethodInvocation(mi, p);
@@ -729,5 +736,63 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         }
 
         return mi;
+    }
+
+    /// <summary>
+    /// If any argument in an Annotation is a placeholder identifier bound to a variadic capture,
+    /// expand it into the argument list. When all arguments expand to empty, remove the
+    /// Arguments container entirely (producing an attribute with no parentheses).
+    /// </summary>
+    private Annotation ExpandVariadicAnnotationArgs(Annotation annotation)
+    {
+        if (annotation.Arguments == null)
+            return annotation;
+
+        var elements = annotation.Arguments.Elements;
+        List<JRightPadded<Expression>>? expanded = null;
+
+        for (int i = 0; i < elements.Count; i++)
+        {
+            var arg = elements[i].Element;
+            if (arg is Identifier ident)
+            {
+                var captureName = Placeholder.FromPlaceholder(ident.SimpleName);
+                if (captureName != null && _values.Has(captureName))
+                {
+                    var capturedList = _values.GetList<Expression>(captureName);
+                    if (expanded == null)
+                    {
+                        expanded = new List<JRightPadded<Expression>>();
+                        for (int k = 0; k < i; k++)
+                            expanded.Add(elements[k]);
+                    }
+                    for (int j = 0; j < capturedList.Count; j++)
+                    {
+                        var capturedArg = capturedList[j];
+                        if (j == 0)
+                            capturedArg = J.SetPrefix(capturedArg, ident.Prefix);
+                        expanded.Add(new JRightPadded<Expression>(
+                            capturedArg, Space.Empty, Markers.Empty));
+                    }
+                    continue;
+                }
+            }
+            expanded?.Add(elements[i]);
+        }
+
+        if (expanded != null)
+        {
+            if (expanded.Count == 0)
+            {
+                // All variadic captures were empty — remove parentheses entirely
+                annotation = annotation.WithArguments(null);
+            }
+            else
+            {
+                annotation = annotation.WithArguments(annotation.Arguments.WithElements(expanded));
+            }
+        }
+
+        return annotation;
     }
 }

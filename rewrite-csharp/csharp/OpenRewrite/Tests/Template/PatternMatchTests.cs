@@ -971,6 +971,44 @@ public class PatternMatchTests : RewriteTest
         );
     }
 
+    // ===============================================================
+    // Variadic captures in attribute arguments
+    // ===============================================================
+
+    [Fact]
+    public void VariadicAttributeCaptureMatchesNoParens()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(FindAnnotation($"Fact({args})")),
+            CSharp(
+                """
+                class C { [Fact] void M() {} }
+                """,
+                """
+                class C { [/*~~>*/Fact] void M() {} }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicAttributeCaptureMatchesWithArguments()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(FindAnnotation($"Fact({args})")),
+            CSharp(
+                """
+                class C { [Fact(DisplayName = "test")] void M() {} }
+                """,
+                """
+                class C { [/*~~>*/Fact(DisplayName = "test")] void M() {} }
+                """
+            )
+        );
+    }
+
     [Fact]
     public void ConsistentCaptureBindingMatchesWhenSame()
     {
@@ -1641,6 +1679,9 @@ public class PatternMatchTests : RewriteTest
     private static Core.Recipe FindIsPattern(string c) => Search<IsPattern>(c);
     private static Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
     private static Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
+
+    private static Core.Recipe FindAnnotation(TemplateStringHandler h) =>
+        new PatternSearchRecipe<Annotation>(CSharpPattern.Attribute(h));
 
     /// <summary>
     /// Search for a Binary or IsPattern null-check, matching across both node types.

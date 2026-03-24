@@ -317,9 +317,14 @@ internal class PatternMatchingComparator
         // Both null
         if (patternValue == null && candidateValue == null)
             return true;
-        // One null
+        // One null — but a pattern container with only zero-min variadic captures
+        // can match a null candidate (e.g., pattern `Fact({args})` vs `[Fact]` with no parens)
         if (patternValue == null || candidateValue == null)
+        {
+            if (patternValue != null && candidateValue == null && TreeHelper.IsContainer(patternValue))
+                return MatchContainerAgainstNull(patternValue, cursor);
             return false;
+        }
 
         // J tree nodes — recursive structural match
         if (patternValue is J pj && candidateValue is J cj)
@@ -367,6 +372,39 @@ internal class PatternMatchingComparator
             return patternElements == null && candidateElements == null;
 
         return MatchPaddedList(patternElements, candidateElements, cursor);
+    }
+
+    /// <summary>
+    /// Match a pattern container against a null candidate. Succeeds only when every
+    /// element in the container is a variadic capture placeholder with min == 0,
+    /// binding each to an empty list.
+    /// </summary>
+    private bool MatchContainerAgainstNull(object patternContainer, Cursor cursor)
+    {
+        var patternElements = TreeHelper.GetContainerElements(patternContainer);
+        if (patternElements == null || patternElements.Count == 0)
+            return true;
+
+        foreach (var el in patternElements)
+        {
+            var inner = TreeHelper.UnwrapPadded(el) ?? el;
+            if (inner is Identifier id)
+            {
+                var captureName = Placeholder.FromPlaceholder(id.SimpleName);
+                if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
+                    && IsVariadic(captureObj))
+                {
+                    var (min, _) = GetVariadicBounds(captureObj);
+                    if (min == 0)
+                    {
+                        _bindings[captureName] = new List<object>().AsReadOnly();
+                        continue;
+                    }
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
