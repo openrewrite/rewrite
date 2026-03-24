@@ -165,9 +165,23 @@ public sealed class CSharpPattern
     public MatchResult? Match(J tree, Cursor cursor)
     {
         var patternTree = GetTree();
+
+        // Fast reject: if the pattern root is not a capture placeholder and the
+        // candidate is a different node type, no match is possible. This avoids
+        // allocating a PatternMatchingComparator for the common non-matching case.
+        if (patternTree.GetType() != tree.GetType() && !IsCapturePlaceholder(patternTree))
+            return null;
+
         var comparator = new PatternMatchingComparator(_captures);
         var captured = comparator.Match(patternTree, tree, cursor);
         return captured != null ? new MatchResult(captured) : null;
+    }
+
+    private bool IsCapturePlaceholder(J node)
+    {
+        return node is Identifier id
+               && Placeholder.FromPlaceholder(id.SimpleName) is { } name
+               && _captures.ContainsKey(name);
     }
 
     /// <summary>
