@@ -35,14 +35,14 @@ class DockerBestPracticesTest implements RewriteTest {
         rewriteRun(
           docker(
             """
-              FROM ubuntu:22.04
+              FROM ubuntu:20.04
               ADD app.jar /app/
               RUN apt-get update
               RUN apt-get install -y curl
               ENTRYPOINT /app/start.sh
               """,
             """
-              ~~(EOL: ubuntu:22.04 (ended 2024-09-30, suggest noble (24.04)))~~>~~(Missing HEALTHCHECK instruction)~~>FROM ubuntu:22.04
+              ~~(EOL: ubuntu:20.04 (ended 2025-04-30, suggest noble (24.04)))~~>~~(Missing HEALTHCHECK instruction)~~>FROM ubuntu:20.04
               COPY app.jar /app/
               RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
               ENTRYPOINT ["/app/start.sh"]

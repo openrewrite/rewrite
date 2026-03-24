@@ -20,27 +20,35 @@
 # - Python: https://devguide.python.org/versions/
 # - Node.js: https://nodejs.org/en/about/releases/
 # - Java: https://endoflife.date/eclipse-temurin, https://endoflife.date/amazon-corretto, https://endoflife.date/azul-zulu
+# - CentOS: https://endoflife.date/centos
+# - nginx: https://endoflife.date/nginx
+# - Go: https://endoflife.date/go
 # - General: https://endoflife.date/
 #
 - imageName: debian
   tagPatterns: [jessie, "jessie-*", "8", "8.*"]
   eolDate: "2020-06-30"
-  suggestedReplacement: trixie (13) or bookworm (12)
+  suggestedReplacement: trixie (13)
 
 - imageName: debian
   tagPatterns: [stretch, "stretch-*", "9", "9.*"]
   eolDate: "2022-07-01"
-  suggestedReplacement: trixie (13) or bookworm (12)
+  suggestedReplacement: trixie (13)
 
 - imageName: debian
   tagPatterns: [buster, "buster-*", "10", "10.*"]
   eolDate: "2024-06-30"
-  suggestedReplacement: trixie (13) or bookworm (12)
+  suggestedReplacement: trixie (13)
 
 - imageName: debian
   tagPatterns: [bullseye, "bullseye-*", "11", "11.*"]
   eolDate: "2024-08-14"
-  suggestedReplacement: trixie (13) or bookworm (12)
+  suggestedReplacement: trixie (13)
+
+- imageName: debian
+  tagPatterns: [bookworm, "bookworm-*", "12", "12.*"]
+  eolDate: "2026-06-10"
+  suggestedReplacement: trixie (13)
 
 - imageName: ubuntu
   tagPatterns: [trusty, "trusty-*", "14.04", "14.04.*"]
@@ -64,9 +72,50 @@
 
 - imageName: ubuntu
   tagPatterns: [jammy, "jammy-*", "22.04", "22.04.*"]
-  eolDate: "2024-09-30"
+  eolDate: "2027-04-01"
   suggestedReplacement: noble (24.04)
 
+# Ubuntu non-LTS (interim) releases
+- imageName: ubuntu
+  tagPatterns: [groovy, "groovy-*", "20.10", "20.10.*"]
+  eolDate: "2021-07-22"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [hirsute, "hirsute-*", "21.04", "21.04.*"]
+  eolDate: "2022-01-20"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [impish, "impish-*", "21.10", "21.10.*"]
+  eolDate: "2022-07-14"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [kinetic, "kinetic-*", "22.10", "22.10.*"]
+  eolDate: "2023-07-20"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [lunar, "lunar-*", "23.04", "23.04.*"]
+  eolDate: "2024-01-20"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [mantic, "mantic-*", "23.10", "23.10.*"]
+  eolDate: "2024-07-12"
+  suggestedReplacement: noble (24.04)
+
+- imageName: ubuntu
+  tagPatterns: [oracular, "oracular-*", "24.10", "24.10.*"]
+  eolDate: "2025-07-10"
+  suggestedReplacement: 26.04 LTS or noble (24.04)
+
+
+- imageName: alpine
+  tagPatterns: ["3.13", "3.13.*"]
+  eolDate: "2022-11-01"
+  suggestedReplacement: 3.23 or 3.22
 
 - imageName: alpine
   tagPatterns: ["3.14", "3.14.*"]
@@ -97,6 +146,16 @@
   tagPatterns: ["3.19", "3.19.*"]
   eolDate: "2025-11-01"
   suggestedReplacement: 3.23 or 3.22
+
+- imageName: alpine
+  tagPatterns: ["3.20", "3.20.*"]
+  eolDate: "2026-04-01"
+  suggestedReplacement: 3.23 or 3.22
+
+- imageName: python
+  tagPatterns: ["3.6", "3.6.*", "3.6-*"]
+  eolDate: "2021-12-23"
+  suggestedReplacement: 3.14 or 3.13
 
 - imageName: python
   tagPatterns: ["3.7", "3.7.*", "3.7-*"]
@@ -129,8 +188,23 @@
   suggestedReplacement: 24 or 22
 
 - imageName: node
+  tagPatterns: ["19", "19.*", "19-*"]
+  eolDate: "2023-06-01"
+  suggestedReplacement: 24 or 22
+
+- imageName: node
   tagPatterns: ["20", "20.*", "20-*"]
   eolDate: "2026-04-30"
+  suggestedReplacement: 24 or 22
+
+- imageName: node
+  tagPatterns: ["21", "21.*", "21-*"]
+  eolDate: "2024-06-01"
+  suggestedReplacement: 24 or 22
+
+- imageName: node
+  tagPatterns: ["23", "23.*", "23-*"]
+  eolDate: "2025-06-01"
   suggestedReplacement: 24 or 22
 
 # Official OpenJDK image (deprecated in 2022, recommends eclipse-temurin)
@@ -364,6 +438,16 @@
 
 # Azul Zulu OpenJDK
 - imageName: azul/zulu-openjdk
+  tagPatterns: ["6", "6-*", "6.*"]
+  eolDate: "2018-12-31"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
+  tagPatterns: ["7", "7-*", "7.*"]
+  eolDate: "2022-07-31"
+  suggestedReplacement: 21 or 17 (LTS)
+
+- imageName: azul/zulu-openjdk
   tagPatterns: ["9", "9-*", "9.*"]
   eolDate: "2018-03-20"
   suggestedReplacement: 21 or 17 (LTS)
@@ -427,3 +511,86 @@
   tagPatterns: ["24", "24-*", "24.*"]
   eolDate: "2025-09-16"
   suggestedReplacement: 25 or 21 (LTS)
+
+# CentOS (all versions EOL — commonly found in legacy Dockerfiles)
+- imageName: centos
+  tagPatterns: ["5", "5.*"]
+  eolDate: "2017-03-31"
+  suggestedReplacement: almalinux:9 or rockylinux:9
+
+- imageName: centos
+  tagPatterns: ["6", "6.*"]
+  eolDate: "2020-11-30"
+  suggestedReplacement: almalinux:9 or rockylinux:9
+
+- imageName: centos
+  tagPatterns: ["7", "7.*"]
+  eolDate: "2024-06-30"
+  suggestedReplacement: almalinux:9 or rockylinux:9
+
+- imageName: centos
+  tagPatterns: ["8", "8.*"]
+  eolDate: "2021-12-31"
+  suggestedReplacement: almalinux:9 or rockylinux:9
+
+# nginx
+- imageName: nginx
+  tagPatterns: ["1.20", "1.20.*", "1.20-*"]
+  eolDate: "2022-05-24"
+  suggestedReplacement: 1.28 (stable) or 1.29 (mainline)
+
+- imageName: nginx
+  tagPatterns: ["1.22", "1.22.*", "1.22-*"]
+  eolDate: "2023-04-11"
+  suggestedReplacement: 1.28 (stable) or 1.29 (mainline)
+
+- imageName: nginx
+  tagPatterns: ["1.24", "1.24.*", "1.24-*"]
+  eolDate: "2024-04-23"
+  suggestedReplacement: 1.28 (stable) or 1.29 (mainline)
+
+- imageName: nginx
+  tagPatterns: ["1.25", "1.25.*", "1.25-*"]
+  eolDate: "2024-05-29"
+  suggestedReplacement: 1.28 (stable) or 1.29 (mainline)
+
+- imageName: nginx
+  tagPatterns: ["1.26", "1.26.*", "1.26-*"]
+  eolDate: "2025-04-23"
+  suggestedReplacement: 1.28 (stable) or 1.29 (mainline)
+
+# Go (golang)
+- imageName: golang
+  tagPatterns: ["1.18", "1.18.*", "1.18-*"]
+  eolDate: "2023-02-01"
+  suggestedReplacement: 1.26 or 1.25
+
+- imageName: golang
+  tagPatterns: ["1.19", "1.19.*", "1.19-*"]
+  eolDate: "2023-09-06"
+  suggestedReplacement: 1.26 or 1.25
+
+- imageName: golang
+  tagPatterns: ["1.20", "1.20.*", "1.20-*"]
+  eolDate: "2024-02-06"
+  suggestedReplacement: 1.26 or 1.25
+
+- imageName: golang
+  tagPatterns: ["1.21", "1.21.*", "1.21-*"]
+  eolDate: "2024-08-13"
+  suggestedReplacement: 1.26 or 1.25
+
+- imageName: golang
+  tagPatterns: ["1.22", "1.22.*", "1.22-*"]
+  eolDate: "2025-02-11"
+  suggestedReplacement: 1.26 or 1.25
+
+- imageName: golang
+  tagPatterns: ["1.23", "1.23.*", "1.23-*"]
+  eolDate: "2025-08-12"
+  suggestedReplacement: 1.26 or 1.25
+
+- imageName: golang
+  tagPatterns: ["1.24", "1.24.*", "1.24-*"]
+  eolDate: "2026-02-11"
+  suggestedReplacement: 1.26 or 1.25
