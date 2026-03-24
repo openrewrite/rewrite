@@ -43,13 +43,13 @@ public interface IRewriteRule
     /// hasn't changed; for rules that depend on parent structure, apply them in separate visitor passes.
     /// </para>
     /// </summary>
-    IRewriteRule AndThen(IRewriteRule next);
+    IRewriteRule AndThen(IRewriteRule next) => new RewriteRule.AndThenRule(this, next);
 
     /// <summary>
     /// Provide a fallback rule. If this rule matches, its result is used.
     /// Otherwise the alternative is tried on the original node.
     /// </summary>
-    IRewriteRule OrElse(IRewriteRule alternative);
+    IRewriteRule OrElse(IRewriteRule alternative) => new RewriteRule.OrElseRule(this, alternative);
 }
 
 /// <summary>
@@ -250,11 +250,9 @@ public static class RewriteRule
             return null;
         }
 
-        public IRewriteRule AndThen(IRewriteRule next) => new AndThenRule(this, next);
-        public IRewriteRule OrElse(IRewriteRule alternative) => new OrElseRule(this, alternative);
     }
 
-    private sealed class AndThenRule(IRewriteRule first, IRewriteRule next) : IRewriteRule
+    internal sealed class AndThenRule(IRewriteRule first, IRewriteRule next) : IRewriteRule
     {
         public J? TryOn(Cursor cursor, J node)
         {
@@ -265,21 +263,15 @@ public static class RewriteRule
             var secondResult = next.TryOn(cursor, firstResult);
             return secondResult ?? firstResult;
         }
-
-        public IRewriteRule AndThen(IRewriteRule n) => new AndThenRule(this, n);
-        public IRewriteRule OrElse(IRewriteRule alternative) => new OrElseRule(this, alternative);
     }
 
-    private sealed class OrElseRule(IRewriteRule primary, IRewriteRule alternative) : IRewriteRule
+    internal sealed class OrElseRule(IRewriteRule primary, IRewriteRule alternative) : IRewriteRule
     {
         public J? TryOn(Cursor cursor, J node)
         {
             var result = primary.TryOn(cursor, node);
             return result ?? alternative.TryOn(cursor, node);
         }
-
-        public IRewriteRule AndThen(IRewriteRule next) => new AndThenRule(this, next);
-        public IRewriteRule OrElse(IRewriteRule alt) => new OrElseRule(this, alt);
     }
 
     private sealed class RecipeRuleAdapter(Recipe recipe, ExecutionContext ctx) : IRewriteRule
@@ -291,15 +283,14 @@ public static class RewriteRule
             if (visitor is TreeVisitor<J, ExecutionContext> tv)
                 result = tv.Visit(node, ctx, cursor);
             else
+                // Fallback for non-generic visitors: cursor is not propagated.
+                // Recipes relying on cursor ancestry will not work through this path.
                 result = visitor.Visit(node, ctx);
 
             if (result is not J j || ReferenceEquals(result, node))
                 return null;
             return j;
         }
-
-        public IRewriteRule AndThen(IRewriteRule next) => new AndThenRule(this, next);
-        public IRewriteRule OrElse(IRewriteRule alternative) => new OrElseRule(this, alternative);
     }
 
     private sealed class BlockFlattener<P>(Block target) : CSharpVisitor<P>
