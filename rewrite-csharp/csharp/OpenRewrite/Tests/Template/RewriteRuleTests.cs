@@ -348,8 +348,8 @@ public class RewriteRuleTests : RewriteTest
                 {
                     int M()
                     {
-                            Console.WriteLine(42);
-                            return 42;
+                        Console.WriteLine(42);
+                        return 42;
                     }
                 }
                 """
@@ -583,9 +583,10 @@ class LogBeforeReturnRecipe : Core.Recipe
         {
             ret = (Return)base.VisitReturn(ret, ctx);
             var result = rule.TryOn(Cursor, ret);
-            if (result is Block block)
+            if (result is Block { Markers: var m } block &&
+                m.FindFirst<SyntheticBlockContainer>() != null)
             {
-                DoAfterVisit(RewriteRule.CreateBlockFlattener<ExecutionContext>(block));
+                MaybeDoAfterVisit(RewriteRule.CreateBlockFlattener<ExecutionContext>());
                 return block;
             }
             return result ?? ret;

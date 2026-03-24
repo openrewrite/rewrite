@@ -130,6 +130,19 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
         _afterVisit.Add(visitor);
     }
 
+    protected IReadOnlyList<TreeVisitor<T, P>> GetAfterVisit() =>
+        _afterVisit ?? (IReadOnlyList<TreeVisitor<T, P>>)[];
+
+    /// <summary>
+    /// Register an after-visitor only if an equal instance is not already registered.
+    /// Requires the visitor to implement proper equality (e.g., <see cref="IEquatable{T}"/>).
+    /// </summary>
+    protected void MaybeDoAfterVisit(TreeVisitor<T, P> visitor)
+    {
+        if (_afterVisit == null || !_afterVisit.Contains(visitor))
+            DoAfterVisit(visitor);
+    }
+
     public static TreeVisitor<T, P> Noop() => new NoopVisitor();
 
     private class NoopVisitor : TreeVisitor<T, P>

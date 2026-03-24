@@ -21,6 +21,18 @@ using OpenRewrite.Java;
 namespace OpenRewrite.CSharp.Template;
 
 /// <summary>
+/// Marker placed on a <see cref="Block"/> that is a synthetic container for multiple statements
+/// produced by a multi-statement template, rather than a real block in the source code.
+/// Used by <see cref="TemplateEngine.AutoFormat"/> to format each statement at the parent level,
+/// and by <see cref="RewriteRule.CreateBlockFlattener{P}"/> to identify blocks to splice.
+/// </summary>
+public sealed class SyntheticBlockContainer : Marker
+{
+    public static readonly SyntheticBlockContainer Instance = new();
+    public Guid Id { get; } = Guid.NewGuid();
+}
+
+/// <summary>
 /// Controls how template code is wrapped in a scaffold and how the target node is extracted.
 /// </summary>
 internal enum ScaffoldKind
@@ -296,7 +308,8 @@ internal static class TemplateEngine
         }
 
         // Multiple statements: return them as a Block
-        return methodDecl.Body;
+        return methodDecl.Body.WithMarkers(
+            methodDecl.Body.Markers.Add(SyntheticBlockContainer.Instance));
     }
 
     /// <summary>
@@ -316,7 +329,8 @@ internal static class TemplateEngine
         if (statements.Count == 1)
             return StripPrefix(statements[0].Element);
 
-        return methodDecl.Body;
+        return methodDecl.Body.WithMarkers(
+            methodDecl.Body.Markers.Add(SyntheticBlockContainer.Instance));
     }
 
     /// <summary>
@@ -516,6 +530,17 @@ internal static class TemplateEngine
         if (original == null)
             return tree;
 
+        // Synthetic block containers hold multiple statements that will be spliced
+        // into the parent block. Format each statement individually at the parent level
+        // so Roslyn sees them as direct siblings, not block-internal children.
+        if (tree is Block blk && blk.Markers.FindFirst<SyntheticBlockContainer>() != null)
+            return AutoFormatSyntheticBlock(blk, cu, original);
+
+        return AutoFormatSingle(tree, cu, original);
+    }
+
+    private static J AutoFormatSingle(J tree, CompilationUnit cu, J original)
+    {
         // Save the prefix set by ApplyCoordinates — the formatter may override it
         var preservedPrefix = tree.Prefix;
 
@@ -528,6 +553,26 @@ internal static class TemplateEngine
         // Restore the coordinate-set prefix. The formatter handles internal whitespace;
         // the prefix (indentation/newlines before the node) comes from the original tree.
         return J.SetPrefix(formatted, preservedPrefix);
+    }
+
+    /// <summary>
+    /// Format each statement in a synthetic block individually, splicing each one
+    /// into the original node's position so Roslyn formats it at the parent level.
+    /// </summary>
+    private static Block AutoFormatSyntheticBlock(Block blk, CompilationUnit cu, J original)
+    {
+        var preservedBlockPrefix = blk.Prefix;
+        var formattedStmts = new List<JRightPadded<Statement>>(blk.Statements.Count);
+
+        foreach (var s in blk.Statements)
+        {
+            var stmt = (J)s.Element;
+            stmt = J.SetId(stmt, Guid.NewGuid());
+            var formatted = RoslynFormatter.FormatSubtree(cu, original.Id, stmt, stopAfter: null);
+            formattedStmts.Add(s.WithElement((Statement)formatted));
+        }
+
+        return blk.WithStatements(formattedStmts).WithPrefix(preservedBlockPrefix);
     }
 
     private static string BuildCacheKey(string code, IReadOnlyList<string> preamble,
