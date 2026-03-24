@@ -321,6 +321,11 @@ internal class CSharpTypeMapping
 
     private static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
     {
+        // System.String is intentionally omitted: it is a reference type with interfaces
+        // (IEnumerable<char>, IComparable<string>, etc.) that TypeUtils.IsAssignableTo needs
+        // to walk. Mapping it as JavaType.Class preserves the full type hierarchy.
+        // J.Literal and J.Primitive (the syntax node for the `string` keyword) still use
+        // JavaType.Primitive(String) directly — they don't go through this method.
         return symbol.SpecialType switch
         {
             SpecialType.System_Boolean => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean),
@@ -332,7 +337,6 @@ internal class CSharpTypeMapping
             SpecialType.System_Int64 => JavaType.Primitive.Of(JavaType.PrimitiveKind.Long),
             SpecialType.System_Int16 => JavaType.Primitive.Of(JavaType.PrimitiveKind.Short),
             SpecialType.System_Void => JavaType.Primitive.Of(JavaType.PrimitiveKind.Void),
-            SpecialType.System_String => JavaType.Primitive.Of(JavaType.PrimitiveKind.String),
             _ => null
         };
     }
