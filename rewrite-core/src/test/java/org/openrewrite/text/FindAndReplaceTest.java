@@ -137,6 +137,37 @@ class FindAndReplaceTest implements RewriteTest {
     }
 
     @Test
+    void regexWithSlashDelimiters() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace(
+            "url\\s+\"(\\$\\{?ARTIFACTORY_URL\\}?\\/(libs-release|plugins-release))\"",
+            "url \"\\${ARTIFACTORY_URL}/plugins-release\"\n" +
+              "        credentials(HttpHeaderCredentials) { name = \"Authorization\" value = \"Bearer \" + System.getenv('ARTIFACTORY_ACCESS_TOKEN') }\n" +
+              "        authentication { header(HttpHeaderAuthentication) }",
+            true, null, null, null, "**/*.gradle", null)),
+          text(
+            """
+              repositories {
+                  maven {
+                      url "$ARTIFACTORY_URL/plugins-release"
+                  }
+              }
+              """,
+            """
+              repositories {
+                  maven {
+                      url "${ARTIFACTORY_URL}/plugins-release"
+                      credentials(HttpHeaderCredentials) { name = "Authorization" value = "Bearer " + System.getenv('ARTIFACTORY_ACCESS_TOKEN') }
+                      authentication { header(HttpHeaderAuthentication) }
+                  }
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          )
+        );
+    }
+
+    @Test
     void successiveReplacement() {
         rewriteRun(
           spec -> spec.recipes(
