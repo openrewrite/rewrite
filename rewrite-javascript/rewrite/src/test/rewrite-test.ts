@@ -144,7 +144,13 @@ export class RecipeSpec {
     private async expectParsePrintIdempotence(parsed: [SourceSpec<any>, SourceFile][]) {
         for (const [spec, sourceFile] of parsed) {
             const beforeSource = dedent(spec.before!);
-            expect(await TreePrinters.print(sourceFile)).toEqual(beforeSource);
+            const printed = await TreePrinters.print(sourceFile);
+            if (printed !== beforeSource) {
+                throw new Error(
+                    `Parse-print idempotence check failed.\n` +
+                    `Expected:\n${beforeSource}\n\nActual:\n${printed}`
+                );
+            }
         }
     }
 
@@ -205,12 +211,16 @@ export class RecipeSpec {
         if (!after) {
             throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
         }
-        expect(after).toBeDefined();
-        await new ValidateWhitespaceVisitor().visit(after!, this.executionContext);
-        const actualAfter = await TreePrinters.print(after!);
+        await new ValidateWhitespaceVisitor().visit(after, this.executionContext);
+        const actualAfter = await TreePrinters.print(after);
         const afterSource = typeof spec.after === "function" ?
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
-        expect(actualAfter).toEqual(afterSource);
+        if (actualAfter !== afterSource) {
+            throw new Error(
+                `Recipe output does not match expected.\n` +
+                `Expected:\n${afterSource}\n\nActual:\n${actualAfter}`
+            );
+        }
         if (spec.afterRecipe) {
             await spec.afterRecipe(after);
         }
@@ -247,7 +257,11 @@ export class RecipeSpec {
 class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
     public override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
         const ret = super.visitSpace(space, p);
-        expect(space.whitespace).toMatch(/^\s*$/);
+        if (!/^\s*$/.test(space.whitespace)) {
+            throw new Error(
+                `Whitespace contains non-whitespace characters: ${JSON.stringify(space.whitespace)}`
+            );
+        }
         return ret;
     }
 }

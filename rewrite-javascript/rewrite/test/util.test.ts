@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import {describe} from "@jest/globals";
 import {mapAsync} from "../src";
 
 describe("mapAsync", () => {

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -27,6 +28,80 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaTemplateTest8Test implements RewriteTest {
+
+    @Test
+    void replaceMethodInvocationInsideReturn() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate t = JavaTemplate.builder("String.valueOf(#{any(String)})")
+                .build();
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("toString")) {
+                      return t.apply(getCursor(), method.getCoordinates().replace(),
+                        method.getSelect());
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  String test(String s) {
+                      return s.toString();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String test(String s) {
+                      return String.valueOf(s);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceNewClassInsideReturn() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate t = JavaTemplate.builder("new StringBuilder(#{any(String)})")
+                .build();
+
+              @Override
+              public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                  newClass = super.visitNewClass(newClass, ctx);
+                  if (newClass.getClazz() != null &&
+                      newClass.getClazz().toString().equals("StringBuffer") &&
+                      newClass.getArguments().size() == 1) {
+                      return t.apply(getCursor(), newClass.getCoordinates().replace(),
+                        newClass.getArguments().get(0));
+                  }
+                  return newClass;
+              }
+          })),
+          java(
+            """
+              class Test {
+                  CharSequence test(String s) {
+                      return new StringBuffer(s);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  CharSequence test(String s) {
+                      return new StringBuilder(s);
+                  }
+              }
+              """
+          )
+        );
+    }
 
     @DocumentExample
     @Test

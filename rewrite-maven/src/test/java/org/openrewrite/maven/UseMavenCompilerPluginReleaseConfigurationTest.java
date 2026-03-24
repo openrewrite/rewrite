@@ -384,6 +384,108 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7100")
+    @Test
+    void preservesExistingPropertyReferenceInRelease() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <properties>
+                  <java.version>11</java.version>
+                  <jdk.version>10</jdk.version>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <release>${jdk.version}</release>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7100")
+    @Test
+    void preservesExistingPropertyReferenceFromSourceTarget() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <properties>
+                  <java.version>11</java.version>
+                  <jdk.version>8</jdk.version>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <source>${jdk.version}</source>
+                        <target>${jdk.version}</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <properties>
+                  <java.version>11</java.version>
+                  <jdk.version>8</jdk.version>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <release>${jdk.version}</release>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/169")
     @Test
     void noVersionDowngrade() {

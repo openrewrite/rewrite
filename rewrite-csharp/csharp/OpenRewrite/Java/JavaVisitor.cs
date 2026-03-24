@@ -40,6 +40,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             ForLoop fl => VisitForLoop(fl, p),
             ForEachLoop fel => VisitForEachLoop(fel, p),
             Try tr => VisitTry(tr, p),
+            Try.Catch cat => VisitCatch(cat, p),
             Throw thr => VisitThrow(thr, p),
             Break brk => VisitBreak(brk, p),
             Continue cont => VisitContinue(cont, p),
@@ -59,6 +60,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             ControlParentheses<VariableDeclarations> cpvd => VisitControlParentheses(cpvd, p),
             ExpressionStatement es => VisitExpressionStatement(es, p),
             VariableDeclarations vd => VisitVariableDeclarations(vd, p),
+            NamedVariable nv => VisitNamedVariable(nv, p),
             Primitive prim => VisitPrimitive(prim, p),
             MethodInvocation mi => VisitMethodInvocation(mi, p),
             NewClass nc => VisitNewClass(nc, p),
@@ -70,1315 +72,1050 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             ArrayAccess aa => VisitArrayAccess(aa, p),
             ArrayDimension ad => VisitArrayDimension(ad, p),
             Lambda lam => VisitLambda(lam, p),
+            Lambda.Parameters lp => VisitLambdaParameters(lp, p),
             Switch sw => VisitSwitch(sw, p),
             SwitchExpression se => VisitSwitchExpression(se, p),
             Case cs => VisitCase(cs, p),
             DeconstructionPattern dp => VisitDeconstructionPattern(dp, p),
+            If.Else els => VisitElse(els, p),
             Label lbl => VisitLabel(lbl, p),
             Synchronized sync => VisitSynchronized(sync, p),
             TypeCast tc => VisitTypeCast(tc, p),
             TypeParameter tp => VisitTypeParameter(tp, p),
             Package pkg => VisitPackage(pkg, p),
+            ForLoop.Control flc => VisitForControl(flc, p),
+            ForEachLoop.Control felc => VisitForEachControl(felc, p),
             _ => throw new InvalidOperationException($"Unknown J tree type: {tree.GetType()}")
         };
     }
 
+    public virtual Space VisitSpace(Space space, P p)
+    {
+        return space;
+    }
+
+    public virtual JLeftPadded<T>? VisitLeftPadded<T>(JLeftPadded<T>? left, P p)
+    {
+        if (left == null) return null;
+
+        Cursor = new Cursor(Cursor, left);
+
+        var before = VisitSpace(left.Before, p);
+        var t = left.Element;
+        bool elementChanged = false;
+        if (t is J j)
+        {
+            var visited = Visit(j, p);
+            if (visited is T vt) { t = vt; elementChanged = !ReferenceEquals(visited, j); }
+            else { Cursor = Cursor.Parent!; return null; }
+        }
+
+        Cursor = Cursor.Parent!;
+
+        if (ReferenceEquals(before, left.Before) && !elementChanged)
+            return left;
+        return new JLeftPadded<T>(before, t);
+    }
+
+    public virtual JRightPadded<T>? VisitRightPadded<T>(JRightPadded<T>? right, P p)
+    {
+        if (right == null) return null;
+
+        Cursor = new Cursor(Cursor, right);
+
+        var t = right.Element;
+        bool elementChanged = false;
+        if (t is J j)
+        {
+            var visited = Visit(j, p);
+            if (visited is T vt) { t = vt; elementChanged = !ReferenceEquals(visited, j); }
+            else { Cursor = Cursor.Parent!; return null; }
+        }
+
+        var after = VisitSpace(right.After, p);
+        var markers = VisitMarkers(right.Markers, p);
+
+        Cursor = Cursor.Parent!;
+
+        if (ReferenceEquals(after, right.After) && !elementChanged && ReferenceEquals(markers, right.Markers))
+            return right;
+        return new JRightPadded<T>(t, after, markers);
+    }
+
+    public virtual JContainer<T>? VisitContainer<T>(JContainer<T>? container, P p) where T : J
+    {
+        if (container == null) return null;
+
+        Cursor = new Cursor(Cursor, container);
+
+        var before = VisitSpace(container.Before, p);
+        var elements = container.Elements;
+        var changed = false;
+        var newElements = new List<JRightPadded<T>>(elements.Count);
+        foreach (var elem in elements)
+        {
+            var visited = VisitRightPadded(elem, p);
+            if (visited != null)
+            {
+                if (!ReferenceEquals(visited, elem)) changed = true;
+                newElements.Add(visited);
+            }
+            else changed = true;
+        }
+
+        Cursor = Cursor.Parent!;
+
+        if (!changed && ReferenceEquals(before, container.Before))
+            return container;
+        return new JContainer<T>(before, newElements, container.Markers);
+    }
+
+    public virtual Markers VisitMarkers(Markers markers, P p)
+    {
+        if (ReferenceEquals(markers, Markers.Empty) || markers.MarkerList.Count == 0)
+        {
+            return markers;
+        }
+
+        var list = markers.MarkerList;
+        bool changed = false;
+        var newList = new List<Marker>(list.Count);
+        foreach (var marker in list)
+        {
+            var visited = VisitMarker(marker, p);
+            newList.Add(visited);
+            if (!ReferenceEquals(visited, marker)) changed = true;
+        }
+
+        return changed ? markers.WithMarkerList(newList) : markers;
+    }
+
+    public virtual Marker VisitMarker(Marker marker, P p)
+    {
+        return marker;
+    }
+
+    public virtual J VisitExpression(Expression expression, P p)
+    {
+        return (J)expression;
+    }
+
+    public virtual J VisitStatement(Statement statement, P p)
+    {
+        return (J)statement;
+    }
+
+    public virtual JavaType? VisitType(JavaType? javaType, P p)
+    {
+        return javaType;
+    }
+
+    // -----------------------------------------------------------------------
+    // Annotation : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitAnnotation(Annotation annotation, P p)
     {
-        var changed = false;
+        var exprResult = VisitExpression(annotation, p);
+        if (exprResult is not Annotation node) return exprResult;
 
-        NameTree newAnnotationType = annotation.AnnotationType;
-        var visitedType = Visit(annotation.AnnotationType, p);
-        if (visitedType is NameTree tt && !ReferenceEquals(tt, annotation.AnnotationType))
-        {
-            newAnnotationType = tt;
-            changed = true;
-        }
-
-        JContainer<Expression>? newArguments = annotation.Arguments;
-        if (annotation.Arguments != null)
-        {
-            var newArgs = new List<JRightPadded<Expression>>();
-            bool argsChanged = false;
-            foreach (var paddedArg in annotation.Arguments.Elements)
-            {
-                var visited = Visit(paddedArg.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedArg.Element)) argsChanged = true;
-                    newArgs.Add(paddedArg.WithElement(e));
-                }
-                else
-                {
-                    newArgs.Add(paddedArg);
-                }
-            }
-            if (argsChanged)
-            {
-                newArguments = annotation.Arguments.WithElements(newArgs);
-                changed = true;
-            }
-        }
-
-        return changed
-            ? annotation.WithAnnotationType(newAnnotationType).WithArguments(newArguments)
-            : annotation;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithAnnotationType((NameTree)Visit(node.AnnotationType, p)!)
+            .WithArguments(VisitContainer(node.Arguments, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Block : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitBlock(Block block, P p)
     {
-        var statements = new List<JRightPadded<Statement>>();
-        bool changed = false;
-        foreach (var stmt in block.Statements)
-        {
-            var visited = Visit(stmt.Element, p);
-            if (visited is Statement s)
-            {
-                if (!ReferenceEquals(s, stmt.Element)) changed = true;
-                statements.Add(stmt.WithElement(s));
-            }
-        }
-        return changed ? block.WithStatements(statements) : block;
+        var stmtResult = VisitStatement(block, p);
+        if (stmtResult is not Block node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithEnd(VisitSpace(node.End, p))
+            .WithStatements(ListUtils.Map(node.Statements, stmt => VisitRightPadded(stmt, p)));
     }
 
+    // -----------------------------------------------------------------------
+    // ClassDeclaration : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitClassDeclaration(ClassDeclaration classDecl, P p)
     {
-        var body = Visit(classDecl.Body, p);
-        if (body is Block b && !ReferenceEquals(b, classDecl.Body))
-        {
-            return classDecl.WithBody(b);
-        }
-        return classDecl;
+        var stmtResult = VisitStatement(classDecl, p);
+        if (stmtResult is not ClassDeclaration node) return stmtResult;
+
+        var newKindAnnotations = ListUtils.Map(node.ClassKind.Annotations, ann => Visit(ann, p) as Annotation);
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
+            .WithClassKind(node.ClassKind.WithAnnotations(newKindAnnotations))
+            .WithName((Identifier)Visit(node.Name, p)!)
+            .WithTypeParameters(VisitContainer(node.TypeParameters, p))
+            .WithPrimaryConstructor(VisitContainer(node.PrimaryConstructor, p))
+            .WithExtends(VisitLeftPadded(node.Extends, p))
+            .WithImplements(VisitContainer(node.Implements, p))
+            .WithPermits(VisitContainer(node.Permits, p))
+            .WithBody((Block)Visit(node.Body, p)!)
+            .WithType((JavaType.FullyQualified?)VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // EnumValueSet : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitEnumValueSet(EnumValueSet enumValueSet, P p)
     {
-        var changed = false;
-        var newEnums = new List<JRightPadded<EnumValue>>();
-        foreach (var paddedValue in enumValueSet.Enums)
-        {
-            var visited = Visit(paddedValue.Element, p);
-            if (visited is EnumValue ev)
-            {
-                if (!ReferenceEquals(ev, paddedValue.Element))
-                {
-                    changed = true;
-                }
-                newEnums.Add(paddedValue.WithElement(ev));
-            }
-            else
-            {
-                newEnums.Add(paddedValue);
-            }
-        }
-        return changed ? enumValueSet.WithEnums(newEnums) : enumValueSet;
+        var stmtResult = VisitStatement(enumValueSet, p);
+        if (stmtResult is not EnumValueSet node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithEnums(ListUtils.Map(node.Enums, e => VisitRightPadded(e, p)));
     }
 
+    // -----------------------------------------------------------------------
+    // EnumValue : (neither Statement nor Expression)
+    // -----------------------------------------------------------------------
     public virtual J VisitEnumValue(EnumValue enumValue, P p)
     {
-        var changed = false;
-
-        Identifier newName = enumValue.Name;
-        var visitedName = Visit(enumValue.Name, p);
-        if (visitedName is Identifier id && !ReferenceEquals(id, enumValue.Name))
-        {
-            newName = id;
-            changed = true;
-        }
-
-        JLeftPadded<Expression>? newInitializer = enumValue.Initializer;
-        if (enumValue.Initializer != null)
-        {
-            var visitedInit = Visit(enumValue.Initializer.Element, p);
-            if (visitedInit is Expression e && !ReferenceEquals(e, enumValue.Initializer.Element))
-            {
-                newInitializer = enumValue.Initializer.WithElement(e);
-                changed = true;
-            }
-        }
-
-        return changed
-            ? enumValue.WithName(newName).WithInitializer(newInitializer)
-            : enumValue;
+        return enumValue
+            .WithPrefix(VisitSpace(enumValue.Prefix, p))
+            .WithMarkers(VisitMarkers(enumValue.Markers, p))
+            .WithAnnotations(ListUtils.Map(enumValue.Annotations, ann => Visit(ann, p) as Annotation))
+            .WithName((Identifier)Visit(enumValue.Name, p)!)
+            .WithInitializer((NewClass?)Visit(enumValue.Initializer, p));
     }
 
+    // -----------------------------------------------------------------------
+    // MethodDeclaration : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitMethodDeclaration(MethodDeclaration method, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(method, p);
+        if (stmtResult is not MethodDeclaration node) return stmtResult;
 
-        TypeTree? newReturnType = method.ReturnTypeExpression;
-        if (method.ReturnTypeExpression != null)
-        {
-            var visited = Visit(method.ReturnTypeExpression, p);
-            if (visited is TypeTree tt && !ReferenceEquals(tt, method.ReturnTypeExpression))
-            {
-                newReturnType = tt;
-                changed = true;
-            }
-        }
-
-        JContainer<Statement> newParams = method.Parameters;
-        var paramElements = new List<JRightPadded<Statement>>();
-        bool paramsChanged = false;
-        foreach (var paddedParam in method.Parameters.Elements)
-        {
-            var visited = Visit(paddedParam.Element, p);
-            if (visited is Statement s)
-            {
-                if (!ReferenceEquals(s, paddedParam.Element)) paramsChanged = true;
-                paramElements.Add(paddedParam.WithElement(s));
-            }
-            else
-            {
-                paramElements.Add(paddedParam);
-            }
-        }
-        if (paramsChanged)
-        {
-            newParams = method.Parameters.WithElements(paramElements);
-            changed = true;
-        }
-
-        Block? newBody = method.Body;
-        if (method.Body != null)
-        {
-            var visited = Visit(method.Body, p);
-            if (visited is Block b && !ReferenceEquals(b, method.Body))
-            {
-                newBody = b;
-                changed = true;
-            }
-        }
-
-        return changed
-            ? method.WithReturnTypeExpression(newReturnType).WithParameters(newParams).WithBody(newBody)
-            : method;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
+            .WithTypeParameters(VisitContainer(node.TypeParameters, p))
+            .WithReturnTypeExpression((TypeTree?)Visit(node.ReturnTypeExpression, p))
+            .WithName((Identifier)Visit(node.Name, p)!)
+            .WithParameters(VisitContainer(node.Parameters, p)!)
+            .WithThrows(VisitContainer(node.Throws, p))
+            .WithBody((Block?)Visit(node.Body, p))
+            .WithDefaultValue(VisitLeftPadded(node.DefaultValue, p))
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Return : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitReturn(Return ret, P p)
     {
-        if (ret.Expression != null)
-        {
-            var visited = Visit(ret.Expression, p);
-            if (visited is Expression expr && !ReferenceEquals(expr, ret.Expression))
-            {
-                return ret.WithExpression(expr);
-            }
-        }
-        return ret;
+        var stmtResult = VisitStatement(ret, p);
+        if (stmtResult is not Return node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithExpression((Expression?)Visit(node.Expression, p));
     }
 
+    // -----------------------------------------------------------------------
+    // If : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitIf(If iff, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(iff, p);
+        if (stmtResult is not If node) return stmtResult;
 
-        var visitedCondition = Visit(iff.Condition.Tree.Element, p);
-        ControlParentheses<Expression> newCondition = iff.Condition;
-        if (visitedCondition is Expression ce && !ReferenceEquals(ce, iff.Condition.Tree.Element))
-        {
-            newCondition = iff.Condition.WithTree(iff.Condition.Tree.WithElement(ce));
-            changed = true;
-        }
-
-        JRightPadded<Statement> newThenPart = iff.ThenPart;
-        var visitedThen = Visit(iff.ThenPart.Element, p);
-        if (visitedThen is Statement ts && !ReferenceEquals(ts, iff.ThenPart.Element))
-        {
-            newThenPart = iff.ThenPart.WithElement(ts);
-            changed = true;
-        }
-
-        If.Else? newElsePart = iff.ElsePart;
-        if (iff.ElsePart != null)
-        {
-            var visitedElse = Visit(iff.ElsePart.Body.Element, p);
-            if (visitedElse is Statement es && !ReferenceEquals(es, iff.ElsePart.Body.Element))
-            {
-                newElsePart = iff.ElsePart.WithBody(iff.ElsePart.Body.WithElement(es));
-                changed = true;
-            }
-        }
-
-        return changed
-            ? iff.WithCondition(newCondition).WithThenPart(newThenPart).WithElsePart(newElsePart)
-            : iff;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithCondition((ControlParentheses<Expression>)Visit(node.Condition, p)!)
+            .WithThenPart(VisitRightPadded(node.ThenPart, p)!)
+            .WithElsePart((If.Else?)Visit(node.ElsePart, p));
     }
 
+    // -----------------------------------------------------------------------
+    // If.Else : (neither)
+    // -----------------------------------------------------------------------
+    public virtual J VisitElse(If.Else @else, P p)
+    {
+        return @else
+            .WithPrefix(VisitSpace(@else.Prefix, p))
+            .WithMarkers(VisitMarkers(@else.Markers, p))
+            .WithBody(VisitRightPadded(@else.Body, p)!);
+    }
+
+    // -----------------------------------------------------------------------
+    // WhileLoop : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitWhileLoop(WhileLoop whl, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(whl, p);
+        if (stmtResult is not WhileLoop node) return stmtResult;
 
-        ControlParentheses<Expression> newCondition = whl.Condition;
-        var visitedCondition = Visit(whl.Condition.Tree.Element, p);
-        if (visitedCondition is Expression ce && !ReferenceEquals(ce, whl.Condition.Tree.Element))
-        {
-            newCondition = whl.Condition.WithTree(whl.Condition.Tree.WithElement(ce));
-            changed = true;
-        }
-
-        JRightPadded<Statement> newBody = whl.Body;
-        var visitedBody = Visit(whl.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, whl.Body.Element))
-        {
-            newBody = whl.Body.WithElement(bs);
-            changed = true;
-        }
-
-        return changed ? whl.WithCondition(newCondition).WithBody(newBody) : whl;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithCondition((ControlParentheses<Expression>)Visit(node.Condition, p)!)
+            .WithBody(VisitRightPadded(node.Body, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // DoWhileLoop : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitDoWhileLoop(DoWhileLoop dwl, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(dwl, p);
+        if (stmtResult is not DoWhileLoop node) return stmtResult;
 
-        JRightPadded<Statement> newBody = dwl.Body;
-        var visitedBody = Visit(dwl.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, dwl.Body.Element))
-        {
-            newBody = dwl.Body.WithElement(bs);
-            changed = true;
-        }
-
-        JLeftPadded<ControlParentheses<Expression>> newCondition = dwl.Condition;
-        var visitedCondition = Visit(dwl.Condition.Element.Tree.Element, p);
-        if (visitedCondition is Expression ce && !ReferenceEquals(ce, dwl.Condition.Element.Tree.Element))
-        {
-            var newCtrlParen = dwl.Condition.Element.WithTree(dwl.Condition.Element.Tree.WithElement(ce));
-            newCondition = dwl.Condition.WithElement(newCtrlParen);
-            changed = true;
-        }
-
-        return changed ? dwl.WithBody(newBody).WithCondition(newCondition) : dwl;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithBody(VisitRightPadded(node.Body, p)!)
+            .WithCondition(VisitLeftPadded(node.Condition, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // ForLoop : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitForLoop(ForLoop fl, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(fl, p);
+        if (stmtResult is not ForLoop node) return stmtResult;
 
-        var newInit = new List<JRightPadded<Statement>>();
-        bool initChanged = false;
-        foreach (var init in fl.LoopControl.Init)
-        {
-            var visited = Visit(init.Element, p);
-            if (visited is Statement s)
-            {
-                if (!ReferenceEquals(s, init.Element)) initChanged = true;
-                newInit.Add(init.WithElement(s));
-            }
-            else
-            {
-                newInit.Add(init);
-            }
-        }
-        if (initChanged) changed = true;
-
-        JRightPadded<Expression> newControlCondition = fl.LoopControl.Condition;
-        var visitedCondition = Visit(fl.LoopControl.Condition.Element, p);
-        if (visitedCondition is Expression ce && !ReferenceEquals(ce, fl.LoopControl.Condition.Element))
-        {
-            newControlCondition = fl.LoopControl.Condition.WithElement(ce);
-            changed = true;
-        }
-
-        var newUpdate = new List<JRightPadded<Statement>>();
-        bool updateChanged = false;
-        foreach (var update in fl.LoopControl.Update)
-        {
-            var visited = Visit(update.Element, p);
-            if (visited is Statement s)
-            {
-                if (!ReferenceEquals(s, update.Element)) updateChanged = true;
-                newUpdate.Add(update.WithElement(s));
-            }
-            else
-            {
-                newUpdate.Add(update);
-            }
-        }
-        if (updateChanged) changed = true;
-
-        JRightPadded<Statement> newBody = fl.Body;
-        var visitedBody = Visit(fl.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, fl.Body.Element))
-        {
-            newBody = fl.Body.WithElement(bs);
-            changed = true;
-        }
-
-        if (changed)
-        {
-            var newControl = fl.LoopControl
-                .WithInit(initChanged ? newInit : fl.LoopControl.Init)
-                .WithCondition(newControlCondition)
-                .WithUpdate(updateChanged ? newUpdate : fl.LoopControl.Update);
-            return fl.WithLoopControl(newControl).WithBody(newBody);
-        }
-        return fl;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLoopControl((ForLoop.Control)Visit(node.LoopControl, p)!)
+            .WithBody(VisitRightPadded(node.Body, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // ForLoop.Control : (neither)
+    // -----------------------------------------------------------------------
+    public virtual J VisitForControl(ForLoop.Control control, P p)
+    {
+        return control
+            .WithPrefix(VisitSpace(control.Prefix, p))
+            .WithMarkers(VisitMarkers(control.Markers, p))
+            .WithInit(ListUtils.Map(control.Init, init => VisitRightPadded(init, p)))
+            .WithCondition(VisitRightPadded(control.Condition, p)!)
+            .WithUpdate(ListUtils.Map(control.Update, update => VisitRightPadded(update, p)));
+    }
+
+    // -----------------------------------------------------------------------
+    // ForEachLoop : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitForEachLoop(ForEachLoop fel, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(fel, p);
+        if (stmtResult is not ForEachLoop node) return stmtResult;
 
-        JRightPadded<VariableDeclarations> newVariable = fel.LoopControl.Variable;
-        var visitedVar = Visit(fel.LoopControl.Variable.Element, p);
-        if (visitedVar is VariableDeclarations vd && !ReferenceEquals(vd, fel.LoopControl.Variable.Element))
-        {
-            newVariable = fel.LoopControl.Variable.WithElement(vd);
-            changed = true;
-        }
-
-        JRightPadded<Expression> newIterable = fel.LoopControl.Iterable;
-        var visitedIterable = Visit(fel.LoopControl.Iterable.Element, p);
-        if (visitedIterable is Expression ie && !ReferenceEquals(ie, fel.LoopControl.Iterable.Element))
-        {
-            newIterable = fel.LoopControl.Iterable.WithElement(ie);
-            changed = true;
-        }
-
-        JRightPadded<Statement> newBody = fel.Body;
-        var visitedBody = Visit(fel.Body.Element, p);
-        if (visitedBody is Statement bs && !ReferenceEquals(bs, fel.Body.Element))
-        {
-            newBody = fel.Body.WithElement(bs);
-            changed = true;
-        }
-
-        if (changed)
-        {
-            var newControl = fel.LoopControl.WithVariable(newVariable).WithIterable(newIterable);
-            return fel.WithLoopControl(newControl).WithBody(newBody);
-        }
-        return fel;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLoopControl((ForEachLoop.Control)Visit(node.LoopControl, p)!)
+            .WithBody(VisitRightPadded(node.Body, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // ForEachLoop.Control : (neither)
+    // -----------------------------------------------------------------------
+    public virtual J VisitForEachControl(ForEachLoop.Control control, P p)
+    {
+        return control
+            .WithPrefix(VisitSpace(control.Prefix, p))
+            .WithMarkers(VisitMarkers(control.Markers, p))
+            .WithVariable(VisitRightPadded(control.Variable, p)!)
+            .WithIterable(VisitRightPadded(control.Iterable, p)!);
+    }
+
+    // -----------------------------------------------------------------------
+    // Try : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitTry(Try tr, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(tr, p);
+        if (stmtResult is not Try node) return stmtResult;
 
-        Block newBody = tr.Body;
-        var visitedBody = Visit(tr.Body, p);
-        if (visitedBody is Block bb && !ReferenceEquals(bb, tr.Body))
-        {
-            newBody = bb;
-            changed = true;
-        }
-
-        var newCatches = new List<Try.Catch>();
-        bool catchesChanged = false;
-        foreach (var c in tr.Catches)
-        {
-            bool catchChanged = false;
-
-            ControlParentheses<VariableDeclarations> newParam = c.Parameter;
-            var visitedParam = Visit(c.Parameter.Tree.Element, p);
-            if (visitedParam is VariableDeclarations pvd && !ReferenceEquals(pvd, c.Parameter.Tree.Element))
-            {
-                newParam = c.Parameter.WithTree(c.Parameter.Tree.WithElement(pvd));
-                catchChanged = true;
-            }
-
-            Block newCatchBody = c.Body;
-            var visitedCatchBody = Visit(c.Body, p);
-            if (visitedCatchBody is Block cb && !ReferenceEquals(cb, c.Body))
-            {
-                newCatchBody = cb;
-                catchChanged = true;
-            }
-
-            if (catchChanged)
-            {
-                catchesChanged = true;
-                newCatches.Add(c.WithParameter(newParam).WithBody(newCatchBody));
-            }
-            else
-            {
-                newCatches.Add(c);
-            }
-        }
-        if (catchesChanged) changed = true;
-
-        JLeftPadded<Block>? newFinally = tr.Finally;
-        if (tr.Finally != null)
-        {
-            var visitedFinally = Visit(tr.Finally.Element, p);
-            if (visitedFinally is Block fb && !ReferenceEquals(fb, tr.Finally.Element))
-            {
-                newFinally = tr.Finally.WithElement(fb);
-                changed = true;
-            }
-        }
-
-        return changed
-            ? tr.WithBody(newBody).WithCatches(catchesChanged ? newCatches : tr.Catches).WithFinally(newFinally)
-            : tr;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithResources(VisitContainer(node.Resources, p))
+            .WithBody((Block)Visit(node.Body, p)!)
+            .WithCatches(ListUtils.Map(node.Catches, c => Visit(c, p) as Try.Catch))
+            .WithFinally(VisitLeftPadded(node.Finally, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Try.Catch : (neither)
+    // -----------------------------------------------------------------------
+    public virtual J VisitCatch(Try.Catch cat, P p)
+    {
+        return cat
+            .WithPrefix(VisitSpace(cat.Prefix, p))
+            .WithMarkers(VisitMarkers(cat.Markers, p))
+            .WithParameter((ControlParentheses<VariableDeclarations>)Visit(cat.Parameter, p)!)
+            .WithBody((Block)Visit(cat.Body, p)!);
+    }
+
+    // -----------------------------------------------------------------------
+    // Throw : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitThrow(Throw thr, P p)
     {
-        var visited = Visit(thr.Exception, p);
-        if (visited is Expression e && !ReferenceEquals(e, thr.Exception))
-        {
-            return thr.WithException(e);
-        }
-        return thr;
+        var stmtResult = VisitStatement(thr, p);
+        if (stmtResult is not Throw node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithException((Expression)Visit(node.Exception, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // Break : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitBreak(Break brk, P p)
     {
-        return brk;
+        var stmtResult = VisitStatement(brk, p);
+        if (stmtResult is not Break node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLabel((Identifier?)Visit(node.Label, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Continue : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitContinue(Continue cont, P p)
     {
-        return cont;
+        var stmtResult = VisitStatement(cont, p);
+        if (stmtResult is not Continue node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLabel((Identifier?)Visit(node.Label, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Empty : Statement, Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitEmpty(Empty emp, P p)
     {
-        return emp;
+        var stmtResult = VisitStatement(emp, p);
+        if (stmtResult is not Empty node) return stmtResult;
+
+        var exprResult = VisitExpression(node, p);
+        if (exprResult is not Empty node2) return exprResult;
+
+        return node2
+            .WithPrefix(VisitSpace(node2.Prefix, p))
+            .WithMarkers(VisitMarkers(node2.Markers, p));
     }
 
+    // -----------------------------------------------------------------------
+    // ControlParentheses<Expression> : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitControlParentheses(ControlParentheses<Expression> cp, P p)
     {
-        var visited = Visit(cp.Tree.Element, p);
-        if (visited is Expression e && !ReferenceEquals(e, cp.Tree.Element))
-        {
-            return cp.WithTree(cp.Tree.WithElement(e));
-        }
-        return cp;
+        var exprResult = VisitExpression(cp, p);
+        if (exprResult is not ControlParentheses<Expression> node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithTree(VisitRightPadded(node.Tree, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // ControlParentheses<TypeTree> : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitControlParentheses(ControlParentheses<TypeTree> cp, P p)
     {
-        var visited = Visit(cp.Tree.Element, p);
-        if (visited is TypeTree tt && !ReferenceEquals(tt, cp.Tree.Element))
-        {
-            return cp.WithTree(cp.Tree.WithElement(tt));
-        }
-        return cp;
+        var exprResult = VisitExpression(cp, p);
+        if (exprResult is not ControlParentheses<TypeTree> node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithTree(VisitRightPadded(node.Tree, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // ControlParentheses<VariableDeclarations> : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitControlParentheses(ControlParentheses<VariableDeclarations> cp, P p)
     {
-        var visited = Visit(cp.Tree.Element, p);
-        if (visited is VariableDeclarations vd && !ReferenceEquals(vd, cp.Tree.Element))
-        {
-            return cp.WithTree(cp.Tree.WithElement(vd));
-        }
-        return cp;
+        var exprResult = VisitExpression(cp, p);
+        if (exprResult is not ControlParentheses<VariableDeclarations> node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithTree(VisitRightPadded(node.Tree, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // Literal : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitLiteral(Literal literal, P p)
     {
-        return literal;
+        var exprResult = VisitExpression(literal, p);
+        if (exprResult is not Literal node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Identifier : Expression, TypeTree
+    // -----------------------------------------------------------------------
     public virtual J VisitIdentifier(Identifier identifier, P p)
     {
-        return identifier;
+        var exprResult = VisitExpression(identifier, p);
+        if (exprResult is not Identifier node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithAnnotations(ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation))
+            .WithType(VisitType(node.Type, p))
+            .WithFieldType(VisitType(node.FieldType, p));
     }
 
+    // -----------------------------------------------------------------------
+    // FieldAccess : Expression, Statement, TypeTree
+    // -----------------------------------------------------------------------
     public virtual J VisitFieldAccess(FieldAccess fieldAccess, P p)
     {
-        var target = Visit(fieldAccess.Target, p);
-        if (target is Expression t && !ReferenceEquals(t, fieldAccess.Target))
-        {
-            return fieldAccess.WithTarget(t);
-        }
-        return fieldAccess;
+        var stmtResult = VisitStatement(fieldAccess, p);
+        if (stmtResult is not FieldAccess s1) return stmtResult;
+
+        var exprResult = VisitExpression(s1, p);
+        if (exprResult is not FieldAccess node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithTarget((Expression)Visit(node.Target, p)!)
+            .WithName(VisitLeftPadded(node.Name, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // MemberReference : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitMemberReference(MemberReference memberRef, P p)
     {
-        var changed = false;
+        var exprResult = VisitExpression(memberRef, p);
+        if (exprResult is not MemberReference node) return exprResult;
 
-        JRightPadded<Expression> newContaining = memberRef.Containing;
-        var visitedContaining = Visit(memberRef.Containing.Element, p);
-        if (visitedContaining is Expression ce && !ReferenceEquals(ce, memberRef.Containing.Element))
-        {
-            newContaining = memberRef.Containing.WithElement(ce);
-            changed = true;
-        }
-
-        JLeftPadded<Identifier> newReference = memberRef.Reference;
-        var visitedRef = Visit(memberRef.Reference.Element, p);
-        if (visitedRef is Identifier id && !ReferenceEquals(id, memberRef.Reference.Element))
-        {
-            newReference = memberRef.Reference.WithElement(id);
-            changed = true;
-        }
-
-        return changed
-            ? memberRef.WithContaining(newContaining).WithReference(newReference)
-            : memberRef;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithContaining(VisitRightPadded(node.Containing, p)!)
+            .WithTypeParameters(VisitContainer(node.TypeParameters, p))
+            .WithReference(VisitLeftPadded(node.Reference, p)!)
+            .WithType(VisitType(node.Type, p))
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p))
+            .WithVariableType((JavaType.Variable?)VisitType(node.VariableType, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Binary : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitBinary(Binary binary, P p)
     {
-        var left = Visit(binary.Left, p);
-        var right = Visit(binary.Right, p);
+        var exprResult = VisitExpression(binary, p);
+        if (exprResult is not Binary node) return exprResult;
 
-        if (left is Expression l && right is Expression r &&
-            (!ReferenceEquals(l, binary.Left) || !ReferenceEquals(r, binary.Right)))
-        {
-            return binary.WithLeft(l).WithRight(r);
-        }
-        return binary;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLeft((Expression)Visit(node.Left, p)!)
+            .WithOperator(VisitLeftPadded(node.Operator, p)!)
+            .WithRight((Expression)Visit(node.Right, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Ternary : Expression, Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitTernary(Ternary ternary, P p)
     {
-        var condition = Visit(ternary.Condition, p);
-        var truePart = Visit(ternary.TruePart.Element, p);
-        var falsePart = Visit(ternary.FalsePart.Element, p);
+        var exprResult = VisitExpression(ternary, p);
+        if (exprResult is not Ternary e1) return exprResult;
 
-        if (condition is Expression c && truePart is Expression t && falsePart is Expression f &&
-            (!ReferenceEquals(c, ternary.Condition) ||
-             !ReferenceEquals(t, ternary.TruePart.Element) ||
-             !ReferenceEquals(f, ternary.FalsePart.Element)))
-        {
-            return ternary.WithCondition(c).WithTruePart(ternary.TruePart.WithElement(t)).WithFalsePart(ternary.FalsePart.WithElement(f));
-        }
-        return ternary;
+        var stmtResult = VisitStatement(e1, p);
+        if (stmtResult is not Ternary node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithCondition((Expression)Visit(node.Condition, p)!)
+            .WithTruePart(VisitLeftPadded(node.TruePart, p)!)
+            .WithFalsePart(VisitLeftPadded(node.FalsePart, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Assignment : Statement, Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitAssignment(Assignment assignment, P p)
     {
-        var variable = Visit(assignment.Variable, p);
-        var value = Visit(assignment.AssignmentValue.Element, p);
+        var stmtResult = VisitStatement(assignment, p);
+        if (stmtResult is not Assignment s1) return stmtResult;
 
-        if (variable is Expression v && value is Expression val &&
-            (!ReferenceEquals(v, assignment.Variable) || !ReferenceEquals(val, assignment.AssignmentValue.Element)))
-        {
-            return assignment.WithVariable(v).WithAssignmentValue(assignment.AssignmentValue.WithElement(val));
-        }
-        return assignment;
+        var exprResult = VisitExpression(s1, p);
+        if (exprResult is not Assignment node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithVariable((Expression)Visit(node.Variable, p)!)
+            .WithAssignmentValue(VisitLeftPadded(node.AssignmentValue, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // AssignmentOperation : Statement, Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitAssignmentOperation(AssignmentOperation assignment, P p)
     {
-        var variable = Visit(assignment.Variable, p);
-        var value = Visit(assignment.AssignmentValue, p);
+        var stmtResult = VisitStatement(assignment, p);
+        if (stmtResult is not AssignmentOperation s1) return stmtResult;
 
-        if (variable is Expression v && value is Expression val &&
-            (!ReferenceEquals(v, assignment.Variable) || !ReferenceEquals(val, assignment.AssignmentValue)))
-        {
-            return assignment.WithVariable(v).WithAssignmentValue(val);
-        }
-        return assignment;
+        var exprResult = VisitExpression(s1, p);
+        if (exprResult is not AssignmentOperation node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithVariable((Expression)Visit(node.Variable, p)!)
+            .WithAssignmentValue((Expression)Visit(node.AssignmentValue, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Unary : Statement, Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitUnary(Unary unary, P p)
     {
-        var expr = Visit(unary.Expression, p);
-        if (expr is Expression e && !ReferenceEquals(e, unary.Expression))
-        {
-            return unary.WithExpression(e);
-        }
-        return unary;
+        var stmtResult = VisitStatement(unary, p);
+        if (stmtResult is not Unary s1) return stmtResult;
+
+        var exprResult = VisitExpression(s1, p);
+        if (exprResult is not Unary node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithExpression((Expression)Visit(node.Expression, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Parentheses<Expression> : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitParentheses(Parentheses<Expression> parens, P p)
     {
-        var inner = Visit(parens.Tree.Element, p);
-        if (inner is Expression e && !ReferenceEquals(e, parens.Tree.Element))
-        {
-            return parens.WithTree(parens.Tree.WithElement(e));
-        }
-        return parens;
+        var exprResult = VisitExpression(parens, p);
+        if (exprResult is not Parentheses<Expression> node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithTree(VisitRightPadded(node.Tree, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // ExpressionStatement : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitExpressionStatement(ExpressionStatement expressionStatement, P p)
     {
-        var expr = Visit(expressionStatement.Expression, p);
-        if (expr is Expression e && !ReferenceEquals(e, expressionStatement.Expression))
-        {
-            return expressionStatement.WithExpression(e);
-        }
-        return expressionStatement;
+        var stmtResult = VisitStatement(expressionStatement, p);
+        if (stmtResult is not ExpressionStatement node) return stmtResult;
+
+        // ExpressionStatement delegates Prefix/Markers to its inner Expression,
+        // so they are visited when the Expression itself is visited.
+        return node
+            .WithExpression((Expression)Visit(node.Expression, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // VariableDeclarations : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitVariableDeclarations(VariableDeclarations varDecl, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(varDecl, p);
+        if (stmtResult is not VariableDeclarations node) return stmtResult;
 
-        TypeTree? newTypeExpr = varDecl.TypeExpression;
-        if (varDecl.TypeExpression != null)
-        {
-            var visited = Visit(varDecl.TypeExpression, p);
-            if (visited is TypeTree tt && !ReferenceEquals(tt, varDecl.TypeExpression))
-            {
-                newTypeExpr = tt;
-                changed = true;
-            }
-        }
-
-        var newVars = new List<JRightPadded<NamedVariable>>();
-        bool varsChanged = false;
-        foreach (var paddedVar in varDecl.Variables)
-        {
-            var namedVar = paddedVar.Element;
-            if (namedVar.Initializer != null)
-            {
-                var visited = Visit(namedVar.Initializer.Element, p);
-                if (visited is Expression expr && !ReferenceEquals(expr, namedVar.Initializer.Element))
-                {
-                    var newInit = namedVar.Initializer.WithElement(expr);
-                    var newNamedVar = namedVar.WithInitializer(newInit);
-                    newVars.Add(paddedVar.WithElement(newNamedVar));
-                    varsChanged = true;
-                    continue;
-                }
-            }
-            newVars.Add(paddedVar);
-        }
-        if (varsChanged) changed = true;
-
-        return changed
-            ? varDecl.WithTypeExpression(newTypeExpr).WithVariables(varsChanged ? newVars : varDecl.Variables)
-            : varDecl;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLeadingAnnotations(ListUtils.Map(node.LeadingAnnotations, ann => Visit(ann, p) as Annotation))
+            .WithTypeExpression((TypeTree?)Visit(node.TypeExpression, p))
+            .WithVarargs(node.Varargs != null ? VisitSpace(node.Varargs, p) : null)
+            .WithVariables(ListUtils.Map(node.Variables, v => VisitRightPadded(v, p)));
     }
 
+    // -----------------------------------------------------------------------
+    // NamedVariable : (neither)
+    // -----------------------------------------------------------------------
+    public virtual J VisitNamedVariable(NamedVariable namedVariable, P p)
+    {
+        return namedVariable
+            .WithPrefix(VisitSpace(namedVariable.Prefix, p))
+            .WithMarkers(VisitMarkers(namedVariable.Markers, p))
+            .WithName((Identifier)Visit(namedVariable.Name, p)!)
+            .WithInitializer(VisitLeftPadded(namedVariable.Initializer, p))
+            .WithType(VisitType(namedVariable.Type, p));
+    }
+
+    // -----------------------------------------------------------------------
+    // Primitive : Expression, TypeTree
+    // -----------------------------------------------------------------------
     public virtual J VisitPrimitive(Primitive primitive, P p)
     {
-        return primitive;
+        var exprResult = VisitExpression(primitive, p);
+        if (exprResult is not Primitive node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p));
     }
 
+    // -----------------------------------------------------------------------
+    // MethodInvocation : Statement, Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitMethodInvocation(MethodInvocation mi, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(mi, p);
+        if (stmtResult is not MethodInvocation s1) return stmtResult;
 
-        JRightPadded<Expression>? newSelect = mi.Select;
-        if (mi.Select != null)
-        {
-            var visited = Visit(mi.Select.Element, p);
-            if (visited is Expression sel && !ReferenceEquals(sel, mi.Select.Element))
-            {
-                newSelect = mi.Select.WithElement(sel);
-                changed = true;
-            }
-        }
+        var exprResult = VisitExpression(s1, p);
+        if (exprResult is not MethodInvocation node) return exprResult;
 
-        JContainer<Expression>? newTypeParams = mi.TypeParameters;
-        if (mi.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<Expression>>();
-            bool tpChanged = false;
-            foreach (var paddedTypeArg in mi.TypeParameters.Elements)
-            {
-                var visited = Visit(paddedTypeArg.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedTypeArg.Element)) tpChanged = true;
-                    tpElements.Add(paddedTypeArg.WithElement(e));
-                }
-                else
-                {
-                    tpElements.Add(paddedTypeArg);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParams = mi.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
-
-        JContainer<Expression> newArgs = mi.Arguments;
-        var argElements = new List<JRightPadded<Expression>>();
-        bool argsChanged = false;
-        foreach (var paddedArg in mi.Arguments.Elements)
-        {
-            var visited = Visit(paddedArg.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, paddedArg.Element)) argsChanged = true;
-                argElements.Add(paddedArg.WithElement(e));
-            }
-            else
-            {
-                argElements.Add(paddedArg);
-            }
-        }
-        if (argsChanged)
-        {
-            newArgs = mi.Arguments.WithElements(argElements);
-            changed = true;
-        }
-
-        return changed
-            ? mi.WithSelect(newSelect).WithTypeParameters(newTypeParams).WithArguments(newArgs)
-            : mi;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithSelect(VisitRightPadded(node.Select, p))
+            .WithTypeParameters(VisitContainer(node.TypeParameters, p))
+            .WithName((Identifier)Visit(node.Name, p)!)
+            .WithArguments(VisitContainer(node.Arguments, p)!)
+            .WithMethodType((JavaType.Method?)VisitType(node.MethodType, p));
     }
 
+    // -----------------------------------------------------------------------
+    // NewClass : Expression, Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitNewClass(NewClass nc, P p)
     {
-        var changed = false;
+        var stmtResult = VisitStatement(nc, p);
+        if (stmtResult is not NewClass s1) return stmtResult;
 
-        JRightPadded<Expression>? newEnclosing = nc.Enclosing;
-        if (nc.Enclosing != null)
-        {
-            var visited = Visit(nc.Enclosing.Element, p);
-            if (visited is Expression e && !ReferenceEquals(e, nc.Enclosing.Element))
-            {
-                newEnclosing = nc.Enclosing.WithElement(e);
-                changed = true;
-            }
-        }
+        var exprResult = VisitExpression(s1, p);
+        if (exprResult is not NewClass node) return exprResult;
 
-        TypeTree? newClazz = nc.Clazz;
-        if (nc.Clazz != null)
-        {
-            var visited = Visit(nc.Clazz, p);
-            if (visited is TypeTree tt && !ReferenceEquals(tt, nc.Clazz))
-            {
-                newClazz = tt;
-                changed = true;
-            }
-        }
-
-        JContainer<Expression> newArgs = nc.Arguments;
-        var argElements = new List<JRightPadded<Expression>>();
-        bool argsChanged = false;
-        foreach (var paddedArg in nc.Arguments.Elements)
-        {
-            var visited = Visit(paddedArg.Element, p);
-            if (visited is Expression e)
-            {
-                if (!ReferenceEquals(e, paddedArg.Element)) argsChanged = true;
-                argElements.Add(paddedArg.WithElement(e));
-            }
-            else
-            {
-                argElements.Add(paddedArg);
-            }
-        }
-        if (argsChanged)
-        {
-            newArgs = nc.Arguments.WithElements(argElements);
-            changed = true;
-        }
-
-        Block? newBody = nc.Body;
-        if (nc.Body != null)
-        {
-            var visited = Visit(nc.Body, p);
-            if (visited is Block b && !ReferenceEquals(b, nc.Body))
-            {
-                newBody = b;
-                changed = true;
-            }
-        }
-
-        return changed
-            ? nc.WithEnclosing(newEnclosing).WithClazz(newClazz).WithArguments(newArgs).WithBody(newBody)
-            : nc;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithNew(VisitSpace(node.New, p))
+            .WithEnclosing(VisitRightPadded(node.Enclosing, p))
+            .WithClazz((J?)Visit(node.Clazz, p))
+            .WithArguments(VisitContainer(node.Arguments, p)!)
+            .WithBody((Block?)Visit(node.Body, p))
+            .WithConstructorType((JavaType.Method?)VisitType(node.ConstructorType, p));
     }
 
+    // -----------------------------------------------------------------------
+    // NewArray : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitNewArray(NewArray na, P p)
     {
-        var changed = false;
+        var exprResult = VisitExpression(na, p);
+        if (exprResult is not NewArray node) return exprResult;
 
-        TypeTree? newTypeExpr = na.TypeExpression;
-        if (na.TypeExpression != null)
-        {
-            var visited = Visit(na.TypeExpression, p);
-            if (visited is TypeTree tt && !ReferenceEquals(tt, na.TypeExpression))
-            {
-                newTypeExpr = tt;
-                changed = true;
-            }
-        }
-
-        var newDims = new List<ArrayDimension>();
-        bool dimsChanged = false;
-        foreach (var dim in na.Dimensions)
-        {
-            var visited = Visit(dim, p);
-            if (visited is ArrayDimension d)
-            {
-                if (!ReferenceEquals(d, dim)) dimsChanged = true;
-                newDims.Add(d);
-            }
-            else
-            {
-                newDims.Add(dim);
-            }
-        }
-        if (dimsChanged) changed = true;
-
-        JContainer<Expression>? newInitializer = na.Initializer;
-        if (na.Initializer != null)
-        {
-            var initElements = new List<JRightPadded<Expression>>();
-            bool initChanged = false;
-            foreach (var paddedElem in na.Initializer.Elements)
-            {
-                var visited = Visit(paddedElem.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedElem.Element)) initChanged = true;
-                    initElements.Add(paddedElem.WithElement(e));
-                }
-                else
-                {
-                    initElements.Add(paddedElem);
-                }
-            }
-            if (initChanged)
-            {
-                newInitializer = na.Initializer.WithElements(initElements);
-                changed = true;
-            }
-        }
-
-        return changed
-            ? na.WithTypeExpression(newTypeExpr).WithDimensions(dimsChanged ? newDims : na.Dimensions).WithInitializer(newInitializer)
-            : na;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithTypeExpression((TypeTree?)Visit(node.TypeExpression, p))
+            .WithDimensions(ListUtils.Map(node.Dimensions, dim => Visit(dim, p) as ArrayDimension))
+            .WithInitializer(VisitContainer(node.Initializer, p))
+            .WithType(VisitType(node.Type, p));
     }
 
-    public virtual J VisitLabel(Label label, P p)
-    {
-        var changed = false;
-
-        JRightPadded<Identifier> newLabelName = label.LabelName;
-        var visitedLabel = Visit(label.LabelName.Element, p);
-        if (visitedLabel is Identifier id && !ReferenceEquals(id, label.LabelName.Element))
-        {
-            newLabelName = label.LabelName.WithElement(id);
-            changed = true;
-        }
-
-        Statement newStatement = label.Statement;
-        var visitedStmt = Visit(label.Statement, p);
-        if (visitedStmt is Statement s && !ReferenceEquals(s, label.Statement))
-        {
-            newStatement = s;
-            changed = true;
-        }
-
-        return changed
-            ? label.WithLabelName(newLabelName).WithStatement(newStatement)
-            : label;
-    }
-
+    // -----------------------------------------------------------------------
+    // InstanceOf : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitInstanceOf(InstanceOf instanceOf, P p)
     {
-        var changed = false;
+        var exprResult = VisitExpression(instanceOf, p);
+        if (exprResult is not InstanceOf node) return exprResult;
 
-        JRightPadded<Expression> newExpr = instanceOf.Expression;
-        var visitedExpr = Visit(instanceOf.Expression.Element, p);
-        if (visitedExpr is Expression e && !ReferenceEquals(e, instanceOf.Expression.Element))
-        {
-            newExpr = instanceOf.Expression.WithElement(e);
-            changed = true;
-        }
-
-        J newClazz = instanceOf.Clazz;
-        var visitedClazz = Visit(instanceOf.Clazz, p);
-        if (visitedClazz is J vc && !ReferenceEquals(vc, instanceOf.Clazz))
-        {
-            newClazz = vc;
-            changed = true;
-        }
-
-        J? newPattern = instanceOf.Pattern;
-        if (instanceOf.Pattern != null)
-        {
-            var visitedPattern = Visit(instanceOf.Pattern, p);
-            if (visitedPattern is J vp && !ReferenceEquals(vp, instanceOf.Pattern))
-            {
-                newPattern = vp;
-                changed = true;
-            }
-        }
-
-        Modifier? newModifier = instanceOf.InstanceOfModifier;
-        if (instanceOf.InstanceOfModifier != null)
-        {
-            var visitedMod = Visit(instanceOf.InstanceOfModifier, p);
-            if (visitedMod is Modifier vm && !ReferenceEquals(vm, instanceOf.InstanceOfModifier))
-            {
-                newModifier = vm;
-                changed = true;
-            }
-        }
-
-        return changed
-            ? instanceOf.WithExpression(newExpr).WithClazz(newClazz).WithPattern(newPattern).WithInstanceOfModifier(newModifier)
-            : instanceOf;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithExpression(VisitRightPadded(node.Expression, p)!)
+            .WithClazz((J)Visit(node.Clazz, p)!)
+            .WithPattern((J?)Visit(node.Pattern, p))
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // NullableType : Expression, TypeTree
+    // -----------------------------------------------------------------------
     public virtual J VisitNullableType(NullableType nullableType, P p)
     {
-        var visited = Visit(nullableType.TypeTree, p);
-        if (visited is TypeTree tt && !ReferenceEquals(tt, nullableType.TypeTree))
-        {
-            return nullableType.WithTypeTreePadded(nullableType.TypeTreePadded.WithElement(tt));
-        }
-        return nullableType;
+        var exprResult = VisitExpression(nullableType, p);
+        if (exprResult is not NullableType node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithAnnotations(ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation))
+            .WithTypeTreePadded(VisitRightPadded(node.TypeTreePadded, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // ParameterizedType : Expression, TypeTree
+    // -----------------------------------------------------------------------
     public virtual J VisitParameterizedType(ParameterizedType pt, P p)
     {
-        var changed = false;
+        var exprResult = VisitExpression(pt, p);
+        if (exprResult is not ParameterizedType node) return exprResult;
 
-        NameTree newClazz = pt.Clazz;
-        var visitedClazz = Visit(pt.Clazz, p);
-        if (visitedClazz is NameTree nt && !ReferenceEquals(nt, pt.Clazz))
-        {
-            newClazz = nt;
-            changed = true;
-        }
-
-        JContainer<Expression>? newTypeParams = pt.TypeParameters;
-        if (pt.TypeParameters != null)
-        {
-            var tpElements = new List<JRightPadded<Expression>>();
-            bool tpChanged = false;
-            foreach (var paddedParam in pt.TypeParameters.Elements)
-            {
-                var visited = Visit(paddedParam.Element, p);
-                if (visited is Expression e)
-                {
-                    if (!ReferenceEquals(e, paddedParam.Element)) tpChanged = true;
-                    tpElements.Add(paddedParam.WithElement(e));
-                }
-                else
-                {
-                    tpElements.Add(paddedParam);
-                }
-            }
-            if (tpChanged)
-            {
-                newTypeParams = pt.TypeParameters.WithElements(tpElements);
-                changed = true;
-            }
-        }
-
-        return changed
-            ? pt.WithClazz(newClazz).WithTypeParameters(newTypeParams)
-            : pt;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithClazz((NameTree)Visit(node.Clazz, p)!)
+            .WithTypeParameters(VisitContainer(node.TypeParameters, p))
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // ArrayType : Expression, TypeTree
+    // -----------------------------------------------------------------------
     public virtual J VisitArrayType(ArrayType at, P p)
     {
-        var changed = false;
+        var exprResult = VisitExpression(at, p);
+        if (exprResult is not ArrayType node) return exprResult;
 
-        TypeTree newElementType = at.ElementType;
-        var visitedElem = Visit(at.ElementType, p);
-        if (visitedElem is TypeTree tt && !ReferenceEquals(tt, at.ElementType))
-        {
-            newElementType = tt;
-            changed = true;
-        }
-
-        IList<Annotation>? newAnnotations = at.Annotations;
-        if (at.Annotations != null)
-        {
-            var annList = new List<Annotation>();
-            bool annsChanged = false;
-            foreach (var ann in at.Annotations)
-            {
-                var visited = Visit(ann, p);
-                if (visited is Annotation a)
-                {
-                    if (!ReferenceEquals(a, ann)) annsChanged = true;
-                    annList.Add(a);
-                }
-                else
-                {
-                    annList.Add(ann);
-                }
-            }
-            if (annsChanged)
-            {
-                newAnnotations = annList;
-                changed = true;
-            }
-        }
-
-        return changed
-            ? at.WithElementType(newElementType).WithAnnotations(newAnnotations)
-            : at;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithElementType((TypeTree)Visit(node.ElementType, p)!)
+            .WithAnnotations(node.Annotations != null ? ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation) : null)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // ArrayAccess : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitArrayAccess(ArrayAccess arrayAccess, P p)
     {
-        var indexed = Visit(arrayAccess.Indexed, p);
-        var dimension = Visit(arrayAccess.Dimension, p);
-        if (indexed is Expression i && dimension is ArrayDimension d &&
-            (!ReferenceEquals(i, arrayAccess.Indexed) || !ReferenceEquals(d, arrayAccess.Dimension)))
-        {
-            return arrayAccess.WithIndexed(i).WithDimension(d);
-        }
-        return arrayAccess;
+        var exprResult = VisitExpression(arrayAccess, p);
+        if (exprResult is not ArrayAccess node) return exprResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithIndexed((Expression)Visit(node.Indexed, p)!)
+            .WithDimension((ArrayDimension)Visit(node.Dimension, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // ArrayDimension : (neither)
+    // -----------------------------------------------------------------------
     public virtual J VisitArrayDimension(ArrayDimension dimension, P p)
     {
-        var index = Visit(dimension.Index.Element, p);
-        if (index is Expression i && !ReferenceEquals(i, dimension.Index.Element))
-        {
-            return dimension.WithIndex(dimension.Index.WithElement(i));
-        }
-        return dimension;
+        return dimension
+            .WithPrefix(VisitSpace(dimension.Prefix, p))
+            .WithMarkers(VisitMarkers(dimension.Markers, p))
+            .WithIndex(VisitRightPadded(dimension.Index, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // Lambda : Expression, Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitLambda(Lambda lambda, P p)
     {
-        var @params = lambda.Params;
-        var elements = new List<JRightPadded<J>>();
-        bool changed = false;
+        var exprResult = VisitExpression(lambda, p);
+        if (exprResult is not Lambda e1) return exprResult;
 
-        foreach (var paddedParam in @params.Elements)
-        {
-            var visitedParam = Visit(paddedParam.Element, p);
-            if (visitedParam is J vp)
-            {
-                if (!ReferenceEquals(vp, paddedParam.Element))
-                {
-                    changed = true;
-                }
-                elements.Add(paddedParam.WithElement(vp));
-            }
-        }
+        var stmtResult = VisitStatement(e1, p);
+        if (stmtResult is not Lambda node) return stmtResult;
 
-        var newParams = changed ? @params.WithElements(elements) : @params;
-
-        var body = Visit(lambda.Body, p);
-
-        if (!ReferenceEquals(newParams, @params) ||
-            (body is J b && !ReferenceEquals(b, lambda.Body)))
-        {
-            return lambda.WithParams(newParams).WithBody(body is J newBody ? newBody : lambda.Body);
-        }
-
-        return lambda;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithParams((Lambda.Parameters)Visit(node.Params, p)!)
+            .WithArrow(VisitSpace(node.Arrow, p))
+            .WithBody((J)Visit(node.Body, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Lambda.Parameters : (neither)
+    // -----------------------------------------------------------------------
+    public virtual J VisitLambdaParameters(Lambda.Parameters parameters, P p)
+    {
+        return parameters
+            .WithPrefix(VisitSpace(parameters.Prefix, p))
+            .WithMarkers(VisitMarkers(parameters.Markers, p))
+            .WithElements(ListUtils.Map(parameters.Elements, elem => VisitRightPadded(elem, p)));
+    }
+
+    // -----------------------------------------------------------------------
+    // Switch : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitSwitch(Switch @switch, P p)
     {
-        var selector = @switch.Selector;
-        var selectorExpr = Visit(selector.Tree.Element, p);
+        var stmtResult = VisitStatement(@switch, p);
+        if (stmtResult is not Switch node) return stmtResult;
 
-        var casesBlock = VisitBlock(@switch.Cases, p);
-
-        if (selectorExpr is Expression se && !ReferenceEquals(se, selector.Tree.Element) ||
-            casesBlock is Block cb && !ReferenceEquals(cb, @switch.Cases))
-        {
-            return @switch.WithSelector(selectorExpr is Expression newSe ? selector.WithTree(selector.Tree.WithElement(newSe)) : selector).WithCases(casesBlock is Block newCb ? newCb : @switch.Cases);
-        }
-
-        return @switch;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithSelector((ControlParentheses<Expression>)Visit(node.Selector, p)!)
+            .WithCases((Block)Visit(node.Cases, p)!);
     }
 
-    public virtual J VisitCase(Case @case, P p)
-    {
-        var labels = @case.CaseLabels.Elements;
-        var newLabels = new List<JRightPadded<J>>();
-        bool labelsChanged = false;
-
-        foreach (var labelPadded in labels)
-        {
-            var visited = Visit(labelPadded.Element, p);
-            if (visited is J v)
-            {
-                if (!ReferenceEquals(v, labelPadded.Element))
-                {
-                    labelsChanged = true;
-                }
-                newLabels.Add(labelPadded.WithElement(v));
-            }
-        }
-
-        var statements = @case.Statements.Elements;
-        var newStatements = new List<JRightPadded<Statement>>();
-        bool statementsChanged = false;
-
-        foreach (var stmtPadded in statements)
-        {
-            var visited = Visit(stmtPadded.Element, p);
-            if (visited is Statement s)
-            {
-                if (!ReferenceEquals(s, stmtPadded.Element))
-                {
-                    statementsChanged = true;
-                }
-                newStatements.Add(stmtPadded.WithElement(s));
-            }
-        }
-
-        J? newBody = null;
-        bool bodyChanged = false;
-        if (@case.Body != null)
-        {
-            var visitedBody = Visit(@case.Body.Element, p);
-            if (visitedBody is J vb && !ReferenceEquals(vb, @case.Body.Element))
-            {
-                newBody = vb;
-                bodyChanged = true;
-            }
-        }
-
-        if (labelsChanged || statementsChanged || bodyChanged)
-        {
-            return @case.WithCaseLabels(labelsChanged ? @case.CaseLabels.WithElements(newLabels) : @case.CaseLabels).WithStatements(statementsChanged ? @case.Statements.WithElements(newStatements) : @case.Statements).WithBody(bodyChanged && newBody != null ? @case.Body!.WithElement(newBody) : @case.Body);
-        }
-
-        return @case;
-    }
-
+    // -----------------------------------------------------------------------
+    // SwitchExpression : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitSwitchExpression(SwitchExpression se, P p)
     {
-        var selector = Visit(se.Selector.Tree.Element, p);
-        var cases = Visit(se.Cases, p);
+        var exprResult = VisitExpression(se, p);
+        if (exprResult is not SwitchExpression node) return exprResult;
 
-        if ((selector is Expression s && !ReferenceEquals(s, se.Selector.Tree.Element)) ||
-            (cases is Block b && !ReferenceEquals(b, se.Cases)))
-        {
-            return se.WithSelector(selector is Expression sel ? se.Selector.WithTree(se.Selector.Tree.WithElement(sel)) : se.Selector).WithCases(cases is Block newCases ? newCases : se.Cases);
-        }
-
-        return se;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithSelector((ControlParentheses<Expression>)Visit(node.Selector, p)!)
+            .WithCases((Block)Visit(node.Cases, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // Case : Statement
+    // -----------------------------------------------------------------------
+    public virtual J VisitCase(Case @case, P p)
+    {
+        var stmtResult = VisitStatement(@case, p);
+        if (stmtResult is not Case node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithCaseLabels(VisitContainer(node.CaseLabels, p)!)
+            .WithGuard((Expression?)Visit(node.Guard, p))
+            .WithBody(VisitRightPadded(node.Body, p))
+            .WithStatements(VisitContainer(node.Statements, p)!);
+    }
+
+    // -----------------------------------------------------------------------
+    // DeconstructionPattern : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitDeconstructionPattern(DeconstructionPattern dp, P p)
     {
-        Expression deconstructor = dp.Deconstructor;
-        var visitedDeconstructor = Visit(deconstructor, p);
-        if (visitedDeconstructor is Expression d && !ReferenceEquals(d, deconstructor))
-        {
-            deconstructor = d;
-        }
+        var exprResult = VisitExpression(dp, p);
+        if (exprResult is not DeconstructionPattern node) return exprResult;
 
-        var newElements = new List<JRightPadded<J>>();
-        bool changed = false;
-
-        foreach (var nested in dp.Nested.Elements)
-        {
-            var visited = Visit(nested.Element, p);
-            if (visited is J v && !ReferenceEquals(v, nested.Element))
-            {
-                changed = true;
-                newElements.Add(nested.WithElement(v));
-            }
-            else
-            {
-                newElements.Add(nested);
-            }
-        }
-
-        var nestedPatterns = changed
-            ? dp.Nested.WithElements(newElements)
-            : dp.Nested;
-
-        if (!ReferenceEquals(deconstructor, dp.Deconstructor) ||
-            !ReferenceEquals(nestedPatterns, dp.Nested))
-        {
-            return dp.WithDeconstructor(deconstructor).WithNested(nestedPatterns);
-        }
-
-        return dp;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithDeconstructor((Expression)Visit(node.Deconstructor, p)!)
+            .WithNested(VisitContainer(node.Nested, p)!)
+            .WithType(VisitType(node.Type, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Label : Statement
+    // -----------------------------------------------------------------------
+    public virtual J VisitLabel(Label label, P p)
+    {
+        var stmtResult = VisitStatement(label, p);
+        if (stmtResult is not Label node) return stmtResult;
+
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLabelName(VisitRightPadded(node.LabelName, p)!)
+            .WithStatement((Statement)Visit(node.Statement, p)!);
+    }
+
+    // -----------------------------------------------------------------------
+    // Synchronized : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitSynchronized(Synchronized sync, P p)
     {
-        var lockExpr = Visit(sync.Lock, p);
-        var body = Visit(sync.Body, p);
+        var stmtResult = VisitStatement(sync, p);
+        if (stmtResult is not Synchronized node) return stmtResult;
 
-        if ((lockExpr is ControlParentheses<Expression> cp && !ReferenceEquals(cp, sync.Lock)) ||
-            (body is Block b && !ReferenceEquals(b, sync.Body)))
-        {
-            return sync.WithLock(lockExpr as ControlParentheses<Expression> ?? sync.Lock).WithBody(body as Block ?? sync.Body);
-        }
-
-        return sync;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithLock((ControlParentheses<Expression>)Visit(node.Lock, p)!)
+            .WithBody((Block)Visit(node.Body, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // TypeCast : Expression
+    // -----------------------------------------------------------------------
     public virtual J VisitTypeCast(TypeCast cast, P p)
     {
-        var clazz = Visit(cast.Clazz, p);
-        var expr = Visit(cast.Expression, p);
+        var exprResult = VisitExpression(cast, p);
+        if (exprResult is not TypeCast node) return exprResult;
 
-        if ((clazz is ControlParentheses<TypeTree> cp && !ReferenceEquals(cp, cast.Clazz)) ||
-            (expr is Expression e && !ReferenceEquals(e, cast.Expression)))
-        {
-            return cast.WithClazz(clazz as ControlParentheses<TypeTree> ?? cast.Clazz).WithExpression(expr as Expression ?? cast.Expression);
-        }
-
-        return cast;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithClazz((ControlParentheses<TypeTree>)Visit(node.Clazz, p)!)
+            .WithExpression((Expression)Visit(node.Expression, p)!);
     }
 
+    // -----------------------------------------------------------------------
+    // TypeParameter : (neither)
+    // -----------------------------------------------------------------------
     public virtual J VisitTypeParameter(TypeParameter typeParameter, P p)
     {
-        var changed = false;
-
-        Expression newName = typeParameter.Name;
-        var visitedName = Visit(typeParameter.Name, p);
-        if (visitedName is Expression ne && !ReferenceEquals(ne, typeParameter.Name))
-        {
-            newName = ne;
-            changed = true;
-        }
-
-        JContainer<TypeTree>? newBounds = typeParameter.Bounds;
-        if (typeParameter.Bounds != null)
-        {
-            var boundElements = new List<JRightPadded<TypeTree>>();
-            bool boundsChanged = false;
-            foreach (var paddedBound in typeParameter.Bounds.Elements)
-            {
-                var visited = Visit(paddedBound.Element, p);
-                if (visited is TypeTree tt)
-                {
-                    if (!ReferenceEquals(tt, paddedBound.Element)) boundsChanged = true;
-                    boundElements.Add(paddedBound.WithElement(tt));
-                }
-                else
-                {
-                    boundElements.Add(paddedBound);
-                }
-            }
-            if (boundsChanged)
-            {
-                newBounds = typeParameter.Bounds.WithElements(boundElements);
-                changed = true;
-            }
-        }
-
-        return changed
-            ? typeParameter.WithName(newName).WithBounds(newBounds)
-            : typeParameter;
+        return typeParameter
+            .WithPrefix(VisitSpace(typeParameter.Prefix, p))
+            .WithMarkers(VisitMarkers(typeParameter.Markers, p))
+            .WithAnnotations(ListUtils.Map(typeParameter.Annotations, ann => Visit(ann, p) as Annotation))
+            .WithName((Expression)Visit(typeParameter.Name, p)!)
+            .WithBounds(VisitContainer(typeParameter.Bounds, p));
     }
 
+    // -----------------------------------------------------------------------
+    // Package : Statement
+    // -----------------------------------------------------------------------
     public virtual J VisitPackage(Package pkg, P p)
     {
-        var annotations = pkg.Annotations;
-        bool annotationsChanged = false;
-        var newAnnotations = new List<Annotation>();
-        foreach (var ann in annotations)
-        {
-            var visited = Visit(ann, p);
-            if (visited is Annotation a)
-            {
-                if (!ReferenceEquals(a, ann))
-                {
-                    annotationsChanged = true;
-                }
-                newAnnotations.Add(a);
-            }
-        }
+        var stmtResult = VisitStatement(pkg, p);
+        if (stmtResult is not Package node) return stmtResult;
 
-        var expr = Visit(pkg.Expression.Element, p);
-
-        if (annotationsChanged ||
-            (expr is Expression e && !ReferenceEquals(e, pkg.Expression.Element)))
-        {
-            return pkg.WithAnnotations(annotationsChanged ? newAnnotations : pkg.Annotations).WithExpression(expr is Expression newExpr ? pkg.Expression.WithElement(newExpr) : pkg.Expression);
-        }
-
-        return pkg;
+        return node
+            .WithPrefix(VisitSpace(node.Prefix, p))
+            .WithMarkers(VisitMarkers(node.Markers, p))
+            .WithExpression((Expression)Visit(node.Expression, p)!)
+            .WithAnnotations(ListUtils.Map(node.Annotations, ann => Visit(ann, p) as Annotation));
     }
 }

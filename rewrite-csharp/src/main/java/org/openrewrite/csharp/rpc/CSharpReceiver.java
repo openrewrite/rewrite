@@ -63,9 +63,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withCharsetBomMarked(q.receive(cu.isCharsetBomMarked()))
                 .withChecksum(q.receive(cu.getChecksum()))
                 .<Cs.CompilationUnit>withFileAttributes(q.receive(cu.getFileAttributes()))
-                .getPadding().withExterns(q.receiveList(cu.getPadding().getExterns(), stmt -> visitRightPadded(stmt, q)))
-                .getPadding().withUsings(q.receiveList(cu.getPadding().getUsings(), stmt -> visitRightPadded(stmt, q)))
-                .withAttributeLists(q.receiveList(cu.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, q)))
                 .getPadding().withMembers(q.receiveList(cu.getPadding().getMembers(), stmt -> visitRightPadded(stmt, q)))
                 .withEof(q.receive(cu.getEof(), space -> visitSpace(space, q)));
     }
@@ -223,13 +220,11 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitBlockScopeNamespaceDeclaration(Cs.BlockScopeNamespaceDeclaration blockScopeNamespaceDeclaration, RpcReceiveQueue q) {
-        return blockScopeNamespaceDeclaration
-                .getPadding().withName(q.receive(blockScopeNamespaceDeclaration.getPadding().getName(), el -> visitRightPadded(el, q)))
-                .getPadding().withExterns(q.receiveList(blockScopeNamespaceDeclaration.getPadding().getExterns(), el -> visitRightPadded(el, q)))
-                .getPadding().withUsings(q.receiveList(blockScopeNamespaceDeclaration.getPadding().getUsings(), el -> visitRightPadded(el, q)))
-                .getPadding().withMembers(q.receiveList(blockScopeNamespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, q)))
-                .withEnd(q.receive(blockScopeNamespaceDeclaration.getEnd(), space -> visitSpace(space, q)));
+    public J visitNamespaceDeclaration(Cs.NamespaceDeclaration namespaceDeclaration, RpcReceiveQueue q) {
+        return namespaceDeclaration
+                .getPadding().withName(q.receive(namespaceDeclaration.getPadding().getName(), el -> visitRightPadded(el, q)))
+                .getPadding().withMembers(q.receiveList(namespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, q)))
+                .withEnd(q.receive(namespaceDeclaration.getEnd(), space -> visitSpace(space, q)));
     }
 
     @Override
@@ -251,14 +246,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withIdentifier(q.receive(externAlias.getPadding().getIdentifier(), el -> visitLeftPadded(el, q)));
     }
 
-    @Override
-    public J visitFileScopeNamespaceDeclaration(Cs.FileScopeNamespaceDeclaration fileScopeNamespaceDeclaration, RpcReceiveQueue q) {
-        return fileScopeNamespaceDeclaration
-                .getPadding().withName(q.receive(fileScopeNamespaceDeclaration.getPadding().getName(), el -> visitRightPadded(el, q)))
-                .getPadding().withExterns(q.receiveList(fileScopeNamespaceDeclaration.getPadding().getExterns(), el -> visitRightPadded(el, q)))
-                .getPadding().withUsings(q.receiveList(fileScopeNamespaceDeclaration.getPadding().getUsings(), el -> visitRightPadded(el, q)))
-                .getPadding().withMembers(q.receiveList(fileScopeNamespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, q)));
-    }
 
     @Override
     public J visitInterpolatedString(Cs.InterpolatedString interpolatedString, RpcReceiveQueue q) {
@@ -293,7 +280,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         return usingDirective
                 .getPadding().withGlobal(q.receive(usingDirective.getPadding().getGlobal(), el -> visitRightPadded(el, q)))
                 .getPadding().withStatic(q.receive(usingDirective.getPadding().getStatic(), el -> visitLeftPadded(el, q)))
-                .getPadding().withUnsafe(q.receive(usingDirective.getPadding().getUnsafe(), el -> visitLeftPadded(el, q)))
                 .getPadding().withAlias(q.receive(usingDirective.getPadding().getAlias(), el -> visitRightPadded(el, q)))
                 .withNamespaceOrType(q.receive(usingDirective.getNamespaceOrType(), el -> (TypeTree) visitNonNull(el, q)));
     }
@@ -687,6 +673,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         return conversionOperatorDeclaration
                 .withModifiers(q.receiveList(conversionOperatorDeclaration.getModifiers(), el -> (J.Modifier) visitNonNull(el, q)))
                 .getPadding().withKind(q.receive(conversionOperatorDeclaration.getPadding().getKind(), el -> visitLeftPadded(el, q, toEnum(Cs.ConversionOperatorDeclaration.ExplicitImplicit.class))))
+                .getPadding().withInterfaceSpecifier(q.receive(conversionOperatorDeclaration.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q)))
                 .getPadding().withReturnType(q.receive(conversionOperatorDeclaration.getPadding().getReturnType(), el -> visitLeftPadded(el, q)))
                 .getPadding().withParameters(q.receive(conversionOperatorDeclaration.getPadding().getParameters(), el -> visitContainer(el, q)))
                 .getPadding().withExpressionBody(q.receive(conversionOperatorDeclaration.getPadding().getExpressionBody(), el -> visitLeftPadded(el, q)))
@@ -726,22 +713,6 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .withTypeExpression(q.receive(arrayType.getTypeExpression(), el -> (TypeTree) visitNonNull(el, q)))
                 .withDimensions(q.receiveList(arrayType.getDimensions(), el -> (J.ArrayDimension) visitNonNull(el, q)))
                 .withType(q.receive(arrayType.getType(), type -> visitType(type, q)));
-    }
-
-    @Override
-    public J visitTry(Cs.Try try_, RpcReceiveQueue q) {
-        return try_
-                .withBody(q.receive(try_.getBody(), el -> (J.Block) visitNonNull(el, q)))
-                .withCatches(q.receiveList(try_.getCatches(), el -> (Cs.Try.Catch) visitNonNull(el, q)))
-                .getPadding().withFinally(q.receive(try_.getPadding().getFinally(), el -> visitLeftPadded(el, q)));
-    }
-
-    @Override
-    public J visitTryCatch(Cs.Try.Catch catch_, RpcReceiveQueue q) {
-        return catch_
-                .withParameter(q.receive(catch_.getParameter(), el -> (J.ControlParentheses<J.VariableDeclarations>) visitNonNull(el, q)))
-                .getPadding().withFilterExpression(q.receive(catch_.getPadding().getFilterExpression(), el -> visitLeftPadded(el, q)))
-                .withBody(q.receive(catch_.getBody(), el -> (J.Block) visitNonNull(el, q)));
     }
 
     @Override
@@ -881,6 +852,36 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 .getPadding().withUnmanagedCallingConventionTypes(q.receive(functionPointerType.getPadding().getUnmanagedCallingConventionTypes(), el -> visitContainer(el, q)))
                 .getPadding().withParameterTypes(q.receive(functionPointerType.getPadding().getParameterTypes(), el -> visitContainer(el, q)))
                 .withType(q.receive(functionPointerType.getType(), el -> visitType(el, q)));
+    }
+
+    @Override
+    public J visitTypeWithArguments(Cs.TypeWithArguments typeWithArguments, RpcReceiveQueue q) {
+        return typeWithArguments
+                .withTypeExpression(q.receive(typeWithArguments.getTypeExpression(), el -> (TypeTree) visitNonNull(el, q)))
+                .getPadding().withArguments(q.receive(typeWithArguments.getPadding().getArguments(), el -> visitContainer(el, q)));
+    }
+
+    @Override
+    public J visitExplicitInterfaceMember(Cs.ExplicitInterfaceMember explicitInterfaceMember, RpcReceiveQueue q) {
+        return explicitInterfaceMember
+                .getPadding().withInterfaceSpecifier(q.receive(explicitInterfaceMember.getPadding().getInterfaceSpecifier(), el -> visitRightPadded(el, q)))
+                .withMethodDeclaration(q.receive(explicitInterfaceMember.getMethodDeclaration(), el -> (J.MethodDeclaration) visitNonNull(el, q)));
+    }
+
+    @Override
+    public J visitExceptionFilteredTry(Cs.ExceptionFilteredTry exceptionFilteredTry, RpcReceiveQueue q) {
+        exceptionFilteredTry = exceptionFilteredTry
+                .withATry(q.receive(exceptionFilteredTry.getATry(), el -> (J.Try) visitNonNull(el, q)));
+        // catchFilters parallels aTry.catches — one filter per catch clause.
+        // On first receive (ADD), catchFilters is null but we know the count from the catches.
+        List<JLeftPadded<J.ControlParentheses<Expression>>> existing = exceptionFilteredTry.getCatchFilters();
+        int filterCount = existing != null ? existing.size() : exceptionFilteredTry.getATry().getCatches().size();
+        List<JLeftPadded<J.ControlParentheses<Expression>>> filters = new ArrayList<>(filterCount);
+        for (int i = 0; i < filterCount; i++) {
+            JLeftPadded<J.ControlParentheses<Expression>> before = existing != null ? existing.get(i) : null;
+            filters.add(q.receive(before, el -> visitLeftPadded(el, q)));
+        }
+        return exceptionFilteredTry.withCatchFilters(filters);
     }
 
     // Delegate methods to JavaReceiver

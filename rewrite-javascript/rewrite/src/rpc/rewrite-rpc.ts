@@ -32,7 +32,8 @@ import {
     Print,
     TraceGetObject,
     Visit,
-    VisitResponse
+    VisitResponse,
+    BatchVisit
 } from "./request";
 import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
@@ -87,6 +88,7 @@ export class RewriteRpc {
         const marketplace = options.marketplace || new RecipeMarketplace();
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
@@ -102,6 +104,19 @@ export class RewriteRpc {
             new rpc.RequestType<TraceGetObject, boolean, Error>("TraceGetObject"),
             async (request) => {
                 this.traceGetObject = request;
+                return true;
+            }
+        )
+
+        this.connection.onRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+            async () => {
+                this.localObjects.clear();
+                this.localObjectIds.clear();
+                this.remoteObjects.clear();
+                this.remoteRefs.clear();
+                this.localRefs.clear();
+                preparedRecipes.clear();
                 return true;
             }
         )
@@ -311,5 +326,10 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
+    }
+
+    clear(): void {
+        this.objectMap = new WeakMap<any, string>();
+        this.primitiveMap.clear();
     }
 }

@@ -35,6 +35,7 @@ import static java.util.stream.Collectors.toMap;
 
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
+    @Getter
     private final transient RewriteRpc rpc;
     private transient @Nullable List<Recipe> recipeList;
 
@@ -44,8 +45,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final String remoteId;
 
     private final RecipeDescriptor descriptor;
+    @Getter
     private final String editVisitor;
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
+    @Getter
     private final @Nullable String scanVisitor;
     private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 

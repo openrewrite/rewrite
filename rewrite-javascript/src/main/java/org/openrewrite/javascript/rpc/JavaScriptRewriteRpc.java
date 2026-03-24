@@ -92,6 +92,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
         MANAGER.shutdown();
     }
 
+    public static void resetCurrent() {
+        MANAGER.reset();
+    }
+
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
@@ -378,6 +382,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
             // caller-provided options, if any, are taking precedence over the options baked above

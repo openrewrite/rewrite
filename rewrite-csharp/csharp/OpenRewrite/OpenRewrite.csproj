@@ -17,7 +17,9 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <!-- VSTHRD200: RPC method names must match Java-side protocol (no Async suffix) -->
     <!-- VSTHRD002: Synchronous waits needed for RPC interop with Java peer -->
-    <NoWarn>VSTHRD200;VSTHRD002</NoWarn>
+    <!-- VSTHRD103: Synchronous blocks needed for RPC interop -->
+    <!-- CS0114: Intentional method hiding in sender/receiver visitors -->
+    <NoWarn>VSTHRD200;VSTHRD002;VSTHRD103;CS0114;CS8602;CS8603;CS8604</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,6 +36,7 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="JunitXml.TestLogger" Version="4.0.254" />
   </ItemGroup>
 
   <ItemGroup>

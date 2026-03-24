@@ -22,12 +22,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.rpc.CSharpRewriteRpc;
+import org.openrewrite.csharp.service.CSharpAutoFormatService;
 import org.openrewrite.csharp.service.CSharpNamingService;
 import org.openrewrite.csharp.service.CSharpWhitespaceValidationService;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NamingService;
 import org.openrewrite.internal.WhitespaceValidationService;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -139,30 +141,6 @@ public interface Cs extends J {
         public Cs.CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return this;
         }
-
-        List<JRightPadded<ExternAlias>> externs;
-
-        public List<ExternAlias> getExterns() {
-            return JRightPadded.getElements(externs);
-        }
-
-        public Cs.CompilationUnit withExterns(List<ExternAlias> externs) {
-            return getPadding().withExterns(JRightPadded.withElements(this.externs, externs));
-        }
-
-        List<JRightPadded<UsingDirective>> usings;
-
-        public List<UsingDirective> getUsings() {
-            return JRightPadded.getElements(usings);
-        }
-
-        public Cs.CompilationUnit withUsings(List<UsingDirective> usings) {
-            return getPadding().withUsings(JRightPadded.withElements(this.usings, usings));
-        }
-
-        @Getter
-        @With
-        List<AttributeList> attributeLists;
 
         List<JRightPadded<Statement>> members;
 
@@ -285,6 +263,9 @@ public interface Cs extends J {
         @Override
         @Incubating(since = "8.2.0")
         public <S, T extends S> T service(Class<S> service) {
+            if (AutoFormatService.class.getName().equals(service.getName())) {
+                return (T) new CSharpAutoFormatService();
+            }
             if (NamingService.class.getName().equals(service.getName())) {
                 return (T) new CSharpNamingService();
             }
@@ -313,23 +294,7 @@ public interface Cs extends J {
             }
 
             public Cs.CompilationUnit withMembers(List<JRightPadded<Statement>> members) {
-                return t.members == members ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.externs, t.usings, t.attributeLists, members, t.eof);
-            }
-
-            public List<JRightPadded<ExternAlias>> getExterns() {
-                return t.externs;
-            }
-
-            public Cs.CompilationUnit withExterns(List<JRightPadded<ExternAlias>> externs) {
-                return t.externs == externs ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, externs, t.usings, t.attributeLists, t.members, t.eof);
-            }
-
-            public List<JRightPadded<UsingDirective>> getUsings() {
-                return t.usings;
-            }
-
-            public Cs.CompilationUnit withUsings(List<JRightPadded<UsingDirective>> usings) {
-                return t.usings == usings ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.externs, usings, t.attributeLists, t.members, t.eof);
+                return t.members == members ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, members, t.eof);
             }
         }
     }
@@ -2066,7 +2031,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class BlockScopeNamespaceDeclaration implements Cs, Statement {
+    class NamespaceDeclaration implements Cs, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2090,28 +2055,8 @@ public interface Cs extends J {
             return name.getElement();
         }
 
-        public BlockScopeNamespaceDeclaration withName(Expression name) {
+        public NamespaceDeclaration withName(Expression name) {
             return getPadding().withName(JRightPadded.withElement(this.name, name));
-        }
-
-        List<JRightPadded<ExternAlias>> externs;
-
-        public List<ExternAlias> getExterns() {
-            return JRightPadded.getElements(externs);
-        }
-
-        public BlockScopeNamespaceDeclaration withExterns(List<ExternAlias> externs) {
-            return getPadding().withExterns(JRightPadded.withElements(this.externs, externs));
-        }
-
-        List<JRightPadded<UsingDirective>> usings;
-
-        public List<UsingDirective> getUsings() {
-            return JRightPadded.getElements(usings);
-        }
-
-        public BlockScopeNamespaceDeclaration withUsings(List<UsingDirective> usings) {
-            return getPadding().withUsings(JRightPadded.withElements(this.usings, usings));
         }
 
         List<JRightPadded<Statement>> members;
@@ -2120,7 +2065,7 @@ public interface Cs extends J {
             return JRightPadded.getElements(members);
         }
 
-        public BlockScopeNamespaceDeclaration withMembers(List<Statement> members) {
+        public NamespaceDeclaration withMembers(List<Statement> members) {
             return getPadding().withMembers(JRightPadded.withElements(this.members, members));
         }
 
@@ -2135,7 +2080,7 @@ public interface Cs extends J {
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitBlockScopeNamespaceDeclaration(this, p);
+            return v.visitNamespaceDeclaration(this, p);
         }
 
         public Padding getPadding() {
@@ -2155,38 +2100,22 @@ public interface Cs extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final BlockScopeNamespaceDeclaration t;
+            private final NamespaceDeclaration t;
 
             public JRightPadded<Expression> getName() {
                 return t.name;
             }
 
-            public BlockScopeNamespaceDeclaration withName(JRightPadded<Expression> name) {
-                return t.name == name ? t : new BlockScopeNamespaceDeclaration(t.id, t.prefix, t.markers, name, t.externs, t.usings, t.members, t.end);
-            }
-
-            public List<JRightPadded<ExternAlias>> getExterns() {
-                return t.externs;
-            }
-
-            public BlockScopeNamespaceDeclaration withExterns(List<JRightPadded<ExternAlias>> externs) {
-                return t.externs == externs ? t : new BlockScopeNamespaceDeclaration(t.id, t.prefix, t.markers, t.name, externs, t.usings, t.members, t.end);
-            }
-
-            public List<JRightPadded<UsingDirective>> getUsings() {
-                return t.usings;
-            }
-
-            public BlockScopeNamespaceDeclaration withUsings(List<JRightPadded<UsingDirective>> usings) {
-                return t.usings == usings ? t : new BlockScopeNamespaceDeclaration(t.id, t.prefix, t.markers, t.name, t.externs, usings, t.members, t.end);
+            public NamespaceDeclaration withName(JRightPadded<Expression> name) {
+                return t.name == name ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, name, t.members, t.end);
             }
 
             public List<JRightPadded<Statement>> getMembers() {
                 return t.members;
             }
 
-            public BlockScopeNamespaceDeclaration withMembers(List<JRightPadded<Statement>> members) {
-                return t.members == members ? t : new BlockScopeNamespaceDeclaration(t.id, t.prefix, t.markers, t.name, t.externs, t.usings, members, t.end);
+            public NamespaceDeclaration withMembers(List<JRightPadded<Statement>> members) {
+                return t.members == members ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, t.name, members, t.end);
             }
         }
     }
@@ -2407,131 +2336,6 @@ public interface Cs extends J {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class FileScopeNamespaceDeclaration implements Cs, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @Getter
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        JRightPadded<Expression> name;
-
-        public Expression getName() {
-            return name.getElement();
-        }
-
-        public FileScopeNamespaceDeclaration withName(Expression name) {
-            return getPadding().withName(JRightPadded.withElement(this.name, name));
-        }
-
-        List<JRightPadded<ExternAlias>> externs;
-
-        public List<ExternAlias> getExterns() {
-            return JRightPadded.getElements(externs);
-        }
-
-        public FileScopeNamespaceDeclaration withExterns(List<ExternAlias> externs) {
-            return getPadding().withExterns(JRightPadded.withElements(this.externs, externs));
-        }
-
-        List<JRightPadded<UsingDirective>> usings;
-
-        public List<UsingDirective> getUsings() {
-            return JRightPadded.getElements(usings);
-        }
-
-        public FileScopeNamespaceDeclaration withUsings(List<UsingDirective> usings) {
-            return getPadding().withUsings(JRightPadded.withElements(this.usings, usings));
-        }
-
-        List<JRightPadded<Statement>> members;
-
-        public List<Statement> getMembers() {
-            return JRightPadded.getElements(members);
-        }
-
-        public FileScopeNamespaceDeclaration withMembers(List<Statement> members) {
-            return getPadding().withMembers(JRightPadded.withElements(this.members, members));
-        }
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitFileScopeNamespaceDeclaration(this, p);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final FileScopeNamespaceDeclaration t;
-
-            public JRightPadded<Expression> getName() {
-                return t.name;
-            }
-
-            public FileScopeNamespaceDeclaration withName(JRightPadded<Expression> name) {
-                return t.name == name ? t : new FileScopeNamespaceDeclaration(t.id, t.prefix, t.markers, name, t.externs, t.usings, t.members);
-            }
-
-            public List<JRightPadded<ExternAlias>> getExterns() {
-                return t.externs;
-            }
-
-            public FileScopeNamespaceDeclaration withExterns(List<JRightPadded<ExternAlias>> externs) {
-                return t.externs == externs ? t : new FileScopeNamespaceDeclaration(t.id, t.prefix, t.markers, t.name, externs, t.usings, t.members);
-            }
-
-            public List<JRightPadded<UsingDirective>> getUsings() {
-                return t.usings;
-            }
-
-            public FileScopeNamespaceDeclaration withUsings(List<JRightPadded<UsingDirective>> usings) {
-                return t.usings == usings ? t : new FileScopeNamespaceDeclaration(t.id, t.prefix, t.markers, t.name, t.externs, usings, t.members);
-            }
-
-            public List<JRightPadded<Statement>> getMembers() {
-                return t.members;
-            }
-
-            public FileScopeNamespaceDeclaration withMembers(List<JRightPadded<Statement>> members) {
-                return t.members == members ? t : new FileScopeNamespaceDeclaration(t.id, t.prefix, t.markers, t.name, t.externs, t.usings, members);
-            }
-        }
-    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2907,16 +2711,6 @@ public interface Cs extends J {
             return getPadding().withStatic(JLeftPadded.withElement(this.statik, statik));
         }
 
-        JLeftPadded<Boolean> unsafe;
-
-        public boolean isUnsafe() {
-            return unsafe.getElement();
-        }
-
-        public UsingDirective withUnsafe(boolean unsafe) {
-            return getPadding().withUnsafe(JLeftPadded.withElement(this.unsafe, unsafe));
-        }
-
         @Nullable
         JRightPadded<Identifier> alias;
 
@@ -2966,7 +2760,7 @@ public interface Cs extends J {
             }
 
             public UsingDirective withGlobal(JRightPadded<Boolean> global) {
-                return t.global == global ? t : new UsingDirective(t.id, t.prefix, t.markers, global, t.statik, t.unsafe, t.alias, t.namespaceOrType);
+                return t.global == global ? t : new UsingDirective(t.id, t.prefix, t.markers, global, t.statik, t.alias, t.namespaceOrType);
             }
 
             public JLeftPadded<Boolean> getStatic() {
@@ -2974,15 +2768,7 @@ public interface Cs extends J {
             }
 
             public UsingDirective withStatic(JLeftPadded<Boolean> statik) {
-                return t.statik == statik ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, statik, t.unsafe, t.alias, t.namespaceOrType);
-            }
-
-            public JLeftPadded<Boolean> getUnsafe() {
-                return t.unsafe;
-            }
-
-            public UsingDirective withUnsafe(JLeftPadded<Boolean> unsafe) {
-                return t.unsafe == unsafe ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, unsafe, t.alias, t.namespaceOrType);
+                return t.statik == statik ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, statik, t.alias, t.namespaceOrType);
             }
 
             public @Nullable JRightPadded<Identifier> getAlias() {
@@ -2990,7 +2776,7 @@ public interface Cs extends J {
             }
 
             public UsingDirective withAlias(JRightPadded<Identifier> alias) {
-                return t.alias == alias ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, t.unsafe, alias, t.namespaceOrType);
+                return t.alias == alias ? t : new UsingDirective(t.id, t.prefix, t.markers, t.global, t.statik, alias, t.namespaceOrType);
             }
         }
     }
@@ -4156,46 +3942,6 @@ public interface Cs extends J {
         }
     }
 
-    /**
-     * Represents a C# destructor which is a method called before an object is destroyed by the garbage collector.
-     * A destructor must be named the same as the class prefixed with a tilde (~), cannot be explicitly called,
-     * cannot have parameters or access modifiers, and cannot be overloaded or inherited.
-     * <p>
-     * For example:
-     * <pre>
-     *     // Basic destructor
-     *     ~MyClass()
-     *     {
-     *         // Cleanup code
-     *     }
-     *
-     *     // Destructor with cleanup logic
-     *     ~ResourceHandler()
-     *     {
-     *         if (handle != IntPtr.Zero)
-     *         {
-     *             CloseHandle(handle);
-     *         }
-     *     }
-     *
-     *     // Class with both constructor and destructor
-     *     public class FileWrapper
-     *     {
-     *         public FileWrapper()
-     *         {
-     *             // Initialize
-     *         }
-     *
-     *         ~FileWrapper()
-     *         {
-     *             // Cleanup
-     *         }
-     *     }
-     * </pre>
-     * <p>
-     * Note: In modern C#, it's recommended to implement IDisposable pattern instead of relying on destructors
-     * for deterministic cleanup of resources, as destructors are non-deterministic and can impact performance.
-     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PUBLIC)
@@ -4494,27 +4240,6 @@ public interface Cs extends J {
 
     }
 
-    /**
-     * Represents a C# new class instantiation expression, which can optionally include an object/collection initializer.
-     * <p>
-     * For example:
-     * <pre>
-     * // Simple new class without initializer
-     * new Person("John", 25)
-     *
-     * // New class with object initializer
-     * new Person { Name = "John", Age = 25 }
-     *
-     * // New class with collection initializer
-     * new List<int> { 1, 2, 3 }
-     *
-     * // New class with constructor and initializer
-     * new Person("John") { Age = 25 }
-     * </pre>
-     * The newClassCore field contains the basic class instantiation including constructor call,
-     * while the initializer field contains the optional object/collection initializer expressions
-     * wrapped in a JContainer to preserve whitespace around curly braces and between initializer expressions.
-     */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -4560,7 +4285,6 @@ public interface Cs extends J {
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
-
     }
 
     /**
@@ -6768,6 +6492,25 @@ public interface Cs extends J {
         }
 
         /**
+         * The explicit interface type (e.g., {@code N.I}), right-padded with the
+         * space before the dot. Null when no explicit interface.
+         * <pre>
+         * N.I.implicit operator int(MyType t)
+         * ^^^
+         * </pre>
+         */
+        @Nullable
+        JRightPadded<TypeTree> interfaceSpecifier;
+
+        public @Nullable TypeTree getInterfaceSpecifier() {
+            return interfaceSpecifier == null ? null : interfaceSpecifier.getElement();
+        }
+
+        public ConversionOperatorDeclaration withInterfaceSpecifier(@Nullable TypeTree interfaceSpecifier) {
+            return getPadding().withInterfaceSpecifier(JRightPadded.withElement(this.interfaceSpecifier, interfaceSpecifier));
+        }
+
+        /**
          * <pre>
          * public static implicit operator string(MyType t)
          *                                ^^^^^^^
@@ -6861,23 +6604,33 @@ public interface Cs extends J {
         public static class Padding {
             private final ConversionOperatorDeclaration t;
 
-            public JLeftPadded<TypeTree> getReturnType() {
-                return t.returnType;
-            }
-
-            public ConversionOperatorDeclaration withReturnType(JLeftPadded<TypeTree> returnType) {
-                return t.returnType == returnType ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, t.kind, returnType, t.parameters,
-                        t.expressionBody, t.body);
-            }
-
             public JLeftPadded<ExplicitImplicit> getKind() {
                 return t.kind;
             }
 
             public ConversionOperatorDeclaration withKind(JLeftPadded<ExplicitImplicit> kind) {
                 return t.kind == kind ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, kind, t.returnType, t.parameters,
+                        t.modifiers, kind, t.interfaceSpecifier, t.returnType, t.parameters,
+                        t.expressionBody, t.body);
+            }
+
+            public @Nullable JRightPadded<TypeTree> getInterfaceSpecifier() {
+                return t.interfaceSpecifier;
+            }
+
+            public ConversionOperatorDeclaration withInterfaceSpecifier(@Nullable JRightPadded<TypeTree> interfaceSpecifier) {
+                return t.interfaceSpecifier == interfaceSpecifier ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
+                        t.modifiers, t.kind, interfaceSpecifier, t.returnType, t.parameters,
+                        t.expressionBody, t.body);
+            }
+
+            public JLeftPadded<TypeTree> getReturnType() {
+                return t.returnType;
+            }
+
+            public ConversionOperatorDeclaration withReturnType(JLeftPadded<TypeTree> returnType) {
+                return t.returnType == returnType ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
+                        t.modifiers, t.kind, t.interfaceSpecifier, returnType, t.parameters,
                         t.expressionBody, t.body);
             }
 
@@ -6887,7 +6640,7 @@ public interface Cs extends J {
 
             public ConversionOperatorDeclaration withParameters(JContainer<Statement> parameters) {
                 return t.parameters == parameters ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, t.kind, t.returnType, parameters,
+                        t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, parameters,
                         t.expressionBody, t.body);
             }
 
@@ -6897,7 +6650,7 @@ public interface Cs extends J {
 
             public ConversionOperatorDeclaration withExpressionBody(@Nullable JLeftPadded<Expression> expressionBody) {
                 return t.expressionBody == expressionBody ? t : new ConversionOperatorDeclaration(t.id, t.prefix, t.markers,
-                        t.modifiers, t.kind, t.returnType, t.parameters,
+                        t.modifiers, t.kind, t.interfaceSpecifier, t.returnType, t.parameters,
                         expressionBody, t.body);
             }
         }
@@ -7477,201 +7230,6 @@ public interface Cs extends J {
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
-        }
-
-    }
-
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Try implements Cs, Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Cs.Try.Padding> padding;
-
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        Block body;
-
-        @With
-        @Getter
-        List<Cs.Try.Catch> catches;
-
-        @Nullable
-        JLeftPadded<Block> finallie;
-
-        public @Nullable Block getFinally() {
-            return finallie == null ? null : finallie.getElement();
-        }
-
-        public Cs.Try withFinally(@Nullable Block finallie) {
-            return getPadding().withFinally(JLeftPadded.withElement(this.finallie, finallie));
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitTry(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        /**
-         * Represents a C# catch clause in a try/catch statement, which optionally includes a filter expression.
-         * <p>
-         * For example:
-         * <pre>
-         *     // Simple catch clause
-         *     catch (Exception e) { }
-         *
-         *     // Catch with filter expression
-         *     catch (Exception e) when (e.Code == 404) { }
-         *
-         *     // Multiple catch clauses with filters
-         *     try {
-         *         // code
-         *     }
-         *     catch (ArgumentException e) when (e.ParamName == "id") { }
-         *     catch (Exception e) when (e.InnerException != null) { }
-         * </pre>
-         */
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @RequiredArgsConstructor
-        @AllArgsConstructor(access = AccessLevel.PRIVATE)
-        public static final class Catch implements Cs {
-            @Nullable
-            @NonFinal
-            transient WeakReference<Padding> padding;
-
-            @With
-            @EqualsAndHashCode.Include
-            @Getter
-            UUID id;
-
-            @With
-            @Getter
-            Space prefix;
-
-            @With
-            @Getter
-            Markers markers;
-
-            /**
-             * <pre>
-             * catch (Exception e) when (e.Code == 404) { }
-             *      ^^^^^^^^^^^^^^
-             * </pre>
-             */
-            @With
-            @Getter
-            ControlParentheses<VariableDeclarations> parameter;
-
-            /**
-             * <pre>
-             * catch (Exception e) when (e.Code == 404) { }
-             *                    ^^^^^^^^^^^^^^^^^^^^^
-             * </pre>
-             */
-            @Nullable
-            JLeftPadded<ControlParentheses<Expression>> filterExpression;
-
-            /**
-             * <pre>
-             * catch (Exception e) when (e.Code == 404) { }
-             *                                         ^^^^
-             * </pre>
-             */
-            @With
-            @Getter
-            Block body;
-
-            public @Nullable ControlParentheses<Expression> getFilterExpression() {
-                return filterExpression == null ? null : filterExpression.getElement();
-            }
-
-            public Catch withFilterExpression(@Nullable ControlParentheses<Expression> filterExpression) {
-                return getPadding().withFilterExpression(JLeftPadded.withElement(this.filterExpression, filterExpression));
-            }
-
-            @Override
-            public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-                return v.visitTryCatch(this, p);
-            }
-
-            public Padding getPadding() {
-                Padding p;
-                if (this.padding == null) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                } else {
-                    p = this.padding.get();
-                    if (p == null || p.t != this) {
-                        p = new Padding(this);
-                        this.padding = new WeakReference<>(p);
-                    }
-                }
-                return p;
-            }
-
-            @RequiredArgsConstructor
-            public class Padding {
-                private final Catch t;
-
-                public @Nullable JLeftPadded<ControlParentheses<Expression>> getFilterExpression() {
-                    return t.filterExpression;
-                }
-
-                public Catch withFilterExpression(@Nullable JLeftPadded<ControlParentheses<Expression>> filterExpression) {
-                    return t.filterExpression == filterExpression ? t : new Catch(t.id, t.prefix, t.markers, t.parameter, filterExpression, t.body);
-                }
-            }
-        }
-
-        public Cs.Try.Padding getPadding() {
-            Cs.Try.Padding p;
-            if (this.padding == null) {
-                p = new Cs.Try.Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Cs.Try.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Cs.Try t;
-
-            public @Nullable JLeftPadded<Block> getFinally() {
-                return t.finallie;
-            }
-
-            public Cs.Try withFinally(@Nullable JLeftPadded<Block> finallie) {
-                return t.finallie == finallie ? t : new Cs.Try(t.id, t.prefix, t.markers, t.body, t.catches, finallie);
-            }
         }
     }
 
@@ -8916,6 +8474,230 @@ public interface Cs extends J {
             public FunctionPointerType withParameterTypes(JContainer<TypeTree> parameterTypes) {
                 return t.parameterTypes == parameterTypes ? t : new FunctionPointerType(t.id, t.prefix, t.markers, t.callingConvention, t.unmanagedCallingConventionTypes, parameterTypes, t.type);
             }
+        }
+    }
+
+    /**
+     * A base type reference with constructor arguments, e.g., {@code Base(x, y)}
+     * in {@code class Derived(int x) : Base(x, y) { }}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeWithArguments implements Cs, TypeTree, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        TypeTree typeExpression;
+
+        JContainer<Expression> arguments;
+
+        public List<Expression> getArguments() {
+            return arguments.getElements();
+        }
+
+        public TypeWithArguments withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typeExpression.getType();
+        }
+
+        @Override
+        public TypeWithArguments withType(@Nullable JavaType javaType) {
+            return withTypeExpression(typeExpression.withType(javaType));
+        }
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitTypeWithArguments(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TypeWithArguments t;
+
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
+            }
+
+            public TypeWithArguments withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new TypeWithArguments(t.id, t.prefix, t.markers, t.typeExpression, arguments);
+            }
+        }
+    }
+
+    /**
+     * Wraps a {@link J.MethodDeclaration} that has an explicit interface specifier
+     * (e.g., {@code void IFoo.Bar()}). The interface specifier is stored separately
+     * since {@link J.MethodDeclaration#getName()} is an {@link J.Identifier} only.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class ExplicitInterfaceMember implements Cs, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * The interface type (e.g., IFoo), right-padded with the space before the dot.
+         */
+        JRightPadded<TypeTree> interfaceSpecifier;
+
+        public TypeTree getInterfaceSpecifier() {
+            return interfaceSpecifier.getElement();
+        }
+
+        public ExplicitInterfaceMember withInterfaceSpecifier(TypeTree interfaceSpecifier) {
+            return getPadding().withInterfaceSpecifier(JRightPadded.withElement(this.interfaceSpecifier, interfaceSpecifier));
+        }
+
+        @With
+        @Getter
+        J.MethodDeclaration methodDeclaration;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitExplicitInterfaceMember(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ExplicitInterfaceMember t;
+
+            public JRightPadded<TypeTree> getInterfaceSpecifier() {
+                return t.interfaceSpecifier;
+            }
+
+            public ExplicitInterfaceMember withInterfaceSpecifier(JRightPadded<TypeTree> interfaceSpecifier) {
+                return t.interfaceSpecifier == interfaceSpecifier ? t : new ExplicitInterfaceMember(t.id, t.prefix, t.markers, interfaceSpecifier, t.methodDeclaration);
+            }
+        }
+    }
+
+    /**
+     * C# try statement with exception filter support ({@code catch when (expr)}).
+     * Wraps a {@link J.Try} and adds a parallel list of catch filters (when clauses).
+     * Each filter corresponds positionally to a catch clause in the inner Try;
+     * null entries indicate no filter for that catch.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    final class ExceptionFilteredTry implements Cs, Statement {
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        J.Try aTry;
+
+        /**
+         * Parallel to {@link J.Try#getCatches()}. Each entry is the {@code when(expr)} filter
+         * for the corresponding catch clause, or null if no filter. The {@link JLeftPadded#getBefore()}
+         * is the space before {@code when}. The {@link J.ControlParentheses} prefix is
+         * the space before {@code (}.
+         */
+        @With
+        @Getter
+        List<JLeftPadded<J.ControlParentheses<Expression>>> catchFilters;
+
+        @Override
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitExceptionFilteredTry(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 

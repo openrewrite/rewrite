@@ -22,7 +22,7 @@ namespace OpenRewrite.Java;
 /// The base interface for all Java-family LST elements.
 /// C# LST elements extend J where the syntax is isomorphic.
 /// </summary>
-public interface J : Tree
+public partial interface J : Tree
 {
     Space Prefix { get; }
     Markers Markers { get; }
@@ -33,6 +33,7 @@ public interface J : Tree
 /// </summary>
 public interface Expression : J
 {
+    JavaType? Type { get; }
 }
 
 /// <summary>
@@ -137,14 +138,14 @@ public sealed class Package(
     Guid id,
     Space prefix,
     Markers markers,
-    JRightPadded<Expression> expression,
+    Expression expression,
     IList<Annotation> annotations
 ) : J, Statement, IEquatable<Package>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JRightPadded<Expression> Expression { get; } = expression;
+    public Expression Expression { get; } = expression;
     public IList<Annotation> Annotations { get; } = annotations;
 
     public Package WithId(Guid id) =>
@@ -153,7 +154,7 @@ public sealed class Package(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Expression, Annotations);
     public Package WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Expression, Annotations);
-    public Package WithExpression(JRightPadded<Expression> expression) =>
+    public Package WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, expression, Annotations);
     public Package WithAnnotations(IList<Annotation> annotations) =>
         ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, Expression, annotations);
@@ -175,7 +176,7 @@ public sealed class Literal(
     object? value,
     string? valueSource,
     IList<Literal.UnicodeEscape>? unicodeEscapes,
-    JavaType.Primitive? type
+    JavaType? type
 ) : J, Expression, IEquatable<Literal>
 {
     public Guid Id { get; } = id;
@@ -184,7 +185,7 @@ public sealed class Literal(
     public object? Value { get; } = value;
     public string? ValueSource { get; } = valueSource;
     public IList<Literal.UnicodeEscape>? UnicodeEscapes { get; } = unicodeEscapes;
-    public JavaType.Primitive? Type { get; } = type;
+    public JavaType? Type { get; } = type;
 
     public Literal WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Value, ValueSource, UnicodeEscapes, Type);
@@ -198,7 +199,7 @@ public sealed class Literal(
         string.Equals(valueSource, ValueSource, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Value, valueSource, UnicodeEscapes, Type);
     public Literal WithUnicodeEscapes(IList<Literal.UnicodeEscape>? unicodeEscapes) =>
         ReferenceEquals(unicodeEscapes, UnicodeEscapes) ? this : new(Id, Prefix, Markers, Value, ValueSource, unicodeEscapes, Type);
-    public Literal WithType(JavaType.Primitive? type) =>
+    public Literal WithType(JavaType? type) =>
         ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Value, ValueSource, UnicodeEscapes, type);
 
     public record UnicodeEscape(int ValueSourceIndex, string CodePoint);
@@ -400,6 +401,8 @@ public sealed class ControlParentheses<T>(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Tree);
     public ControlParentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
+
+    public JavaType? Type => Tree.Element is Expression expr ? expr.Type : null;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -662,7 +665,7 @@ public sealed class Try(
     Guid id,
     Space prefix,
     Markers markers,
-    JContainer<NameTree>? resources,
+    JContainer<Try.Resource>? resources,
     Block body,
     IList<Try.Catch> catches,
     JLeftPadded<Block>? @finally
@@ -671,7 +674,7 @@ public sealed class Try(
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public JContainer<NameTree>? Resources { get; } = resources;
+    public JContainer<Try.Resource>? Resources { get; } = resources;
     public Block Body { get; } = body;
     public IList<Try.Catch> Catches { get; } = catches;
     public JLeftPadded<Block>? Finally { get; } = @finally;
@@ -682,7 +685,7 @@ public sealed class Try(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Resources, Body, Catches, Finally);
     public Try WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Resources, Body, Catches, Finally);
-    public Try WithResources(JContainer<NameTree>? resources) =>
+    public Try WithResources(JContainer<Try.Resource>? resources) =>
         ReferenceEquals(resources, Resources) ? this : new(Id, Prefix, Markers, resources, Body, Catches, Finally);
     public Try WithBody(Block body) =>
         ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Resources, body, Catches, Finally);
@@ -690,6 +693,38 @@ public sealed class Try(
         ReferenceEquals(catches, Catches) ? this : new(Id, Prefix, Markers, Resources, Body, catches, Finally);
     public Try WithFinally(JLeftPadded<Block>? @finally) =>
         ReferenceEquals(@finally, Finally) ? this : new(Id, Prefix, Markers, Resources, Body, Catches, @finally);
+
+    public sealed class Resource(
+        Guid id,
+        Space prefix,
+        Markers markers,
+        J variableDeclarations,
+        bool terminatedWithSemicolon
+    ) : J, IEquatable<Resource>
+    {
+        public Guid Id { get; } = id;
+        public Space Prefix { get; } = prefix;
+        public Markers Markers { get; } = markers;
+        public J VariableDeclarations { get; } = variableDeclarations;
+        public bool TerminatedWithSemicolon { get; } = terminatedWithSemicolon;
+
+        public Resource WithId(Guid id) =>
+            id == Id ? this : new(id, Prefix, Markers, VariableDeclarations, TerminatedWithSemicolon);
+        public Resource WithPrefix(Space prefix) =>
+            ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, VariableDeclarations, TerminatedWithSemicolon);
+        public Resource WithMarkers(Markers markers) =>
+            ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, VariableDeclarations, TerminatedWithSemicolon);
+        public Resource WithVariableDeclarations(J variableDeclarations) =>
+            ReferenceEquals(variableDeclarations, VariableDeclarations) ? this : new(Id, Prefix, Markers, variableDeclarations, TerminatedWithSemicolon);
+        public Resource WithTerminatedWithSemicolon(bool terminatedWithSemicolon) =>
+            terminatedWithSemicolon == TerminatedWithSemicolon ? this : new(Id, Prefix, Markers, VariableDeclarations, terminatedWithSemicolon);
+
+        Tree Tree.WithId(Guid id) => WithId(id);
+
+        public bool Equals(Resource? other) => other is not null && Id == other.Id;
+        public override bool Equals(object? obj) => Equals(obj as Resource);
+        public override int GetHashCode() => Id.GetHashCode();
+    }
 
         public sealed class Catch(
         Guid id,
@@ -844,6 +879,8 @@ public sealed class Empty(
     public Empty WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers);
 
+    public JavaType? Type => null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(Empty? other) => other is not null && Id == other.Id;
@@ -970,7 +1007,7 @@ public sealed class EnumValue(
     Markers markers,
     IList<Annotation> annotations,
     Identifier name,
-    JLeftPadded<Expression>? initializer
+    NewClass? initializer
 ) : J, IEquatable<EnumValue>
 {
     public Guid Id { get; } = id;
@@ -978,7 +1015,7 @@ public sealed class EnumValue(
     public Markers Markers { get; } = markers;
     public IList<Annotation> Annotations { get; } = annotations;
     public Identifier Name { get; } = name;
-    public JLeftPadded<Expression>? Initializer { get; } = initializer;
+    public NewClass? Initializer { get; } = initializer;
 
     public EnumValue WithId(Guid id) =>
         id == Id ? this : new(id, Prefix, Markers, Annotations, Name, Initializer);
@@ -990,7 +1027,7 @@ public sealed class EnumValue(
         ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, Name, Initializer);
     public EnumValue WithName(Identifier name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, Annotations, name, Initializer);
-    public EnumValue WithInitializer(JLeftPadded<Expression>? initializer) =>
+    public EnumValue WithInitializer(NewClass? initializer) =>
         ReferenceEquals(initializer, Initializer) ? this : new(Id, Prefix, Markers, Annotations, Name, initializer);
 
     Tree Tree.WithId(Guid id) => WithId(id);
@@ -1204,26 +1241,34 @@ public sealed class Identifier(
     Guid id,
     Space prefix,
     Markers markers,
+    IList<Annotation> annotations,
     string simpleName,
-    JavaType? type
+    JavaType? type,
+    JavaType? fieldType
 ) : J, Expression, TypeTree, IEquatable<Identifier>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
+    public IList<Annotation> Annotations { get; } = annotations;
     public string SimpleName { get; } = simpleName;
     public JavaType? Type { get; } = type;
+    public JavaType? FieldType { get; } = fieldType;
 
     public Identifier WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, SimpleName, Type);
+        id == Id ? this : new(id, Prefix, Markers, Annotations, SimpleName, Type, FieldType);
     public Identifier WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SimpleName, Type);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Annotations, SimpleName, Type, FieldType);
     public Identifier WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SimpleName, Type);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Annotations, SimpleName, Type, FieldType);
+    public Identifier WithAnnotations(IList<Annotation> annotations) =>
+        ReferenceEquals(annotations, Annotations) ? this : new(Id, Prefix, Markers, annotations, SimpleName, Type, FieldType);
     public Identifier WithSimpleName(string simpleName) =>
-        string.Equals(simpleName, SimpleName, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, simpleName, Type);
+        string.Equals(simpleName, SimpleName, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, Annotations, simpleName, Type, FieldType);
     public Identifier WithType(JavaType? type) =>
-        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, SimpleName, type);
+        ReferenceEquals(type, Type) ? this : new(Id, Prefix, Markers, Annotations, SimpleName, type, FieldType);
+    public Identifier WithFieldType(JavaType? fieldType) =>
+        ReferenceEquals(fieldType, FieldType) ? this : new(Id, Prefix, Markers, Annotations, SimpleName, Type, fieldType);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1548,6 +1593,8 @@ public sealed class MethodInvocation(
     public MethodInvocation WithMethodType(JavaType.Method? methodType) =>
         ReferenceEquals(methodType, MethodType) ? this : new(Id, Prefix, Markers, Select, Name, TypeParameters, Arguments, methodType);
 
+    public JavaType? Type => MethodType?.ReturnType;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(MethodInvocation? other) => other is not null && Id == other.Id;
@@ -1702,6 +1749,8 @@ public sealed class TypeCast(
     public TypeCast WithExpression(Expression expression) =>
         ReferenceEquals(expression, Expression) ? this : new(Id, Prefix, Markers, Clazz, expression);
 
+    public JavaType? Type => Clazz.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(TypeCast? other) => other is not null && Id == other.Id;
@@ -1733,6 +1782,8 @@ public sealed class Parentheses<T>(
     public Parentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
 
+    public JavaType? Type => Tree.Element is Expression expr ? expr.Type : null;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(Parentheses<T>? other) => other is not null && Id == other.Id;
@@ -1747,7 +1798,7 @@ public sealed class VariableDeclarations(
     Guid id,
     Space prefix,
     Markers markers,
-    IList<Modifier> leadingAnnotations,
+    IList<Annotation> leadingAnnotations,
     IList<Modifier> modifiers,
     TypeTree? typeExpression,
     Space? varargs,
@@ -1758,7 +1809,7 @@ public sealed class VariableDeclarations(
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public IList<Modifier> LeadingAnnotations { get; } = leadingAnnotations;
+    public IList<Annotation> LeadingAnnotations { get; } = leadingAnnotations;
     public IList<Modifier> Modifiers { get; } = modifiers;
     public TypeTree? TypeExpression { get; } = typeExpression;
     public Space? Varargs { get; } = varargs;
@@ -1771,7 +1822,7 @@ public sealed class VariableDeclarations(
         ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
     public VariableDeclarations WithMarkers(Markers markers) =>
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, LeadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
-    public VariableDeclarations WithLeadingAnnotations(IList<Modifier> leadingAnnotations) =>
+    public VariableDeclarations WithLeadingAnnotations(IList<Annotation> leadingAnnotations) =>
         ReferenceEquals(leadingAnnotations, LeadingAnnotations) ? this : new(Id, Prefix, Markers, leadingAnnotations, Modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
     public VariableDeclarations WithModifiers(IList<Modifier> modifiers) =>
         ReferenceEquals(modifiers, Modifiers) ? this : new(Id, Prefix, Markers, LeadingAnnotations, modifiers, TypeExpression, Varargs, DimensionsBeforeName, Variables);
@@ -1864,6 +1915,8 @@ public sealed class Primitive(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Kind);
     public Primitive WithKind(JavaType.PrimitiveKind kind) =>
         kind == Kind ? this : new(Id, Prefix, Markers, kind);
+
+    public JavaType? Type => JavaType.Primitive.Of(Kind);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1971,6 +2024,8 @@ public sealed class Annotation(
     public Annotation WithArguments(JContainer<Expression>? arguments) =>
         ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, AnnotationType, arguments);
 
+    public JavaType? Type => AnnotationType.Type;
+
     Tree Tree.WithId(Guid id) => WithId(id);
 
     public bool Equals(Annotation? other) => other is not null && Id == other.Id;
@@ -1983,6 +2038,7 @@ public sealed class Annotation(
 /// </summary>
 public interface NameTree : J
 {
+    JavaType? Type { get; }
 }
 
 /// <summary>
@@ -2241,7 +2297,7 @@ public sealed class NewClass(
     Markers markers,
     JRightPadded<Expression>? enclosing,
     Space @new,
-    TypeTree? clazz,
+    J? clazz,
     JContainer<Expression> arguments,
     Block? body,
     JavaType.Method? constructorType
@@ -2252,7 +2308,7 @@ public sealed class NewClass(
     public Markers Markers { get; } = markers;
     public JRightPadded<Expression>? Enclosing { get; } = enclosing;
     public Space New { get; } = @new;
-    public TypeTree? Clazz { get; } = clazz;
+    public J? Clazz { get; } = clazz;
     public JContainer<Expression> Arguments { get; } = arguments;
     public Block? Body { get; } = body;
     public JavaType.Method? ConstructorType { get; } = constructorType;
@@ -2267,7 +2323,7 @@ public sealed class NewClass(
         ReferenceEquals(enclosing, Enclosing) ? this : new(Id, Prefix, Markers, enclosing, New, Clazz, Arguments, Body, ConstructorType);
     public NewClass WithNew(Space @new) =>
         ReferenceEquals(@new, New) ? this : new(Id, Prefix, Markers, Enclosing, @new, Clazz, Arguments, Body, ConstructorType);
-    public NewClass WithClazz(TypeTree? clazz) =>
+    public NewClass WithClazz(J? clazz) =>
         ReferenceEquals(clazz, Clazz) ? this : new(Id, Prefix, Markers, Enclosing, New, clazz, Arguments, Body, ConstructorType);
     public NewClass WithArguments(JContainer<Expression> arguments) =>
         ReferenceEquals(arguments, Arguments) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, arguments, Body, ConstructorType);
@@ -2275,6 +2331,8 @@ public sealed class NewClass(
         ReferenceEquals(body, Body) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, Arguments, body, ConstructorType);
     public NewClass WithConstructorType(JavaType.Method? constructorType) =>
         ReferenceEquals(constructorType, ConstructorType) ? this : new(Id, Prefix, Markers, Enclosing, New, Clazz, Arguments, Body, constructorType);
+
+    public JavaType? Type => ConstructorType?.ReturnType;
 
     Tree Tree.WithId(Guid id) => WithId(id);
 

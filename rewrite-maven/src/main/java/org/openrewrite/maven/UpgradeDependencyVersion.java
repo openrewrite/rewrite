@@ -24,6 +24,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.RetainVersions;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -527,10 +528,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         getResolutionResult().getPom().getRepositories()
                 );
 
+                VersionComparator bomVersionComparator = new LatestRelease(null);
                 return metadata.getVersioning().getVersions().stream()
-                        .filter(version -> versionComparator.isValid(currentVersion, version))
-                        .filter(version -> versionComparator.compare(null, currentVersion, version) < 0)
-                        .sorted(versionComparator)
+                        .filter(version -> bomVersionComparator.isValid(currentVersion, version))
+                        .filter(version -> bomVersionComparator.compare(null, currentVersion, version) < 0)
+                        .sorted(bomVersionComparator)
                         .collect(toList());
             }
 

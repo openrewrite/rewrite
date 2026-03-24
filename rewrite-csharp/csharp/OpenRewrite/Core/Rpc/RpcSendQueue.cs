@@ -35,7 +35,7 @@ public class RpcSendQueue
     private readonly int _batchSize;
     private readonly List<RpcObjectData> _batch;
     private readonly Action<List<RpcObjectData>> _drain;
-    private readonly Dictionary<object, int> _refs;
+    private readonly IDictionary<object, int> _refs;
     private readonly string? _sourceFileType;
     private readonly bool _trace;
     private readonly IRpcCodec? _treeCodec;
@@ -43,7 +43,7 @@ public class RpcSendQueue
     private object? _before;
 
     public RpcSendQueue(int batchSize, Action<List<RpcObjectData>> drain,
-                        Dictionary<object, int> refs, string? sourceFileType, bool trace,
+                        IDictionary<object, int> refs, string? sourceFileType, bool trace,
                         IRpcCodec? treeCodec = null)
     {
         _batchSize = batchSize;
@@ -138,7 +138,8 @@ public class RpcSendQueue
         var afterVal = Reference.GetValue<object>(after);
         var beforeVal = Reference.GetValue<object>(before);
 
-        if (ReferenceEquals(beforeVal, afterVal))
+        if (ReferenceEquals(beforeVal, afterVal) ||
+            (beforeVal != null && beforeVal.GetType().IsValueType && beforeVal.Equals(afterVal)))
         {
             Put(new RpcObjectData { State = NO_CHANGE });
         }
@@ -211,7 +212,7 @@ public class RpcSendQueue
 
     private Dictionary<object, int> PutListPositions<T>(IList<T> after, IList<T>? before, Func<T, object> id)
     {
-        var beforeIdx = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
+        var beforeIdx = new Dictionary<object, int>();
         if (before != null)
         {
             for (int i = 0; i < before.Count; i++)
@@ -313,7 +314,7 @@ public class RpcSendQueue
     /// Maps a C# type to its equivalent Java type name for RPC protocol compatibility.
     /// Uses namespace-based conventions to derive the Java class name.
     /// </summary>
-    private static string? ToJavaTypeName(Type type)
+    internal static string? ToJavaTypeName(Type type)
     {
         // Check explicit overrides first
         if (JavaTypeNameOverrides.TryGetValue(type, out var overrideName))
@@ -341,6 +342,7 @@ public class RpcSendQueue
                 _ => $"org.openrewrite.java.tree.J${name}",
             },
             "OpenRewrite.CSharp" => $"org.openrewrite.csharp.tree.Cs${name}",
+            "OpenRewrite.Xml" => $"org.openrewrite.xml.tree.Xml${name}",
             "OpenRewrite.Core" => name switch
             {
                 "Markers" => "org.openrewrite.marker.Markers",
@@ -348,6 +350,8 @@ public class RpcSendQueue
                 "Markup" => "org.openrewrite.marker.Markup",
                 "Space" => "org.openrewrite.java.tree.Space",
                 "TextComment" => "org.openrewrite.java.tree.TextComment",
+                "Checksum" => "org.openrewrite.Checksum",
+                "FileAttributes" => "org.openrewrite.FileAttributes",
                 _ => null,
             },
             _ => null

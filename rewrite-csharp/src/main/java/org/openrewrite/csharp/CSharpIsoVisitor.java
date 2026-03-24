@@ -134,8 +134,8 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.BlockScopeNamespaceDeclaration visitBlockScopeNamespaceDeclaration(Cs.BlockScopeNamespaceDeclaration blockScopeNamespaceDeclaration, P p) {
-        return (Cs.BlockScopeNamespaceDeclaration) super.visitBlockScopeNamespaceDeclaration(blockScopeNamespaceDeclaration, p);
+    public Cs.NamespaceDeclaration visitNamespaceDeclaration(Cs.NamespaceDeclaration namespaceDeclaration, P p) {
+        return (Cs.NamespaceDeclaration) super.visitNamespaceDeclaration(namespaceDeclaration, p);
     }
 
     @Override
@@ -153,10 +153,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
         return (Cs.ExternAlias) super.visitExternAlias(externAlias, p);
     }
 
-    @Override
-    public Cs.FileScopeNamespaceDeclaration visitFileScopeNamespaceDeclaration(Cs.FileScopeNamespaceDeclaration fileScopeNamespaceDeclaration, P p) {
-        return (Cs.FileScopeNamespaceDeclaration) super.visitFileScopeNamespaceDeclaration(fileScopeNamespaceDeclaration, p);
-    }
 
     @Override
     public Cs.InterpolatedString visitInterpolatedString(Cs.InterpolatedString interpolatedString, P p) {
@@ -468,16 +464,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.ArrayType visitArrayType(Cs.ArrayType arrayType, P p) {
         return (Cs.ArrayType) super.visitArrayType(arrayType, p);
-    }
-
-    @Override
-    public Cs.Try visitTry(Cs.Try try_, P p) {
-        return (Cs.Try) super.visitTry(try_, p);
-    }
-
-    @Override
-    public Cs.Try.Catch visitTryCatch(Cs.Try.Catch catch_, P p) {
-        return (Cs.Try.Catch) super.visitTryCatch(catch_, p);
     }
 
     @Override

@@ -1,9 +1,12 @@
 @file:Suppress("UnstableApiUsage")
 
+import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import com.hierynomus.gradle.license.tasks.LicenseCheck
 import com.hierynomus.gradle.license.tasks.LicenseFormat
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import java.time.LocalDateTime
+import java.time.Instant
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
@@ -65,9 +68,47 @@ val csharpBuild by tasks.registering(Exec::class) {
     workingDir = csharpDir
     commandLine(findDotnet(), "build")
 
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
+
     doFirst {
         logger.lifecycle("Building C# projects in ${csharpDir}")
     }
+}
+
+val junitXmlFile = csharpDir.resolve("build/test-results/xunit/junit.xml")
+
+val csharpTest by tasks.registering(Exec::class) {
+    group = "csharp"
+    description = "Run C# xunit tests"
+    dependsOn(csharpBuild)
+
+    workingDir = csharpDir
+    commandLine(
+        findDotnet(), "test", "--no-build", "--verbosity", "normal",
+        "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
+    )
+
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.files(junitXmlFile)
+    outputs.cacheIf { true }
+
+    doFirst {
+        logger.lifecycle("Running C# tests in ${csharpDir}")
+    }
+}
+
+ImportJUnitXmlReports.register(tasks, csharpTest, JUnitXmlDialect.GENERIC)
+
+tasks.named("check") {
+    dependsOn(csharpTest)
 }
 
 testing {
@@ -104,6 +145,9 @@ tasks.withType<Test> {
         if (!project.hasProperty("includeWorkingSetFull")) {
             excludeTags("workingSet-full")
         }
+        if (!project.hasProperty("includeSlow")) {
+            excludeTags("slow")
+        }
     }
     // Add timeout to identify hanging tests
     systemProperty("junit.jupiter.execution.timeout.default", "30s")
@@ -119,12 +163,17 @@ tasks.withType<Test> {
 // ============================================
 
 // Generate a NuGet-compatible version
-// Snapshots use pre-release suffix with timestamp: 8.73.0-snapshot.20260110143252
+// CI builds use timestamped pre-release: 8.73.0-snapshot.20260110143252
+// Local builds use stable suffix that sorts higher: 8.73.0-zlocal
 // Releases use clean version: 8.73.0
-val nugetVersion: String = project.version.toString().replace(
-    "-SNAPSHOT",
-    "-snapshot.${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
-)
+val nugetVersion: String = if (System.getenv("CI") != null) {
+    project.version.toString().replace(
+        "-SNAPSHOT",
+        "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+    )
+} else {
+    project.version.toString().replace("-SNAPSHOT", "-zlocal")
+}
 
 val generateVersionTxt by tasks.registering {
     group = "csharp"
@@ -164,8 +213,9 @@ val csharpPack by tasks.registering(Exec::class) {
         "/p:Version=$nugetVersion"
     )
 
-    inputs.dir(csharpDir.resolve("OpenRewrite"))
-    inputs.dir(csharpDir.resolve("OpenRewrite.Tool"))
+    // Track only source files — exclude bin/obj build outputs to avoid stale up-to-date checks
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
     inputs.property("version", nugetVersion)
     outputs.dir(csharpDir.resolve("dist"))
 
@@ -202,22 +252,92 @@ val csharpPublish by tasks.registering(Exec::class) {
 // Usage: ./gradlew :rewrite-csharp:csharpPublishLocal
 val csharpPublishLocal by tasks.registering {
     group = "csharp"
-    description = "Pack and publish C# SDK library to local NuGet feed (~/.nuget/local-feed/)"
+    description = "Pack and install C# NuGet packages into local NuGet cache"
 
     dependsOn(csharpPack)
 
-    val localFeed = file("${System.getProperty("user.home")}/.nuget/local-feed")
-
     doLast {
+        val localFeed = file("${System.getProperty("user.home")}/.nuget/local-feed")
         localFeed.mkdirs()
+
+        val dotnet = findDotnet()
+        val distDir = csharpDir.resolve("dist").absolutePath
+
+        fun run(vararg args: String, dir: File? = null, ignoreExitCode: Boolean = false): String {
+            val pb = ProcessBuilder(*args)
+                .redirectErrorStream(true)
+            if (dir != null) pb.directory(dir)
+            val proc = pb.start()
+            val output = proc.inputStream.bufferedReader().readText()
+            val exitCode = proc.waitFor()
+            if (exitCode != 0 && !ignoreExitCode) {
+                throw GradleException("Command failed (exit $exitCode): ${args.joinToString(" ")}\n$output")
+            }
+            return output
+        }
+
+        // Find NuGet global-packages cache path
+        val localsOutput = run(dotnet, "nuget", "locals", "global-packages", "--list")
+        val cachePath = localsOutput.trim().substringAfter("global-packages: ")
+
+        // Clear stale entries from NuGet caches for each package
         csharpDir.resolve("dist").listFiles()
             ?.filter { it.name.endsWith(".nupkg") }
             ?.forEach { nupkg ->
-                val target = localFeed.resolve(nupkg.name)
-                nupkg.copyTo(target, overwrite = true)
-                logger.lifecycle("Published ${nupkg.name} to ${localFeed.absolutePath}")
+                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
+                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
+
+                // Clear the specific version from global packages cache
+                val packageCacheDir = file("$cachePath/${packageId.lowercase()}/$nugetVersion")
+                if (packageCacheDir.exists()) {
+                    logger.lifecycle("Clearing cached: ${packageCacheDir.absolutePath}")
+                    packageCacheDir.deleteRecursively()
+                }
+
+                nupkg.copyTo(localFeed.resolve(nupkg.name), overwrite = true)
+                logger.lifecycle("Published $packageId@$nugetVersion to ${localFeed.absolutePath}")
             }
+
+        // Create a temp project with PackageDownload entries and restore to populate the NuGet cache
+        val tempDir = temporaryDir
+        tempDir.deleteRecursively()
+        tempDir.mkdirs()
+
+        val packageDownloads = csharpDir.resolve("dist").listFiles()
+            ?.filter { it.name.endsWith(".nupkg") }
+            ?.joinToString("\n") { nupkg ->
+                val nameWithoutExt = nupkg.name.removeSuffix(".nupkg")
+                val packageId = nameWithoutExt.removeSuffix(".$nugetVersion")
+                logger.lifecycle("Installing $packageId@$nugetVersion into NuGet cache from $distDir")
+                """    <PackageDownload Include="$packageId" Version="[$nugetVersion]" />"""
+            } ?: ""
+
+        val tempCsproj = tempDir.resolve("Temp.csproj")
+        tempCsproj.writeText("""
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+            $packageDownloads
+              </ItemGroup>
+            </Project>
+        """.trimIndent())
+
+        val restoreOutput = run(
+            dotnet, "restore",
+            "--source", distDir,
+            "--force",
+            dir = tempDir,
+            ignoreExitCode = true
+        )
+        logger.lifecycle(restoreOutput)
     }
+}
+
+// Wire publishToMavenLocal to also publish the NuGet packages locally
+tasks.named("publishToMavenLocal") {
+    dependsOn(csharpPublishLocal)
 }
 
 // Wire into the main publish task only when the NuGet API key is available
@@ -238,7 +358,7 @@ extensions.configure<LicenseExtension> {
 val licenseCsharp by tasks.registering(LicenseCheck::class) {
     group = "license"
     description = "Check license headers on C# files"
-    source = fileTree(csharpDir) { include("**/*.cs") }
+    source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     mapping("cs", "SLASHSTAR_STYLE")
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)
@@ -247,7 +367,7 @@ val licenseCsharp by tasks.registering(LicenseCheck::class) {
 val licenseFormatCsharp by tasks.registering(LicenseFormat::class) {
     group = "license"
     description = "Apply license headers to C# files"
-    source = fileTree(csharpDir) { include("**/*.cs") }
+    source = fileTree(csharpDir) { include("**/*.cs"); exclude("**/obj/**", "**/bin/**") }
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     mapping("cs", "SLASHSTAR_STYLE")
     ext["year"] = Calendar.getInstance().get(Calendar.YEAR)

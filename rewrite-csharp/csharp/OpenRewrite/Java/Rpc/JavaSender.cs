@@ -21,8 +21,6 @@ namespace OpenRewrite.Java.Rpc;
 
 public class JavaSender : JavaVisitor<RpcSendQueue>
 {
-    private static readonly IList<Annotation> EmptyAnnotationList = Array.Empty<Annotation>();
-
     public override J? Visit(Tree? tree, RpcSendQueue q)
     {
         if (tree == null) return null;
@@ -54,6 +52,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             ForLoop fl => VisitForLoop(fl, q),
             ForEachLoop.Control fec => VisitForEachControl(fec, q),
             ForEachLoop fel => VisitForEachLoop(fel, q),
+            Try.Resource tryResource => VisitTryResource(tryResource, q),
             Try.Catch tryCatch => VisitCatch(tryCatch, q),
             Try tr => VisitTry(tr, q),
             Throw thr => VisitThrow(thr, q),
@@ -287,7 +286,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSendList(enumValue, e => e.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(enumValue, e => (J)e.Name, name => Visit(name, q));
-        q.GetAndSend(enumValue, e => e.Initializer, init => VisitLeftPadded(init, q));
+        q.GetAndSend(enumValue, e => (J?)e.Initializer, init => Visit(init, q));
         return enumValue;
     }
 
@@ -354,12 +353,10 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitIdentifier(Identifier identifier, RpcSendQueue q)
     {
-        // C# model does not have Annotations on Identifier; send empty list for protocol compatibility
-        q.GetAndSendList(identifier, _ => EmptyAnnotationList, a => a.Id, a => Visit(a, q));
+        q.GetAndSendList(identifier, i => i.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(identifier, i => i.SimpleName);
         q.GetAndSend(identifier, i => AsRef(i.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
-        // C# model does not have FieldType; send null for protocol compatibility
-        q.GetAndSend(identifier, _ => (object?)null);
+        q.GetAndSend(identifier, i => AsRef(i.FieldType), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return identifier;
     }
 
@@ -408,8 +405,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             m => m.TypeParameters != null ? TypeParameters.FromContainer(m.TypeParameters) : null,
             tp => Visit(tp, q));
         q.GetAndSend(method, m => m.ReturnTypeExpression, type => Visit(type, q));
-        // C# model does not have name annotations; send empty list for protocol compatibility
-        q.GetAndSendList(method, _ => EmptyAnnotationList, a => a.Id, a => Visit(a, q));
+        q.GetAndSendList(method, m => m.Name.Annotations, a => a.Id, a => Visit(a, q));
         q.GetAndSend(method, m => (J)m.Name, name => Visit(name, q));
         q.GetAndSend(method, m => m.Parameters, @params => VisitContainer(@params, q));
         q.GetAndSend(method, m => m.Throws, thr => VisitContainer(thr, q));
@@ -461,7 +457,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitPackage(Package pkg, RpcSendQueue q)
     {
-        q.GetAndSend(pkg, p => (J)p.Expression.Element, expr => Visit(expr, q));
+        q.GetAndSend(pkg, p => (J)p.Expression, expr => Visit(expr, q));
         q.GetAndSendList(pkg, p => p.Annotations, a => a.Id, a => Visit(a, q));
         return pkg;
     }
@@ -474,7 +470,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
 
     public override J VisitPrimitive(Primitive primitive, RpcSendQueue q)
     {
-        q.GetAndSend(primitive, p => AsRef(new JavaType.Primitive(p.Kind)), type => VisitType(GetValueNonNull<JavaType>(type), q));
+        q.GetAndSend(primitive, p => AsRef(JavaType.Primitive.Of(p.Kind)), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return primitive;
     }
 
@@ -528,6 +524,13 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSendList(tryStmt, t => t.Catches, c => c.Id, c => Visit(c, q));
         q.GetAndSend(tryStmt, t => t.Finally, fin => VisitLeftPadded(fin, q));
         return tryStmt;
+    }
+
+    public virtual J VisitTryResource(Try.Resource tryResource, RpcSendQueue q)
+    {
+        q.GetAndSend(tryResource, r => (J)r.VariableDeclarations, vars => Visit(vars, q));
+        q.GetAndSend(tryResource, r => r.TerminatedWithSemicolon);
+        return tryResource;
     }
 
     public override J VisitTypeCast(TypeCast typeCast, RpcSendQueue q)
@@ -589,7 +592,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         return whileLoop;
     }
 
-    public J VisitCatch(Try.Catch tryCatch, RpcSendQueue q)
+    public override J VisitCatch(Try.Catch tryCatch, RpcSendQueue q)
     {
         q.GetAndSend(tryCatch, c => (J)c.Parameter, param => Visit(param, q));
         q.GetAndSend(tryCatch, c => (J)c.Body, body => Visit(body, q));

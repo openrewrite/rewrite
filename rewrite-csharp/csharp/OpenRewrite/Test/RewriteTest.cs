@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -29,6 +30,17 @@ namespace OpenRewrite.Test;
 /// </summary>
 public abstract class RewriteTest
 {
+    private static readonly ConcurrentDictionary<ReferenceAssemblies, ImmutableArray<MetadataReference>>
+        ResolvedAssembliesCache = new();
+
+    private static ImmutableArray<MetadataReference> ResolveAssemblies(ReferenceAssemblies assemblies)
+    {
+        return ResolvedAssembliesCache.GetOrAdd(assemblies, a =>
+            a.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
+                .GetAwaiter()
+                .GetResult());
+    }
+
     protected void RewriteRun(params SourceSpec[] specs)
     {
         RewriteRun(_ => { }, specs);
@@ -44,10 +56,7 @@ public abstract class RewriteTest
 
         // Resolve metadata references if ReferenceAssemblies is configured
         ImmutableArray<MetadataReference>? metadataReferences = recipeSpec.ReferenceAssemblies != null
-            ? recipeSpec.ReferenceAssemblies
-                .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
-                .GetAwaiter()
-                .GetResult()
+            ? ResolveAssemblies(recipeSpec.ReferenceAssemblies)
             : null;
 
         // 1. Parse all sources and validate round-trip
@@ -67,6 +76,13 @@ public abstract class RewriteTest
 
             var source = parser.Parse(spec.Before, semanticModel: semanticModel);
 
+            // Verify no non-whitespace content leaked into Space fields
+            var whitespaceViolations = new List<WhitespaceViolation>();
+            new WhitespaceValidator().Visit(source, whitespaceViolations);
+            Assert.True(whitespaceViolations.Count == 0,
+                $"Found non-whitespace content in Space fields:\n" +
+                string.Join("\n", whitespaceViolations));
+
             // Verify round-trip: printed should match input
             var printed = printer.Print(source);
             Assert.Equal(spec.Before, printed);
@@ -83,7 +99,7 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
-            var results = recipeSpec.Recipe.Run(sources, new ExecutionContext());
+            var results = RecipeScheduler.Run(recipeSpec.Recipe, sources, new ExecutionContext());
 
             foreach (var (spec, source) in parsed)
             {
@@ -125,7 +141,7 @@ public record SourceSpec(string Before, string? After = null);
 public class RecipeSpec
 {
     public Recipe? Recipe { get; private set; }
-    public ReferenceAssemblies? ReferenceAssemblies { get; private set; }
+    public ReferenceAssemblies? ReferenceAssemblies { get; private set; } = Assemblies.Net90;
 
     public RecipeSpec SetRecipe(Recipe recipe)
     {
@@ -133,7 +149,7 @@ public class RecipeSpec
         return this;
     }
 
-    public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies referenceAssemblies)
+    public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies? referenceAssemblies)
     {
         ReferenceAssemblies = referenceAssemblies;
         return this;

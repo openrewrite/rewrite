@@ -60,17 +60,51 @@ internal class PatternMatchingComparator
                     // Already bound — check consistency
                     return MatchValue(existing, candidate, cursor);
                 }
+                // Evaluate constraint before binding
+                if (!EvaluateConstraint(_captures[captureName], candidate, cursor))
+                    return false;
                 _bindings[captureName] = candidate;
                 return true;
             }
         }
 
-        // Different node types don't match
+        // Different node types — check for cross-type equivalences before failing
         if (pattern.GetType() != candidate.GetType())
+            return MatchCrossType(pattern, candidate, cursor);
+
+        // NullSafe marker must match: ?. and . are structurally different
+        if (TreeHelper.HasNullSafe(pattern) != TreeHelper.HasNullSafe(candidate))
             return false;
+
+        // Semantic matching for method invocations: when both resolve to the same
+        // static method (same declaring type + name), skip receiver comparison.
+        if (pattern is MethodInvocation patMethod && candidate is MethodInvocation candMethod)
+            return MatchMethodInvocation(patMethod, candMethod, cursor);
 
         // Generic property-based comparison: iterate all structural properties
         // and compare them recursively, skipping formatting/identity fields.
+        if (pattern is Binary patBin && candidate is Binary candBin)
+        {
+            // Save bindings so we can backtrack if direct match fails
+            var savedBindings = new Dictionary<string, object>(_bindings);
+            if (MatchProperties(pattern, candidate, cursor))
+                return true;
+
+            // Restore bindings and try commuted (swapped) operands for == and !=
+            _bindings.Clear();
+            foreach (var kvp in savedBindings)
+                _bindings[kvp.Key] = kvp.Value;
+            return MatchCommutedBinary(patBin, candBin, cursor);
+        }
+
+        return MatchProperties(pattern, candidate, cursor);
+    }
+
+    /// <summary>
+    /// Compare all structural properties of two same-type nodes.
+    /// </summary>
+    private bool MatchProperties(J pattern, J candidate, Cursor cursor)
+    {
         var properties = TreeHelper.GetStructuralProperties(pattern.GetType());
         foreach (var prop in properties)
         {
@@ -80,9 +114,199 @@ internal class PatternMatchingComparator
             if (!MatchValue(patternValue, candidateValue, cursor))
                 return false;
         }
-
         return true;
     }
+
+    /// <summary>
+    /// For Binary == and != where one side is a literal, try matching with
+    /// left and right swapped (commutative match).
+    /// </summary>
+    private bool MatchCommutedBinary(Binary pattern, Binary candidate, Cursor cursor)
+    {
+        var op = pattern.Operator.Element;
+        if (op != Binary.OperatorType.Equal && op != Binary.OperatorType.NotEqual)
+            return false;
+
+        if (!HasLiteral(pattern) && !HasLiteral(candidate))
+            return false;
+
+        // Operator must still match
+        if (!MatchPaddedElement(pattern.Operator, candidate.Operator, cursor))
+            return false;
+
+        // Try swapped: pattern.Left ↔ candidate.Right, pattern.Right ↔ candidate.Left
+        return MatchNode(pattern.Left, candidate.Right, cursor)
+            && MatchNode(pattern.Right, candidate.Left, cursor);
+    }
+
+    /// <summary>
+    /// Semantic matching for method invocations. When both sides have a MethodType
+    /// that is static and shares the same declaring type FQN and method name,
+    /// skip comparing the receiver (Select) — the method is the same regardless
+    /// of whether it's called as <c>Math.Abs(x)</c> or <c>Abs(x)</c> via using static.
+    /// Falls back to structural matching otherwise.
+    /// </summary>
+    private bool MatchMethodInvocation(MethodInvocation pattern, MethodInvocation candidate, Cursor cursor)
+    {
+        var patType = pattern.MethodType;
+        var candType = candidate.MethodType;
+
+        // If both have type info, same method name, and the method is static,
+        // compare by declaring type instead of by receiver syntax
+        if (patType != null && candType != null
+            && patType.Name == candType.Name
+            && IsStatic(patType) && IsStatic(candType)
+            && GetDeclaringTypeFqn(patType) is { } patFqn
+            && GetDeclaringTypeFqn(candType) is { } candFqn
+            && patFqn == candFqn)
+        {
+            // Declaring type and method name match — skip Select, compare the rest
+            return MatchNode(pattern.Name, candidate.Name, cursor)
+                && MatchValue(pattern.TypeParameters, candidate.TypeParameters, cursor)
+                && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
+        }
+
+        // Implicit this: Foo() ↔ this.Foo()
+        // When one side has no Select and the other's Select is "this", they are equivalent
+        var patSelect = pattern.Select != null ? TreeHelper.UnwrapPadded(pattern.Select) as J : null;
+        var candSelect = candidate.Select != null ? TreeHelper.UnwrapPadded(candidate.Select) as J : null;
+        if (IsImplicitThisPair(patSelect, candSelect))
+        {
+            return MatchNode(pattern.Name, candidate.Name, cursor)
+                && MatchValue(pattern.TypeParameters, candidate.TypeParameters, cursor)
+                && MatchValue(pattern.Arguments, candidate.Arguments, cursor);
+        }
+
+        // Fall back to structural matching
+        return MatchProperties(pattern, candidate, cursor);
+    }
+
+    /// <summary>
+    /// Handle cross-type equivalences (e.g. <c>== null</c> ↔ <c>is null</c>,
+    /// <c>Identifier</c> ↔ <c>FieldAccess</c> for static members).
+    /// Called when pattern and candidate have different node types.
+    /// </summary>
+    /// <summary>
+    /// Returns <c>true</c> when the two node types form a pair that
+    /// <see cref="MatchCrossType"/> knows how to compare. Used by
+    /// <see cref="CSharpPattern.Match"/> to avoid rejecting these pairs
+    /// in its fast-reject check.
+    /// </summary>
+    internal static bool HasCrossTypeEquivalence(J pattern, J candidate)
+    {
+        return (pattern is Binary && candidate is IsPattern)
+            || (pattern is IsPattern && candidate is Binary)
+            || (pattern is FieldAccess && candidate is Identifier)
+            || (pattern is Identifier && candidate is FieldAccess);
+    }
+
+    private bool MatchCrossType(J pattern, J candidate, Cursor cursor)
+    {
+        // Binary(expr == null) pattern ↔ IsPattern(expr is null) candidate
+        if (pattern is Binary patBin && candidate is IsPattern candIsP)
+            return MatchBinaryPatternToIsNullCandidate(patBin, candIsP, cursor);
+        // IsPattern(expr is null) pattern ↔ Binary(expr == null) candidate
+        if (pattern is IsPattern patIsP && candidate is Binary candBin)
+            return MatchIsNullPatternToBinaryCandidate(patIsP, candBin, cursor);
+
+        // Identifier ↔ FieldAccess for static members and type references
+        if (pattern is FieldAccess patFA && candidate is Identifier candId)
+            return MatchFieldAccessToIdentifier(patFA, candId);
+        if (pattern is Identifier patId2 && candidate is FieldAccess candFA)
+            return MatchIdentifierToFieldAccess(patId2, candFA);
+
+        return false;
+    }
+
+    /// <summary>
+    /// Pattern is a FieldAccess (e.g. <c>Math.PI</c>), candidate is an Identifier
+    /// (e.g. <c>PI</c> via using static). Match if both reference the same static
+    /// variable (same owner FQN and name) or the same fully qualified type.
+    /// </summary>
+    private static bool MatchFieldAccessToIdentifier(FieldAccess pattern, Identifier candidate)
+    {
+        // Static field/variable: Math.PI ↔ PI
+        if (pattern.Name.Element.FieldType is JavaType.Variable patVar
+            && candidate.FieldType is JavaType.Variable candVar
+            && IsStatic(patVar) && IsStatic(candVar)
+            && patVar.Name == candVar.Name
+            && patVar.Owner is JavaType.Class patOwner
+            && candVar.Owner is JavaType.Class candOwner
+            && patOwner.FullyQualifiedName == candOwner.FullyQualifiedName)
+        {
+            return true;
+        }
+
+        // Type reference: System.Console ↔ Console (same FullyQualified type)
+        if (pattern.Type is JavaType.Class patTypeFq
+            && candidate.Type is JavaType.Class candTypeFq
+            && patTypeFq.FullyQualifiedName == candTypeFq.FullyQualifiedName
+            && candidate.FieldType == null && pattern.Name.Element.FieldType == null)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Pattern is an Identifier (e.g. <c>PI</c> via using static), candidate is
+    /// a FieldAccess (e.g. <c>Math.PI</c>). Symmetric to <see cref="MatchFieldAccessToIdentifier"/>.
+    /// </summary>
+    private static bool MatchIdentifierToFieldAccess(Identifier pattern, FieldAccess candidate)
+    {
+        return MatchFieldAccessToIdentifier(candidate, pattern);
+    }
+
+    /// <summary>
+    /// Pattern is <c>expr == null</c> (Binary), candidate is <c>expr is null</c> (IsPattern).
+    /// Also handles commuted pattern <c>null == expr</c>.
+    /// </summary>
+    private bool MatchBinaryPatternToIsNullCandidate(Binary patternBinary, IsPattern candidateIsPattern, Cursor cursor)
+    {
+        if (patternBinary.Operator.Element != Binary.OperatorType.Equal)
+            return false;
+
+        if (candidateIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+            return false;
+
+        // pattern: {s} == null → match {s} against candidate's expression
+        if (IsNullLiteral(patternBinary.Right))
+            return MatchNode(patternBinary.Left, candidateIsPattern.Expression, cursor);
+        // pattern: null == {s} → match {s} against candidate's expression
+        if (IsNullLiteral(patternBinary.Left))
+            return MatchNode(patternBinary.Right, candidateIsPattern.Expression, cursor);
+
+        return false;
+    }
+
+    /// <summary>
+    /// Pattern is <c>expr is null</c> (IsPattern), candidate is <c>expr == null</c> (Binary).
+    /// Also handles commuted candidate <c>null == expr</c>.
+    /// </summary>
+    private bool MatchIsNullPatternToBinaryCandidate(IsPattern patternIsPattern, Binary candidateBinary, Cursor cursor)
+    {
+        if (candidateBinary.Operator.Element != Binary.OperatorType.Equal)
+            return false;
+
+        if (patternIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+            return false;
+
+        // candidate: expr == null → match pattern's expression against candidate's left
+        if (IsNullLiteral(candidateBinary.Right))
+            return MatchNode(patternIsPattern.Expression, candidateBinary.Left, cursor);
+        // candidate: null == expr → match pattern's expression against candidate's right
+        if (IsNullLiteral(candidateBinary.Left))
+            return MatchNode(patternIsPattern.Expression, candidateBinary.Right, cursor);
+
+        return false;
+    }
+
+    private static bool IsNullLiteral(J node) =>
+        node is Literal { Type: JavaType.Primitive { Kind: JavaType.PrimitiveKind.Null } };
+
+    private static bool HasLiteral(Binary binary) =>
+        binary.Left is Literal || binary.Right is Literal;
 
     /// <summary>
     /// Compare two property values, dispatching based on their type.
@@ -93,24 +317,29 @@ internal class PatternMatchingComparator
         // Both null
         if (patternValue == null && candidateValue == null)
             return true;
-        // One null
+        // One null — but a pattern container with only zero-min variadic captures
+        // can match a null candidate (e.g., pattern `Fact({args})` vs `[Fact]` with no parens)
         if (patternValue == null || candidateValue == null)
+        {
+            if (patternValue != null && candidateValue == null && TreeHelper.IsContainer(patternValue))
+                return MatchContainerAgainstNull(patternValue, cursor);
             return false;
+        }
 
         // J tree nodes — recursive structural match
         if (patternValue is J pj && candidateValue is J cj)
             return MatchNode(pj, cj, cursor);
 
         // JRightPadded<T> — unwrap and compare the element
-        if (IsRightPadded(patternValue) && IsRightPadded(candidateValue))
+        if (TreeHelper.IsRightPadded(patternValue) && TreeHelper.IsRightPadded(candidateValue))
             return MatchPaddedElement(patternValue, candidateValue, cursor);
 
         // JLeftPadded<T> — unwrap and compare the element
-        if (IsLeftPadded(patternValue) && IsLeftPadded(candidateValue))
+        if (TreeHelper.IsLeftPadded(patternValue) && TreeHelper.IsLeftPadded(candidateValue))
             return MatchPaddedElement(patternValue, candidateValue, cursor);
 
         // JContainer<T> — compare elements with variadic support
-        if (IsContainer(patternValue) && IsContainer(candidateValue))
+        if (TreeHelper.IsContainer(patternValue) && TreeHelper.IsContainer(candidateValue))
             return MatchContainer(patternValue, candidateValue, cursor);
 
         // IList — compare element-by-element
@@ -143,6 +372,39 @@ internal class PatternMatchingComparator
             return patternElements == null && candidateElements == null;
 
         return MatchPaddedList(patternElements, candidateElements, cursor);
+    }
+
+    /// <summary>
+    /// Match a pattern container against a null candidate. Succeeds only when every
+    /// element in the container is a variadic capture placeholder with min == 0,
+    /// binding each to an empty list.
+    /// </summary>
+    private bool MatchContainerAgainstNull(object patternContainer, Cursor cursor)
+    {
+        var patternElements = TreeHelper.GetContainerElements(patternContainer);
+        if (patternElements == null || patternElements.Count == 0)
+            return true;
+
+        foreach (var el in patternElements)
+        {
+            var inner = TreeHelper.UnwrapPadded(el) ?? el;
+            if (inner is Identifier id)
+            {
+                var captureName = Placeholder.FromPlaceholder(id.SimpleName);
+                if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
+                    && IsVariadic(captureObj))
+                {
+                    var (min, _) = GetVariadicBounds(captureObj);
+                    if (min == 0)
+                    {
+                        _bindings[captureName] = new List<object>().AsReadOnly();
+                        continue;
+                    }
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -206,6 +468,10 @@ internal class PatternMatchingComparator
                         captured.Add(innerCandidate);
                     }
 
+                    // Evaluate variadic constraint before binding
+                    if (!EvaluateVariadicConstraint(captureObj, captured.AsReadOnly(), cursor))
+                        continue;
+
                     // Save bindings for backtracking
                     var savedBindings = new Dictionary<string, object>(_bindings);
                     _bindings[captureName] = captured.AsReadOnly();
@@ -249,37 +515,57 @@ internal class PatternMatchingComparator
         return true;
     }
 
-    private static bool IsVariadic(object captureObj)
-    {
-        var prop = captureObj.GetType().GetProperty("IsVariadic");
-        return prop != null && (bool)(prop.GetValue(captureObj) ?? false);
-    }
+    private static bool IsVariadic(object captureObj) =>
+        captureObj is ICapture capture && capture.IsVariadic;
 
     private static (int min, int max) GetVariadicBounds(object captureObj)
     {
-        var type = captureObj.GetType();
-        var minProp = type.GetProperty("MinCount");
-        var maxProp = type.GetProperty("MaxCount");
-        var min = minProp?.GetValue(captureObj) as int? ?? 0;
-        var max = maxProp?.GetValue(captureObj) as int? ?? int.MaxValue;
-        return (min, max);
+        if (captureObj is not ICapture capture)
+            return (0, int.MaxValue);
+        return (capture.MinCount ?? 0, capture.MaxCount ?? int.MaxValue);
     }
 
-    private static bool IsRightPadded(object value)
+    /// <summary>
+    /// Check if one side is null (no receiver / implicit this) and the other is
+    /// an explicit <c>this</c> identifier. Handles both directions.
+    /// </summary>
+    private static bool IsImplicitThisPair(J? a, J? b)
     {
-        var type = value.GetType();
-        return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JRightPadded<>);
+        return (a == null && IsThis(b)) || (b == null && IsThis(a));
     }
 
-    private static bool IsLeftPadded(object value)
-    {
-        var type = value.GetType();
-        return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JLeftPadded<>);
-    }
+    private static bool IsThis(J? node) =>
+        node is Identifier { SimpleName: "this" };
 
-    private static bool IsContainer(object value)
-    {
-        var type = value.GetType();
-        return type.IsGenericType && type.GetGenericTypeDefinition() == typeof(JContainer<>);
-    }
+    /// <summary>
+    /// Get the FQN of a method's declaring type, unwrapping Parameterized if needed.
+    /// <c>List&lt;int&gt;.Contains</c> has declaring type <c>Parameterized(List)</c> —
+    /// we need the underlying <c>Class.FullyQualifiedName</c>.
+    /// </summary>
+    private static string? GetDeclaringTypeFqn(JavaType.Method method) =>
+        method.DeclaringType switch
+        {
+            JavaType.Class cls => cls.FullyQualifiedName,
+            JavaType.Parameterized { Type: JavaType.Class cls } => cls.FullyQualifiedName,
+            _ => null
+        };
+
+    /// <summary>Flag.Static bit value (from Java's Flag enum).</summary>
+    private const long FlagStatic = 8;
+
+    private static bool IsStatic(JavaType.Method method) =>
+        (method.FlagsBitMap & FlagStatic) != 0;
+
+    private static bool IsStatic(JavaType.Variable variable) =>
+        (variable.FlagsBitMap & FlagStatic) != 0;
+
+    private CaptureConstraintContext BuildConstraintContext(Cursor cursor) =>
+        new(cursor, new Dictionary<string, object>(_bindings));
+
+    private bool EvaluateConstraint(object captureObj, object candidate, Cursor cursor) =>
+        captureObj is not ICapture capture || capture.EvaluateConstraint(candidate, BuildConstraintContext(cursor));
+
+    private bool EvaluateVariadicConstraint(object captureObj, IReadOnlyList<object> captured, Cursor cursor) =>
+        captureObj is not ICapture capture || capture.EvaluateVariadicConstraint(captured, BuildConstraintContext(cursor));
+
 }

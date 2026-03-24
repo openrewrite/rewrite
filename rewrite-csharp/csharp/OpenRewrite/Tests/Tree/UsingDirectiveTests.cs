@@ -107,4 +107,40 @@ public class UsingDirectiveTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void UsingUnsafe()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using unsafe System.Int32;
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void UsingStaticUnsafe()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using static unsafe System.Int32;
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void UsingUnsafeAlias()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using unsafe Ptr = int*;
+                """
+            )
+        );
+    }
 }
