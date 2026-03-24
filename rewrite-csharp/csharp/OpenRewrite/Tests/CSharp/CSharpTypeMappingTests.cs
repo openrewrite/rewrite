@@ -30,6 +30,18 @@ public class CSharpTypeMappingTests : RewriteTest
     /// <summary>
     /// Parse source code with reference assemblies and return the CompilationUnit.
     /// </summary>
+    private static readonly SyntaxTree ImplicitUsingsSyntaxTree = CSharpSyntaxTree.ParseText(
+        """
+        global using System;
+        global using System.Collections.Generic;
+        global using System.IO;
+        global using System.Linq;
+        global using System.Net.Http;
+        global using System.Threading;
+        global using System.Threading.Tasks;
+        """,
+        path: "__GlobalUsings__.g.cs");
+
     private static CompilationUnit ParseWithSemanticModel(string code)
     {
         var refs = Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
@@ -38,7 +50,7 @@ public class CSharpTypeMappingTests : RewriteTest
         var compilation = CSharpCompilation.Create("TestCompilation")
             .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             .AddReferences(refs)
-            .AddSyntaxTrees(syntaxTree);
+            .AddSyntaxTrees(ImplicitUsingsSyntaxTree, syntaxTree);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
 
         var parser = new CSharpParser();
@@ -195,6 +207,32 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public void ImplicitUsings_ShortNameResolvesWithoutExplicitUsing()
+    {
+        // In .NET 6+, System.Collections.Generic is an implicit using.
+        // Test whether Dictionary (short name, no using directive) gets
+        // type attribution. This will fail if implicit usings are not
+        // configured in the compilation.
+        var cu = ParseWithSemanticModel("""
+            class Test
+            {
+                void M()
+                {
+                    Dictionary<string, int> dict = new Dictionary<string, int>();
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "dict");
+        Assert.NotNull(varDecl);
+        var declType = varDecl!.TypeExpression?.Type;
+        // If implicit usings work, this should be Parameterized.
+        // If not, it will be null or Unknown (unresolved).
+        Assert.NotNull(declType);
+        Assert.IsType<JavaType.Parameterized>(declType);
+    }
+
+    [Fact]
     public void DictionaryClass_HasFormalTypeParameters()
     {
         // Verify that the underlying Class for Dictionary has formal type parameters
@@ -226,5 +264,30 @@ public class CSharpTypeMappingTests : RewriteTest
 
         var formal1 = Assert.IsType<JavaType.GenericTypeVariable>(dictClass.TypeParameters[1]);
         Assert.Equal("TValue", formal1.Name);
+    }
+
+    [Fact]
+    public void StringTypeArgument_IsMappedAsClass()
+    {
+        // System.String should be mapped as JavaType.Class (not Primitive) when used
+        // as a type argument, so TypeUtils.IsAssignableTo can walk its interface chain.
+        var cu = ParseWithSemanticModel("""
+            using System.Collections.Generic;
+            class Test
+            {
+                void M()
+                {
+                    List<string> items = new List<string>();
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "items");
+        Assert.NotNull(varDecl);
+
+        var paramType = Assert.IsType<JavaType.Parameterized>(varDecl!.TypeExpression?.Type);
+        Assert.NotNull(paramType.TypeParameters);
+        var stringArg = Assert.IsType<JavaType.Class>(Assert.Single(paramType.TypeParameters!));
+        Assert.Equal("System.String", stringArg.FullyQualifiedName);
     }
 }
