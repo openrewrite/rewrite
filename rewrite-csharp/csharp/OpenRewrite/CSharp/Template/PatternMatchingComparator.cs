@@ -60,8 +60,9 @@ internal class PatternMatchingComparator
                     // Already bound — check consistency
                     return MatchValue(existing, candidate, cursor);
                 }
-                // Evaluate constraint before binding
-                if (!EvaluateConstraint(_captures[captureName], candidate, cursor))
+                // Evaluate constraint before binding — pass the pattern placeholder's
+                // resolved type so typed captures can compare JavaType-to-JavaType
+                if (!EvaluateConstraint(_captures[captureName], candidate, cursor, patternId.Type))
                     return false;
                 _bindings[captureName] = candidate;
                 return true;
@@ -559,11 +560,11 @@ internal class PatternMatchingComparator
     private static bool IsStatic(JavaType.Variable variable) =>
         (variable.FlagsBitMap & FlagStatic) != 0;
 
-    private CaptureConstraintContext BuildConstraintContext(Cursor cursor) =>
-        new(cursor, new Dictionary<string, object>(_bindings));
+    private CaptureConstraintContext BuildConstraintContext(Cursor cursor, JavaType? patternType = null) =>
+        new(cursor, new Dictionary<string, object>(_bindings), patternType);
 
-    private bool EvaluateConstraint(object captureObj, object candidate, Cursor cursor) =>
-        captureObj is not ICapture capture || capture.EvaluateConstraint(candidate, BuildConstraintContext(cursor));
+    private bool EvaluateConstraint(object captureObj, object candidate, Cursor cursor, JavaType? patternType = null) =>
+        captureObj is not ICapture capture || capture.EvaluateConstraint(candidate, BuildConstraintContext(cursor, patternType));
 
     private bool EvaluateVariadicConstraint(object captureObj, IReadOnlyList<object> captured, Cursor cursor) =>
         captureObj is not ICapture capture || capture.EvaluateVariadicConstraint(captured, BuildConstraintContext(cursor));

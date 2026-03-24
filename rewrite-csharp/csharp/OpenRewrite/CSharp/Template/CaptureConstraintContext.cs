@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using OpenRewrite.Java;
 
 namespace OpenRewrite.CSharp.Template;
 
@@ -26,7 +27,11 @@ namespace OpenRewrite.CSharp.Template;
 /// <param name="Captures">Read-only snapshot of captures already bound at the point this
 /// constraint is evaluated. Enables dependent constraints where one capture's validity
 /// depends on another's value.</param>
+/// <param name="PatternType">The Roslyn-resolved <see cref="JavaType"/> of the pattern
+/// placeholder, when available. Used by typed captures to compare against the candidate's
+/// type using the fully-resolved type from the scaffold rather than the raw type string.</param>
 public sealed record CaptureConstraintContext(
     Cursor Cursor,
-    IReadOnlyDictionary<string, object> Captures
+    IReadOnlyDictionary<string, object> Captures,
+    JavaType? PatternType = null
 );

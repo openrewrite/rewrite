@@ -117,9 +117,16 @@ public sealed class Capture<T> : ICapture where T : J
         // attribution, verify the candidate's semantic type is assignable to it.
         // If the candidate has no type info (expr.Type == null), skip the check —
         // type attribution may be unavailable when reference assemblies aren't provided.
-        if (Type != null && candidate is Expression { Type: not null } expr
-            && !TypeUtils.IsAssignableTo(expr.Type, ResolveCSharpAlias(Type)))
-            return false;
+        if (Type != null && candidate is Expression { Type: not null } expr)
+        {
+            // Prefer the Roslyn-resolved type from the pattern scaffold when available.
+            // This handles generics (IDictionary<object, object> resolves to its FQN)
+            // and primitives (int resolves to System.Int32) correctly without string parsing.
+            var matched = context.PatternType != null
+                ? TypeUtils.IsAssignableTo(expr.Type, context.PatternType)
+                : TypeUtils.IsAssignableTo(expr.Type, ResolveCSharpAlias(Type));
+            if (!matched) return false;
+        }
 
         if (Constraint == null) return true;
         // The `is T` check acts as an implicit type guard: if the candidate is not
