@@ -785,6 +785,26 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
         return fieldAccess;
     }
 
+    public override J VisitArrayAccess(ArrayAccess arrayAccess, int p)
+    {
+        // Check if the indexed expression is a capture placeholder BEFORE substitution
+        var indexedCaptureName = arrayAccess.Indexed is Identifier indexedId
+            ? Placeholder.FromPlaceholder(indexedId.SimpleName)
+            : null;
+
+        arrayAccess = (ArrayAccess)base.VisitArrayAccess(arrayAccess, p);
+
+        // Transfer NullSafe from matched tree when the capture was a null-conditional indexed expr
+        if (indexedCaptureName != null && arrayAccess.Markers.FindFirst<NullSafe>() == null)
+        {
+            var nullSafe = _values.GetNullSafe(indexedCaptureName);
+            if (nullSafe != null)
+                arrayAccess = arrayAccess.WithMarkers(arrayAccess.Markers.Add(nullSafe));
+        }
+
+        return arrayAccess;
+    }
+
     /// <summary>
     /// If any argument is a placeholder identifier bound to a variadic capture (list),
     /// expand it into the argument list.

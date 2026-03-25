@@ -118,10 +118,11 @@ internal class PatternMatchingComparator
     }
 
     /// <summary>
-    /// After a successful match of a MethodInvocation or FieldAccess, check if the
-    /// candidate has a NullSafe marker that the pattern doesn't have. If so, find the
-    /// capture placeholder in the Select position and record the NullSafe association
-    /// so the template engine can preserve <c>?.</c> through rewrites.
+    /// After a successful match of a MethodInvocation, FieldAccess, or ArrayAccess,
+    /// check if the candidate has a NullSafe marker that the pattern doesn't have.
+    /// If so, find the capture placeholder in the Select/Target/Indexed position and
+    /// record the NullSafe association so the template engine can preserve <c>?.</c>
+    /// and <c>?[</c> through rewrites.
     /// </summary>
     private void RecordNullSafeForCaptures(J pattern, J candidate)
     {
@@ -140,6 +141,15 @@ internal class PatternMatchingComparator
             if (candNullSafe != null && patFa.Markers.FindFirst<NullSafe>() == null)
             {
                 if (FindTargetCaptureName(patFa.Target) is { } captureName)
+                    _nullSafeBindings[captureName] = candNullSafe;
+            }
+        }
+        else if (pattern is ArrayAccess patAa && candidate is ArrayAccess candAa)
+        {
+            var candNullSafe = candAa.Markers.FindFirst<NullSafe>();
+            if (candNullSafe != null && patAa.Markers.FindFirst<NullSafe>() == null)
+            {
+                if (FindTargetCaptureName(patAa.Indexed) is { } captureName)
                     _nullSafeBindings[captureName] = candNullSafe;
             }
         }

@@ -6595,19 +6595,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var closeBracketSpace = ExtractSpaceBefore(argList.CloseBracketToken);
             _cursor = argList.CloseBracketToken.Span.End;
 
-            // Combine operatorSpace (before ?) with bracketPrefix (before [) into dimension prefix
-            // The NullSafe marker on dimension tells printer to print ?[
-            var combinedPrefix = CombineSpaces(operatorSpace, bracketPrefix);
+            // operatorSpace = space before ?, bracketPrefix = space between ? and [
+            // NullSafe.DotPrefix stores space between ? and [ (like space between ? and . in MI)
+            var singleDimNs = bracketPrefix.IsEmpty
+                ? NullSafe.Instance
+                : new NullSafe(Guid.NewGuid(), bracketPrefix);
 
             return new ArrayAccess(
                 Guid.NewGuid(),
                 prefix,
-                Markers.Empty,
+                Markers.Build([singleDimNs]),
                 target,
                 new ArrayDimension(
                     Guid.NewGuid(),
-                    combinedPrefix,
-                    Markers.Build([NullSafe.Instance]),
+                    operatorSpace,
+                    Markers.Empty,
                     new JRightPadded<Expression>(index, closeBracketSpace, Markers.Empty)
                 ),
                 null
@@ -6633,18 +6635,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var currentSpaceBeforeComma = ExtractSpaceBefore(firstSeparator);
         _cursor = firstSeparator.Span.End;
 
-        var combinedFirstPrefix = CombineSpaces(operatorSpace, firstBracketPrefix);
+        var multiDimNs = firstBracketPrefix.IsEmpty
+            ? NullSafe.Instance
+            : new NullSafe(Guid.NewGuid(), firstBracketPrefix);
 
-        // Innermost ArrayAccess with NullSafe marker on dimension
+        // Innermost ArrayAccess with NullSafe marker on the ArrayAccess
         ArrayAccess current = new ArrayAccess(
             Guid.NewGuid(),
             prefix,
-            Markers.Empty,
+            Markers.Build([multiDimNs]),
             target,
             new ArrayDimension(
                 Guid.NewGuid(),
-                combinedFirstPrefix,
-                Markers.Build([NullSafe.Instance]),
+                operatorSpace,
+                Markers.Empty,
                 new JRightPadded<Expression>(firstIndexExpr, Space.Empty, Markers.Empty)
             ),
             null

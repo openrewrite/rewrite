@@ -588,6 +588,40 @@ public class RewriteRuleTests : RewriteTest
     }
 
     [Fact]
+    public void PreservesNullConditionalOnElementAccess()
+    {
+        var x = Capture.Expression();
+        var i = Capture.Expression();
+
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteRecipe(
+                CSharpTemplate.Rewrite(
+                    CSharpPattern.Expression($"{x}[{i}]"),
+                    CSharpTemplate.Expression($"{x}[{i}]")))),
+            CSharp(
+                """
+                class Test
+                {
+                    void M(int[]? arr)
+                    {
+                        var n = arr?[0];
+                    }
+                }
+                """,
+                """
+                class Test
+                {
+                    void M(int[]? arr)
+                    {
+                        var n = arr?[0];
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
     public void NullConditionalNotAddedWhenOriginalHasNone()
     {
         var x = Capture.Expression(type: "IEnumerable<T>", typeParameters: ["T"]);
