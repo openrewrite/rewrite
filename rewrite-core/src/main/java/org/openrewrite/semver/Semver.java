@@ -72,12 +72,13 @@ public class Semver {
     }
 
     public static String majorVersion(String version) {
-        Scanner scanner = new Scanner(version);
-        scanner.useDelimiter("[.\\-$]");
-        if (scanner.hasNext()) {
-            return scanner.next();
+        try (Scanner scanner = new Scanner(version)) {
+            scanner.useDelimiter("[.\\-$]");
+            if (scanner.hasNext()) {
+                return scanner.next();
+            }
+            return version;
         }
-        return version;
     }
 
     public static String minorVersion(String version) {
