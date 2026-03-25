@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Java;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.CSharp.Template;
 
@@ -244,5 +245,148 @@ public sealed class CSharpTemplate
         }
 
         return null;
+    }
+
+    // ===============================================================
+    // Rewrite — declarative pattern→template visitor factory
+    // ===============================================================
+
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that matches a single pattern
+    /// and applies a template via <see cref="TreeVisitor{T,P}.PostVisit"/>. The pattern's
+    /// fast-reject ensures only nodes whose type matches the pattern root are fully compared.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var expr = Capture.Expression();
+    /// return CSharpTemplate.Rewrite(
+    ///     CSharpPattern.Expression($"Console.Write({expr})"),
+    ///     CSharpTemplate.Expression($"Console.WriteLine({expr})"));
+    /// </code>
+    /// </example>
+    public static CSharpVisitor<ExecutionContext> Rewrite(CSharpPattern before, CSharpTemplate after) =>
+        new RewriteVisitor([(before, after)]);
+
+    /// <summary>
+    /// Create a visitor that tries multiple patterns against a shared template. First match wins.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var s = Capture.Expression("s", type: "string");
+    /// return CSharpTemplate.Rewrite(
+    ///     [
+    ///         CSharpPattern.Expression($"{s} == null || {s} == \"\""),
+    ///         CSharpPattern.Expression($"{s} == null || {s}.Length == 0"),
+    ///     ],
+    ///     CSharpTemplate.Expression($"string.IsNullOrEmpty({s})"));
+    /// </code>
+    /// </example>
+    public static CSharpVisitor<ExecutionContext> Rewrite(CSharpPattern[] befores, CSharpTemplate after) =>
+        new RewriteVisitor(Array.ConvertAll(befores, b => (b, after)));
+
+    /// <summary>
+    /// Create a visitor that tries multiple (pattern, template) pairs in order. First match wins.
+    /// Use this when different patterns map to different templates.
+    /// </summary>
+    public static CSharpVisitor<ExecutionContext> Rewrite(
+        params (CSharpPattern before, CSharpTemplate after)[] rules) =>
+        new RewriteVisitor(rules);
+
+    /// <summary>
+    /// Creates a visitor that splices statements from any <see cref="Block"/> marked with
+    /// <see cref="SyntheticBlockContainer"/> into its parent block. Register once via
+    /// <see cref="TreeVisitor{T,P}.DoAfterVisit"/> — a single instance handles all
+    /// synthetic blocks produced during the visit.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var match = pat.Match(ret, Cursor);
+    /// if (match != null)
+    /// {
+    ///     var result = tmpl.Apply(Cursor, values: match);
+    ///     if (result is Block block &amp;&amp; block.Markers.FindFirst&lt;SyntheticBlockContainer&gt;() != null)
+    ///     {
+    ///         MaybeDoAfterVisit(CSharpTemplate.CreateBlockFlattener&lt;ExecutionContext&gt;());
+    ///         return block;
+    ///     }
+    ///     return result ?? ret;
+    /// }
+    /// </code>
+    /// </example>
+    public static CSharpVisitor<P> CreateBlockFlattener<P>() => new BlockFlattener<P>();
+
+    // ===============================================================
+    // Implementation
+    // ===============================================================
+
+    private sealed class RewriteVisitor((CSharpPattern before, CSharpTemplate after)[] rules)
+        : CSharpVisitor<ExecutionContext>
+    {
+        public override J? PostVisit(J tree, ExecutionContext ctx)
+        {
+            foreach (var (before, after) in rules)
+            {
+                var match = before.Match(tree, Cursor);
+                if (match != null)
+                    return after.Apply(Cursor, values: match);
+            }
+            return tree;
+        }
+    }
+
+    private sealed class BlockFlattener<P> : CSharpVisitor<P>, IEquatable<BlockFlattener<P>>
+    {
+        public bool Equals(BlockFlattener<P>? other) => other is not null;
+        public override bool Equals(object? obj) => obj is BlockFlattener<P>;
+        public override int GetHashCode() => typeof(BlockFlattener<P>).GetHashCode();
+        public override J VisitBlock(Block block, P ctx)
+        {
+            block = (Block)base.VisitBlock(block, ctx);
+
+            var statements = block.Statements;
+            var newStatements = new List<JRightPadded<Statement>>(statements.Count);
+            var changed = false;
+
+            foreach (var stmt in statements)
+            {
+                if (stmt.Element is Block inner &&
+                    inner.Markers.FindFirst<SyntheticBlockContainer>() != null)
+                {
+                    // Splice inner block's statements into the parent.
+                    // An empty inner block is intentionally dropped — flattening a block
+                    // that produced no statements should remove the slot.
+                    var innerStmts = inner.Statements;
+                    for (var i = 0; i < innerStmts.Count; i++)
+                    {
+                        var s = innerStmts[i];
+                        if (i == 0)
+                        {
+                            // Transfer the original statement's prefix (comments, blank lines)
+                            // to the first spliced statement.
+                            s = s.WithElement(SetStatementPrefix(s.Element, stmt.Element.Prefix));
+                        }
+                        newStatements.Add(s);
+                    }
+                    changed = true;
+                }
+                else
+                {
+                    newStatements.Add(stmt);
+                }
+            }
+
+            return changed ? block.WithStatements(newStatements) : block;
+        }
+
+        /// <summary>
+        /// Sets the prefix on a statement, handling <see cref="ExpressionStatement"/> which
+        /// delegates its prefix to its inner expression and has no <c>WithPrefix</c> method.
+        /// </summary>
+        private static Statement SetStatementPrefix(Statement stmt, Space prefix)
+        {
+            if (stmt is ExpressionStatement es)
+                return es.WithExpression(J.SetPrefix(es.Expression, prefix));
+            return (Statement)J.SetPrefix(stmt, prefix);
+        }
     }
 }

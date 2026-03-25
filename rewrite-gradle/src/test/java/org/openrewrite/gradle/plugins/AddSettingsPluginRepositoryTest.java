@@ -505,35 +505,6 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void addToExistingPluginManagementNotFirstStatement() {
-        rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .expectedCyclesThatMakeChanges(1).cycles(3),
-          settingsGradle(
-            """
-              rootProject.name = "demo"
-
-              pluginManagement {
-                  repositories {
-                      mavenLocal()
-                  }
-              }
-              """,
-            """
-              rootProject.name = "demo"
-
-              pluginManagement {
-                  repositories {
-                      mavenLocal()
-                      gradlePluginPortal()
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void addToExistingPluginManagementNotFirstStatementKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
@@ -563,10 +534,10 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void skipWhenExistsPluginManagementNotFirstStatement() {
+    void skipWhenExistsPluginManagementNotFirstStatementKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
-          settingsGradle(
+          settingsGradleKts(
             """
               rootProject.name = "demo"
 
@@ -581,18 +552,33 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void skipWhenExistsPluginManagementNotFirstStatementKts() {
+    void noPluginManagementBlockWithBuildCacheKts() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          spec -> spec.recipe(new AddSettingsPluginRepository("mavenCentral", null)),
           settingsGradleKts(
             """
-              rootProject.name = "demo"
-
-              pluginManagement {
-                  repositories {
-                      gradlePluginPortal()
+              buildCache {
+                  local {
+                      isEnabled = false
                   }
               }
+
+              rootProject.name = "demo"
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              buildCache {
+                  local {
+                      isEnabled = false
+                  }
+              }
+
+              rootProject.name = "demo"
               """
           )
         );

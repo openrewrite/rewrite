@@ -378,12 +378,14 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, RpcReceiveQueue q) {
-        return method
+        method = method
                 .getPadding().withSelect(q.receive(method.getPadding().getSelect(), s -> visitRightPadded(s, q)))
-                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)))
-                .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
+                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)));
+        J.Identifier name = q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q));
+        return method
                 .getPadding().withArguments(q.receive(method.getPadding().getArguments(), a -> visitContainer(a, q)))
-                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
+                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)))
+                .withName(name);
     }
 
     @Override

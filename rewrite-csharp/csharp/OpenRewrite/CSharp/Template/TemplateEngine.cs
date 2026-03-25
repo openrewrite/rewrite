@@ -24,7 +24,7 @@ namespace OpenRewrite.CSharp.Template;
 /// Marker placed on a <see cref="Block"/> that is a synthetic container for multiple statements
 /// produced by a multi-statement template, rather than a real block in the source code.
 /// Used by <see cref="TemplateEngine.AutoFormat"/> to format each statement at the parent level,
-/// and by <see cref="RewriteRule.CreateBlockFlattener{P}"/> to identify blocks to splice.
+/// and by <see cref="CSharpTemplate.CreateBlockFlattener{P}"/> to identify blocks to splice.
 /// </summary>
 public sealed class SyntheticBlockContainer : Marker
 {
@@ -100,18 +100,13 @@ internal static class TemplateEngine
         var scaffold = BuildScaffold(code, preamble, usings, context, scaffoldKind);
         var parser = new CSharpParser();
 
-        CompilationUnit cu;
-        if (dependencies.Count > 0 || usings.Count > 0)
-        {
-            // When usings or dependencies are provided, create a semantic model
-            // so the scaffold gets type attribution (needed for semantic matching).
-            var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
-            cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
-        }
-        else
-        {
-            cu = parser.Parse(scaffold, "__template__.cs");
-        }
+        // Always create a semantic model so the scaffold gets type attribution.
+        // DependencyWorkspace includes .NET 6+ implicit usings (System,
+        // System.Collections.Generic, etc.) via a synthetic global-using source file,
+        // so common types resolve even without explicit usings in the pattern.
+        // Reference resolution is cached, so repeated calls are cheap.
+        var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
+        var cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
 
         var result = ExtractTemplateNode(cu, code, scaffoldKind);
 

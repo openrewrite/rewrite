@@ -22,7 +22,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.toml.tree.Comment;
+import org.openrewrite.toml.tree.Space;
 import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.toml.tree.TomlRightPadded;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -44,6 +50,46 @@ public class DeleteKey extends Recipe {
             public Toml.@Nullable KeyValue visitKeyValue(Toml.KeyValue keyValue, ExecutionContext ctx) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, ctx);
                 return matcher.matches(getCursor()) ? null : kv;
+            }
+
+            @Override
+            public Toml.Table visitTable(Toml.Table table, ExecutionContext ctx) {
+                Toml.Table t = table;
+                t = t.withPrefix(visitSpace(t.getPrefix(), ctx));
+                t = t.withMarkers(visitMarkers(t.getMarkers(), ctx));
+
+                List<TomlRightPadded<Toml>> original = t.getPadding().getValues();
+                List<TomlRightPadded<Toml>> result = new ArrayList<>(original.size());
+                boolean changed = false;
+                boolean prevDeleted = false;
+
+                for (TomlRightPadded<Toml> rp : original) {
+                    Toml visited = visit(rp.getElement(), ctx);
+                    if (visited == null) {
+                        prevDeleted = changed = true;
+                        continue;
+                    }
+                    if (prevDeleted) {
+                        visited = visited.withPrefix(
+                                stripInlineCommentFromDeletedLine(visited.getPrefix()));
+                        prevDeleted = false;
+                    }
+                    TomlRightPadded<Toml> newRp = visited == rp.getElement() ? rp : rp.withElement(visited);
+                    if (newRp != rp) changed = true;
+                    result.add(newRp);
+                }
+                return changed ? t.getPadding().withValues(result) : t;
+            }
+
+            private Space stripInlineCommentFromDeletedLine(Space prefix) {
+                List<Comment> comments = prefix.getComments();
+                if (prefix.getWhitespace().contains("\n") || comments.isEmpty()) {
+                    return prefix;
+                }
+                return Space.build(
+                        comments.get(0).getSuffix(),
+                        new ArrayList<>(comments.subList(1, comments.size()))
+                );
             }
         };
     }
