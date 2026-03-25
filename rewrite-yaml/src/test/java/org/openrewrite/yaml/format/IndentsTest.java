@@ -292,5 +292,21 @@ class IndentsTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void sameColumnNestedSequences() {
+            rewriteRun(
+              yaml(
+                    """
+                  outer:
+                  - inner:
+                    - name: nested
+                      value: 1
+                    - name: nested2
+                      value: 2
+                  """
+              )
+            );
+        }
     }
 }
