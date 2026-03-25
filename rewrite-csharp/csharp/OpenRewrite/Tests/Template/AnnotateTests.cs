@@ -244,6 +244,64 @@ public class AnnotateTests : RewriteTest
             )
         );
     }
+
+    // ===============================================================
+    // CSharpPattern.Find with (pattern, annotator) pairs
+    // ===============================================================
+
+    [Fact]
+    public void FindPairsAppliesCorrectAnnotatorPerPattern()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    (CSharpPattern.Expression("Console.WriteLine(\"hello\")"),
+                        (node, _, _) => Markup.CreateWarn(node, "Avoid hello")),
+                    (CSharpPattern.Expression("Console.WriteLine(\"world\")"),
+                        (node, _, _) => Markup.CreateWarn(node, "Avoid world"))
+                ))),
+            CSharp(
+                "class C { void M() { Console.WriteLine(\"hello\"); Console.WriteLine(\"world\"); } }",
+                "class C { void M() { /*~~(Avoid hello)~~>*/Console.WriteLine(\"hello\"); /*~~(Avoid world)~~>*/Console.WriteLine(\"world\"); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void FindPairsFirstMatchWins()
+    {
+        var x = Capture.Of<Expression>("x");
+        RewriteRun(
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    (CSharpPattern.Expression($"Console.WriteLine({x})"),
+                        (node, _, _) => Markup.CreateWarn(node, "Generic write")),
+                    (CSharpPattern.Expression("Console.WriteLine(\"hello\")"),
+                        (node, _, _) => Markup.CreateWarn(node, "Specific hello"))
+                ))),
+            CSharp(
+                "class C { void M() { Console.WriteLine(\"hello\"); } }",
+                "class C { void M() { /*~~(Generic write)~~>*/Console.WriteLine(\"hello\"); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void FindPairsNoMatchLeavesUnchanged()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    (CSharpPattern.Expression("Console.Write(\"hello\")"),
+                        (node, _, _) => Markup.CreateWarn(node, "should not appear")),
+                    (CSharpPattern.Expression("Console.Write(\"world\")"),
+                        (node, _, _) => Markup.CreateWarn(node, "should not appear either"))
+                ))),
+            CSharp(
+                "class C { void M() { Console.WriteLine(\"hello\"); } }"
+            )
+        );
+    }
 }
 
 /// <summary>

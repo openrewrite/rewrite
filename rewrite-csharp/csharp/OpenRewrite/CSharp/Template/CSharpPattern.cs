@@ -239,7 +239,7 @@ public sealed class CSharpPattern
     /// </example>
     public static CSharpVisitor<Core.ExecutionContext> Find(
         CSharpPattern pattern, string? description = null) =>
-        new FindVisitor([pattern], (node, _, _) => SearchResult.Found(node, description));
+        new FindVisitor([(pattern, (J node, Cursor _, MatchResult _) => SearchResult.Found(node, description))]);
 
     /// <summary>
     /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that visits every node and
@@ -256,7 +256,7 @@ public sealed class CSharpPattern
     /// </example>
     public static CSharpVisitor<Core.ExecutionContext> Find(
         CSharpPattern pattern, Func<J, Cursor, MatchResult, J> annotator) =>
-        new FindVisitor([pattern], annotator);
+        new FindVisitor([(pattern, annotator)]);
 
     /// <summary>
     /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that tries multiple patterns
@@ -275,7 +275,7 @@ public sealed class CSharpPattern
     /// </example>
     public static CSharpVisitor<Core.ExecutionContext> Find(
         CSharpPattern[] patterns, string? description = null) =>
-        new FindVisitor(patterns, (node, _, _) => SearchResult.Found(node, description));
+        new FindVisitor(Array.ConvertAll(patterns, p => (p, (Func<J, Cursor, MatchResult, J>)((node, _, _) => SearchResult.Found(node, description)))));
 
     /// <summary>
     /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that tries multiple patterns
@@ -283,14 +283,31 @@ public sealed class CSharpPattern
     /// </summary>
     public static CSharpVisitor<Core.ExecutionContext> Find(
         CSharpPattern[] patterns, Func<J, Cursor, MatchResult, J> annotator) =>
-        new FindVisitor(patterns, annotator);
+        new FindVisitor(Array.ConvertAll(patterns, p => (p, annotator)));
 
-    private sealed class FindVisitor(CSharpPattern[] patterns, Func<J, Cursor, MatchResult, J> annotator)
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that tries multiple
+    /// (pattern, annotator) pairs in order. First match wins, and its annotator is applied.
+    /// Use this when different patterns need different annotation messages.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// return CSharpPattern.Find([
+    ///     (countPredN, (node, _, _) => Markup.CreateWarn(node, "Count(predicate) could be optimized")),
+    ///     (countGtN,   (node, _, _) => Markup.CreateWarn(node, "Count() comparison could use Skip/Any")),
+    /// ]);
+    /// </code>
+    /// </example>
+    public static CSharpVisitor<Core.ExecutionContext> Find(
+        params (CSharpPattern pattern, Func<J, Cursor, MatchResult, J> annotator)[] rules) =>
+        new FindVisitor(rules);
+
+    private sealed class FindVisitor((CSharpPattern pattern, Func<J, Cursor, MatchResult, J> annotator)[] rules)
         : CSharpVisitor<Core.ExecutionContext>
     {
         public override J? PostVisit(J tree, Core.ExecutionContext ctx)
         {
-            foreach (var pattern in patterns)
+            foreach (var (pattern, annotator) in rules)
             {
                 var match = pattern.Match(tree, Cursor);
                 if (match != null)
