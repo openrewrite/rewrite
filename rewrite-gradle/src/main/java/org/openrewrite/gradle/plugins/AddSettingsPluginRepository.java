@@ -138,12 +138,31 @@ public class AddSettingsPluginRepository extends Recipe {
                 if (mapped != statements) {
                     return mapped;
                 }
-                // No existing pluginManagement found — insert a new block
+                // No existing pluginManagement found — insert after any leading imports
                 Statement pluginManagementStatement = pluginManagement instanceof J.Block ?
                         ((J.Block) pluginManagement).getStatements().get(0) :
                         (J.MethodInvocation) pluginManagement;
-                List<Statement> result = ListUtils.concat(pluginManagementStatement, statements);
-                return ListUtils.map(result, (i, s) -> i == 1 ? s.withPrefix(Space.format("\n\n")) : s);
+
+                int insertIdx = 0;
+                for (int i = 0; i < statements.size(); i++) {
+                    if (statements.get(i) instanceof J.Import) {
+                        insertIdx = i + 1;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (insertIdx == 0) {
+                    List<Statement> result = ListUtils.concat(pluginManagementStatement, statements);
+                    return ListUtils.map(result, (i, s) -> i == 1 ? s.withPrefix(Space.format("\n\n")) : s);
+                } else {
+                    List<Statement> result = ListUtils.insert(statements, pluginManagementStatement.withPrefix(Space.format("\n\n")), insertIdx);
+                    if (insertIdx < result.size() - 1) {
+                        int nextIdx = insertIdx + 1;
+                        result = ListUtils.map(result, (i, s) -> i == nextIdx ? s.withPrefix(Space.format("\n\n")) : s);
+                    }
+                    return result;
+                }
             }
 
             private J.@Nullable MethodInvocation unwrapMethodCall(Statement statement, String methodName) {
