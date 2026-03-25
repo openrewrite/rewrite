@@ -546,6 +546,44 @@ class DeletePropertyKeyTest implements RewriteTest {
     }
 
     @Test
+    void doesNotDeletePreExistingEmptyMappings() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("spring.some.property", null, null, null)),
+          yaml(
+            """
+              name: CI workflow
+              on:
+                push:
+                  branches:
+                    - main
+                workflow_dispatch: {}
+
+              jobs:
+                build:
+                  runs-on: ubuntu-latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesEmptyMappingThatBecameEmptyFromDeletion() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("parent.child", null, null, null)),
+          yaml(
+            """
+              parent:
+                child: value
+              other: keep
+              """,
+            """
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
     void deleteLastEntryPreservesInlineCommentOnPreviousEntry() {
         rewriteRun(
           spec -> spec.recipe(new DeleteProperty("root.delete-me", null, null, null)),
