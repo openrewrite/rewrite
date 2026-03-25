@@ -218,6 +218,11 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
 
     public J visitAttributeList(Cs.AttributeList attributeList, P p) {
         attributeList = attributeList.withPrefix(visitSpace(attributeList.getPrefix(), CsSpace.Location.ATTRIBUTE_LIST_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(attributeList, p);
+        if (!(tempStatement instanceof Cs.AttributeList)) {
+            return tempStatement;
+        }
+        attributeList = (Cs.AttributeList) tempStatement;
         attributeList = attributeList.withMarkers(visitMarkers(attributeList.getMarkers(), p));
         attributeList = attributeList.getPadding().withTarget(visitRightPadded(attributeList.getPadding().getTarget(), CsRightPadded.Location.ATTRIBUTE_LIST_TARGET, p));
         return attributeList.getPadding().withAttributes(ListUtils.map(attributeList.getPadding().getAttributes(), el -> visitRightPadded(el, CsRightPadded.Location.ATTRIBUTE_LIST_ATTRIBUTES, p)));

@@ -1513,7 +1513,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class AttributeList implements Cs {
+    final class AttributeList implements Cs, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1550,6 +1550,11 @@ public interface Cs extends J {
 
         public AttributeList withAttributes(List<Annotation> attributes) {
             return getPadding().withAttributes(JRightPadded.withElements(this.attributes, attributes));
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @Override
