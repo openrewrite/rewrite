@@ -78,12 +78,15 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             if (y instanceof Yaml.Sequence.Entry) {
                 indent = getCursor().getParentOrThrow().getMessage("sequenceEntryIndent", indent);
 
-                y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
+                int seqIndentOffset = style.isIndentedSequences() ? style.getIndentSize() : 0;
+                int dashColumn = indent + seqIndentOffset;
+                y = y.withPrefix(indentTo(y.getPrefix(), dashColumn));
 
                 getCursor().getParentOrThrow().putMessage("sequenceEntryIndent", indent);
                 // the +1 is for the '-' character
+                int contentColumn = dashColumn + firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1;
                 getCursor().getParentOrThrow().putMessage("lastIndent",
-                        indent + firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
+                        contentColumn - style.getIndentSize());
             } else if (y instanceof Yaml.Mapping.Entry) {
                 y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
                 getCursor().putMessage("lastIndent", indent + style.getIndentSize());

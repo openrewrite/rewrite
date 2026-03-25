@@ -24,5 +24,19 @@ import lombok.experimental.FieldDefaults;
 @Data
 @With
 public class IndentsStyle implements YamlStyle {
-    private int indentSize;
+    int indentSize;
+
+    /**
+     * When {@code true}, sequence entries are indented relative to their parent mapping key (indented style):
+     * <pre>
+     * fruit:
+     *   - apple
+     * </pre>
+     * When {@code false}, sequence entry dashes are at the same column as their parent key (same-column style):
+     * <pre>
+     * fruit:
+     * - apple
+     * </pre>
+     */
+    boolean indentedSequences;
 }
