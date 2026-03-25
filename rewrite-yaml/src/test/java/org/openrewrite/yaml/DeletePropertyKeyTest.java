@@ -608,6 +608,48 @@ class DeletePropertyKeyTest implements RewriteTest {
     }
 
     @Test
+    void cascadingDeleteOfDeeplyNestedProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.b.c.d", null, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: value
+              other: keep
+              """,
+            """
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
+    void cascadingDeletePreservesEmptyMappingSiblingDeeplyNested() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.b.c.d", null, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: value
+                  empty: {}
+              other: keep
+              """,
+            """
+              a:
+                b:
+                  empty: {}
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
     void deleteLastEntryPreservesInlineCommentOnPreviousEntry() {
         rewriteRun(
           spec -> spec.recipe(new DeleteProperty("root.delete-me", null, null, null)),
