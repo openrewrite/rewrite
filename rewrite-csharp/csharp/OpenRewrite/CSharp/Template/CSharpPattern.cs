@@ -219,6 +219,10 @@ public sealed class CSharpPattern
         return match != null ? annotator(tree, cursor, match) : tree;
     }
 
+    // ===============================================================
+    // Find — declarative pattern→annotator visitor factory
+    // ===============================================================
+
     /// <summary>
     /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that visits every node and
     /// adds a <see cref="SearchResult"/> marker to matches. The pattern's fast-reject in
@@ -228,14 +232,14 @@ public sealed class CSharpPattern
     /// <example>
     /// <code>
     /// public override JavaVisitor&lt;ExecutionContext&gt; GetVisitor() =>
-    ///     CSharpPattern.Expression("Console.WriteLine(\"hello\")")
-    ///         .ToFindVisitor("found it");
+    ///     CSharpPattern.Find(
+    ///         CSharpPattern.Expression("Console.WriteLine(\"hello\")"),
+    ///         "found it");
     /// </code>
     /// </example>
-    public CSharpVisitor<Core.ExecutionContext> ToFindVisitor(string? description = null)
-    {
-        return ToFindVisitor((node, _, _) => SearchResult.Found(node, description));
-    }
+    public static CSharpVisitor<Core.ExecutionContext> Find(
+        CSharpPattern pattern, string? description = null) =>
+        new FindVisitor([pattern], (node, _, _) => SearchResult.Found(node, description));
 
     /// <summary>
     /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that visits every node and
@@ -245,22 +249,54 @@ public sealed class CSharpPattern
     /// <example>
     /// <code>
     /// public override JavaVisitor&lt;ExecutionContext&gt; GetVisitor() =>
-    ///     CSharpPattern.Expression($"new BinaryFormatter({args})")
-    ///         .ToFindVisitor((node, _, _) => Markup.CreateWarn(node, "BinaryFormatter is obsolete"));
+    ///     CSharpPattern.Find(
+    ///         CSharpPattern.Expression($"new BinaryFormatter({args})"),
+    ///         (node, _, _) => Markup.CreateWarn(node, "BinaryFormatter is obsolete"));
     /// </code>
     /// </example>
-    public CSharpVisitor<Core.ExecutionContext> ToFindVisitor(Func<J, Cursor, MatchResult, J> annotator)
-    {
-        return new FindVisitor(this, annotator);
-    }
+    public static CSharpVisitor<Core.ExecutionContext> Find(
+        CSharpPattern pattern, Func<J, Cursor, MatchResult, J> annotator) =>
+        new FindVisitor([pattern], annotator);
 
-    private sealed class FindVisitor(CSharpPattern pattern, Func<J, Cursor, MatchResult, J> annotator)
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that tries multiple patterns
+    /// and adds a <see cref="SearchResult"/> marker on the first match.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var x = Capture.Expression();
+    /// return CSharpPattern.Find(
+    ///     [
+    ///         CSharpPattern.Expression($"{x} == double.NaN"),
+    ///         CSharpPattern.Expression($"{x} != double.NaN"),
+    ///     ],
+    ///     "Use IsNaN() instead");
+    /// </code>
+    /// </example>
+    public static CSharpVisitor<Core.ExecutionContext> Find(
+        CSharpPattern[] patterns, string? description = null) =>
+        new FindVisitor(patterns, (node, _, _) => SearchResult.Found(node, description));
+
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that tries multiple patterns
+    /// and calls <paramref name="annotator"/> on the first match.
+    /// </summary>
+    public static CSharpVisitor<Core.ExecutionContext> Find(
+        CSharpPattern[] patterns, Func<J, Cursor, MatchResult, J> annotator) =>
+        new FindVisitor(patterns, annotator);
+
+    private sealed class FindVisitor(CSharpPattern[] patterns, Func<J, Cursor, MatchResult, J> annotator)
         : CSharpVisitor<Core.ExecutionContext>
     {
         public override J? PostVisit(J tree, Core.ExecutionContext ctx)
         {
-            var match = pattern.Match(tree, Cursor);
-            return match != null ? annotator(tree, Cursor, match) : tree;
+            foreach (var pattern in patterns)
+            {
+                var match = pattern.Match(tree, Cursor);
+                if (match != null)
+                    return annotator(tree, Cursor, match);
+            }
+            return tree;
         }
     }
 }

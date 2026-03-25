@@ -109,16 +109,16 @@ public class AnnotateTests : RewriteTest
     }
 
     // ===============================================================
-    // ToFindVisitor
+    // CSharpPattern.Find (static factory)
     // ===============================================================
 
     [Fact]
-    public void ToFindVisitorDefaultSearchResult()
+    public void FindDefaultSearchResult()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new ToFindVisitorRecipe(
-                CSharpPattern.Expression("Console.WriteLine(\"hello\")")
-                    .ToFindVisitor())),
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    CSharpPattern.Expression("Console.WriteLine(\"hello\")")))),
             CSharp(
                 "class C { void M() { Console.WriteLine(\"hello\"); } }",
                 "class C { void M() { /*~~>*/Console.WriteLine(\"hello\"); } }"
@@ -127,12 +127,13 @@ public class AnnotateTests : RewriteTest
     }
 
     [Fact]
-    public void ToFindVisitorWithDescription()
+    public void FindWithDescription()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new ToFindVisitorRecipe(
-                CSharpPattern.Expression("Console.WriteLine(\"hello\")")
-                    .ToFindVisitor("found it"))),
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    CSharpPattern.Expression("Console.WriteLine(\"hello\")"),
+                    "found it"))),
             CSharp(
                 "class C { void M() { Console.WriteLine(\"hello\"); } }",
                 "class C { void M() { /*~~(found it)~~>*/Console.WriteLine(\"hello\"); } }"
@@ -141,12 +142,13 @@ public class AnnotateTests : RewriteTest
     }
 
     [Fact]
-    public void ToFindVisitorWithCustomAnnotator()
+    public void FindWithCustomAnnotator()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new ToFindVisitorRecipe(
-                CSharpPattern.Expression("Console.WriteLine(\"hello\")")
-                    .ToFindVisitor((node, _, _) => Markup.CreateWarn(node, "Avoid Console.WriteLine")))),
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    CSharpPattern.Expression("Console.WriteLine(\"hello\")"),
+                    (node, _, _) => Markup.CreateWarn(node, "Avoid Console.WriteLine")))),
             CSharp(
                 "class C { void M() { Console.WriteLine(\"hello\"); } }",
                 "class C { void M() { /*~~(Avoid Console.WriteLine)~~>*/Console.WriteLine(\"hello\"); } }"
@@ -155,13 +157,14 @@ public class AnnotateTests : RewriteTest
     }
 
     [Fact]
-    public void ToFindVisitorAnnotatorReceivesMatchResult()
+    public void FindAnnotatorReceivesMatchResult()
     {
         var expr = Capture.Of<Expression>("expr");
         RewriteRun(
-            spec => spec.SetRecipe(new ToFindVisitorRecipe(
-                CSharpPattern.Expression($"Console.WriteLine({expr})")
-                    .ToFindVisitor((node, _, match) =>
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    CSharpPattern.Expression($"Console.WriteLine({expr})"),
+                    (node, _, match) =>
                         Markup.CreateWarn(node, $"Found arg: {match.Get(expr)!.GetType().Name}")))),
             CSharp(
                 "class C { void M() { Console.WriteLine(42); } }",
@@ -171,12 +174,71 @@ public class AnnotateTests : RewriteTest
     }
 
     [Fact]
-    public void ToFindVisitorNoMatchLeavesUnchanged()
+    public void FindNoMatchLeavesUnchanged()
     {
         RewriteRun(
-            spec => spec.SetRecipe(new ToFindVisitorRecipe(
-                CSharpPattern.Expression("Console.Write(\"hello\")")
-                    .ToFindVisitor((node, _, _) => Markup.CreateWarn(node, "should not appear")))),
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    CSharpPattern.Expression("Console.Write(\"hello\")"),
+                    (node, _, _) => Markup.CreateWarn(node, "should not appear")))),
+            CSharp(
+                "class C { void M() { Console.WriteLine(\"hello\"); } }"
+            )
+        );
+    }
+
+    // ===============================================================
+    // CSharpPattern.Find with multiple patterns
+    // ===============================================================
+
+    [Fact]
+    public void FindMultiplePatternsMatchesFirst()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    [
+                        CSharpPattern.Expression("Console.WriteLine(\"hello\")"),
+                        CSharpPattern.Expression("Console.WriteLine(\"world\")"),
+                    ],
+                    "found it"))),
+            CSharp(
+                "class C { void M() { Console.WriteLine(\"hello\"); Console.WriteLine(\"world\"); } }",
+                "class C { void M() { /*~~(found it)~~>*/Console.WriteLine(\"hello\"); /*~~(found it)~~>*/Console.WriteLine(\"world\"); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void FindMultiplePatternsWithCustomAnnotator()
+    {
+        var x = Capture.Of<Expression>("x");
+        RewriteRun(
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    [
+                        CSharpPattern.Expression($"{x} == double.NaN"),
+                        CSharpPattern.Expression($"{x} != double.NaN"),
+                    ],
+                    (node, _, _) => Markup.CreateWarn(node, "Use IsNaN() instead")))),
+            CSharp(
+                "class C { bool M(double d) { return d == double.NaN; } }",
+                "class C { bool M(double d) { return /*~~(Use IsNaN() instead)~~>*/d == double.NaN; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void FindMultiplePatternsNoMatchLeavesUnchanged()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new FindVisitorRecipe(
+                CSharpPattern.Find(
+                    [
+                        CSharpPattern.Expression("Console.Write(\"hello\")"),
+                        CSharpPattern.Expression("Console.Write(\"world\")"),
+                    ],
+                    "should not appear"))),
             CSharp(
                 "class C { void M() { Console.WriteLine(\"hello\"); } }"
             )
@@ -240,12 +302,12 @@ file class FindVsAnnotateRecipe(CSharpPattern pat) : Core.Recipe
 }
 
 /// <summary>
-/// Thin recipe wrapper around a pre-built visitor from <see cref="CSharpPattern.ToFindVisitor"/>.
+/// Thin recipe wrapper around a pre-built visitor from <see cref="CSharpPattern.Find(CSharpPattern, string?)"/>.
 /// </summary>
-file class ToFindVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : Core.Recipe
+file class FindVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : Core.Recipe
 {
-    public override string DisplayName => "ToFindVisitor test";
-    public override string Description => "Test recipe wrapping ToFindVisitor.";
+    public override string DisplayName => "Find visitor test";
+    public override string Description => "Test recipe wrapping CSharpPattern.Find.";
 
     public override JavaVisitor<ExecutionContext> GetVisitor() => visitor;
 }
