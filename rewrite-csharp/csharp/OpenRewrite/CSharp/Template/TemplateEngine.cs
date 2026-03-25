@@ -720,6 +720,11 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
 
     public override J VisitMethodInvocation(MethodInvocation mi, int p)
     {
+        // Check if the select is a capture placeholder BEFORE substitution
+        var selectCaptureName = mi.Select?.Element is Identifier selectId
+            ? Placeholder.FromPlaceholder(selectId.SimpleName)
+            : null;
+
         mi = (MethodInvocation)base.VisitMethodInvocation(mi, p);
 
         // Substitute placeholder in method name position
@@ -733,6 +738,14 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
             }
         }
 
+        // Transfer NullSafe from matched tree when the capture was a null-conditional select
+        if (selectCaptureName != null && mi.Markers.FindFirst<NullSafe>() == null)
+        {
+            var nullSafe = _values.GetNullSafe(selectCaptureName);
+            if (nullSafe != null)
+                mi = mi.WithMarkers(mi.Markers.Add(nullSafe));
+        }
+
         // Substitute variadic placeholder in arguments
         mi = ExpandVariadicArgs(mi);
 
@@ -741,6 +754,11 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
 
     public override J VisitFieldAccess(FieldAccess fieldAccess, int p)
     {
+        // Check if the target is a capture placeholder BEFORE substitution
+        var targetCaptureName = fieldAccess.Target is Identifier targetId
+            ? Placeholder.FromPlaceholder(targetId.SimpleName)
+            : null;
+
         fieldAccess = (FieldAccess)base.VisitFieldAccess(fieldAccess, p);
 
         // Substitute placeholder in field name position
@@ -754,6 +772,14 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
                 fieldAccess = fieldAccess.WithName(
                     fieldAccess.Name.WithElement(captured.WithPrefix(nameIdent.Prefix)));
             }
+        }
+
+        // Transfer NullSafe from matched tree when the capture was a null-conditional target
+        if (targetCaptureName != null && fieldAccess.Markers.FindFirst<NullSafe>() == null)
+        {
+            var nullSafe = _values.GetNullSafe(targetCaptureName);
+            if (nullSafe != null)
+                fieldAccess = fieldAccess.WithMarkers(fieldAccess.Markers.Add(nullSafe));
         }
 
         return fieldAccess;

@@ -24,10 +24,13 @@ namespace OpenRewrite.CSharp.Template;
 public sealed class MatchResult
 {
     private readonly Dictionary<string, object> _captures;
+    private readonly IReadOnlyDictionary<string, NullSafe>? _nullSafeCaptures;
 
-    internal MatchResult(Dictionary<string, object> captures)
+    internal MatchResult(Dictionary<string, object> captures,
+        IReadOnlyDictionary<string, NullSafe>? nullSafeCaptures = null)
     {
         _captures = captures;
+        _nullSafeCaptures = nullSafeCaptures;
     }
 
     /// <summary>
@@ -120,6 +123,13 @@ public sealed class MatchResult
     /// Check if a capture was bound.
     /// </summary>
     public bool Has(ICapture capture) => _captures.ContainsKey(capture.Name);
+
+    /// <summary>
+    /// Get the NullSafe marker associated with a capture, if any.
+    /// Present when the capture was the Select of a null-conditional MI/FA in the matched tree.
+    /// </summary>
+    internal NullSafe? GetNullSafe(string name) =>
+        _nullSafeCaptures != null && _nullSafeCaptures.TryGetValue(name, out var ns) ? ns : null;
 
     internal Dictionary<string, object> AsDict() => _captures;
 }

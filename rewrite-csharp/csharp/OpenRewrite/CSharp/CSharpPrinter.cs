@@ -250,8 +250,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Check for PointerMemberAccess marker on target PointerDereference - if present, print -> instead of .
         var isPointerMemberAccess = fieldAccess.Target is PointerDereference pd
             && pd.Markers.FindFirst<PointerMemberAccess>() != null;
-        // Check for NullSafe marker on the name - if present, print ?. instead of .
-        var nullSafe = fieldAccess.Name.Element.Markers.FindFirst<NullSafe>();
+        // Check for NullSafe marker on the FieldAccess - if present, print ?. instead of .
+        var nullSafe = fieldAccess.Markers.FindFirst<NullSafe>();
         if (isPointerMemberAccess)
         {
             p.Append("->");
@@ -393,9 +393,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             // For delegate invocation, skip the dot and name (it's syntactic sugar for .Invoke())
             if (!isDelegateInvocation)
             {
-                // Check for NullSafe marker on the name - if present, print ?. instead of .
+                // Check for NullSafe marker on the MethodInvocation - if present, print ?. instead of .
                 // Check for PointerMemberAccess marker on select PointerDereference - if present, print -> instead of .
-                var nullSafe = mi.Name.Markers.FindFirst<NullSafe>();
+                var nullSafe = mi.Markers.FindFirst<NullSafe>();
                 var isPointerDeref = mi.Select.Element is PointerDereference selectPd
                     && selectPd.Markers.FindFirst<PointerMemberAccess>() != null;
                 if (isPointerDeref)
