@@ -284,10 +284,6 @@ public class Result {
             if (before instanceof Quark && after instanceof Quark) {
                 return before.getSourcePath().equals(after.getSourcePath());
             }
-            // Binary files don't support printAll(); compare by byte content
-            if (before instanceof Binary && after instanceof Binary) {
-                return Arrays.equals(((Binary) before).getBytes(), ((Binary) after).getBytes());
-            }
             return before.printAll().equals(after.printAll());
         } catch (Exception e) {
             return false;
