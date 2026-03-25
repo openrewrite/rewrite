@@ -342,6 +342,90 @@ class UpgradeNuGetPackageVersionTest implements RewriteTest {
     }
 
     @Test
+    void dotStarGlobMatchesSuffixedPackagesOnly() {
+        // Pattern "Microsoft.EntityFrameworkCore.*" should match suffixed packages
+        // but NOT the base package "Microsoft.EntityFrameworkCore" itself
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeNuGetPackageVersion("Microsoft.EntityFrameworkCore.*", "10.0.0", null)),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <ItemGroup>
+                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+                </ItemGroup>
+              </Project>
+              """,
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <ItemGroup>
+                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+                </ItemGroup>
+              </Project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void starGlobMatchesBaseAndSuffixedPackages() {
+        // Pattern "Microsoft.EntityFrameworkCore*" (no dot before star) should match
+        // BOTH the base package and suffixed packages
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeNuGetPackageVersion("Microsoft.EntityFrameworkCore*", "10.0.0", null)),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <ItemGroup>
+                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+                </ItemGroup>
+              </Project>
+              """,
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <ItemGroup>
+                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+                  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+                </ItemGroup>
+              </Project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void starGlobDoesNotMatchUnrelatedPackages() {
+        // "Microsoft.EntityFrameworkCore*" should NOT match "Microsoft.Extensions.Logging"
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeNuGetPackageVersion("Microsoft.EntityFrameworkCore*", "10.0.0", null)),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <ItemGroup>
+                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+                  <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+                </ItemGroup>
+              </Project>
+              """,
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <ItemGroup>
+                  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+                  <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+                </ItemGroup>
+              </Project>
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradePropertyInDirectoryBuildProps() {
         // Build a custom MSBuildProject marker for the .csproj that knows
         // the NewtonsoftVersion property is defined in Directory.Build.props

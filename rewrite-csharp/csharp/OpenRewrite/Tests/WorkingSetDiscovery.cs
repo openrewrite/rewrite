@@ -55,7 +55,6 @@ public static class WorkingSetDiscovery
             if (ExcludedDirNames.Contains(dirName))
                 return;
         }
-
         // If this directory is a .NET project, add it and prune subtree
         if (IsDotNetProject(dir))
         {
