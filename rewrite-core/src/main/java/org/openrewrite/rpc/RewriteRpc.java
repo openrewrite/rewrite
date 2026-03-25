@@ -344,12 +344,12 @@ public class RewriteRpc {
         if (r.getDelegatesTo() != null) {
             PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
             RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
-            if (listing == null) {
-                throw new IllegalStateException(
-                        "Remote declared delegatesTo " + d.getRecipeName() +
-                        " but no recipe found in marketplace.");
+            if (listing != null) {
+                return listing.prepare(resolvers, d.getOptions());
             }
-            return listing.prepare(resolvers, d.getOptions());
+            // Delegate recipe not available locally (e.g. cross-ecosystem delegation).
+            // Fall through to wrap in an RpcRecipe so the descriptor is still accessible
+            // and the remote can handle execution via its own delegation mechanism.
         }
 
         // FIXME do this validation on the server side instead
