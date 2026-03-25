@@ -236,4 +236,25 @@ class ImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6310")
+    @Test
+    void extraSemicolonAfterImportWithComment() {
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.*;; // Semicolon here
+              import java.io.*;   // Followed by another import
+
+              public class Main {
+                  public static void main(String[] args) {
+                      System.out.printf("Hello and welcome!");
+                  }
+              }
+              """
+          )
+        );
+    }
 }
