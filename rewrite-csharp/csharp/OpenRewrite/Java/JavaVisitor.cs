@@ -1031,7 +1031,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
     }
 
     // -----------------------------------------------------------------------
-    // Lambda : Expression, Statement
+    // Lambda : Expression (also implements Statement for JavaTemplate reasons)
     // -----------------------------------------------------------------------
     public virtual J VisitLambda(Lambda lambda, P p)
     {
@@ -1040,10 +1040,7 @@ public class JavaVisitor<P> : TreeVisitor<J, P>
             .WithMarkers(VisitMarkers(lambda.Markers, p));
 
         var exprResult = VisitExpression(lambda, p);
-        if (exprResult is not Lambda e1) return exprResult;
-
-        var stmtResult = VisitStatement(e1, p);
-        if (stmtResult is not Lambda node) return stmtResult;
+        if (exprResult is not Lambda node) return exprResult;
 
         return node
             .WithParams((Lambda.Parameters)Visit(node.Params, p)!)
