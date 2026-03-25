@@ -834,7 +834,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     public J visitImport(ImportTree node, Space fmt) {
         Space beforeImport = sourceBefore("import");
         if (!beforeImport.isEmpty()) {
-            fmt = fmt.withWhitespace(fmt.getWhitespace() + beforeImport.getWhitespace());
+            fmt = Space.build(
+                    fmt.getWhitespace() + beforeImport.getWhitespace(),
+                    ListUtils.concatAll(fmt.getComments(), beforeImport.getComments()));
         }
         return new J.Import(randomId(), fmt, Markers.EMPTY,
                 new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
