@@ -306,11 +306,11 @@ public class TemplateApplyTests : RewriteTest
     public void AttributeRenameViaRewriteRule()
     {
         var args = Capture.Expression("args", variadic: new());
-        var rule = RewriteRule.Rewrite(
+        var visitor = CSharpTemplate.Rewrite(
             CSharpPattern.Attribute($"Fact({args})"),
             CSharpTemplate.Attribute($"Test({args})"));
         RewriteRun(
-            spec => spec.SetRecipe(new RewriteRuleRecipe(rule)),
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(visitor)),
             CSharp(
                 """
                 class C
@@ -727,10 +727,10 @@ file class UseRethrowRecipe : Core.Recipe
     }
 }
 
-file class RewriteRuleRecipe(IRewriteRule rule) : Core.Recipe
+file class RewriteVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : Core.Recipe
 {
-    public override string DisplayName => "RewriteRule";
-    public override string Description => "Applies a RewriteRule via ToVisitor().";
+    public override string DisplayName => "Rewrite";
+    public override string Description => "Applies a CSharpTemplate.Rewrite() visitor.";
 
-    public override JavaVisitor<ExecutionContext> GetVisitor() => rule.ToVisitor();
+    public override JavaVisitor<ExecutionContext> GetVisitor() => visitor;
 }
