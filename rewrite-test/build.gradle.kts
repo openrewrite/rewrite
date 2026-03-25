@@ -14,6 +14,8 @@ dependencies {
     implementation("org.slf4j:slf4j-api:1.7.36")
     implementation("org.slf4j:slf4j-nop:1.7.36")
 
+    testImplementation(project(":rewrite-java"))
     testImplementation(project(":rewrite-groovy"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 }
