@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -188,7 +187,6 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @Disabled("Parser does not support semicolon after package declaration yet")
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
     @Test
     void semicolonAfterPackage() {
@@ -206,7 +204,6 @@ class ImportTest implements RewriteTest {
         );
     }
 
-    @Disabled("Parser does not support semicolon between imports yet")
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
     @Test
     void semicolonBetweenImports() {
