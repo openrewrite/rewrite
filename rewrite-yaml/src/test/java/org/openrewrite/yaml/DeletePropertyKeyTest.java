@@ -567,6 +567,30 @@ class DeletePropertyKeyTest implements RewriteTest {
     }
 
     @Test
+    void deleteSiblingOfEmptyMappingPreservesEmptyMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("on.push", null, null, null)),
+          yaml(
+            """
+              name: CI workflow
+              on:
+                push:
+                  branches:
+                    - main
+                  paths:
+                    - 'src/**'
+                workflow_dispatch: {}
+              """,
+            """
+              name: CI workflow
+              on:
+                workflow_dispatch: {}
+              """
+          )
+        );
+    }
+
+    @Test
     void deletesEmptyMappingThatBecameEmptyFromDeletion() {
         rewriteRun(
           spec -> spec.recipe(new DeleteProperty("parent.child", null, null, null)),
