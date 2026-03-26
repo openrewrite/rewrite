@@ -23,6 +23,8 @@ using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
 using OpenRewrite.CSharp.Rpc;
 using OpenRewrite.Java;
+using OpenRewrite.Xml;
+using OpenRewrite.Xml.Rpc;
 using Rewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -157,7 +159,7 @@ public abstract class RewriteTest
                     // Expected a change
                     Assert.True(result != null && result.After != null,
                         $"Recipe was expected to make changes but did not modify the source file.");
-                    var afterPrinted = printer.Print(result.After);
+                    var afterPrinted = PrintTree(result.After);
                     AssertContentEquals(spec.After, afterPrinted, result.After.SourcePath,
                         "Unexpected result from recipe");
                 }
@@ -219,6 +221,17 @@ public abstract class RewriteTest
             }
             return base.Visit(tree, p);
         }
+    }
+
+    private static string PrintTree(SourceFile tree)
+    {
+        if (tree is Xml.Document)
+        {
+            var capture = new PrintOutputCapture<object>(null!);
+            new XmlPrinter<object>().Visit(tree, capture);
+            return capture.ToString();
+        }
+        return new CSharpPrinter<object>().Print(tree);
     }
 
     private static void AssertContentEquals(string expected, string actual, string sourcePath,
