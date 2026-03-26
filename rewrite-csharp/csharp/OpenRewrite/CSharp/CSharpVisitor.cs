@@ -51,6 +51,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             FixedStatement fs => VisitFixedStatement(fs, p),
             PointerType pt => VisitPointerType(pt, p),
             DefaultExpression de2 => VisitDefaultExpression(de2, p),
+            ExpressionStatement es => VisitExpressionStatement(es, p),
             ExternAlias ea => VisitExternAlias(ea, p),
             InitializerExpression ie => VisitInitializerExpression(ie, p),
             RelationalPattern rp => VisitRelationalPattern(rp, p),
@@ -148,6 +149,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
         return compilationUnit
             .WithPrefix(VisitSpace(compilationUnit.Prefix, p))
             .WithMarkers(VisitMarkers(compilationUnit.Markers, p))
+            .WithExterns(ListUtils.Map(compilationUnit.Externs, e => VisitRightPadded(e, p)))
+            .WithUsings(ListUtils.Map(compilationUnit.Usings, u => VisitRightPadded(u, p)))
+            .WithAttributeLists(ListUtils.Map(compilationUnit.AttributeLists, al => (AttributeList?)Visit(al, p)))
             .WithMembers(ListUtils.Map(compilationUnit.Members, m => VisitRightPadded(m, p)))
             .WithEof(VisitSpace(compilationUnit.Eof, p));
     }
@@ -158,12 +162,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithPrefix(VisitSpace(usingDirective.Prefix, p))
             .WithMarkers(VisitMarkers(usingDirective.Markers, p));
 
-        var stmtResult = VisitStatement(usingDirective, p);
-        if (stmtResult is not UsingDirective node) return stmtResult;
-
-        return node
-            .WithAlias(VisitRightPadded(node.Alias, p))
-            .WithNamespaceOrType((TypeTree)Visit(node.NamespaceOrType, p)!);
+        return usingDirective
+            .WithAlias(VisitRightPadded(usingDirective.Alias, p))
+            .WithNamespaceOrType((TypeTree)Visit(usingDirective.NamespaceOrType, p)!);
     }
 
     public virtual J VisitPropertyDeclaration(PropertyDeclaration prop, P p)
@@ -206,12 +207,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithPrefix(VisitSpace(attrList.Prefix, p))
             .WithMarkers(VisitMarkers(attrList.Markers, p));
 
-        var stmtResult = VisitStatement(attrList, p);
-        if (stmtResult is not AttributeList node) return stmtResult;
-
-        return node
-            .WithTarget(VisitRightPadded(node.Target, p))
-            .WithAttributes(ListUtils.Map(node.Attributes, a => VisitRightPadded(a, p)));
+        return attrList
+            .WithTarget(VisitRightPadded(attrList.Target, p))
+            .WithAttributes(ListUtils.Map(attrList.Attributes, a => VisitRightPadded(a, p)));
     }
 
     public virtual J VisitNamedExpression(NamedExpression ne, P p)
@@ -343,11 +341,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithPrefix(VisitSpace(externAlias.Prefix, p))
             .WithMarkers(VisitMarkers(externAlias.Markers, p));
 
-        var stmtResult = VisitStatement(externAlias, p);
-        if (stmtResult is not ExternAlias node) return stmtResult;
-
-        return node
-            .WithIdentifier(VisitLeftPadded(node.Identifier, p)!);
+        return externAlias
+            .WithIdentifier(VisitLeftPadded(externAlias.Identifier, p)!);
     }
 
     public virtual J VisitInitializerExpression(InitializerExpression initializerExpression, P p)
@@ -516,6 +511,8 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
         return node
             .WithName(VisitRightPadded(node.Name, p)!)
+            .WithExterns(ListUtils.Map(node.Externs, e => VisitRightPadded(e, p)))
+            .WithUsings(ListUtils.Map(node.Usings, u => VisitRightPadded(u, p)))
             .WithMembers(ListUtils.Map(node.Members, m => VisitRightPadded(m, p)))
             .WithEnd(VisitSpace(node.End, p));
     }

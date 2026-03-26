@@ -61,8 +61,6 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             case Throw:
             case Break:
             case Continue:
-            case UsingDirective:
-            case ExternAlias:
             case GotoStatement:
             case DelegateDeclaration:
             case Yield:
@@ -122,15 +120,51 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(compilationUnit, p);
 
-        foreach (var member in compilationUnit.Members)
+        // Print leading directive members (e.g., #nullable enable that appear before usings)
+        int memberIdx = 0;
+        while (memberIdx < compilationUnit.Members.Count && IsDirective(compilationUnit.Members[memberIdx].Element))
         {
-            VisitStatement(member, p);
+            VisitStatement(compilationUnit.Members[memberIdx], p);
+            memberIdx++;
+        }
+
+        foreach (var externAlias in compilationUnit.Externs)
+        {
+            Visit(externAlias.Element, p);
+            VisitSpace(externAlias.After, p);
+            p.Append(';');
+        }
+
+        foreach (var usingDirective in compilationUnit.Usings)
+        {
+            Visit(usingDirective.Element, p);
+            VisitSpace(usingDirective.After, p);
+            p.Append(';');
+        }
+
+        foreach (var attrList in compilationUnit.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
+
+        // Print remaining members
+        while (memberIdx < compilationUnit.Members.Count)
+        {
+            VisitStatement(compilationUnit.Members[memberIdx], p);
+            memberIdx++;
         }
 
         VisitSpace(compilationUnit.Eof, p);
 
         AfterSyntax(compilationUnit, p);
         return compilationUnit;
+    }
+
+    private static bool IsDirective(Statement stmt)
+    {
+        return stmt is NullableDirective or PragmaWarningDirective or PragmaChecksumDirective
+            or RegionDirective or EndRegionDirective or DefineDirective or UndefDirective
+            or ErrorDirective or WarningDirective or LineDirective;
     }
 
     public override J VisitUsingDirective(UsingDirective usingDirective, PrintOutputCapture<P> p)
@@ -186,15 +220,42 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append("namespace");
         Visit(ns.Name.Element, p);
         VisitSpace(ns.Name.After, p);
-        p.Append('{');
+
+        // File-scoped namespace: Semicolon marker on Name padding means ';' instead of '{...}'
+        bool isFileScopedNamespace = ns.Name.Markers.FindFirst<Semicolon>() != null;
+        if (isFileScopedNamespace)
+        {
+            p.Append(';');
+        }
+        else
+        {
+            p.Append('{');
+        }
+
+        foreach (var externAlias in ns.Externs)
+        {
+            Visit(externAlias.Element, p);
+            VisitSpace(externAlias.After, p);
+            p.Append(';');
+        }
+
+        foreach (var usingDirective in ns.Usings)
+        {
+            Visit(usingDirective.Element, p);
+            VisitSpace(usingDirective.After, p);
+            p.Append(';');
+        }
 
         foreach (var member in ns.Members)
         {
             VisitStatement(member, p);
         }
 
-        VisitSpace(ns.End, p);
-        p.Append('}');
+        if (!isFileScopedNamespace)
+        {
+            VisitSpace(ns.End, p);
+            p.Append('}');
+        }
         AfterSyntax(ns, p);
         return ns;
     }

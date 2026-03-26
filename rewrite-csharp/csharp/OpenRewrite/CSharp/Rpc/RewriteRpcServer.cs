@@ -107,10 +107,6 @@ public class RewriteRpcServer
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.NamedVariable),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable");
 
-        // Types in nagoya's Rewrite.Java namespace that are Cs types in Java
-        RpcSendQueue.RegisterJavaTypeName(typeof(Java.ExpressionStatement),
-            "org.openrewrite.csharp.tree.Cs$ExpressionStatement");
-
         // Marker type name overrides — markers live in marker packages, not tree packages
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.Semicolon),
             "org.openrewrite.java.marker.Semicolon");

@@ -130,6 +130,9 @@ public class CSharpParser
             _charsetBomMarked,
             null,
             null,
+            [],
+            [],
+            [],
             new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
             Space.Empty
         );
@@ -223,6 +226,9 @@ public class CSharpParser
             _charsetBomMarked,
             null,
             null,
+            [],
+            [],
+            [],
             new List<JRightPadded<Statement>> { new(directive, Space.Empty, Markers.Empty) },
             Space.Empty
         );
@@ -301,36 +307,44 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // whitespace after the last directive naturally becomes the next member's prefix
         var prefix = leadingDirectives.Count > 0 ? Space.Empty : ExtractPrefix(node);
 
-        // Handle extern alias directives — added as members
+        // Handle extern alias directives into separate list
+        var externAliases = new List<JRightPadded<ExternAlias>>();
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
-            if (visited is Statement stmt)
+            if (visited is ExternAlias ea)
             {
-                members.Add(PadStatement(stmt));
+                externAliases.Add(new JRightPadded<ExternAlias>(ea, Space.Empty, Markers.Empty));
             }
         }
 
-        // Handle using directives
+        // Handle using directives into separate list
+        var usingDirectives = new List<JRightPadded<UsingDirective>>();
         foreach (var usingDirective in node.Usings)
         {
             foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
                 members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = VisitUsingDirective(usingDirective);
-            members.Add(PadStatement(visited));
+            if (visited is UsingDirective ud)
+            {
+                usingDirectives.Add(new JRightPadded<UsingDirective>(ud, Space.Empty, Markers.Empty));
+            }
         }
 
-        // Handle assembly/module-level attributes — added as members
+        // Handle assembly/module-level attributes into separate list
+        var attributeLists = new List<AttributeList>();
         foreach (var attrList in node.AttributeLists)
         {
             var visited = VisitAttributeList(attrList);
-            if (visited is Statement attrStmt)
+            if (visited is AttributeList al)
             {
-                members.Add(PadStatement(attrStmt));
+                attributeLists.Add(al);
             }
         }
 
         // Handle top-level statements and type declarations
+        // File-scoped namespaces are now represented as NamespaceDeclaration nodes
+        // (not Package + flat members), so their children are NOT flattened here.
         foreach (var member in node.Members)
         {
             foreach (var d in ProcessGapDirectives(member.SpanStart))
@@ -339,40 +353,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             if (visited is Statement stmt)
             {
                 members.Add(PadStatement(stmt));
-            }
-
-            // For file-scoped namespaces, the type declarations are children of the
-            // namespace node, not of the CompilationUnit. Visit them here so they
-            // appear as top-level members in the OpenRewrite AST.
-            if (member is FileScopedNamespaceDeclarationSyntax fsns)
-            {
-                foreach (var fsExtern in fsns.Externs)
-                {
-                    var fsExVisited = VisitExternAliasDirective(fsExtern);
-                    if (fsExVisited is Statement fsExStmt)
-                    {
-                        members.Add(PadStatement(fsExStmt));
-                    }
-                }
-
-                foreach (var fsUsing in fsns.Usings)
-                {
-                    foreach (var d in ProcessGapDirectives(fsUsing.SpanStart))
-                        members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
-                    var fsUVisited = VisitUsingDirective(fsUsing);
-                    members.Add(PadStatement(fsUVisited));
-                }
-
-                foreach (var nsMember in fsns.Members)
-                {
-                    foreach (var d in ProcessGapDirectives(nsMember.SpanStart))
-                        members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
-                    var nsVisited = Visit(nsMember);
-                    if (nsVisited is Statement nsStmt)
-                    {
-                        members.Add(PadStatement(nsStmt));
-                    }
-                }
             }
         }
 
@@ -391,6 +371,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             _charsetBomMarked,
             null,
             null,
+            externAliases,
+            usingDirectives,
+            attributeLists,
             members,
             eof
         );
@@ -488,16 +471,63 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             throw new InvalidOperationException($"Expected Expression for namespace name but got {name?.GetType().Name}");
         }
 
-        // Capture space before semicolon into _pendingSemicolonSpace
-        _pendingSemicolonSpace = ExtractSpaceBefore(node.SemicolonToken);
+        // Capture space before semicolon
+        var nameAfter = ExtractSpaceBefore(node.SemicolonToken);
         _cursor = node.SemicolonToken.Span.End;
 
-        return new Package(
+        // Parse extern alias directives within the file-scoped namespace
+        var externAliases = new List<JRightPadded<ExternAlias>>();
+        foreach (var externAlias in node.Externs)
+        {
+            var visited = VisitExternAliasDirective(externAlias);
+            if (visited is ExternAlias ea)
+            {
+                externAliases.Add(new JRightPadded<ExternAlias>(ea, Space.Empty, Markers.Empty));
+            }
+        }
+
+        // Parse using directives within the file-scoped namespace
+        var nsUsingDirectives = new List<JRightPadded<UsingDirective>>();
+        var members = new List<JRightPadded<Statement>>();
+        foreach (var usingDirective in node.Usings)
+        {
+            foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
+                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+            var visited = VisitUsingDirective(usingDirective);
+            if (visited is UsingDirective ud)
+            {
+                nsUsingDirectives.Add(new JRightPadded<UsingDirective>(ud, Space.Empty, Markers.Empty));
+            }
+        }
+
+        // Parse member declarations (types)
+        foreach (var member in node.Members)
+        {
+            foreach (var d in ProcessGapDirectives(member.SpanStart))
+                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+            var visited = Visit(member);
+            if (visited is Statement stmt)
+            {
+                members.Add(PadStatement(stmt));
+            }
+        }
+
+        // Process trailing directives
+        foreach (var d in ProcessGapDirectives(_source.Length))
+            members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+
+        // Use Semicolon marker on the Name padding to indicate file-scoped (no braces)
+        var nameMarkers = new Markers(Guid.NewGuid(), [new Semicolon(Guid.NewGuid())]);
+
+        return new NamespaceDeclaration(
             Guid.NewGuid(),
             prefix,
             Markers.Empty,
-            nameExpr,
-            []  // No annotations for C# namespaces
+            new JRightPadded<Expression>(nameExpr, nameAfter, nameMarkers),
+            externAliases,
+            nsUsingDirectives,
+            members,
+            Space.Empty  // No closing brace
         );
     }
 
@@ -519,26 +549,29 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var nameAfter = ExtractSpaceBefore(node.OpenBraceToken);
         _cursor = node.OpenBraceToken.Span.End;
 
-        // Parse members (extern aliases, using directives, types, nested namespaces)
-        var members = new List<JRightPadded<Statement>>();
-
-        // Parse extern alias directives within the namespace — added as members
+        // Parse extern alias directives within the namespace into separate list
+        var externAliases = new List<JRightPadded<ExternAlias>>();
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
-            if (visited is Statement stmt)
+            if (visited is ExternAlias ea)
             {
-                members.Add(PadStatement(stmt));
+                externAliases.Add(new JRightPadded<ExternAlias>(ea, Space.Empty, Markers.Empty));
             }
         }
 
-        // Handle using directives within the namespace
+        // Handle using directives within the namespace into separate list
+        var nsUsingDirectives = new List<JRightPadded<UsingDirective>>();
+        var members = new List<JRightPadded<Statement>>();
         foreach (var usingDirective in node.Usings)
         {
             foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
                 members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = VisitUsingDirective(usingDirective);
-            members.Add(PadStatement(visited));
+            if (visited is UsingDirective ud)
+            {
+                nsUsingDirectives.Add(new JRightPadded<UsingDirective>(ud, Space.Empty, Markers.Empty));
+            }
         }
 
         // Then handle member declarations (types, nested namespaces)
@@ -566,6 +599,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             prefix,
             Markers.Empty,
             new JRightPadded<Expression>(nameExpr, nameAfter, Markers.Empty),
+            externAliases,
+            nsUsingDirectives,
             members,
             end
         );

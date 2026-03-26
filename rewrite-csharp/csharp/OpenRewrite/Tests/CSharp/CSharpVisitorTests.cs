@@ -29,9 +29,9 @@ public class CSharpVisitorTests
     [Fact]
     public void VisitStatement_ReturnsReplacedType()
     {
-        var original = new ExternAlias(
+        var original = new GotoStatement(
             Guid.NewGuid(), Space.Empty, Markers.Empty,
-            new JLeftPadded<Identifier>(Space.Empty, MakeId("foo"))
+            null, MakeId("foo")
         );
 
         var replacement = MakeId("replaced");
