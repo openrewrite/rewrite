@@ -512,6 +512,155 @@ public class RewriteRuleTests : RewriteTest
     }
 
     // ===============================================================
+    // NullSafe preservation — ?. marker transfers through Rewrite
+    // ===============================================================
+
+    [Fact]
+    public void PreservesNullConditionalInRewrite()
+    {
+        var x = Capture.Expression(type: "IEnumerable<T>", typeParameters: ["T"]);
+        var pred = Capture.Expression();
+
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteRecipe(
+                CSharpTemplate.Rewrite(
+                    CSharpPattern.Expression($"{x}.Where({pred}).First()"),
+                    CSharpTemplate.Expression($"{x}.First({pred})"))))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M(Dictionary<string, List<int>> dict)
+                    {
+                        var result = dict["key"]?.Where(x => x > 0).First();
+                    }
+                }
+                """,
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M(Dictionary<string, List<int>> dict)
+                    {
+                        var result = dict["key"]?.First(x => x > 0);
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void PreservesNullConditionalOnFieldAccess()
+    {
+        var x = Capture.Expression();
+
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteRecipe(
+                CSharpTemplate.Rewrite(
+                    CSharpPattern.Expression($"{x}.Length"),
+                    CSharpTemplate.Expression($"{x}.Count")))),
+            CSharp(
+                """
+                class Test
+                {
+                    void M(string? s)
+                    {
+                        var n = s?.Length;
+                    }
+                }
+                """,
+                """
+                class Test
+                {
+                    void M(string? s)
+                    {
+                        var n = s?.Count;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void PreservesNullConditionalOnElementAccess()
+    {
+        var x = Capture.Expression();
+        var i = Capture.Expression();
+
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteRecipe(
+                CSharpTemplate.Rewrite(
+                    CSharpPattern.Expression($"{x}[{i}]"),
+                    CSharpTemplate.Expression($"{x}[{i}]")))),
+            CSharp(
+                """
+                class Test
+                {
+                    void M(int[]? arr)
+                    {
+                        var n = arr?[0];
+                    }
+                }
+                """,
+                """
+                class Test
+                {
+                    void M(int[]? arr)
+                    {
+                        var n = arr?[0];
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void NullConditionalNotAddedWhenOriginalHasNone()
+    {
+        var x = Capture.Expression(type: "IEnumerable<T>", typeParameters: ["T"]);
+        var pred = Capture.Expression();
+
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteRecipe(
+                CSharpTemplate.Rewrite(
+                    CSharpPattern.Expression($"{x}.Where({pred}).First()"),
+                    CSharpTemplate.Expression($"{x}.First({pred})"))))
+                .SetReferenceAssemblies(Assemblies.Net90),
+            CSharp(
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M(List<int> list)
+                    {
+                        var result = list.Where(x => x > 0).First();
+                    }
+                }
+                """,
+                """
+                using System.Linq;
+                using System.Collections.Generic;
+                class Test
+                {
+                    void M(List<int> list)
+                    {
+                        var result = list.First(x => x > 0);
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    // ===============================================================
     // FlattenBlock — multi-statement template spliced into parent
     // ===============================================================
 
@@ -868,6 +1017,14 @@ class UseElementAtRecipe : Core.Recipe
                 usings: ["System.Collections.Generic", "System.Linq"]),
             CSharpTemplate.Expression($"{expr}[{idx}]"));
     }
+}
+
+class RewriteRecipe(CSharpVisitor<ExecutionContext> visitor) : Core.Recipe
+{
+    public override string DisplayName => "Rewrite recipe";
+    public override string Description => "Applies a CSharpTemplate.Rewrite visitor.";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor() => visitor;
 }
 
 class FallbackWithManualVisitorRecipe : Core.Recipe

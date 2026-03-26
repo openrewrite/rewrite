@@ -177,7 +177,9 @@ public sealed class CSharpPattern
 
         var comparator = new PatternMatchingComparator(_captures);
         var captured = comparator.Match(patternTree, tree, cursor);
-        return captured != null ? new MatchResult(captured) : null;
+        if (captured == null) return null;
+        var nullSafe = comparator.NullSafeBindings;
+        return new MatchResult(captured, nullSafe.Count > 0 ? nullSafe : null);
     }
 
     private bool IsCapturePlaceholder(J node)

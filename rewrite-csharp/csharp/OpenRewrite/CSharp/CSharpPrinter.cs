@@ -311,8 +311,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Check for PointerMemberAccess marker on target PointerDereference - if present, print -> instead of .
         var isPointerMemberAccess = fieldAccess.Target is PointerDereference pd
             && pd.Markers.FindFirst<PointerMemberAccess>() != null;
-        // Check for NullSafe marker on the name - if present, print ?. instead of .
-        var nullSafe = fieldAccess.Name.Element.Markers.FindFirst<NullSafe>();
+        // Check for NullSafe marker on the FieldAccess - if present, print ?. instead of .
+        var nullSafe = fieldAccess.Markers.FindFirst<NullSafe>();
         if (isPointerMemberAccess)
         {
             p.Append("->");
@@ -417,9 +417,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(aa.Prefix, p);
             Visit(aa.Indexed, p);
             VisitSpace(aa.Dimension.Prefix, p);
-            // Check for NullSafe marker - if present, print ?[ instead of [
-            var isNullSafe = aa.Dimension.Markers.FindFirst<NullSafe>() != null;
-            p.Append(isNullSafe ? "?[" : "[");
+            var nullSafe = aa.Markers.FindFirst<NullSafe>();
+            if (nullSafe != null)
+            {
+                p.Append('?');
+                VisitSpace(nullSafe.DotPrefix, p);
+            }
+            p.Append('[');
             Visit(aa.Dimension.Index.Element, p);
             VisitSpace(aa.Dimension.Index.After, p);
             // Don't print ] - parent will
@@ -429,9 +433,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitArrayDimension(ArrayDimension dimension, PrintOutputCapture<P> p)
     {
         BeforeSyntax(dimension, p);
-        // Check for NullSafe marker - if present, print ?[ instead of [
-        var isNullSafe = dimension.Markers.FindFirst<NullSafe>() != null;
-        p.Append(isNullSafe ? "?[" : "[");
+        // NullSafe marker lives on the parent ArrayAccess — check via cursor
+        // Dimension prefix holds space before ?, NullSafe.DotPrefix holds space between ? and [
+        var nullSafe = Cursor.Value is ArrayAccess aa
+            ? aa.Markers.FindFirst<NullSafe>() : null;
+        if (nullSafe != null)
+        {
+            p.Append('?');
+            VisitSpace(nullSafe.DotPrefix, p);
+        }
+        p.Append('[');
         Visit(dimension.Index.Element, p);
         VisitSpace(dimension.Index.After, p);
         p.Append(']');
@@ -454,9 +465,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             // For delegate invocation, skip the dot and name (it's syntactic sugar for .Invoke())
             if (!isDelegateInvocation)
             {
-                // Check for NullSafe marker on the name - if present, print ?. instead of .
+                // Check for NullSafe marker on the MethodInvocation - if present, print ?. instead of .
                 // Check for PointerMemberAccess marker on select PointerDereference - if present, print -> instead of .
-                var nullSafe = mi.Name.Markers.FindFirst<NullSafe>();
+                var nullSafe = mi.Markers.FindFirst<NullSafe>();
                 var isPointerDeref = mi.Select.Element is PointerDereference selectPd
                     && selectPd.Markers.FindFirst<PointerMemberAccess>() != null;
                 if (isPointerDeref)

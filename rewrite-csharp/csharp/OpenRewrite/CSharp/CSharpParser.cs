@@ -6343,7 +6343,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 // Skip the . in the member binding (it's part of ?.)
                 var nullSafe = AdvancePastDotWithNullSafe(memberBinding.OperatorToken);
 
-                // Parse the method name with NullSafe marker
+                // Parse the method name — NullSafe marker goes on the MethodInvocation
                 Identifier name;
                 JContainer<Expression>? typeParameters = null;
 
@@ -6354,7 +6354,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     name = new Identifier(
                         Guid.NewGuid(),
                         namePrefix,
-                        Markers.Build([nullSafe]),
+                        Markers.Empty,
                         [],
                         genericName.Identifier.Text,
                         null,
@@ -6369,7 +6369,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     name = new Identifier(
                         Guid.NewGuid(),
                         namePrefix,
-                        Markers.Build([nullSafe]),
+                        Markers.Empty,
                         [],
                         memberBinding.Name.Identifier.Text,
                         null,
@@ -6382,7 +6382,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 return new MethodInvocation(
                     Guid.NewGuid(),
                     prefix,
-                    Markers.Empty,
+                    Markers.Build([nullSafe]),
                     new JRightPadded<Expression>(targetExpr, operatorSpace, Markers.Empty),
                     name,
                     typeParameters,
@@ -6468,7 +6468,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var name = new Identifier(
                 Guid.NewGuid(),
                 namePrefix,
-                Markers.Build([nullSafe]),
+                Markers.Empty,
                 [],
                 memberBinding.Name.Identifier.Text,
                 null,
@@ -6478,7 +6478,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             return new FieldAccess(
                 Guid.NewGuid(),
                 prefix,
-                Markers.Empty,
+                Markers.Build([nullSafe]),
                 targetExpr,
                 new JLeftPadded<Identifier>(operatorSpace, name),
                 null
@@ -6537,7 +6537,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     firstName = new Identifier(
                         Guid.NewGuid(),
                         namePrefix,
-                        Markers.Build([innerNullSafe]),
+                        Markers.Empty,
                         [],
                         genericName.Identifier.Text,
                         null,
@@ -6552,7 +6552,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     firstName = new Identifier(
                         Guid.NewGuid(),
                         namePrefix,
-                        Markers.Build([innerNullSafe]),
+                        Markers.Empty,
                         [],
                         innerMemberBinding.Name.Identifier.Text,
                         null,
@@ -6565,7 +6565,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 firstAccess = new MethodInvocation(
                     Guid.NewGuid(),
                     Space.Empty,
-                    Markers.Empty,
+                    Markers.Build([innerNullSafe]),
                     new JRightPadded<Expression>(targetExpr, operatorSpace, Markers.Empty),
                     firstName,
                     firstTypeParams,
@@ -6630,19 +6630,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var closeBracketSpace = ExtractSpaceBefore(argList.CloseBracketToken);
             _cursor = argList.CloseBracketToken.Span.End;
 
-            // Combine operatorSpace (before ?) with bracketPrefix (before [) into dimension prefix
-            // The NullSafe marker on dimension tells printer to print ?[
-            var combinedPrefix = CombineSpaces(operatorSpace, bracketPrefix);
+            // operatorSpace = space before ?, bracketPrefix = space between ? and [
+            // NullSafe.DotPrefix stores space between ? and [ (like space between ? and . in MI)
+            var singleDimNs = bracketPrefix.IsEmpty
+                ? NullSafe.Instance
+                : new NullSafe(Guid.NewGuid(), bracketPrefix);
 
             return new ArrayAccess(
                 Guid.NewGuid(),
                 prefix,
-                Markers.Empty,
+                Markers.Build([singleDimNs]),
                 target,
                 new ArrayDimension(
                     Guid.NewGuid(),
-                    combinedPrefix,
-                    Markers.Build([NullSafe.Instance]),
+                    operatorSpace,
+                    Markers.Empty,
                     new JRightPadded<Expression>(index, closeBracketSpace, Markers.Empty)
                 ),
                 null
@@ -6668,18 +6670,20 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         var currentSpaceBeforeComma = ExtractSpaceBefore(firstSeparator);
         _cursor = firstSeparator.Span.End;
 
-        var combinedFirstPrefix = CombineSpaces(operatorSpace, firstBracketPrefix);
+        var multiDimNs = firstBracketPrefix.IsEmpty
+            ? NullSafe.Instance
+            : new NullSafe(Guid.NewGuid(), firstBracketPrefix);
 
-        // Innermost ArrayAccess with NullSafe marker on dimension
+        // Innermost ArrayAccess with NullSafe marker on the ArrayAccess
         ArrayAccess current = new ArrayAccess(
             Guid.NewGuid(),
             prefix,
-            Markers.Empty,
+            Markers.Build([multiDimNs]),
             target,
             new ArrayDimension(
                 Guid.NewGuid(),
-                combinedFirstPrefix,
-                Markers.Build([NullSafe.Instance]),
+                operatorSpace,
+                Markers.Empty,
                 new JRightPadded<Expression>(firstIndexExpr, Space.Empty, Markers.Empty)
             ),
             null
@@ -6776,7 +6780,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 name = new Identifier(
                     Guid.NewGuid(),
                     namePrefix,
-                    Markers.Build([nullSafe]),
+                    Markers.Empty,
                     [],
                     genericName.Identifier.Text,
                     null,
@@ -6791,7 +6795,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 name = new Identifier(
                     Guid.NewGuid(),
                     namePrefix,
-                    Markers.Build([nullSafe]),
+                    Markers.Empty,
                     [],
                     memberBinding.Name.Identifier.Text,
                     null,
@@ -6804,7 +6808,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             return new MethodInvocation(
                 Guid.NewGuid(),
                 prefix,
-                Markers.Empty,
+                Markers.Build([nullSafe]),
                 new JRightPadded<Expression>(target, operatorSpace, Markers.Empty),
                 name,
                 typeParameters,
@@ -6837,7 +6841,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             var name = new Identifier(
                 Guid.NewGuid(),
                 namePrefix,
-                Markers.Build([tbNullSafe]),
+                Markers.Empty,
                 [],
                 terminalBinding.Name.Identifier.Text,
                 null,
@@ -6846,7 +6850,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             return new FieldAccess(
                 Guid.NewGuid(),
                 prefix,
-                Markers.Empty,
+                Markers.Build([tbNullSafe]),
                 target,
                 new JLeftPadded<Identifier>(operatorSpace, name),
                 null
@@ -6883,7 +6887,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     firstName = new Identifier(
                         Guid.NewGuid(),
                         namePrefix,
-                        Markers.Build([innerNs]),
+                        Markers.Empty,
                         [],
                         genericName.Identifier.Text,
                         null,
@@ -6898,7 +6902,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     firstName = new Identifier(
                         Guid.NewGuid(),
                         namePrefix,
-                        Markers.Build([innerNs]),
+                        Markers.Empty,
                         [],
                         innerMemberBinding.Name.Identifier.Text,
                         null,
@@ -6911,7 +6915,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 firstCall = new MethodInvocation(
                     Guid.NewGuid(),
                     Space.Empty,
-                    Markers.Empty,
+                    Markers.Build([innerNs]),
                     new JRightPadded<Expression>(target, operatorSpace, Markers.Empty),
                     firstName,
                     firstTypeParams,
@@ -6969,7 +6973,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     var namePrefix = ExtractSpaceBefore(genericName.Identifier);
                     _cursor = genericName.Identifier.Span.End;
                     name = new Identifier(
-                        Guid.NewGuid(), namePrefix, Markers.Build([mbNs]),
+                        Guid.NewGuid(), namePrefix, Markers.Empty,
                         [],
                         genericName.Identifier.Text, null,
                         null
@@ -6981,14 +6985,14 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     var namePrefix = ExtractSpaceBefore(memberBinding.Name.Identifier);
                     _cursor = memberBinding.Name.Identifier.Span.End;
                     name = new Identifier(
-                        Guid.NewGuid(), namePrefix, Markers.Build([mbNs]),
+                        Guid.NewGuid(), namePrefix, Markers.Empty,
                         [],
                         memberBinding.Name.Identifier.Text, null,
                         null
                         );
                 }
                 return new FieldAccess(
-                    Guid.NewGuid(), Space.Empty, Markers.Empty,
+                    Guid.NewGuid(), Space.Empty, Markers.Build([mbNs]),
                     target, new JLeftPadded<Identifier>(operatorSpace, name), null);
             }
 
@@ -7032,16 +7036,17 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                 JRightPadded<Expression> select;
                 Identifier name;
                 JContainer<Expression>? typeParams = null;
+                NullSafe? nullSafeMarker = null;
 
                 if (invocation.Expression is MemberBindingExpressionSyntax binding)
                 {
-                    var bNs = AdvancePastDotWithNullSafe(binding.OperatorToken);
+                    nullSafeMarker = AdvancePastDotWithNullSafe(binding.OperatorToken);
                     if (binding.Name is GenericNameSyntax gn)
                     {
                         var np = ExtractSpaceBefore(gn.Identifier);
                         _cursor = gn.Identifier.Span.End;
                         name = new Identifier(
-                            Guid.NewGuid(), np, Markers.Build([bNs]),
+                            Guid.NewGuid(), np, Markers.Empty,
                             [],
                             gn.Identifier.Text, null,
                             null
@@ -7053,7 +7058,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                         var np = ExtractSpaceBefore(binding.Name.Identifier);
                         _cursor = binding.Name.Identifier.Span.End;
                         name = new Identifier(
-                            Guid.NewGuid(), np, Markers.Build([bNs]),
+                            Guid.NewGuid(), np, Markers.Empty,
                             [],
                             binding.Name.Identifier.Text, null,
                             null
@@ -7099,7 +7104,8 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
                 var args = ParseArgumentList(invocation.ArgumentList);
                 return new MethodInvocation(
-                    Guid.NewGuid(), Space.Empty, Markers.Empty,
+                    Guid.NewGuid(), Space.Empty,
+                    nullSafeMarker != null ? Markers.Build([nullSafeMarker]) : Markers.Empty,
                     select, name, typeParams, args, null);
             }
 

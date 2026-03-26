@@ -792,14 +792,15 @@ public class PatternMatchTests : RewriteTest
     }
 
     [Fact]
-    public void RegularDotPatternDoesNotMatchNullConditionalAccess()
+    public void RegularDotPatternMatchesNullConditionalAccess()
     {
         var obj = Capture.Of<Expression>("obj");
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"{obj}.ToString()")),
             CSharp(
-                // ?. access should NOT match a regular . pattern
-                "class C { void M() { string s = null; var x = s?.ToString(); } }"
+                // A pattern without ?. matches both . and ?. access (asymmetric)
+                "class C { void M() { string s = null; var x = s?.ToString(); } }",
+                "class C { void M() { string s = null; var x = /*~~>*/s?.ToString(); } }"
             )
         );
     }
