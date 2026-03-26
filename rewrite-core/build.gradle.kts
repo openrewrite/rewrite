@@ -32,6 +32,7 @@ dependencies {
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
     testImplementation(project(":rewrite-test"))
 }
 

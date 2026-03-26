@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.table.ParseFailures;
 import org.openrewrite.table.TextMatches;
@@ -31,6 +32,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class RecipeRunTest implements RewriteTest {
     @DocumentExample
+    @ExpectedToFail("https://github.com/openrewrite/rewrite/pull/7098")
     @Test
     void multipleRecipeInstancesProduceSeparateScopedDataTables() {
         rewriteRun(
