@@ -43,6 +43,9 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
     public J visitCompilationUnit(Cs.CompilationUnit compilationUnit, P p) {
         compilationUnit = compilationUnit.withPrefix(visitSpace(compilationUnit.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         compilationUnit = compilationUnit.withMarkers(visitMarkers(compilationUnit.getMarkers(), p));
+        compilationUnit = compilationUnit.getPadding().withExterns(ListUtils.map(compilationUnit.getPadding().getExterns(), el -> visitRightPadded(el, CsRightPadded.Location.COMPILATION_UNIT_EXTERNS, p)));
+        compilationUnit = compilationUnit.getPadding().withUsings(ListUtils.map(compilationUnit.getPadding().getUsings(), el -> visitRightPadded(el, CsRightPadded.Location.COMPILATION_UNIT_USINGS, p)));
+        compilationUnit = compilationUnit.withAttributeLists(ListUtils.map(compilationUnit.getAttributeLists(), el -> (Cs.AttributeList) visitNonNull(el, p)));
         compilationUnit = compilationUnit.getPadding().withMembers(ListUtils.map(compilationUnit.getPadding().getMembers(), el -> visitRightPadded(el, CsRightPadded.Location.COMPILATION_UNIT_MEMBERS, p)));
         return compilationUnit.withEof(visitSpace(compilationUnit.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
     }
@@ -218,11 +221,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
 
     public J visitAttributeList(Cs.AttributeList attributeList, P p) {
         attributeList = attributeList.withPrefix(visitSpace(attributeList.getPrefix(), CsSpace.Location.ATTRIBUTE_LIST_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(attributeList, p);
-        if (!(tempStatement instanceof Cs.AttributeList)) {
-            return tempStatement;
-        }
-        attributeList = (Cs.AttributeList) tempStatement;
         attributeList = attributeList.withMarkers(visitMarkers(attributeList.getMarkers(), p));
         attributeList = attributeList.getPadding().withTarget(visitRightPadded(attributeList.getPadding().getTarget(), CsRightPadded.Location.ATTRIBUTE_LIST_TARGET, p));
         return attributeList.getPadding().withAttributes(ListUtils.map(attributeList.getPadding().getAttributes(), el -> visitRightPadded(el, CsRightPadded.Location.ATTRIBUTE_LIST_ATTRIBUTES, p)));
@@ -312,6 +310,8 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         namespaceDeclaration = (Cs.NamespaceDeclaration) tempStatement;
         namespaceDeclaration = namespaceDeclaration.withMarkers(visitMarkers(namespaceDeclaration.getMarkers(), p));
         namespaceDeclaration = namespaceDeclaration.getPadding().withName(visitRightPadded(namespaceDeclaration.getPadding().getName(), CsRightPadded.Location.NAMESPACE_DECLARATION_NAME, p));
+        namespaceDeclaration = namespaceDeclaration.getPadding().withExterns(ListUtils.map(namespaceDeclaration.getPadding().getExterns(), el -> visitRightPadded(el, CsRightPadded.Location.NAMESPACE_DECLARATION_EXTERNS, p)));
+        namespaceDeclaration = namespaceDeclaration.getPadding().withUsings(ListUtils.map(namespaceDeclaration.getPadding().getUsings(), el -> visitRightPadded(el, CsRightPadded.Location.NAMESPACE_DECLARATION_USINGS, p)));
         namespaceDeclaration = namespaceDeclaration.getPadding().withMembers(ListUtils.map(namespaceDeclaration.getPadding().getMembers(), el -> visitRightPadded(el, CsRightPadded.Location.NAMESPACE_DECLARATION_MEMBERS, p)));
         return namespaceDeclaration.withEnd(visitSpace(namespaceDeclaration.getEnd(), CsSpace.Location.NAMESPACE_DECLARATION_END, p));
     }
@@ -342,12 +342,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
 
     public J visitExternAlias(Cs.ExternAlias externAlias, P p) {
         externAlias = externAlias.withPrefix(visitSpace(externAlias.getPrefix(), CsSpace.Location.EXTERN_ALIAS_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(externAlias, p);
-        if (!(tempStatement instanceof Cs.ExternAlias))
-        {
-            return tempStatement;
-        }
-        externAlias = (Cs.ExternAlias) tempStatement;
         externAlias = externAlias.withMarkers(visitMarkers(externAlias.getMarkers(), p));
         return externAlias.getPadding().withIdentifier(visitLeftPadded(externAlias.getPadding().getIdentifier(), CsLeftPadded.Location.EXTERN_ALIAS_IDENTIFIER, p));
     }
@@ -405,12 +399,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
 
     public J visitUsingDirective(Cs.UsingDirective usingDirective, P p) {
         usingDirective = usingDirective.withPrefix(visitSpace(usingDirective.getPrefix(), CsSpace.Location.USING_DIRECTIVE_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(usingDirective, p);
-        if (!(tempStatement instanceof Cs.UsingDirective))
-        {
-            return tempStatement;
-        }
-        usingDirective = (Cs.UsingDirective) tempStatement;
         usingDirective = usingDirective.withMarkers(visitMarkers(usingDirective.getMarkers(), p));
         usingDirective = usingDirective.getPadding().withGlobal(visitRightPadded(usingDirective.getPadding().getGlobal(), CsRightPadded.Location.USING_DIRECTIVE_GLOBAL, p));
         usingDirective = usingDirective.getPadding().withStatic(visitLeftPadded(usingDirective.getPadding().getStatic(), CsLeftPadded.Location.USING_DIRECTIVE_STATIC, p));
@@ -456,25 +444,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         lambda = lambda.withLambdaExpression(visitAndCast(lambda.getLambdaExpression(), p));
         lambda = lambda.withReturnType(visitAndCast(lambda.getReturnType(), p));
         return lambda.withModifiers(ListUtils.map(lambda.getModifiers(), el -> (J.Modifier)visit(el, p)));
-    }
-
-    public J visitMethodDeclaration(Cs.MethodDeclaration methodDeclaration, P p) {
-        methodDeclaration = methodDeclaration.withPrefix(visitSpace(methodDeclaration.getPrefix(), CsSpace.Location.METHOD_DECLARATION_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(methodDeclaration, p);
-        if (!(tempStatement instanceof Cs.MethodDeclaration))
-        {
-            return tempStatement;
-        }
-        methodDeclaration = (Cs.MethodDeclaration) tempStatement;
-        methodDeclaration = methodDeclaration.withMarkers(visitMarkers(methodDeclaration.getMarkers(), p));
-        methodDeclaration = methodDeclaration.withAttributes(ListUtils.map(methodDeclaration.getAttributes(), el -> (Cs.AttributeList)visit(el, p)));
-        methodDeclaration = methodDeclaration.withModifiers(ListUtils.map(methodDeclaration.getModifiers(), el -> (J.Modifier)visit(el, p)));
-        methodDeclaration = methodDeclaration.getPadding().withTypeParameters(visitContainer(methodDeclaration.getPadding().getTypeParameters(), CsContainer.Location.METHOD_DECLARATION_TYPE_PARAMETERS, p));
-        methodDeclaration = methodDeclaration.withReturnTypeExpression(visitAndCast(methodDeclaration.getReturnTypeExpression(), p));
-        methodDeclaration = methodDeclaration.getPadding().withExplicitInterfaceSpecifier(visitRightPadded(methodDeclaration.getPadding().getExplicitInterfaceSpecifier(), CsRightPadded.Location.METHOD_DECLARATION_EXPLICIT_INTERFACE_SPECIFIER, p));
-        methodDeclaration = methodDeclaration.withName(visitAndCast(methodDeclaration.getName(), p));
-        methodDeclaration = methodDeclaration.getPadding().withParameters(visitContainer(methodDeclaration.getPadding().getParameters(), CsContainer.Location.METHOD_DECLARATION_PARAMETERS, p));
-        return methodDeclaration.withBody(visitAndCast(methodDeclaration.getBody(), p));
     }
 
     public J visitUsingStatement(Cs.UsingStatement usingStatement, P p) {
@@ -587,18 +556,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return tupleExpression.getPadding().withArguments(visitContainer(tupleExpression.getPadding().getArguments(), CsContainer.Location.TUPLE_EXPRESSION_ARGUMENTS, p));
     }
 
-    public J visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, P p) {
-        destructorDeclaration = destructorDeclaration.withPrefix(visitSpace(destructorDeclaration.getPrefix(), CsSpace.Location.DESTRUCTOR_DECLARATION_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(destructorDeclaration, p);
-        if (!(tempStatement instanceof Cs.DestructorDeclaration))
-        {
-            return tempStatement;
-        }
-        destructorDeclaration = (Cs.DestructorDeclaration) tempStatement;
-        destructorDeclaration = destructorDeclaration.withMarkers(visitMarkers(destructorDeclaration.getMarkers(), p));
-        return destructorDeclaration.withMethodCore(visitAndCast(destructorDeclaration.getMethodCore(), p));
-    }
-
     public J visitUnary(Cs.Unary unary, P p) {
         unary = unary.withPrefix(visitSpace(unary.getPrefix(), CsSpace.Location.UNARY_PREFIX, p));
         Statement tempStatement = (Statement) visitStatement(unary, p);
@@ -635,25 +592,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         tupleElement = tupleElement.withMarkers(visitMarkers(tupleElement.getMarkers(), p));
         tupleElement = tupleElement.withType(visitAndCast(tupleElement.getType(), p));
         return tupleElement.withName(visitAndCast(tupleElement.getName(), p));
-    }
-
-    public J visitNewClass(Cs.NewClass newClass, P p) {
-        newClass = newClass.withPrefix(visitSpace(newClass.getPrefix(), CsSpace.Location.NEW_CLASS_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(newClass, p);
-        if (!(tempStatement instanceof Cs.NewClass))
-        {
-            return tempStatement;
-        }
-        newClass = (Cs.NewClass) tempStatement;
-        Expression tempExpression = (Expression) visitExpression(newClass, p);
-        if (!(tempExpression instanceof Cs.NewClass))
-        {
-            return tempExpression;
-        }
-        newClass = (Cs.NewClass) tempExpression;
-        newClass = newClass.withMarkers(visitMarkers(newClass.getMarkers(), p));
-        newClass = newClass.withNewClassCore(visitAndCast(newClass.getNewClassCore(), p));
-        return newClass.withInitializer(visitAndCast(newClass.getInitializer(), p));
     }
 
     public J visitInitializerExpression(Cs.InitializerExpression initializerExpression, P p) {
@@ -1067,19 +1005,6 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         aliasQualifiedName = aliasQualifiedName.withMarkers(visitMarkers(aliasQualifiedName.getMarkers(), p));
         aliasQualifiedName = aliasQualifiedName.getPadding().withAlias(visitRightPadded(aliasQualifiedName.getPadding().getAlias(), CsRightPadded.Location.ALIAS_QUALIFIED_NAME_ALIAS, p));
         return aliasQualifiedName.withName(visitAndCast(aliasQualifiedName.getName(), p));
-    }
-
-    public J visitArrayType(Cs.ArrayType arrayType, P p) {
-        arrayType = arrayType.withPrefix(visitSpace(arrayType.getPrefix(), CsSpace.Location.ARRAY_TYPE_PREFIX, p));
-        Expression tempExpression = (Expression) visitExpression(arrayType, p);
-        if (!(tempExpression instanceof Cs.ArrayType))
-        {
-            return tempExpression;
-        }
-        arrayType = (Cs.ArrayType) tempExpression;
-        arrayType = arrayType.withMarkers(visitMarkers(arrayType.getMarkers(), p));
-        arrayType = arrayType.withTypeExpression(visitAndCast(arrayType.getTypeExpression(), p));
-        return arrayType.withDimensions(ListUtils.map(arrayType.getDimensions(), el -> (J.ArrayDimension)visit(el, p)));
     }
 
     public J visitAccessorDeclaration(Cs.AccessorDeclaration accessorDeclaration, P p) {

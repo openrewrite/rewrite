@@ -37,9 +37,9 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     {
         if (tree == null) return null;
 
-        // ExpressionStatement (from Rewrite.Java) maps to Cs$ExpressionStatement in Java,
-        // which wraps expression in JRightPadded. C#'s model has a bare Expression, so we
-        // intercept here and receive in the format Java's CSharpSender sends.
+        // ExpressionStatement wraps expression in JRightPadded on the Java side.
+        // C#'s model has a bare Expression, so we intercept here and receive in the
+        // format Java's CSharpSender sends.
         if (tree is ExpressionStatement es)
         {
             Cursor = new Cursor(Cursor, tree);
@@ -195,6 +195,15 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         var charsetBomMarked = q.Receive(cu.CharsetBomMarked);
         var checksum = q.Receive<Checksum?>(cu.Checksum);
         var fileAttributes = q.Receive<Core.FileAttributes?>(cu.FileAttributes);
+        var externs = q.ReceiveList(
+            cu.Externs ?? [],
+            rp => _delegate.VisitRightPadded(rp, q));
+        var usings = q.ReceiveList(
+            cu.Usings ?? [],
+            rp => _delegate.VisitRightPadded(rp, q));
+        var attributeLists = q.ReceiveList(
+            cu.AttributeLists ?? [],
+            al => (AttributeList)_delegate.VisitNonNull(al, q));
         var members = q.ReceiveList(
             cu.Members ?? [],
             rp => _delegate.VisitRightPadded(rp, q));
@@ -203,6 +212,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         return cu.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers)
             .WithSourcePath(sourcePath!).WithCharset(charset!).WithCharsetBomMarked(charsetBomMarked)
             .WithChecksum(checksum).WithFileAttributes(fileAttributes)
+            .WithExterns(externs ?? []).WithUsings(usings ?? []).WithAttributeLists(attributeLists ?? [])
             .WithMembers(members ?? []).WithEof(eof!);
     }
 
@@ -437,12 +447,18 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, RpcReceiveQueue q)
     {
         var name = q.Receive(ns.Name, rp => _delegate.VisitRightPadded(rp, q));
+        var externs = q.ReceiveList(
+            ns.Externs ?? [],
+            rp => _delegate.VisitRightPadded(rp, q));
+        var usings = q.ReceiveList(
+            ns.Usings ?? [],
+            rp => _delegate.VisitRightPadded(rp, q));
         var members = q.ReceiveList(
             ns.Members ?? [],
             rp => _delegate.VisitRightPadded(rp, q));
         var end = q.Receive(ns.End, space => VisitSpace(space, q));
 
-        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!).WithMembers(members!).WithEnd(end!);
+        return ns.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithName(name!).WithExterns(externs ?? []).WithUsings(usings ?? []).WithMembers(members!).WithEnd(end!);
     }
 
     // ---- TupleType ----
@@ -1096,7 +1112,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             {
                 return base.Visit(tree, q);
             }
-            if (tree is Cs || tree is ExpressionStatement)
+            if (tree is Cs)
             {
                 return _outer.Visit(tree, q);
             }

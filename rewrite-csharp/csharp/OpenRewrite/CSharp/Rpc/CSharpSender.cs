@@ -38,10 +38,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         if (tree == null) return null;
 
-        // ExpressionStatement (from Rewrite.Java) maps to Cs$ExpressionStatement in Java,
-        // which wraps expression in JRightPadded. C#'s model has a bare Expression, so we
-        // intercept here and send in the format Java's CSharpReceiver expects.
-        if (tree is Java.ExpressionStatement es)
+        // ExpressionStatement wraps expression in JRightPadded on the Java side.
+        // C#'s model has a bare Expression, so we intercept here and send in the
+        // format Java's CSharpReceiver expects.
+        if (tree is ExpressionStatement es)
         {
             Cursor = new Cursor(Cursor, tree);
             PreVisit(es, q);
@@ -199,6 +199,12 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cu, c => (object)c.CharsetBomMarked);
         q.GetAndSend(cu, c => c.Checksum);
         q.GetAndSend(cu, c => c.FileAttributes);
+        q.GetAndSendList(cu, c => c.Externs,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        q.GetAndSendList(cu, c => c.Usings,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        q.GetAndSendList(cu, c => c.AttributeLists,
+            a => (object)a.Id, a => Visit(a, q));
         q.GetAndSendList(cu, c => c.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(cu, c => c.Eof, space => VisitSpace(space, q));
@@ -443,6 +449,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, RpcSendQueue q)
     {
         q.GetAndSend(ns, n => n.Name, rp => VisitRightPadded(rp, q));
+        q.GetAndSendList(ns, n => n.Externs,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        q.GetAndSendList(ns, n => n.Usings,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSendList(ns, n => n.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(ns, n => n.End, space => VisitSpace(space, q));
@@ -1074,7 +1084,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             {
                 return base.Visit(tree, q);
             }
-            if (tree is Cs || tree is ExpressionStatement)
+            if (tree is Cs)
             {
                 return _outer.Visit(tree, q);
             }

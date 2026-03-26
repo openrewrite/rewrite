@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using OpenRewrite.Core;
+using OpenRewrite.CSharp;
 
 namespace OpenRewrite.Java;
 

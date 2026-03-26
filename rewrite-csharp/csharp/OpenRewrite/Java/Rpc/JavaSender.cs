@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp;
 using static Rewrite.Core.Rpc.Reference;
 
 namespace OpenRewrite.Java.Rpc;
