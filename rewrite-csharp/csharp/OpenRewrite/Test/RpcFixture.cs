@@ -74,39 +74,21 @@ public class RpcFixture : IDisposable
 
     private static ProcessStartInfo CreateJavaProcessStartInfo()
     {
-        // Option 1: fat JAR (used by recipes-csharp)
-        var jarPath = Environment.GetEnvironmentVariable("RPC_TEST_SERVER_JAR");
-        if (jarPath != null)
-        {
-            return new ProcessStartInfo("java", $"-jar \"{jarPath}\"")
-            {
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-        }
+        var cpFile = Environment.GetEnvironmentVariable("RPC_TEST_SERVER_CLASSPATH")
+                     ?? throw new InvalidOperationException(
+                         "RPC_TEST_SERVER_CLASSPATH environment variable not set. " +
+                         "Run './gradlew :rewrite-csharp:rpcTestClasspath' to generate the classpath file.");
 
-        // Option 2: classpath file (used by rewrite-csharp Gradle build)
-        var cpFile = Environment.GetEnvironmentVariable("RPC_TEST_SERVER_CLASSPATH");
-        if (cpFile != null)
+        var classpath = File.ReadAllText(cpFile).Trim();
+        return new ProcessStartInfo("java",
+            $"-cp \"{classpath}\" org.openrewrite.maven.rpc.JavaRewriteRpc")
         {
-            var classpath = File.ReadAllText(cpFile).Trim();
-            return new ProcessStartInfo("java",
-                $"-cp \"{classpath}\" org.openrewrite.maven.rpc.JavaRewriteRpc")
-            {
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-        }
-
-        throw new InvalidOperationException(
-            "Neither RPC_TEST_SERVER_JAR nor RPC_TEST_SERVER_CLASSPATH environment variable is set. " +
-            "Run './gradlew :rewrite-csharp:rpcTestClasspath' to generate the classpath file.");
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
     }
 
     public void Dispose()
