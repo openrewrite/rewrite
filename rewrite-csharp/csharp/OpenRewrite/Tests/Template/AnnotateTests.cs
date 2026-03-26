@@ -310,7 +310,7 @@ public class AnnotateTests : RewriteTest
 file class AnnotateRecipe<T>(
     CSharpPattern pat,
     Func<T, Cursor, MatchResult, T>? annotator = null,
-    string? description = null) : Core.Recipe where T : J
+    string? description = null) : OpenRewrite.Core.Recipe where T : J
 {
     public override string DisplayName => "Annotate test";
     public override string Description => "Test recipe for Annotate.";
@@ -339,7 +339,7 @@ file class AnnotateRecipe<T>(
 /// Test recipe that verifies Find() and Annotate() with SearchResult produce equivalent results.
 /// Uses Find() — the point is that Find() should still work after being refactored to use Annotate().
 /// </summary>
-file class FindVsAnnotateRecipe(CSharpPattern pat) : Core.Recipe
+file class FindVsAnnotateRecipe(CSharpPattern pat) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find vs Annotate";
     public override string Description => "Verifies Find delegates to Annotate.";
@@ -362,7 +362,7 @@ file class FindVsAnnotateRecipe(CSharpPattern pat) : Core.Recipe
 /// <summary>
 /// Thin recipe wrapper around a pre-built visitor from <see cref="CSharpPattern.Find(CSharpPattern, string?)"/>.
 /// </summary>
-file class FindVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : Core.Recipe
+file class FindVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find visitor test";
     public override string Description => "Test recipe wrapping CSharpPattern.Find.";

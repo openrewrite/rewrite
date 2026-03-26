@@ -1626,71 +1626,71 @@ public class PatternMatchTests : RewriteTest
     // ===============================================================
 
 #pragma warning disable CS0618
-    private static Core.Recipe Search<T>(TemplateStringHandler handler) where T : J =>
+    private static OpenRewrite.Core.Recipe Search<T>(TemplateStringHandler handler) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(handler));
 
-    private static Core.Recipe Search<T>(string code) where T : J =>
+    private static OpenRewrite.Core.Recipe Search<T>(string code) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(code));
 
-    private static Core.Recipe Search<T>(TemplateStringHandler handler, IReadOnlyList<string> usings) where T : J =>
+    private static OpenRewrite.Core.Recipe Search<T>(TemplateStringHandler handler, IReadOnlyList<string> usings) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(handler, usings: usings));
 
-    private static Core.Recipe Search<T>(string code, IReadOnlyList<string> usings) where T : J =>
+    private static OpenRewrite.Core.Recipe Search<T>(string code, IReadOnlyList<string> usings) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(code, usings: usings));
 #pragma warning restore CS0618
 
-    private static Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
-    private static Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
-    private static Core.Recipe FindMethodInvocation(TemplateStringHandler h, IReadOnlyList<string> usings) => Search<MethodInvocation>(h, usings);
-    private static Core.Recipe FindMethodInvocation(string c, IReadOnlyList<string> usings) => Search<MethodInvocation>(c, usings);
-    private static Core.Recipe FindFieldAccess(TemplateStringHandler h) => Search<FieldAccess>(h);
-    private static Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
-    private static Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
-    private static Core.Recipe FindStaticMember(string c) =>
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(TemplateStringHandler h, IReadOnlyList<string> usings) => Search<MethodInvocation>(h, usings);
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(string c, IReadOnlyList<string> usings) => Search<MethodInvocation>(c, usings);
+    private static OpenRewrite.Core.Recipe FindFieldAccess(TemplateStringHandler h) => Search<FieldAccess>(h);
+    private static OpenRewrite.Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
+    private static OpenRewrite.Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
+    private static OpenRewrite.Core.Recipe FindStaticMember(string c) =>
         new StaticMemberSearchRecipe(CSharpPattern.Expression(c));
-    private static Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
+    private static OpenRewrite.Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
         new StaticMemberSearchRecipe(CSharpPattern.Expression(c, usings: usings));
-    private static Core.Recipe FindLiteral(string c) => Search<Literal>(c);
-    private static Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
-    private static Core.Recipe FindUnary(TemplateStringHandler h) => Search<Unary>(h);
-    private static Core.Recipe FindTernary(TemplateStringHandler h) => Search<Ternary>(h);
-    private static Core.Recipe FindAssignment(TemplateStringHandler h) => Search<Assignment>(h);
-    private static Core.Recipe FindAssignmentOperation(TemplateStringHandler h) => Search<OpenRewrite.CSharp.AssignmentOperation>(h);
-    private static Core.Recipe FindNewClass(string c) => Search<NewClass>(c);
-    private static Core.Recipe FindNewClass(TemplateStringHandler h) => Search<NewClass>(h);
-    private static Core.Recipe FindNewArray(string c) => Search<NewArray>(c);
-    private static Core.Recipe FindTypeCast(TemplateStringHandler h) => Search<TypeCast>(h);
-    private static Core.Recipe FindArrayAccess(TemplateStringHandler h) => Search<ArrayAccess>(h);
-    private static Core.Recipe FindReturn(TemplateStringHandler h) => Search<Return>(h);
-    private static Core.Recipe FindThrow(string c) => Search<Throw>(c);
-    private static Core.Recipe FindThrow(TemplateStringHandler h) => Search<Throw>(h);
-    private static Core.Recipe FindIf(string c) => Search<If>(c);
-    private static Core.Recipe FindWhileLoop(string c) => Search<WhileLoop>(c);
-    private static Core.Recipe FindDoWhileLoop(string c) => Search<DoWhileLoop>(c);
-    private static Core.Recipe FindForEachLoop(string c) => Search<ForEachLoop>(c);
-    private static Core.Recipe FindSwitch(string c) => Search<Switch>(c);
-    private static Core.Recipe FindTry(string c) => Search<Try>(c);
-    private static Core.Recipe FindLambda(string c) => Search<Lambda>(c);
-    private static Core.Recipe FindInstanceOf(string c) => Search<InstanceOf>(c);
-    private static Core.Recipe FindDefaultExpression(string c) => Search<DefaultExpression>(c);
-    private static Core.Recipe FindSizeOf(string c) => Search<SizeOf>(c);
-    private static Core.Recipe FindSwitchExpression(string c) => Search<OpenRewrite.CSharp.SwitchExpression>(c);
-    private static Core.Recipe FindTupleExpression(string c) => Search<TupleExpression>(c);
-    private static Core.Recipe FindNullSafeExpression(string c) => Search<NullSafeExpression>(c);
-    private static Core.Recipe FindIsPattern(string c) => Search<IsPattern>(c);
-    private static Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
-    private static Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
+    private static OpenRewrite.Core.Recipe FindLiteral(string c) => Search<Literal>(c);
+    private static OpenRewrite.Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
+    private static OpenRewrite.Core.Recipe FindUnary(TemplateStringHandler h) => Search<Unary>(h);
+    private static OpenRewrite.Core.Recipe FindTernary(TemplateStringHandler h) => Search<Ternary>(h);
+    private static OpenRewrite.Core.Recipe FindAssignment(TemplateStringHandler h) => Search<Assignment>(h);
+    private static OpenRewrite.Core.Recipe FindAssignmentOperation(TemplateStringHandler h) => Search<OpenRewrite.CSharp.AssignmentOperation>(h);
+    private static OpenRewrite.Core.Recipe FindNewClass(string c) => Search<NewClass>(c);
+    private static OpenRewrite.Core.Recipe FindNewClass(TemplateStringHandler h) => Search<NewClass>(h);
+    private static OpenRewrite.Core.Recipe FindNewArray(string c) => Search<NewArray>(c);
+    private static OpenRewrite.Core.Recipe FindTypeCast(TemplateStringHandler h) => Search<TypeCast>(h);
+    private static OpenRewrite.Core.Recipe FindArrayAccess(TemplateStringHandler h) => Search<ArrayAccess>(h);
+    private static OpenRewrite.Core.Recipe FindReturn(TemplateStringHandler h) => Search<Return>(h);
+    private static OpenRewrite.Core.Recipe FindThrow(string c) => Search<Throw>(c);
+    private static OpenRewrite.Core.Recipe FindThrow(TemplateStringHandler h) => Search<Throw>(h);
+    private static OpenRewrite.Core.Recipe FindIf(string c) => Search<If>(c);
+    private static OpenRewrite.Core.Recipe FindWhileLoop(string c) => Search<WhileLoop>(c);
+    private static OpenRewrite.Core.Recipe FindDoWhileLoop(string c) => Search<DoWhileLoop>(c);
+    private static OpenRewrite.Core.Recipe FindForEachLoop(string c) => Search<ForEachLoop>(c);
+    private static OpenRewrite.Core.Recipe FindSwitch(string c) => Search<Switch>(c);
+    private static OpenRewrite.Core.Recipe FindTry(string c) => Search<Try>(c);
+    private static OpenRewrite.Core.Recipe FindLambda(string c) => Search<Lambda>(c);
+    private static OpenRewrite.Core.Recipe FindInstanceOf(string c) => Search<InstanceOf>(c);
+    private static OpenRewrite.Core.Recipe FindDefaultExpression(string c) => Search<DefaultExpression>(c);
+    private static OpenRewrite.Core.Recipe FindSizeOf(string c) => Search<SizeOf>(c);
+    private static OpenRewrite.Core.Recipe FindSwitchExpression(string c) => Search<OpenRewrite.CSharp.SwitchExpression>(c);
+    private static OpenRewrite.Core.Recipe FindTupleExpression(string c) => Search<TupleExpression>(c);
+    private static OpenRewrite.Core.Recipe FindNullSafeExpression(string c) => Search<NullSafeExpression>(c);
+    private static OpenRewrite.Core.Recipe FindIsPattern(string c) => Search<IsPattern>(c);
+    private static OpenRewrite.Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
+    private static OpenRewrite.Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
 
-    private static Core.Recipe FindAnnotation(TemplateStringHandler h) =>
+    private static OpenRewrite.Core.Recipe FindAnnotation(TemplateStringHandler h) =>
         new PatternSearchRecipe<Annotation>(CSharpPattern.Attribute(h));
 
     /// <summary>
     /// Search for a Binary or IsPattern null-check, matching across both node types.
     /// </summary>
-    private static Core.Recipe FindNullCheck(TemplateStringHandler h) =>
+    private static OpenRewrite.Core.Recipe FindNullCheck(TemplateStringHandler h) =>
         new NullCheckSearchRecipe(CSharpPattern.Expression(h));
 
-    private static Core.Recipe FindNullCheck(string c) =>
+    private static OpenRewrite.Core.Recipe FindNullCheck(string c) =>
         new NullCheckSearchRecipe(CSharpPattern.Expression(c));
 }
 
@@ -1698,7 +1698,7 @@ public class PatternMatchTests : RewriteTest
 /// Generic search recipe that visits all nodes of type <typeparamref name="T"/>
 /// and marks matches with a <see cref="SearchResult"/> marker.
 /// </summary>
-file class PatternSearchRecipe<T>(CSharpPattern pat) : Core.Recipe where T : J
+file class PatternSearchRecipe<T>(CSharpPattern pat) : OpenRewrite.Core.Recipe where T : J
 {
     public override string DisplayName => $"Find {typeof(T).Name}";
     public override string Description => $"Searches for {typeof(T).Name} matching the pattern.";
@@ -1722,7 +1722,7 @@ file class PatternSearchRecipe<T>(CSharpPattern pat) : Core.Recipe where T : J
 /// Search recipe that visits both Binary and IsPattern nodes to support
 /// cross-type null-check equivalence (== null ↔ is null).
 /// </summary>
-file class NullCheckSearchRecipe(CSharpPattern pat) : Core.Recipe
+file class NullCheckSearchRecipe(CSharpPattern pat) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find null check";
     public override string Description => "Searches for null checks matching the pattern (== null or is null).";
@@ -1746,7 +1746,7 @@ file class NullCheckSearchRecipe(CSharpPattern pat) : Core.Recipe
 /// Search recipe that visits both FieldAccess and Identifier nodes to support
 /// cross-type semantic matching for static members (e.g. Math.PI ↔ PI with using static).
 /// </summary>
-file class StaticMemberSearchRecipe(CSharpPattern pat) : Core.Recipe
+file class StaticMemberSearchRecipe(CSharpPattern pat) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find static member";
     public override string Description => "Searches for static member references matching the pattern (FieldAccess or Identifier).";
