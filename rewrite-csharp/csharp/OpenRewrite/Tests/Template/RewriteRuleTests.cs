@@ -1070,7 +1070,7 @@ class FallbackWithManualVisitorRecipe : Core.Recipe
     }
 }
 
-class SwapBinaryWithAutoFormatRecipe : Core.Recipe
+class SwapBinaryWithAutoFormatRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Swap binary with auto-format";
     public override string Description => "Swaps binary operands, using AutoFormat.";
