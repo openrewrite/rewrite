@@ -16,16 +16,17 @@
 namespace OpenRewrite.Test;
 
 /// <summary>
-/// Defines a shared collection so all RPC test classes use a single Java RPC
-/// server process and don't conflict on the static RewriteRpcServer.Current.
-/// </summary>
-[CollectionDefinition("RPC")]
-public class RpcCollection : ICollectionFixture<RpcFixture>;
-
-/// <summary>
 /// Base class for tests that need a Java RPC connection.
 /// Uses a shared collection fixture for one JVM across all test classes,
 /// and IDisposable to reset state between tests.
+/// <para>
+/// Each test assembly must define its own xUnit collection definition:
+/// <code>
+/// [CollectionDefinition("RPC")]
+/// public class RpcCollection : ICollectionFixture&lt;RpcFixture&gt;;
+/// </code>
+/// xUnit requires collection definitions to be in the test assembly itself.
+/// </para>
 /// </summary>
 [Collection("RPC")]
 public abstract class RpcRewriteTest : RewriteTest, IDisposable
