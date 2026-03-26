@@ -696,32 +696,27 @@ public class RewriteRuleTests : RewriteTest
     [Fact]
     public void DeferredFormatDoesNotAffectSurroundingWhitespace()
     {
-        // Replacing an expression inside a nested structure should not
-        // change the indentation of surrounding code (parent closing braces, etc.)
+        // Replacing an attribute should not change indentation of surrounding code
         RewriteRun(
-            spec => spec.SetRecipe(new SwapBinaryWithAutoFormatRecipe()),
+            spec => spec.SetRecipe(new RenameAttributeRecipe()),
             CSharp(
                 """
                 class C
                 {
-                    object[][] M()
+                    [Foo]
+                    public void M()
                     {
-                        return new object[][]
-                        {
-                            new object[] { 1 + 2 }
-                        };
+                        var x = 1;
                     }
                 }
                 """,
                 """
                 class C
                 {
-                    object[][] M()
+                    [Bar]
+                    public void M()
                     {
-                        return new object[][]
-                        {
-                            new object[] { 2 + 1 }
-                        };
+                        var x = 1;
                     }
                 }
                 """
@@ -1067,6 +1062,19 @@ class FallbackWithManualVisitorRecipe : Core.Recipe
         return CSharpTemplate.Rewrite(
             (CSharpPattern.Expression($"{x} == null"), CSharpTemplate.Expression($"{x} is null")),
             (CSharpPattern.Expression($"{x} != null"), CSharpTemplate.Expression($"{x} is not null")));
+    }
+}
+
+class RenameAttributeRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Rename attribute";
+    public override string Description => "Renames [Foo] to [Bar].";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        return CSharpTemplate.Rewrite(
+            CSharpPattern.Attribute($"Foo"),
+            CSharpTemplate.Attribute($"Bar"));
     }
 }
 

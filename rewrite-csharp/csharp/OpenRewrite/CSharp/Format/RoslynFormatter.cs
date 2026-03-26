@@ -249,9 +249,9 @@ public static class RoslynFormatter
             return cu;
         }
 
-        // 7. Reconcile whitespace (full CU — Roslyn only changed the span regions)
+        // 7. Reconcile whitespace only within the target subtrees
         var reconciler = new WhitespaceReconciler();
-        var result = reconciler.Reconcile(cu, formattedCu);
+        var result = reconciler.Reconcile(cu, formattedCu, nodeIds);
 
         if (!reconciler.IsCompatible)
             return cu;
