@@ -623,6 +623,63 @@ public class TypeUtilsTests
     }
 
     // =============================================================
+    // IsAssignableTo — Nullable<T> (value type assignable to Nullable<T>)
+    // =============================================================
+
+    [Fact]
+    public void IsAssignableTo_PrimitiveInt_AssignableToNullableInt()
+    {
+        var from = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable,
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_ClassInt_AssignableToNullableInt()
+    {
+        var from = MakeClass("System.Int32");
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable,
+            [MakeClass("System.Int32")]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Struct_AssignableToNullableStruct()
+    {
+        var from = MakeClass("System.DateTime",
+            supertype: MakeClass("System.ValueType"));
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable, [MakeClass("System.DateTime")]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_WrongType_NotAssignableToNullable()
+    {
+        // int is NOT assignable to Nullable<double>
+        var from = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable,
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Double)]);
+        Assert.False(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_NullableInt_AssignableToNullableInt()
+    {
+        // Nullable<int> is assignable to Nullable<int>
+        var nullable = MakeClass("System.Nullable");
+        var from = new JavaType.Parameterized(nullable,
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)]);
+        var target = new JavaType.Parameterized(MakeClass("System.Nullable"),
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    // =============================================================
     // Cycle protection
     // =============================================================
 

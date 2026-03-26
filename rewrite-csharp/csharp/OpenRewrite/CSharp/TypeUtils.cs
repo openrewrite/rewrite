@@ -78,6 +78,19 @@ public static class TypeUtils
         if (type is JavaType.Primitive candPrim && targetType is JavaType.Primitive targetPrim)
             return candPrim.Kind == targetPrim.Kind;
 
+        // Nullable<T>: both Nullable<T> and T are assignable to Nullable<T>
+        if (targetType is JavaType.Parameterized { TypeParameters: [var innerType] } nullableParam
+            && GetFullyQualifiedName(nullableParam.Type) == "System.Nullable")
+        {
+            // Nullable<T> → Nullable<T>
+            if (type is JavaType.Parameterized { TypeParameters: [var sourceInner] } sourceParam
+                && GetFullyQualifiedName(sourceParam.Type) == "System.Nullable")
+                return IsAssignableTo(sourceInner, innerType);
+
+            // T → Nullable<T>
+            return IsAssignableTo(type, innerType);
+        }
+
         // When target is parameterized with type parameters, do parameter-aware matching.
         // This handles both open generics (with GenericTypeVariable wildcards) and concrete
         // generics (where all type args must match exactly).
