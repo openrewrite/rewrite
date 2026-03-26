@@ -62,7 +62,7 @@ public class CSharpTypeMappingTests : RewriteTest
     private static VariableDeclarations? FindVariableDeclaration(CompilationUnit cu, string varName)
     {
         var finder = new VarFinder(varName);
-        finder.Cursor = new Core.Cursor(null, Core.Cursor.ROOT_VALUE);
+        finder.Cursor = new OpenRewrite.Core.Cursor(null, OpenRewrite.Core.Cursor.ROOT_VALUE);
         finder.Visit(cu, 0);
         return finder.Found;
     }

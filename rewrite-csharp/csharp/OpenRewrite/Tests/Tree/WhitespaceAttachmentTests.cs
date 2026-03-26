@@ -19,9 +19,9 @@ using OpenRewrite.Java;
 
 namespace OpenRewrite.Tests.Tree;
 
-file class OutputNode(Core.Tree element)
+file class OutputNode(OpenRewrite.Core.Tree element)
 {
-    public Core.Tree Element { get; } = element;
+    public OpenRewrite.Core.Tree Element { get; } = element;
     public List<object> Children { get; } = [];
 
     public override string ToString()
@@ -31,7 +31,7 @@ file class OutputNode(Core.Tree element)
         return $"{PrettifyType(Element)}{{{childrenStr}}}";
     }
 
-    internal static string PrettifyType(Core.Tree tree)
+    internal static string PrettifyType(OpenRewrite.Core.Tree tree)
     {
         var type = tree.GetType();
         var ns = type.Namespace;
@@ -52,7 +52,7 @@ file class TreeStructurePrintOutputCapture : PrintOutputCapture<int>
     {
     }
 
-    public void StartNode(Core.Tree element)
+    public void StartNode(OpenRewrite.Core.Tree element)
     {
         var node = new OutputNode(element);
         if (_nodeStack.Count > 0)

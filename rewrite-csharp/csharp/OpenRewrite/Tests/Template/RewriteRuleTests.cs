@@ -699,7 +699,7 @@ public class RewriteRuleTests : RewriteTest
 // Recipe implementations
 // ===============================================================
 
-class SwapBinaryOperandsRecipe : Core.Recipe
+class SwapBinaryOperandsRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Swap binary operands";
     public override string Description => "Swaps left and right operands of addition.";
@@ -727,7 +727,7 @@ class SwapBinaryOperandsRecipe : Core.Recipe
     }
 }
 
-class NormalizeConsoleOutputRecipe : Core.Recipe
+class NormalizeConsoleOutputRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Normalize console output";
     public override string Description => "Normalizes Console.Write and Console.Error.Write to Console.WriteLine.";
@@ -756,7 +756,7 @@ class NormalizeConsoleOutputRecipe : Core.Recipe
     }
 }
 
-class MigrateAndRedirectRecipe : Core.Recipe
+class MigrateAndRedirectRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Migrate and redirect";
     public override string Description => "Chains two rules: Write→WriteLine, then WriteLine→Error.WriteLine.";
@@ -796,7 +796,7 @@ class MigrateAndRedirectRecipe : Core.Recipe
     }
 }
 
-class MigrateWithFallbackRecipe : Core.Recipe
+class MigrateWithFallbackRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Migrate with fallback";
     public override string Description => "Tries primary then fallback rule.";
@@ -833,7 +833,7 @@ class MigrateWithFallbackRecipe : Core.Recipe
     }
 }
 
-class PreMatchFilteredRecipe : Core.Recipe
+class PreMatchFilteredRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "PreMatch filtered";
     public override string Description => "Only transforms inside methods named Target.";
@@ -862,7 +862,7 @@ class PreMatchFilteredRecipe : Core.Recipe
     }
 }
 
-class CaptureConstraintFilteredRecipe : Core.Recipe
+class CaptureConstraintFilteredRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Capture constraint filtered";
     public override string Description => "Simplifies x + 0 to x using a capture constraint.";
@@ -891,7 +891,7 @@ class CaptureConstraintFilteredRecipe : Core.Recipe
     }
 }
 
-class CaptureFlowRecipe : Core.Recipe
+class CaptureFlowRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Capture flow";
     public override string Description => "Tests captures flowing from pattern to template.";
@@ -922,7 +922,7 @@ class CaptureFlowRecipe : Core.Recipe
 /// Expands "return expr" into "Console.WriteLine(expr); return expr;" — two statements.
 /// Exercises multi-statement templates and CSharpTemplate.CreateBlockFlattener.
 /// </summary>
-class LogBeforeReturnRecipe : Core.Recipe
+class LogBeforeReturnRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Log before return";
     public override string Description => "Adds Console.WriteLine before return statements.";
@@ -958,7 +958,7 @@ class LogBeforeReturnRecipe : Core.Recipe
     }
 }
 
-class RewriteBinaryRecipe : Core.Recipe
+class RewriteBinaryRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Rewrite binary swap";
     public override string Description => "Swaps binary operands using CSharpTemplate.Rewrite().";
@@ -973,7 +973,7 @@ class RewriteBinaryRecipe : Core.Recipe
     }
 }
 
-class RewriteMethodInvocationRecipe : Core.Recipe
+class RewriteMethodInvocationRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Rewrite method invocation";
     public override string Description => "Replaces Console.Write with Console.WriteLine using CSharpTemplate.Rewrite().";
@@ -987,7 +987,7 @@ class RewriteMethodInvocationRecipe : Core.Recipe
     }
 }
 
-class UseContainsKeyRecipe : Core.Recipe
+class UseContainsKeyRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Use ContainsKey";
     public override string Description => "Replace dict.Keys.Contains(key) with dict.ContainsKey(key).";
@@ -1003,7 +1003,7 @@ class UseContainsKeyRecipe : Core.Recipe
     }
 }
 
-class UseElementAtRecipe : Core.Recipe
+class UseElementAtRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Use element access";
     public override string Description => "Replace ElementAt with indexer.";
@@ -1019,7 +1019,7 @@ class UseElementAtRecipe : Core.Recipe
     }
 }
 
-class RewriteRecipe(CSharpVisitor<ExecutionContext> visitor) : Core.Recipe
+class RewriteRecipe(CSharpVisitor<ExecutionContext> visitor) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Rewrite recipe";
     public override string Description => "Applies a CSharpTemplate.Rewrite visitor.";
@@ -1027,7 +1027,7 @@ class RewriteRecipe(CSharpVisitor<ExecutionContext> visitor) : Core.Recipe
     public override ITreeVisitor<ExecutionContext> GetVisitor() => visitor;
 }
 
-class FallbackWithManualVisitorRecipe : Core.Recipe
+class FallbackWithManualVisitorRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Fallback with manual visitor";
     public override string Description => "Replaces == null / != null with is null / is not null.";
