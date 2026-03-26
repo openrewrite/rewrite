@@ -1526,7 +1526,7 @@ class JavaTemplateTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/2074")
     @Test
-    void contextSensitiveTemplateInsideLambdaInAnonymousClass() {
+    void contextSensitiveTemplateInsideLambdaBlockBody() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
@@ -1626,4 +1626,104 @@ class JavaTemplateTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2074")
+    @Test
+    void contextSensitiveTemplateInsideLambdaExpressionBody() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final MethodMatcher matcher = new MethodMatcher("Test oldMethod(..)");
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                    if (matcher.matches(mi)) {
+                        return JavaTemplate.builder("newMethod()")
+                          .contextSensitive()
+                          .build()
+                          .apply(getCursor(), mi.getCoordinates().replace());
+                    }
+                    return mi;
+                }
+            })),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.function.UnaryOperator;
+
+              abstract class Test {
+                  abstract Test withBody(Test body);
+                  abstract Test getBody();
+                  abstract List<String> getStatements();
+                  abstract Test withStatements(List<String> stmts);
+
+                  interface Visitor {
+                      Test visit(Test cd);
+                  }
+
+                  Visitor getVisitor() {
+                      return new Visitor() {
+                          @Override
+                          public Test visit(Test test) {
+                              Test cd = test;
+                              return cd.withBody(cd.getBody().withStatements(map(cd.getBody().getStatements(), st -> oldMethod(st))));
+                          }
+                      };
+                  }
+
+                  static <T> List<T> map(List<T> list, UnaryOperator<T> fn) {
+                      List<T> result = new ArrayList<>();
+                      for (T t : list) {
+                          result.add(fn.apply(t));
+                      }
+                      return result;
+                  }
+
+                  String oldMethod(String s) { return s; }
+                  String newMethod() { return ""; }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+              import java.util.function.UnaryOperator;
+
+              abstract class Test {
+                  abstract Test withBody(Test body);
+                  abstract Test getBody();
+                  abstract List<String> getStatements();
+                  abstract Test withStatements(List<String> stmts);
+
+                  interface Visitor {
+                      Test visit(Test cd);
+                  }
+
+                  Visitor getVisitor() {
+                      return new Visitor() {
+                          @Override
+                          public Test visit(Test test) {
+                              Test cd = test;
+                              return cd.withBody(cd.getBody().withStatements(map(cd.getBody().getStatements(), st -> newMethod())));
+                          }
+                      };
+                  }
+
+                  static <T> List<T> map(List<T> list, UnaryOperator<T> fn) {
+                      List<T> result = new ArrayList<>();
+                      for (T t : list) {
+                          result.add(fn.apply(t));
+                      }
+                      return result;
+                  }
+
+                  String oldMethod(String s) { return s; }
+                  String newMethod() { return ""; }
+              }
+              """
+          )
+        );
+    }
+
 }
