@@ -95,7 +95,7 @@ public class MergeYaml extends Recipe {
         this.createNewKeys = createNewKeys;
     }
 
-    public enum InsertMode { Before, After, Last }
+    public enum InsertMode {Before, After, Last}
 
     @Nullable
     @NonFinal
@@ -118,6 +118,7 @@ public class MergeYaml extends Recipe {
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
+
     String displayName = "Merge YAML snippet";
 
     @Override
