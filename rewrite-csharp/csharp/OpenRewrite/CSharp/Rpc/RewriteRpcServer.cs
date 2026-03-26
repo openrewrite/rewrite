@@ -151,6 +151,10 @@ public class RewriteRpcServer
         RpcSendQueue.RegisterJavaTypeName(typeof(ImplicitTypeParameters),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters");
 
+        // DotNetProject marker
+        RpcSendQueue.RegisterJavaTypeName(typeof(DotNetProject),
+            "org.openrewrite.csharp.marker.DotNetProject");
+
         // MSBuildProject marker and nested types
         RpcSendQueue.RegisterJavaTypeName(typeof(MSBuildProject),
             "org.openrewrite.csharp.marker.MSBuildProject");

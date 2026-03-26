@@ -485,6 +485,10 @@ public class RpcReceiveQueue
             "org.openrewrite.csharp.marker.ImplicitTypeParameters" =>
                 typeof(ImplicitTypeParameters),
 
+            // DotNetProject marker
+            "org.openrewrite.csharp.marker.DotNetProject" =>
+                typeof(DotNetProject),
+
             // MSBuildProject marker and nested types
             "org.openrewrite.csharp.marker.MSBuildProject" =>
                 typeof(MSBuildProject),
