@@ -1517,14 +1517,25 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     /// <summary>
     /// Auto-formats the given tree node using Roslyn within the enclosing compilation unit.
+    /// For subtrees, formatting is deferred to a single batch pass after the visitor completes,
+    /// avoiding O(N × file_size) cost when many nodes are formatted in the same file.
+    /// For the CompilationUnit itself, formats immediately (no benefit to deferring).
     /// </summary>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
-        return tree.AutoFormat(cursor);
+        // Full CU formatting — do it immediately, no benefit to deferring
+        if (tree is CompilationUnit cu)
+            return (T)(J)RoslynFormatter.Format(cu);
+
+        _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
+        _deferredFormat.Add(tree);
+        MaybeDoAfterVisit(_deferredFormat);
+        return tree;
     }
 
     /// <summary>
     /// Auto-formats the given tree node if it differs from the original (before).
+    /// Formatting is deferred to a single batch pass after the visitor completes.
     /// </summary>
     protected T MaybeAutoFormat<T>(T before, T after, P p, Cursor cursor) where T : class, J
     {
@@ -1533,10 +1544,15 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     /// <summary>
     /// Auto-formats the given tree node if it differs from the original (before),
-    /// stopping after the specified node.
+    /// stopping after the specified node. This overload formats immediately (not deferred)
+    /// because stopAfter scoping is not supported in batch mode.
     /// </summary>
     protected T MaybeAutoFormat<T>(T before, T after, J? stopAfter, P p, Cursor cursor) where T : class, J
     {
-        return ReferenceEquals(before, after) ? after : after.AutoFormat(cursor, stopAfter);
+        if (ReferenceEquals(before, after)) return after;
+        var visitor = new AutoFormatVisitor<int>(stopAfter);
+        return visitor.Format(after, cursor) as T ?? after;
     }
+
+    private RoslynFormatter.DeferredFormatVisitor<P>? _deferredFormat;
 }

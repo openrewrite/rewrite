@@ -369,7 +369,7 @@ public class AutoFormatTests
         var classCursor = new Cursor(cuCursor, classDecl);
 
         // AutoFormat the class declaration subtree
-        var formatted = classDecl.AutoFormat(classCursor);
+        var formatted = new AutoFormatVisitor<int>().Format(classDecl, classCursor);
 
         // The result should be a ClassDeclaration, not a CompilationUnit
         Assert.IsType<ClassDeclaration>(formatted);
@@ -453,7 +453,7 @@ public class AutoFormatTests
         var forCursor = new Cursor(cuCursor, forLoop);
 
         // AutoFormat the modified subtree
-        var formatted = modifiedForLoop.AutoFormat(forCursor);
+        var formatted = new AutoFormatVisitor<int>().Format(modifiedForLoop, forCursor);
 
         // The result should have properly indented braces
         var printed = _printer.Print(formatted);
@@ -518,7 +518,7 @@ public class AutoFormatTests
             );
             var modified = fl.WithBody(fl.Body.WithElement(block));
 
-            return modified.AutoFormat(Cursor.ParentTree);
+            return AutoFormat(modified, p, Cursor.ParentTree);
         }
     }
 

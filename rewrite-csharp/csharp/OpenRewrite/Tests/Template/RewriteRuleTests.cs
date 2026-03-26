@@ -693,6 +693,36 @@ public class RewriteRuleTests : RewriteTest
             )
         );
     }
+    [Fact]
+    public void DeferredFormatDoesNotAffectSurroundingWhitespace()
+    {
+        // Replacing an attribute should not change indentation of surrounding code
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameAttributeRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    [Foo]
+                    public void M()
+                    {
+                        var x = 1;
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    [Bar]
+                    public void M()
+                    {
+                        var x = 1;
+                    }
+                }
+                """
+            )
+        );
+    }
 }
 
 // ===============================================================
@@ -920,7 +950,7 @@ class CaptureFlowRecipe : OpenRewrite.Core.Recipe
 
 /// <summary>
 /// Expands "return expr" into "Console.WriteLine(expr); return expr;" — two statements.
-/// Exercises multi-statement templates and CSharpTemplate.CreateBlockFlattener.
+/// Exercises multi-statement templates with synthetic block flattening.
 /// </summary>
 class LogBeforeReturnRecipe : OpenRewrite.Core.Recipe
 {
@@ -945,13 +975,7 @@ class LogBeforeReturnRecipe : OpenRewrite.Core.Recipe
             if (match != null)
             {
                 var result = tmpl.Apply(Cursor, values: match);
-                if (result is Block { Markers: var m } block &&
-                    m.FindFirst<SyntheticBlockContainer>() != null)
-                {
-                    MaybeDoAfterVisit(CSharpTemplate.CreateBlockFlattener<ExecutionContext>());
-                    return block;
-                }
-                return result ?? ret;
+                return result != null ? AutoFormat(result, ctx, Cursor) : ret;
             }
             return ret;
         }
@@ -1038,5 +1062,33 @@ class FallbackWithManualVisitorRecipe : OpenRewrite.Core.Recipe
         return CSharpTemplate.Rewrite(
             (CSharpPattern.Expression($"{x} == null"), CSharpTemplate.Expression($"{x} is null")),
             (CSharpPattern.Expression($"{x} != null"), CSharpTemplate.Expression($"{x} is not null")));
+    }
+}
+
+class RenameAttributeRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Rename attribute";
+    public override string Description => "Renames [Foo] to [Bar].";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        return CSharpTemplate.Rewrite(
+            CSharpPattern.Attribute($"Foo"),
+            CSharpTemplate.Attribute($"Bar"));
+    }
+}
+
+class SwapBinaryWithAutoFormatRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Swap binary with auto-format";
+    public override string Description => "Swaps binary operands, using AutoFormat.";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var left = Capture.Expression("left");
+        var right = Capture.Expression("right");
+        return CSharpTemplate.Rewrite(
+            CSharpPattern.Expression($"{left} + {right}"),
+            CSharpTemplate.Expression($"{right} + {left}"));
     }
 }

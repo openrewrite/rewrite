@@ -644,7 +644,7 @@ file class ReplaceWithIfBlockRecipe : OpenRewrite.Core.Recipe
                 // Multi-line template with 0-based indentation.
                 // Auto-format should fix internal indentation to match the target context.
                 var tmpl = CSharpTemplate.Statement("if (true)\n{\n    Console.WriteLine(42);\n}");
-                return (J)tmpl.Apply(Cursor)!;
+                return AutoFormat((J)tmpl.Apply(Cursor)!, ctx, Cursor);
             }
             return es;
         }
