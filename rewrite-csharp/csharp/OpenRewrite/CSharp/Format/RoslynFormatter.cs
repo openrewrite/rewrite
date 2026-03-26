@@ -18,6 +18,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Text;
 using OpenRewrite.Core;
+using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
 
 namespace OpenRewrite.CSharp.Format;
@@ -140,6 +141,18 @@ public static class RoslynFormatter
 
         // 4. Extract the formatted subtree by ID
         return FindById(formattedCu, replacement.Id) ?? replacement;
+    }
+
+    /// <summary>
+    /// Returns the ID and prefix that the printer will see in BeforeSyntax.
+    /// ExpressionStatement delegates its prefix to its Expression and the printer
+    /// skips BeforeSyntax for it, so we track the expression instead.
+    /// </summary>
+    internal static (Guid id, Space prefix) PrintableIdAndPrefix(J node)
+    {
+        if (node is ExpressionStatement es)
+            return (es.Expression.Id, es.Expression.Prefix);
+        return (node.Id, node.Prefix);
     }
 
     internal static J? FindById(J root, Guid targetId)
@@ -338,7 +351,8 @@ public static class RoslynFormatter
     }
 
     /// <summary>
-    /// After-visitor that batch-formats all nodes registered for deferred formatting.
+    /// After-visitor that flattens synthetic blocks and batch-formats all registered nodes
+    /// in a single Roslyn pass. Replaces the need for a separate <c>BlockFlattener</c>.
     /// Registered via <see cref="TreeVisitor{T,P}.DoAfterVisit"/> during template application.
     /// </summary>
     public class DeferredFormatVisitor<P> : CSharpVisitor<P>,
@@ -347,22 +361,105 @@ public static class RoslynFormatter
         private readonly HashSet<Guid> _nodeIds = [];
         private readonly Dictionary<Guid, Space> _preservedPrefixes = [];
 
-        public void Add(Guid nodeId, Space preservedPrefix)
+        public void Add(J node)
         {
-            _nodeIds.Add(nodeId);
-            _preservedPrefixes[nodeId] = preservedPrefix;
+            var (id, prefix) = PrintableIdAndPrefix(node);
+            _nodeIds.Add(id);
+            _preservedPrefixes[id] = prefix;
         }
 
         public override J VisitCompilationUnit(CompilationUnit cu, P ctx)
         {
             if (_nodeIds.Count == 0)
                 return cu;
+
+            // Flatten synthetic blocks and register their statements for formatting
+            // in a single pass — ensures IDs match the actual tree
+            cu = (CompilationUnit)FlattenAndRegister(cu);
+
             return FormatSpans(cu, _nodeIds, _preservedPrefixes);
+        }
+
+        /// <summary>
+        /// Walk the tree. When a block contains a synthetic block child whose ID is registered,
+        /// splice its statements into the parent and register them for formatting.
+        /// Also flattens any synthetic blocks unconditionally (they always need flattening).
+        /// </summary>
+        private J FlattenAndRegister(J tree)
+        {
+            var flattener = new SyntheticBlockFlattener(_nodeIds, _preservedPrefixes);
+            flattener.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+            return flattener.VisitNonNull(tree, 0);
         }
 
         public bool Equals(DeferredFormatVisitor<P>? other) => other is not null;
         public override bool Equals(object? obj) => obj is DeferredFormatVisitor<P>;
         public override int GetHashCode() => typeof(DeferredFormatVisitor<P>).GetHashCode();
+    }
+
+    /// <summary>
+    /// Flattens synthetic blocks by splicing their statements into the parent block.
+    /// When a synthetic block's ID is in the registered set, replaces it with
+    /// the individual statement IDs so formatting targets the actual nodes.
+    /// </summary>
+    private class SyntheticBlockFlattener(
+        HashSet<Guid> nodeIds, Dictionary<Guid, Space> preservedPrefixes) : CSharpVisitor<int>
+    {
+        public override J VisitBlock(Block block, int ctx)
+        {
+            block = (Block)base.VisitBlock(block, ctx);
+
+            var statements = block.Statements;
+            List<JRightPadded<Statement>>? newStatements = null;
+
+            for (var i = 0; i < statements.Count; i++)
+            {
+                if (statements[i].Element is Block inner &&
+                    inner.Markers.FindFirst<SyntheticBlockContainer>() != null)
+                {
+                    if (newStatements == null)
+                    {
+                        newStatements = new List<JRightPadded<Statement>>(statements.Count);
+                        for (var j = 0; j < i; j++)
+                            newStatements.Add(statements[j]);
+                    }
+
+                    // If this synthetic block was registered for formatting,
+                    // register its individual statements instead
+                    var registered = nodeIds.Remove(inner.Id);
+                    if (registered)
+                        preservedPrefixes.Remove(inner.Id);
+
+                    var innerStmts = inner.Statements;
+                    for (var k = 0; k < innerStmts.Count; k++)
+                    {
+                        var s = innerStmts[k];
+                        if (k == 0)
+                        {
+                            // Transfer the original statement's prefix to the first spliced statement
+                            s = s.WithElement(
+                                (Statement)J.SetPrefix(s.Element, statements[i].Element.Prefix));
+                        }
+                        newStatements.Add(s);
+
+                        // Register each spliced statement for formatting.
+                        // Don't save prefixes — Roslyn determines the correct
+                        // indentation for each statement at its new nesting level.
+                        if (registered)
+                        {
+                            var (sid, _) = PrintableIdAndPrefix(s.Element);
+                            nodeIds.Add(sid);
+                        }
+                    }
+                }
+                else
+                {
+                    newStatements?.Add(statements[i]);
+                }
+            }
+
+            return newStatements != null ? block.WithStatements(newStatements) : block;
+        }
     }
 
     internal static string FormatWithRoslyn(string source, FormatStyle style, TextSpan? span = null)

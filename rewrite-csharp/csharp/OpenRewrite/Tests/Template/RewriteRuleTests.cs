@@ -945,13 +945,7 @@ class LogBeforeReturnRecipe : Core.Recipe
             if (match != null)
             {
                 var result = tmpl.Apply(Cursor, values: match);
-                if (result is Block { Markers: var m } block &&
-                    m.FindFirst<SyntheticBlockContainer>() != null)
-                {
-                    MaybeDoAfterVisit(CSharpTemplate.CreateBlockFlattener<ExecutionContext>());
-                    return block;
-                }
-                return result ?? ret;
+                return result != null ? AutoFormat(result, ctx, Cursor) : ret;
             }
             return ret;
         }

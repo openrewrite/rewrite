@@ -186,7 +186,10 @@ public sealed class CSharpTemplate
     /// <param name="cursor">The cursor pointing to the current location in the tree.</param>
     /// <param name="values">Optional match result providing values for captures.</param>
     /// <param name="coordinates">Optional coordinates specifying where to apply (defaults to Replace).</param>
-    /// <returns>The generated AST node with substitutions applied.</returns>
+    /// <returns>The generated AST node with substitutions and prefix applied, but not formatted.
+    /// The caller is responsible for formatting, e.g. via
+    /// <see cref="CSharpVisitor{P}.AutoFormat{T}"/> (deferred batch) or
+    /// <see cref="AutoFormatExtensions.AutoFormat{T}"/> (immediate).</returns>
     public J? Apply(Cursor cursor, MatchResult? values = null,
         CSharpCoordinates? coordinates = null)
     {
@@ -217,9 +220,6 @@ public sealed class CSharpTemplate
             tree = TemplateEngine.ApplyCoordinates(tree, cursor,
                 CSharpCoordinates.Replace(cursorJ));
         }
-
-        // Phase 3: auto-format within the enclosing compilation unit
-        tree = TemplateEngine.AutoFormat(tree, cursor);
 
         return tree;
     }
@@ -328,7 +328,10 @@ public sealed class CSharpTemplate
             {
                 var match = before.Match(tree, Cursor);
                 if (match != null)
-                    return after.Apply(Cursor, values: match);
+                {
+                    var result = after.Apply(Cursor, values: match);
+                    return result != null ? AutoFormat(result, ctx, Cursor) : null;
+                }
             }
             return tree;
         }

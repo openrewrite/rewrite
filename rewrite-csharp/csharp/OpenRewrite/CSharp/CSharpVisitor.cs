@@ -1523,7 +1523,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
         _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
-        _deferredFormat.Add(tree.Id, tree.Prefix);
+        _deferredFormat.Add(tree);
         MaybeDoAfterVisit(_deferredFormat);
         return tree;
     }
@@ -1544,7 +1544,9 @@ public class CSharpVisitor<P> : JavaVisitor<P>
     /// </summary>
     protected T MaybeAutoFormat<T>(T before, T after, J? stopAfter, P p, Cursor cursor) where T : class, J
     {
-        return ReferenceEquals(before, after) ? after : after.AutoFormat(cursor, stopAfter);
+        if (ReferenceEquals(before, after)) return after;
+        var visitor = new AutoFormatVisitor<int>(stopAfter);
+        return visitor.Format(after, cursor) as T ?? after;
     }
 
     private RoslynFormatter.DeferredFormatVisitor<P>? _deferredFormat;
