@@ -30,6 +30,8 @@ import org.openrewrite.rpc.RpcSendQueue;
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,7 +92,11 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
     public void rpcSend(MSBuildProject after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
         q.getAndSend(after, MSBuildProject::getSdk);
-        q.getAndSend(after, MSBuildProject::getProperties);
+        // Send map as parallel lists: keys then values (each value through its codec)
+        q.getAndSendList(after, m -> new ArrayList<>(m.getProperties().keySet()),
+                k -> k, k -> q.getAndSend(k, x -> x));
+        q.getAndSendList(after, m -> new ArrayList<>(m.getProperties().values()),
+                v -> v.getValue(), v -> v.rpcSend(v, q));
         q.getAndSendList(after, MSBuildProject::getPackageSources,
                 PackageSource::getKey,
                 ps -> ps.rpcSend(ps, q));
@@ -101,10 +107,23 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
 
     @Override
     public MSBuildProject rpcReceive(MSBuildProject before, RpcReceiveQueue q) {
+        UUID id = q.receiveAndGet(before.id, UUID::fromString);
+        String sdk = q.receive(before.sdk);
+        // Receive parallel lists and zip into map
+        List<String> keys = q.receiveList(new ArrayList<>(before.properties.keySet()),
+                k -> q.<String, String>receiveAndGet(k, x -> x));
+        List<PropertyValue> values = q.receiveList(new ArrayList<>(before.properties.values()),
+                v -> v.rpcReceive(v, q));
+        Map<String, PropertyValue> props = new LinkedHashMap<>();
+        if (keys != null && values != null) {
+            for (int i = 0; i < keys.size(); i++) {
+                props.put(keys.get(i), values.get(i));
+            }
+        }
         return before
-                .withId(q.receiveAndGet(before.id, UUID::fromString))
-                .withSdk(q.receive(before.sdk))
-                .withProperties(q.receive(before.properties))
+                .withId(id)
+                .withSdk(sdk)
+                .withProperties(props)
                 .withPackageSources(q.receiveList(before.packageSources,
                         ps -> ps.rpcReceive(ps, q)))
                 .withTargetFrameworks(q.receiveList(before.targetFrameworks,

@@ -68,12 +68,6 @@ public class Parse implements RpcRequest {
                         Collections.singletonList(parserInput), relativeTo, ctx
                 ).findFirst().orElseThrow(() ->
                         new IllegalStateException("Parser returned no results for " + input.getSourcePath()));
-                System.err.println("[Parse] " + input.getSourcePath()
-                        + " parser=" + parser.getClass().getName()
-                        + " markers=" + sourceFile.getMarkers().getMarkers().size()
-                        + " markerTypes=" + sourceFile.getMarkers().getMarkers().stream()
-                            .map(m -> m.getClass().getSimpleName())
-                            .collect(java.util.stream.Collectors.joining(",")));
                 String id = sourceFile.getId().toString();
                 localObjects.put(id, sourceFile);
                 ids.add(id);

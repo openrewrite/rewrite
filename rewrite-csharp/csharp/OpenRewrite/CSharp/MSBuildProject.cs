@@ -63,7 +63,13 @@ public sealed class MSBuildProject : Marker, IRpcCodec<MSBuildProject>, IEquatab
     {
         q.GetAndSend(after, m => m.Id);
         q.GetAndSend(after, m => m.Sdk);
-        q.GetAndSend(after, m => m.Properties);
+        // Send map as parallel lists: keys then values
+        q.GetAndSendList(after, m => (IList<string>)new List<string>(m.Properties.Keys),
+            k => k,
+            k => q.GetAndSend(k, x => x));
+        q.GetAndSendList(after, m => (IList<PropertyValue>)new List<PropertyValue>(m.Properties.Values),
+            v => v.Value,
+            v => v.RpcSend(v, q));
         q.GetAndSendList(after, m => m.PackageSources,
             ps => ps.Key,
             ps => ps.RpcSend(ps, q));
@@ -74,10 +80,24 @@ public sealed class MSBuildProject : Marker, IRpcCodec<MSBuildProject>, IEquatab
 
     public MSBuildProject RpcReceive(MSBuildProject before, RpcReceiveQueue q)
     {
+        var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
+        var sdk = q.Receive(before.Sdk);
+        // Receive parallel lists and zip into dictionary
+        var beforeProps = before.Properties ?? new Dictionary<string, PropertyValue>();
+        var keys = q.ReceiveList((IList<string>)new List<string>(beforeProps.Keys),
+            k => q.ReceiveAndGet<string, string>(k, x => x)!);
+        var values = q.ReceiveList((IList<PropertyValue>)new List<PropertyValue>(beforeProps.Values),
+            v => v.RpcReceive(v, q));
+        var props = new Dictionary<string, PropertyValue>();
+        if (keys != null && values != null)
+        {
+            for (int i = 0; i < keys.Count; i++)
+                props[keys[i]] = values[i];
+        }
         return before
-            .WithId(q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse))
-            .WithSdk(q.Receive(before.Sdk))
-            .WithProperties(q.Receive(before.Properties)!)
+            .WithId(id)
+            .WithSdk(sdk)
+            .WithProperties(props)
             .WithPackageSources(q.ReceiveList(before.PackageSources,
                 ps => ps.RpcReceive(ps, q))!)
             .WithTargetFrameworks(q.ReceiveList(before.TargetFrameworks,
