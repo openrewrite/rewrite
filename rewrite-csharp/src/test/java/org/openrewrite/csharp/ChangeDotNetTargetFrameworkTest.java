@@ -151,6 +151,29 @@ class ChangeDotNetTargetFrameworkTest implements RewriteTest {
     }
 
     @Test
+    void deduplicatesMultiTfmAfterReplacement() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDotNetTargetFramework("netstandard2.0", "net6.0")),
+          csproj(
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFrameworks>net40;netstandard2.0;net6.0</TargetFrameworks>
+                </PropertyGroup>
+              </Project>
+              """,
+            """
+              <Project Sdk="Microsoft.NET.Sdk">
+                <PropertyGroup>
+                  <TargetFrameworks>net40;net6.0</TargetFrameworks>
+                </PropertyGroup>
+              </Project>
+              """
+          )
+        );
+    }
+
+    @Test
     void noChangeWhenTfmNotPresent() {
         rewriteRun(
           csproj(
