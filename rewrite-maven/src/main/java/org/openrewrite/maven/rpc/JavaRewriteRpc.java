@@ -40,6 +40,7 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.marketplace.MavenRecipeBundleResolver;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
+import org.openrewrite.Parser;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.xml.XmlParser;
 
@@ -50,7 +51,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
@@ -200,7 +200,21 @@ public class JavaRewriteRpc {
 
         // Create the RPC server with the marketplace and resolvers
         RewriteRpc server = new RewriteRpc(jsonRpc, marketplace, resolvers);
-        server.setParsers(Collections.singletonList(new XmlParser()));
+
+        // Register parsers for handling Parse requests. More specific parsers
+        // (like CsprojParser) must come before generic ones (XmlParser) so they
+        // win the accept() dispatch for file types they both handle.
+        List<Parser> parsers = new ArrayList<>();
+        try {
+            parsers.add((Parser) Class.forName("org.openrewrite.csharp.CsprojParser")
+                    .getMethod("build")
+                    .invoke(Class.forName("org.openrewrite.csharp.CsprojParser")
+                            .getMethod("builder").invoke(null)));
+        } catch (Exception ignored) {
+            // CsprojParser not on classpath
+        }
+        parsers.add(new XmlParser());
+        server.setParsers(parsers);
 
         if (logStream != null) {
             server.log(logStream);
