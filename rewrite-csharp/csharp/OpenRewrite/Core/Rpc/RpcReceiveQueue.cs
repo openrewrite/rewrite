@@ -454,8 +454,6 @@ public class RpcReceiveQueue
                 typeof(CsBinary),
             "org.openrewrite.csharp.tree.Cs$Unary" =>
                 typeof(CsUnary),
-            "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter" =>
-                typeof(ConstrainedTypeParameter),
             "org.openrewrite.csharp.tree.Cs$ForEachVariableLoop$Control" =>
                 typeof(ForEachVariableLoopControl),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable" =>

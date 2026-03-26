@@ -100,8 +100,6 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Cs$Binary");
         RpcSendQueue.RegisterJavaTypeName(typeof(CsUnary),
             "org.openrewrite.csharp.tree.Cs$Unary");
-        RpcSendQueue.RegisterJavaTypeName(typeof(ConstrainedTypeParameter),
-            "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter");
 
         // Types in nagoya's Rewrite.Java namespace that don't follow nesting conventions
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.NamedVariable),
