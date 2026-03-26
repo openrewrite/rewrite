@@ -103,8 +103,7 @@ public class Find extends Recipe {
     @Nullable
     Integer contextSize;
 
-    transient TextMatches textMatches = new TextMatches(this)
-            .withInstanceName(this::dataTableInstanceName);
+    transient TextMatches textMatches = new TextMatches(this);
 
     private String dataTableInstanceName() {
         return "Text matches for `" + find + "`";
