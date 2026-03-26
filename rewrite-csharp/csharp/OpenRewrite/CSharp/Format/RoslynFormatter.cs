@@ -341,8 +341,8 @@ public static class RoslynFormatter
     /// After-visitor that batch-formats all nodes registered for deferred formatting.
     /// Registered via <see cref="TreeVisitor{T,P}.DoAfterVisit"/> during template application.
     /// </summary>
-    public class DeferredFormatVisitor : CSharpVisitor<Core.ExecutionContext>,
-        IEquatable<DeferredFormatVisitor>
+    public class DeferredFormatVisitor<P> : CSharpVisitor<P>,
+        IEquatable<DeferredFormatVisitor<P>>
     {
         private readonly HashSet<Guid> _nodeIds = [];
         private readonly Dictionary<Guid, Space> _preservedPrefixes = [];
@@ -353,16 +353,16 @@ public static class RoslynFormatter
             _preservedPrefixes[nodeId] = preservedPrefix;
         }
 
-        public override J VisitCompilationUnit(CompilationUnit cu, Core.ExecutionContext ctx)
+        public override J VisitCompilationUnit(CompilationUnit cu, P ctx)
         {
             if (_nodeIds.Count == 0)
                 return cu;
             return FormatSpans(cu, _nodeIds, _preservedPrefixes);
         }
 
-        public bool Equals(DeferredFormatVisitor? other) => other is not null;
-        public override bool Equals(object? obj) => obj is DeferredFormatVisitor;
-        public override int GetHashCode() => typeof(DeferredFormatVisitor).GetHashCode();
+        public bool Equals(DeferredFormatVisitor<P>? other) => other is not null;
+        public override bool Equals(object? obj) => obj is DeferredFormatVisitor<P>;
+        public override int GetHashCode() => typeof(DeferredFormatVisitor<P>).GetHashCode();
     }
 
     internal static string FormatWithRoslyn(string source, FormatStyle style, TextSpan? span = null)

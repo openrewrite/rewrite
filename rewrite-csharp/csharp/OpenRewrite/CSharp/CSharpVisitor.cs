@@ -1517,14 +1517,20 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     /// <summary>
     /// Auto-formats the given tree node using Roslyn within the enclosing compilation unit.
+    /// Formatting is deferred to a single batch pass after the visitor completes, avoiding
+    /// O(N × file_size) cost when many nodes are formatted in the same file.
     /// </summary>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
-        return tree.AutoFormat(cursor);
+        _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
+        _deferredFormat.Add(tree.Id, tree.Prefix);
+        MaybeDoAfterVisit(_deferredFormat);
+        return tree;
     }
 
     /// <summary>
     /// Auto-formats the given tree node if it differs from the original (before).
+    /// Formatting is deferred to a single batch pass after the visitor completes.
     /// </summary>
     protected T MaybeAutoFormat<T>(T before, T after, P p, Cursor cursor) where T : class, J
     {
@@ -1533,10 +1539,13 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     /// <summary>
     /// Auto-formats the given tree node if it differs from the original (before),
-    /// stopping after the specified node.
+    /// stopping after the specified node. This overload formats immediately (not deferred)
+    /// because stopAfter scoping is not supported in batch mode.
     /// </summary>
     protected T MaybeAutoFormat<T>(T before, T after, J? stopAfter, P p, Cursor cursor) where T : class, J
     {
         return ReferenceEquals(before, after) ? after : after.AutoFormat(cursor, stopAfter);
     }
+
+    private RoslynFormatter.DeferredFormatVisitor<P>? _deferredFormat;
 }
