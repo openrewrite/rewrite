@@ -210,10 +210,9 @@ public class JavaRewriteRpc {
         // win the accept() dispatch for file types they both handle.
         List<Parser> parsers = new ArrayList<>();
         try {
-            parsers.add((Parser) Class.forName("org.openrewrite.csharp.CsprojParser")
-                    .getMethod("build")
-                    .invoke(Class.forName("org.openrewrite.csharp.CsprojParser")
-                            .getMethod("builder").invoke(null)));
+            Object builder = Class.forName("org.openrewrite.csharp.CsprojParser")
+                    .getMethod("builder").invoke(null);
+            parsers.add((Parser) builder.getClass().getMethod("build").invoke(builder));
         } catch (ClassNotFoundException ignored) {
             // CsprojParser not on classpath — fall through to XmlParser
         } catch (ReflectiveOperationException e) {
