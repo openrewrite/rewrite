@@ -42,19 +42,10 @@ public class Parse implements RpcRequest {
     @Nullable
     String relativeTo;
 
-    public interface Input {
-        Path getSourcePath();
-    }
-
     @Value
-    public static class StringInput implements Input {
+    public static class Input {
+        @Nullable
         String text;
-        Path sourcePath;
-    }
-
-    @Value
-    public static class PathInput implements Input {
-        @JsonValue
         Path sourcePath;
     }
 
@@ -96,16 +87,13 @@ public class Parse implements RpcRequest {
         }
 
         private static Parser.Input toParserInput(Input input) {
-            if (input instanceof StringInput) {
-                StringInput si = (StringInput) input;
+            if (input.getText() != null) {
                 return new Parser.Input(
-                        si.getSourcePath(),
-                        () -> new ByteArrayInputStream(si.getText().getBytes(StandardCharsets.UTF_8))
+                        input.getSourcePath(),
+                        () -> new ByteArrayInputStream(input.getText().getBytes(StandardCharsets.UTF_8))
                 );
-            } else if (input instanceof PathInput) {
-                return new Parser.Input(((PathInput) input).getSourcePath(), null);
             }
-            throw new IllegalArgumentException("Unknown input type: " + input.getClass());
+            return new Parser.Input(input.getSourcePath(), null);
         }
     }
 }

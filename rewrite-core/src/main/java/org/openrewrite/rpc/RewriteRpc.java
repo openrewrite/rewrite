@@ -413,9 +413,9 @@ public class RewriteRpc {
         for (Parser.Input input : inputs) {
             inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.Input(input.getSource(ctx).readFully(), input.getPath()));
             } else {
-                mappedInputs.add(new Parse.PathInput(input.getPath()));
+                mappedInputs.add(new Parse.Input(null, input.getPath()));
             }
         }
 
