@@ -5,10 +5,11 @@ out/
 */src/main/gen/
 */src/main/antlr/gen
 .idea/*
-# Exception: Include Python module for IntelliJ (needs parent dirs unignored first)
+# Exception: Include Python/C# modules for IntelliJ (needs parent dirs unignored first)
 !.idea/modules/
 .idea/modules/*
 !.idea/modules/rewrite-python-src/
+!.idea/modules/rewrite-csharp-src/
 .project
 .classpath
 .settings/
@@ -32,3 +33,7 @@ dist/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.context/
+CLAUDE.local.md
+
+/.claude/settings.local.json

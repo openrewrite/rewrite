@@ -366,6 +366,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         ScanningRecipe<T> delegate;
 
         @Override
+        public T getAccumulator(Cursor cursor, ExecutionContext ctx) {
+            return delegate.getAccumulator(cursor, ctx);
+        }
+
+        @Override
         public T getInitialValue(ExecutionContext ctx) {
             return delegate.getInitialValue(ctx);
         }

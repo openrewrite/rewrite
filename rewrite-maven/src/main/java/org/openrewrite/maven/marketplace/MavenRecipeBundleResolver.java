@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.marketplace;
 
-import org.apache.commons.lang3.StringUtils;
+import org.openrewrite.internal.StringUtils;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;

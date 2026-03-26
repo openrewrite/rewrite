@@ -214,7 +214,11 @@ public class MavenPomDownloader {
             return null;
         }
         String relativePath = parent.getRelativePath();
-        if (StringUtils.isBlank(relativePath)) {
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
+        if (relativePath != null && relativePath.isEmpty()) {
+            return null;
+        }
+        if (relativePath == null) {
             relativePath = "../pom.xml";
         }
         Path parentPath = projectPom.getSourcePath()
@@ -269,7 +273,7 @@ public class MavenPomDownloader {
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
-                        Path path = Paths.get(URI.create(baseUri + "maven-metadata-local.xml"));
+                        Path path = Paths.get(URI.create(baseUri + "maven-metadata-local.xml").getPath());
                         if (Files.exists(path)) {
                             MavenMetadata parsed = MavenMetadata.parse(Files.readAllBytes(path));
                             if (parsed != null) {
@@ -388,7 +392,7 @@ public class MavenPomDownloader {
     }
 
     private MavenMetadata.@Nullable Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
-        Path dir = Paths.get(URI.create(uri));
+        Path dir = Paths.get(URI.create(uri).getPath());
         if (Files.exists(dir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
                 List<String> versions = new ArrayList<>();
@@ -516,20 +520,28 @@ public class MavenPomDownloader {
             }
         }
 
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-            !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
-            Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
-            if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath).resolve("pom.xml"))
-                        .normalize());
-                // Even poms published to remote repositories still contain relative paths to their parent poms
-                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
-                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                if (maybeLocalPom != null &&
-                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
-                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
-                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
-                    return maybeLocalPom;
+                !(relativePath != null && relativePath.isEmpty())) {
+            // Maven POM §4.0.0 specifies that <relativePath> defaults to ".." when omitted.
+            // See DefaultModelBuilder#readParentLocally in maven-model-builder.
+            String effectiveRelativePath = relativePath == null ? ".." : relativePath;
+            if (!effectiveRelativePath.contains(":")) {
+                Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
+                if (folderContainingPom != null) {
+                    Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(effectiveRelativePath).resolve("pom.xml"))
+                            .normalize());
+                    // Even poms published to remote repositories still contain relative paths to their parent poms.
+                    // Like Maven 3's DefaultModelBuilder#readParentLocally, check groupId, artifactId,
+                    // and version to guard against a relative path like ".." or "../.." coincidentally
+                    // resolving to an unrelated local pom. The version check is relaxed when it contains
+                    // unresolved placeholders (e.g. ${project.version}) that only the parent can resolve.
+                    if (maybeLocalPom != null &&
+                            gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                            gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                            (gav.getVersion().equals(maybeLocalPom.getVersion()) || gav.getVersion().contains("${"))) {
+                        return maybeLocalPom;
+                    }
                 }
             }
         }

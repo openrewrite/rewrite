@@ -23,6 +23,7 @@ from rewrite import (
     categorize,
     get_recipe_category,
     activate,
+    Recipe,
 )
 from rewrite.python.recipes import RemovePass, Cleanup
 
@@ -157,6 +158,48 @@ class TestActivate:
             (c for c in categories if c.descriptor.display_name == "Python"), None
         )
         assert python_cat is not None
+
+
+class _UnregisteredRecipe(Recipe):
+    @property
+    def name(self): return "org.openrewrite.python.test.Unregistered"
+    @property
+    def display_name(self): return "Unregistered"
+    @property
+    def description(self): return "A recipe not registered in the marketplace."
+
+
+class _CrossModuleRecipeList(Recipe):
+    @property
+    def name(self): return "org.openrewrite.python.test.CrossModuleRecipeList"
+    @property
+    def display_name(self): return "Cross-module recipe list"
+    @property
+    def description(self): return "A recipe that delegates to an unregistered sub-recipe."
+    def recipe_list(self):
+        return [_UnregisteredRecipe()]
+
+
+class TestInstallSubRecipes:
+    """Tests for cross-module sub-recipe installation during PrepareRecipe."""
+
+    def test_sub_recipes_installed_on_prepare(self):
+        """Preparing a recipe auto-installs its sub-recipes so they can be prepared later."""
+        import rewrite.rpc.server as server
+
+        # given
+        marketplace = RecipeMarketplace()
+        marketplace.install(_CrossModuleRecipeList, Python)
+        saved = server._marketplace
+        server._marketplace = marketplace
+        try:
+            # when
+            server.handle_prepare_recipe({'id': 'org.openrewrite.python.test.CrossModuleRecipeList'})
+
+            # then
+            server.handle_prepare_recipe({'id': 'org.openrewrite.python.test.Unregistered'})
+        finally:
+            server._marketplace = saved
 
 
 class TestPythonCategory:

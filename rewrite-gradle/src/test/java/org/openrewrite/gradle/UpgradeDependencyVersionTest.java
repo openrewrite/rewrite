@@ -623,6 +623,86 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesVersionInExtSubscriptNotation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext['guava.version'] = "29.0-jre"
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext['guava.version'] = "30.1.1-jre"
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionInExtBlockSetMethod() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  set('guava.version', "29.0-jre")
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  set('guava.version', "30.1.1-jre")
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradesVariablesDefinedInExtraPropertiesInBuildscript() {
         rewriteRun(
           buildGradle(

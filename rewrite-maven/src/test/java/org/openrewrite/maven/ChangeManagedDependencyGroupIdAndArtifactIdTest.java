@@ -18,10 +18,10 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
@@ -79,16 +79,9 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
-        assertThatExceptionOfType(AssertionError.class)
-          .isThrownBy(() -> rewriteRun(
-            spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
-              "javax.activation",
-              "javax.activation-api",
-              "javax.activation",
-              "javax.activation-api",
-              null
-            ))
-          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+        ChangeManagedDependencyGroupIdAndArtifactId recipe = new ChangeManagedDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", "javax.activation-api", null);
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("newGroupId OR newArtifactId must be different from before");
     }
 
     @Test

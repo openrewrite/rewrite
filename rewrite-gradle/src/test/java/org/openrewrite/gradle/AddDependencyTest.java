@@ -901,7 +901,7 @@ class AddDependencyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject("project",
-            srcMainJava(
+            srcTestJava(
               java(usingGuavaIntMath)
             ),
             buildGradle(
@@ -1013,7 +1013,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"api", "compileOnly", "testRuntimeOnly"})
+    @ValueSource(strings = {"api", "compileOnly"})
     void addDependencyToConfiguration(String configuration) {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*", configuration)),
@@ -1050,6 +1050,77 @@ class AddDependencyTest implements RewriteTest {
                     %s "com.fasterxml.jackson.core:jackson-core:2.12.0"
                 }
                 """.formatted(configuration)
+            )
+          )
+        );
+    }
+
+    @Test
+    void testConfigurationDependencyNotAddedWhenTypeOnlyInMainSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*", "testRuntimeOnly")),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void testConfigurationDependencyAddedWhenTypeInTestSources() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.fasterxml.jackson.core:jackson-core:2.12.0", "com.fasterxml.jackson.core.*", "testImplementation")),
+          mavenProject("project",
+            srcTestJava(
+              java(
+                """
+                  public class A {
+                      com.fasterxml.jackson.core.Versioned v;
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    testImplementation "com.fasterxml.jackson.core:jackson-core:2.12.0"
+                }
+                """
             )
           )
         );
@@ -1155,6 +1226,76 @@ class AddDependencyTest implements RewriteTest {
             mavenProject("project2",
               buildGradle(
                 ""
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/6833")
+    void doesNotAddToProjectNotUsingTypeWhenConfigurationIsExplicit() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("root",
+            buildGradle(
+              ""
+            ),
+            settingsGradle(
+              """
+                include "project1"
+                include "project2"
+                """
+            ),
+            mavenProject("project1",
+              srcMainJava(
+                java(usingGuavaIntMath)
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+
+                  dependencies {
+                      implementation "com.google.guava:guava:29.0-jre"
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              srcMainJava(
+                java(
+                  """
+                    public class B {
+                        String hello() { return "world"; }
+                    }
+                    """
+                )
+              ),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+
+                  repositories {
+                      mavenCentral()
+                  }
+                  """
               )
             )
           )

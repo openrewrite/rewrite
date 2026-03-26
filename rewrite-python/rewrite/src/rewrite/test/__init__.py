@@ -44,7 +44,7 @@ For testing visitors directly without a Recipe:
         spec.rewrite_run(python("x = 1", "x = 2"))
 """
 
-from .spec import SourceSpec, AfterRecipeText, python, dedent
+from .spec import SourceSpec, AfterRecipeText, python, pyproject, uv, dedent
 from .rewrite_test import RecipeSpec, NoopRecipe, AdHocRecipe, from_visitor, rewrite_run
 
 __all__ = [
@@ -59,5 +59,7 @@ __all__ = [
     "rewrite_run",
     # Source spec helpers
     "python",
+    "pyproject",
+    "uv",
     "dedent",
 ]

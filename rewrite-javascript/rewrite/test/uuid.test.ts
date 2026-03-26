@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import {describe} from "@jest/globals";
 import {randomId} from "../src/uuid";
 
 describe("randomId", () => {

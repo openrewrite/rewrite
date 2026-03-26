@@ -21,7 +21,7 @@ import org.openrewrite.Validated;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.lang.Integer.parseInt;
+import static java.lang.Long.parseLong;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.semver.Semver.isVersion;
 
@@ -69,16 +69,16 @@ public class TildeRange extends LatestRelease {
 
         if (minor == null) {
             lower = major;
-            upper = Integer.toString(parseInt(major) + 1);
+            upper = Long.toString(parseLong(major) + 1);
         } else if (patch == null) {
             lower = major + "." + minor;
-            upper = major + "." + (parseInt(minor) + 1);
+            upper = major + "." + (parseLong(minor) + 1);
         } else if (micro == null) {
             lower = major + "." + minor + "." + patch;
-            upper = major + "." + (parseInt(minor) + 1);
+            upper = major + "." + (parseLong(minor) + 1);
         } else {
             lower = major + "." + minor + "." + patch + "." + micro;
-            upper = major + "." + minor + "." + (parseInt(patch) + 1);
+            upper = major + "." + minor + "." + (parseLong(patch) + 1);
         }
 
         return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern, requireRelease));

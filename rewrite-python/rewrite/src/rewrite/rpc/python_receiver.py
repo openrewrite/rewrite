@@ -1925,6 +1925,220 @@ def _register_python_marker_codecs():
     )
 
 
+def _register_python_resolution_result_codecs():
+    """Register codecs for PythonResolutionResult and its nested types."""
+    from dataclasses import replace
+    from rewrite.python.markers import PythonResolutionResult
+    from rewrite.rpc.receive_queue import register_codec_with_both_names, RpcReceiveQueue
+    from rewrite.rpc.send_queue import RpcSendQueue
+    from uuid import uuid4
+
+    PRR = PythonResolutionResult
+    Dep = PRR.Dependency
+    ResDep = PRR.ResolvedDependency
+    SrcIdx = PRR.SourceIndex
+    PkgMgr = PRR.PackageManager
+
+    # --- SourceIndex ---
+
+    def _receive_source_index(si: SrcIdx, q: RpcReceiveQueue) -> SrcIdx:
+        return replace(si,
+            _name=q.receive(si.name),
+            _url=q.receive(si.url),
+            _default_index=q.receive(si.default_index),
+        )
+
+    def _send_source_index(si: SrcIdx, q: RpcSendQueue) -> None:
+        q.get_and_send(si, lambda x: x.name)
+        q.get_and_send(si, lambda x: x.url)
+        q.get_and_send(si, lambda x: x.default_index)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.PythonResolutionResult$SourceIndex',
+        SrcIdx,
+        _receive_source_index,
+        lambda: SrcIdx(_name='', _url='', _default_index=False),
+        _send_source_index
+    )
+
+    # --- ResolvedDependency ---
+
+    def _receive_resolved_dep(rd: ResDep, q: RpcReceiveQueue) -> ResDep:
+        return replace(rd,
+            _name=q.receive(rd.name),
+            _version=q.receive(rd.version),
+            _source=q.receive(rd.source),
+            _dependencies=q.receive_list(
+                rd.dependencies,
+                lambda dep: _receive_resolved_dep(dep, q)
+            ),
+        )
+
+    def _send_resolved_dep(rd: ResDep, q: RpcSendQueue) -> None:
+        q.get_and_send(rd, lambda x: x.name)
+        q.get_and_send(rd, lambda x: x.version)
+        q.get_and_send(rd, lambda x: x.source)
+        q.get_and_send_list_as_ref(
+            rd,
+            lambda x: x.dependencies if x.dependencies is not None else [],
+            lambda dep: dep.name + '@' + dep.version,
+            lambda dep: _send_resolved_dep(dep, q)
+        )
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.PythonResolutionResult$ResolvedDependency',
+        ResDep,
+        _receive_resolved_dep,
+        lambda: ResDep(_name='', _version='', _source=None, _dependencies=None),
+        _send_resolved_dep
+    )
+
+    # --- Dependency ---
+
+    def _receive_dependency(dep: Dep, q: RpcReceiveQueue) -> Dep:
+        return replace(dep,
+            _name=q.receive(dep.name),
+            _version_constraint=q.receive(dep.version_constraint),
+            _extras=q.receive(dep.extras),
+            _marker=q.receive(dep.marker),
+            _resolved=q.receive(dep.resolved),
+        )
+
+    def _send_dependency(dep: Dep, q: RpcSendQueue) -> None:
+        q.get_and_send(dep, lambda x: x.name)
+        q.get_and_send(dep, lambda x: x.version_constraint)
+        q.get_and_send(dep, lambda x: x.extras)
+        q.get_and_send(dep, lambda x: x.marker)
+        q.get_and_send(dep, lambda x: x.resolved)
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.PythonResolutionResult$Dependency',
+        Dep,
+        _receive_dependency,
+        lambda: Dep(_name='', _version_constraint=None, _extras=None, _marker=None, _resolved=None),
+        _send_dependency
+    )
+
+    # --- PythonResolutionResult ---
+
+    def _receive_resolution_result(marker: PRR, q: RpcReceiveQueue) -> PRR:
+        new_id = q.receive_defined(marker.id)
+        new_name = q.receive(marker.name)
+        new_version = q.receive(marker.version)
+        new_description = q.receive(marker.description)
+        new_license = q.receive(marker.license)
+        new_path = q.receive(marker.path)
+        new_requires_python = q.receive(marker.requires_python)
+        new_build_backend = q.receive(marker.build_backend)
+        new_build_requires = q.receive_list(
+            marker.build_requires,
+            lambda dep: _receive_dependency(dep, q)
+        )
+        new_dependencies = q.receive_list(
+            marker.dependencies,
+            lambda dep: _receive_dependency(dep, q)
+        )
+        new_optional_deps = q.receive(marker.optional_dependencies)
+        new_dep_groups = q.receive(marker.dependency_groups)
+        new_constraint_deps = q.receive_list(
+            marker.constraint_dependencies,
+            lambda dep: _receive_dependency(dep, q)
+        )
+        new_override_deps = q.receive_list(
+            marker.override_dependencies,
+            lambda dep: _receive_dependency(dep, q)
+        )
+        new_resolved_deps = q.receive_list(
+            marker.resolved_dependencies,
+            lambda rd: _receive_resolved_dep(rd, q)
+        )
+        new_pm = q.receive(marker.package_manager)
+        if isinstance(new_pm, str):
+            new_pm = PkgMgr[new_pm]
+        new_source_indexes = q.receive_list(
+            marker.source_indexes,
+            lambda si: _receive_source_index(si, q)
+        )
+        return replace(marker,
+            _id=new_id,
+            _name=new_name,
+            _version=new_version,
+            _description=new_description,
+            _license=new_license,
+            _path=new_path,
+            _requires_python=new_requires_python,
+            _build_backend=new_build_backend,
+            _build_requires=new_build_requires,
+            _dependencies=new_dependencies,
+            _optional_dependencies=new_optional_deps,
+            _dependency_groups=new_dep_groups,
+            _constraint_dependencies=new_constraint_deps,
+            _override_dependencies=new_override_deps,
+            _resolved_dependencies=new_resolved_deps,
+            _package_manager=new_pm,
+            _source_indexes=new_source_indexes,
+        )
+
+    def _send_resolution_result(marker: PRR, q: RpcSendQueue) -> None:
+        q.get_and_send(marker, lambda x: x.id)
+        q.get_and_send(marker, lambda x: x.name)
+        q.get_and_send(marker, lambda x: x.version)
+        q.get_and_send(marker, lambda x: x.description)
+        q.get_and_send(marker, lambda x: x.license)
+        q.get_and_send(marker, lambda x: x.path)
+        q.get_and_send(marker, lambda x: x.requires_python)
+        q.get_and_send(marker, lambda x: x.build_backend)
+        q.get_and_send_list_as_ref(
+            marker, lambda x: x.build_requires,
+            lambda dep: dep.name + '@' + str(dep.version_constraint),
+            lambda dep: _send_dependency(dep, q)
+        )
+        q.get_and_send_list_as_ref(
+            marker, lambda x: x.dependencies,
+            lambda dep: dep.name + '@' + str(dep.version_constraint),
+            lambda dep: _send_dependency(dep, q)
+        )
+        q.get_and_send(marker, lambda x: x.optional_dependencies)
+        q.get_and_send(marker, lambda x: x.dependency_groups)
+        q.get_and_send_list_as_ref(
+            marker, lambda x: x.constraint_dependencies,
+            lambda dep: dep.name + '@' + str(dep.version_constraint),
+            lambda dep: _send_dependency(dep, q)
+        )
+        q.get_and_send_list_as_ref(
+            marker, lambda x: x.override_dependencies,
+            lambda dep: dep.name + '@' + str(dep.version_constraint),
+            lambda dep: _send_dependency(dep, q)
+        )
+        q.get_and_send_list_as_ref(
+            marker, lambda x: x.resolved_dependencies,
+            lambda rd: rd.name + '@' + rd.version,
+            lambda rd: _send_resolved_dep(rd, q)
+        )
+        q.get_and_send(marker, lambda x: x.package_manager)
+        q.get_and_send_list(
+            marker,
+            lambda x: x.source_indexes if x.source_indexes is not None else [],
+            lambda si: si.name,
+            lambda si: _send_source_index(si, q)
+        )
+
+    register_codec_with_both_names(
+        'org.openrewrite.python.marker.PythonResolutionResult',
+        PRR,
+        _receive_resolution_result,
+        lambda: PRR(
+            _id=uuid4(), _name=None, _version=None, _description=None,
+            _license=None, _path='', _requires_python=None, _build_backend=None,
+            _build_requires=[], _dependencies=[], _optional_dependencies={},
+            _dependency_groups={}, _constraint_dependencies=[],
+            _override_dependencies=[], _resolved_dependencies=[],
+            _package_manager=None, _source_indexes=None
+        ),
+        _send_resolution_result
+    )
+
+
 # Register all codecs on module import
 _register_marker_codecs()  # Existing marker codecs with full deserialization
 _register_tree_codecs()
@@ -1935,3 +2149,4 @@ _register_markup_marker_codecs()  # Markup.Warn, Error, Info, Debug
 _register_style_codecs()
 _register_parse_error_codec()  # ParseError handling
 _register_python_marker_codecs()  # Python-specific markers including PrintSyntax, ExecSyntax
+_register_python_resolution_result_codecs()  # PythonResolutionResult and nested types

@@ -135,7 +135,7 @@ class FileAttributes:
                 is_executable = os.access(path, os.X_OK)
                 size = stat.st_size
 
-                return FileAttributes(creation_time, last_access_time, last_modified_time, is_readable, is_writable,
+                return FileAttributes(creation_time, last_modified_time, last_access_time, is_readable, is_writable,
                                       is_executable, size)
             except OSError:
                 pass

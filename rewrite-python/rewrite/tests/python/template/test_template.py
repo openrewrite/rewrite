@@ -14,15 +14,22 @@
 
 """Tests for Template class."""
 
+from typing import Any, Optional
 from uuid import uuid4
 
 import pytest
 
+from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.java import tree as j
-from rewrite.java.support_types import Space
+from rewrite.java.tree import Unary
+from rewrite.java.support_types import Space, JRightPadded
 from rewrite.markers import Markers
-from rewrite.python.template import template, capture, Template, TemplateBuilder
+from rewrite.python.template import template, capture, pattern, Template, TemplateBuilder
 from rewrite.python.template.engine import TemplateEngine
+from rewrite.python.template.replacement import maybe_parenthesize
+from rewrite.python.visitor import PythonVisitor
+from rewrite.test import RecipeSpec, python
+from rewrite.visitor import Cursor
 
 
 class TestTemplate:
@@ -86,7 +93,7 @@ class TestApplySubstitutions:
         assert isinstance(tree, j.MethodInvocation)
 
         result = TemplateEngine.apply_substitutions(
-            tree, {'expr': self._ident("hello")}, cursor=None,
+            tree, {'expr': self._ident("hello")},
         )
 
         assert isinstance(result, j.MethodInvocation)
@@ -104,7 +111,7 @@ class TestApplySubstitutions:
         assert isinstance(tree, j.MethodInvocation)
 
         result = TemplateEngine.apply_substitutions(
-            tree, {'obj': self._ident("myobj")}, cursor=None,
+            tree, {'obj': self._ident("myobj")},
         )
 
         assert isinstance(result, j.MethodInvocation)
@@ -121,7 +128,7 @@ class TestApplySubstitutions:
         assert isinstance(tree, j.Binary)
 
         result = TemplateEngine.apply_substitutions(
-            tree, {'a': self._ident("x"), 'b': self._ident("y")}, cursor=None,
+            tree, {'a': self._ident("x"), 'b': self._ident("y")},
         )
 
         assert isinstance(result, j.Binary)
@@ -362,3 +369,409 @@ class TestTemplateApply:
         assert len(result.arguments) == 1
         assert isinstance(result.arguments[0], j.Identifier)
         assert result.arguments[0].simple_name == "world"
+
+
+# ---------------------------------------------------------------------------
+# maybe_parenthesize unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestMaybeParenthesize:
+    """Unit tests for maybe_parenthesize() — verifies that the function
+    wraps a result node in parentheses when required by the parent context.
+    """
+
+    @staticmethod
+    def _ident(name: str) -> j.Identifier:
+        return j.Identifier(uuid4(), Space.EMPTY, Markers.EMPTY, [], name, None, None)
+
+    @staticmethod
+    def _binary(left, op, right) -> j.Binary:
+        return j.Binary(
+            uuid4(), Space.EMPTY, Markers.EMPTY, left,
+            JRightPadded(op, Space([], ' '), Markers.EMPTY),
+            right, None,
+        )
+
+    @staticmethod
+    def _cursor_chain(*nodes) -> Cursor:
+        """Build a cursor chain from root → … → leaf."""
+        cur = Cursor(None, Cursor.ROOT_VALUE)
+        for node in nodes:
+            cur = Cursor(cur, node)
+        return cur
+
+    def test_or_result_in_and_parent(self):
+        """An `or` expression placed inside an `and` must be parenthesized."""
+        or_expr = self._binary(self._ident('a'), j.Binary.Type.Or, self._ident('b'))
+        and_parent = self._binary(or_expr, j.Binary.Type.And, self._ident('z'))
+        cursor = self._cursor_chain(and_parent, or_expr)
+
+        result = maybe_parenthesize(or_expr, cursor)
+        assert isinstance(result, j.Parentheses)
+
+    def test_and_result_in_or_parent(self):
+        """`and` has higher precedence than `or`, so no parens needed."""
+        and_expr = self._binary(self._ident('a'), j.Binary.Type.And, self._ident('b'))
+        or_parent = self._binary(and_expr, j.Binary.Type.Or, self._ident('z'))
+        cursor = self._cursor_chain(or_parent, and_expr)
+
+        result = maybe_parenthesize(and_expr, cursor)
+        assert not isinstance(result, j.Parentheses)
+
+    def test_or_result_under_not(self):
+        """`or` under `not` needs parens (not has precedence 3, or is 1)."""
+        or_expr = self._binary(self._ident('a'), j.Binary.Type.Or, self._ident('b'))
+        not_parent = j.Unary(
+            uuid4(), Space.EMPTY, Markers.EMPTY,
+            JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
+            or_expr, None,
+        )
+        cursor = self._cursor_chain(not_parent, or_expr)
+
+        result = maybe_parenthesize(or_expr, cursor)
+        assert isinstance(result, j.Parentheses)
+
+    def test_identifier_result_unchanged(self):
+        """Non-binary/unary results are returned unchanged."""
+        ident = self._ident('x')
+        and_parent = self._binary(ident, j.Binary.Type.And, self._ident('z'))
+        cursor = self._cursor_chain(and_parent, ident)
+
+        result = maybe_parenthesize(ident, cursor)
+        assert result is ident
+
+    def test_same_precedence_no_parens(self):
+        """`and` inside `and` — same precedence, no parens needed."""
+        inner = self._binary(self._ident('a'), j.Binary.Type.And, self._ident('b'))
+        outer = self._binary(inner, j.Binary.Type.And, self._ident('c'))
+        cursor = self._cursor_chain(outer, inner)
+
+        result = maybe_parenthesize(inner, cursor)
+        assert not isinstance(result, j.Parentheses)
+
+    def test_template_apply_parenthesizes_in_binary_context(self):
+        """template.apply() should parenthesize its result when the cursor
+        parent is a higher-precedence binary operator."""
+        from rewrite.python.tree import ExpressionStatement
+
+        _x = capture('x')
+        _y = capture('y')
+        _not_x_or_not_y = template("not {x} or not {y}", x=_x, y=_y)
+
+        # Build cursor: root → Binary(and) → Unary(not)
+        # The Unary is the node being replaced by the template result.
+        x_ident = self._ident('x')
+        y_ident = self._ident('y')
+        and_inner = self._binary(x_ident, j.Binary.Type.And, y_ident)
+        not_expr = j.Unary(
+            uuid4(), Space.EMPTY, Markers.EMPTY,
+            JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
+            j.Parentheses(
+                uuid4(), Space.EMPTY, Markers.EMPTY,
+                JRightPadded(and_inner, Space.EMPTY, Markers.EMPTY),
+            ),
+            None,
+        )
+        z_ident = self._ident('z')
+        outer_and = self._binary(not_expr, j.Binary.Type.And, z_ident)
+        cursor = self._cursor_chain(outer_and, not_expr)
+
+        result = _not_x_or_not_y.apply(
+            cursor, values={'x': x_ident, 'y': y_ident}
+        )
+
+        # apply() wraps in ExpressionStatement (target Unary is a Statement);
+        # the inner expression should be Parentheses since `or` is placed
+        # inside an `and` context.
+        inner = result.expression if isinstance(result, ExpressionStatement) else result
+        assert isinstance(inner, j.Parentheses), (
+            f"Expected Parentheses but got {type(inner).__name__}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Template apply precedence in surrounding context (integration tests)
+# ---------------------------------------------------------------------------
+#
+# When template.apply() returns a node with lower precedence than the
+# site where it replaces, the framework should wrap it in parentheses.
+#
+# Example: "not {x} or not {y}" produces an `or` expression. If the
+# replacement site's parent is `and`, the result needs outer parentheses
+# because `or` has lower precedence than `and`.
+# ---------------------------------------------------------------------------
+
+
+class _DeMorganRecipe(Recipe):
+    """Minimal De Morgan recipe that demonstrates the parenthesization bug."""
+
+    @property
+    def name(self) -> str:
+        return "test.DeMorgan"
+
+    @property
+    def display_name(self) -> str:
+        return "Test De Morgan"
+
+    @property
+    def description(self) -> str:
+        return "Test De Morgan parenthesization"
+
+    def editor(self) -> TreeVisitor[Any, ExecutionContext]:
+        _x = capture('x')
+        _y = capture('y')
+        _not_and = pattern("not ({x} and {y})", x=_x, y=_y)
+        _not_or = pattern("not ({x} or {y})", x=_x, y=_y)
+        _not_x_or_not_y = template("not {x} or not {y}", x=_x, y=_y)
+        _not_x_and_not_y = template("not {x} and not {y}", x=_x, y=_y)
+
+        class Visitor(PythonVisitor[ExecutionContext]):
+            def visit_unary(
+                self, unary: Unary, p: ExecutionContext
+            ) -> Optional[Unary]:
+                unary = super().visit_unary(unary, p)
+
+                match = _not_and.match(unary, self.cursor)
+                if match:
+                    return _not_x_or_not_y.apply(self.cursor, values=match)
+
+                match = _not_or.match(unary, self.cursor)
+                if match:
+                    return _not_x_and_not_y.apply(self.cursor, values=match)
+
+                return unary
+
+        return Visitor()
+
+
+class TestTemplateApplyPrecedenceInContext:
+    """Template.apply() result must be parenthesized when inserted into
+    a higher-precedence context.
+
+    All tests use a minimal De Morgan recipe:
+        not (x and y) → not x or not y
+        not (x or y)  → not x and not y
+    """
+
+    def test_demorgan_standalone(self):
+        """Baseline: De Morgan works at top level (no surrounding context)."""
+        spec = RecipeSpec(recipe=_DeMorganRecipe())
+        spec.rewrite_run(
+            python(
+                "result = not (a and b)",
+                "result = not a or not b",
+            )
+        )
+
+    def test_demorgan_result_in_and_context(self):
+        """not (x and y) inside `... and z` must wrap result in parens.
+
+        not (x and y) and z
+          → (not x or not y) and z
+
+        Without parens: not x or not y and z
+        Python parses:  (not x) or ((not y) and z)  ← WRONG
+        """
+        spec = RecipeSpec(recipe=_DeMorganRecipe())
+        spec.rewrite_run(
+            python(
+                "result = not (x and y) and z",
+                "result = (not x or not y) and z",
+            )
+        )
+
+    def test_demorgan_result_in_or_context(self):
+        """not (x or y) inside `... or z` — no parens needed.
+
+        not (x or y) or z
+          → not x and not y or z
+
+        `and` has higher precedence than `or`, so
+        Python parses:  ((not x) and (not y)) or z  ← correct without parens.
+        """
+        spec = RecipeSpec(recipe=_DeMorganRecipe())
+        spec.rewrite_run(
+            python(
+                "result = not (x or y) or z",
+                "result = not x and not y or z",
+            )
+        )
+
+    def test_demorgan_result_on_right_of_and(self):
+        """z and not (x and y) must wrap result in parens.
+
+        z and not (x and y)
+          → z and (not x or not y)
+
+        Without parens: z and not x or not y
+        Python parses:  (z and (not x)) or (not y)  ← WRONG
+        """
+        spec = RecipeSpec(recipe=_DeMorganRecipe())
+        spec.rewrite_run(
+            python(
+                "result = z and not (x and y)",
+                "result = z and (not x or not y)",
+            )
+        )
+
+    def test_demorgan_result_in_if_condition(self):
+        """De Morgan in an if condition should still be correct."""
+        spec = RecipeSpec(recipe=_DeMorganRecipe())
+        spec.rewrite_run(
+            python(
+                "if not (x and y) and z:\n    pass",
+                "if (not x or not y) and z:\n    pass",
+            )
+        )
+
+
+class TestTemplateFactoryOptions:
+    """Tests for context/dependencies keyword arguments on template() and TemplateBuilder."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_template_factory_with_context(self):
+        """template() factory accepts context parameter."""
+        tmpl = template("x + 1", context=["MyType = int"])
+        assert tmpl._options.context == ("MyType = int",)
+
+    def test_template_factory_with_dependencies(self):
+        """template() factory accepts dependencies parameter."""
+        tmpl = template("x", dependencies={"flask": "3.0.0"})
+        assert tmpl._options.dependencies == (("flask", "3.0.0"),)
+
+    def test_builder_with_context(self):
+        """TemplateBuilder supports .context() method."""
+        tmpl = (Template.builder()
+            .code("x + 1")
+            .context("MyType = int")
+            .build())
+        assert tmpl._options.context == ("MyType = int",)
+
+    def test_builder_with_dependencies(self):
+        """TemplateBuilder supports .dependencies() method."""
+        tmpl = (Template.builder()
+            .code("x")
+            .dependencies({"requests": "2.31.0"})
+            .build())
+        assert tmpl._options.dependencies == (("requests", "2.31.0"),)
+
+
+class TestTypeAttributedPatternMatching:
+    """Integration tests for pattern matching with type attribution.
+
+    These tests use stdlib ``json.dumps`` (no external dependencies) to verify
+    that type-attributed ASTs enable FQN-based semantic matching in the 3-layer
+    comparator.  ``ty`` consistently resolves ``json.dumps`` to
+    ``declaring_fqn=json`` regardless of import style.
+    """
+
+    def test_fqn_match_different_import_styles(self):
+        """Pattern matches code that uses a different import style via FQN.
+
+        Code uses ``from json import dumps; dumps(x)`` (bare name).
+        Pattern uses ``json.dumps({val})`` (qualified name).
+        Without type attribution, these would NOT structurally match because
+        the select (None vs Identifier("json")) differs.  With type attribution,
+        Layer 2 FQN matching detects both resolve to ``json.dumps`` and
+        skips the select comparison.
+        """
+        val = capture('val')
+        pat = pattern(
+            f"json.dumps({val})",
+            context=["import json"],
+        )
+        tmpl = template(f"str({val})")
+
+        class ReplaceJsonDumps(Recipe):
+            @property
+            def name(self):
+                return "test.ReplaceJsonDumps"
+
+            @property
+            def display_name(self):
+                return "Test"
+
+            @property
+            def description(self):
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=ReplaceJsonDumps())
+        spec.rewrite_run(
+            python(
+                """
+                from json import dumps
+                x = dumps({"key": "value"})
+                """,
+                """
+                from json import dumps
+                x = str({"key": "value"})
+                """,
+            ),
+        )
+
+    def test_fqn_match_with_aliased_import(self):
+        """Pattern matches code that uses an aliased import via FQN.
+
+        Code uses ``import json as j; j.dumps(x)`` (aliased select ``j``).
+        Pattern uses ``json.dumps({val})`` (canonical select ``json``).
+        Without type attribution, ``Identifier("j")`` != ``Identifier("json")``
+        so the structural comparison would fail.  With type attribution,
+        Layer 2 FQN matching detects both resolve to ``json.dumps``
+        and skips the select comparison entirely.
+        """
+        val = capture('val')
+        pat = pattern(
+            f"json.dumps({val})",
+            context=["import json"],
+        )
+        tmpl = template(f"str({val})")
+
+        class ReplaceJsonDumps(Recipe):
+            @property
+            def name(self):
+                return "test.ReplaceJsonDumps"
+
+            @property
+            def display_name(self):
+                return "Test"
+
+            @property
+            def description(self):
+                return "Test"
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if match:
+                            return tmpl.apply(self.cursor, values=match)
+                        return method
+                return Visitor()
+
+        spec = RecipeSpec(recipe=ReplaceJsonDumps())
+        spec.rewrite_run(
+            python(
+                """
+                import json as j
+                x = j.dumps({"key": "value"})
+                """,
+                """
+                import json as j
+                x = str({"key": "value"})
+                """,
+            ),
+        )

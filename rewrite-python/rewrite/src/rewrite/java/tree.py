@@ -113,7 +113,7 @@ class Annotation(Expression):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Annotation.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -331,7 +331,7 @@ class Assignment(Statement, Expression, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Assignment.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -428,7 +428,7 @@ class AssignmentOperation(Statement, Expression, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = AssignmentOperation.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -530,7 +530,7 @@ class Binary(Expression, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Binary.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -608,7 +608,7 @@ class Block(Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Block.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -742,7 +742,7 @@ class Case(Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Case.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -947,7 +947,7 @@ class ClassDeclaration(Statement, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ClassDeclaration.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1067,7 +1067,7 @@ class CompilationUnit(JavaSourceFile, SourceFile):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = CompilationUnit.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1177,7 +1177,7 @@ class DoWhileLoop(Loop):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = DoWhileLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1319,7 +1319,7 @@ class EnumValueSet(Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = EnumValueSet.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1393,7 +1393,7 @@ class FieldAccess(TypeTree, Expression, Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = FieldAccess.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1512,7 +1512,7 @@ class ForEachLoop(Loop):
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = ForEachLoop.Control.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -1541,7 +1541,7 @@ class ForEachLoop(Loop):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ForEachLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1673,7 +1673,7 @@ class ForLoop(Loop):
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = ForLoop.Control.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -1702,7 +1702,7 @@ class ForLoop(Loop):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ForLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -1911,7 +1911,7 @@ class If(Statement):
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = If.Else.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -1940,7 +1940,7 @@ class If(Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = If.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2018,7 +2018,7 @@ class Import(Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Import.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2099,7 +2099,7 @@ class InstanceOf(Expression, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = InstanceOf.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2173,7 +2173,7 @@ class DeconstructionPattern(TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = DeconstructionPattern.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2233,7 +2233,7 @@ class IntersectionType(TypeTree, Expression):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = IntersectionType.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2300,7 +2300,7 @@ class Label(Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Label.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2429,7 +2429,7 @@ class Lambda(Statement, Expression, TypedTree):
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = Lambda.Parameters.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -2610,7 +2610,7 @@ class MemberReference(TypedTree, MethodCall):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MemberReference.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2753,7 +2753,7 @@ class MethodDeclaration(Statement, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MethodDeclaration.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -2814,7 +2814,7 @@ class MethodDeclaration(Statement, TypedTree):
         else:
             p = self._annotations()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MethodDeclaration.AnnotationsHelper(self)
                 object.__setattr__(self, '_annotations', weakref.ref(p))
         return p
@@ -2909,7 +2909,7 @@ class MethodInvocation(Statement, TypedTree, MethodCall):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MethodInvocation.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3037,7 +3037,7 @@ class MultiCatch(TypeTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = MultiCatch.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3118,7 +3118,7 @@ class NewArray(Expression, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = NewArray.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3178,7 +3178,7 @@ class ArrayDimension(J):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ArrayDimension.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3277,7 +3277,7 @@ class NewClass(Statement, TypedTree, MethodCall):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = NewClass.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3344,7 +3344,7 @@ class NullableType(TypeTree, Expression):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = NullableType.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3459,7 +3459,7 @@ class ParameterizedType(TypeTree, Expression):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ParameterizedType.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3524,7 +3524,7 @@ class Parentheses(Expression, Generic[J2]):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Parentheses[J2].PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3584,7 +3584,7 @@ class ControlParentheses(Expression, Generic[J2]):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = ControlParentheses[J2].PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -3867,7 +3867,7 @@ class Ternary(Expression, Statement, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Ternary.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4088,7 +4088,7 @@ class Try(Statement):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Try.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4210,7 +4210,7 @@ class TypeParameter(J):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = TypeParameter.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4277,7 +4277,7 @@ class TypeParameters(J):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = TypeParameters.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4361,7 +4361,7 @@ class Unary(Statement, Expression, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Unary.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4522,7 +4522,7 @@ class VariableDeclarations(Statement, TypedTree):
             else:
                 p = self._padding()
                 # noinspection PyProtectedMember
-                if p is None or p._t != self:
+                if p is None or p._t is not self:
                     p = VariableDeclarations.NamedVariable.PaddingHelper(self)
                     object.__setattr__(self, '_padding', weakref.ref(p))
             return p
@@ -4551,7 +4551,7 @@ class VariableDeclarations(Statement, TypedTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = VariableDeclarations.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4618,7 +4618,7 @@ class WhileLoop(Loop):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = WhileLoop.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -4689,7 +4689,7 @@ class Wildcard(Expression, TypeTree):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = Wildcard.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
