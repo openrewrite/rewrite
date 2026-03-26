@@ -436,9 +436,12 @@ public static class RoslynFormatter
                         var s = innerStmts[k];
                         if (k == 0)
                         {
-                            // Transfer the original statement's prefix to the first spliced statement
-                            s = s.WithElement(
-                                (Statement)J.SetPrefix(s.Element, statements[i].Element.Prefix));
+                            // Transfer the original statement's prefix to the first spliced statement.
+                            // ExpressionStatement delegates its prefix to its inner expression.
+                            var prefix = statements[i].Element.Prefix;
+                            s = s.WithElement(s.Element is ExpressionStatement es
+                                ? es.WithExpression(J.SetPrefix(es.Expression, prefix))
+                                : (Statement)J.SetPrefix(s.Element, prefix));
                         }
                         newStatements.Add(s);
 

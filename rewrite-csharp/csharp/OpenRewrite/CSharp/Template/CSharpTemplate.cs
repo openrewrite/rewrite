@@ -292,29 +292,6 @@ public sealed class CSharpTemplate
         params (CSharpPattern before, CSharpTemplate after)[] rules) =>
         new RewriteVisitor(rules);
 
-    /// <summary>
-    /// Creates a visitor that splices statements from any <see cref="Block"/> marked with
-    /// <see cref="SyntheticBlockContainer"/> into its parent block. Register once via
-    /// <see cref="TreeVisitor{T,P}.DoAfterVisit"/> — a single instance handles all
-    /// synthetic blocks produced during the visit.
-    /// </summary>
-    /// <example>
-    /// <code>
-    /// var match = pat.Match(ret, Cursor);
-    /// if (match != null)
-    /// {
-    ///     var result = tmpl.Apply(Cursor, values: match);
-    ///     if (result is Block block &amp;&amp; block.Markers.FindFirst&lt;SyntheticBlockContainer&gt;() != null)
-    ///     {
-    ///         MaybeDoAfterVisit(CSharpTemplate.CreateBlockFlattener&lt;ExecutionContext&gt;());
-    ///         return block;
-    ///     }
-    ///     return result ?? ret;
-    /// }
-    /// </code>
-    /// </example>
-    public static CSharpVisitor<P> CreateBlockFlattener<P>() => new BlockFlattener<P>();
-
     // ===============================================================
     // Implementation
     // ===============================================================
@@ -337,59 +314,4 @@ public sealed class CSharpTemplate
         }
     }
 
-    private sealed class BlockFlattener<P> : CSharpVisitor<P>, IEquatable<BlockFlattener<P>>
-    {
-        public bool Equals(BlockFlattener<P>? other) => other is not null;
-        public override bool Equals(object? obj) => obj is BlockFlattener<P>;
-        public override int GetHashCode() => typeof(BlockFlattener<P>).GetHashCode();
-        public override J VisitBlock(Block block, P ctx)
-        {
-            block = (Block)base.VisitBlock(block, ctx);
-
-            var statements = block.Statements;
-            var newStatements = new List<JRightPadded<Statement>>(statements.Count);
-            var changed = false;
-
-            foreach (var stmt in statements)
-            {
-                if (stmt.Element is Block inner &&
-                    inner.Markers.FindFirst<SyntheticBlockContainer>() != null)
-                {
-                    // Splice inner block's statements into the parent.
-                    // An empty inner block is intentionally dropped — flattening a block
-                    // that produced no statements should remove the slot.
-                    var innerStmts = inner.Statements;
-                    for (var i = 0; i < innerStmts.Count; i++)
-                    {
-                        var s = innerStmts[i];
-                        if (i == 0)
-                        {
-                            // Transfer the original statement's prefix (comments, blank lines)
-                            // to the first spliced statement.
-                            s = s.WithElement(SetStatementPrefix(s.Element, stmt.Element.Prefix));
-                        }
-                        newStatements.Add(s);
-                    }
-                    changed = true;
-                }
-                else
-                {
-                    newStatements.Add(stmt);
-                }
-            }
-
-            return changed ? block.WithStatements(newStatements) : block;
-        }
-
-        /// <summary>
-        /// Sets the prefix on a statement, handling <see cref="ExpressionStatement"/> which
-        /// delegates its prefix to its inner expression and has no <c>WithPrefix</c> method.
-        /// </summary>
-        private static Statement SetStatementPrefix(Statement stmt, Space prefix)
-        {
-            if (stmt is ExpressionStatement es)
-                return es.WithExpression(J.SetPrefix(es.Expression, prefix));
-            return (Statement)J.SetPrefix(stmt, prefix);
-        }
-    }
 }

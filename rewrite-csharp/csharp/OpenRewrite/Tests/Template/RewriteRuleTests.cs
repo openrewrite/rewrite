@@ -693,6 +693,41 @@ public class RewriteRuleTests : RewriteTest
             )
         );
     }
+    [Fact]
+    public void DeferredFormatDoesNotAffectSurroundingWhitespace()
+    {
+        // Replacing an expression inside a nested structure should not
+        // change the indentation of surrounding code (parent closing braces, etc.)
+        RewriteRun(
+            spec => spec.SetRecipe(new SwapBinaryWithAutoFormatRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    object[][] M()
+                    {
+                        return new object[][]
+                        {
+                            new object[] { 1 + 2 }
+                        };
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    object[][] M()
+                    {
+                        return new object[][]
+                        {
+                            new object[] { 2 + 1 }
+                        };
+                    }
+                }
+                """
+            )
+        );
+    }
 }
 
 // ===============================================================
@@ -920,7 +955,7 @@ class CaptureFlowRecipe : Core.Recipe
 
 /// <summary>
 /// Expands "return expr" into "Console.WriteLine(expr); return expr;" — two statements.
-/// Exercises multi-statement templates and CSharpTemplate.CreateBlockFlattener.
+/// Exercises multi-statement templates with synthetic block flattening.
 /// </summary>
 class LogBeforeReturnRecipe : Core.Recipe
 {
@@ -1032,5 +1067,20 @@ class FallbackWithManualVisitorRecipe : Core.Recipe
         return CSharpTemplate.Rewrite(
             (CSharpPattern.Expression($"{x} == null"), CSharpTemplate.Expression($"{x} is null")),
             (CSharpPattern.Expression($"{x} != null"), CSharpTemplate.Expression($"{x} is not null")));
+    }
+}
+
+class SwapBinaryWithAutoFormatRecipe : Core.Recipe
+{
+    public override string DisplayName => "Swap binary with auto-format";
+    public override string Description => "Swaps binary operands, using AutoFormat.";
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        var left = Capture.Expression("left");
+        var right = Capture.Expression("right");
+        return CSharpTemplate.Rewrite(
+            CSharpPattern.Expression($"{left} + {right}"),
+            CSharpTemplate.Expression($"{right} + {left}"));
     }
 }
