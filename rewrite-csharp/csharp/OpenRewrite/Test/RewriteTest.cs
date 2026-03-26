@@ -21,6 +21,7 @@ using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
+using OpenRewrite.CSharp.Rpc;
 using OpenRewrite.Java;
 using Rewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -71,45 +72,60 @@ public abstract class RewriteTest
         var parsed = new List<(SourceSpec Spec, SourceFile Source)>();
         foreach (var spec in specs)
         {
-            SemanticModel? semanticModel = null;
-            if (metadataReferences != null)
+            SourceFile source;
+            if (spec.SourcePath != null)
             {
-                var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: "source.cs");
-                var compilation = CSharpCompilation.Create("TestCompilation")
-                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-                    .AddReferences(metadataReferences)
-                    .AddSyntaxTrees(syntaxTree);
-                semanticModel = compilation.GetSemanticModel(syntaxTree);
+                // Remote-parsed source (e.g., XML/.csproj via Java RPC)
+                var rpc = RewriteRpcServer.Current
+                          ?? throw new InvalidOperationException(
+                              $"Parsing {spec.SourcePath} requires an RPC connection. " +
+                              "Use RpcFixture to start a Java RPC server.");
+                source = (SourceFile)rpc.ParseOnRemote(spec.SourcePath, spec.Before,
+                    spec.SourceFileType);
             }
-
-            var source = parser.Parse(spec.Before, semanticModel: semanticModel);
-
-            // Verify no non-whitespace content leaked into Space fields
-            if (validations.WhitespaceInSpaces)
+            else
             {
-                var whitespaceViolations = new List<WhitespaceViolation>();
-                new WhitespaceValidator().Visit(source, whitespaceViolations);
-                Assert.True(whitespaceViolations.Count == 0,
-                    $"Found non-whitespace content in Space fields:\n" +
-                    string.Join("\n", whitespaceViolations));
-            }
+                // Local C# parsing
+                SemanticModel? semanticModel = null;
+                if (metadataReferences != null)
+                {
+                    var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: "source.cs");
+                    var compilation = CSharpCompilation.Create("TestCompilation")
+                        .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                        .AddReferences(metadataReferences)
+                        .AddSyntaxTrees(syntaxTree);
+                    semanticModel = compilation.GetSemanticModel(syntaxTree);
+                }
 
-            // Verify round-trip: printed should match input
-            var printed = printer.Print(source);
-            if (validations.PrintEqualsInput)
-            {
-                AssertContentEquals(spec.Before, printed, source.SourcePath,
-                    "The printed source didn't match the original source code. " +
-                    "This means there is a bug in the parser implementation itself.");
-            }
+                source = parser.Parse(spec.Before, semanticModel: semanticModel);
 
-            // Verify idempotence: reparse and reprint should match
-            if (validations.PrintIdempotence)
-            {
-                var reparsed = parser.Parse(printed);
-                var reprinted = printer.Print(reparsed);
-                AssertContentEquals(printed, reprinted, source.SourcePath,
-                    "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+                // Verify no non-whitespace content leaked into Space fields
+                if (validations.WhitespaceInSpaces)
+                {
+                    var whitespaceViolations = new List<WhitespaceViolation>();
+                    new WhitespaceValidator().Visit(source, whitespaceViolations);
+                    Assert.True(whitespaceViolations.Count == 0,
+                        $"Found non-whitespace content in Space fields:\n" +
+                        string.Join("\n", whitespaceViolations));
+                }
+
+                // Verify round-trip: printed should match input
+                var printed = printer.Print(source);
+                if (validations.PrintEqualsInput)
+                {
+                    AssertContentEquals(spec.Before, printed, source.SourcePath,
+                        "The printed source didn't match the original source code. " +
+                        "This means there is a bug in the parser implementation itself.");
+                }
+
+                // Verify idempotence: reparse and reprint should match
+                if (validations.PrintIdempotence)
+                {
+                    var reparsed = parser.Parse(printed);
+                    var reprinted = printer.Print(reparsed);
+                    AssertContentEquals(printed, reprinted, source.SourcePath,
+                        "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+                }
             }
 
             parsed.Add((spec, source));
@@ -158,6 +174,11 @@ public abstract class RewriteTest
     protected static SourceSpec CSharp(string before, string? after = null)
     {
         return new SourceSpec(before, after);
+    }
+
+    protected static SourceSpec CsProj(string before, string? after = null)
+    {
+        return new SourceSpec(before, after, "project.csproj", "org.openrewrite.xml.tree.Xml$Document");
     }
 
     /// <summary>
@@ -212,7 +233,15 @@ public abstract class RewriteTest
 /// <summary>
 /// Specification for a source file in a test.
 /// </summary>
-public record SourceSpec(string Before, string? After = null);
+/// <param name="Before">Source content before recipe execution.</param>
+/// <param name="After">Expected content after recipe execution (null = expect no change).</param>
+/// <param name="SourcePath">File path for remote parsing (null = local C# parsing).</param>
+/// <param name="SourceFileType">Java type name for RPC GetObject calls.</param>
+public record SourceSpec(
+    string Before,
+    string? After = null,
+    string? SourcePath = null,
+    string? SourceFileType = null);
 
 /// <summary>
 /// Specification for recipe configuration in a test.

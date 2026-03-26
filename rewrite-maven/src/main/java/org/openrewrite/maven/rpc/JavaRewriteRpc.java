@@ -41,6 +41,7 @@ import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.marketplace.MavenRecipeBundleResolver;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -49,6 +50,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -198,6 +200,7 @@ public class JavaRewriteRpc {
 
         // Create the RPC server with the marketplace and resolvers
         RewriteRpc server = new RewriteRpc(jsonRpc, marketplace, resolvers);
+        server.setParsers(Collections.singletonList(new XmlParser()));
 
         if (logStream != null) {
             server.log(logStream);
