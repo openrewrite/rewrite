@@ -110,9 +110,10 @@ public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildPro
         UUID id = q.receiveAndGet(before.id, UUID::fromString);
         String sdk = q.receive(before.sdk);
         // Receive parallel lists and zip into map
-        List<String> keys = q.receiveList(new ArrayList<>(before.properties.keySet()),
+        Map<String, PropertyValue> beforeProps = before.properties != null ? before.properties : emptyMap();
+        List<String> keys = q.receiveList(new ArrayList<>(beforeProps.keySet()),
                 k -> q.<String, String>receiveAndGet(k, x -> x));
-        List<PropertyValue> values = q.receiveList(new ArrayList<>(before.properties.values()),
+        List<PropertyValue> values = q.receiveList(new ArrayList<>(beforeProps.values()),
                 v -> v.rpcReceive(v, q));
         Map<String, PropertyValue> props = new LinkedHashMap<>();
         if (keys != null && values != null) {
