@@ -15,6 +15,7 @@
  */
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Rpc;
+using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Rpc;
 

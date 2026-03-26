@@ -21,7 +21,7 @@ using OpenRewrite.Core;
 using OpenRewrite.CSharp.Rpc;
 using StreamJsonRpc;
 
-namespace OpenRewrite.Tests.Rpc;
+namespace OpenRewrite.Test;
 
 /// <summary>
 /// xUnit collection fixture that manages a Java RPC test server process.

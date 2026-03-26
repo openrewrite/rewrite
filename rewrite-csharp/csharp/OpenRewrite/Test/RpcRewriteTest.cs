@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using OpenRewrite.Test;
-
-namespace OpenRewrite.Tests.Rpc;
+namespace OpenRewrite.Test;
 
 /// <summary>
 /// Defines a shared collection so all RPC test classes use a single Java RPC
