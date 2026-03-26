@@ -439,8 +439,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc == STATEMENT_PREFIX && isScope(method) &&
                     (parentValue instanceof J.Return ||
                      parentValue instanceof J.Assignment ||
-                     parentValue instanceof J.AssignmentOperation)) {
-                    // Method invocation is used as an expression (e.g., inside return, assignment),
+                     parentValue instanceof J.AssignmentOperation ||
+                     parentValue instanceof J.TypeCast)) {
+                    // Method invocation is used as an expression (e.g., inside return, assignment, type cast),
                     // not as a standalone statement in a block. Parse as expression replacement.
                     return autoFormat(unsubstitute(templateParser.parseExpression(
                                     getCursor(),
@@ -459,7 +460,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     if (loc == STATEMENT_PREFIX &&
                         (parentValue instanceof J.Return ||
                          parentValue instanceof J.Assignment ||
-                         parentValue instanceof J.AssignmentOperation)) {
+                         parentValue instanceof J.AssignmentOperation ||
+                         parentValue instanceof J.TypeCast)) {
                         return autoFormat(unsubstitute(templateParser.parseExpression(
                                         getCursor(),
                                         substitutedTemplate,
