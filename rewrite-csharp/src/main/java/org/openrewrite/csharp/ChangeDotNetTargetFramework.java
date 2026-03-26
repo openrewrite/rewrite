@@ -22,6 +22,9 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.LinkedHashSet;
+import java.util.StringJoiner;
+
 /**
  * Changes the target framework in .csproj files.
  * Handles both single-TFM ({@code <TargetFramework>}) and
@@ -69,24 +72,24 @@ public class ChangeDotNetTargetFramework extends Recipe {
                             }
                         } else if ("TargetFrameworks".equals(name)) {
                             String value = t.getValue().orElse("");
-                            // Replace within semicolon-delimited list
+                            // Replace within semicolon-delimited list, deduplicating
                             String[] frameworks = value.split(";");
                             boolean changed = false;
-                            StringBuilder sb = new StringBuilder();
-                            for (int i = 0; i < frameworks.length; i++) {
-                                String fw = frameworks[i].trim();
+                            LinkedHashSet<String> seen = new LinkedHashSet<>();
+                            for (String framework : frameworks) {
+                                String fw = framework.trim();
                                 if (oldTargetFramework.equals(fw)) {
-                                    sb.append(newTargetFramework);
                                     changed = true;
-                                } else {
-                                    sb.append(fw);
+                                    fw = newTargetFramework;
                                 }
-                                if (i < frameworks.length - 1) {
-                                    sb.append(';');
-                                }
+                                seen.add(fw);
                             }
                             if (changed) {
-                                doAfterVisit(new ChangeTagValueVisitor<>(t, sb.toString()));
+                                StringJoiner sj = new StringJoiner(";");
+                                for (String fw : seen) {
+                                    sj.add(fw);
+                                }
+                                doAfterVisit(new ChangeTagValueVisitor<>(t, sj.toString()));
                             }
                         }
                         return t;
