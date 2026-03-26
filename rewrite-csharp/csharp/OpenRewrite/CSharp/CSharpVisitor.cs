@@ -1517,11 +1517,16 @@ public class CSharpVisitor<P> : JavaVisitor<P>
 
     /// <summary>
     /// Auto-formats the given tree node using Roslyn within the enclosing compilation unit.
-    /// Formatting is deferred to a single batch pass after the visitor completes, avoiding
-    /// O(N × file_size) cost when many nodes are formatted in the same file.
+    /// For subtrees, formatting is deferred to a single batch pass after the visitor completes,
+    /// avoiding O(N × file_size) cost when many nodes are formatted in the same file.
+    /// For the CompilationUnit itself, formats immediately (no benefit to deferring).
     /// </summary>
     protected T AutoFormat<T>(T tree, P p, Cursor cursor) where T : class, J
     {
+        // Full CU formatting — do it immediately, no benefit to deferring
+        if (tree is CompilationUnit cu)
+            return (T)(J)RoslynFormatter.Format(cu);
+
         _deferredFormat ??= new RoslynFormatter.DeferredFormatVisitor<P>();
         _deferredFormat.Add(tree);
         MaybeDoAfterVisit(_deferredFormat);
