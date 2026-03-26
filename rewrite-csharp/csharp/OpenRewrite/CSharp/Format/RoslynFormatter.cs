@@ -16,6 +16,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Text;
 using OpenRewrite.Core;
 using OpenRewrite.Java;
 
@@ -37,27 +38,46 @@ public static class RoslynFormatter
 
     /// <summary>
     /// Formats the compilation unit, optionally limiting to a subtree.
+    /// When a <paramref name="targetSubtree"/> is provided, only the region of the source
+    /// corresponding to that subtree is formatted by Roslyn, avoiding O(file_size) formatting
+    /// cost on every template application.
     /// </summary>
     public static CompilationUnit Format(CompilationUnit cu, J? targetSubtree, J? stopAfter)
     {
         // 1. Ensure minimum spacing so printed output is parseable
         cu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
 
-        // 2. Print to string
-        var printer = new CSharpPrinter<int>();
-        var source = printer.Print(cu);
+        // 2. Print to string, tracking the position of the target subtree if provided
+        string source;
+        TextSpan? formatSpan = null;
 
-        // 2. Detect style
+        if (targetSubtree != null)
+        {
+            var trackingPrinter = new PositionTrackingPrinter(targetSubtree.Id);
+            source = trackingPrinter.Print(cu);
+            var (start, end) = trackingPrinter.GetTrackedSpan();
+            if (start >= 0 && end > start)
+            {
+                formatSpan = TextSpan.FromBounds(start, end);
+            }
+        }
+        else
+        {
+            var printer = new CSharpPrinter<int>();
+            source = printer.Print(cu);
+        }
+
+        // 3. Detect style
         var style = FormatStyle.DetectStyle(source);
 
-        // 3. Format with Roslyn
-        var formattedSource = FormatWithRoslyn(source, style);
+        // 4. Format with Roslyn (scoped to the target span when available)
+        var formattedSource = FormatWithRoslyn(source, style, formatSpan);
 
-        // 4. If formatting didn't change anything, return original
+        // 5. If formatting didn't change anything, return original
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
             return cu;
 
-        // 5. Parse formatted string back to LST (no type attribution)
+        // 6. Parse formatted string back to LST (no type attribution)
         var parser = new CSharpParser();
         CompilationUnit formattedCu;
         try
@@ -70,7 +90,7 @@ public static class RoslynFormatter
             return cu;
         }
 
-        // 6. Reconcile whitespace
+        // 7. Reconcile whitespace
         var reconciler = new WhitespaceReconciler();
         var result = reconciler.Reconcile(cu, formattedCu, targetSubtree, stopAfter);
 
@@ -170,7 +190,33 @@ public static class RoslynFormatter
         }
     }
 
-    internal static string FormatWithRoslyn(string source, FormatStyle style)
+    /// <summary>
+    /// A printer that tracks the character offset of a specific node by ID.
+    /// Used to compute the <see cref="TextSpan"/> for span-scoped Roslyn formatting.
+    /// </summary>
+    private class PositionTrackingPrinter(Guid targetId) : CSharpPrinter<int>
+    {
+        private int _start = -1;
+        private int _end = -1;
+
+        public (int Start, int End) GetTrackedSpan() => (_start, _end);
+
+        protected override void BeforeSyntax(J j, PrintOutputCapture<int> p)
+        {
+            if (_start < 0 && j.Id == targetId)
+                _start = p.Length;
+            base.BeforeSyntax(j, p);
+        }
+
+        protected override void AfterSyntax(J j, PrintOutputCapture<int> p)
+        {
+            base.AfterSyntax(j, p);
+            if (_end < 0 && j.Id == targetId)
+                _end = p.Length;
+        }
+    }
+
+    internal static string FormatWithRoslyn(string source, FormatStyle style, TextSpan? span = null)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var root = syntaxTree.GetRoot();
@@ -182,7 +228,9 @@ public static class RoslynFormatter
             .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.IndentationSize)
             .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine);
 
-        var formatted = Formatter.Format(root, workspace, options);
+        var formatted = span != null
+            ? Formatter.Format(root, span.Value, workspace, options)
+            : Formatter.Format(root, workspace, options);
         return formatted.ToFullString();
     }
 }
