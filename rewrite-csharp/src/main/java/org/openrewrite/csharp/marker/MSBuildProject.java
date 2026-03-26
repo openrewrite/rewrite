@@ -23,9 +23,13 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.io.Serializable;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,7 +46,7 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @Builder
 @AllArgsConstructor
-public class MSBuildProject implements Marker, Serializable {
+public class MSBuildProject implements Marker, Serializable, RpcCodec<MSBuildProject> {
 
     @With
     @Builder.Default
@@ -82,13 +86,39 @@ public class MSBuildProject implements Marker, Serializable {
     @Builder.Default
     List<TargetFramework> targetFrameworks = emptyList();
 
+    @Override
+    public void rpcSend(MSBuildProject after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, MSBuildProject::getSdk);
+        q.getAndSend(after, MSBuildProject::getProperties);
+        q.getAndSendList(after, MSBuildProject::getPackageSources,
+                PackageSource::getKey,
+                ps -> ps.rpcSend(ps, q));
+        q.getAndSendList(after, MSBuildProject::getTargetFrameworks,
+                TargetFramework::getTargetFramework,
+                tf -> tf.rpcSend(tf, q));
+    }
+
+    @Override
+    public MSBuildProject rpcReceive(MSBuildProject before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.id, UUID::fromString))
+                .withSdk(q.receive(before.sdk))
+                .withProperties(q.receive(before.properties))
+                .withPackageSources(q.receiveList(before.packageSources,
+                        ps -> ps.rpcReceive(ps, q)))
+                .withTargetFrameworks(q.receiveList(before.targetFrameworks,
+                        tf -> tf.rpcReceive(tf, q)));
+    }
+
     /**
      * Metadata for a single target framework within this project.
      */
     @Value
+    @With
     @Builder
     @AllArgsConstructor
-    public static class TargetFramework implements Serializable {
+    public static class TargetFramework implements Serializable, RpcCodec<TargetFramework> {
         String targetFramework;
 
         @Builder.Default
@@ -99,6 +129,32 @@ public class MSBuildProject implements Marker, Serializable {
 
         @Builder.Default
         List<ProjectReference> projectReferences = emptyList();
+
+        @Override
+        public void rpcSend(TargetFramework after, RpcSendQueue q) {
+            q.getAndSend(after, TargetFramework::getTargetFramework);
+            q.getAndSendList(after, TargetFramework::getPackageReferences,
+                    PackageReference::getInclude,
+                    pr -> pr.rpcSend(pr, q));
+            q.getAndSendListAsRef(after, TargetFramework::getResolvedPackages,
+                    rp -> rp.getName() + "@" + rp.getResolvedVersion(),
+                    rp -> rp.rpcSend(rp, q));
+            q.getAndSendList(after, TargetFramework::getProjectReferences,
+                    ProjectReference::getInclude,
+                    pr -> pr.rpcSend(pr, q));
+        }
+
+        @Override
+        public TargetFramework rpcReceive(TargetFramework before, RpcReceiveQueue q) {
+            return before
+                    .withTargetFramework(q.receive(before.targetFramework))
+                    .withPackageReferences(q.receiveList(before.packageReferences,
+                            pr -> pr.rpcReceive(pr, q)))
+                    .withResolvedPackages(q.receiveList(before.resolvedPackages,
+                            rp -> rp.rpcReceive(rp, q)))
+                    .withProjectReferences(q.receiveList(before.projectReferences,
+                            pr -> pr.rpcReceive(pr, q)));
+        }
     }
 
     /**
@@ -107,9 +163,10 @@ public class MSBuildProject implements Marker, Serializable {
      * enabling recipes to decide whether to update a property or a literal.
      */
     @Value
+    @With
     @Builder
     @AllArgsConstructor
-    public static class PackageReference implements Serializable {
+    public static class PackageReference implements Serializable, RpcCodec<PackageReference> {
         String include;
 
         @Nullable
@@ -117,6 +174,21 @@ public class MSBuildProject implements Marker, Serializable {
 
         @Nullable
         String resolvedVersion;
+
+        @Override
+        public void rpcSend(PackageReference after, RpcSendQueue q) {
+            q.getAndSend(after, PackageReference::getInclude);
+            q.getAndSend(after, PackageReference::getRequestedVersion);
+            q.getAndSend(after, PackageReference::getResolvedVersion);
+        }
+
+        @Override
+        public PackageReference rpcReceive(PackageReference before, RpcReceiveQueue q) {
+            return before
+                    .withInclude(q.receive(before.include))
+                    .withRequestedVersion(q.receive(before.requestedVersion))
+                    .withResolvedVersion(q.receive(before.resolvedVersion));
+        }
     }
 
     /**
@@ -125,9 +197,10 @@ public class MSBuildProject implements Marker, Serializable {
      */
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     @Value
+    @With
     @Builder
     @AllArgsConstructor
-    public static class ResolvedPackage implements Serializable {
+    public static class ResolvedPackage implements Serializable, RpcCodec<ResolvedPackage> {
         String name;
 
         String resolvedVersion;
@@ -136,16 +209,47 @@ public class MSBuildProject implements Marker, Serializable {
         List<ResolvedPackage> dependencies = emptyList();
 
         int depth;
+
+        @Override
+        public void rpcSend(ResolvedPackage after, RpcSendQueue q) {
+            q.getAndSend(after, ResolvedPackage::getName);
+            q.getAndSend(after, ResolvedPackage::getResolvedVersion);
+            q.getAndSendListAsRef(after, ResolvedPackage::getDependencies,
+                    dep -> dep.getName() + "@" + dep.getResolvedVersion(),
+                    dep -> dep.rpcSend(dep, q));
+            q.getAndSend(after, ResolvedPackage::getDepth);
+        }
+
+        @Override
+        public ResolvedPackage rpcReceive(ResolvedPackage before, RpcReceiveQueue q) {
+            return before
+                    .withName(q.receive(before.name))
+                    .withResolvedVersion(q.receive(before.resolvedVersion))
+                    .withDependencies(q.receiveList(before.dependencies,
+                            dep -> dep.rpcReceive(dep, q)))
+                    .withDepth(q.receive(before.depth));
+        }
     }
 
     /**
      * A project-to-project reference within a solution.
      */
     @Value
+    @With
     @Builder
     @AllArgsConstructor
-    public static class ProjectReference implements Serializable {
+    public static class ProjectReference implements Serializable, RpcCodec<ProjectReference> {
         String include;
+
+        @Override
+        public void rpcSend(ProjectReference after, RpcSendQueue q) {
+            q.getAndSend(after, ProjectReference::getInclude);
+        }
+
+        @Override
+        public ProjectReference rpcReceive(ProjectReference before, RpcReceiveQueue q) {
+            return before.withInclude(q.receive(before.include));
+        }
     }
 
     /**
@@ -154,13 +258,31 @@ public class MSBuildProject implements Marker, Serializable {
      * when updating a property value.
      */
     @Value
+    @With
     @Builder
     @AllArgsConstructor
-    public static class PropertyValue implements Serializable {
+    public static class PropertyValue implements Serializable, RpcCodec<PropertyValue> {
         String value;
 
         @Nullable
         Path definedIn;
+
+        @Override
+        public void rpcSend(PropertyValue after, RpcSendQueue q) {
+            q.getAndSend(after, PropertyValue::getValue);
+            q.getAndSend(after, p -> {
+                Path path = p.getDefinedIn();
+                return path == null ? null : path.toString();
+            });
+        }
+
+        @Override
+        public PropertyValue rpcReceive(PropertyValue before, RpcReceiveQueue q) {
+            return before
+                    .withValue(q.receive(before.value))
+                    .withDefinedIn(q.<Path, String>receiveAndGet(
+                            before.definedIn, s -> s == null ? null : Paths.get(s)));
+        }
     }
 
     /**
@@ -168,9 +290,10 @@ public class MSBuildProject implements Marker, Serializable {
      * Analogous to MavenRepository in the Maven/Gradle ecosystems.
      */
     @Value
+    @With
     @Builder
     @AllArgsConstructor
-    public static class PackageSource implements Serializable {
+    public static class PackageSource implements Serializable, RpcCodec<PackageSource> {
         /**
          * The key/name of the package source (e.g., "nuget.org", "mycompany-feed").
          */
@@ -181,5 +304,18 @@ public class MSBuildProject implements Marker, Serializable {
          * (e.g., "https://api.nuget.org/v3/index.json").
          */
         String url;
+
+        @Override
+        public void rpcSend(PackageSource after, RpcSendQueue q) {
+            q.getAndSend(after, PackageSource::getKey);
+            q.getAndSend(after, PackageSource::getUrl);
+        }
+
+        @Override
+        public PackageSource rpcReceive(PackageSource before, RpcReceiveQueue q) {
+            return before
+                    .withKey(q.receive(before.key))
+                    .withUrl(q.receive(before.url));
+        }
     }
 }

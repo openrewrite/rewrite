@@ -151,6 +151,22 @@ public class RewriteRpcServer
         RpcSendQueue.RegisterJavaTypeName(typeof(ImplicitTypeParameters),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters");
 
+        // MSBuildProject marker and nested types
+        RpcSendQueue.RegisterJavaTypeName(typeof(MSBuildProject),
+            "org.openrewrite.csharp.marker.MSBuildProject");
+        RpcSendQueue.RegisterJavaTypeName(typeof(TargetFramework),
+            "org.openrewrite.csharp.marker.MSBuildProject$TargetFramework");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PackageReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageReference");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ResolvedPackage),
+            "org.openrewrite.csharp.marker.MSBuildProject$ResolvedPackage");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ProjectReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$ProjectReference");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PropertyValue),
+            "org.openrewrite.csharp.marker.MSBuildProject$PropertyValue");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PackageSource),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageSource");
+
         // LINQ types live in Linq$ not Cs$ on the Java side
         RpcSendQueue.RegisterJavaTypeName(typeof(QueryExpression),
             "org.openrewrite.csharp.tree.Linq$QueryExpression");
