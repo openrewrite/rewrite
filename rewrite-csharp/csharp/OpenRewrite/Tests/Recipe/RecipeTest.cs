@@ -94,6 +94,7 @@ public class RecipeTest : RewriteTest
         Assert.Equal("To", descriptor.Options[1].Name);
         Assert.Equal("Bar", descriptor.Options[1].Value);
     }
+
 }
 
 class RenameClassRecipe : Core.Recipe
