@@ -485,12 +485,19 @@ public class BlockStatementTemplateGenerator {
             J.MethodInvocation m = (J.MethodInvocation) j;
             J firstEnclosing = cursor.getParentOrThrow().firstEnclosing(J.class);
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
-                before.insert(0, "__M__.any(");
-                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case ||
-                    firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
-                    after.append(");");
+                if (prior instanceof J.Lambda || prior instanceof J.MemberReference) {
+                    // Lambdas and method references require a functional interface target type for
+                    // type inference, so they cannot be wrapped in __M__.any(Object). Instead,
+                    // reconstruct the method call to provide the compiler with the necessary context.
+                    methodInvocationWithLambdaArg(m, prior, before, after, cursor, firstEnclosing);
                 } else {
-                    after.append(")");
+                    before.insert(0, "__M__.any(");
+                    if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case ||
+                        firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
+                        after.append(");");
+                    } else {
+                        after.append(")");
+                    }
                 }
             } else if (m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
                 before.insert(0, "__M__.anyT<");
@@ -618,6 +625,52 @@ public class BlockStatementTemplateGenerator {
         }
     }
 
+    private void methodInvocationWithLambdaArg(J.MethodInvocation m, J prior,
+                                                StringBuilder before, StringBuilder after,
+                                                Cursor cursor, J firstEnclosing) {
+        StringBuilder methodBefore = new StringBuilder();
+        StringBuilder methodAfter = new StringBuilder();
+
+        JavaType.Method mt = m.getMethodType();
+        if (m.getSelect() != null && mt != null) {
+            String fqn = mt.getDeclaringType().getFullyQualifiedName();
+            if (mt.hasFlags(Flag.Static)) {
+                methodBefore.append(fqn);
+            } else {
+                methodBefore.append("((").append(fqn).append(") null)");
+            }
+            methodBefore.append(".");
+        }
+
+        methodBefore.append(m.getSimpleName()).append("(");
+
+        boolean priorFound = false;
+        List<Expression> args = m.getArguments();
+        for (int i = 0; i < args.size(); i++) {
+            Expression arg = args.get(i);
+            if (!priorFound) {
+                if (referToSameElement(prior, arg)) {
+                    priorFound = true;
+                    continue;
+                }
+                methodBefore.append(valueOfType(arg.getType()));
+                methodBefore.append(", ");
+            } else {
+                methodAfter.append(", ");
+                methodAfter.append(valueOfType(arg.getType()));
+            }
+        }
+        methodAfter.append(")");
+
+        if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case ||
+            firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
+            methodAfter.append(";");
+        }
+
+        before.insert(0, methodBefore);
+        after.append(methodAfter);
+    }
+
     private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {
         if (!(body instanceof J.Block)) {
             before.insert(0, "{");
@@ -687,14 +740,18 @@ public class BlockStatementTemplateGenerator {
             throw new IllegalStateException("Unable to template inside a J.NewClass instance having a null clazz and constructor type.");
         }
 
-        // Build stub arguments to make it parseable
+        // Build stub arguments to make it parseable.
+        // For interface implementations, skip arguments since interfaces have no constructors.
         StringBuilder stubArgs = new StringBuilder("(");
         List<Expression> arguments = nc.getArguments();
-        for (int i = 0; i < arguments.size(); i++) {
-            if (i > 0) {
-                stubArgs.append(", ");
+        boolean hasRealArguments = arguments.stream().anyMatch(arg -> !(arg instanceof J.Empty));
+        if (hasRealArguments) {
+            for (int i = 0; i < arguments.size(); i++) {
+                if (i > 0) {
+                    stubArgs.append(", ");
+                }
+                stubArgs.append(valueOfType(arguments.get(i).getType()));
             }
-            stubArgs.append(valueOfType(arguments.get(i).getType()));
         }
         stubArgs.append(")");
 
