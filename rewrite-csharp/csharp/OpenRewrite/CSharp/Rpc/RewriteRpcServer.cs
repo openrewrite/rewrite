@@ -1488,7 +1488,7 @@ public class RewriteRpcServer
     /// Asks the Java peer to parse source content and returns the parsed tree.
     /// The Java side selects the appropriate parser based on the file extension.
     /// </summary>
-    public Tree ParseOnRemote(string sourcePath, string content, string? sourceFileType = null)
+    public SourceFile ParseOnRemote(string sourcePath, string content, string? sourceFileType = null)
     {
         var response = _jsonRpc!.InvokeWithParameterObjectAsync<List<string>>(
             "Parse",
@@ -1502,7 +1502,7 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Parse returned no results for {sourcePath}");
 
         var id = response[0];
-        return GetObjectFromRemoteAsync(id, sourceFileType).GetAwaiter().GetResult();
+        return (SourceFile)GetObjectFromRemoteAsync(id, sourceFileType).GetAwaiter().GetResult();
     }
 
     /// <summary>

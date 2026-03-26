@@ -80,7 +80,7 @@ public abstract class RewriteTest
                           ?? throw new InvalidOperationException(
                               $"Parsing {spec.SourcePath} requires an RPC connection. " +
                               "Use RpcFixture to start a Java RPC server.");
-                source = (SourceFile)rpc.ParseOnRemote(spec.SourcePath, spec.Before,
+                source = rpc.ParseOnRemote(spec.SourcePath, spec.Before,
                     spec.SourceFileType);
             }
             else

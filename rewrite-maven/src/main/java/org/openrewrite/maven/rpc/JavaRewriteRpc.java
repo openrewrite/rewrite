@@ -214,8 +214,11 @@ public class JavaRewriteRpc {
                     .getMethod("build")
                     .invoke(Class.forName("org.openrewrite.csharp.CsprojParser")
                             .getMethod("builder").invoke(null)));
-        } catch (Exception ignored) {
-            // CsprojParser not on classpath
+        } catch (ClassNotFoundException ignored) {
+            // CsprojParser not on classpath — fall through to XmlParser
+        } catch (ReflectiveOperationException e) {
+            PrintStream err = logStream != null ? logStream : System.err;
+            err.println("Failed to load CsprojParser: " + e.getMessage());
         }
         parsers.add(new XmlParser());
         server.setParsers(parsers);

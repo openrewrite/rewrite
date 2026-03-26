@@ -449,11 +449,11 @@ public class SolutionParser
             {
                 sdk = root.Attribute("Sdk")?.Value;
 
-                var tfm = root.Descendants("TargetFramework").FirstOrDefault()?.Value;
+                var tfm = root.Elements("PropertyGroup").Elements("TargetFramework").FirstOrDefault()?.Value;
                 if (tfm != null)
                     tfms.Add(tfm);
 
-                var tfmList = root.Descendants("TargetFrameworks").FirstOrDefault()?.Value;
+                var tfmList = root.Elements("PropertyGroup").Elements("TargetFrameworks").FirstOrDefault()?.Value;
                 if (tfmList != null)
                 {
                     foreach (var t in tfmList.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))

@@ -60,11 +60,12 @@ public class Parse implements RpcRequest {
                     ? Paths.get(request.getRelativeTo()) : null;
 
             List<String> ids = new ArrayList<>();
+            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
             for (Input input : request.getInputs()) {
                 Parser parser = findParser(input.getSourcePath());
                 Parser.Input parserInput = toParserInput(input);
                 SourceFile sourceFile = parser.parseInputs(
-                        Collections.singletonList(parserInput), relativeTo, new InMemoryExecutionContext()
+                        Collections.singletonList(parserInput), relativeTo, ctx
                 ).findFirst().orElseThrow(() ->
                         new IllegalStateException("Parser returned no results for " + input.getSourcePath()));
                 String id = sourceFile.getId().toString();
@@ -93,7 +94,7 @@ public class Parse implements RpcRequest {
                         () -> new ByteArrayInputStream(input.getText().getBytes(StandardCharsets.UTF_8))
                 );
             }
-            return new Parser.Input(input.getSourcePath(), null);
+            return Parser.Input.fromFile(input.getSourcePath());
         }
     }
 }
