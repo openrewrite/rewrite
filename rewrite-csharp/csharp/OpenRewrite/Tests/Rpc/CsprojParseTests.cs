@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Rpc;
 
@@ -131,12 +130,7 @@ public class CsprojParseTests : RpcRewriteTest
             </Project>
             """, "org.openrewrite.xml.tree.Xml$Document");
 
-        // The parsed tree should have Markers accessible via reflection or casting
-        Assert.IsAssignableFrom<SourceFile>(tree);
-        var markersProperty = tree.GetType().GetProperty("Markers");
-        Assert.NotNull(markersProperty);
-        var markers = (Markers)markersProperty.GetValue(tree)!;
-        var msbuild = markers.MarkerList.OfType<MSBuildProject>().FirstOrDefault();
+        var msbuild = tree.Markers.MarkerList.OfType<MSBuildProject>().FirstOrDefault();
         Assert.NotNull(msbuild);
         Assert.Equal("Microsoft.NET.Sdk", msbuild.Sdk);
         Assert.NotEmpty(msbuild.TargetFrameworks);
