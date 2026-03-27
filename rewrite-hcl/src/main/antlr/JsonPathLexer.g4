@@ -66,7 +66,7 @@ MATCHES: '=~';
 LOGICAL_OPERATOR: (AND | OR) ;
 AND : '&&';
 OR : '||';
-//NOT : '!';
+NOT : '!';
 
 EQUALITY_OPERATOR: (EQ | NE) ;
 EQ : '==';
