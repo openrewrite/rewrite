@@ -905,6 +905,41 @@ class CheckstyleConfigLoaderTest {
     }
 
     @Test
+    void importOrderInflow() throws Exception {
+        var checkstyle = loadCheckstyleConfig("""
+            <!DOCTYPE module PUBLIC
+                "-//Checkstyle//DTD Checkstyle Configuration 1.2//EN"
+                "https://checkstyle.org/dtds/configuration_1_2.dtd">
+            <module name="Checker">
+                <module name="TreeWalker">
+                    <module name="ImportOrder">
+                        <property name="option" value="inflow"/>
+                        <property name="separated" value="false"/>
+                    </module>
+                </module>
+            </module>
+        """, emptyMap());
+
+        assertThat(checkstyle.getStyles()).anySatisfy(style -> {
+            assertThat(style).isInstanceOf(ImportLayoutStyle.class);
+            ImportLayoutStyle importLayout = (ImportLayoutStyle) style;
+            // Should have exactly one AllOthers block with inflow=true
+            assertThat(importLayout.getLayout().stream()
+                    .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
+                    .count()).isEqualTo(1);
+            ImportLayoutStyle.Block.AllOthers inflowBlock = importLayout.getLayout().stream()
+                    .filter(b -> b instanceof ImportLayoutStyle.Block.AllOthers)
+                    .map(b -> (ImportLayoutStyle.Block.AllOthers) b)
+                    .findFirst().orElseThrow();
+            assertThat(inflowBlock.isInflow()).isTrue();
+            // No blank lines between static and non-static groups
+            assertThat(importLayout.getLayout().stream()
+                    .filter(b -> b instanceof ImportLayoutStyle.Block.BlankLines)
+                    .count()).isEqualTo(0);
+        });
+    }
+
+    @Test
     void parenPadNospace() throws Exception {
         var checkstyle = loadCheckstyleConfig("""
             <!DOCTYPE module PUBLIC

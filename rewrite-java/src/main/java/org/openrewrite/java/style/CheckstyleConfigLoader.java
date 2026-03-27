@@ -1047,6 +1047,8 @@ public class CheckstyleConfigLoader {
                         }
                     }
 
+                    boolean isInflow = !staticsOnTop && !staticsOnBottom;
+
                     // Add non-static import groups
                     if (groups != null && !groups.isEmpty()) {
                         addGroupBlocks(builder, groups, separated, false);
@@ -1054,9 +1056,17 @@ public class CheckstyleConfigLoader {
                         if (separated) {
                             builder.blankLine();
                         }
-                        builder.importAllOthers();
+                        if (isInflow) {
+                            builder.importAllOthersInflow();
+                        } else {
+                            builder.importAllOthers();
+                        }
                     } else {
-                        builder.importAllOthers();
+                        if (isInflow) {
+                            builder.importAllOthersInflow();
+                        } else {
+                            builder.importAllOthers();
+                        }
                     }
 
                     if (staticsOnBottom) {
@@ -1066,11 +1076,6 @@ public class CheckstyleConfigLoader {
                         } else {
                             builder.importStaticAllOthers();
                         }
-                    }
-
-                    // If "inflow", statics are mixed with non-statics — use catch-all
-                    if (!staticsOnTop && !staticsOnBottom) {
-                        builder.importStaticAllOthers();
                     }
 
                     return builder.build()
