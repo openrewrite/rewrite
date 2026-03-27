@@ -213,34 +213,6 @@ public sealed class Literal(
 }
 
 /// <summary>
-/// An expression used as a statement.
-/// </summary>
-public sealed class ExpressionStatement(
-    Guid id,
-    Expression expression
-) : J, Statement, IEquatable<ExpressionStatement>
-{
-    public Guid Id { get; } = id;
-    public Expression Expression { get; } = expression;
-
-    public ExpressionStatement WithId(Guid id) =>
-        id == Id ? this : new(id, Expression);
-    public ExpressionStatement WithExpression(Expression expression) =>
-        ReferenceEquals(expression, Expression) ? this : new(Id, expression);
-
-    // ExpressionStatement delegates prefix/markers to its expression
-    public Space Prefix => Expression.Prefix;
-    public Markers Markers => Expression.Markers;
-
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(ExpressionStatement? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as ExpressionStatement);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-/// <summary>
 /// A block of statements enclosed in braces { }.
 /// </summary>
 public sealed class Block(

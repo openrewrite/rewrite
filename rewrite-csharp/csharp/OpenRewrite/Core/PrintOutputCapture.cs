@@ -53,5 +53,7 @@ public class PrintOutputCapture<T>
         return this;
     }
 
+    public int Length => _output.Length;
+
     public override string ToString() => _output.ToString();
 }

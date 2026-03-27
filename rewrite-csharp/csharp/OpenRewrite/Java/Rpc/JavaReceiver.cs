@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp;
 using Space = OpenRewrite.Core.Space;
 
 namespace OpenRewrite.Java.Rpc;

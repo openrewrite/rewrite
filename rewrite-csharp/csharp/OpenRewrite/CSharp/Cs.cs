@@ -33,6 +33,33 @@ public interface SwitchLabel : Expression { }
 // AllowsConstraint and TypeParameterConstraint interfaces DELETED — constraint types implement Expression directly
 
 /// <summary>
+/// An expression used as a statement.
+/// </summary>
+public sealed class ExpressionStatement(
+    Guid id,
+    Expression expression
+) : Cs, Statement, IEquatable<ExpressionStatement>
+{
+    public Guid Id { get; } = id;
+    public Expression Expression { get; } = expression;
+
+    public ExpressionStatement WithId(Guid id) =>
+        id == Id ? this : new(id, Expression);
+    public ExpressionStatement WithExpression(Expression expression) =>
+        ReferenceEquals(expression, Expression) ? this : new(Id, expression);
+
+    // ExpressionStatement delegates prefix/markers to its expression
+    public Space Prefix => Expression.Prefix;
+    public Markers Markers => Expression.Markers;
+
+    Tree Tree.WithId(Guid id) => WithId(id);
+
+    public bool Equals(ExpressionStatement? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as ExpressionStatement);
+    public override int GetHashCode() => Id.GetHashCode();
+}
+
+/// <summary>
 /// A C# using directive.
 /// Examples:
 ///   using System;
@@ -49,7 +76,7 @@ public sealed class UsingDirective(
     JLeftPadded<bool>? @unsafe,
     JRightPadded<Identifier>? alias,
     TypeTree namespaceOrType
-) : Cs, Statement, IEquatable<UsingDirective>
+) : Cs, IEquatable<UsingDirective>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -237,7 +264,7 @@ public sealed class AttributeList(
     Markers markers,
     JRightPadded<Identifier>? target,
     IList<JRightPadded<Annotation>> attributes
-) : Cs, Statement, IEquatable<AttributeList>
+) : Cs, IEquatable<AttributeList>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -1625,6 +1652,9 @@ public sealed class CompilationUnit(
     bool charsetBomMarked,
     Checksum? checksum,
     Core.FileAttributes? fileAttributes,
+    IList<JRightPadded<ExternAlias>> externs,
+    IList<JRightPadded<UsingDirective>> usings,
+    IList<AttributeList> attributeLists,
     IList<JRightPadded<Statement>> members,
     Space eof
 ) : Cs, SourceFile, IEquatable<CompilationUnit>
@@ -1637,29 +1667,38 @@ public sealed class CompilationUnit(
     public bool CharsetBomMarked { get; } = charsetBomMarked;
     public Checksum? Checksum { get; } = checksum;
     public Core.FileAttributes? FileAttributes { get; } = fileAttributes;
+    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
+    public IList<JRightPadded<UsingDirective>> Usings { get; } = usings;
+    public IList<AttributeList> AttributeLists { get; } = attributeLists;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space Eof { get; } = eof;
 
     public CompilationUnit WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        id == Id ? this : new(id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithSourcePath(string sourcePath) =>
-        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        string.Equals(sourcePath, SourcePath, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, sourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithCharset(string charset) =>
-        string.Equals(charset, Charset, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, SourcePath, charset, CharsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        string.Equals(charset, Charset, StringComparison.Ordinal) ? this : new(Id, Prefix, Markers, SourcePath, charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithCharsetBomMarked(bool charsetBomMarked) =>
-        charsetBomMarked == CharsetBomMarked ? this : new(Id, Prefix, Markers, SourcePath, Charset, charsetBomMarked, Checksum, FileAttributes, Members, Eof);
+        charsetBomMarked == CharsetBomMarked ? this : new(Id, Prefix, Markers, SourcePath, Charset, charsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithChecksum(Checksum? checksum) =>
-        ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Members, Eof);
+        ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithFileAttributes(Core.FileAttributes? fileAttributes) =>
-        ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Members, Eof);
+        ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Externs, Usings, AttributeLists, Members, Eof);
+    public CompilationUnit WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
+        ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, externs, Usings, AttributeLists, Members, Eof);
+    public CompilationUnit WithUsings(IList<JRightPadded<UsingDirective>> usings) =>
+        ReferenceEquals(usings, Usings) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, usings, AttributeLists, Members, Eof);
+    public CompilationUnit WithAttributeLists(IList<AttributeList> attributeLists) =>
+        ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, attributeLists, Members, Eof);
     public CompilationUnit WithMembers(IList<JRightPadded<Statement>> members) =>
-        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, members, Eof);
+        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, members, Eof);
     public CompilationUnit WithEof(Space eof) =>
-        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Members, eof);
+        ReferenceEquals(eof, Eof) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, AttributeLists, Members, eof);
 
     Tree Tree.WithId(Guid id) => WithId(id);
     SourceFile SourceFile.WithSourcePath(string sourcePath) => WithSourcePath(sourcePath);
@@ -1855,6 +1894,8 @@ public sealed class NamespaceDeclaration(
     Space prefix,
     Markers markers,
     JRightPadded<Expression> name,
+    IList<JRightPadded<ExternAlias>> externs,
+    IList<JRightPadded<UsingDirective>> usings,
     IList<JRightPadded<Statement>> members,
     Space end
 ) : Cs, Statement, IEquatable<NamespaceDeclaration>
@@ -1863,21 +1904,27 @@ public sealed class NamespaceDeclaration(
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public JRightPadded<Expression> Name { get; } = name;
+    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
+    public IList<JRightPadded<UsingDirective>> Usings { get; } = usings;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space End { get; } = end;
 
     public NamespaceDeclaration WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Name, Members, End);
+        id == Id ? this : new(id, Prefix, Markers, Name, Externs, Usings, Members, End);
     public NamespaceDeclaration WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, Members, End);
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Name, Externs, Usings, Members, End);
     public NamespaceDeclaration WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Members, End);
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Externs, Usings, Members, End);
     public NamespaceDeclaration WithName(JRightPadded<Expression> name) =>
-        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Members, End);
+        ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Externs, Usings, Members, End);
+    public NamespaceDeclaration WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
+        ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, Name, externs, Usings, Members, End);
+    public NamespaceDeclaration WithUsings(IList<JRightPadded<UsingDirective>> usings) =>
+        ReferenceEquals(usings, Usings) ? this : new(Id, Prefix, Markers, Name, Externs, usings, Members, End);
     public NamespaceDeclaration WithMembers(IList<JRightPadded<Statement>> members) =>
-        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, members, End);
+        ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, Externs, Usings, members, End);
     public NamespaceDeclaration WithEnd(Space end) =>
-        ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Name, Members, end);
+        ReferenceEquals(end, End) ? this : new(Id, Prefix, Markers, Name, Externs, Usings, Members, end);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
@@ -1937,7 +1984,7 @@ public sealed class ExternAlias(
     Space prefix,
     Markers markers,
     JLeftPadded<Identifier> identifier
-) : Cs, Statement, IEquatable<ExternAlias>
+) : Cs, IEquatable<ExternAlias>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -3955,44 +4002,38 @@ public sealed class ExplicitInterfaceMember(
 }
 
 /// <summary>
-/// C# try statement with exception filter support. Wraps a J.Try and adds a parallel list
-/// of catch filters (when clauses). Each filter corresponds positionally to a catch clause
-/// in the inner Try; null entries indicate no filter for that catch.
+/// C# <c>when (expr)</c> clause on a <see cref="Try.Catch"/>.
+/// Stored as the initializer of the catch parameter's <see cref="VariableDeclarations.NamedVariable"/>.
+/// Printing is handled by the C# printer which emits <c>when(expr)</c> after the
+/// catch parameter's closing parenthesis.
 /// </summary>
-public sealed class ExceptionFilteredTry(
+public sealed class WhenClause(
     Guid id,
     Space prefix,
     Markers markers,
-    Try @try,
-    IList<JLeftPadded<ControlParentheses<Expression>>?> catchFilters
-) : Cs, Statement, IEquatable<ExceptionFilteredTry>
+    ControlParentheses<Expression> condition
+) : Cs, Expression, IEquatable<WhenClause>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public Try Try { get; } = @try;
-    /// <summary>
-    /// Parallel to Try.Catches. Each entry is the when(expr) filter for the corresponding
-    /// catch clause, or null if no filter. JLeftPadded.Before = space before 'when'.
-    /// ControlParentheses.Prefix = space before '('. RightPadded.After = space before ')'.
-    /// </summary>
-    public IList<JLeftPadded<ControlParentheses<Expression>>?> CatchFilters { get; } = catchFilters;
+    public ControlParentheses<Expression> Condition { get; } = condition;
 
-    public ExceptionFilteredTry WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Try, CatchFilters);
-    public ExceptionFilteredTry WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Try, CatchFilters);
-    public ExceptionFilteredTry WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Try, CatchFilters);
-    public ExceptionFilteredTry WithTry(Try @try) =>
-        ReferenceEquals(@try, Try) ? this : new(Id, Prefix, Markers, @try, CatchFilters);
-    public ExceptionFilteredTry WithCatchFilters(IList<JLeftPadded<ControlParentheses<Expression>>?> catchFilters) =>
-        ReferenceEquals(catchFilters, CatchFilters) ? this : new(Id, Prefix, Markers, Try, catchFilters);
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
+
+    public WhenClause WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Condition);
+    public WhenClause WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Condition);
+    public WhenClause WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Condition);
+    public WhenClause WithCondition(ControlParentheses<Expression> condition) =>
+        ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, condition);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
-    public bool Equals(ExceptionFilteredTry? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as ExceptionFilteredTry);
+    public bool Equals(WhenClause? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as WhenClause);
     public override int GetHashCode() => Id.GetHashCode();
 }
 

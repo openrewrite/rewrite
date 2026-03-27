@@ -15,7 +15,6 @@
  */
 package org.openrewrite.toml;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
@@ -225,7 +224,6 @@ class DeleteKeyTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void preserveComments() {
         rewriteRun(

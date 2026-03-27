@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 using OpenRewrite.Core;
 
-namespace OpenRewrite.Tests.DataTable;
+namespace OpenRewrite.Tests.Core;
 
 public record TextMatch
 {
@@ -37,7 +38,7 @@ public class InMemoryDataTableStoreTests
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
         var row = new TextMatch { SourcePath = "Foo.cs", LineNumber = 42, Match = "hello" };
 
         store.InsertRow(table, ctx, row);
@@ -54,7 +55,7 @@ public class InMemoryDataTableStoreTests
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
@@ -67,7 +68,7 @@ public class InMemoryDataTableStoreTests
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "A.cs", LineNumber = 1, Match = "a" });
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "B.cs", LineNumber = 2, Match = "b" });
@@ -81,7 +82,7 @@ public class InMemoryDataTableStoreTests
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "A.cs", LineNumber = 1, Match = "a" });
 
@@ -104,7 +105,7 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 42, Match = "hello" });
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "Bar.cs", LineNumber = 7, Match = "world" });
@@ -137,7 +138,7 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
             store.InsertRow(table, ctx,
                 new TextMatch { SourcePath = "path,with,commas.cs", LineNumber = 1, Match = "has \"quotes\"" });
@@ -167,7 +168,7 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
@@ -191,7 +192,7 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "A.cs", LineNumber = 1, Match = "a" });
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "B.cs", LineNumber = 2, Match = "b" });
@@ -215,7 +216,7 @@ public class DataTableTests
     {
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         table.InsertRow(ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
@@ -229,7 +230,7 @@ public class DataTableTests
     {
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         var store = new InMemoryDataTableStore();
         ctx.PutMessage(DataTable<TextMatch>.DataTableStoreKey, store);
@@ -246,7 +247,7 @@ public class DataTableTests
     {
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
         var store = new InMemoryDataTableStore();
         ctx.PutMessage(DataTable<TextMatch>.DataTableStoreKey, store);
 

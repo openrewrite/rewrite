@@ -40,6 +40,8 @@ public class WhitespaceReconciler
     private bool _compatible = true;
     private J? _targetSubtree;
     private J? _stopAfter;
+    private HashSet<Guid>? _targetIds;
+    private int _multiTargetDepth;
     private ReconcileState _state;
 
     private enum ReconcileState
@@ -56,7 +58,25 @@ public class WhitespaceReconciler
         _compatible = true;
         _targetSubtree = targetSubtree;
         _stopAfter = stopAfter;
+        _targetIds = null;
         _state = targetSubtree != null ? ReconcileState.Searching : ReconcileState.Reconciling;
+
+        var result = VisitTree(original, formatted);
+        return result as J ?? original;
+    }
+
+    /// <summary>
+    /// Reconcile whitespace only within subtrees whose root IDs are in <paramref name="targetIds"/>.
+    /// Nodes outside these subtrees keep their original whitespace.
+    /// </summary>
+    public J Reconcile(J original, J formatted, HashSet<Guid> targetIds)
+    {
+        _compatible = true;
+        _targetSubtree = null;
+        _stopAfter = null;
+        _targetIds = targetIds;
+        _multiTargetDepth = 0;
+        _state = ReconcileState.Searching;
 
         var result = VisitTree(original, formatted);
         return result as J ?? original;
@@ -134,13 +154,25 @@ public class WhitespaceReconciler
         if (original.GetType() != formatted.GetType())
             return StructureMismatch(original);
 
-        // Track target subtree
+        // Track target subtree (single-target mode)
         var isTarget = _targetSubtree != null && ReferenceEquals(original, _targetSubtree);
         var isStopAfter = _stopAfter != null && ReferenceEquals(original, _stopAfter);
+
+        // Track target IDs (multi-target mode): enter Reconciling when we hit a target ID
+        var isMultiTarget = _targetIds != null && _state == ReconcileState.Searching &&
+                            _targetIds.Contains(original.Id);
+
         var previousState = _state;
 
         if (isTarget && _state == ReconcileState.Searching)
             _state = ReconcileState.Reconciling;
+        if (isMultiTarget)
+        {
+            _state = ReconcileState.Reconciling;
+            _multiTargetDepth = 0;
+        }
+        if (_targetIds != null && _state == ReconcileState.Reconciling)
+            _multiTargetDepth++;
 
         try
         {
@@ -171,6 +203,14 @@ public class WhitespaceReconciler
                 _state = ReconcileState.Done;
             if (isStopAfter && previousState == ReconcileState.Reconciling)
                 _state = ReconcileState.Done;
+
+            // Multi-target: return to Searching when leaving a target subtree
+            if (_targetIds != null && _state == ReconcileState.Reconciling)
+            {
+                _multiTargetDepth--;
+                if (_multiTargetDepth <= 0)
+                    _state = ReconcileState.Searching;
+            }
         }
     }
 

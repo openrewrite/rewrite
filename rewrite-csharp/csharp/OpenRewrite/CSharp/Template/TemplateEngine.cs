@@ -24,7 +24,7 @@ namespace OpenRewrite.CSharp.Template;
 /// Marker placed on a <see cref="Block"/> that is a synthetic container for multiple statements
 /// produced by a multi-statement template, rather than a real block in the source code.
 /// Used by <see cref="TemplateEngine.AutoFormat"/> to format each statement at the parent level,
-/// and by <see cref="RewriteRule.CreateBlockFlattener{P}"/> to identify blocks to splice.
+/// and by <see cref="RoslynFormatter.DeferredFormatVisitor{P}"/> to identify blocks to flatten.
 /// </summary>
 public sealed class SyntheticBlockContainer : Marker
 {
@@ -100,18 +100,13 @@ internal static class TemplateEngine
         var scaffold = BuildScaffold(code, preamble, usings, context, scaffoldKind);
         var parser = new CSharpParser();
 
-        CompilationUnit cu;
-        if (dependencies.Count > 0 || usings.Count > 0)
-        {
-            // When usings or dependencies are provided, create a semantic model
-            // so the scaffold gets type attribution (needed for semantic matching).
-            var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
-            cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
-        }
-        else
-        {
-            cu = parser.Parse(scaffold, "__template__.cs");
-        }
+        // Always create a semantic model so the scaffold gets type attribution.
+        // DependencyWorkspace includes .NET 6+ implicit usings (System,
+        // System.Collections.Generic, etc.) via a synthetic global-using source file,
+        // so common types resolve even without explicit usings in the pattern.
+        // Reference resolution is cached, so repeated calls are cheap.
+        var semanticModel = DependencyWorkspace.CreateSemanticModel(scaffold, dependencies);
+        var cu = parser.Parse(scaffold, "__template__.cs", semanticModel);
 
         var result = ExtractTemplateNode(cu, code, scaffoldKind);
 
@@ -725,6 +720,11 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
 
     public override J VisitMethodInvocation(MethodInvocation mi, int p)
     {
+        // Check if the select is a capture placeholder BEFORE substitution
+        var selectCaptureName = mi.Select?.Element is Identifier selectId
+            ? Placeholder.FromPlaceholder(selectId.SimpleName)
+            : null;
+
         mi = (MethodInvocation)base.VisitMethodInvocation(mi, p);
 
         // Substitute placeholder in method name position
@@ -738,6 +738,14 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
             }
         }
 
+        // Transfer NullSafe from matched tree when the capture was a null-conditional select
+        if (selectCaptureName != null && mi.Markers.FindFirst<NullSafe>() == null)
+        {
+            var nullSafe = _values.GetNullSafe(selectCaptureName);
+            if (nullSafe != null)
+                mi = mi.WithMarkers(mi.Markers.Add(nullSafe));
+        }
+
         // Substitute variadic placeholder in arguments
         mi = ExpandVariadicArgs(mi);
 
@@ -746,6 +754,11 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
 
     public override J VisitFieldAccess(FieldAccess fieldAccess, int p)
     {
+        // Check if the target is a capture placeholder BEFORE substitution
+        var targetCaptureName = fieldAccess.Target is Identifier targetId
+            ? Placeholder.FromPlaceholder(targetId.SimpleName)
+            : null;
+
         fieldAccess = (FieldAccess)base.VisitFieldAccess(fieldAccess, p);
 
         // Substitute placeholder in field name position
@@ -761,7 +774,35 @@ internal class SubstitutionVisitor : CSharpVisitor<int>
             }
         }
 
+        // Transfer NullSafe from matched tree when the capture was a null-conditional target
+        if (targetCaptureName != null && fieldAccess.Markers.FindFirst<NullSafe>() == null)
+        {
+            var nullSafe = _values.GetNullSafe(targetCaptureName);
+            if (nullSafe != null)
+                fieldAccess = fieldAccess.WithMarkers(fieldAccess.Markers.Add(nullSafe));
+        }
+
         return fieldAccess;
+    }
+
+    public override J VisitArrayAccess(ArrayAccess arrayAccess, int p)
+    {
+        // Check if the indexed expression is a capture placeholder BEFORE substitution
+        var indexedCaptureName = arrayAccess.Indexed is Identifier indexedId
+            ? Placeholder.FromPlaceholder(indexedId.SimpleName)
+            : null;
+
+        arrayAccess = (ArrayAccess)base.VisitArrayAccess(arrayAccess, p);
+
+        // Transfer NullSafe from matched tree when the capture was a null-conditional indexed expr
+        if (indexedCaptureName != null && arrayAccess.Markers.FindFirst<NullSafe>() == null)
+        {
+            var nullSafe = _values.GetNullSafe(indexedCaptureName);
+            if (nullSafe != null)
+                arrayAccess = arrayAccess.WithMarkers(arrayAccess.Markers.Add(nullSafe));
+        }
+
+        return arrayAccess;
     }
 
     /// <summary>

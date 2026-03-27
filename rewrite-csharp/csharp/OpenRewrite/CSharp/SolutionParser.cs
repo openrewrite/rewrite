@@ -310,8 +310,9 @@ public class SolutionParser
                     {
                         Log.Debug("  IDEMPOTENCY [{FileIndex}/{TotalFiles}] {RelativePath}",
                             fileIndex, userDocs.Count, relativePath);
+                        var diff = DiffUtils.UnifiedDiff(source, printed, relativePath);
                         results.Add(ParseError.Build(relativePath, source,
-                            new InvalidOperationException(relativePath + " is not print idempotent.")));
+                            new InvalidOperationException(relativePath + " is not print idempotent. \n" + diff)));
                         fileSw.Stop();
                         continue;
                     }

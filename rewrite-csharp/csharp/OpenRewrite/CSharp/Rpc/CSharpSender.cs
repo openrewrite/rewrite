@@ -38,10 +38,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     {
         if (tree == null) return null;
 
-        // ExpressionStatement (from Rewrite.Java) maps to Cs$ExpressionStatement in Java,
-        // which wraps expression in JRightPadded. C#'s model has a bare Expression, so we
-        // intercept here and send in the format Java's CSharpReceiver expects.
-        if (tree is Java.ExpressionStatement es)
+        // ExpressionStatement wraps expression in JRightPadded on the Java side.
+        // C#'s model has a bare Expression, so we intercept here and send in the
+        // format Java's CSharpReceiver expects.
+        if (tree is ExpressionStatement es)
         {
             Cursor = new Cursor(Cursor, tree);
             PreVisit(es, q);
@@ -159,7 +159,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, q),
             TypeWithArguments twa => VisitTypeWithArguments(twa, q),
             ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, q),
-            ExceptionFilteredTry eft => VisitExceptionFilteredTry(eft, q),
+            WhenClause wc => VisitWhenClause(wc, q),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, q),
             QueryBody qb => VisitQueryBody(qb, q),
@@ -199,6 +199,12 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         q.GetAndSend(cu, c => (object)c.CharsetBomMarked);
         q.GetAndSend(cu, c => c.Checksum);
         q.GetAndSend(cu, c => c.FileAttributes);
+        q.GetAndSendList(cu, c => c.Externs,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        q.GetAndSendList(cu, c => c.Usings,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        q.GetAndSendList(cu, c => c.AttributeLists,
+            a => (object)a.Id, a => Visit(a, q));
         q.GetAndSendList(cu, c => c.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(cu, c => c.Eof, space => VisitSpace(space, q));
@@ -443,6 +449,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     public override J VisitNamespaceDeclaration(NamespaceDeclaration ns, RpcSendQueue q)
     {
         q.GetAndSend(ns, n => n.Name, rp => VisitRightPadded(rp, q));
+        q.GetAndSendList(ns, n => n.Externs,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
+        q.GetAndSendList(ns, n => n.Usings,
+            r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSendList(ns, n => n.Members,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         q.GetAndSend(ns, n => n.End, space => VisitSpace(space, q));
@@ -467,17 +477,15 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- ConditionalDirective ----
     public override J VisitConditionalDirective(ConditionalDirective cd, RpcSendQueue q)
     {
-        // Send DirectiveLines as inline list
-        q.GetAndSend(cd, c => (object)c.DirectiveLines.Count);
-        foreach (var dl in cd.DirectiveLines)
-        {
-            q.GetAndSend(cd, _ => (object)dl.LineNumber);
-            q.GetAndSend(cd, _ => (object)dl.Text);
-            q.GetAndSend(cd, _ => (object)(int)dl.Kind);
-            q.GetAndSend(cd, _ => (object)dl.GroupId);
-            q.GetAndSend(cd, _ => (object)dl.ActiveBranchIndex);
-        }
-        // Send Branches
+        q.GetAndSendList(cd, c => c.DirectiveLines,
+            dl => (object)dl.LineNumber, dl =>
+            {
+                q.GetAndSend(dl, d => (object)d.LineNumber);
+                q.GetAndSend(dl, d => (object)d.Text);
+                q.GetAndSend(dl, d => (object)(int)d.Kind);
+                q.GetAndSend(dl, d => (object)d.GroupId);
+                q.GetAndSend(dl, d => (object)d.ActiveBranchIndex);
+            });
         q.GetAndSendList(cd, c => c.Branches,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         return cd;
@@ -1017,14 +1025,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         return eim;
     }
 
-    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcSendQueue q)
+    public override J VisitWhenClause(WhenClause wc, RpcSendQueue q)
     {
-        q.GetAndSend(eft, e => (J)e.Try, el => Visit(el, q));
-        foreach (var filter in eft.CatchFilters)
-        {
-            q.GetAndSend(eft, _ => (object?)filter, el => VisitLeftPadded((JLeftPadded<ControlParentheses<Expression>>)el!, q));
-        }
-        return eft;
+        q.GetAndSend(wc, e => (J)e.Condition, el => Visit(el, q));
+        return wc;
     }
 
     // ---- Helper delegation to JavaSender ----
@@ -1074,7 +1078,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             {
                 return base.Visit(tree, q);
             }
-            if (tree is Cs || tree is ExpressionStatement)
+            if (tree is Cs)
             {
                 return _outer.Visit(tree, q);
             }

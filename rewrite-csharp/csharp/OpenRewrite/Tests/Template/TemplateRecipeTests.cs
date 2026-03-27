@@ -249,7 +249,7 @@ public class TemplateRecipeTests : RewriteTest
 // Replacement recipes
 // ===============================================================
 
-class MigrateConsoleWriteRecipe : Core.Recipe
+class MigrateConsoleWriteRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Migrate Console.Write to Console.WriteLine";
     public override string Description => "Replaces Console.Write with Console.WriteLine.";
@@ -282,7 +282,7 @@ class MigrateConsoleWriteRecipe : Core.Recipe
 // Search recipes using CSharpPattern.Find
 // ===============================================================
 
-class FindConsoleWriteRecipe : Core.Recipe
+class FindConsoleWriteRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find Console.Write calls";
     public override string Description => "Marks Console.Write calls with a search marker.";
@@ -305,7 +305,7 @@ class FindConsoleWriteRecipe : Core.Recipe
     }
 }
 
-class FindConsoleWriteWithDescriptionRecipe : Core.Recipe
+class FindConsoleWriteWithDescriptionRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find Console.Write calls with description";
     public override string Description => "Marks Console.Write calls with a descriptive search marker.";
@@ -328,7 +328,7 @@ class FindConsoleWriteWithDescriptionRecipe : Core.Recipe
     }
 }
 
-class FindBinaryAddRecipe : Core.Recipe
+class FindBinaryAddRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find addition expressions";
     public override string Description => "Marks binary addition expressions with a search marker.";
@@ -352,7 +352,7 @@ class FindBinaryAddRecipe : Core.Recipe
     }
 }
 
-class FindThrowExceptionRecipe : Core.Recipe
+class FindThrowExceptionRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find throw new Exception";
     public override string Description => "Marks throw new Exception statements with a search marker.";

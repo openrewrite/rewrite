@@ -179,7 +179,7 @@ public class PreconditionsCheckTest : RewriteTest
 /// This does NOT work — returning null from VisitMethodInvocation removes the invocation
 /// but not the enclosing ExpressionStatement, so the tree appears unchanged.
 /// </summary>
-class RemoveConsoleWriteLineRecipe : Core.Recipe
+class RemoveConsoleWriteLineRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Remove Console.WriteLine (broken)";
     public override string Description => "Attempts to remove Console.WriteLine by returning null from VisitMethodInvocation.";
@@ -205,7 +205,7 @@ class RemoveConsoleWriteLineRecipe : Core.Recipe
     }
 }
 
-class RenameWriteLineRecipe : Core.Recipe
+class RenameWriteLineRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Rename Console.WriteLine to Write";
     public override string Description => "Renames Console.WriteLine to Console.Write.";

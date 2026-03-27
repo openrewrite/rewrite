@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-namespace OpenRewrite.Java;
+using OpenRewrite.Java;
+
+namespace OpenRewrite.CSharp;
 
 /// <summary>
 /// Utility methods for working with <see cref="JavaType"/> instances.
@@ -46,6 +48,10 @@ public static class TypeUtils
             return primFqn != null && string.Equals(primFqn, fullyQualifiedName, StringComparison.Ordinal);
         }
 
+        // Arrays implement a known set of non-generic interfaces
+        if (type is JavaType.Array)
+            return IsArrayAssignableTo(fullyQualifiedName);
+
         var cls = AsClass(type);
         if (cls == null) return false;
 
@@ -71,6 +77,19 @@ public static class TypeUtils
         // Both primitives: same kind means match
         if (type is JavaType.Primitive candPrim && targetType is JavaType.Primitive targetPrim)
             return candPrim.Kind == targetPrim.Kind;
+
+        // Nullable<T>: both Nullable<T> and T are assignable to Nullable<T>
+        if (targetType is JavaType.Parameterized { TypeParameters: [var innerType] } nullableParam
+            && GetFullyQualifiedName(nullableParam.Type) == "System.Nullable")
+        {
+            // Nullable<T> → Nullable<T>
+            if (type is JavaType.Parameterized { TypeParameters: [var sourceInner] } sourceParam
+                && GetFullyQualifiedName(sourceParam.Type) == "System.Nullable")
+                return IsAssignableTo(sourceInner, innerType);
+
+            // T → Nullable<T>
+            return IsAssignableTo(type, innerType);
+        }
 
         // When target is parameterized with type parameters, do parameter-aware matching.
         // This handles both open generics (with GenericTypeVariable wildcards) and concrete
@@ -354,6 +373,12 @@ public static class TypeUtils
                 }
             }
         }
+        else if (type is JavaType.Array arr)
+        {
+            // T[] implements IEnumerable<T>, IList<T>, etc. — synthesize matches
+            if (arr.ElemType != null)
+                CollectArrayParameterizedMatches(arr.ElemType, targetFqn, results);
+        }
         else if (type is JavaType.Class cls)
         {
             if (!seen.Add(cls.FullyQualifiedName)) return;
@@ -500,6 +525,62 @@ public static class TypeUtils
         JavaType.Primitive.PrimitiveKind.String => "System.String",
         _ => null
     };
+
+    // ===============================================================
+    // Array type support
+    // ===============================================================
+
+    /// <summary>
+    /// Non-generic supertypes of single-dimensional .NET arrays.
+    /// </summary>
+    private static readonly HashSet<string> ArrayNonGenericSupertypes =
+    [
+        "System.Array",
+        "System.Object",
+        "System.ICloneable",
+        "System.Collections.IList",
+        "System.Collections.ICollection",
+        "System.Collections.IEnumerable",
+        "System.Collections.IStructuralComparable",
+        "System.Collections.IStructuralEquatable"
+    ];
+
+    /// <summary>
+    /// FQNs of generic interfaces that single-dimensional .NET arrays implement,
+    /// parameterized by the element type.
+    /// </summary>
+    private static readonly string[] ArrayGenericInterfaceFqns =
+    [
+        "System.Collections.Generic.IEnumerable",
+        "System.Collections.Generic.ICollection",
+        "System.Collections.Generic.IList",
+        "System.Collections.Generic.IReadOnlyCollection",
+        "System.Collections.Generic.IReadOnlyList"
+    ];
+
+    /// <summary>
+    /// Check if a <see cref="JavaType.Array"/> is assignable to a non-generic target FQN.
+    /// </summary>
+    private static bool IsArrayAssignableTo(string fqn) => ArrayNonGenericSupertypes.Contains(fqn);
+
+    /// <summary>
+    /// Synthesize the generic interfaces that <c>T[]</c> implements as
+    /// <see cref="JavaType.Parameterized"/> instances with the element type substituted.
+    /// Used by <see cref="CollectParameterizedMatches"/> to handle array assignability.
+    /// </summary>
+    private static void CollectArrayParameterizedMatches(JavaType elemType, string targetFqn,
+        List<JavaType.Parameterized> results)
+    {
+        foreach (var ifaceFqn in ArrayGenericInterfaceFqns)
+        {
+            if (string.Equals(ifaceFqn, targetFqn, StringComparison.Ordinal))
+            {
+                // Synthesize Parameterized(IFoo<elemType>)
+                var rawClass = new JavaType.Class { FullyQualifiedName = ifaceFqn };
+                results.Add(new JavaType.Parameterized(rawClass, [elemType]));
+            }
+        }
+    }
 
     private static JavaType? TryGetTypeDynamic(Expression expr)
     {

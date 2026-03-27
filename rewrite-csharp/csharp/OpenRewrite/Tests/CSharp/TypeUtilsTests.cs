@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 
-namespace OpenRewrite.Tests.Java;
+namespace OpenRewrite.Tests.CSharp;
 
 public class TypeUtilsTests
 {
@@ -520,6 +521,162 @@ public class TypeUtilsTests
             [MakeClass("System.String"), MakeClass("System.Int32")]);
 
         Assert.False(TypeUtils.IsAssignableTo(candidate, target));
+    }
+
+    // =============================================================
+    // IsAssignableTo — Array types
+    // =============================================================
+
+    [Fact]
+    public void IsAssignableTo_Array_SystemArray()
+    {
+        var arr = new JavaType.Array(MakeClass("System.String"), null);
+        Assert.True(TypeUtils.IsAssignableTo(arr, "System.Array"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_SystemObject()
+    {
+        var arr = new JavaType.Array(MakeClass("System.String"), null);
+        Assert.True(TypeUtils.IsAssignableTo(arr, "System.Object"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_NonGenericIEnumerable()
+    {
+        var arr = new JavaType.Array(MakeClass("System.String"), null);
+        Assert.True(TypeUtils.IsAssignableTo(arr, "System.Collections.IEnumerable"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_ICloneable()
+    {
+        var arr = new JavaType.Array(MakeClass("System.String"), null);
+        Assert.True(TypeUtils.IsAssignableTo(arr, "System.ICloneable"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_NotAssignableToUnrelated()
+    {
+        var arr = new JavaType.Array(MakeClass("System.String"), null);
+        Assert.False(TypeUtils.IsAssignableTo(arr, "System.IDisposable"));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_GenericIEnumerable()
+    {
+        // string[] should be assignable to IEnumerable<string>
+        var stringClass = MakeClass("System.String");
+        var arr = new JavaType.Array(stringClass, null);
+        var target = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IEnumerable"),
+            [MakeClass("System.String")]);
+        Assert.True(TypeUtils.IsAssignableTo(arr, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_GenericIList()
+    {
+        // string[] should be assignable to IList<string>
+        var stringClass = MakeClass("System.String");
+        var arr = new JavaType.Array(stringClass, null);
+        var target = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IList"),
+            [MakeClass("System.String")]);
+        Assert.True(TypeUtils.IsAssignableTo(arr, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_GenericIReadOnlyList()
+    {
+        // string[] should be assignable to IReadOnlyList<string>
+        var stringClass = MakeClass("System.String");
+        var arr = new JavaType.Array(stringClass, null);
+        var target = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IReadOnlyList"),
+            [MakeClass("System.String")]);
+        Assert.True(TypeUtils.IsAssignableTo(arr, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_GenericIEnumerable_OpenTypeVariable()
+    {
+        // string[] should be assignable to IEnumerable<T> (open generic)
+        var stringClass = MakeClass("System.String");
+        var arr = new JavaType.Array(stringClass, null);
+        var target = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IEnumerable"),
+            [new JavaType.GenericTypeVariable("T", JavaType.GenericTypeVariable.VarianceKind.Invariant, null)]);
+        Assert.True(TypeUtils.IsAssignableTo(arr, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Array_GenericMismatch()
+    {
+        // string[] should NOT be assignable to IEnumerable<int>
+        var stringClass = MakeClass("System.String");
+        var arr = new JavaType.Array(stringClass, null);
+        var target = new JavaType.Parameterized(
+            MakeClass("System.Collections.Generic.IEnumerable"),
+            [MakeClass("System.Int32")]);
+        Assert.False(TypeUtils.IsAssignableTo(arr, target));
+    }
+
+    // =============================================================
+    // IsAssignableTo — Nullable<T> (value type assignable to Nullable<T>)
+    // =============================================================
+
+    [Fact]
+    public void IsAssignableTo_PrimitiveInt_AssignableToNullableInt()
+    {
+        var from = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable,
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_ClassInt_AssignableToNullableInt()
+    {
+        var from = MakeClass("System.Int32");
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable,
+            [MakeClass("System.Int32")]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_Struct_AssignableToNullableStruct()
+    {
+        var from = MakeClass("System.DateTime",
+            supertype: MakeClass("System.ValueType"));
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable, [MakeClass("System.DateTime")]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_WrongType_NotAssignableToNullable()
+    {
+        // int is NOT assignable to Nullable<double>
+        var from = JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int);
+        var nullable = MakeClass("System.Nullable");
+        var target = new JavaType.Parameterized(nullable,
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Double)]);
+        Assert.False(TypeUtils.IsAssignableTo(from, target));
+    }
+
+    [Fact]
+    public void IsAssignableTo_NullableInt_AssignableToNullableInt()
+    {
+        // Nullable<int> is assignable to Nullable<int>
+        var nullable = MakeClass("System.Nullable");
+        var from = new JavaType.Parameterized(nullable,
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)]);
+        var target = new JavaType.Parameterized(MakeClass("System.Nullable"),
+            [JavaType.Primitive.Of(JavaType.Primitive.PrimitiveKind.Int)]);
+        Assert.True(TypeUtils.IsAssignableTo(from, target));
     }
 
     // =============================================================

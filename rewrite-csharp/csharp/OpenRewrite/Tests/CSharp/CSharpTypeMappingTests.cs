@@ -18,7 +18,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
-
 namespace OpenRewrite.Tests.CSharp;
 
 /// <summary>
@@ -30,6 +29,18 @@ public class CSharpTypeMappingTests : RewriteTest
     /// <summary>
     /// Parse source code with reference assemblies and return the CompilationUnit.
     /// </summary>
+    private static readonly SyntaxTree ImplicitUsingsSyntaxTree = CSharpSyntaxTree.ParseText(
+        """
+        global using System;
+        global using System.Collections.Generic;
+        global using System.IO;
+        global using System.Linq;
+        global using System.Net.Http;
+        global using System.Threading;
+        global using System.Threading.Tasks;
+        """,
+        path: "__GlobalUsings__.g.cs");
+
     private static CompilationUnit ParseWithSemanticModel(string code)
     {
         var refs = Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
@@ -38,7 +49,7 @@ public class CSharpTypeMappingTests : RewriteTest
         var compilation = CSharpCompilation.Create("TestCompilation")
             .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             .AddReferences(refs)
-            .AddSyntaxTrees(syntaxTree);
+            .AddSyntaxTrees(ImplicitUsingsSyntaxTree, syntaxTree);
         var semanticModel = compilation.GetSemanticModel(syntaxTree);
 
         var parser = new CSharpParser();
@@ -51,7 +62,7 @@ public class CSharpTypeMappingTests : RewriteTest
     private static VariableDeclarations? FindVariableDeclaration(CompilationUnit cu, string varName)
     {
         var finder = new VarFinder(varName);
-        finder.Cursor = new Core.Cursor(null, Core.Cursor.ROOT_VALUE);
+        finder.Cursor = new OpenRewrite.Core.Cursor(null, OpenRewrite.Core.Cursor.ROOT_VALUE);
         finder.Visit(cu, 0);
         return finder.Found;
     }
@@ -195,6 +206,32 @@ public class CSharpTypeMappingTests : RewriteTest
     }
 
     [Fact]
+    public void ImplicitUsings_ShortNameResolvesWithoutExplicitUsing()
+    {
+        // In .NET 6+, System.Collections.Generic is an implicit using.
+        // Test whether Dictionary (short name, no using directive) gets
+        // type attribution. This will fail if implicit usings are not
+        // configured in the compilation.
+        var cu = ParseWithSemanticModel("""
+            class Test
+            {
+                void M()
+                {
+                    Dictionary<string, int> dict = new Dictionary<string, int>();
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "dict");
+        Assert.NotNull(varDecl);
+        var declType = varDecl!.TypeExpression?.Type;
+        // If implicit usings work, this should be Parameterized.
+        // If not, it will be null or Unknown (unresolved).
+        Assert.NotNull(declType);
+        Assert.IsType<JavaType.Parameterized>(declType);
+    }
+
+    [Fact]
     public void DictionaryClass_HasFormalTypeParameters()
     {
         // Verify that the underlying Class for Dictionary has formal type parameters
@@ -226,5 +263,153 @@ public class CSharpTypeMappingTests : RewriteTest
 
         var formal1 = Assert.IsType<JavaType.GenericTypeVariable>(dictClass.TypeParameters[1]);
         Assert.Equal("TValue", formal1.Name);
+    }
+
+    [Fact]
+    public void NullableValueType_IsMappedAsParameterizedNullable()
+    {
+        // int? should be mapped as Parameterized(System.Nullable, [Primitive(Int)])
+        var cu = ParseWithSemanticModel("""
+            class Test
+            {
+                void M()
+                {
+                    int? x = 42;
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "x");
+        Assert.NotNull(varDecl);
+
+        var declType = varDecl!.TypeExpression?.Type;
+        Assert.NotNull(declType);
+        var paramType = Assert.IsType<JavaType.Parameterized>(declType);
+        Assert.Equal("System.Nullable", TypeUtils.GetFullyQualifiedName(paramType.Type));
+        Assert.NotNull(paramType.TypeParameters);
+        Assert.Single(paramType.TypeParameters!);
+        Assert.IsType<JavaType.Primitive>(paramType.TypeParameters[0]);
+    }
+
+    [Fact]
+    public void NullableReferenceType_String_IsNotWrappedInNullable()
+    {
+        // string? is a nullable reference type — Roslyn models it as plain System.String
+        // (not Nullable<String>), since nullable reference types are annotation-only
+        var cu = ParseWithSemanticModel("""
+            #nullable enable
+            class Test
+            {
+                void M()
+                {
+                    string? s = null;
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "s");
+        Assert.NotNull(varDecl);
+
+        var declType = varDecl!.TypeExpression?.Type;
+        Assert.IsType<JavaType.Class>(declType);
+        Assert.Equal("System.String", TypeUtils.GetFullyQualifiedName(declType));
+    }
+
+    [Fact]
+    public void NullableReferenceType_Object_IsNotWrappedInNullable()
+    {
+        // object? is a nullable reference type — plain System.Object, not Nullable<Object>
+        var cu = ParseWithSemanticModel("""
+            #nullable enable
+            class Test
+            {
+                void M()
+                {
+                    object? o = null;
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "o");
+        Assert.NotNull(varDecl);
+
+        var declType = varDecl!.TypeExpression?.Type;
+        Assert.IsType<JavaType.Class>(declType);
+        Assert.Equal("System.Object", TypeUtils.GetFullyQualifiedName(declType));
+    }
+
+    [Fact]
+    public void NullableUserDefinedClass_IsNotWrappedInNullable()
+    {
+        // Foo? where Foo is a user-defined reference type — plain Class, not Nullable
+        var cu = ParseWithSemanticModel("""
+            #nullable enable
+            class Foo { }
+            class Test
+            {
+                void M()
+                {
+                    Foo? f = null;
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "f");
+        Assert.NotNull(varDecl);
+
+        var declType = varDecl!.TypeExpression?.Type;
+        Assert.IsType<JavaType.Class>(declType);
+        Assert.Equal("Foo", TypeUtils.GetFullyQualifiedName(declType));
+    }
+
+    [Fact]
+    public void NullableUserDefinedStruct_IsMappedAsParameterizedNullable()
+    {
+        // Bar? where Bar is a user-defined struct — Parameterized(Nullable, [Bar])
+        var cu = ParseWithSemanticModel("""
+            struct Bar { public int X; }
+            class Test
+            {
+                void M()
+                {
+                    Bar? b = null;
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "b");
+        Assert.NotNull(varDecl);
+
+        var declType = varDecl!.TypeExpression?.Type;
+        var paramType = Assert.IsType<JavaType.Parameterized>(declType);
+        Assert.Equal("System.Nullable", TypeUtils.GetFullyQualifiedName(paramType.Type));
+        Assert.NotNull(paramType.TypeParameters);
+        var innerType = Assert.IsType<JavaType.Class>(Assert.Single(paramType.TypeParameters!));
+        Assert.Equal("Bar", innerType.FullyQualifiedName);
+    }
+
+    [Fact]
+    public void StringTypeArgument_IsMappedAsClass()
+    {
+        // System.String should be mapped as JavaType.Class (not Primitive) when used
+        // as a type argument, so TypeUtils.IsAssignableTo can walk its interface chain.
+        var cu = ParseWithSemanticModel("""
+            using System.Collections.Generic;
+            class Test
+            {
+                void M()
+                {
+                    List<string> items = new List<string>();
+                }
+            }
+            """);
+
+        var varDecl = FindVariableDeclaration(cu, "items");
+        Assert.NotNull(varDecl);
+
+        var paramType = Assert.IsType<JavaType.Parameterized>(varDecl!.TypeExpression?.Type);
+        Assert.NotNull(paramType.TypeParameters);
+        var stringArg = Assert.IsType<JavaType.Class>(Assert.Single(paramType.TypeParameters!));
+        Assert.Equal("System.String", stringArg.FullyQualifiedName);
     }
 }

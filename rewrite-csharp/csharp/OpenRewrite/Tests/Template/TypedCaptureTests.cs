@@ -443,23 +443,23 @@ public class TypedCaptureTests : RewriteTest
     // Recipe factories
     // ===============================================================
 
-    private static Core.Recipe FindExpression(TemplateStringHandler handler)
+    private static OpenRewrite.Core.Recipe FindExpression(TemplateStringHandler handler)
         => new TypedPatternSearchRecipe(CSharpPattern.Expression(handler));
 
-    private static Core.Recipe FindExpression(string code)
+    private static OpenRewrite.Core.Recipe FindExpression(string code)
         => new TypedPatternSearchRecipe(CSharpPattern.Expression(code));
 
-    private static Core.Recipe FindExpression(CSharpPattern pat)
+    private static OpenRewrite.Core.Recipe FindExpression(CSharpPattern pat)
         => new TypedPatternSearchRecipe(pat);
 
-    private static Core.Recipe FindMethodInvocation(TemplateStringHandler handler, IReadOnlyList<string> usings)
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(TemplateStringHandler handler, IReadOnlyList<string> usings)
         => new MethodInvocationSearchRecipe(CSharpPattern.Expression(handler, usings: usings));
 
-    private static Core.Recipe FindMethodInvocation(CSharpPattern pat)
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(CSharpPattern pat)
         => new MethodInvocationSearchRecipe(pat);
 }
 
-file class TypedPatternSearchRecipe(CSharpPattern pat) : Core.Recipe
+file class TypedPatternSearchRecipe(CSharpPattern pat) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find expression";
     public override string Description => "Searches for expressions matching the pattern.";
@@ -479,7 +479,7 @@ file class TypedPatternSearchRecipe(CSharpPattern pat) : Core.Recipe
     }
 }
 
-file class MethodInvocationSearchRecipe(CSharpPattern pat) : Core.Recipe
+file class MethodInvocationSearchRecipe(CSharpPattern pat) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find method invocation";
     public override string Description => "Searches for method invocations matching the pattern.";

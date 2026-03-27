@@ -306,11 +306,11 @@ public class TemplateApplyTests : RewriteTest
     public void AttributeRenameViaRewriteRule()
     {
         var args = Capture.Expression("args", variadic: new());
-        var rule = RewriteRule.Rewrite(
+        var visitor = CSharpTemplate.Rewrite(
             CSharpPattern.Attribute($"Fact({args})"),
             CSharpTemplate.Attribute($"Test({args})"));
         RewriteRun(
-            spec => spec.SetRecipe(new RewriteRuleRecipe(rule)),
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(visitor)),
             CSharp(
                 """
                 class C
@@ -532,15 +532,15 @@ public class TemplateApplyTests : RewriteTest
     // Recipe factories
     // ===============================================================
 
-    private static Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
+    private static OpenRewrite.Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
         new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));
 
 #pragma warning disable CS0618
-    private static Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
+    private static OpenRewrite.Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
         where T : J =>
         new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
 
-    private static Core.Recipe Replace<T>(string pattern, string template) where T : J =>
+    private static OpenRewrite.Core.Recipe Replace<T>(string pattern, string template) where T : J =>
         new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
 #pragma warning restore CS0618
 }
@@ -549,7 +549,7 @@ public class TemplateApplyTests : RewriteTest
 /// Generic replacement recipe that matches nodes of type <typeparamref name="T"/>
 /// against a pattern and replaces them using a template.
 /// </summary>
-file class PatternReplaceRecipe<T>(CSharpPattern pat, CSharpTemplate tmpl) : Core.Recipe where T : J
+file class PatternReplaceRecipe<T>(CSharpPattern pat, CSharpTemplate tmpl) : OpenRewrite.Core.Recipe where T : J
 {
     public override string DisplayName => $"Replace {typeof(T).Name}";
     public override string Description => $"Replaces {typeof(T).Name} matching the pattern with the template.";
@@ -572,7 +572,7 @@ file class PatternReplaceRecipe<T>(CSharpPattern pat, CSharpTemplate tmpl) : Cor
 /// <summary>
 /// Recipe demonstrating Raw.Code splice — replaces logger.Debug({expr}) with logger.{level}({expr}).
 /// </summary>
-file class RawSpliceRecipe(Capture<Expression> expr, string level) : Core.Recipe
+file class RawSpliceRecipe(Capture<Expression> expr, string level) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Replace logger method";
     public override string Description => "Replaces logger.Debug with logger.<level> using Raw.Code splice.";
@@ -602,7 +602,7 @@ file class RawSpliceRecipe(Capture<Expression> expr, string level) : Core.Recipe
 /// Recipe that removes empty statements (standalone semicolons) from blocks.
 /// Tests that VisitBlock properly handles null returns (statement deletion).
 /// </summary>
-file class RemoveEmptyStatementRecipe : Core.Recipe
+file class RemoveEmptyStatementRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Remove empty statements";
     public override string Description => "Remove standalone semicolons.";
@@ -625,7 +625,7 @@ file class RemoveEmptyStatementRecipe : Core.Recipe
 /// The template produces a single-line if statement that auto-format should expand to multi-line
 /// with correct indentation.
 /// </summary>
-file class ReplaceWithIfBlockRecipe : Core.Recipe
+file class ReplaceWithIfBlockRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Replace Console.Write with if block";
     public override string Description => "Wraps Console.Write in an if block.";
@@ -644,7 +644,7 @@ file class ReplaceWithIfBlockRecipe : Core.Recipe
                 // Multi-line template with 0-based indentation.
                 // Auto-format should fix internal indentation to match the target context.
                 var tmpl = CSharpTemplate.Statement("if (true)\n{\n    Console.WriteLine(42);\n}");
-                return (J)tmpl.Apply(Cursor)!;
+                return AutoFormat((J)tmpl.Apply(Cursor)!, ctx, Cursor);
             }
             return es;
         }
@@ -654,7 +654,7 @@ file class ReplaceWithIfBlockRecipe : Core.Recipe
 /// <summary>
 /// Replaces only the outermost || binary with &&, avoiding double-matching of inner || nodes.
 /// </summary>
-file class ReplaceOutermostOrWithAndRecipe : Core.Recipe
+file class ReplaceOutermostOrWithAndRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Replace outermost || with &&";
     public override string Description => "Replaces the outermost || with &&.";
@@ -688,7 +688,7 @@ file class ReplaceOutermostOrWithAndRecipe : Core.Recipe
     }
 }
 
-file class UseRethrowRecipe : Core.Recipe
+file class UseRethrowRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Use rethrow";
     public override string Description => "Replace throw ex with throw.";
@@ -727,10 +727,10 @@ file class UseRethrowRecipe : Core.Recipe
     }
 }
 
-file class RewriteRuleRecipe(IRewriteRule rule) : Core.Recipe
+file class RewriteVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : OpenRewrite.Core.Recipe
 {
-    public override string DisplayName => "RewriteRule";
-    public override string Description => "Applies a RewriteRule via ToVisitor().";
+    public override string DisplayName => "Rewrite";
+    public override string Description => "Applies a CSharpTemplate.Rewrite() visitor.";
 
-    public override JavaVisitor<ExecutionContext> GetVisitor() => rule.ToVisitor();
+    public override JavaVisitor<ExecutionContext> GetVisitor() => visitor;
 }

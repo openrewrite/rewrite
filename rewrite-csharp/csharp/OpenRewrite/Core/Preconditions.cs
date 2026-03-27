@@ -32,4 +32,36 @@ public static class Preconditions
     {
         return new Check(precondition, visitor);
     }
+
+    /// <summary>
+    /// Wraps a recipe so its visitor only runs on files where the precondition matches.
+    /// Useful for applying a precondition to sub-recipes within a composite recipe.
+    /// </summary>
+    public static Recipe Check(ITreeVisitor<ExecutionContext> precondition, Recipe recipe)
+    {
+        return new PreconditionedRecipe(precondition, recipe);
+    }
+}
+
+/// <summary>
+/// A recipe wrapper that gates execution on a precondition visitor.
+/// </summary>
+internal class PreconditionedRecipe : Recipe
+{
+    private readonly ITreeVisitor<ExecutionContext> _precondition;
+    private readonly Recipe _delegate;
+
+    public PreconditionedRecipe(ITreeVisitor<ExecutionContext> precondition, Recipe @delegate)
+    {
+        _precondition = precondition;
+        _delegate = @delegate;
+    }
+
+    public override string DisplayName => _delegate.DisplayName;
+    public override string Description => _delegate.Description;
+
+    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    {
+        return Preconditions.Check(_precondition, _delegate.GetVisitor());
+    }
 }

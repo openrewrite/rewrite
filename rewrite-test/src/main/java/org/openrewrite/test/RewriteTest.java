@@ -470,6 +470,7 @@ public interface RewriteTest extends SourceSpecs {
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         continue nextSourceSpec;
                     }
                 }
@@ -496,6 +497,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         //noinspection unchecked
                         ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         if (sourceSpec.sourcePath != null) {
                             assertThat(result.getAfter().getSourcePath())
                                     .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));

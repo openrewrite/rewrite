@@ -30,6 +30,7 @@ internal class PatternMatchingComparator
 {
     private readonly IReadOnlyDictionary<string, object> _captures;
     private readonly Dictionary<string, object> _bindings = new();
+    private readonly Dictionary<string, NullSafe> _nullSafeBindings = new();
 
     public PatternMatchingComparator(IReadOnlyDictionary<string, object> captures)
     {
@@ -43,8 +44,17 @@ internal class PatternMatchingComparator
     public Dictionary<string, object>? Match(J pattern, J candidate, Cursor cursor)
     {
         _bindings.Clear();
+        _nullSafeBindings.Clear();
         return MatchNode(pattern, candidate, cursor) ? new Dictionary<string, object>(_bindings) : null;
     }
+
+    /// <summary>
+    /// After a successful <see cref="Match"/>, returns capture names mapped to the
+    /// <see cref="NullSafe"/> marker from the candidate MethodInvocation/FieldAccess
+    /// when the capture was in the Select position. Used by the template engine to
+    /// preserve <c>?.</c> through rewrites.
+    /// </summary>
+    internal IReadOnlyDictionary<string, NullSafe> NullSafeBindings => _nullSafeBindings;
 
     private bool MatchNode(J pattern, J candidate, Cursor cursor)
     {
@@ -73,32 +83,105 @@ internal class PatternMatchingComparator
         if (pattern.GetType() != candidate.GetType())
             return MatchCrossType(pattern, candidate, cursor);
 
-        // NullSafe marker must match: ?. and . are structurally different
-        if (TreeHelper.HasNullSafe(pattern) != TreeHelper.HasNullSafe(candidate))
+        // NullSafe: a pattern with ?. only matches candidates with ?.
+        // but a pattern without ?. matches both (asymmetric — patterns are lenient)
+        if (TreeHelper.HasNullSafe(pattern) && !TreeHelper.HasNullSafe(candidate))
             return false;
 
         // Semantic matching for method invocations: when both resolve to the same
         // static method (same declaring type + name), skip receiver comparison.
+        bool matched;
         if (pattern is MethodInvocation patMethod && candidate is MethodInvocation candMethod)
-            return MatchMethodInvocation(patMethod, candMethod, cursor);
-
-        // Generic property-based comparison: iterate all structural properties
-        // and compare them recursively, skipping formatting/identity fields.
-        if (pattern is Binary patBin && candidate is Binary candBin)
+            matched = MatchMethodInvocation(patMethod, candMethod, cursor);
+        else if (pattern is Binary patBin && candidate is Binary candBin)
         {
-            // Save bindings so we can backtrack if direct match fails
+            // Generic property-based comparison with backtracking for commutative ops
             var savedBindings = new Dictionary<string, object>(_bindings);
-            if (MatchProperties(pattern, candidate, cursor))
-                return true;
-
-            // Restore bindings and try commuted (swapped) operands for == and !=
-            _bindings.Clear();
-            foreach (var kvp in savedBindings)
-                _bindings[kvp.Key] = kvp.Value;
-            return MatchCommutedBinary(patBin, candBin, cursor);
+            matched = MatchProperties(pattern, candidate, cursor);
+            if (!matched)
+            {
+                // Restore bindings and try commuted (swapped) operands for == and !=
+                _bindings.Clear();
+                foreach (var kvp in savedBindings)
+                    _bindings[kvp.Key] = kvp.Value;
+                matched = MatchCommutedBinary(patBin, candBin, cursor);
+            }
         }
+        else
+            matched = MatchProperties(pattern, candidate, cursor);
 
-        return MatchProperties(pattern, candidate, cursor);
+        // Record NullSafe associations for captures used as Select in MI/FA
+        if (matched)
+            RecordNullSafeForCaptures(pattern, candidate);
+
+        return matched;
+    }
+
+    /// <summary>
+    /// After a successful match of a MethodInvocation, FieldAccess, or ArrayAccess,
+    /// check if the candidate has a NullSafe marker that the pattern doesn't have.
+    /// If so, find the capture placeholder in the Select/Target/Indexed position and
+    /// record the NullSafe association so the template engine can preserve <c>?.</c>
+    /// and <c>?[</c> through rewrites.
+    /// </summary>
+    private void RecordNullSafeForCaptures(J pattern, J candidate)
+    {
+        if (pattern is MethodInvocation patMi && candidate is MethodInvocation candMi)
+        {
+            var candNullSafe = candMi.Markers.FindFirst<NullSafe>();
+            if (candNullSafe != null && patMi.Markers.FindFirst<NullSafe>() == null)
+            {
+                if (FindSelectCaptureName(patMi.Select) is { } captureName)
+                    _nullSafeBindings[captureName] = candNullSafe;
+            }
+        }
+        else if (pattern is FieldAccess patFa && candidate is FieldAccess candFa)
+        {
+            var candNullSafe = candFa.Markers.FindFirst<NullSafe>();
+            if (candNullSafe != null && patFa.Markers.FindFirst<NullSafe>() == null)
+            {
+                if (FindTargetCaptureName(patFa.Target) is { } captureName)
+                    _nullSafeBindings[captureName] = candNullSafe;
+            }
+        }
+        else if (pattern is ArrayAccess patAa && candidate is ArrayAccess candAa)
+        {
+            var candNullSafe = candAa.Markers.FindFirst<NullSafe>();
+            if (candNullSafe != null && patAa.Markers.FindFirst<NullSafe>() == null)
+            {
+                if (FindTargetCaptureName(patAa.Indexed) is { } captureName)
+                    _nullSafeBindings[captureName] = candNullSafe;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Check if a MI's Select (JRightPadded&lt;Expression&gt;?) contains a direct
+    /// capture placeholder, returning its name if so.
+    /// </summary>
+    private string? FindSelectCaptureName(JRightPadded<Expression>? select)
+    {
+        if (select?.Element is Identifier ident)
+        {
+            var name = Placeholder.FromPlaceholder(ident.SimpleName);
+            if (name != null && _captures.ContainsKey(name))
+                return name;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Check if a FieldAccess's Target is a direct capture placeholder.
+    /// </summary>
+    private string? FindTargetCaptureName(Expression target)
+    {
+        if (target is Identifier ident)
+        {
+            var name = Placeholder.FromPlaceholder(ident.SimpleName);
+            if (name != null && _captures.ContainsKey(name))
+                return name;
+        }
+        return null;
     }
 
     /// <summary>

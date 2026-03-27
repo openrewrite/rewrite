@@ -494,4 +494,5 @@ class CSharpRecipeTest implements RewriteTest {
           )
         );
     }
+
 }

@@ -38,7 +38,7 @@ public class NullCoalescingVisitorTest : RewriteTest
         var source = parser.Parse("class C { }");
 
         var visitor = new NullifyBlockVisitor();
-        var result = visitor.Visit(source, new Core.ExecutionContext());
+        var result = visitor.Visit(source, new OpenRewrite.Core.ExecutionContext());
 
         // When VisitBlock returns null, the parent should NOT silently restore
         // the original. The tree should be modified (different reference).
@@ -67,7 +67,7 @@ public class NullCoalescingVisitorTest : RewriteTest
             """);
 
         var visitor = new NullifyMethodInvocationVisitor();
-        var result = visitor.Visit(source, new Core.ExecutionContext());
+        var result = visitor.Visit(source, new OpenRewrite.Core.ExecutionContext());
 
         // The visitor returned null for the MethodInvocation inside the
         // ExpressionStatement. The tree should change.
@@ -76,17 +76,17 @@ public class NullCoalescingVisitorTest : RewriteTest
             "ExpressionStatement should not silently restore the original.");
     }
 
-    private class NullifyBlockVisitor : CSharpVisitor<Core.ExecutionContext>
+    private class NullifyBlockVisitor : CSharpVisitor<OpenRewrite.Core.ExecutionContext>
     {
-        public override J VisitBlock(Block block, Core.ExecutionContext ctx)
+        public override J VisitBlock(Block block, OpenRewrite.Core.ExecutionContext ctx)
         {
             return null!;
         }
     }
 
-    private class NullifyMethodInvocationVisitor : CSharpVisitor<Core.ExecutionContext>
+    private class NullifyMethodInvocationVisitor : CSharpVisitor<OpenRewrite.Core.ExecutionContext>
     {
-        public override J VisitMethodInvocation(MethodInvocation mi, Core.ExecutionContext ctx)
+        public override J VisitMethodInvocation(MethodInvocation mi, OpenRewrite.Core.ExecutionContext ctx)
         {
             return null!;
         }

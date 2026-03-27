@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Java;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.CSharp.Template;
 
@@ -185,7 +186,10 @@ public sealed class CSharpTemplate
     /// <param name="cursor">The cursor pointing to the current location in the tree.</param>
     /// <param name="values">Optional match result providing values for captures.</param>
     /// <param name="coordinates">Optional coordinates specifying where to apply (defaults to Replace).</param>
-    /// <returns>The generated AST node with substitutions applied.</returns>
+    /// <returns>The generated AST node with substitutions and prefix applied, but not formatted.
+    /// The caller is responsible for formatting, e.g. via
+    /// <see cref="CSharpVisitor{P}.AutoFormat{T}"/> (deferred batch) or
+    /// <see cref="AutoFormatExtensions.AutoFormat{T}"/> (immediate).</returns>
     public J? Apply(Cursor cursor, MatchResult? values = null,
         CSharpCoordinates? coordinates = null)
     {
@@ -217,9 +221,6 @@ public sealed class CSharpTemplate
                 CSharpCoordinates.Replace(cursorJ));
         }
 
-        // Phase 3: auto-format within the enclosing compilation unit
-        tree = TemplateEngine.AutoFormat(tree, cursor);
-
         return tree;
     }
 
@@ -245,4 +246,72 @@ public sealed class CSharpTemplate
 
         return null;
     }
+
+    // ===============================================================
+    // Rewrite — declarative pattern→template visitor factory
+    // ===============================================================
+
+    /// <summary>
+    /// Create a <see cref="CSharpVisitor{ExecutionContext}"/> that matches a single pattern
+    /// and applies a template via <see cref="TreeVisitor{T,P}.PostVisit"/>. The pattern's
+    /// fast-reject ensures only nodes whose type matches the pattern root are fully compared.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var expr = Capture.Expression();
+    /// return CSharpTemplate.Rewrite(
+    ///     CSharpPattern.Expression($"Console.Write({expr})"),
+    ///     CSharpTemplate.Expression($"Console.WriteLine({expr})"));
+    /// </code>
+    /// </example>
+    public static CSharpVisitor<ExecutionContext> Rewrite(CSharpPattern before, CSharpTemplate after) =>
+        new RewriteVisitor([(before, after)]);
+
+    /// <summary>
+    /// Create a visitor that tries multiple patterns against a shared template. First match wins.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var s = Capture.Expression("s", type: "string");
+    /// return CSharpTemplate.Rewrite(
+    ///     [
+    ///         CSharpPattern.Expression($"{s} == null || {s} == \"\""),
+    ///         CSharpPattern.Expression($"{s} == null || {s}.Length == 0"),
+    ///     ],
+    ///     CSharpTemplate.Expression($"string.IsNullOrEmpty({s})"));
+    /// </code>
+    /// </example>
+    public static CSharpVisitor<ExecutionContext> Rewrite(CSharpPattern[] befores, CSharpTemplate after) =>
+        new RewriteVisitor(Array.ConvertAll(befores, b => (b, after)));
+
+    /// <summary>
+    /// Create a visitor that tries multiple (pattern, template) pairs in order. First match wins.
+    /// Use this when different patterns map to different templates.
+    /// </summary>
+    public static CSharpVisitor<ExecutionContext> Rewrite(
+        params (CSharpPattern before, CSharpTemplate after)[] rules) =>
+        new RewriteVisitor(rules);
+
+    // ===============================================================
+    // Implementation
+    // ===============================================================
+
+    private sealed class RewriteVisitor((CSharpPattern before, CSharpTemplate after)[] rules)
+        : CSharpVisitor<ExecutionContext>
+    {
+        public override J? PostVisit(J tree, ExecutionContext ctx)
+        {
+            foreach (var (before, after) in rules)
+            {
+                var match = before.Match(tree, Cursor);
+                if (match != null)
+                {
+                    var result = after.Apply(Cursor, values: match);
+                    return result != null ? AutoFormat(result, ctx, Cursor) : null;
+                }
+            }
+            return tree;
+        }
+    }
+
 }
