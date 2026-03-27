@@ -82,8 +82,15 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
                 getCursor().getParentOrThrow().putMessage("sequenceEntryIndent", indent);
                 // the +1 is for the '-' character
-                getCursor().getParentOrThrow().putMessage("lastIndent",
-                        indent + firstIndent(((Yaml.Sequence.Entry) y).getBlock()).length() + 1);
+                String fi = firstIndent(((Yaml.Sequence.Entry) y).getBlock());
+                int contentIndent;
+                if (StringUtils.hasLineBreak(fi)) {
+                    // When the dash is on its own line, content is indented by indentSize from the dash
+                    contentIndent = indent + style.getIndentSize();
+                } else {
+                    contentIndent = indent + fi.length() + 1;
+                }
+                getCursor().getParentOrThrow().putMessage("lastIndent", contentIndent);
             } else if (y instanceof Yaml.Mapping.Entry) {
                 y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
                 getCursor().putMessage("lastIndent", indent + style.getIndentSize());
