@@ -180,6 +180,83 @@ class JavaTemplateTest8Test implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceContextSensitiveMethodInvocationInsideAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("visitClassDeclaration") &&
+                      method.getSelect() != null &&
+                      !(method.getSelect() instanceof J.Identifier &&
+                        "super".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
+                      return JavaTemplate.builder("#{any()}.visit(#{any()}, #{any()}, getCursor().getParentTreeCursor())")
+                        .contextSensitive()
+                        .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(),
+                          method.getSelect(), method.getArguments().get(0), method.getArguments().get(1));
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {}, new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                              J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                              cd = new JavaVisitor<ExecutionContext>() {}.visitClassDeclaration(cd, ctx);
+                              return cd;
+                          }
+                      });
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {}, new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                              J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                              cd = new JavaVisitor<ExecutionContext>() {
+                              }.visit(cd, ctx, getCursor().getParentTreeCursor());
+                              return cd;
+                          }
+                      });
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void parameterizedMatch() {
