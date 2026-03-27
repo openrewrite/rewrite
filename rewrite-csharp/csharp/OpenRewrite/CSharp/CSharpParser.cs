@@ -4169,14 +4169,12 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
 
         // Parse catch clauses
         var catches = new List<Try.Catch>();
-        var catchFilters = new List<JLeftPadded<ControlParentheses<Expression>>?>();
-        bool hasAnyFilter = false;
         foreach (var catchClause in node.Catches)
         {
             var catchPrefix = ExtractSpaceBefore(catchClause.CatchKeyword);
             _cursor = catchClause.CatchKeyword.Span.End;
 
-            ControlParentheses<VariableDeclarations>? parameter = null;
+            ControlParentheses<VariableDeclarations> parameter;
             if (catchClause.Declaration != null)
             {
                 var parenPrefix = ExtractSpaceBefore(catchClause.Declaration.OpenParenToken);
@@ -4193,18 +4191,37 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     exName = new Identifier(Guid.NewGuid(), exNamePrefix, Markers.Empty, [], catchClause.Declaration.Identifier.Text, catchVarType?.Type, catchVarType);
                 }
 
+                var closeParenPrefix = ExtractSpaceBefore(catchClause.Declaration.CloseParenToken);
+                _cursor = catchClause.Declaration.CloseParenToken.Span.End;
+
+                // Parse when clause if present — stored on the NamedVariable initializer
+                JLeftPadded<Expression>? whenInitializer = catchClause.Filter != null
+                    ? ParseWhenClause(catchClause.Filter)
+                    : null;
+
+                IList<JRightPadded<NamedVariable>> variables;
+                if (exName != null)
+                {
+                    variables = [new JRightPadded<NamedVariable>(new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, exName, [], whenInitializer, _typeMapping?.VariableType(catchClause.Declaration!)), Space.Empty, Markers.Empty)];
+                }
+                else if (whenInitializer != null)
+                {
+                    // Type-only catch with when clause: create a NamedVariable with empty name to hold the when clause
+                    var emptyName = new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "", null, null);
+                    variables = [new JRightPadded<NamedVariable>(new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, emptyName, [], whenInitializer, null), Space.Empty, Markers.Empty)];
+                }
+                else
+                {
+                    variables = [];
+                }
+
                 var varDecl = new VariableDeclarations(
                     Guid.NewGuid(),
                     Space.Empty,
                     Markers.Empty,
                     [], [], typeExpr, null, [],
-                    exName != null
-                        ? [new JRightPadded<NamedVariable>(new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, exName, [], null, _typeMapping?.VariableType(catchClause.Declaration!)), Space.Empty, Markers.Empty)]
-                        : []
+                    variables
                 );
-
-                var closeParenPrefix = ExtractSpaceBefore(catchClause.Declaration.CloseParenToken);
-                _cursor = catchClause.Declaration.CloseParenToken.Span.End;
 
                 parameter = new ControlParentheses<VariableDeclarations>(
                     Guid.NewGuid(),
@@ -4216,8 +4233,24 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             else
             {
                 // Catch-all without declaration
+                // Parse when clause if present
+                JLeftPadded<Expression>? whenInitializer = catchClause.Filter != null
+                    ? ParseWhenClause(catchClause.Filter)
+                    : null;
+
+                IList<JRightPadded<NamedVariable>> variables;
+                if (whenInitializer != null)
+                {
+                    // Bare catch with when clause: create a NamedVariable with empty name to hold the when clause
+                    var emptyName = new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "", null, null);
+                    variables = [new JRightPadded<NamedVariable>(new NamedVariable(Guid.NewGuid(), Space.Empty, Markers.Empty, emptyName, [], whenInitializer, null), Space.Empty, Markers.Empty)];
+                }
+                else
+                {
+                    variables = [];
+                }
                 var emptyVarDecl = new VariableDeclarations(
-                    Guid.NewGuid(), Space.Empty, Markers.Empty, [], [], null, null, [], []
+                    Guid.NewGuid(), Space.Empty, Markers.Empty, [], [], null, null, [], variables
                 );
                 parameter = new ControlParentheses<VariableDeclarations>(
                     Guid.NewGuid(),
@@ -4226,25 +4259,6 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
                     new JRightPadded<VariableDeclarations>(emptyVarDecl, Space.Empty, Markers.Empty)
                 );
             }
-
-            // Parse catch filter (when clause) if present
-            JLeftPadded<ControlParentheses<Expression>>? catchFilter = null;
-            if (catchClause.Filter != null)
-            {
-                var whenPrefix = ExtractSpaceBefore(catchClause.Filter.WhenKeyword);
-                _cursor = catchClause.Filter.WhenKeyword.Span.End;
-                var openParenPrefix = ExtractSpaceBefore(catchClause.Filter.OpenParenToken);
-                _cursor = catchClause.Filter.OpenParenToken.Span.End;
-                var filterExpr = (Expression)Visit(catchClause.Filter.FilterExpression)!;
-                var closeParenPrefix = ExtractSpaceBefore(catchClause.Filter.CloseParenToken);
-                _cursor = catchClause.Filter.CloseParenToken.Span.End;
-                var controlParens = new ControlParentheses<Expression>(
-                    Guid.NewGuid(), openParenPrefix, Markers.Empty,
-                    new JRightPadded<Expression>(filterExpr, closeParenPrefix, Markers.Empty));
-                catchFilter = new JLeftPadded<ControlParentheses<Expression>>(whenPrefix, controlParens);
-                hasAnyFilter = true;
-            }
-            catchFilters.Add(catchFilter);
 
             var catchBody = (Block)VisitBlock(catchClause.Block);
 
@@ -4267,28 +4281,31 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             finallyBlock = new JLeftPadded<Block>(finallyPrefix, finallyBody);
         }
 
-        var tryStmt = new Try(
+        return new Try(
             Guid.NewGuid(),
-            hasAnyFilter ? Space.Empty : prefix,
+            prefix,
             Markers.Empty,
             null,
             body,
             catches,
             finallyBlock
         );
+    }
 
-        if (hasAnyFilter)
-        {
-            return new ExceptionFilteredTry(
-                Guid.NewGuid(),
-                prefix,
-                Markers.Empty,
-                tryStmt,
-                catchFilters
-            );
-        }
-
-        return tryStmt;
+    private JLeftPadded<Expression> ParseWhenClause(CatchFilterClauseSyntax filter)
+    {
+        var whenPrefix = ExtractSpaceBefore(filter.WhenKeyword);
+        _cursor = filter.WhenKeyword.Span.End;
+        var openParenPrefix = ExtractSpaceBefore(filter.OpenParenToken);
+        _cursor = filter.OpenParenToken.Span.End;
+        var filterExpr = (Expression)Visit(filter.FilterExpression)!;
+        var closeParenPrefix = ExtractSpaceBefore(filter.CloseParenToken);
+        _cursor = filter.CloseParenToken.Span.End;
+        var controlParens = new ControlParentheses<Expression>(
+            Guid.NewGuid(), openParenPrefix, Markers.Empty,
+            new JRightPadded<Expression>(filterExpr, closeParenPrefix, Markers.Empty));
+        var whenClause = new WhenClause(Guid.NewGuid(), Space.Empty, Markers.Empty, controlParens);
+        return new JLeftPadded<Expression>(whenPrefix, whenClause);
     }
 
     public override J VisitThrowStatement(ThrowStatementSyntax node)

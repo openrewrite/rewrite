@@ -126,7 +126,7 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, p),
             TypeWithArguments twa => VisitTypeWithArguments(twa, p),
             ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, p),
-            ExceptionFilteredTry eft => VisitExceptionFilteredTry(eft, p),
+            WhenClause wc => VisitWhenClause(wc, p),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, p),
             QueryBody qb => VisitQueryBody(qb, p),
@@ -1469,36 +1469,19 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithArguments(VisitContainer(node.Arguments, p)!);
     }
 
-    public virtual J VisitExceptionFilteredTry(ExceptionFilteredTry eft, P p)
+    public virtual J VisitWhenClause(WhenClause whenClause, P p)
     {
-        eft = eft
-            .WithPrefix(VisitSpace(eft.Prefix, p))
-            .WithMarkers(VisitMarkers(eft.Markers, p));
+        whenClause = whenClause
+            .WithPrefix(VisitSpace(whenClause.Prefix, p))
+            .WithMarkers(VisitMarkers(whenClause.Markers, p));
 
-        var stmtResult = VisitStatement(eft, p);
-        if (stmtResult is not ExceptionFilteredTry node) return stmtResult;
+        var exprResult = VisitExpression(whenClause, p);
+        if (exprResult is not WhenClause node) return exprResult;
 
         node = node
-            .WithTry((Try)Visit(node.Try, p)!);
+            .WithCondition((ControlParentheses<Expression>)Visit(node.Condition, p)!);
 
-        // Keep manual loop for CatchFilters since the list element type is nullable (JLeftPadded<...>?)
-        var newFilters = new List<JLeftPadded<ControlParentheses<Expression>>?>(node.CatchFilters.Count);
-        bool filtersChanged = false;
-        foreach (var filter in node.CatchFilters)
-        {
-            if (filter != null)
-            {
-                var visited = VisitLeftPadded(filter, p);
-                if (!ReferenceEquals(visited, filter)) filtersChanged = true;
-                newFilters.Add(visited);
-            }
-            else
-            {
-                newFilters.Add(null);
-            }
-        }
-
-        return node.WithCatchFilters(filtersChanged ? newFilters : node.CatchFilters);
+        return node;
     }
 
     public virtual J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, P p)

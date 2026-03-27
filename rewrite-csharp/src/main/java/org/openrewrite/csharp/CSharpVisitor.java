@@ -1253,18 +1253,16 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
         return explicitInterfaceMember;
     }
 
-    public J visitExceptionFilteredTry(Cs.ExceptionFilteredTry exceptionFilteredTry, P p) {
-        exceptionFilteredTry = exceptionFilteredTry.withPrefix(visitSpace(exceptionFilteredTry.getPrefix(), CsSpace.Location.EXCEPTION_FILTERED_TRY_PREFIX, p));
-        Statement tempStatement = (Statement) visitStatement(exceptionFilteredTry, p);
-        if (!(tempStatement instanceof Cs.ExceptionFilteredTry))
-        {
-            return tempStatement;
+    public J visitWhenClause(Cs.WhenClause whenClause, P p) {
+        whenClause = whenClause.withPrefix(visitSpace(whenClause.getPrefix(), CsSpace.Location.WHEN_CLAUSE_PREFIX, p));
+        Expression tempExpression = (Expression) visitExpression(whenClause, p);
+        if (!(tempExpression instanceof Cs.WhenClause)) {
+            return tempExpression;
         }
-        exceptionFilteredTry = (Cs.ExceptionFilteredTry) tempStatement;
-        exceptionFilteredTry = exceptionFilteredTry.withMarkers(visitMarkers(exceptionFilteredTry.getMarkers(), p));
-        exceptionFilteredTry = exceptionFilteredTry.withATry(visitAndCast(exceptionFilteredTry.getATry(), p));
-        exceptionFilteredTry = exceptionFilteredTry.withCatchFilters(ListUtils.map(exceptionFilteredTry.getCatchFilters(), el -> visitLeftPadded(el, CsLeftPadded.Location.TRY_CATCH_FILTER_EXPRESSION, p)));
-        return exceptionFilteredTry;
+        whenClause = (Cs.WhenClause) tempExpression;
+        whenClause = whenClause.withMarkers(visitMarkers(whenClause.getMarkers(), p));
+        whenClause = whenClause.withCondition(visitAndCast(whenClause.getCondition(), p));
+        return whenClause;
     }
 
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,

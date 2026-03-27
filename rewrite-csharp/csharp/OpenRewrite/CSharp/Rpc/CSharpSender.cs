@@ -159,7 +159,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, q),
             TypeWithArguments twa => VisitTypeWithArguments(twa, q),
             ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, q),
-            ExceptionFilteredTry eft => VisitExceptionFilteredTry(eft, q),
+            WhenClause wc => VisitWhenClause(wc, q),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, q),
             QueryBody qb => VisitQueryBody(qb, q),
@@ -1025,14 +1025,10 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
         return eim;
     }
 
-    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcSendQueue q)
+    public override J VisitWhenClause(WhenClause wc, RpcSendQueue q)
     {
-        q.GetAndSend(eft, e => (J)e.Try, el => Visit(el, q));
-        foreach (var filter in eft.CatchFilters)
-        {
-            q.GetAndSend(eft, _ => (object?)filter, el => VisitLeftPadded((JLeftPadded<ControlParentheses<Expression>>)el!, q));
-        }
-        return eft;
+        q.GetAndSend(wc, e => (J)e.Condition, el => Visit(el, q));
+        return wc;
     }
 
     // ---- Helper delegation to JavaSender ----
