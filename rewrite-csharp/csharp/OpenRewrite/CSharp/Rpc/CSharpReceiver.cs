@@ -479,23 +479,17 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
     // ---- ConditionalDirective ----
     public override J VisitConditionalDirective(ConditionalDirective cd, RpcReceiveQueue q)
     {
-        // Receive DirectiveLines (may be null for brand-new trees)
-        var existingDirectiveLines = cd.DirectiveLines ?? [];
-        var count = q.Receive<int>(existingDirectiveLines.Count);
-        var directiveLines = new List<DirectiveLine>();
-        for (int i = 0; i < count; i++)
+        var directiveLines = q.ReceiveList(cd.DirectiveLines, dl =>
         {
-            var existing = i < existingDirectiveLines.Count ? existingDirectiveLines[i] : null;
-            var lineNumber = q.Receive<int>(existing?.LineNumber ?? 0);
-            var text = q.Receive<string>(existing?.Text ?? "")!;
-            var kind = (PreprocessorDirectiveKind)q.Receive<int>((int)(existing?.Kind ?? 0));
-            var groupId = q.Receive<int>(existing?.GroupId ?? 0);
-            var activeBranchIndex = q.Receive<int>(existing?.ActiveBranchIndex ?? -1);
-            directiveLines.Add(new DirectiveLine(lineNumber, text, kind, groupId, activeBranchIndex));
-        }
-        // Receive Branches
+            var lineNumber = q.Receive<int>(dl?.LineNumber ?? 0);
+            var text = q.Receive<string>(dl?.Text ?? "")!;
+            var kind = (PreprocessorDirectiveKind)q.Receive<int>((int)(dl?.Kind ?? 0));
+            var groupId = q.Receive<int>(dl?.GroupId ?? 0);
+            var activeBranchIndex = q.Receive<int>(dl?.ActiveBranchIndex ?? -1);
+            return new DirectiveLine(lineNumber, text, kind, groupId, activeBranchIndex);
+        });
         var branches = q.ReceiveList(cd.Branches, rp => _delegate.VisitRightPadded(rp, q));
-        return cd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDirectiveLines(directiveLines).WithBranches(branches!);
+        return cd.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithDirectiveLines(directiveLines!).WithBranches(branches!);
     }
 
     // ---- PragmaWarningDirective ----

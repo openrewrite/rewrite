@@ -477,17 +477,15 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- ConditionalDirective ----
     public override J VisitConditionalDirective(ConditionalDirective cd, RpcSendQueue q)
     {
-        // Send DirectiveLines as inline list
-        q.GetAndSend(cd, c => (object)c.DirectiveLines.Count);
-        foreach (var dl in cd.DirectiveLines)
-        {
-            q.GetAndSend(cd, _ => (object)dl.LineNumber);
-            q.GetAndSend(cd, _ => (object)dl.Text);
-            q.GetAndSend(cd, _ => (object)(int)dl.Kind);
-            q.GetAndSend(cd, _ => (object)dl.GroupId);
-            q.GetAndSend(cd, _ => (object)dl.ActiveBranchIndex);
-        }
-        // Send Branches
+        q.GetAndSendList(cd, c => c.DirectiveLines,
+            dl => (object)dl.LineNumber, dl =>
+            {
+                q.GetAndSend(dl, d => (object)d.LineNumber);
+                q.GetAndSend(dl, d => (object)d.Text);
+                q.GetAndSend(dl, d => (object)(int)d.Kind);
+                q.GetAndSend(dl, d => (object)d.GroupId);
+                q.GetAndSend(dl, d => (object)d.ActiveBranchIndex);
+            });
         q.GetAndSendList(cd, c => c.Branches,
             r => (object)r.Element.Id, r => VisitRightPadded(r, q));
         return cd;

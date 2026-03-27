@@ -712,20 +712,14 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitConditionalDirective(Cs.ConditionalDirective conditionalDirective, RpcReceiveQueue q) {
-        // Receive DirectiveLines
-        List<Cs.DirectiveLine> existingLines = conditionalDirective.getDirectiveLines();
-        int count = q.receive(existingLines != null ? existingLines.size() : 0);
-        List<Cs.DirectiveLine> directiveLines = new ArrayList<>();
-        for (int i = 0; i < count; i++) {
-            Cs.DirectiveLine existing = existingLines != null && i < existingLines.size()
-                    ? existingLines.get(i) : null;
-            int lineNumber = q.receive(existing != null ? existing.getLineNumber() : 0);
-            String text = q.receive(existing != null ? existing.getText() : "");
-            Cs.PreprocessorDirectiveKind kind = Cs.PreprocessorDirectiveKind.values()[q.receive(existing != null ? existing.getKind().ordinal() : 0)];
-            int groupId = q.receive(existing != null ? existing.getGroupId() : 0);
-            int activeBranchIndex = q.receive(existing != null ? existing.getActiveBranchIndex() : -1);
-            directiveLines.add(new Cs.DirectiveLine(lineNumber, text, kind, groupId, activeBranchIndex));
-        }
+        List<Cs.DirectiveLine> directiveLines = q.receiveList(conditionalDirective.getDirectiveLines(), dl -> {
+            int lineNumber = q.receive(dl != null ? dl.getLineNumber() : 0);
+            String text = q.receive(dl != null ? dl.getText() : "");
+            Cs.PreprocessorDirectiveKind kind = Cs.PreprocessorDirectiveKind.values()[q.receive(dl != null ? dl.getKind().ordinal() : 0)];
+            int groupId = q.receive(dl != null ? dl.getGroupId() : 0);
+            int activeBranchIndex = q.receive(dl != null ? dl.getActiveBranchIndex() : -1);
+            return new Cs.DirectiveLine(lineNumber, text, kind, groupId, activeBranchIndex);
+        });
         return conditionalDirective
                 .withDirectiveLines(directiveLines)
                 .getPadding().withBranches(q.receiveList(conditionalDirective.getPadding().getBranches(), el -> visitRightPadded(el, q)));
