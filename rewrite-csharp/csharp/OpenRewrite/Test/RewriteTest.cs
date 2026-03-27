@@ -85,12 +85,15 @@ public abstract class RewriteTest
 
             // Verify round-trip: printed should match input
             var printed = printer.Print(source);
-            Assert.Equal(spec.Before, printed);
+            AssertContentEquals(spec.Before, printed, source.SourcePath,
+                "The printed source didn't match the original source code. " +
+                "This means there is a bug in the parser implementation itself.");
 
             // Verify idempotence: reparse and reprint should match
             var reparsed = parser.Parse(printed);
             var reprinted = printer.Print(reparsed);
-            Assert.Equal(printed, reprinted);
+            AssertContentEquals(printed, reprinted, source.SourcePath,
+                "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
 
             parsed.Add((spec, source));
         }
@@ -112,7 +115,8 @@ public abstract class RewriteTest
                     Assert.True(result != null && result.After != null,
                         $"Recipe was expected to make changes but did not modify the source file.");
                     var afterPrinted = printer.Print(result.After);
-                    Assert.Equal(spec.After, afterPrinted);
+                    AssertContentEquals(spec.After, afterPrinted, result.After.SourcePath,
+                        "Unexpected result from recipe");
                 }
                 else
                 {
@@ -127,6 +131,14 @@ public abstract class RewriteTest
     protected static SourceSpec CSharp(string before, string? after = null)
     {
         return new SourceSpec(before, after);
+    }
+
+    private static void AssertContentEquals(string expected, string actual, string sourcePath,
+        string errorMessagePrefix)
+    {
+        if (expected == actual) return;
+        var diff = DiffUtils.UnifiedDiff(expected, actual, sourcePath);
+        Assert.Fail($"{errorMessagePrefix} \"{sourcePath}\":\n{diff}");
     }
 }
 
