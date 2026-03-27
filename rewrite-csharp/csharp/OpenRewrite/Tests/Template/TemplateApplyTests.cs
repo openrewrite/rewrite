@@ -200,7 +200,7 @@ public class TemplateApplyTests : RewriteTest
     [Fact]
     public void SubstitutesVariadicArgs()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"Foo({args})",
@@ -216,7 +216,7 @@ public class TemplateApplyTests : RewriteTest
     public void SubstitutesMethodNameAndVariadicArgs()
     {
         var method = Capture.Of<Identifier>("method");
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"new Random().{method}({args})",
@@ -232,7 +232,7 @@ public class TemplateApplyTests : RewriteTest
     public void SubstitutesMethodNameAndVariadicArgsWithZeroArgs()
     {
         var method = Capture.Of<Identifier>("method");
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
                 $"new Random().{method}({args})",
@@ -247,7 +247,7 @@ public class TemplateApplyTests : RewriteTest
     [Fact]
     public void SubstitutesVariadicArgsInNonTrailingPosition()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         var last = Capture.Of<Expression>("last");
         RewriteRun(
             spec => spec.SetRecipe(Replace<MethodInvocation>(
@@ -256,6 +256,76 @@ public class TemplateApplyTests : RewriteTest
             CSharp(
                 "class C { void M() { Foo(1, 2, 3); } }",
                 "class C { void M() { Bar(3, 1, 2); } }"
+            )
+        );
+    }
+
+    // ===============================================================
+    // Attribute variadic captures
+    // ===============================================================
+
+    [Fact]
+    public void SubstitutesVariadicArgsInAttribute()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(ReplaceAnnotation(
+                $"Fact({args})",
+                $"Test({args})")),
+            CSharp(
+                """
+                class C { [Fact(DisplayName = "test")] void M() {} }
+                """,
+                """
+                class C { [Test(DisplayName = "test")] void M() {} }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void SubstitutesEmptyVariadicArgsInAttribute()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(ReplaceAnnotation(
+                $"Fact({args})",
+                $"Test({args})")),
+            CSharp(
+                """
+                class C { [Fact] void M() {} }
+                """,
+                """
+                class C { [Test] void M() {} }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeRenameViaRewriteRule()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        var visitor = CSharpTemplate.Rewrite(
+            CSharpPattern.Attribute($"Fact({args})"),
+            CSharpTemplate.Attribute($"Test({args})"));
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(visitor)),
+            CSharp(
+                """
+                class C
+                {
+                    [Fact] void M1() {}
+                    [Fact(DisplayName = "test")] void M2() {}
+                }
+                """,
+                """
+                class C
+                {
+                    [Test] void M1() {}
+                    [Test(DisplayName = "test")] void M2() {}
+                }
+                """
             )
         );
     }
@@ -349,6 +419,79 @@ public class TemplateApplyTests : RewriteTest
     }
 
     // ===============================================================
+    // Auto-parenthesization
+    // ===============================================================
+
+    [Fact]
+    public void AutoParenthesizesWhenSubstitutionNeedsParens()
+    {
+        // Replace a + b with a - b; when the result sits inside x * _, it needs parens
+        var lhs = Capture.Of<Expression>("lhs");
+        var rhs = Capture.Of<Expression>("rhs");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{lhs} + {rhs}",
+                $"{lhs} - {rhs}")),
+            CSharp(
+                "class C { void M() { var x = 2 * (1 + 3); } }",
+                "class C { void M() { var x = 2 * (1 - 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void AutoParenthesizesCaptureInsideHigherPrecedenceBinary()
+    {
+        // Pattern: {left} - {right} captures left = 1 + 2
+        // Template: {left} * {right} — should produce (1 + 2) * 3, not 1 + 2 * 3
+        var left = Capture.Of<Expression>("left");
+        var right = Capture.Of<Expression>("right");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{left} - {right}",
+                $"{left} * {right}")),
+            CSharp(
+                "class C { int M() { return 1 + 2 - 3; } }",
+                "class C { int M() { return (1 + 2) * 3; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void AutoParenthesizesCaptureOrInsideAnd()
+    {
+        // {left} || {right} where left = true, right = false — replace with &&
+        // Use a custom recipe to only match the outermost || in: true || false || true
+        // left = Binary(||, true, false), right = true
+        // Template {left} && {right} should produce (true || false) && true
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceOutermostOrWithAndRecipe()),
+            CSharp(
+                "class C { void M() { var x = true || false || true; } }",
+                "class C { void M() { var x = (true || false) && true; } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void NoCaptureParenthesizationWhenUnnecessary()
+    {
+        // Pattern: {left} - {right} captures left = 2 * 3 (higher prec than -)
+        // Template: {left} + {right} — should produce 2 * 3 + 4 (no parens needed)
+        var left = Capture.Of<Expression>("left");
+        var right = Capture.Of<Expression>("right");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{left} - {right}",
+                $"{left} + {right}")),
+            CSharp(
+                "class C { void M() { var x = 2 * 3 - 4; } }",
+                "class C { void M() { var x = 2 * 3 + 4; } }"
+            )
+        );
+    }
+
+    // ===============================================================
     // Auto-formatting
     // ===============================================================
 
@@ -389,19 +532,24 @@ public class TemplateApplyTests : RewriteTest
     // Recipe factories
     // ===============================================================
 
-    private static Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
+    private static OpenRewrite.Core.Recipe ReplaceAnnotation(TemplateStringHandler pattern, TemplateStringHandler template) =>
+        new PatternReplaceRecipe<Annotation>(CSharpPattern.Attribute(pattern), CSharpTemplate.Attribute(template));
+
+#pragma warning disable CS0618
+    private static OpenRewrite.Core.Recipe Replace<T>(TemplateStringHandler pattern, TemplateStringHandler template)
         where T : J =>
         new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
 
-    private static Core.Recipe Replace<T>(string pattern, string template) where T : J =>
+    private static OpenRewrite.Core.Recipe Replace<T>(string pattern, string template) where T : J =>
         new PatternReplaceRecipe<T>(CSharpPattern.Create(pattern), CSharpTemplate.Create(template));
+#pragma warning restore CS0618
 }
 
 /// <summary>
 /// Generic replacement recipe that matches nodes of type <typeparamref name="T"/>
 /// against a pattern and replaces them using a template.
 /// </summary>
-file class PatternReplaceRecipe<T>(CSharpPattern pat, CSharpTemplate tmpl) : Core.Recipe where T : J
+file class PatternReplaceRecipe<T>(CSharpPattern pat, CSharpTemplate tmpl) : OpenRewrite.Core.Recipe where T : J
 {
     public override string DisplayName => $"Replace {typeof(T).Name}";
     public override string Description => $"Replaces {typeof(T).Name} matching the pattern with the template.";
@@ -424,15 +572,15 @@ file class PatternReplaceRecipe<T>(CSharpPattern pat, CSharpTemplate tmpl) : Cor
 /// <summary>
 /// Recipe demonstrating Raw.Code splice — replaces logger.Debug({expr}) with logger.{level}({expr}).
 /// </summary>
-file class RawSpliceRecipe(Capture<Expression> expr, string level) : Core.Recipe
+file class RawSpliceRecipe(Capture<Expression> expr, string level) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Replace logger method";
     public override string Description => "Replaces logger.Debug with logger.<level> using Raw.Code splice.";
 
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
-        var pat = CSharpPattern.Create($"logger.Debug({expr})");
-        var tmpl = CSharpTemplate.Create($"logger.{Raw.Code(level)}({expr})");
+        var pat = CSharpPattern.Expression($"logger.Debug({expr})");
+        var tmpl = CSharpTemplate.Expression($"logger.{Raw.Code(level)}({expr})");
         return new ReplaceVisitor(pat, tmpl);
     }
 
@@ -454,7 +602,7 @@ file class RawSpliceRecipe(Capture<Expression> expr, string level) : Core.Recipe
 /// Recipe that removes empty statements (standalone semicolons) from blocks.
 /// Tests that VisitBlock properly handles null returns (statement deletion).
 /// </summary>
-file class RemoveEmptyStatementRecipe : Core.Recipe
+file class RemoveEmptyStatementRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Remove empty statements";
     public override string Description => "Remove standalone semicolons.";
@@ -477,7 +625,7 @@ file class RemoveEmptyStatementRecipe : Core.Recipe
 /// The template produces a single-line if statement that auto-format should expand to multi-line
 /// with correct indentation.
 /// </summary>
-file class ReplaceWithIfBlockRecipe : Core.Recipe
+file class ReplaceWithIfBlockRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Replace Console.Write with if block";
     public override string Description => "Wraps Console.Write in an if block.";
@@ -495,15 +643,52 @@ file class ReplaceWithIfBlockRecipe : Core.Recipe
             {
                 // Multi-line template with 0-based indentation.
                 // Auto-format should fix internal indentation to match the target context.
-                var tmpl = CSharpTemplate.Create("if (true)\n{\n    Console.WriteLine(42);\n}");
-                return (J)tmpl.Apply(Cursor)!;
+                var tmpl = CSharpTemplate.Statement("if (true)\n{\n    Console.WriteLine(42);\n}");
+                return AutoFormat((J)tmpl.Apply(Cursor)!, ctx, Cursor);
             }
             return es;
         }
     }
 }
 
-file class UseRethrowRecipe : Core.Recipe
+/// <summary>
+/// Replaces only the outermost || binary with &&, avoiding double-matching of inner || nodes.
+/// </summary>
+file class ReplaceOutermostOrWithAndRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Replace outermost || with &&";
+    public override string Description => "Replaces the outermost || with &&.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitBinary(Binary binary, ExecutionContext ctx)
+        {
+            binary = (Binary)base.VisitBinary(binary, ctx);
+            if (binary.Operator.Element != Binary.OperatorType.Or)
+                return binary;
+
+            // Only match the outermost ||
+            if (Cursor.ParentTree.Value is Binary parentBin &&
+                parentBin.Operator.Element == Binary.OperatorType.Or)
+                return binary;
+
+            var left = Capture.Of<Expression>("left");
+            var right = Capture.Of<Expression>("right");
+            var pat = CSharpPattern.Expression($"{left} || {right}");
+            var tmpl = CSharpTemplate.Expression($"{left} && {right}");
+
+            if (pat.Match(binary, Cursor) is { } match)
+            {
+                return (J)tmpl.Apply(Cursor, values: match)!;
+            }
+            return binary;
+        }
+    }
+}
+
+file class UseRethrowRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Use rethrow";
     public override string Description => "Replace throw ex with throw.";
@@ -540,4 +725,12 @@ file class UseRethrowRecipe : Core.Recipe
             return throwStmt;
         }
     }
+}
+
+file class RewriteVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Rewrite";
+    public override string Description => "Applies a CSharpTemplate.Rewrite() visitor.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => visitor;
 }

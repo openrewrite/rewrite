@@ -142,6 +142,30 @@ public interface Cs extends J {
             return this;
         }
 
+        List<JRightPadded<ExternAlias>> externs;
+
+        public List<ExternAlias> getExterns() {
+            return JRightPadded.getElements(externs);
+        }
+
+        public Cs.CompilationUnit withExterns(List<ExternAlias> externs) {
+            return getPadding().withExterns(JRightPadded.withElements(this.externs, externs));
+        }
+
+        List<JRightPadded<UsingDirective>> usings;
+
+        public List<UsingDirective> getUsings() {
+            return JRightPadded.getElements(usings);
+        }
+
+        public Cs.CompilationUnit withUsings(List<UsingDirective> usings) {
+            return getPadding().withUsings(JRightPadded.withElements(this.usings, usings));
+        }
+
+        @Getter
+        @With
+        List<AttributeList> attributeLists;
+
         List<JRightPadded<Statement>> members;
 
         public List<Statement> getMembers() {
@@ -294,7 +318,23 @@ public interface Cs extends J {
             }
 
             public Cs.CompilationUnit withMembers(List<JRightPadded<Statement>> members) {
-                return t.members == members ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, members, t.eof);
+                return t.members == members ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.externs, t.usings, t.attributeLists, members, t.eof);
+            }
+
+            public List<JRightPadded<ExternAlias>> getExterns() {
+                return t.externs;
+            }
+
+            public Cs.CompilationUnit withExterns(List<JRightPadded<ExternAlias>> externs) {
+                return t.externs == externs ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, externs, t.usings, t.attributeLists, t.members, t.eof);
+            }
+
+            public List<JRightPadded<UsingDirective>> getUsings() {
+                return t.usings;
+            }
+
+            public Cs.CompilationUnit withUsings(List<JRightPadded<UsingDirective>> usings) {
+                return t.usings == usings ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.externs, usings, t.attributeLists, t.members, t.eof);
             }
         }
     }
@@ -2059,6 +2099,26 @@ public interface Cs extends J {
             return getPadding().withName(JRightPadded.withElement(this.name, name));
         }
 
+        List<JRightPadded<ExternAlias>> externs;
+
+        public List<ExternAlias> getExterns() {
+            return JRightPadded.getElements(externs);
+        }
+
+        public NamespaceDeclaration withExterns(List<ExternAlias> externs) {
+            return getPadding().withExterns(JRightPadded.withElements(this.externs, externs));
+        }
+
+        List<JRightPadded<UsingDirective>> usings;
+
+        public List<UsingDirective> getUsings() {
+            return JRightPadded.getElements(usings);
+        }
+
+        public NamespaceDeclaration withUsings(List<UsingDirective> usings) {
+            return getPadding().withUsings(JRightPadded.withElements(this.usings, usings));
+        }
+
         List<JRightPadded<Statement>> members;
 
         public List<Statement> getMembers() {
@@ -2107,7 +2167,23 @@ public interface Cs extends J {
             }
 
             public NamespaceDeclaration withName(JRightPadded<Expression> name) {
-                return t.name == name ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, name, t.members, t.end);
+                return t.name == name ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, name, t.externs, t.usings, t.members, t.end);
+            }
+
+            public List<JRightPadded<ExternAlias>> getExterns() {
+                return t.externs;
+            }
+
+            public NamespaceDeclaration withExterns(List<JRightPadded<ExternAlias>> externs) {
+                return t.externs == externs ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, t.name, externs, t.usings, t.members, t.end);
+            }
+
+            public List<JRightPadded<UsingDirective>> getUsings() {
+                return t.usings;
+            }
+
+            public NamespaceDeclaration withUsings(List<JRightPadded<UsingDirective>> usings) {
+                return t.usings == usings ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, t.name, t.externs, usings, t.members, t.end);
             }
 
             public List<JRightPadded<Statement>> getMembers() {
@@ -2115,7 +2191,7 @@ public interface Cs extends J {
             }
 
             public NamespaceDeclaration withMembers(List<JRightPadded<Statement>> members) {
-                return t.members == members ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, t.name, members, t.end);
+                return t.members == members ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, t.name, t.externs, t.usings, members, t.end);
             }
         }
     }
@@ -2198,6 +2274,7 @@ public interface Cs extends J {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2275,7 +2352,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ExternAlias implements Cs, Statement {
+    final class ExternAlias implements Cs {
 
         @Nullable
         @NonFinal
@@ -2299,12 +2376,6 @@ public interface Cs extends J {
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitExternAlias(this, p);
-        }
-
-        @Transient
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
         }
 
         public Padding getPadding() {
@@ -2673,7 +2744,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class UsingDirective implements Cs, Statement {
+    class UsingDirective implements Cs {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2725,11 +2796,6 @@ public interface Cs extends J {
         @Getter
         @With
         TypeTree namespaceOrType;
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
@@ -3039,158 +3105,6 @@ public interface Cs extends J {
     }
 
     // Cs.ClassDeclaration DELETED — use J.ClassDeclaration with ConstrainedTypeParameter in J.TypeParameter.Bounds
-
-    //  CS specific method exists to allow for modelling for the following not possible in J version:
-    // - implicit interface implementations
-    // - Cs.AttributeList that may appear before any of the type variables
-    // - generics constraints that appear on the end of the method declaration
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodDeclaration implements Cs, Statement, TypedTree {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        List<AttributeList> attributes;
-
-        @With
-        @Getter
-        List<Modifier> modifiers;
-
-        @Nullable
-        JContainer<J.TypeParameter> typeParameters;
-
-        @With
-        @Getter
-        TypeTree returnTypeExpression;
-
-        @Nullable
-        JRightPadded<TypeTree> explicitInterfaceSpecifier;
-
-        public TypeTree getExplicitInterfaceSpecifier() {
-            return explicitInterfaceSpecifier.getElement();
-        }
-
-        public Cs.MethodDeclaration withExplicitInterfaceSpecifier(TypeTree explicitInterfaceSpecifier) {
-            return getPadding().withExplicitInterfaceSpecifier(this.explicitInterfaceSpecifier.withElement(explicitInterfaceSpecifier));
-        }
-
-        @With
-        @Getter
-        Identifier name;
-
-        JContainer<Statement> parameters;
-
-        public List<Statement> getParameters() {
-            return parameters.getElements();
-        }
-
-        public Cs.MethodDeclaration withParameters(List<Statement> parameters) {
-            return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
-        }
-
-        /**
-         * Null for abstract method declarations and interface method declarations.
-         */
-        @With
-        @Getter
-        @Nullable
-        Statement body;
-
-        @Getter
-        JavaType.@Nullable Method methodType;
-
-        public Cs.MethodDeclaration withMethodType(JavaType.@Nullable Method type) {
-            if (type == this.methodType) {
-                return this;
-            }
-            return new Cs.MethodDeclaration(id, prefix, markers, attributes, modifiers, typeParameters, returnTypeExpression, explicitInterfaceSpecifier, name, parameters, body, type);
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return methodType == null ? null : methodType.getReturnType();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public Cs.MethodDeclaration withType(@Nullable JavaType type) {
-            throw new UnsupportedOperationException("To change the return type of this method declaration, use withMethodType(..)");
-        }
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitMethodDeclaration(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Cs.MethodDeclaration t;
-
-            public JContainer<Statement> getParameters() {
-                return t.parameters;
-            }
-
-            public Cs.MethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, t.explicitInterfaceSpecifier, t.name, parameters, t.body, t.methodType);
-            }
-
-            public @Nullable JRightPadded<TypeTree> getExplicitInterfaceSpecifier() {
-                return t.explicitInterfaceSpecifier;
-            }
-
-            public Cs.MethodDeclaration withExplicitInterfaceSpecifier(JRightPadded<TypeTree> explicitInterfaceSpecifier) {
-                return t.explicitInterfaceSpecifier == explicitInterfaceSpecifier ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, t.typeParameters, t.returnTypeExpression, explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType);
-            }
-
-            public @Nullable JContainer<J.TypeParameter> getTypeParameters() {
-                return t.typeParameters;
-            }
-
-            public Cs.MethodDeclaration withTypeParameters(@Nullable JContainer<J.TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new Cs.MethodDeclaration(t.id, t.prefix, t.markers, t.attributes, t.modifiers, typeParameters, t.returnTypeExpression, t.explicitInterfaceSpecifier, t.name, t.parameters, t.body, t.methodType);
-            }
-        }
-
-    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -3944,39 +3858,6 @@ public interface Cs extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    public class DestructorDeclaration implements Cs, Statement {
-        @Getter
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        @Getter
-        @With
-        J.MethodDeclaration methodCore;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitDestructorDeclaration(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Unary implements Cs, Statement, Expression, TypedTree, Pattern {
@@ -4238,53 +4119,6 @@ public interface Cs extends J {
             return v.visitTupleElement(this, p);
         }
 
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    final class NewClass implements Cs, Statement, Expression {
-        @With
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        J.NewClass newClassCore;
-
-        @With
-        @Getter
-        @Nullable
-        InitializerExpression initializer;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitNewClass(this, p);
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return newClassCore.getType();
-        }
-
-        @Override
-        public Cs.NewClass withType(@Nullable JavaType type) {
-            return newClassCore.getType() == type ? this : new Cs.NewClass(id, prefix, markers, newClassCore.withType(type), initializer);
-        }
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
     }
 
     /**
@@ -7188,51 +7022,6 @@ public interface Cs extends J {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PUBLIC)
-    final class ArrayType implements Cs, Expression, TypeTree {
-
-        @With
-        @EqualsAndHashCode.Include
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Nullable
-        @Getter
-        TypeTree typeExpression;
-
-        @With
-        @Getter
-        List<ArrayDimension> dimensions;
-
-        @With
-        @Nullable
-        @Getter
-        JavaType type;
-
-        @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitArrayType(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-    }
-
     /**
      * Represents a C# accessor declaration (get/set/init) within a property or indexer.
      * <p>
@@ -8653,51 +8442,49 @@ public interface Cs extends J {
     }
 
     /**
-     * C# try statement with exception filter support ({@code catch when (expr)}).
-     * Wraps a {@link J.Try} and adds a parallel list of catch filters (when clauses).
-     * Each filter corresponds positionally to a catch clause in the inner Try;
-     * null entries indicate no filter for that catch.
+     * C# {@code when (expr)} clause on a {@link J.Try.Catch}.
+     * Stored as the initializer of the catch parameter's {@link J.VariableDeclarations.NamedVariable}.
+     * Printing is handled by the C# printer which emits {@code when(expr)} after the
+     * catch parameter's closing parenthesis.
      */
+    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    final class ExceptionFilteredTry implements Cs, Statement {
-
+    @AllArgsConstructor(access = AccessLevel.PUBLIC)
+    final class WhenClause implements Cs, Expression {
         @With
         @EqualsAndHashCode.Include
-        @Getter
         UUID id;
 
         @With
-        @Getter
         Space prefix;
 
         @With
-        @Getter
         Markers markers;
 
         @With
-        @Getter
-        J.Try aTry;
-
-        /**
-         * Parallel to {@link J.Try#getCatches()}. Each entry is the {@code when(expr)} filter
-         * for the corresponding catch clause, or null if no filter. The {@link JLeftPadded#getBefore()}
-         * is the space before {@code when}. The {@link J.ControlParentheses} prefix is
-         * the space before {@code (}.
-         */
-        @With
-        @Getter
-        List<JLeftPadded<J.ControlParentheses<Expression>>> catchFilters;
+        J.ControlParentheses<Expression> condition;
 
         @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitExceptionFilteredTry(this, p);
+        public @Nullable JavaType getType() {
+            return JavaType.Primitive.Boolean;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public WhenClause withType(@Nullable JavaType type) {
+            return this;
         }
 
         @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitWhenClause(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 

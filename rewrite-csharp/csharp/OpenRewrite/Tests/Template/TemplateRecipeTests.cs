@@ -249,7 +249,7 @@ public class TemplateRecipeTests : RewriteTest
 // Replacement recipes
 // ===============================================================
 
-class MigrateConsoleWriteRecipe : Core.Recipe
+class MigrateConsoleWriteRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Migrate Console.Write to Console.WriteLine";
     public override string Description => "Replaces Console.Write with Console.WriteLine.";
@@ -257,8 +257,8 @@ class MigrateConsoleWriteRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"Console.Write({expr})");
-        var tmpl = CSharpTemplate.Create($"Console.WriteLine({expr})");
+        var pat = CSharpPattern.Expression($"Console.Write({expr})");
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({expr})");
 
         return new MigrateVisitor(pat, tmpl);
     }
@@ -282,7 +282,7 @@ class MigrateConsoleWriteRecipe : Core.Recipe
 // Search recipes using CSharpPattern.Find
 // ===============================================================
 
-class FindConsoleWriteRecipe : Core.Recipe
+class FindConsoleWriteRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find Console.Write calls";
     public override string Description => "Marks Console.Write calls with a search marker.";
@@ -290,7 +290,7 @@ class FindConsoleWriteRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"Console.Write({expr})");
+        var pat = CSharpPattern.Expression($"Console.Write({expr})");
 
         return new FindVisitor(pat);
     }
@@ -305,7 +305,7 @@ class FindConsoleWriteRecipe : Core.Recipe
     }
 }
 
-class FindConsoleWriteWithDescriptionRecipe : Core.Recipe
+class FindConsoleWriteWithDescriptionRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find Console.Write calls with description";
     public override string Description => "Marks Console.Write calls with a descriptive search marker.";
@@ -313,7 +313,7 @@ class FindConsoleWriteWithDescriptionRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var expr = Capture.Of<Expression>("expr");
-        var pat = CSharpPattern.Create($"Console.Write({expr})");
+        var pat = CSharpPattern.Expression($"Console.Write({expr})");
 
         return new FindVisitor(pat);
     }
@@ -328,7 +328,7 @@ class FindConsoleWriteWithDescriptionRecipe : Core.Recipe
     }
 }
 
-class FindBinaryAddRecipe : Core.Recipe
+class FindBinaryAddRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find addition expressions";
     public override string Description => "Marks binary addition expressions with a search marker.";
@@ -337,7 +337,7 @@ class FindBinaryAddRecipe : Core.Recipe
     {
         var lhs = Capture.Of<Expression>("lhs");
         var rhs = Capture.Of<Expression>("rhs");
-        var pat = CSharpPattern.Create($"{lhs} + {rhs}");
+        var pat = CSharpPattern.Expression($"{lhs} + {rhs}");
 
         return new FindVisitor(pat);
     }
@@ -352,7 +352,7 @@ class FindBinaryAddRecipe : Core.Recipe
     }
 }
 
-class FindThrowExceptionRecipe : Core.Recipe
+class FindThrowExceptionRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find throw new Exception";
     public override string Description => "Marks throw new Exception statements with a search marker.";
@@ -360,7 +360,7 @@ class FindThrowExceptionRecipe : Core.Recipe
     public override JavaVisitor<ExecutionContext> GetVisitor()
     {
         var msg = Capture.Of<Expression>("msg");
-        var pat = CSharpPattern.Create($"throw new Exception({msg})");
+        var pat = CSharpPattern.Statement($"throw new Exception({msg})");
 
         return new FindVisitor(pat);
     }

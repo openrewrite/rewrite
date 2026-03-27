@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 
-namespace OpenRewrite.Tests.Java;
+namespace OpenRewrite.Tests.CSharp;
 
 public class MethodMatcherTests
 {
@@ -209,5 +210,29 @@ public class MethodMatcherTests
         var method = MakeMethod("System.String", "Equals",
             parameterTypes: [MakeClass("System.String"), MakeClass("System.StringComparison")]);
         Assert.False(mm.Matches(method));
+    }
+
+    // =============================================================
+    // Short name matching (e.g., "String" matches "System.String")
+    // =============================================================
+
+    [Fact]
+    public void MatchesShortNameArgAgainstClassType()
+    {
+        // Pattern uses "String" (short name), param type is JavaType.Class("System.String")
+        var mm = new MethodMatcher("System.Security.Cryptography.Aes Create(String)");
+        var method = MakeMethod("System.Security.Cryptography.Aes", "Create",
+            parameterTypes: [MakeClass("System.String")]);
+        Assert.True(mm.Matches(method));
+    }
+
+    [Fact]
+    public void MatchesKeywordArgAgainstClassType()
+    {
+        // Pattern uses "string" (C# keyword), param type is JavaType.Class("System.String")
+        var mm = new MethodMatcher("System.Security.Cryptography.Aes Create(string)");
+        var method = MakeMethod("System.Security.Cryptography.Aes", "Create",
+            parameterTypes: [MakeClass("System.String")]);
+        Assert.True(mm.Matches(method));
     }
 }

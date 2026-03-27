@@ -142,8 +142,8 @@ class MemberReferenceTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/386")
     @Disabled("K2 produces J.Unknown for unresolved callable references (::unresolved)")
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/386")
     @Test
     void firCallableReferenceAccess() {
         rewriteRun(

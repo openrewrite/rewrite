@@ -27,10 +27,7 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -158,11 +155,24 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
                 if ("PackageReference".equals(t.getName())) {
                     String include = getAttributeValue(t, "Include");
                     String resolvedVersion = include != null ? acc.resolvedVersions.get(include) : null;
-                    // Fall back to exact version when scan phase didn't populate resolved versions
+                    // Fall back when scan phase didn't populate resolved versions
                     // (e.g., when called via RPC proxy without scan phase)
-                    if (resolvedVersion == null && include != null && matchesGlob(include, packageName)
-                            && versionComparator instanceof org.openrewrite.semver.ExactVersion) {
-                        resolvedVersion = ((org.openrewrite.semver.ExactVersion) versionComparator).getVersion();
+                    if (resolvedVersion == null && include != null && matchesGlob(include, packageName)) {
+                        if (versionComparator instanceof org.openrewrite.semver.ExactVersion) {
+                            resolvedVersion = ((org.openrewrite.semver.ExactVersion) versionComparator).getVersion();
+                        } else {
+                            // Lazy resolution: fetch available versions from NuGet and resolve
+                            String currentVersion = getAttributeValue(t, "Version");
+                            if (currentVersion != null && !isPropertyReference(currentVersion)) {
+                                Xml.Document doc = getCursor().firstEnclosingOrThrow(Xml.Document.class);
+                                MSBuildProject marker = doc.getMarkers().findFirst(MSBuildProject.class).orElse(null);
+                                List<String> available = NuGetVersionResolver.resolveAvailableVersions(
+                                        include, marker != null ? marker.getPackageSources() : Collections.emptyList(), ctx);
+                                if (!available.isEmpty()) {
+                                    resolvedVersion = versionComparator.upgrade(currentVersion, available).orElse(null);
+                                }
+                            }
+                        }
                     }
                     String targetVersion = resolvedVersion;
                     if (targetVersion != null) {
@@ -186,11 +196,22 @@ public class UpgradeNuGetPackageVersion extends ScanningRecipe<UpgradeNuGetPacka
                 if ("PackageVersion".equals(t.getName())) {
                     String include = getAttributeValue(t, "Include");
                     if (include != null && matchesGlob(include, packageName)) {
-                        // For PackageVersion (central pkg mgmt), use resolved version if available,
-                        // otherwise fall back to exact version for ExactVersion selectors
                         String targetVersion = acc.resolvedVersions.get(include);
-                        if (targetVersion == null && versionComparator instanceof org.openrewrite.semver.ExactVersion) {
-                            targetVersion = ((org.openrewrite.semver.ExactVersion) versionComparator).getVersion();
+                        if (targetVersion == null) {
+                            if (versionComparator instanceof org.openrewrite.semver.ExactVersion) {
+                                targetVersion = ((org.openrewrite.semver.ExactVersion) versionComparator).getVersion();
+                            } else {
+                                String currentVersion = getAttributeValue(t, "Version");
+                                if (currentVersion != null) {
+                                    Xml.Document doc = getCursor().firstEnclosingOrThrow(Xml.Document.class);
+                                    MSBuildProject marker = doc.getMarkers().findFirst(MSBuildProject.class).orElse(null);
+                                    List<String> available = NuGetVersionResolver.resolveAvailableVersions(
+                                            include, marker != null ? marker.getPackageSources() : Collections.emptyList(), ctx);
+                                    if (!available.isEmpty()) {
+                                        targetVersion = versionComparator.upgrade(currentVersion, available).orElse(null);
+                                    }
+                                }
+                            }
                         }
                         if (targetVersion != null) {
                             String versionAttr = getAttributeValue(t, "Version");

@@ -64,15 +64,15 @@ class RewriteRpcTest implements RewriteTest {
 
     @BeforeEach
     void before() throws IOException {
-        PipedOutputStream serverOut = new PipedOutputStream();
-        PipedOutputStream clientOut = new PipedOutputStream();
-        PipedInputStream serverIn = new PipedInputStream(clientOut);
-        PipedInputStream clientIn = new PipedInputStream(serverOut);
+        var serverOut = new PipedOutputStream();
+        var clientOut = new PipedOutputStream();
+        var serverIn = new PipedInputStream(clientOut);
+        var clientIn = new PipedInputStream(serverOut);
 
         marketplace = env.toMarketplace(runtimeClasspath());
 
-        JsonMessageFormatter clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
-        JsonMessageFormatter serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
         client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
           .batchSize(1);
@@ -239,7 +239,7 @@ class RewriteRpcTest implements RewriteTest {
     @Disabled("Disabled until https://github.com/openrewrite/rewrite/pull/5260 is complete")
     @Test
     void runRecipe() {
-        CountDownLatch latch = new CountDownLatch(1);
+        var latch = new CountDownLatch(1);
         rewriteRun(
           spec -> spec
             .recipe(client.prepareRecipe("org.openrewrite.text.Find",
@@ -415,9 +415,9 @@ class RewriteRpcTest implements RewriteTest {
 
     @Test
     void getCursor() {
-        Cursor parent = new Cursor(null, Cursor.ROOT_VALUE);
-        Cursor c1 = new Cursor(parent, 0);
-        Cursor c2 = new Cursor(c1, 1);
+        var parent = new Cursor(null, Cursor.ROOT_VALUE);
+        var c1 = new Cursor(parent, 0);
+        var c2 = new Cursor(c1, 1);
 
         Cursor clientC2 = server.getCursor(client.getCursorIds(c2), null);
         assertThat(clientC2.<Integer>getValue()).isEqualTo(1);

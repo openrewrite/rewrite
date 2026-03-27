@@ -100,16 +100,10 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Cs$Binary");
         RpcSendQueue.RegisterJavaTypeName(typeof(CsUnary),
             "org.openrewrite.csharp.tree.Cs$Unary");
-        RpcSendQueue.RegisterJavaTypeName(typeof(ConstrainedTypeParameter),
-            "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter");
 
         // Types in nagoya's Rewrite.Java namespace that don't follow nesting conventions
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.NamedVariable),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable");
-
-        // Types in nagoya's Rewrite.Java namespace that are Cs types in Java
-        RpcSendQueue.RegisterJavaTypeName(typeof(Java.ExpressionStatement),
-            "org.openrewrite.csharp.tree.Cs$ExpressionStatement");
 
         // Marker type name overrides — markers live in marker packages, not tree packages
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.Semicolon),
@@ -1573,7 +1567,10 @@ public class RewriteRpcServer
 
         var ctx = new ExecutionContext();
         if (pId != null)
+        {
             _executionContexts[pId] = ctx;
+            _localObjects[pId] = ctx;
+        }
         return ctx;
     }
 

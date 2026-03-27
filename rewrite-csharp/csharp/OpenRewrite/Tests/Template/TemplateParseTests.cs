@@ -23,7 +23,7 @@ public class TemplateParseTests
     [Fact]
     public void ParseLiteralExpression()
     {
-        var tmpl = CSharpTemplate.Create("42");
+        var tmpl = CSharpTemplate.Expression("42");
         var tree = tmpl.GetTree();
         Assert.IsType<Literal>(tree);
         Assert.Equal(42, ((Literal)tree).Value);
@@ -32,7 +32,7 @@ public class TemplateParseTests
     [Fact]
     public void ParseStringLiteral()
     {
-        var tmpl = CSharpTemplate.Create("\"hello\"");
+        var tmpl = CSharpTemplate.Expression("\"hello\"");
         var tree = tmpl.GetTree();
         Assert.IsType<Literal>(tree);
         Assert.Equal("hello", ((Literal)tree).Value);
@@ -41,7 +41,7 @@ public class TemplateParseTests
     [Fact]
     public void ParseSimpleIdentifier()
     {
-        var tmpl = CSharpTemplate.Create("x");
+        var tmpl = CSharpTemplate.Expression("x");
         var tree = tmpl.GetTree();
         Assert.IsType<Identifier>(tree);
         Assert.Equal("x", ((Identifier)tree).SimpleName);
@@ -50,7 +50,7 @@ public class TemplateParseTests
     [Fact]
     public void ParseMethodInvocation()
     {
-        var tmpl = CSharpTemplate.Create("Console.WriteLine(\"hello\")");
+        var tmpl = CSharpTemplate.Expression("Console.WriteLine(\"hello\")");
         var tree = tmpl.GetTree();
         Assert.IsType<MethodInvocation>(tree);
         var mi = (MethodInvocation)tree;
@@ -60,7 +60,7 @@ public class TemplateParseTests
     [Fact]
     public void ParseBinaryExpression()
     {
-        var tmpl = CSharpTemplate.Create("x + 1");
+        var tmpl = CSharpTemplate.Expression("x + 1");
         var tree = tmpl.GetTree();
         Assert.IsType<Binary>(tree);
     }
@@ -69,7 +69,7 @@ public class TemplateParseTests
     public void ParseWithCapturePlaceholder()
     {
         var expr = Capture.Of<Expression>("expr");
-        var tmpl = CSharpTemplate.Create($"Console.WriteLine({expr})");
+        var tmpl = CSharpTemplate.Expression($"Console.WriteLine({expr})");
         var tree = tmpl.GetTree();
         Assert.IsType<MethodInvocation>(tree);
         var mi = (MethodInvocation)tree;
@@ -83,7 +83,7 @@ public class TemplateParseTests
     [Fact]
     public void ParseWithRawCodeSplice()
     {
-        var tmpl = CSharpTemplate.Create($"logger.{Raw.Code("Info")}(\"message\")");
+        var tmpl = CSharpTemplate.Expression($"logger.{Raw.Code("Info")}(\"message\")");
         var tree = tmpl.GetTree();
         Assert.IsType<MethodInvocation>(tree);
         var mi = (MethodInvocation)tree;
@@ -93,7 +93,7 @@ public class TemplateParseTests
     [Fact]
     public void TemplateIsCached()
     {
-        var tmpl = CSharpTemplate.Create("42");
+        var tmpl = CSharpTemplate.Expression("42");
         var tree1 = tmpl.GetTree();
         var tree2 = tmpl.GetTree();
         Assert.Same(tree1, tree2);

@@ -70,8 +70,8 @@ public class RecipeTest : RewriteTest
     {
         var parser = new CSharpParser();
         var source = parser.Parse("class C { void M() { var x = 1; } }");
-        var visitor = new CSharpVisitor<Core.ExecutionContext>();
-        var result = visitor.Visit(source, new Core.ExecutionContext());
+        var visitor = new CSharpVisitor<OpenRewrite.Core.ExecutionContext>();
+        var result = visitor.Visit(source, new OpenRewrite.Core.ExecutionContext());
         Assert.True(ReferenceEquals(source, result),
             $"No-op visitor should preserve reference equality. " +
             $"source type={source.GetType().Name}, result type={result?.GetType().Name}");
@@ -94,9 +94,10 @@ public class RecipeTest : RewriteTest
         Assert.Equal("To", descriptor.Options[1].Name);
         Assert.Equal("Bar", descriptor.Options[1].Value);
     }
+
 }
 
-class RenameClassRecipe : Core.Recipe
+class RenameClassRecipe : OpenRewrite.Core.Recipe
 {
     [Option(DisplayName = "From", Description = "The class name to rename from.", Example = "Foo")]
     public required string From { get; init; }
@@ -107,9 +108,9 @@ class RenameClassRecipe : Core.Recipe
     public override string DisplayName => "Rename class";
     public override string Description => $"Renames class `{From}` to `{To}`.";
 
-    public override JavaVisitor<Core.ExecutionContext> GetVisitor() => new RenameClassVisitor(From, To);
+    public override JavaVisitor<OpenRewrite.Core.ExecutionContext> GetVisitor() => new RenameClassVisitor(From, To);
 
-    private class RenameClassVisitor : CSharpVisitor<Core.ExecutionContext>
+    private class RenameClassVisitor : CSharpVisitor<OpenRewrite.Core.ExecutionContext>
     {
         private readonly string _from;
         private readonly string _to;
@@ -120,7 +121,7 @@ class RenameClassRecipe : Core.Recipe
             _to = to;
         }
 
-        public override J VisitClassDeclaration(ClassDeclaration cd, Core.ExecutionContext ctx)
+        public override J VisitClassDeclaration(ClassDeclaration cd, OpenRewrite.Core.ExecutionContext ctx)
         {
             cd = (ClassDeclaration)base.VisitClassDeclaration(cd, ctx);
             if (cd.Name.SimpleName == _from)

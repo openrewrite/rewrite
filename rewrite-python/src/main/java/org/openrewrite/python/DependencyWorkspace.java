@@ -28,6 +28,7 @@ import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -76,6 +77,18 @@ public class DependencyWorkspace {
      * @return Path to the workspace directory containing .venv
      */
     static Path getOrCreateWorkspace(String pyprojectContent) {
+        return getOrCreateWorkspace(pyprojectContent, Collections.emptyMap());
+    }
+
+    /**
+     * Gets or creates a workspace directory for the given pyproject.toml content.
+     * Workspaces are cached by content hash to avoid repeated installations.
+     *
+     * @param pyprojectContent The complete pyproject.toml file content
+     * @param environment      additional environment variables for subprocess (e.g., SSL_CERT_FILE)
+     * @return Path to the workspace directory containing .venv
+     */
+    static Path getOrCreateWorkspace(String pyprojectContent, Map<String, String> environment) {
         String hash = hashContent(pyprojectContent);
 
         // Check in-memory cache
@@ -106,10 +119,10 @@ public class DependencyWorkspace {
                 );
 
                 // Sync: creates .venv, generates uv.lock, and installs dependencies
-                runCommand(tempDir, "uv", "sync");
+                runCommand(tempDir, environment, "uv", "sync");
 
                 // Install ty for type stubs
-                runCommand(tempDir, "uv", "pip", "install", "ty");
+                runCommand(tempDir, environment, "uv", "pip", "install", "ty");
 
                 // Write workspace version for cache invalidation
                 Files.write(tempDir.resolve("version.txt"),
@@ -152,6 +165,21 @@ public class DependencyWorkspace {
      */
     static @Nullable Path getOrCreateRequirementsWorkspace(String requirementsContent,
                                                             @Nullable Path originalFilePath) {
+        return getOrCreateRequirementsWorkspace(requirementsContent, originalFilePath, Collections.emptyMap());
+    }
+
+    /**
+     * Gets or creates a workspace directory for a requirements.txt file.
+     * Returns null (graceful degradation) when uv is unavailable.
+     *
+     * @param requirementsContent The complete requirements.txt content
+     * @param originalFilePath    The original file path on disk (supports -r includes), or null
+     * @param environment         additional environment variables for subprocess (e.g., SSL_CERT_FILE)
+     * @return Path to the workspace directory, or null if uv is unavailable
+     */
+    static @Nullable Path getOrCreateRequirementsWorkspace(String requirementsContent,
+                                                            @Nullable Path originalFilePath,
+                                                            Map<String, String> environment) {
         String uvPath = UvExecutor.findUvExecutable();
         if (uvPath == null) {
             return null;
@@ -180,7 +208,7 @@ public class DependencyWorkspace {
 
             try {
                 // Create virtualenv
-                runCommandWithPath(tempDir, uvPath, "venv");
+                runCommandWithPath(tempDir, uvPath, environment, "venv");
 
                 // Install dependencies from requirements file
                 Path reqFile;
@@ -190,10 +218,10 @@ public class DependencyWorkspace {
                     reqFile = tempDir.resolve("requirements.txt");
                     Files.write(reqFile, requirementsContent.getBytes(StandardCharsets.UTF_8));
                 }
-                runCommandWithPath(tempDir, uvPath, "pip", "install", "-r", reqFile.toString());
+                runCommandWithPath(tempDir, uvPath, environment, "pip", "install", "-r", reqFile.toString());
 
                 // Capture freeze output BEFORE installing ty
-                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, "pip", "freeze");
+                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, environment, "pip", "freeze");
                 if (freezeResult.isSuccess()) {
                     Files.write(
                             tempDir.resolve("freeze.txt"),
@@ -202,7 +230,7 @@ public class DependencyWorkspace {
                 }
 
                 // Install ty for type stubs (after freeze so it's not in the dep model)
-                runCommandWithPath(tempDir, uvPath, "pip", "install", "ty");
+                runCommandWithPath(tempDir, uvPath, environment, "pip", "install", "ty");
 
                 // Write workspace version for cache invalidation
                 Files.write(tempDir.resolve("version.txt"),
@@ -243,6 +271,22 @@ public class DependencyWorkspace {
      */
     public static @Nullable Path getOrCreateSetuptoolsWorkspace(String manifestContent,
                                                                 @Nullable Path projectDir) {
+        return getOrCreateSetuptoolsWorkspace(manifestContent, projectDir, Collections.emptyMap());
+    }
+
+    /**
+     * Gets or creates a workspace directory for a setuptools project (setup.cfg / setup.py).
+     * Uses {@code uv pip install <projectDir>} to install the project and its dependencies.
+     * Returns null (graceful degradation) when uv is unavailable.
+     *
+     * @param manifestContent The setup.cfg (or setup.py) content for hashing
+     * @param projectDir      The project directory to install from, or null
+     * @param environment     additional environment variables for subprocess (e.g., SSL_CERT_FILE)
+     * @return Path to the workspace directory, or null if uv is unavailable
+     */
+    public static @Nullable Path getOrCreateSetuptoolsWorkspace(String manifestContent,
+                                                                @Nullable Path projectDir,
+                                                                Map<String, String> environment) {
         String uvPath = UvExecutor.findUvExecutable();
         if (uvPath == null) {
             return null;
@@ -275,13 +319,13 @@ public class DependencyWorkspace {
 
             try {
                 // Create virtualenv
-                runCommandWithPath(tempDir, uvPath, "venv");
+                runCommandWithPath(tempDir, uvPath, environment, "venv");
 
                 // Install from the project directory
-                runCommandWithPath(tempDir, uvPath, "pip", "install", projectDir.toString());
+                runCommandWithPath(tempDir, uvPath, environment, "pip", "install", projectDir.toString());
 
                 // Capture freeze output BEFORE installing ty
-                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, "pip", "freeze");
+                UvExecutor.RunResult freezeResult = UvExecutor.run(tempDir, uvPath, environment, "pip", "freeze");
                 if (freezeResult.isSuccess()) {
                     Files.write(
                             tempDir.resolve("freeze.txt"),
@@ -290,7 +334,7 @@ public class DependencyWorkspace {
                 }
 
                 // Install ty for type stubs (after freeze so it's not in the dep model)
-                runCommandWithPath(tempDir, uvPath, "pip", "install", "ty");
+                runCommandWithPath(tempDir, uvPath, environment, "pip", "install", "ty");
 
                 // Write workspace version for cache invalidation
                 Files.write(tempDir.resolve("version.txt"),
@@ -335,14 +379,14 @@ public class DependencyWorkspace {
                 hasCurrentVersion(workspaceDir);
     }
 
-    private static void runCommandWithPath(Path dir, String uvPath, String... args) throws IOException, InterruptedException {
-        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, args);
+    private static void runCommandWithPath(Path dir, String uvPath, Map<String, String> environment, String... args) throws IOException, InterruptedException {
+        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, environment, args);
         if (!result.isSuccess()) {
             throw new RuntimeException("uv " + String.join(" ", args) + " failed with exit code: " + result.getExitCode());
         }
     }
 
-    private static void runCommand(Path dir, String... command) throws IOException, InterruptedException {
+    private static void runCommand(Path dir, Map<String, String> environment, String... command) throws IOException, InterruptedException {
         String uvPath = UvExecutor.findUvExecutable();
         if (uvPath == null) {
             throw new RuntimeException("uv is not installed. Install it with: pip install uv");
@@ -352,7 +396,7 @@ public class DependencyWorkspace {
         String[] args = new String[command.length - 1];
         System.arraycopy(command, 1, args, 0, args.length);
 
-        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, args);
+        UvExecutor.RunResult result = UvExecutor.run(dir, uvPath, environment, args);
         if (!result.isSuccess()) {
             throw new RuntimeException(String.join(" ", command) + " failed with exit code: " + result.getExitCode());
         }

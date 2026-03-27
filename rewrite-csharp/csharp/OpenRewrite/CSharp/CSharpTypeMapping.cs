@@ -311,13 +311,21 @@ internal class CSharpTypeMapping
         if (_typeCache.TryGetValue(symbol, out var cached) && cached is JavaType.Variable v)
             return v;
 
-        var variable = new JavaType.Variable(name, owner, type, null);
+        var variable = new JavaType.Variable(name, owner, type, null)
+        {
+            FlagsBitMap = MapFlags(symbol)
+        };
         _typeCache[symbol] = variable;
         return variable;
     }
 
     private static JavaType.Primitive? MapPrimitive(INamedTypeSymbol symbol)
     {
+        // System.String is intentionally omitted: it is a reference type with interfaces
+        // (IEnumerable<char>, IComparable<string>, etc.) that TypeUtils.IsAssignableTo needs
+        // to walk. Mapping it as JavaType.Class preserves the full type hierarchy.
+        // J.Literal and J.Primitive (the syntax node for the `string` keyword) still use
+        // JavaType.Primitive(String) directly — they don't go through this method.
         return symbol.SpecialType switch
         {
             SpecialType.System_Boolean => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean),
@@ -329,7 +337,6 @@ internal class CSharpTypeMapping
             SpecialType.System_Int64 => JavaType.Primitive.Of(JavaType.PrimitiveKind.Long),
             SpecialType.System_Int16 => JavaType.Primitive.Of(JavaType.PrimitiveKind.Short),
             SpecialType.System_Void => JavaType.Primitive.Of(JavaType.PrimitiveKind.Void),
-            SpecialType.System_String => JavaType.Primitive.Of(JavaType.PrimitiveKind.String),
             _ => null
         };
     }
@@ -348,6 +355,8 @@ internal class CSharpTypeMapping
         if (symbol.IsStatic) flags |= 8;     // Flag.Static
         if (symbol.IsAbstract) flags |= 1024; // Flag.Abstract
         if (symbol.IsSealed) flags |= 16;     // Flag.Final (sealed ~ final)
+        // C#-specific: mark extension methods (bit 20, not used by Java Flag enum)
+        if (symbol is IMethodSymbol { IsExtensionMethod: true }) flags |= 1L << 20;
         return flags;
     }
 

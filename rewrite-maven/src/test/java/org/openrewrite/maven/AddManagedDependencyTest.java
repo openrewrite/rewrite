@@ -125,7 +125,7 @@ class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void validation()  {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+        var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "org.apache.logging:*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
@@ -133,7 +133,7 @@ class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void validationAllowsDashesInOnlyIfUsing()  {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+        var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "something-with:dashes-is-ok*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
@@ -141,7 +141,7 @@ class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void badCharactersInOnlyIfUsingAreInvalid() {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+        var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "spaced group:*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated.isValid()).isFalse();

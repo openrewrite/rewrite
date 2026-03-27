@@ -152,7 +152,6 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case BLOCK_STATEMENT:
                 if (wrappedRight.getElement() instanceof J && getCursor().getValue() instanceof J.Block && !(wrappedRight.getElement() instanceof J.EnumValueSet)) {
-                    // for `J.EnumValueSet` the prefix is on the enum constants
                     wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
                 }
                 break;
@@ -226,7 +225,11 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
                 List<J.EnumValue> enums = ((J.EnumValueSet) getCursor().getValue()).getEnums();
                 if (!enums.isEmpty()) {
                     if (shouldWrap(getCursor(), loc)) {
-                        wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
+                        if (wrappedRight.getElement() == enums.get(0) && ((J) wrappedRight.getElement()).getPrefix().isEmpty()) {
+                            getCursor().putMessage("wrapEnumValueSetPrefix", true);
+                        } else {
+                            wrappedRight = wrappedRight.withElement(((J) wrappedRight.getElement()).withPrefix(withWhitespace(((J) wrappedRight.getElement()).getPrefix(), "\n")));
+                        }
                         getCursor().pollNearestMessage("single-line-enum");
                     }
                 }
@@ -422,6 +425,16 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             } catch (IllegalStateException ignored) {}
         }
         return super.visitSpace(space, loc, p);
+    }
+
+    @Override
+    public J.EnumValueSet visitEnumValueSet(J.EnumValueSet enums, P p) {
+        J.EnumValueSet e = (J.EnumValueSet) super.visitEnumValueSet(enums, p);
+        Boolean wrapFirst = getCursor().pollMessage("wrapEnumValueSetPrefix");
+        if (wrapFirst != null && wrapFirst) {
+            e = e.withPrefix(withWhitespace(e.getPrefix(), "\n"));
+        }
+        return e;
     }
 
     @Override

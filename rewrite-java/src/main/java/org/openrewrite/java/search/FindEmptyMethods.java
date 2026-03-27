@@ -24,7 +24,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
@@ -80,21 +79,13 @@ public class FindEmptyMethods extends Recipe {
             }
 
             private boolean hasEmptyBody(J.MethodDeclaration method) {
-                return method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty();
+                return method.getBody() != null && method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty();
             }
 
             private boolean isEmptyMethod(J.MethodDeclaration method) {
-                return !method.isConstructor() && !isInterfaceMethod(method) &&
+                return !method.isConstructor() &&
                        (matchOverrides == null || !matchOverrides && !TypeUtils.isOverride(method.getMethodType()) || matchOverrides) &&
                        hasEmptyBody(method);
-            }
-
-            private boolean isInterfaceMethod(J.MethodDeclaration method) {
-                //noinspection ConstantConditions
-                return method.getMethodType() != null &&
-                       method.getMethodType().getDeclaringType() != null &&
-                       method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface &&
-                       !method.hasModifier(J.Modifier.Type.Default);
             }
 
             private boolean hasEmptySinglePublicNoArgsConstructor(List<Statement> classStatements) {

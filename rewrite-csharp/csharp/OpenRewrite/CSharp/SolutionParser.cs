@@ -277,6 +277,10 @@ public class SolutionParser
             // Normalize path separators to forward slashes for cross-platform consistency
             relativePath = relativePath.Replace('\\', '/');
 
+            // Detect UTF-8 BOM — Roslyn's SourceText.ToString() strips the BOM character,
+            // so we check the raw file bytes to preserve the flag for patch fidelity.
+            var charsetBomMarked = HasUtf8Bom(doc.FilePath!);
+
             var fileSw = Stopwatch.StartNew();
             try
             {
@@ -291,11 +295,12 @@ public class SolutionParser
                 CompilationUnit cu;
                 if (configSymbolSets.Count > 1)
                 {
-                    cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets);
+                    cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets,
+                        charsetBomMarked);
                 }
                 else
                 {
-                    cu = _parser.Parse(source, relativePath, semanticModel);
+                    cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked);
                 }
 
                 if (requirePrintEqualsInput)
@@ -305,8 +310,9 @@ public class SolutionParser
                     {
                         Log.Debug("  IDEMPOTENCY [{FileIndex}/{TotalFiles}] {RelativePath}",
                             fileIndex, userDocs.Count, relativePath);
+                        var diff = DiffUtils.UnifiedDiff(source, printed, relativePath);
                         results.Add(ParseError.Build(relativePath, source,
-                            new InvalidOperationException(relativePath + " is not print idempotent.")));
+                            new InvalidOperationException(relativePath + " is not print idempotent. \n" + diff)));
                         fileSw.Stop();
                         continue;
                     }
@@ -334,6 +340,24 @@ public class SolutionParser
         Log.Debug("ParseProject: {ProjectName} completed {ResultCount} files in {ElapsedSec}s",
             projectName, results.Count, projectSw.Elapsed.TotalSeconds.ToString("F1"));
         return results;
+    }
+
+    /// <summary>
+    /// Checks whether a file starts with a UTF-8 BOM (byte order mark: EF BB BF).
+    /// </summary>
+    private static bool HasUtf8Bom(string filePath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            Span<byte> buf = stackalloc byte[3];
+            return stream.Read(buf) == 3
+                   && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

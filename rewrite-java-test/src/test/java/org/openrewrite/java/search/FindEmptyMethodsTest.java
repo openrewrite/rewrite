@@ -174,6 +174,19 @@ class FindEmptyMethodsTest implements RewriteTest {
     }
 
     @Test
+    void annotationInterfaceMethods() {
+        rewriteRun(
+          java(
+            """
+              public @interface Requirement {
+                  String[] value();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void interfaceMethods() {
         rewriteRun(
           java(

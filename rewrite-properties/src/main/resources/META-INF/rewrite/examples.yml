@@ -78,6 +78,26 @@ examples:
     language: properties
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.properties.CopyValue
+examples:
+- description: '`CopyValueTest#copyValueSameFile`'
+  parameters:
+  - source.key
+  - 'null'
+  - destination.key
+  - 'null'
+  - 'null'
+  - 'null'
+  sources:
+  - before: |
+      source.key=myValue
+      destination.key=original
+    after: |
+      source.key=myValue
+      destination.key=myValue
+    language: properties
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.properties.CreatePropertiesFile
 examples:
 - description: '`CreatePropertiesFileTest#hasCreatedPropertiesFile`'

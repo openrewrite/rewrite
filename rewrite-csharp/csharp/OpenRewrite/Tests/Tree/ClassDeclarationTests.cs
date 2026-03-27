@@ -1532,6 +1532,23 @@ public class ClassDeclarationTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void SelfReferentialGenericType()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                interface ISelf<T> where T : ISelf<T> { }
+                class Node : ISelf<Node>
+                {
+                    Node _parent;
+                    public Node GetSelf() => this;
+                }
+                """
+            )
+        );
+    }
+
     // ==================== Whitespace Preservation ====================
 
     [Fact]
@@ -1557,6 +1574,50 @@ public class ClassDeclarationTests : RewriteTest
             CSharp(
                 """
                 class Foo < T >   where   T   :   class ,   new()  { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintNullableInterfaceType()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                interface IComparable<T> { }
+                class Foo<T> where T : IComparable<T>? { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintNullableInterfaceTypeOnMethod()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+                class Foo
+                {
+                    void Bar<T>(T input, T rangeFrom, T rangeTo) where T : IComparable<T>?
+                    {
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintStructAndNullableInterface()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+                class Foo<T> where T : struct, IComparable<T>? { }
                 """
             )
         );

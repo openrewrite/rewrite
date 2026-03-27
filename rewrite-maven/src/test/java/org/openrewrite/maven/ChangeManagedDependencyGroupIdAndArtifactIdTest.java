@@ -79,7 +79,7 @@ class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
-        ChangeManagedDependencyGroupIdAndArtifactId recipe = new ChangeManagedDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", "javax.activation-api", null);
+        var recipe = new ChangeManagedDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", "javax.activation-api", null);
         assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
             .contains("newGroupId OR newArtifactId must be different from before");
     }

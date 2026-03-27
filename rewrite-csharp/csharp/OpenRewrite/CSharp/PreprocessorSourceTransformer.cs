@@ -28,14 +28,13 @@ public static class PreprocessorSourceTransformer
     private const int MaxPermutations = 64;
 
     /// <summary>
-    /// Extracts the set of external preprocessor symbols referenced in #if/#elif conditions.
-    /// Excludes symbols that are #define'd or #undef'd within the file itself.
+    /// Extracts the set of preprocessor symbols referenced in #if/#elif conditions.
+    /// Includes locally #define'd/#undef'd symbols — they still need permutations
+    /// so that ParseMulti can build ConditionalDirective nodes for both branches.
     /// </summary>
     public static HashSet<string> ExtractSymbols(string source)
     {
         var symbols = new HashSet<string>();
-        var defined = new HashSet<string>();
-        var undefined = new HashSet<string>();
 
         foreach (var line in EnumerateLines(source))
         {
@@ -44,19 +43,7 @@ public static class PreprocessorSourceTransformer
 
             var afterHash = trimmed[1..].TrimStart();
 
-            if (afterHash.StartsWith("define "))
-            {
-                var sym = afterHash[7..].Trim();
-                if (sym.Length > 0 && IsIdentifier(sym))
-                    defined.Add(sym);
-            }
-            else if (afterHash.StartsWith("undef "))
-            {
-                var sym = afterHash[6..].Trim();
-                if (sym.Length > 0 && IsIdentifier(sym))
-                    undefined.Add(sym);
-            }
-            else if (afterHash.StartsWith("if ") || afterHash.StartsWith("if("))
+            if (afterHash.StartsWith("if ") || afterHash.StartsWith("if("))
             {
                 var condition = afterHash.StartsWith("if(") ? afterHash[2..] : afterHash[3..];
                 condition = StripLineComment(condition);
@@ -70,9 +57,6 @@ public static class PreprocessorSourceTransformer
             }
         }
 
-        // Remove locally defined/undefined symbols — they're not external
-        symbols.ExceptWith(defined);
-        symbols.ExceptWith(undefined);
         // Remove boolean literals
         symbols.Remove("true");
         symbols.Remove("false");
@@ -90,7 +74,8 @@ public static class PreprocessorSourceTransformer
     /// </summary>
     public static string Transform(string source, HashSet<string> definedSymbols,
         Dictionary<int, int>? directiveLineToIndex = null,
-        HashSet<int>? invertedLines = null)
+        HashSet<int>? invertedLines = null,
+        bool ignoreFileDefines = false)
     {
         var lines = SplitLines(source);
         var result = new string[lines.Length];
@@ -151,7 +136,9 @@ public static class PreprocessorSourceTransformer
             else if (afterHash.StartsWith("define "))
             {
                 bool active = stack.Count == 0 || stack.Peek().branchActive;
-                if (active)
+                // Still emit/hide the directive line based on scope;
+                // only skip symbol tracking when generating permutations
+                if (active && !ignoreFileDefines)
                 {
                     var sym = afterHash[7..].Trim();
                     if (sym.Length > 0) localDefines.Add(sym);
@@ -161,7 +148,9 @@ public static class PreprocessorSourceTransformer
             else if (afterHash.StartsWith("undef "))
             {
                 bool active = stack.Count == 0 || stack.Peek().branchActive;
-                if (active)
+                // Still emit/hide the directive line based on scope;
+                // only skip symbol tracking when generating permutations
+                if (active && !ignoreFileDefines)
                 {
                     var sym = afterHash[6..].Trim();
                     if (sym.Length > 0) localDefines.Remove(sym);
@@ -257,13 +246,13 @@ public static class PreprocessorSourceTransformer
 
         // Generate "all defined" first (primary branch)
         var allDefined = new HashSet<string>(symbolList);
-        var primaryClean = Transform(source, allDefined, directiveLineToIndex);
+        var primaryClean = Transform(source, allDefined, directiveLineToIndex, ignoreFileDefines: true);
         seen[primaryClean] = 0;
         result.Add((primaryClean, allDefined));
 
         // Add "none defined" (covers #else branches)
         var noneDefined = new HashSet<string>();
-        var noneClean = Transform(source, noneDefined, directiveLineToIndex);
+        var noneClean = Transform(source, noneDefined, directiveLineToIndex, ignoreFileDefines: true);
         if (!seen.ContainsKey(noneClean))
         {
             seen[noneClean] = result.Count;
@@ -291,7 +280,7 @@ public static class PreprocessorSourceTransformer
                 if (defined.SetEquals(allDefined))
                     continue;
 
-                var clean = Transform(source, defined, directiveLineToIndex);
+                var clean = Transform(source, defined, directiveLineToIndex, ignoreFileDefines: true);
                 if (!seen.ContainsKey(clean))
                 {
                     seen[clean] = result.Count;
@@ -425,7 +414,7 @@ public static class PreprocessorSourceTransformer
 
                 if (!hasTautologicalIf)
                 {
-                    var clean = Transform(source, targetSymbols, directiveLineToIndex);
+                    var clean = Transform(source, targetSymbols, directiveLineToIndex, ignoreFileDefines: true);
                     if (!seen.ContainsKey(clean))
                     {
                         seen[clean] = result.Count;
@@ -439,7 +428,7 @@ public static class PreprocessorSourceTransformer
         if (tautologicalIfLines.Count > 0)
         {
             // Generate a permutation with all tautological #if lines inverted
-            var clean = Transform(source, allSymbols, directiveLineToIndex, tautologicalIfLines);
+            var clean = Transform(source, allSymbols, directiveLineToIndex, tautologicalIfLines, ignoreFileDefines: true);
             if (!seen.ContainsKey(clean))
             {
                 seen[clean] = result.Count;
@@ -448,7 +437,7 @@ public static class PreprocessorSourceTransformer
             }
 
             // Also generate with empty symbols + inversion
-            clean = Transform(source, new HashSet<string>(), directiveLineToIndex, tautologicalIfLines);
+            clean = Transform(source, new HashSet<string>(), directiveLineToIndex, tautologicalIfLines, ignoreFileDefines: true);
             if (!seen.ContainsKey(clean))
             {
                 seen[clean] = result.Count;

@@ -473,6 +473,118 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     }
 
     @Test
+    void skipWhenExistsGradlePluginPortalAlone() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsGradlePluginPortalAloneKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addToExistingPluginManagementNotFirstStatementKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
+            .expectedCyclesThatMakeChanges(1).cycles(3),
+          settingsGradleKts(
+            """
+              rootProject.name = "demo"
+
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                  }
+              }
+              """,
+            """
+              rootProject.name = "demo"
+
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsPluginManagementNotFirstStatementKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              rootProject.name = "demo"
+
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noPluginManagementBlockWithBuildCacheKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("mavenCentral", null)),
+          settingsGradleKts(
+            """
+              buildCache {
+                  local {
+                      isEnabled = false
+                  }
+              }
+
+              rootProject.name = "demo"
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              buildCache {
+                  local {
+                      isEnabled = false
+                  }
+              }
+
+              rootProject.name = "demo"
+              """
+          )
+        );
+    }
+
+    @Test
     void addToExistingPluginManagementWithPluginsBlockKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
