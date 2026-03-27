@@ -28,14 +28,13 @@ public static class PreprocessorSourceTransformer
     private const int MaxPermutations = 64;
 
     /// <summary>
-    /// Extracts the set of external preprocessor symbols referenced in #if/#elif conditions.
-    /// Excludes symbols that are #define'd or #undef'd within the file itself.
+    /// Extracts the set of preprocessor symbols referenced in #if/#elif conditions.
+    /// Includes locally #define'd/#undef'd symbols — they still need permutations
+    /// so that ParseMulti can build ConditionalDirective nodes for both branches.
     /// </summary>
     public static HashSet<string> ExtractSymbols(string source)
     {
         var symbols = new HashSet<string>();
-        var defined = new HashSet<string>();
-        var undefined = new HashSet<string>();
 
         foreach (var line in EnumerateLines(source))
         {
@@ -44,19 +43,7 @@ public static class PreprocessorSourceTransformer
 
             var afterHash = trimmed[1..].TrimStart();
 
-            if (afterHash.StartsWith("define "))
-            {
-                var sym = afterHash[7..].Trim();
-                if (sym.Length > 0 && IsIdentifier(sym))
-                    defined.Add(sym);
-            }
-            else if (afterHash.StartsWith("undef "))
-            {
-                var sym = afterHash[6..].Trim();
-                if (sym.Length > 0 && IsIdentifier(sym))
-                    undefined.Add(sym);
-            }
-            else if (afterHash.StartsWith("if ") || afterHash.StartsWith("if("))
+            if (afterHash.StartsWith("if ") || afterHash.StartsWith("if("))
             {
                 var condition = afterHash.StartsWith("if(") ? afterHash[2..] : afterHash[3..];
                 condition = StripLineComment(condition);
@@ -149,6 +136,8 @@ public static class PreprocessorSourceTransformer
             else if (afterHash.StartsWith("define "))
             {
                 bool active = stack.Count == 0 || stack.Peek().branchActive;
+                // Still emit/hide the directive line based on scope;
+                // only skip symbol tracking when generating permutations
                 if (active && !ignoreFileDefines)
                 {
                     var sym = afterHash[7..].Trim();
@@ -159,6 +148,8 @@ public static class PreprocessorSourceTransformer
             else if (afterHash.StartsWith("undef "))
             {
                 bool active = stack.Count == 0 || stack.Peek().branchActive;
+                // Still emit/hide the directive line based on scope;
+                // only skip symbol tracking when generating permutations
                 if (active && !ignoreFileDefines)
                 {
                     var sym = afterHash[6..].Trim();

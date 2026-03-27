@@ -97,4 +97,24 @@ public class PreprocessorSourceTransformerTests
         Assert.DoesNotContain("int x;", withIgnore);
         Assert.Contains("int y;", withIgnore);
     }
+
+    [Fact]
+    public void Transform_IgnoreFileDefines_ExternalSymbolStillWorks()
+    {
+        var source = """
+            #define GUICS
+            #if GUICS
+            int x;
+            #else
+            int y;
+            #endif
+            """;
+
+        // With ignoreFileDefines but GUICS in definedSymbols:
+        // the externally-supplied symbol controls the branch, not the #define
+        var result = PreprocessorSourceTransformer.Transform(
+            source, new HashSet<string> { "GUICS" }, ignoreFileDefines: true);
+        Assert.Contains("int x;", result);
+        Assert.DoesNotContain("int y;", result);
+    }
 }
