@@ -308,5 +308,21 @@ class IndentsTest implements RewriteTest {
               )
             );
         }
+
+        @Test
+        void sameColumnWithDashOnOwnLine() {
+            rewriteRun(
+              yaml(
+                    """
+                  props:
+                  - prop: 'name1'
+                    value: 1
+                  -
+                    prop: 'name2'
+                    value: 2
+                  """
+              )
+            );
+        }
     }
 }
