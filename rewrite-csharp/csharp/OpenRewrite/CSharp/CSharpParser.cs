@@ -67,7 +67,7 @@ public class CSharpParser
         var permutations = new List<(string CleanSource, HashSet<string> DefinedSymbols)>();
         foreach (var symbolSet in symbolSets)
         {
-            var cleanSource = PreprocessorSourceTransformer.Transform(source, symbolSet, directiveLineToIndex);
+            var cleanSource = PreprocessorSourceTransformer.Transform(source, symbolSet, directiveLineToIndex, ignoreFileDefines: true);
             permutations.Add((cleanSource, symbolSet));
         }
 
