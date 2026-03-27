@@ -216,16 +216,21 @@ public static class RoslynFormatter
         if (nodeIds.Count == 0)
             return cu;
 
-        // 1. Ensure minimum spacing so printed output is parseable
-        cu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
+        // 1. Ensure minimum spacing so printed output is parseable.
+        // MVS may introduce spacing artifacts on nodes outside the target subtrees
+        // (e.g., adding space to a ParameterizedType whose prefix is empty but whose
+        // inner Clazz already carries the space). Use the MVS result only for
+        // printing/Roslyn formatting, and reconcile back against the original CU.
+        var originalCu = cu;
+        var mvsCu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
 
         // 2. Print to string, tracking positions of all target nodes
         var trackingPrinter = new MultiPositionTrackingPrinter(nodeIds);
-        var source = trackingPrinter.Print(cu);
+        var source = trackingPrinter.Print(mvsCu);
         var spans = trackingPrinter.GetTrackedSpans();
 
         if (spans.Count == 0)
-            return cu;
+            return originalCu;
 
         // 3. Detect style
         var style = FormatStyle.DetectStyle(source);
@@ -235,7 +240,7 @@ public static class RoslynFormatter
 
         // 5. If formatting didn't change anything, return original
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
-            return cu;
+            return originalCu;
 
         // 6. Parse formatted string back to LST
         var parser = new CSharpParser();
@@ -246,17 +251,18 @@ public static class RoslynFormatter
         }
         catch (Exception)
         {
-            return cu;
+            return originalCu;
         }
 
-        // 7. Reconcile whitespace only within the target subtrees
+        // 7. Reconcile whitespace only within the target subtrees.
+        // Reconcile against the original CU so MVS artifacts outside targets are discarded.
         var reconciler = new WhitespaceReconciler();
-        var result = reconciler.Reconcile(cu, formattedCu, nodeIds);
+        var result = reconciler.Reconcile(originalCu, formattedCu, nodeIds);
 
         if (!reconciler.IsCompatible)
-            return cu;
+            return originalCu;
 
-        cu = result as CompilationUnit ?? cu;
+        cu = result as CompilationUnit ?? originalCu;
 
         // 8. Restore preserved prefixes
         if (preservedPrefixes.Count > 0)

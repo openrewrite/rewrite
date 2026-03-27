@@ -723,6 +723,46 @@ public class RewriteRuleTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void AttributeRewriteDoesNotAffectSiblingMethodWhitespace()
+    {
+        // Replacing [Foo] with [Bar] on one method should not introduce
+        // extra whitespace on the return type of an unrelated sibling method
+        RewriteRun(
+            spec => spec.SetRecipe(new RenameAttributeRecipe()),
+            CSharp(
+                """
+                using System.Collections.Generic;
+
+                public class MyTests
+                {
+                    [Foo]
+                    public void SimpleTest() { }
+
+                    public static IEnumerable<object[]> TestData()
+                    {
+                        yield return new object[] { 3, "foo" };
+                    }
+                }
+                """,
+                """
+                using System.Collections.Generic;
+
+                public class MyTests
+                {
+                    [Bar]
+                    public void SimpleTest() { }
+
+                    public static IEnumerable<object[]> TestData()
+                    {
+                        yield return new object[] { 3, "foo" };
+                    }
+                }
+                """
+            )
+        );
+    }
 }
 
 // ===============================================================
