@@ -149,7 +149,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         List<String> headers = new ArrayList<>();
         headers.addAll(prefixColumns.keySet());
         for (ColumnDescriptor col : descriptor.getColumns()) {
-            headers.add(col.getDisplayName());
+            headers.add(col.getName());
         }
         headers.addAll(suffixColumns.keySet());
 
