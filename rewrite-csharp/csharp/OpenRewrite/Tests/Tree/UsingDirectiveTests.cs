@@ -143,4 +143,61 @@ public class UsingDirectiveTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void NullableDirectiveBeforeUsings()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                #nullable enable
+                using System;
+                namespace N
+                {
+                    class C { }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void NullableDirectiveAfterUsings()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+
+                #nullable enable
+
+                namespace N
+                {
+                    class C { }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void NullableDirectiveBetweenUsings()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                using System;
+
+                #nullable enable
+
+                using System.Linq;
+
+                namespace N
+                {
+                    class C { }
+                }
+                """
+            )
+        );
+    }
 }

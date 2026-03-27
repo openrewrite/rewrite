@@ -76,7 +76,7 @@ public sealed class UsingDirective(
     JLeftPadded<bool>? @unsafe,
     JRightPadded<Identifier>? alias,
     TypeTree namespaceOrType
-) : Cs, IEquatable<UsingDirective>
+) : Cs, Statement, IEquatable<UsingDirective>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -1652,8 +1652,8 @@ public sealed class CompilationUnit(
     bool charsetBomMarked,
     Checksum? checksum,
     Core.FileAttributes? fileAttributes,
-    IList<JRightPadded<ExternAlias>> externs,
-    IList<JRightPadded<UsingDirective>> usings,
+    IList<JRightPadded<Statement>> externs,
+    IList<JRightPadded<Statement>> usings,
     IList<AttributeList> attributeLists,
     IList<JRightPadded<Statement>> members,
     Space eof
@@ -1667,8 +1667,8 @@ public sealed class CompilationUnit(
     public bool CharsetBomMarked { get; } = charsetBomMarked;
     public Checksum? Checksum { get; } = checksum;
     public Core.FileAttributes? FileAttributes { get; } = fileAttributes;
-    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
-    public IList<JRightPadded<UsingDirective>> Usings { get; } = usings;
+    public IList<JRightPadded<Statement>> Externs { get; } = externs;
+    public IList<JRightPadded<Statement>> Usings { get; } = usings;
     public IList<AttributeList> AttributeLists { get; } = attributeLists;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space Eof { get; } = eof;
@@ -1689,9 +1689,9 @@ public sealed class CompilationUnit(
         ReferenceEquals(checksum, Checksum) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, checksum, FileAttributes, Externs, Usings, AttributeLists, Members, Eof);
     public CompilationUnit WithFileAttributes(Core.FileAttributes? fileAttributes) =>
         ReferenceEquals(fileAttributes, FileAttributes) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, fileAttributes, Externs, Usings, AttributeLists, Members, Eof);
-    public CompilationUnit WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
+    public CompilationUnit WithExterns(IList<JRightPadded<Statement>> externs) =>
         ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, externs, Usings, AttributeLists, Members, Eof);
-    public CompilationUnit WithUsings(IList<JRightPadded<UsingDirective>> usings) =>
+    public CompilationUnit WithUsings(IList<JRightPadded<Statement>> usings) =>
         ReferenceEquals(usings, Usings) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, usings, AttributeLists, Members, Eof);
     public CompilationUnit WithAttributeLists(IList<AttributeList> attributeLists) =>
         ReferenceEquals(attributeLists, AttributeLists) ? this : new(Id, Prefix, Markers, SourcePath, Charset, CharsetBomMarked, Checksum, FileAttributes, Externs, Usings, attributeLists, Members, Eof);
@@ -1894,8 +1894,8 @@ public sealed class NamespaceDeclaration(
     Space prefix,
     Markers markers,
     JRightPadded<Expression> name,
-    IList<JRightPadded<ExternAlias>> externs,
-    IList<JRightPadded<UsingDirective>> usings,
+    IList<JRightPadded<Statement>> externs,
+    IList<JRightPadded<Statement>> usings,
     IList<JRightPadded<Statement>> members,
     Space end
 ) : Cs, Statement, IEquatable<NamespaceDeclaration>
@@ -1904,8 +1904,8 @@ public sealed class NamespaceDeclaration(
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
     public JRightPadded<Expression> Name { get; } = name;
-    public IList<JRightPadded<ExternAlias>> Externs { get; } = externs;
-    public IList<JRightPadded<UsingDirective>> Usings { get; } = usings;
+    public IList<JRightPadded<Statement>> Externs { get; } = externs;
+    public IList<JRightPadded<Statement>> Usings { get; } = usings;
     public IList<JRightPadded<Statement>> Members { get; } = members;
     public Space End { get; } = end;
 
@@ -1917,9 +1917,9 @@ public sealed class NamespaceDeclaration(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Name, Externs, Usings, Members, End);
     public NamespaceDeclaration WithName(JRightPadded<Expression> name) =>
         ReferenceEquals(name, Name) ? this : new(Id, Prefix, Markers, name, Externs, Usings, Members, End);
-    public NamespaceDeclaration WithExterns(IList<JRightPadded<ExternAlias>> externs) =>
+    public NamespaceDeclaration WithExterns(IList<JRightPadded<Statement>> externs) =>
         ReferenceEquals(externs, Externs) ? this : new(Id, Prefix, Markers, Name, externs, Usings, Members, End);
-    public NamespaceDeclaration WithUsings(IList<JRightPadded<UsingDirective>> usings) =>
+    public NamespaceDeclaration WithUsings(IList<JRightPadded<Statement>> usings) =>
         ReferenceEquals(usings, Usings) ? this : new(Id, Prefix, Markers, Name, Externs, usings, Members, End);
     public NamespaceDeclaration WithMembers(IList<JRightPadded<Statement>> members) =>
         ReferenceEquals(members, Members) ? this : new(Id, Prefix, Markers, Name, Externs, Usings, members, End);
@@ -1984,7 +1984,7 @@ public sealed class ExternAlias(
     Space prefix,
     Markers markers,
     JLeftPadded<Identifier> identifier
-) : Cs, IEquatable<ExternAlias>
+) : Cs, Statement, IEquatable<ExternAlias>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;

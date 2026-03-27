@@ -342,6 +342,12 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
 
     public J visitExternAlias(Cs.ExternAlias externAlias, P p) {
         externAlias = externAlias.withPrefix(visitSpace(externAlias.getPrefix(), CsSpace.Location.EXTERN_ALIAS_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(externAlias, p);
+        if (!(tempStatement instanceof Cs.ExternAlias))
+        {
+            return tempStatement;
+        }
+        externAlias = (Cs.ExternAlias) tempStatement;
         externAlias = externAlias.withMarkers(visitMarkers(externAlias.getMarkers(), p));
         return externAlias.getPadding().withIdentifier(visitLeftPadded(externAlias.getPadding().getIdentifier(), CsLeftPadded.Location.EXTERN_ALIAS_IDENTIFIER, p));
     }
@@ -399,6 +405,12 @@ public class CSharpVisitor<P> extends JavaVisitor<P>
 
     public J visitUsingDirective(Cs.UsingDirective usingDirective, P p) {
         usingDirective = usingDirective.withPrefix(visitSpace(usingDirective.getPrefix(), CsSpace.Location.USING_DIRECTIVE_PREFIX, p));
+        Statement tempStatement = (Statement) visitStatement(usingDirective, p);
+        if (!(tempStatement instanceof Cs.UsingDirective))
+        {
+            return tempStatement;
+        }
+        usingDirective = (Cs.UsingDirective) tempStatement;
         usingDirective = usingDirective.withMarkers(visitMarkers(usingDirective.getMarkers(), p));
         usingDirective = usingDirective.getPadding().withGlobal(visitRightPadded(usingDirective.getPadding().getGlobal(), CsRightPadded.Location.USING_DIRECTIVE_GLOBAL, p));
         usingDirective = usingDirective.getPadding().withStatic(visitLeftPadded(usingDirective.getPadding().getStatic(), CsLeftPadded.Location.USING_DIRECTIVE_STATIC, p));

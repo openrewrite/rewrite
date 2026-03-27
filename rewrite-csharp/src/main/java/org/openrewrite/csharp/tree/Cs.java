@@ -142,23 +142,23 @@ public interface Cs extends J {
             return this;
         }
 
-        List<JRightPadded<ExternAlias>> externs;
+        List<JRightPadded<Statement>> externs;
 
-        public List<ExternAlias> getExterns() {
+        public List<Statement> getExterns() {
             return JRightPadded.getElements(externs);
         }
 
-        public Cs.CompilationUnit withExterns(List<ExternAlias> externs) {
+        public Cs.CompilationUnit withExterns(List<Statement> externs) {
             return getPadding().withExterns(JRightPadded.withElements(this.externs, externs));
         }
 
-        List<JRightPadded<UsingDirective>> usings;
+        List<JRightPadded<Statement>> usings;
 
-        public List<UsingDirective> getUsings() {
+        public List<Statement> getUsings() {
             return JRightPadded.getElements(usings);
         }
 
-        public Cs.CompilationUnit withUsings(List<UsingDirective> usings) {
+        public Cs.CompilationUnit withUsings(List<Statement> usings) {
             return getPadding().withUsings(JRightPadded.withElements(this.usings, usings));
         }
 
@@ -321,19 +321,19 @@ public interface Cs extends J {
                 return t.members == members ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.externs, t.usings, t.attributeLists, members, t.eof);
             }
 
-            public List<JRightPadded<ExternAlias>> getExterns() {
+            public List<JRightPadded<Statement>> getExterns() {
                 return t.externs;
             }
 
-            public Cs.CompilationUnit withExterns(List<JRightPadded<ExternAlias>> externs) {
+            public Cs.CompilationUnit withExterns(List<JRightPadded<Statement>> externs) {
                 return t.externs == externs ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, externs, t.usings, t.attributeLists, t.members, t.eof);
             }
 
-            public List<JRightPadded<UsingDirective>> getUsings() {
+            public List<JRightPadded<Statement>> getUsings() {
                 return t.usings;
             }
 
-            public Cs.CompilationUnit withUsings(List<JRightPadded<UsingDirective>> usings) {
+            public Cs.CompilationUnit withUsings(List<JRightPadded<Statement>> usings) {
                 return t.usings == usings ? t : new Cs.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.externs, usings, t.attributeLists, t.members, t.eof);
             }
         }
@@ -2099,23 +2099,23 @@ public interface Cs extends J {
             return getPadding().withName(JRightPadded.withElement(this.name, name));
         }
 
-        List<JRightPadded<ExternAlias>> externs;
+        List<JRightPadded<Statement>> externs;
 
-        public List<ExternAlias> getExterns() {
+        public List<Statement> getExterns() {
             return JRightPadded.getElements(externs);
         }
 
-        public NamespaceDeclaration withExterns(List<ExternAlias> externs) {
+        public NamespaceDeclaration withExterns(List<Statement> externs) {
             return getPadding().withExterns(JRightPadded.withElements(this.externs, externs));
         }
 
-        List<JRightPadded<UsingDirective>> usings;
+        List<JRightPadded<Statement>> usings;
 
-        public List<UsingDirective> getUsings() {
+        public List<Statement> getUsings() {
             return JRightPadded.getElements(usings);
         }
 
-        public NamespaceDeclaration withUsings(List<UsingDirective> usings) {
+        public NamespaceDeclaration withUsings(List<Statement> usings) {
             return getPadding().withUsings(JRightPadded.withElements(this.usings, usings));
         }
 
@@ -2170,19 +2170,19 @@ public interface Cs extends J {
                 return t.name == name ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, name, t.externs, t.usings, t.members, t.end);
             }
 
-            public List<JRightPadded<ExternAlias>> getExterns() {
+            public List<JRightPadded<Statement>> getExterns() {
                 return t.externs;
             }
 
-            public NamespaceDeclaration withExterns(List<JRightPadded<ExternAlias>> externs) {
+            public NamespaceDeclaration withExterns(List<JRightPadded<Statement>> externs) {
                 return t.externs == externs ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, t.name, externs, t.usings, t.members, t.end);
             }
 
-            public List<JRightPadded<UsingDirective>> getUsings() {
+            public List<JRightPadded<Statement>> getUsings() {
                 return t.usings;
             }
 
-            public NamespaceDeclaration withUsings(List<JRightPadded<UsingDirective>> usings) {
+            public NamespaceDeclaration withUsings(List<JRightPadded<Statement>> usings) {
                 return t.usings == usings ? t : new NamespaceDeclaration(t.id, t.prefix, t.markers, t.name, t.externs, usings, t.members, t.end);
             }
 
@@ -2352,7 +2352,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class ExternAlias implements Cs {
+    final class ExternAlias implements Cs, Statement {
 
         @Nullable
         @NonFinal
@@ -2372,6 +2372,11 @@ public interface Cs extends J {
         Markers markers;
 
         JLeftPadded<Identifier> identifier;
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
@@ -2744,7 +2749,7 @@ public interface Cs extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class UsingDirective implements Cs {
+    class UsingDirective implements Cs, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2796,6 +2801,11 @@ public interface Cs extends J {
         @Getter
         @With
         TypeTree namespaceOrType;
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
 
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
