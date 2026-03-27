@@ -2962,7 +2962,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             if (branchTrailingNewlines[0][d])
                 p.Append('\n');
 
-            // Update the active branch stack
+            // Update the active branch stack.
+            // Guard against empty stack: recipe visitors can remove nodes whose
+            // prefix carried ghost comments, causing directiveOrder to be missing
+            // the matching #if for an #elif/#else/#endif.
             switch (directive.Kind)
             {
                 case PreprocessorDirectiveKind.If:
@@ -2970,16 +2973,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                     break;
                 case PreprocessorDirectiveKind.Elif:
                 case PreprocessorDirectiveKind.Else:
-                    stack.Pop();
+                    if (stack.Count > 0) stack.Pop();
                     stack.Push(directive.ActiveBranchIndex);
                     break;
                 case PreprocessorDirectiveKind.Endif:
-                    stack.Pop();
+                    if (stack.Count > 0) stack.Pop();
                     break;
             }
 
             // Emit next section from the active branch
-            int activeBranch = stack.Peek();
+            int activeBranch = stack.Count > 0 ? stack.Peek() : 0;
             // Fall back to primary branch when no branch activates this directive
             if (activeBranch < 0) activeBranch = 0;
             int sectionIndex = d + 1;
