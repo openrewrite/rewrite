@@ -300,34 +300,60 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Process directives at the very start of the file (before any usings/members)
         // These would otherwise be absorbed into the CompilationUnit prefix
         var leadingDirectives = ProcessGapDirectives(node.SpanStart);
-        foreach (var d in leadingDirectives)
-            members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
 
         // If leading directives were found, don't extract prefix — the trailing
         // whitespace after the last directive naturally becomes the next member's prefix
         var prefix = leadingDirectives.Count > 0 ? Space.Empty : ExtractPrefix(node);
 
         // Handle extern alias directives into separate list
-        var externAliases = new List<JRightPadded<ExternAlias>>();
+        var externAliases = new List<JRightPadded<Statement>>();
+
+        // Leading directives go into the first non-empty printed list so the printer
+        // emits them before any real content (print order: externs → usings → members)
+        if (leadingDirectives.Count > 0)
+        {
+            var leadingTarget = node.Externs.Count > 0 ? externAliases : null;
+            // if target is null, defer to usingDirectives (declared below) or members
+            if (leadingTarget != null)
+            {
+                foreach (var d in leadingDirectives)
+                    leadingTarget.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+                leadingDirectives.Clear();
+            }
+            else if (node.Usings.Count == 0)
+            {
+                // No externs, no usings — put in members
+                foreach (var d in leadingDirectives)
+                    members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+                leadingDirectives.Clear();
+            }
+            // else: leadingDirectives remain, will be prepended to usingDirectives below
+        }
+
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<ExternAlias>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
             }
         }
 
         // Handle using directives into separate list
-        var usingDirectives = new List<JRightPadded<UsingDirective>>();
+        var usingDirectives = new List<JRightPadded<Statement>>();
+
+        // Prepend any leading directives that were deferred (no externs, but usings exist)
+        foreach (var d in leadingDirectives)
+            usingDirectives.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+
         foreach (var usingDirective in node.Usings)
         {
             foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
-                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+                usingDirectives.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = VisitUsingDirective(usingDirective);
             if (visited is UsingDirective ud)
             {
-                usingDirectives.Add(new JRightPadded<UsingDirective>(ud, Space.Empty, Markers.Empty));
+                usingDirectives.Add(new JRightPadded<Statement>(ud, Space.Empty, Markers.Empty));
             }
         }
 
@@ -476,27 +502,27 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.SemicolonToken.Span.End;
 
         // Parse extern alias directives within the file-scoped namespace
-        var externAliases = new List<JRightPadded<ExternAlias>>();
+        var externAliases = new List<JRightPadded<Statement>>();
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<ExternAlias>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
             }
         }
 
         // Parse using directives within the file-scoped namespace
-        var nsUsingDirectives = new List<JRightPadded<UsingDirective>>();
+        var nsUsingDirectives = new List<JRightPadded<Statement>>();
         var members = new List<JRightPadded<Statement>>();
         foreach (var usingDirective in node.Usings)
         {
             foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
-                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+                nsUsingDirectives.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = VisitUsingDirective(usingDirective);
             if (visited is UsingDirective ud)
             {
-                nsUsingDirectives.Add(new JRightPadded<UsingDirective>(ud, Space.Empty, Markers.Empty));
+                nsUsingDirectives.Add(new JRightPadded<Statement>(ud, Space.Empty, Markers.Empty));
             }
         }
 
@@ -550,27 +576,27 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.OpenBraceToken.Span.End;
 
         // Parse extern alias directives within the namespace into separate list
-        var externAliases = new List<JRightPadded<ExternAlias>>();
+        var externAliases = new List<JRightPadded<Statement>>();
         foreach (var externAlias in node.Externs)
         {
             var visited = VisitExternAliasDirective(externAlias);
             if (visited is ExternAlias ea)
             {
-                externAliases.Add(new JRightPadded<ExternAlias>(ea, Space.Empty, Markers.Empty));
+                externAliases.Add(new JRightPadded<Statement>(ea, Space.Empty, Markers.Empty));
             }
         }
 
         // Handle using directives within the namespace into separate list
-        var nsUsingDirectives = new List<JRightPadded<UsingDirective>>();
+        var nsUsingDirectives = new List<JRightPadded<Statement>>();
         var members = new List<JRightPadded<Statement>>();
         foreach (var usingDirective in node.Usings)
         {
             foreach (var d in ProcessGapDirectives(usingDirective.SpanStart))
-                members.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
+                nsUsingDirectives.Add(new JRightPadded<Statement>(d, Space.Empty, Markers.Empty));
             var visited = VisitUsingDirective(usingDirective);
             if (visited is UsingDirective ud)
             {
-                nsUsingDirectives.Add(new JRightPadded<UsingDirective>(ud, Space.Empty, Markers.Empty));
+                nsUsingDirectives.Add(new JRightPadded<Statement>(ud, Space.Empty, Markers.Empty));
             }
         }
 

@@ -64,6 +64,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             case GotoStatement:
             case DelegateDeclaration:
             case Yield:
+            case ExternAlias:
+            case UsingDirective:
                 p.Append(';');
                 break;
 
@@ -120,26 +122,14 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     {
         BeforeSyntax(compilationUnit, p);
 
-        // Print leading directive members (e.g., #nullable enable that appear before usings)
-        int memberIdx = 0;
-        while (memberIdx < compilationUnit.Members.Count && IsDirective(compilationUnit.Members[memberIdx].Element))
-        {
-            VisitStatement(compilationUnit.Members[memberIdx], p);
-            memberIdx++;
-        }
-
         foreach (var externAlias in compilationUnit.Externs)
         {
-            Visit(externAlias.Element, p);
-            VisitSpace(externAlias.After, p);
-            p.Append(';');
+            VisitStatement(externAlias, p);
         }
 
         foreach (var usingDirective in compilationUnit.Usings)
         {
-            Visit(usingDirective.Element, p);
-            VisitSpace(usingDirective.After, p);
-            p.Append(';');
+            VisitStatement(usingDirective, p);
         }
 
         foreach (var attrList in compilationUnit.AttributeLists)
@@ -147,24 +137,15 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             Visit(attrList, p);
         }
 
-        // Print remaining members
-        while (memberIdx < compilationUnit.Members.Count)
+        foreach (var member in compilationUnit.Members)
         {
-            VisitStatement(compilationUnit.Members[memberIdx], p);
-            memberIdx++;
+            VisitStatement(member, p);
         }
 
         VisitSpace(compilationUnit.Eof, p);
 
         AfterSyntax(compilationUnit, p);
         return compilationUnit;
-    }
-
-    private static bool IsDirective(Statement stmt)
-    {
-        return stmt is NullableDirective or PragmaWarningDirective or PragmaChecksumDirective
-            or RegionDirective or EndRegionDirective or DefineDirective or UndefDirective
-            or ErrorDirective or WarningDirective or LineDirective;
     }
 
     public override J VisitUsingDirective(UsingDirective usingDirective, PrintOutputCapture<P> p)
@@ -234,16 +215,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         foreach (var externAlias in ns.Externs)
         {
-            Visit(externAlias.Element, p);
-            VisitSpace(externAlias.After, p);
-            p.Append(';');
+            VisitStatement(externAlias, p);
         }
 
         foreach (var usingDirective in ns.Usings)
         {
-            Visit(usingDirective.Element, p);
-            VisitSpace(usingDirective.After, p);
-            p.Append(';');
+            VisitStatement(usingDirective, p);
         }
 
         foreach (var member in ns.Members)

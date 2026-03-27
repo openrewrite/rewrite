@@ -162,9 +162,12 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithPrefix(VisitSpace(usingDirective.Prefix, p))
             .WithMarkers(VisitMarkers(usingDirective.Markers, p));
 
-        return usingDirective
-            .WithAlias(VisitRightPadded(usingDirective.Alias, p))
-            .WithNamespaceOrType((TypeTree)Visit(usingDirective.NamespaceOrType, p)!);
+        var stmtResult = VisitStatement(usingDirective, p);
+        if (stmtResult is not UsingDirective node) return stmtResult;
+
+        return node
+            .WithAlias(VisitRightPadded(node.Alias, p))
+            .WithNamespaceOrType((TypeTree)Visit(node.NamespaceOrType, p)!);
     }
 
     public virtual J VisitPropertyDeclaration(PropertyDeclaration prop, P p)
@@ -341,8 +344,11 @@ public class CSharpVisitor<P> : JavaVisitor<P>
             .WithPrefix(VisitSpace(externAlias.Prefix, p))
             .WithMarkers(VisitMarkers(externAlias.Markers, p));
 
-        return externAlias
-            .WithIdentifier(VisitLeftPadded(externAlias.Identifier, p)!);
+        var stmtResult = VisitStatement(externAlias, p);
+        if (stmtResult is not ExternAlias node) return stmtResult;
+
+        return node
+            .WithIdentifier(VisitLeftPadded(node.Identifier, p)!);
     }
 
     public virtual J VisitInitializerExpression(InitializerExpression initializerExpression, P p)
