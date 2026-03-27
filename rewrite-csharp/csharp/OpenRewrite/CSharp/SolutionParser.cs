@@ -261,6 +261,15 @@ public class SolutionParser
         var userDocs = project.Documents
             .Where(d => d.FilePath != null && IsUserSource(d, project))
             .ToList();
+
+        // Filter out git-ignored files when inside a git repository
+        var ignoredPaths = GetGitIgnoredPaths(rootDir, userDocs.Select(d => d.FilePath!));
+        if (ignoredPaths.Count > 0)
+        {
+            var before = userDocs.Count;
+            userDocs = userDocs.Where(d => !ignoredPaths.Contains(d.FilePath!)).ToList();
+            Log.Debug("ParseProject: excluded {ExcludedCount} git-ignored files", before - userDocs.Count);
+        }
         Log.Debug("ParseProject: {ProjectName} has {UserDocCount} user source files (of {TotalDocCount} total)",
             projectName, userDocs.Count, project.Documents.Count());
 
@@ -391,6 +400,77 @@ public class SolutionParser
         }
 
         return symbolSets;
+    }
+
+    /// <summary>
+    /// Returns the set of file paths (from <paramref name="candidatePaths"/>) that are
+    /// git-ignored according to the repository rooted at or above <paramref name="rootDir"/>.
+    /// Returns an empty set when git is not available or <paramref name="rootDir"/> is not
+    /// inside a git repository.
+    /// </summary>
+    private static HashSet<string> GetGitIgnoredPaths(string rootDir, IEnumerable<string> candidatePaths)
+    {
+        var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var paths = candidatePaths.ToList();
+        if (paths.Count == 0) return ignored;
+
+        try
+        {
+            // Check if rootDir is inside a git repo
+            var checkPsi = new ProcessStartInfo("git", "rev-parse --git-dir")
+            {
+                WorkingDirectory = rootDir,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var checkProcess = Process.Start(checkPsi);
+            if (checkProcess == null) return ignored;
+            checkProcess.WaitForExit(5_000);
+            if (checkProcess.ExitCode != 0) return ignored;
+
+            // Use git check-ignore --stdin to batch-check all candidate paths
+            var psi = new ProcessStartInfo("git", "check-ignore --stdin")
+            {
+                WorkingDirectory = rootDir,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var process = Process.Start(psi);
+            if (process == null) return ignored;
+
+            // Write all paths to stdin, one per line
+            foreach (var path in paths)
+                process.StandardInput.WriteLine(path);
+            process.StandardInput.Close();
+
+            // Read ignored paths from stdout
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(10_000);
+
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.TrimEnd('\r');
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    // git check-ignore outputs paths relative to the working directory;
+                    // resolve them to full paths for comparison
+                    var fullPath = Path.GetFullPath(trimmed, rootDir);
+                    ignored.Add(fullPath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("GetGitIgnoredPaths: failed ({ExType}: {ExMessage}), skipping filter",
+                ex.GetType().Name, ex.Message);
+        }
+
+        return ignored;
     }
 
     /// <summary>

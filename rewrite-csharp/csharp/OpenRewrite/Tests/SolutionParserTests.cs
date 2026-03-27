@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Diagnostics;
 using OpenRewrite.CSharp;
 
 namespace OpenRewrite.Tests;
@@ -152,6 +153,82 @@ public class SolutionParserTests : IDisposable
             "File written with UTF-8 BOM should have CharsetBomMarked=true");
         Assert.False(noBom.CharsetBomMarked,
             "File written without BOM should have CharsetBomMarked=false");
+    }
+
+    [Fact]
+    public async Task GitIgnoredFilesAreExcluded()
+    {
+        // Initialize a git repo with a .gitignore that excludes **/[Pp]ackages/*
+        RunGit("init");
+        WriteFile(".gitignore", "**/[Pp]ackages/*\n");
+
+        // Create a project that includes a source file under .nuget/packages/
+        // (simulating NuGet source packages like xunit.assert.source)
+        WriteFile("Test.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <Compile Include=".nuget/packages/SomePackage/Source.cs" />
+              </ItemGroup>
+            </Project>
+            """);
+        WriteFile("App.cs", "class App { }\n");
+        WriteFile(".nuget/packages/SomePackage/Source.cs", "class Source { }\n");
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(Path.Combine(_tempDir, "Test.csproj"));
+        var results = parser.ParseProject(solution,
+            Path.Combine(_tempDir, "Test.csproj"), _tempDir);
+
+        // Only App.cs should be parsed; the file under packages/ should be excluded
+        Assert.Single(results);
+        var cu = Assert.IsType<CompilationUnit>(results[0]);
+        Assert.Contains("App.cs", cu.SourcePath);
+    }
+
+    [Fact]
+    public async Task NonGitRepoDoesNotFilter()
+    {
+        // No git init — should parse all files including those that would match gitignore patterns
+        WriteFile("Test.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+              <ItemGroup>
+                <Compile Include=".nuget/packages/SomePackage/Source.cs" />
+              </ItemGroup>
+            </Project>
+            """);
+        WriteFile("App.cs", "class App { }\n");
+        WriteFile(".nuget/packages/SomePackage/Source.cs", "class Source { }\n");
+
+        var parser = new SolutionParser();
+        var solution = await parser.LoadAsync(Path.Combine(_tempDir, "Test.csproj"));
+        var results = parser.ParseProject(solution,
+            Path.Combine(_tempDir, "Test.csproj"), _tempDir);
+
+        // Both files should be parsed since there's no git repo
+        Assert.Equal(2, results.Count);
+    }
+
+    private void RunGit(string args)
+    {
+        var psi = new ProcessStartInfo("git", args)
+        {
+            WorkingDirectory = _tempDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        using var process = Process.Start(psi)!;
+        process.WaitForExit(10_000);
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"git {args} failed: {process.StandardError.ReadToEnd()}");
     }
 
     [Fact]
