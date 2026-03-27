@@ -598,6 +598,82 @@ public class AutoFormatTests
         Assert.Equal(source, result);
     }
 
+    /// <summary>
+    /// Simulates what the MakeFieldReadOnly recipe does: adds a readonly modifier
+    /// to a field and calls MaybeAutoFormat. Verifies the output has proper spacing
+    /// between the modifier and the type name.
+    /// </summary>
+    [Fact]
+    public void AutoFormatAfterAddingReadonlyModifierToGenericField()
+    {
+        const string source = """
+            class Foo
+            {
+                List<int> _elements = new List<int>();
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+
+        var visitor = new AddReadonlyModifierVisitor();
+        visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var result = visitor.Visit(cu, 0)!;
+
+        var printed = _printer.Print(result);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", printed);
+        Assert.Contains("readonly List<int>", printed);
+    }
+
+    [Fact]
+    public void AutoFormatAfterAddingReadonlyModifierToSimpleField()
+    {
+        const string source = """
+            class Foo
+            {
+                int _x;
+            }
+            """;
+
+        var cu = _parser.Parse(source);
+
+        var visitor = new AddReadonlyModifierVisitor();
+        visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var result = visitor.Visit(cu, 0)!;
+
+        var printed = _printer.Print(result);
+
+        Assert.DoesNotContain("readonlyint", printed);
+        Assert.Contains("readonly int", printed);
+    }
+
+    /// <summary>
+    /// Visitor that adds a readonly modifier to fields and calls AutoFormat,
+    /// simulating MakeFieldReadOnly recipe behavior.
+    /// </summary>
+    private class AddReadonlyModifierVisitor : CSharpVisitor<int>
+    {
+        public override J VisitVariableDeclarations(VariableDeclarations varDecl, int p)
+        {
+            var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
+
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
+                return v;
+
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
+                return v;
+
+            var newModifiers = new List<Modifier>(v.Modifiers);
+            newModifiers.Add(new Modifier(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                Modifier.ModifierType.Readonly, new List<Annotation>()));
+            var after = v.WithModifiers(newModifiers);
+
+            return MaybeAutoFormat(v, after, p, Cursor);
+        }
+    }
+
     private class ForLoopFinder(Action<ForLoop> onFound) : CSharpVisitor<int>
     {
         public override J VisitForLoop(ForLoop forLoop, int p)

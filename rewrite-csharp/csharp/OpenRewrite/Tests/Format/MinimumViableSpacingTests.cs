@@ -81,6 +81,59 @@ public class MinimumViableSpacingTests
         Assert.DoesNotContain("int_x", result);
     }
 
+    /// <summary>
+    /// Simulates what MakeFieldReadOnly does: adds a readonly modifier to a field
+    /// that previously had none. The type expression has an empty prefix because
+    /// the indentation lives on the VariableDeclarations prefix.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithGenericType()
+    {
+        var cu = _parser.Parse("""
+            class Foo
+            {
+                List<int> _elements = new List<int>();
+            }
+            """);
+
+        // Add a readonly modifier to the field, simulating what a recipe does
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        // Run MVS to ensure spacing
+        var restored = new MinimumViableSpacingVisitor().Visit(cu, 0) as CompilationUnit ?? cu;
+        var result = _printer.Print(restored);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", result);
+        Assert.Contains("readonly List", result);
+    }
+
+    /// <summary>
+    /// Same as above but with a simple (non-generic) type.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithSimpleType()
+    {
+        var cu = _parser.Parse("""
+            class Foo
+            {
+                int _x;
+            }
+            """);
+
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        var restored = new MinimumViableSpacingVisitor().Visit(cu, 0) as CompilationUnit ?? cu;
+        var result = _printer.Print(restored);
+
+        Assert.DoesNotContain("readonlyint", result);
+        Assert.Contains("readonly int", result);
+    }
+
     [Fact]
     public void ReturnWithExpression()
     {
@@ -295,6 +348,32 @@ public class MinimumViableSpacingTests
         public override Space VisitSpace(Space space, int p)
         {
             return Space.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Visitor that adds a readonly modifier to field declarations,
+    /// simulating what the MakeFieldReadOnly recipe does.
+    /// </summary>
+    private class AddReadonlyModifierVisitor : CSharpVisitor<int>
+    {
+        public override J VisitVariableDeclarations(VariableDeclarations varDecl, int p)
+        {
+            var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
+
+            // Only add to fields (inside a class body)
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
+                return v;
+
+            // Don't add if already has readonly
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
+                return v;
+
+            var newModifiers = new List<Modifier>(v.Modifiers);
+            newModifiers.Add(new Modifier(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                Modifier.ModifierType.Readonly, new List<Annotation>()));
+            return v.WithModifiers(newModifiers);
         }
     }
 }
