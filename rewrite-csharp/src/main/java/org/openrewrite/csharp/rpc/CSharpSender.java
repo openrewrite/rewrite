@@ -828,14 +828,9 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitExceptionFilteredTry(Cs.ExceptionFilteredTry exceptionFilteredTry, RpcSendQueue q) {
-        q.getAndSend(exceptionFilteredTry, Cs.ExceptionFilteredTry::getATry, el -> visit(el, q));
-        if (exceptionFilteredTry.getCatchFilters() != null) {
-            for (JLeftPadded<J.ControlParentheses<Expression>> filter : exceptionFilteredTry.getCatchFilters()) {
-                q.getAndSend(exceptionFilteredTry, e -> filter, el -> visitLeftPadded(el, q));
-            }
-        }
-        return exceptionFilteredTry;
+    public J visitWhenClause(Cs.WhenClause whenClause, RpcSendQueue q) {
+        q.getAndSend(whenClause, Cs.WhenClause::getCondition, el -> visit(el, q));
+        return whenClause;
     }
 
     // Delegate methods to JavaSender

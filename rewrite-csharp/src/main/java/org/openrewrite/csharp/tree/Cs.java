@@ -8442,51 +8442,49 @@ public interface Cs extends J {
     }
 
     /**
-     * C# try statement with exception filter support ({@code catch when (expr)}).
-     * Wraps a {@link J.Try} and adds a parallel list of catch filters (when clauses).
-     * Each filter corresponds positionally to a catch clause in the inner Try;
-     * null entries indicate no filter for that catch.
+     * C# {@code when (expr)} clause on a {@link J.Try.Catch}.
+     * Stored as the initializer of the catch parameter's {@link J.VariableDeclarations.NamedVariable}.
+     * Printing is handled by the C# printer which emits {@code when(expr)} after the
+     * catch parameter's closing parenthesis.
      */
+    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    final class ExceptionFilteredTry implements Cs, Statement {
-
+    @AllArgsConstructor(access = AccessLevel.PUBLIC)
+    final class WhenClause implements Cs, Expression {
         @With
         @EqualsAndHashCode.Include
-        @Getter
         UUID id;
 
         @With
-        @Getter
         Space prefix;
 
         @With
-        @Getter
         Markers markers;
 
         @With
-        @Getter
-        J.Try aTry;
-
-        /**
-         * Parallel to {@link J.Try#getCatches()}. Each entry is the {@code when(expr)} filter
-         * for the corresponding catch clause, or null if no filter. The {@link JLeftPadded#getBefore()}
-         * is the space before {@code when}. The {@link J.ControlParentheses} prefix is
-         * the space before {@code (}.
-         */
-        @With
-        @Getter
-        List<JLeftPadded<J.ControlParentheses<Expression>>> catchFilters;
+        J.ControlParentheses<Expression> condition;
 
         @Override
-        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
-            return v.visitExceptionFilteredTry(this, p);
+        public @Nullable JavaType getType() {
+            return JavaType.Primitive.Boolean;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public WhenClause withType(@Nullable JavaType type) {
+            return this;
         }
 
         @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
+        public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
+            return v.visitWhenClause(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 

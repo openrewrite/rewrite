@@ -4002,44 +4002,38 @@ public sealed class ExplicitInterfaceMember(
 }
 
 /// <summary>
-/// C# try statement with exception filter support. Wraps a J.Try and adds a parallel list
-/// of catch filters (when clauses). Each filter corresponds positionally to a catch clause
-/// in the inner Try; null entries indicate no filter for that catch.
+/// C# <c>when (expr)</c> clause on a <see cref="Try.Catch"/>.
+/// Stored as the initializer of the catch parameter's <see cref="VariableDeclarations.NamedVariable"/>.
+/// Printing is handled by the C# printer which emits <c>when(expr)</c> after the
+/// catch parameter's closing parenthesis.
 /// </summary>
-public sealed class ExceptionFilteredTry(
+public sealed class WhenClause(
     Guid id,
     Space prefix,
     Markers markers,
-    Try @try,
-    IList<JLeftPadded<ControlParentheses<Expression>>?> catchFilters
-) : Cs, Statement, IEquatable<ExceptionFilteredTry>
+    ControlParentheses<Expression> condition
+) : Cs, Expression, IEquatable<WhenClause>
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
     public Markers Markers { get; } = markers;
-    public Try Try { get; } = @try;
-    /// <summary>
-    /// Parallel to Try.Catches. Each entry is the when(expr) filter for the corresponding
-    /// catch clause, or null if no filter. JLeftPadded.Before = space before 'when'.
-    /// ControlParentheses.Prefix = space before '('. RightPadded.After = space before ')'.
-    /// </summary>
-    public IList<JLeftPadded<ControlParentheses<Expression>>?> CatchFilters { get; } = catchFilters;
+    public ControlParentheses<Expression> Condition { get; } = condition;
 
-    public ExceptionFilteredTry WithId(Guid id) =>
-        id == Id ? this : new(id, Prefix, Markers, Try, CatchFilters);
-    public ExceptionFilteredTry WithPrefix(Space prefix) =>
-        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Try, CatchFilters);
-    public ExceptionFilteredTry WithMarkers(Markers markers) =>
-        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Try, CatchFilters);
-    public ExceptionFilteredTry WithTry(Try @try) =>
-        ReferenceEquals(@try, Try) ? this : new(Id, Prefix, Markers, @try, CatchFilters);
-    public ExceptionFilteredTry WithCatchFilters(IList<JLeftPadded<ControlParentheses<Expression>>?> catchFilters) =>
-        ReferenceEquals(catchFilters, CatchFilters) ? this : new(Id, Prefix, Markers, Try, catchFilters);
+    public JavaType? Type => JavaType.Primitive.Of(JavaType.PrimitiveKind.Boolean);
+
+    public WhenClause WithId(Guid id) =>
+        id == Id ? this : new(id, Prefix, Markers, Condition);
+    public WhenClause WithPrefix(Space prefix) =>
+        ReferenceEquals(prefix, Prefix) ? this : new(Id, prefix, Markers, Condition);
+    public WhenClause WithMarkers(Markers markers) =>
+        ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Condition);
+    public WhenClause WithCondition(ControlParentheses<Expression> condition) =>
+        ReferenceEquals(condition, Condition) ? this : new(Id, Prefix, Markers, condition);
 
     Tree Tree.WithId(Guid id) => WithId(id);
 
-    public bool Equals(ExceptionFilteredTry? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as ExceptionFilteredTry);
+    public bool Equals(WhenClause? other) => other is not null && Id == other.Id;
+    public override bool Equals(object? obj) => Equals(obj as WhenClause);
     public override int GetHashCode() => Id.GetHashCode();
 }
 

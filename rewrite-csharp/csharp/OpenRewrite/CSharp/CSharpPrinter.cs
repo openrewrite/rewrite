@@ -1773,19 +1773,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         foreach (var c in tr.Catches)
         {
-            VisitSpace(c.Prefix, p);
-            p.Append("catch");
-
-            if (c.Parameter.Tree.Element.TypeExpression != null || c.Parameter.Tree.Element.Variables.Count > 0)
-            {
-                VisitSpace(c.Parameter.Prefix, p);
-                p.Append('(');
-                VisitVariableDeclarationsWithoutSemicolon(c.Parameter.Tree.Element, p);
-                VisitSpace(c.Parameter.Tree.After, p);
-                p.Append(')');
-            }
-
-            VisitBlock(c.Body, p);
+            VisitCatchClause(c, p);
         }
 
         if (tr.Finally != null)
@@ -3524,60 +3512,70 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return twa;
     }
 
-    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, PrintOutputCapture<P> p)
+    private void VisitCatchClause(Try.Catch catchClause, PrintOutputCapture<P> p)
     {
-        BeforeSyntax(eft, p);
+        VisitSpace(catchClause.Prefix, p);
+        p.Append("catch");
 
-        // Print 'try' keyword and body via the inner Try's prefix
-        var innerTry = eft.Try;
-        VisitSpace(innerTry.Prefix, p);
-        p.Append("try");
+        var varDecl = catchClause.Parameter.Tree.Element;
+        bool hasDeclaration = varDecl.TypeExpression != null;
 
-        Visit(innerTry.Body, p);
-
-        // Print catch clauses with filters
-        for (int i = 0; i < innerTry.Catches.Count; i++)
+        // Find the WhenClause if present (stored on the NamedVariable initializer)
+        JLeftPadded<Expression>? whenInitializer = null;
+        if (varDecl.Variables.Count > 0)
         {
-            var catchClause = innerTry.Catches[i];
-            VisitSpace(catchClause.Prefix, p);
-            p.Append("catch");
-
-            // Print catch parameter manually (ControlParentheses<VariableDeclarations>
-            // is not handled by VisitControlParentheses which only takes Expression)
-            if (catchClause.Parameter.Tree.Element.TypeExpression != null || catchClause.Parameter.Tree.Element.Variables.Count > 0)
+            var namedVar = varDecl.Variables[0].Element;
+            if (namedVar.Initializer?.Element is WhenClause)
             {
-                VisitSpace(catchClause.Parameter.Prefix, p);
-                p.Append('(');
-                VisitVariableDeclarationsWithoutSemicolon(catchClause.Parameter.Tree.Element, p);
-                VisitSpace(catchClause.Parameter.Tree.After, p);
-                p.Append(')');
+                whenInitializer = namedVar.Initializer;
             }
-
-            // Print filter if present: when (expr)
-            if (i < eft.CatchFilters.Count && eft.CatchFilters[i] is { } filter)
-            {
-                VisitSpace(filter.Before, p);
-                p.Append("when");
-                VisitSpace(filter.Element.Prefix, p);
-                p.Append('(');
-                Visit(filter.Element.Tree.Element, p);
-                VisitSpace(filter.Element.Tree.After, p);
-                p.Append(')');
-            }
-
-            Visit(catchClause.Body, p);
         }
 
-        // Print finally if present
-        if (innerTry.Finally != null)
+        if (hasDeclaration)
         {
-            VisitSpace(innerTry.Finally.Before, p);
-            p.Append("finally");
-            Visit(innerTry.Finally.Element, p);
+            VisitSpace(catchClause.Parameter.Prefix, p);
+            p.Append('(');
+
+            // Print type
+            Visit(varDecl.TypeExpression, p);
+
+            // Print variable name if present (skip empty names used as when-clause holders)
+            if (varDecl.Variables.Count > 0)
+            {
+                var namedVar = varDecl.Variables[0].Element;
+                if (namedVar.Name.SimpleName.Length > 0)
+                {
+                    VisitSpace(namedVar.Prefix, p);
+                    VisitSpace(namedVar.Name.Prefix, p);
+                    p.Append(namedVar.Name.SimpleName);
+                }
+            }
+
+            VisitSpace(catchClause.Parameter.Tree.After, p);
+            p.Append(')');
         }
 
-        AfterSyntax(eft, p);
-        return eft;
+        // Print when clause if present
+        if (whenInitializer != null)
+        {
+            VisitSpace(whenInitializer.Before, p);
+            p.Append("when");
+            Visit(whenInitializer.Element, p);
+        }
+
+        VisitBlock(catchClause.Body, p);
+    }
+
+    public override J VisitWhenClause(WhenClause whenClause, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(whenClause, p);
+        VisitSpace(whenClause.Condition.Prefix, p);
+        p.Append('(');
+        Visit(whenClause.Condition.Tree.Element, p);
+        VisitSpace(whenClause.Condition.Tree.After, p);
+        p.Append(')');
+        AfterSyntax(whenClause, p);
+        return whenClause;
     }
 
     public override J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, PrintOutputCapture<P> p)

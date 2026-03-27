@@ -160,7 +160,7 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
             FunctionPointerType fpt => VisitFunctionPointerType(fpt, q),
             TypeWithArguments twa => VisitTypeWithArguments(twa, q),
             ExplicitInterfaceMember eim => VisitExplicitInterfaceMember(eim, q),
-            ExceptionFilteredTry eft => VisitExceptionFilteredTry(eft, q),
+            WhenClause wc => VisitWhenClause(wc, q),
             // LINQ
             QueryExpression qe => VisitQueryExpression(qe, q),
             QueryBody qb => VisitQueryBody(qb, q),
@@ -954,15 +954,10 @@ public class CSharpReceiver : CSharpVisitor<RpcReceiveQueue>
         return eim.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithInterfaceSpecifier(interfaceSpec!).WithMethodDeclaration((MethodDeclaration)methodDecl!);
     }
 
-    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, RpcReceiveQueue q)
+    public override J VisitWhenClause(WhenClause wc, RpcReceiveQueue q)
     {
-        var @try = q.Receive((J)eft.Try, el => (J)VisitNonNull(el, q));
-        var catchFilters = new List<JLeftPadded<ControlParentheses<Expression>>?>(eft.CatchFilters.Count);
-        foreach (var filter in eft.CatchFilters)
-        {
-            catchFilters.Add(q.Receive(filter, el => _delegate.VisitLeftPadded(el!, q)));
-        }
-        return eft.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithTry((Try)@try!).WithCatchFilters(catchFilters);
+        var condition = q.Receive((J)wc.Condition, el => (J)VisitNonNull(el, q));
+        return wc.WithId(PvId).WithPrefix(PvPrefix).WithMarkers(PvMarkers).WithCondition((ControlParentheses<Expression>)condition!);
     }
 
     // ---- LINQ ----
