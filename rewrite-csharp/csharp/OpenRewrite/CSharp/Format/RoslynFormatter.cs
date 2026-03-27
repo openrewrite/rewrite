@@ -79,9 +79,21 @@ public static class RoslynFormatter
         // 4. Format with Roslyn (scoped to the target span when available)
         var formattedSource = FormatWithRoslyn(source, style, formatSpan);
 
-        // 5. If formatting didn't change anything, return original
+        // 5. If Roslyn formatting didn't change anything, reconcile MVS changes
+        // (if any) within the target subtree and return. MVS changes like added
+        // spaces between modifiers and types must not be discarded.
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
-            return originalCu;
+        {
+            if (ReferenceEquals(mvsCu, originalCu))
+                return originalCu;
+
+            // MVS made changes — reconcile them within the target subtree
+            var mvsReconciler = new WhitespaceReconciler();
+            var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, targetSubtree, stopAfter);
+            if (!mvsReconciler.IsCompatible)
+                return originalCu;
+            return mvsResult as CompilationUnit ?? originalCu;
+        }
 
         // 6. Parse formatted string back to LST (no type attribution)
         var parser = new CSharpParser();
@@ -244,9 +256,31 @@ public static class RoslynFormatter
         // 4. Format with Roslyn, scoped to all target spans
         var formattedSource = FormatWithRoslyn(source, style, spans);
 
-        // 5. If formatting didn't change anything, return original
+        // 5. If Roslyn formatting didn't change anything, reconcile MVS changes
+        // (if any) within the target subtrees and return. MVS changes like added
+        // spaces between modifiers and types must not be discarded.
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
-            return originalCu;
+        {
+            if (ReferenceEquals(mvsCu, originalCu))
+                return originalCu;
+
+            // MVS made changes — reconcile them within the target subtrees
+            var mvsReconciler = new WhitespaceReconciler();
+            var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, nodeIds);
+            if (!mvsReconciler.IsCompatible)
+                return originalCu;
+            cu = mvsResult as CompilationUnit ?? originalCu;
+
+            // Restore preserved prefixes
+            if (preservedPrefixes.Count > 0)
+            {
+                var restorer = new PrefixRestorer(preservedPrefixes);
+                restorer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+                cu = (CompilationUnit)(restorer.Visit(cu, 0) ?? cu);
+            }
+
+            return cu;
+        }
 
         // 6. Parse formatted string back to LST
         var parser = new CSharpParser();
