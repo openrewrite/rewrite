@@ -787,7 +787,16 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         }
         else
         {
-            members = new JContainer<Expression>(membersPrefix, [], Markers.Empty);
+            // Capture space inside empty braces (e.g., `enum E {\n\n}`)
+            var emptyMembers = new List<JRightPadded<Expression>>();
+            var closeBraceSpace = ExtractSpaceBefore(node.CloseBraceToken);
+            if (closeBraceSpace != Space.Empty)
+            {
+                emptyMembers.Add(new JRightPadded<Expression>(
+                    new Empty(Guid.NewGuid(), Space.Empty, Markers.Empty),
+                    closeBraceSpace, Markers.Empty));
+            }
+            members = new JContainer<Expression>(membersPrefix, emptyMembers, Markers.Empty);
         }
 
         _cursor = node.CloseBraceToken.Span.End;
@@ -9734,9 +9743,21 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.CloseParenToken.Span.End;
 
         var expressionPadded = new JLeftPadded<Expression>(openParenPrefix, innerExpr);
-        var statement = (Statement)Visit(node.Statement)!;
+        var body = (Statement)Visit(node.Statement)!;
+        Block block;
+        if (body is Block b)
+        {
+            block = b;
+        }
+        else
+        {
+            block = new Block(Guid.NewGuid(), Space.Empty,
+                Markers.Empty.Add(new OmitBraces(Guid.NewGuid())),
+                JRightPadded<bool>.Build(false),
+                [PadStatement(body)], Space.Empty);
+        }
 
-        var usingStatement = new UsingStatement(Guid.NewGuid(), hasAwait ? Space.Empty : prefix, Markers.Empty, expressionPadded, statement);
+        var usingStatement = new UsingStatement(Guid.NewGuid(), hasAwait ? Space.Empty : prefix, Markers.Empty, expressionPadded, block);
 
         if (hasAwait)
         {

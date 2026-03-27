@@ -3586,6 +3586,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             // In C# source order: [modifiers] ReturnType InterfaceName.MethodName(params)
             // The interface specifier is printed between the return type and the method name.
+            // Print the method's prefix (e.g., newline between attribute and return type)
+            // since PrintMethodDeclarationBody does not call BeforeSyntax on the method.
+            VisitSpace(method.Prefix, p);
             PrintMethodDeclarationBody(method, eim.InterfaceSpecifier, p);
         }
         else

@@ -175,4 +175,19 @@ public class EnumDeclarationTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void EmptyEnumWithWhitespace()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                public enum LongEnum : long
+                {
+
+                }
+                """
+            )
+        );
+    }
 }
