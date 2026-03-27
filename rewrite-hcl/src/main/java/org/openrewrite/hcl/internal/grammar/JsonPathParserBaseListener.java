@@ -116,6 +116,18 @@ public class JsonPathParserBaseListener implements JsonPathParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterNegationExpression(JsonPathParser.NegationExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNegationExpression(JsonPathParser.NegationExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}

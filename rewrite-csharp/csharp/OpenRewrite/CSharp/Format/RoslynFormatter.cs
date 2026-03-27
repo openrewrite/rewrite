@@ -45,8 +45,13 @@ public static class RoslynFormatter
     /// </summary>
     public static CompilationUnit Format(CompilationUnit cu, J? targetSubtree, J? stopAfter)
     {
-        // 1. Ensure minimum spacing so printed output is parseable
-        cu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
+        // 1. Ensure minimum spacing so printed output is parseable.
+        // MVS may introduce spacing artifacts on nodes outside the target subtree
+        // (e.g., adding space to a ParameterizedType whose prefix is empty but whose
+        // inner Clazz already carries the space). Use the MVS result only for
+        // printing/Roslyn formatting, and reconcile back against the original CU.
+        var originalCu = cu;
+        var mvsCu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
 
         // 2. Print to string, tracking the position of the target subtree if provided
         string source;
@@ -55,7 +60,7 @@ public static class RoslynFormatter
         if (targetSubtree != null)
         {
             var trackingPrinter = new PositionTrackingPrinter(targetSubtree.Id);
-            source = trackingPrinter.Print(cu);
+            source = trackingPrinter.Print(mvsCu);
             var (start, end) = trackingPrinter.GetTrackedSpan();
             if (start >= 0 && end > start)
             {
@@ -65,7 +70,7 @@ public static class RoslynFormatter
         else
         {
             var printer = new CSharpPrinter<int>();
-            source = printer.Print(cu);
+            source = printer.Print(mvsCu);
         }
 
         // 3. Detect style
@@ -74,9 +79,21 @@ public static class RoslynFormatter
         // 4. Format with Roslyn (scoped to the target span when available)
         var formattedSource = FormatWithRoslyn(source, style, formatSpan);
 
-        // 5. If formatting didn't change anything, return original
+        // 5. If Roslyn formatting didn't change anything, reconcile MVS changes
+        // (if any) within the target subtree and return. MVS changes like added
+        // spaces between modifiers and types must not be discarded.
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
-            return cu;
+        {
+            if (ReferenceEquals(mvsCu, originalCu))
+                return originalCu;
+
+            // MVS made changes — reconcile them within the target subtree
+            var mvsReconciler = new WhitespaceReconciler();
+            var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, targetSubtree, stopAfter);
+            if (!mvsReconciler.IsCompatible)
+                return originalCu;
+            return mvsResult as CompilationUnit ?? originalCu;
+        }
 
         // 6. Parse formatted string back to LST (no type attribution)
         var parser = new CSharpParser();
@@ -88,17 +105,18 @@ public static class RoslynFormatter
         catch (Exception)
         {
             // If parsing fails (shouldn't happen with Roslyn), return original
-            return cu;
+            return originalCu;
         }
 
-        // 7. Reconcile whitespace
+        // 7. Reconcile whitespace against the original CU so MVS artifacts
+        // outside the target subtree are discarded.
         var reconciler = new WhitespaceReconciler();
-        var result = reconciler.Reconcile(cu, formattedCu, targetSubtree, stopAfter);
+        var result = reconciler.Reconcile(originalCu, formattedCu, targetSubtree, stopAfter);
 
         if (!reconciler.IsCompatible)
-            return cu;
+            return originalCu;
 
-        return result as CompilationUnit ?? cu;
+        return result as CompilationUnit ?? originalCu;
     }
 
     /// <summary>
@@ -238,9 +256,31 @@ public static class RoslynFormatter
         // 4. Format with Roslyn, scoped to all target spans
         var formattedSource = FormatWithRoslyn(source, style, spans);
 
-        // 5. If formatting didn't change anything, return original
+        // 5. If Roslyn formatting didn't change anything, reconcile MVS changes
+        // (if any) within the target subtrees and return. MVS changes like added
+        // spaces between modifiers and types must not be discarded.
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
-            return originalCu;
+        {
+            if (ReferenceEquals(mvsCu, originalCu))
+                return originalCu;
+
+            // MVS made changes — reconcile them within the target subtrees
+            var mvsReconciler = new WhitespaceReconciler();
+            var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, nodeIds);
+            if (!mvsReconciler.IsCompatible)
+                return originalCu;
+            cu = mvsResult as CompilationUnit ?? originalCu;
+
+            // Restore preserved prefixes
+            if (preservedPrefixes.Count > 0)
+            {
+                var restorer = new PrefixRestorer(preservedPrefixes);
+                restorer.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+                cu = (CompilationUnit)(restorer.Visit(cu, 0) ?? cu);
+            }
+
+            return cu;
+        }
 
         // 6. Parse formatted string back to LST
         var parser = new CSharpParser();
