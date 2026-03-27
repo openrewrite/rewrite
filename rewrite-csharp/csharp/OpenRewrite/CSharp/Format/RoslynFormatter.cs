@@ -45,8 +45,13 @@ public static class RoslynFormatter
     /// </summary>
     public static CompilationUnit Format(CompilationUnit cu, J? targetSubtree, J? stopAfter)
     {
-        // 1. Ensure minimum spacing so printed output is parseable
-        cu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
+        // 1. Ensure minimum spacing so printed output is parseable.
+        // MVS may introduce spacing artifacts on nodes outside the target subtree
+        // (e.g., adding space to a ParameterizedType whose prefix is empty but whose
+        // inner Clazz already carries the space). Use the MVS result only for
+        // printing/Roslyn formatting, and reconcile back against the original CU.
+        var originalCu = cu;
+        var mvsCu = (CompilationUnit)(new MinimumViableSpacingVisitor().Visit(cu, 0) ?? cu);
 
         // 2. Print to string, tracking the position of the target subtree if provided
         string source;
@@ -55,7 +60,7 @@ public static class RoslynFormatter
         if (targetSubtree != null)
         {
             var trackingPrinter = new PositionTrackingPrinter(targetSubtree.Id);
-            source = trackingPrinter.Print(cu);
+            source = trackingPrinter.Print(mvsCu);
             var (start, end) = trackingPrinter.GetTrackedSpan();
             if (start >= 0 && end > start)
             {
@@ -65,7 +70,7 @@ public static class RoslynFormatter
         else
         {
             var printer = new CSharpPrinter<int>();
-            source = printer.Print(cu);
+            source = printer.Print(mvsCu);
         }
 
         // 3. Detect style
@@ -76,7 +81,7 @@ public static class RoslynFormatter
 
         // 5. If formatting didn't change anything, return original
         if (string.Equals(source, formattedSource, StringComparison.Ordinal))
-            return cu;
+            return originalCu;
 
         // 6. Parse formatted string back to LST (no type attribution)
         var parser = new CSharpParser();
@@ -88,17 +93,18 @@ public static class RoslynFormatter
         catch (Exception)
         {
             // If parsing fails (shouldn't happen with Roslyn), return original
-            return cu;
+            return originalCu;
         }
 
-        // 7. Reconcile whitespace
+        // 7. Reconcile whitespace against the original CU so MVS artifacts
+        // outside the target subtree are discarded.
         var reconciler = new WhitespaceReconciler();
-        var result = reconciler.Reconcile(cu, formattedCu, targetSubtree, stopAfter);
+        var result = reconciler.Reconcile(originalCu, formattedCu, targetSubtree, stopAfter);
 
         if (!reconciler.IsCompatible)
-            return cu;
+            return originalCu;
 
-        return result as CompilationUnit ?? cu;
+        return result as CompilationUnit ?? originalCu;
     }
 
     /// <summary>

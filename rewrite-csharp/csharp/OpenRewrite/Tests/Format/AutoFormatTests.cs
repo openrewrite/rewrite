@@ -554,6 +554,50 @@ public class AutoFormatTests
         Assert.Equal(block.Id, result.Id);
     }
 
+    [Fact]
+    public void FormatSubtreeDoesNotCorruptUnrelatedWhitespace()
+    {
+        // Reproducer for autoformat corrupting whitespace in base type lists
+        // and async modifiers when a method body subtree is formatted.
+        const string source =
+            "using System;\n" +
+            "using System.Threading.Tasks;\n" +
+            "\n" +
+            "public class TestObj : IComparable<TestObj?>, IEquatable<TestObj?>\n" +
+            "{\n" +
+            "    public int CompareTo(TestObj? other) => 0;\n" +
+            "    public bool Equals(TestObj? other) => false;\n" +
+            "\n" +
+            "    public async Task<int> RunAsync()\n" +
+            "    {\n" +
+            "        return await Task.FromResult(0);\n" +
+            "    }\n" +
+            "}\n";
+
+        var cu = _parser.Parse(source);
+        var originalPrinted = _printer.Print(cu);
+        Assert.Equal(source, originalPrinted);
+
+        // Find the first method body (simulating a localized change via FormatSubtree)
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
+        Assert.NotNull(classDecl);
+        var method = classDecl.Body.Statements[0].Element as MethodDeclaration;
+        Assert.NotNull(method);
+        var body = method.Body!;
+
+        // 1. Test FormatSubtree path (used by template application):
+        //    Splice the unmodified body back and format — should be a no-op
+        var subtreeResult = RoslynFormatter.FormatSubtree(cu, body.Id, body, stopAfter: null);
+        Assert.Equal(body.Id, subtreeResult.Id);
+
+        // 2. Test Format path with a target subtree
+        var formattedCu = RoslynFormatter.Format(cu, targetSubtree: method, stopAfter: null);
+        var result = _printer.Print(formattedCu);
+
+        // Since the body is unmodified, the output should be character-identical to input
+        Assert.Equal(source, result);
+    }
+
     private class ForLoopFinder(Action<ForLoop> onFound) : CSharpVisitor<int>
     {
         public override J VisitForLoop(ForLoop forLoop, int p)
