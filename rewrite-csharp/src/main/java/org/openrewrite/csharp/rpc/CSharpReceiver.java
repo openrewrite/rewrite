@@ -715,7 +715,7 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
         List<Cs.DirectiveLine> directiveLines = q.receiveList(conditionalDirective.getDirectiveLines(), dl -> {
             int lineNumber = q.receive(dl != null ? dl.getLineNumber() : 0);
             String text = q.receive(dl != null ? dl.getText() : "");
-            Cs.PreprocessorDirectiveKind kind = Cs.PreprocessorDirectiveKind.values()[q.receive(dl != null ? dl.getKind().ordinal() : 0)];
+            Cs.PreprocessorDirectiveKind kind = Cs.PreprocessorDirectiveKind.values()[q.receive(dl != null && dl.getKind() != null ? dl.getKind().ordinal() : 0)];
             int groupId = q.receive(dl != null ? dl.getGroupId() : 0);
             int activeBranchIndex = q.receive(dl != null ? dl.getActiveBranchIndex() : -1);
             return new Cs.DirectiveLine(lineNumber, text, kind, groupId, activeBranchIndex);
