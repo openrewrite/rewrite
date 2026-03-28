@@ -823,6 +823,33 @@ public class AutoFormatTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// Workaround test for https://github.com/dotnet/roslyn/issues/82974:
+    /// AutoFormat must expand empty constructor bodies with initializers to Allman style.
+    /// </summary>
+    [Fact]
+    public void AutoFormatEmptyConstructorBodyWithInitializer()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AutoFormatRecipe()),
+            CSharp(
+                "class Foo : Exception\n{\npublic Foo() : base(){}\npublic Foo(string m) : base(m){}\n}\n",
+                "class Foo : Exception\n{\n    public Foo() : base()\n    {\n    }\n    public Foo(string m) : base(m)\n    {\n    }\n}\n"
+            )
+        );
+    }
+
+}
+
+/// <summary>
+/// Recipe that auto-formats the entire compilation unit.
+/// </summary>
+file class AutoFormatRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Auto-format";
+    public override string Description => "Formats the entire source file.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new AutoFormatVisitor<ExecutionContext>();
 }
 
 /// <summary>
