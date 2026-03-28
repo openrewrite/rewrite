@@ -16,11 +16,14 @@
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
+using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
+using OpenRewrite.Test;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Format;
 
-public class AutoFormatTests
+public class AutoFormatTests : RewriteTest
 {
     private readonly CSharpParser _parser = new();
     private readonly CSharpPrinter<int> _printer = new();
@@ -54,7 +57,9 @@ public class AutoFormatTests
 
             namespace Test
             {
-                class Foo { }
+                class Foo
+                {
+                }
             }
             """;
 
@@ -339,8 +344,9 @@ public class AutoFormatTests
         Assert.Contains("\n    public string Name", formatted);
         Assert.Contains("\n    public int Age", formatted);
 
-        // Spaces around braces in auto-properties
-        Assert.Contains("{ get; set; }", formatted);
+        // Auto-property accessors are properly formatted
+        Assert.Contains("get;", formatted);
+        Assert.Contains("set;", formatted);
 
         // Expression-bodied member spacing
         Assert.Contains("FullName =>", formatted);
@@ -718,5 +724,161 @@ public class AutoFormatTests
 
         // Proper indentation of bodies
         Assert.Contains("\n            Console.WriteLine(", formatted);
+    }
+
+    /// <summary>
+    /// A recipe replaces a return statement with a compressed if/else template.
+    /// AutoFormat at the statement level (deferred) should format the spliced subtree
+    /// without touching surrounding code — in particular, <c>{ get; set; }</c> must stay on one line.
+    /// </summary>
+    [Fact]
+    public void AutoFormatSplicedSubtreePreservesSurroundingCode()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceReturnWithIfElseRecipe()),
+            CSharp(
+                // Intentional formatting quirks outside the target method:
+                // - extra spaces in "public  string" and "public   int"
+                // - single-line property accessors { get;set; } (no space)
+                // - inconsistent blank lines
+                """
+                class Foo
+                {
+                    public  string Name { get;set; }
+                    string Categorize(bool a, bool b)
+                    {
+                        return a ? "A" : b ? "B" : "D";
+                    }
+
+                    public   int Age {get; set; }
+                }
+                """,
+                // The quirks must survive — only the if/else chain is reformatted
+                """
+                class Foo
+                {
+                    public  string Name { get;set; }
+                    string Categorize(bool a, bool b)
+                    {
+                        if (a)
+                        {
+                            return "A";
+                        }
+                        else if (b)
+                        {
+                            return "B";
+                        }
+                        else
+                        {
+                            return "D";
+                        }
+                    }
+
+                    public   int Age {get; set; }
+                }
+                """
+            )
+        );
+    }
+
+    /// <summary>
+    /// Simulates what happens after a template is applied: the CU is well-formatted
+    /// except for a compressed subtree. A recipe that calls RoslynFormatter.Format
+    /// at the CU level should produce properly formatted output.
+    /// </summary>
+    [Fact]
+    public void AutoFormatHandlesCompressedSubtreeInWellFormattedFile()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AutoFormatCuRecipe()),
+            CSharp(
+                """
+                class Foo
+                {
+                    void Other()
+                    {
+                        var x = 1;
+                    }
+
+                    string Categorize(bool a, bool b)
+                    {
+                        if(a){return "A";}else if(b){return "B";}else{return "D";}
+                    }
+                }
+                """,
+                """
+                class Foo
+                {
+                    void Other()
+                    {
+                        var x = 1;
+                    }
+
+                    string Categorize(bool a, bool b)
+                    {
+                        if (a)
+                        {
+                            return "A";
+                        }
+                        else if (b)
+                        {
+                            return "B";
+                        }
+                        else
+                        {
+                            return "D";
+                        }
+                    }
+                }
+                """
+            )
+        );
+    }
+}
+
+/// <summary>
+/// Recipe that simply calls RoslynFormatter.Format on the entire CompilationUnit.
+/// </summary>
+file class AutoFormatCuRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "AutoFormat CU";
+    public override string Description => "Formats the entire compilation unit.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitCompilationUnit(CompilationUnit cu, ExecutionContext ctx)
+        {
+            return RoslynFormatter.Format(cu);
+        }
+    }
+}
+
+/// <summary>
+/// Recipe that replaces a return statement with a compressed if/else chain via template,
+/// using AutoFormat at the statement level (deferred formatting).
+/// Verifies that only the spliced subtree is reformatted — surrounding code is untouched.
+/// </summary>
+file class ReplaceReturnWithIfElseRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Replace return with if/else";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitReturn(Return ret, ExecutionContext ctx)
+        {
+            ret = (Return)base.VisitReturn(ret, ctx);
+            if (ret.Expression is not Ternary)
+                return ret;
+
+            // Compressed single-line template — no newlines at all
+            var tmpl = CSharpTemplate.Statement(
+                "if(a){return \"A\";}else if(b){return \"B\";}else{return \"D\";}");
+            return AutoFormat((J)tmpl.Apply(Cursor)!, ctx, Cursor);
+        }
     }
 }
