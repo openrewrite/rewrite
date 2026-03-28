@@ -94,11 +94,27 @@ public class WhitespaceReconciler
     {
         if (!_compatible) return original;
 
-        // Handle null
+        // Handle null: if one is null and the other isn't, check whether it's a
+        // structural type (J, padded wrapper, list) where a mismatch is fatal.
+        // For primitive/string properties (e.g., Modifier.Keyword), null vs non-null
+        // is not a structural divergence — just keep the original value.
         if (original == null || formatted == null)
         {
-            if (!ReferenceEquals(original, formatted) && (original != null || formatted != null))
+            if (ReferenceEquals(original, formatted))
+                return original;
+
+            // A null mismatch on a structural type is a real incompatibility
+            var nonNull = original ?? formatted;
+            if (nonNull is J || nonNull is Space || nonNull is Markers ||
+                nonNull is IList ||
+                IsGenericOf(nonNull, typeof(JRightPadded<>)) ||
+                IsGenericOf(nonNull, typeof(JLeftPadded<>)) ||
+                IsGenericOf(nonNull, typeof(JContainer<>)))
+            {
                 return StructureMismatch(original);
+            }
+
+            // For primitive types (string, enum, etc.), keep the original
             return original;
         }
 
