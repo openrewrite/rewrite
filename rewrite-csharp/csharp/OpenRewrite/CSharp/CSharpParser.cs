@@ -4623,7 +4623,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         _cursor = node.Token.Span.End;
 
         var type = node.Kind() == SyntaxKind.NumericLiteralExpression
-            ? _typeMapping?.Type(node) ?? GetPrimitiveType(node.Kind())
+            ? _typeMapping?.Type(node) as JavaType.Primitive ?? GetPrimitiveType(node.Kind())
             : GetPrimitiveType(node.Kind());
 
         return new Literal(
