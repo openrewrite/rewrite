@@ -4622,7 +4622,9 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
         // Skip past the literal token
         _cursor = node.Token.Span.End;
 
-        var type = GetPrimitiveType(node.Kind());
+        var type = node.Kind() == SyntaxKind.NumericLiteralExpression
+            ? _typeMapping?.Type(node) ?? GetPrimitiveType(node.Kind())
+            : GetPrimitiveType(node.Kind());
 
         return new Literal(
             Guid.NewGuid(),

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
@@ -102,5 +103,24 @@ public class LiteralTests : RewriteTest
                 """
             )
         );
+    }
+
+    [Theory]
+    [InlineData("0L", JavaType.PrimitiveKind.Long)]
+    [InlineData("0l", JavaType.PrimitiveKind.Long)]
+    [InlineData("42", JavaType.PrimitiveKind.Int)]
+    [InlineData("1.0f", JavaType.PrimitiveKind.Float)]
+    [InlineData("1.0F", JavaType.PrimitiveKind.Float)]
+    [InlineData("1.0d", JavaType.PrimitiveKind.Double)]
+    [InlineData("1.0D", JavaType.PrimitiveKind.Double)]
+    [InlineData("1.0", JavaType.PrimitiveKind.Double)]
+    public void NumericLiteralTypeAttribution(string literal, JavaType.PrimitiveKind expectedKind)
+    {
+        var cu = Parse($"{literal};");
+        var lit = FindFirst<Literal>(cu);
+        Assert.NotNull(lit);
+        Assert.NotNull(lit.Type);
+        Assert.IsType<JavaType.Primitive>(lit.Type);
+        Assert.Equal(expectedKind, ((JavaType.Primitive)lit.Type).Kind);
     }
 }
