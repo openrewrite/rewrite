@@ -20,6 +20,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using Rewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -131,6 +132,46 @@ public abstract class RewriteTest
     protected static SourceSpec CSharp(string before, string? after = null)
     {
         return new SourceSpec(before, after);
+    }
+
+    /// <summary>
+    /// Parses C# source with a semantic model, returning the CompilationUnit.
+    /// </summary>
+    protected static CSharp.CompilationUnit Parse(string source)
+    {
+        var syntaxTree = CSharpSyntaxTree.ParseText(source, path: "source.cs");
+        var compilation = CSharpCompilation.Create("TestCompilation")
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddReferences(ResolveAssemblies(Assemblies.Net90))
+            .AddSyntaxTrees(syntaxTree);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        return new CSharpParser().Parse(source, semanticModel: semanticModel);
+    }
+
+    /// <summary>
+    /// Finds the first node of type TNode in the tree using a depth-first walk.
+    /// </summary>
+    protected static TNode? FindFirst<TNode>(Tree tree) where TNode : J
+    {
+        var finder = new FirstFinder<TNode>();
+        finder.Visit(tree, 0);
+        return finder.Found;
+    }
+
+    private class FirstFinder<TNode> : CSharpVisitor<int> where TNode : J
+    {
+        public TNode? Found { get; private set; }
+
+        public override J? Visit(Tree? tree, int p)
+        {
+            if (Found != null) return tree as J;
+            if (tree is TNode match)
+            {
+                Found = match;
+                return tree as J;
+            }
+            return base.Visit(tree, p);
+        }
     }
 
     private static void AssertContentEquals(string expected, string actual, string sourcePath,
