@@ -166,13 +166,17 @@ public sealed class CSharpPattern
     {
         var patternTree = GetTree();
 
+        // Unwrap parentheses for fast-reject so (expr) vs expr aren't rejected early
+        var unwrappedPattern = PatternMatchingComparator.UnwrapParentheses(patternTree);
+        var unwrappedTree = PatternMatchingComparator.UnwrapParentheses(tree);
+
         // Fast reject: if the pattern root is not a capture placeholder and the
         // candidate is a different node type, no match is possible — unless the
         // comparator has a known cross-type equivalence (e.g. Binary ↔ IsPattern).
         // This avoids allocating a PatternMatchingComparator for the common non-matching case.
-        if (patternTree.GetType() != tree.GetType()
-            && !IsCapturePlaceholder(patternTree)
-            && !PatternMatchingComparator.HasCrossTypeEquivalence(patternTree, tree))
+        if (unwrappedPattern.GetType() != unwrappedTree.GetType()
+            && !IsCapturePlaceholder(unwrappedPattern)
+            && !PatternMatchingComparator.HasCrossTypeEquivalence(unwrappedPattern, unwrappedTree))
             return null;
 
         var comparator = new PatternMatchingComparator(_captures);
