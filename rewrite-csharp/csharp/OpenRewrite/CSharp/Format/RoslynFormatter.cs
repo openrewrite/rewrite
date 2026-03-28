@@ -15,6 +15,7 @@
  */
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Formatting;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Text;
 using OpenRewrite.Core;
@@ -517,11 +518,7 @@ public static class RoslynFormatter
         var root = syntaxTree.GetRoot();
 
         using var workspace = new AdhocWorkspace();
-        var options = workspace.Options
-            .WithChangedOption(FormattingOptions.UseTabs, LanguageNames.CSharp, style.UseTabs)
-            .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentationSize)
-            .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.IndentationSize)
-            .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine);
+        var options = BuildOptions(workspace, style);
 
         var formatted = span != null
             ? Formatter.Format(root, span.Value, workspace, options)
@@ -535,13 +532,22 @@ public static class RoslynFormatter
         var root = syntaxTree.GetRoot();
 
         using var workspace = new AdhocWorkspace();
-        var options = workspace.Options
-            .WithChangedOption(FormattingOptions.UseTabs, LanguageNames.CSharp, style.UseTabs)
-            .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentationSize)
-            .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.IndentationSize)
-            .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine);
+        var options = BuildOptions(workspace, style);
 
         var formatted = Formatter.Format(root, spans, workspace, options);
         return formatted.ToFullString();
+    }
+
+    private static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(AdhocWorkspace workspace, FormatStyle style)
+    {
+        return workspace.Options
+            .WithChangedOption(FormattingOptions.UseTabs, LanguageNames.CSharp, style.UseTabs)
+            .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentationSize)
+            .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.IndentationSize)
+            .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine)
+            // Don't preserve single-line formatting — synthesized nodes may have no newlines,
+            // and Roslyn must insert structural newlines (after {, before }, before else, etc.)
+            .WithChangedOption(CSharpFormattingOptions.WrappingPreserveSingleLine, false)
+            .WithChangedOption(CSharpFormattingOptions.WrappingKeepStatementsOnSingleLine, false);
     }
 }

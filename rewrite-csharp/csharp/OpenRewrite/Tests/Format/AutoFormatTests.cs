@@ -16,11 +16,14 @@
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
+using OpenRewrite.CSharp.Template;
 using OpenRewrite.Java;
+using OpenRewrite.Test;
+using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Format;
 
-public class AutoFormatTests
+public class AutoFormatTests : RewriteTest
 {
     private readonly CSharpParser _parser = new();
     private readonly CSharpPrinter<int> _printer = new();
@@ -54,7 +57,9 @@ public class AutoFormatTests
 
             namespace Test
             {
-                class Foo { }
+                class Foo
+                {
+                }
             }
             """;
 
@@ -206,17 +211,16 @@ public class AutoFormatTests
     }
 
     [Fact]
-    public void RoslynFormatterNormalizesWhitespace()
+    public void RoslynFormatterExpandsSingleLineBlocks()
     {
         const string before = "class Foo{void Bar(){int x=1;}}";
         var style = new FormatStyle(false, 4, "\n");
         var formatted = RoslynFormatter.FormatWithRoslyn(before, style);
 
-        // Roslyn normalizes spacing (adds spaces around braces) but doesn't add line breaks
+        // With WrappingPreserveSingleLine=false, Roslyn expands single-line blocks
         Assert.Contains("class Foo", formatted);
         Assert.NotEqual(before, formatted);
     }
-
     [Fact]
     public void IntegrationAutoFormatVisitorOnIllFormattedSource()
     {
@@ -339,8 +343,10 @@ public class AutoFormatTests
         Assert.Contains("\n    public string Name", formatted);
         Assert.Contains("\n    public int Age", formatted);
 
-        // Spaces around braces in auto-properties
-        Assert.Contains("{ get; set; }", formatted);
+        // Auto-property accessors are expanded to multi-line by whole-CU formatting
+        // (WrappingPreserveSingleLine=false causes Roslyn to expand single-line blocks)
+        Assert.Contains("get;", formatted);
+        Assert.Contains("set;", formatted);
 
         // Expression-bodied member spacing
         Assert.Contains("FullName =>", formatted);
@@ -719,4 +725,236 @@ public class AutoFormatTests
         // Proper indentation of bodies
         Assert.Contains("\n            Console.WriteLine(", formatted);
     }
+
+    /// <summary>
+    /// Reproduces the AvoidNestingTernary pattern: manually constructed if/else chain with
+    /// Space.Empty, conditions extracted from the original ternary, MaybeAutoFormat at Block level.
+    /// Surrounding formatting quirks must be preserved — only the spliced subtree is reformatted.
+    /// </summary>
+    [Fact]
+    public void AutoFormatManualIfElseWithMaybeAutoFormatAtBlockLevel()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ManualIfElseAtBlockLevelRecipe()),
+            CSharp(
+                // Formatting quirks outside the target method must survive
+                """
+                class Test
+                {
+                    public  string Name { get;set; }
+                    string M(int x)
+                    {
+                        return x > 0 ? "positive" : x < 0 ? "negative" : "zero";
+                    }
+
+                    public   int Age {get; set; }
+                }
+                """,
+                """
+                class Test
+                {
+                    public  string Name { get;set; }
+                    string M(int x)
+                    {
+                        if (x > 0)
+                        {
+                            return "positive";
+                        }
+                        else if (x < 0)
+                        {
+                            return "negative";
+                        }
+                        else
+                        {
+                            return "zero";
+                        }
+                    }
+
+                    public   int Age {get; set; }
+                }
+                """
+            )
+        );
+    }
+
+    /// <summary>
+    /// Multi-statement template: string declaration + compressed if/else + return.
+    /// The template returns a SyntheticBlock that gets flattened into the parent block.
+    /// Each spliced statement should be individually formatted.
+    /// </summary>
+    [Fact]
+    public void AutoFormatSplicedMultiStatementTemplate()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new ReplaceWithMultiStatementTemplateRecipe()),
+            CSharp(
+                """
+                class Test
+                {
+                    string M(int x)
+                    {
+                        return x > 0 ? "positive" : x < 0 ? "negative" : "zero";
+                    }
+                }
+                """,
+                """
+                class Test
+                {
+                    string M(int x)
+                    {
+                        string s;
+                        if (x > 0)
+                        {
+                            s = "positive";
+                        }
+                        else if (x < 0)
+                        {
+                            s = "negative";
+                        }
+                        else
+                        {
+                            s = "zero";
+                        }
+                        return s;
+                    }
+                }
+                """
+            )
+        );
+    }
+
 }
+
+/// <summary>
+/// Recipe that replaces a return statement with a multi-statement template:
+/// string s; if/else chain; return s; — using deferred formatting (AutoFormat at statement level).
+/// The template produces a SyntheticBlock that gets flattened.
+/// </summary>
+file class ReplaceWithMultiStatementTemplateRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Replace with multi-statement template";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitReturn(Return ret, ExecutionContext ctx)
+        {
+            ret = (Return)base.VisitReturn(ret, ctx);
+            if (ret.Expression is not Ternary)
+                return ret;
+
+            // Multi-statement compressed template — produces a SyntheticBlock
+            var tmpl = CSharpTemplate.Statement(
+                "string s;if(x>0){s=\"positive\";}else if(x<0){s=\"negative\";}else{s=\"zero\";}return s;");
+            return AutoFormat((J)tmpl.Apply(Cursor)!, ctx, Cursor);
+        }
+    }
+}
+
+/// <summary>
+/// Recipe that manually constructs an if/else chain with Space.Empty (like AvoidNestingTernary),
+/// extracting conditions and values from the original ternary, and calls MaybeAutoFormat at Block level.
+/// </summary>
+file class ManualIfElseAtBlockLevelRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Manual if/else at block level";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitBlock(Block block, ExecutionContext ctx)
+        {
+            var before = block;
+            block = (Block)base.VisitBlock(block, ctx);
+
+            bool changed = false;
+            var newStmts = new List<JRightPadded<Statement>>();
+
+            foreach (var padded in block.Statements)
+            {
+                if (padded.Element is Return ret && ret.Expression is Ternary ternary &&
+                    ternary.FalsePart.Element is Ternary)
+                {
+                    // Flatten the ternary chain (like AvoidNestingTernary does)
+                    var branches = new List<(Expression condition, Expression value)>();
+                    Expression elseValue;
+                    FlattenTernary(ternary, branches, out elseValue);
+
+                    var ifStmt = BuildIfElseReturn(branches, elseValue, ret.Prefix);
+                    newStmts.Add(new JRightPadded<Statement>(ifStmt, Space.Empty, Markers.Empty));
+                    changed = true;
+                }
+                else
+                {
+                    newStmts.Add(padded);
+                }
+            }
+
+            return changed
+                ? MaybeAutoFormat(before, block.WithStatements(newStmts), ctx, Cursor)
+                : block;
+        }
+
+        private static void FlattenTernary(Ternary ternary,
+            List<(Expression condition, Expression value)> branches, out Expression elseValue)
+        {
+            branches.Add((ternary.Condition, ternary.TruePart.Element));
+            if (ternary.FalsePart.Element is Ternary nested)
+                FlattenTernary(nested, branches, out elseValue);
+            else
+                elseValue = ternary.FalsePart.Element;
+        }
+
+        private static If BuildIfElseReturn(
+            List<(Expression condition, Expression value)> branches,
+            Expression elseValue, Space declPrefix)
+        {
+            var elseBlock = MakeReturnBlock(elseValue);
+            If.Else? currentElse = new(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<Statement>(elseBlock, Space.Empty, Markers.Empty));
+
+            for (int i = branches.Count - 1; i >= 1; i--)
+            {
+                var (cond, val) = branches[i];
+                var block = MakeReturnBlock(val);
+                var elseIfStmt = new If(Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                    MakeCondition(cond),
+                    new JRightPadded<Statement>(block, Space.Empty, Markers.Empty),
+                    currentElse);
+                currentElse = new If.Else(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                    new JRightPadded<Statement>(elseIfStmt, Space.Empty, Markers.Empty));
+            }
+
+            var (firstCond, firstVal) = branches[0];
+            var firstBlock = MakeReturnBlock(firstVal);
+            return new If(Guid.NewGuid(), declPrefix, Markers.Empty,
+                MakeCondition(firstCond),
+                new JRightPadded<Statement>(firstBlock, Space.Empty, Markers.Empty),
+                currentElse);
+        }
+
+        private static ControlParentheses<Expression> MakeCondition(Expression condition)
+        {
+            return new ControlParentheses<Expression>(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                new JRightPadded<Expression>(
+                    J.SetPrefix(condition, Space.Empty),
+                    Space.Empty, Markers.Empty));
+        }
+
+        private static Block MakeReturnBlock(Expression value)
+        {
+            var ret = new Return(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                J.SetPrefix(value, Space.SingleSpace));
+            return new Block(Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [new JRightPadded<Statement>(ret, Space.Empty, Markers.Empty)],
+                Space.Empty);
+        }
+    }
+}
+
