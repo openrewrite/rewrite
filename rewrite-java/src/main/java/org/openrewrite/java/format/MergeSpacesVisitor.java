@@ -73,11 +73,6 @@ public class MergeSpacesVisitor extends JavaVisitor<Object> {
             return space;
         }
         Space newSpace = (Space) ctx;
-        if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && space.getWhitespace().contains("\n")) {
-            if (newSpace.getWhitespace().contains("\n")) {
-                newSpace = newSpace.withWhitespace(space.getWhitespace().substring(0, space.getWhitespace().lastIndexOf("\n") + 1) + newSpace.getWhitespace().substring(newSpace.getWhitespace().lastIndexOf("\n") + 1));
-            }
-        }
         if (space == null) {
             return newSpace;
         }

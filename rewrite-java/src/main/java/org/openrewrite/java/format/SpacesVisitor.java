@@ -794,11 +794,11 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space minimizedSkipComments(Space space, String whitespace) {
         if (space.getComments().isEmpty()) {
+            //Reduce to single new line
             if (evaluate(() -> wrappingAndBracesStyle.getKeepWhenFormatting().getLineBreaks(), true) && StringUtils.hasLineBreak(space.getWhitespace())) {
-                return space;
+                return space.withWhitespace(space.getWhitespace().substring(space.getWhitespace().lastIndexOf('\n')));
             }
             if (StringUtils.hasLineBreak(whitespace)) {
-                //Reduce to single new line
                 return space.withWhitespace(whitespace.substring(whitespace.lastIndexOf('\n')));
             }
             return space.withWhitespace(whitespace);

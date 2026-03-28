@@ -128,6 +128,55 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
+    void extraNewlinesInVariableInitializer() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  int a =
+
+                    1;
+              }
+              """,
+            """
+              public class Test {
+                  int a = 1;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void extraNewlinesInVariableInitializerKeepLineBreaks() {
+        rewriteRun(
+          spec -> spec.recipe(new AutoFormat(null))
+            .parser(JavaParser.fromJavaVersion()
+              .styles(singletonList(
+                new NamedStyles(
+                  Tree.randomId(), "test", "Test", "A test.", emptySet(),
+                  List.of(IntelliJ.wrappingAndBraces())
+                )))
+            ),
+          java(
+            """
+              public class Test {
+                  int a =
+
+                    1;
+              }
+              """,
+            """
+              public class Test {
+                  int a =
+                          1;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void annotatedMethod() {
         rewriteRun(
           java(
