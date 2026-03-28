@@ -517,7 +517,7 @@ public static class RoslynFormatter
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var root = syntaxTree.GetRoot();
 
-        using var workspace = new AdhocWorkspace();
+        using var workspace = CreateWorkspace();
         var options = BuildOptions(workspace, style);
 
         var formatted = span != null
@@ -531,12 +531,39 @@ public static class RoslynFormatter
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var root = syntaxTree.GetRoot();
 
-        using var workspace = new AdhocWorkspace();
+        using var workspace = CreateWorkspace();
         var options = BuildOptions(workspace, style);
 
         var formatted = Formatter.Format(root, spans, workspace, options);
         return formatted.ToFullString();
     }
+
+    /// <summary>
+    /// Cached MEF host services for creating AdhocWorkspaces.
+    /// <para>
+    /// The default <c>new AdhocWorkspace()</c> relies on <c>Assembly.Load</c> to discover
+    /// <c>Microsoft.CodeAnalysis.CSharp.Workspaces</c> via the .NET dependency graph. When the
+    /// OpenRewrite SDK is consumed as a NuGet package with <c>PrivateAssets="all"</c>, the
+    /// dependency entries are absent from the consumer's <c>.deps.json</c>, causing
+    /// <c>Assembly.Load</c> to fail silently. The formatter then becomes a no-op because
+    /// MEF cannot discover the C# formatting services.
+    /// </para>
+    /// <para>
+    /// This field works around the issue by referencing the already-loaded assemblies directly,
+    /// since <c>typeof(CSharpSyntaxTree)</c> and <c>typeof(Formatter)</c> guarantee that the
+    /// required Roslyn assemblies are in the current AppDomain. The host is created once and
+    /// reused for every workspace — MEF composition is expensive, workspaces are cheap.
+    /// </para>
+    /// </summary>
+    private static readonly Microsoft.CodeAnalysis.Host.Mef.MefHostServices HostServices =
+        Microsoft.CodeAnalysis.Host.Mef.MefHostServices.Create(
+        [
+            typeof(Microsoft.CodeAnalysis.Workspace).Assembly,               // Microsoft.CodeAnalysis.Workspaces
+            typeof(CSharpSyntaxTree).Assembly,                               // Microsoft.CodeAnalysis.CSharp
+            typeof(Microsoft.CodeAnalysis.CSharp.Formatting.CSharpFormattingOptions).Assembly  // Microsoft.CodeAnalysis.CSharp.Workspaces
+        ]);
+
+    private static AdhocWorkspace CreateWorkspace() => new(HostServices);
 
     private static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(AdhocWorkspace workspace, FormatStyle style)
     {
