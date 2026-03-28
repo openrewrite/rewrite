@@ -518,7 +518,7 @@ public static class RoslynFormatter
         var root = syntaxTree.GetRoot();
 
         using var workspace = new AdhocWorkspace();
-        var options = BuildOptions(workspace, style, expandSingleLine: true);
+        var options = BuildOptions(workspace, style);
 
         var formatted = span != null
             ? Formatter.Format(root, span.Value, workspace, options)
@@ -532,31 +532,22 @@ public static class RoslynFormatter
         var root = syntaxTree.GetRoot();
 
         using var workspace = new AdhocWorkspace();
-        // Synthesized subtrees may have no newlines — tell Roslyn not to preserve single-line formatting
-        var options = BuildOptions(workspace, style, expandSingleLine: true);
+        var options = BuildOptions(workspace, style);
 
         var formatted = Formatter.Format(root, spans, workspace, options);
         return formatted.ToFullString();
     }
 
-    private static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(
-        AdhocWorkspace workspace, FormatStyle style, bool expandSingleLine = false)
+    private static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(AdhocWorkspace workspace, FormatStyle style)
     {
-        var options = workspace.Options
+        return workspace.Options
             .WithChangedOption(FormattingOptions.UseTabs, LanguageNames.CSharp, style.UseTabs)
             .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentationSize)
             .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.IndentationSize)
-            .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine);
-
-        if (expandSingleLine)
-        {
-            // Don't preserve single-line formatting within the target spans — synthesized nodes
-            // may have no newlines, and Roslyn must insert structural newlines
-            options = options
-                .WithChangedOption(CSharpFormattingOptions.WrappingPreserveSingleLine, false)
-                .WithChangedOption(CSharpFormattingOptions.WrappingKeepStatementsOnSingleLine, false);
-        }
-
-        return options;
+            .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine)
+            // Don't preserve single-line formatting — synthesized nodes may have no newlines,
+            // and Roslyn must insert structural newlines (after {, before }, before else, etc.)
+            .WithChangedOption(CSharpFormattingOptions.WrappingPreserveSingleLine, false)
+            .WithChangedOption(CSharpFormattingOptions.WrappingKeepStatementsOnSingleLine, false);
     }
 }

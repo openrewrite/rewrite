@@ -221,8 +221,6 @@ public class AutoFormatTests : RewriteTest
         Assert.Contains("class Foo", formatted);
         Assert.NotEqual(before, formatted);
     }
-
-
     [Fact]
     public void IntegrationAutoFormatVisitorOnIllFormattedSource()
     {
@@ -345,7 +343,8 @@ public class AutoFormatTests : RewriteTest
         Assert.Contains("\n    public string Name", formatted);
         Assert.Contains("\n    public int Age", formatted);
 
-        // Auto-property accessors are properly formatted
+        // Auto-property accessors are expanded to multi-line by whole-CU formatting
+        // (WrappingPreserveSingleLine=false causes Roslyn to expand single-line blocks)
         Assert.Contains("get;", formatted);
         Assert.Contains("set;", formatted);
 
