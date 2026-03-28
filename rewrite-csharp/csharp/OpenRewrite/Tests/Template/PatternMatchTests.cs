@@ -1622,6 +1622,38 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Parentheses unwrapping
+    // ===============================================================
+
+    [Fact]
+    public void MatchesConcreteArgThroughParentheses()
+    {
+        // Pattern `Console.WriteLine("hello")` should match `Console.WriteLine(("hello"))`
+        // The argument "hello" is wrapped in parens — comparator should unwrap
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("Console.WriteLine(\"hello\")")),
+            CSharp(
+                "class C { void M() { Console.WriteLine((\"hello\")); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine((\"hello\")); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ParenthesizedPatternMatchesUnparenthesized()
+    {
+        // Pattern `(x + 1)` should match candidate `x + 1` (unwrap pattern parens)
+        var x = Capture.Of<Expression>("x");
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression($"({x} + 1)")),
+            CSharp(
+                "class C { int M(int x) => x + 1; }",
+                "class C { int M(int x) => /*~~>*/x + 1; }"
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
@@ -1681,6 +1713,7 @@ public class PatternMatchTests : RewriteTest
     private static OpenRewrite.Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
     private static OpenRewrite.Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
 
+    private static OpenRewrite.Core.Recipe FindExpression(TemplateStringHandler h) => Search<Expression>(h);
     private static OpenRewrite.Core.Recipe FindAnnotation(TemplateStringHandler h) =>
         new PatternSearchRecipe<Annotation>(CSharpPattern.Attribute(h));
 

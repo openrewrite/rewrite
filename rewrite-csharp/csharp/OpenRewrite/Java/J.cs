@@ -1731,6 +1731,16 @@ public sealed class TypeCast(
 }
 
 /// <summary>
+/// Non-generic interface for <see cref="Parentheses{T}"/>, allowing type-checks
+/// and unwrapping without knowing the generic type parameter.
+/// </summary>
+public interface Parentheses : Expression
+{
+    /// <summary>The inner expression, unwrapped from parentheses.</summary>
+    J InnerTree { get; }
+}
+
+/// <summary>
 /// A parenthesized expression.
 /// </summary>
 public sealed class Parentheses<T>(
@@ -1738,7 +1748,7 @@ public sealed class Parentheses<T>(
     Space prefix,
     Markers markers,
     JRightPadded<T> tree
-) : J, Expression, IEquatable<Parentheses<T>> where T : J
+) : J, Parentheses, IEquatable<Parentheses<T>> where T : J
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -1753,6 +1763,8 @@ public sealed class Parentheses<T>(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Tree);
     public Parentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
+
+    public J InnerTree => Tree.Element;
 
     public JavaType? Type => Tree.Element is Expression expr ? expr.Type : null;
 

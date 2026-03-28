@@ -56,8 +56,23 @@ internal class PatternMatchingComparator
     /// </summary>
     internal IReadOnlyDictionary<string, NullSafe> NullSafeBindings => _nullSafeBindings;
 
+    /// <summary>
+    /// Recursively strip <see cref="Parentheses{T}"/> wrappers
+    /// so that <c>(expr)</c> and <c>expr</c> compare as equivalent.
+    /// </summary>
+    internal static J UnwrapParentheses(J node)
+    {
+        while (node is Parentheses p)
+            node = p.InnerTree;
+        return node;
+    }
+
     private bool MatchNode(J pattern, J candidate, Cursor cursor)
     {
+        // Unwrap parentheses from both sides so (expr) matches expr
+        pattern = UnwrapParentheses(pattern);
+        candidate = UnwrapParentheses(candidate);
+
         // Check if pattern node is a placeholder identifier
         if (pattern is Identifier patternId)
         {
