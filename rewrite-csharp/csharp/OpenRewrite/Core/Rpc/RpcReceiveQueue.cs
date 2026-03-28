@@ -575,11 +575,24 @@ public class RpcReceiveQueue
         // Java uses '$' for nested types, .NET uses '+'
         var fullName = $"{ns}.{name.Replace('$', '+')}";
 
+        Type? nonGenericMatch = null;
+
         // Search in all loaded assemblies
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             var type = assembly.GetType(fullName);
-            if (type != null) return type;
+            if (type != null)
+            {
+                // If the match is an interface or abstract type, remember it but keep
+                // looking for a generic concrete type with the same base name (e.g.,
+                // Parentheses<T> vs the Parentheses interface).
+                if (type.IsInterface || type.IsAbstract)
+                {
+                    nonGenericMatch = type;
+                    break;
+                }
+                return type;
+            }
         }
         // Try generic type names: Java sends ControlParentheses but .NET needs ControlParentheses`1
         for (int arity = 1; arity <= 3; arity++)
@@ -591,6 +604,6 @@ public class RpcReceiveQueue
                 if (type != null) return type;
             }
         }
-        return null;
+        return nonGenericMatch;
     }
 }

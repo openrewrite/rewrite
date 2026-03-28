@@ -1649,6 +1649,44 @@ class CSharpRpcTest implements RewriteTest {
         return null;
     }
 
+    /**
+     * Verifies that a tree containing catch-when (ControlParentheses in WhenClause)
+     * survives a Parse → Reset → Print cycle. The Reset clears both sides' caches,
+     * forcing the Java side to re-send the tree to C# via the receiver, which must
+     * correctly handle ControlParentheses deserialized as ControlParentheses&lt;J&gt;.
+     */
+    @Test
+    void catchWithWhenFilterSurvivesResetCycle() {
+        rewriteRun(csharp(
+          """
+            using System;
+
+            namespace Test
+            {
+                public class Foo
+                {
+                    public void Bar()
+                    {
+                        try
+                        {
+                            throw new InvalidOperationException();
+                        }
+                        catch (Exception ex) when (ex.Message != null)
+                        {
+                        }
+                    }
+                }
+            }
+            """,
+          spec -> spec.beforeRecipe(cu -> {
+              // Reset clears both sides' caches, forcing the next print to
+              // re-send the tree from Java to C# via the full receiver path.
+              // This exercises ControlParentheses<J> deserialization.
+              CSharpRewriteRpc.resetCurrent();
+          })
+        ));
+    }
+
     private static J.MethodDeclaration findMethodByName(J.ClassDeclaration classDecl, String name) {
         for (Statement stmt : classDecl.getBody().getStatements()) {
             if (stmt instanceof J.MethodDeclaration md && md.getSimpleName().equals(name)) {

@@ -201,19 +201,36 @@ listOf("sourcesJar", "processResources", "licenseMain", "assemble").forEach {
 
 // Task to pack C# projects as NuGet packages
 // Packs both the SDK library and the tool; version is injected via /p:Version
+val csharpBuildRelease by tasks.registering(Exec::class) {
+    group = "csharp"
+    description = "Build C# projects in Release configuration"
+
+    workingDir = csharpDir
+    commandLine(findDotnet(), "build", "--configuration", "Release")
+
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.dir(csharpDir.resolve("OpenRewrite/bin/Release"))
+    outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin/Release"))
+}
+
 val csharpPack by tasks.registering(Exec::class) {
     group = "csharp"
     description = "Pack C# projects as NuGet packages"
 
+    dependsOn(csharpBuildRelease)
+
     workingDir = csharpDir
     commandLine(
         findDotnet(), "pack",
+        "--no-build",
         "--configuration", "Release",
         "--output", "dist",
         "/p:Version=$nugetVersion"
     )
 
-    // Track only source files — exclude bin/obj build outputs to avoid stale up-to-date checks
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
     inputs.property("version", nugetVersion)

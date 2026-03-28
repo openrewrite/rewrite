@@ -33,6 +33,7 @@ val allProjects = listOf(
     "rewrite-properties",
     "rewrite-protobuf",
     "rewrite-python",
+    "rewrite-scala",
     "rewrite-test",
     "rewrite-toml",
     "rewrite-xml",
