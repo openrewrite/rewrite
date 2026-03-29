@@ -263,22 +263,74 @@ public class EditorConfigResolver
             }
         }
 
+        // Indentation
+        var indentBlock = GetBoolSetting(settings, "csharp_indent_block_contents", "true", true);
+        var indentBraces = GetBoolSetting(settings, "csharp_indent_braces", "true", false);
+        var indentSwitchCaseSection = GetBoolSetting(settings, "csharp_indent_case_contents", "true", true);
+        var indentSwitchCaseSectionWhenBlock = GetBoolSetting(settings, "csharp_indent_case_contents_when_block", "true", true);
+        var indentSwitchSection = GetBoolSetting(settings, "csharp_indent_switch_labels", "true", true);
+        var labelPositioning = GetLabelPositioning(settings);
+
         // New line before keywords
         var newLineBeforeElse = GetBoolSetting(settings, "csharp_new_line_before_else", "true", true);
         var newLineBeforeCatch = GetBoolSetting(settings, "csharp_new_line_before_catch", "true", true);
         var newLineBeforeFinally = GetBoolSetting(settings, "csharp_new_line_before_finally", "true", true);
+        var newLineForClausesInQuery = GetBoolSetting(settings, "csharp_new_line_between_query_expression_clauses", "true", true);
+        var newLineForMembersInAnonymousTypes = GetBoolSetting(settings, "csharp_new_line_before_members_in_anonymous_types", "true", true);
+        var newLineForMembersInObjectInit = GetBoolSetting(settings, "csharp_new_line_before_members_in_object_initializers", "true", true);
+
+        // Spacing
+        var spaceAfterCast = GetBoolSetting(settings, "csharp_space_after_cast", "true", false);
+        var spaceAfterColonInBase = GetBoolSetting(settings, "csharp_space_after_colon_in_inheritance_clause", "true", true);
+        var spaceAfterComma = GetBoolSetting(settings, "csharp_space_after_comma", "true", true);
+        var spaceAfterControlFlow = GetBoolSetting(settings, "csharp_space_after_keywords_in_control_flow_statements", "true", true);
+        var spaceAfterDot = GetBoolSetting(settings, "csharp_space_after_dot", "true", false);
+        var spaceAfterMethodCallName = GetBoolSetting(settings, "csharp_space_between_method_call_name_and_opening_parenthesis", "true", false);
+        var spaceAfterSemicolonInFor = GetBoolSetting(settings, "csharp_space_after_semicolon_in_for_statement", "true", true);
+        var spaceBeforeColonInBase = GetBoolSetting(settings, "csharp_space_before_colon_in_inheritance_clause", "true", true);
+        var spaceBeforeComma = GetBoolSetting(settings, "csharp_space_before_comma", "true", false);
+        var spaceBeforeDot = GetBoolSetting(settings, "csharp_space_before_dot", "true", false);
+        var spaceBeforeOpenSquare = GetBoolSetting(settings, "csharp_space_before_open_square_brackets", "true", false);
+        var spaceBeforeSemicolonInFor = GetBoolSetting(settings, "csharp_space_before_semicolon_in_for_statement", "true", false);
+        var spaceBetweenEmptyMethodCallParens = GetBoolSetting(settings, "csharp_space_between_method_call_empty_parameter_list_parentheses", "true", false);
+        var spaceBetweenEmptyMethodDeclParens = GetBoolSetting(settings, "csharp_space_between_method_declaration_empty_parameter_list_parentheses", "true", false);
+        var spaceBetweenEmptySquare = GetBoolSetting(settings, "csharp_space_between_empty_square_brackets", "true", false);
+        // csharp_space_around_declaration_statements uses "ignore"/"false" not "true"/"false"
+        var spacesIgnoreAroundVarDecl = GetBoolSetting(settings, "csharp_space_around_declaration_statements", "ignore", false);
+        var spaceWithinCast = GetBoolSetting(settings, "csharp_space_within_cast_parentheses", "true", false);
+        var spaceWithinExprParens = GetBoolSetting(settings, "csharp_space_within_expression_parentheses", "true", false);
+        var spaceWithinMethodCallParens = GetBoolSetting(settings, "csharp_space_between_method_call_parameter_list_parentheses", "true", false);
+        var spaceWithinMethodDeclParens = GetBoolSetting(settings, "csharp_space_between_method_declaration_parameter_list_parentheses", "true", false);
+        var spaceWithinOtherParens = GetBoolSetting(settings, "csharp_space_between_parentheses", "true", false);
+        var spaceWithinSquare = GetBoolSetting(settings, "csharp_space_within_square_brackets", "true", false);
+        var spacingAfterMethodDeclName = GetBoolSetting(settings, "csharp_space_between_method_declaration_name_and_open_parenthesis", "true", false);
+        var spacingAroundBinaryOp = GetBinaryOperatorSpacing(settings);
 
         // Wrapping
         var wrappingPreserveSingleLine = GetBoolSetting(settings, "csharp_preserve_single_line_blocks", "true", true);
         var wrappingKeepStatementsOnSingleLine = GetBoolSetting(settings, "csharp_preserve_single_line_statements", "true", true);
 
         return new CSharpFormatStyle(
-            Guid.NewGuid(),
-            useTabs, indentSize, tabSize, newLine,
+            Guid.NewGuid(), useTabs, indentSize, tabSize, newLine,
+            // Indentation
+            indentBlock, indentBraces, indentSwitchCaseSection,
+            indentSwitchCaseSectionWhenBlock, indentSwitchSection, labelPositioning,
+            // Brace placement
             bracesInTypes, bracesInMethods, bracesInProperties, bracesInAccessors,
             bracesInAnonymousMethods, bracesInAnonymousTypes, bracesInControlBlocks,
             bracesInLambdas, bracesInObjectCollectionArray, bracesInLocalFunctions,
+            // New line before keywords
             newLineBeforeElse, newLineBeforeCatch, newLineBeforeFinally,
+            newLineForClausesInQuery, newLineForMembersInAnonymousTypes, newLineForMembersInObjectInit,
+            // Spacing
+            spaceAfterCast, spaceAfterColonInBase, spaceAfterComma, spaceAfterControlFlow,
+            spaceAfterDot, spaceAfterMethodCallName, spaceAfterSemicolonInFor,
+            spaceBeforeColonInBase, spaceBeforeComma, spaceBeforeDot, spaceBeforeOpenSquare,
+            spaceBeforeSemicolonInFor, spaceBetweenEmptyMethodCallParens, spaceBetweenEmptyMethodDeclParens,
+            spaceBetweenEmptySquare, spacesIgnoreAroundVarDecl, spaceWithinCast, spaceWithinExprParens,
+            spaceWithinMethodCallParens, spaceWithinMethodDeclParens, spaceWithinOtherParens,
+            spaceWithinSquare, spacingAfterMethodDeclName, spacingAroundBinaryOp,
+            // Wrapping
             wrappingPreserveSingleLine, wrappingKeepStatementsOnSingleLine
         );
     }
@@ -306,6 +358,38 @@ public class EditorConfigResolver
             "crlf" => "\r\n",
             "cr" => "\r",
             _ => "\n"
+        };
+    }
+
+    /// <summary>
+    /// Parses csharp_indent_labels: flush_left=0 (LeftMost), one_less_than_current=1 (OneLess), no_change=2 (NoIndent).
+    /// </summary>
+    private static int GetLabelPositioning(Dictionary<string, string> settings)
+    {
+        if (!settings.TryGetValue("csharp_indent_labels", out var value))
+            return 1; // OneLess (default)
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "flush_left" => 0,         // LeftMost
+            "one_less_than_current" => 1, // OneLess
+            "no_change" => 2,          // NoIndent
+            _ => 1
+        };
+    }
+
+    /// <summary>
+    /// Parses csharp_space_around_binary_operators: before_and_after=0 (Single), ignore=1, none=2 (Remove).
+    /// </summary>
+    private static int GetBinaryOperatorSpacing(Dictionary<string, string> settings)
+    {
+        if (!settings.TryGetValue("csharp_space_around_binary_operators", out var value))
+            return 0; // Single (default)
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "before_and_after" => 0, // Single
+            "ignore" => 1,          // Ignore
+            "none" => 2,            // Remove
+            _ => 0
         };
     }
 }

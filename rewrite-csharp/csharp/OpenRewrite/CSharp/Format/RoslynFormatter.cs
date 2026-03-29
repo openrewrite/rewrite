@@ -572,6 +572,13 @@ public static class RoslynFormatter
             .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentSize)
             .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.TabSize)
             .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine)
+            // Indentation
+            .WithChangedOption(CSharpFormattingOptions.IndentBlock, style.IndentBlock)
+            .WithChangedOption(CSharpFormattingOptions.IndentBraces, style.IndentBraces)
+            .WithChangedOption(CSharpFormattingOptions.IndentSwitchCaseSection, style.IndentSwitchCaseSection)
+            .WithChangedOption(CSharpFormattingOptions.IndentSwitchCaseSectionWhenBlock, style.IndentSwitchCaseSectionWhenBlock)
+            .WithChangedOption(CSharpFormattingOptions.IndentSwitchSection, style.IndentSwitchSection)
+            .WithChangedOption(CSharpFormattingOptions.LabelPositioning, (LabelPositionOptions)style.LabelPositioning)
             // Brace placement
             .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInTypes, style.NewLinesForBracesInTypes)
             .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInMethods, style.NewLinesForBracesInMethods)
@@ -584,10 +591,38 @@ public static class RoslynFormatter
             .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInObjectCollectionArrayInitializers, style.NewLinesForBracesInObjectCollectionArrayInitializers)
             // Note: NewLinesForBracesInLocalFunctions is stored in the marker for .editorconfig fidelity
             // but Roslyn 5.0's CSharpFormattingOptions does not expose this option.
-            // New line before keywords
+            // New line before keywords / members
             .WithChangedOption(CSharpFormattingOptions.NewLineForElse, style.NewLineBeforeElse)
             .WithChangedOption(CSharpFormattingOptions.NewLineForCatch, style.NewLineBeforeCatch)
             .WithChangedOption(CSharpFormattingOptions.NewLineForFinally, style.NewLineBeforeFinally)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForClausesInQuery, style.NewLineForClausesInQuery)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForMembersInAnonymousTypes, style.NewLineForMembersInAnonymousTypes)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForMembersInObjectInit, style.NewLineForMembersInObjectInit)
+            // Spacing
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterCast, style.SpaceAfterCast)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterColonInBaseTypeDeclaration, style.SpaceAfterColonInBaseTypeDeclaration)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterComma, style.SpaceAfterComma)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterControlFlowStatementKeyword, style.SpaceAfterControlFlowStatementKeyword)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterDot, style.SpaceAfterDot)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterMethodCallName, style.SpaceAfterMethodCallName)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterSemicolonsInForStatement, style.SpaceAfterSemicolonsInForStatement)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeColonInBaseTypeDeclaration, style.SpaceBeforeColonInBaseTypeDeclaration)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeComma, style.SpaceBeforeComma)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeDot, style.SpaceBeforeDot)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeOpenSquareBracket, style.SpaceBeforeOpenSquareBracket)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeSemicolonsInForStatement, style.SpaceBeforeSemicolonsInForStatement)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBetweenEmptyMethodCallParentheses, style.SpaceBetweenEmptyMethodCallParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBetweenEmptyMethodDeclarationParentheses, style.SpaceBetweenEmptyMethodDeclarationParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBetweenEmptySquareBrackets, style.SpaceBetweenEmptySquareBrackets)
+            .WithChangedOption(CSharpFormattingOptions.SpacesIgnoreAroundVariableDeclaration, style.SpacesIgnoreAroundVariableDeclaration)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinCastParentheses, style.SpaceWithinCastParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinExpressionParentheses, style.SpaceWithinExpressionParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinMethodCallParentheses, style.SpaceWithinMethodCallParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinMethodDeclarationParenthesis, style.SpaceWithinMethodDeclarationParenthesis)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinOtherParentheses, style.SpaceWithinOtherParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinSquareBrackets, style.SpaceWithinSquareBrackets)
+            .WithChangedOption(CSharpFormattingOptions.SpacingAfterMethodDeclarationName, style.SpacingAfterMethodDeclarationName)
+            .WithChangedOption(CSharpFormattingOptions.SpacingAroundBinaryOperator, (BinaryOperatorSpacingOptions)style.SpacingAroundBinaryOperator)
             // Don't preserve single-line formatting — synthesized nodes may have no newlines,
             // and Roslyn must insert structural newlines (after {, before }, before else, etc.)
             .WithChangedOption(CSharpFormattingOptions.WrappingPreserveSingleLine, false)
