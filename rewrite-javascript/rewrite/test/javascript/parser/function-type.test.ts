@@ -95,12 +95,18 @@ describe("function type mapping", () => {
                     let foundMultiply = false;
 
                     await (new class extends JavaScriptVisitor<any> {
-                        async visitIdentifier(identifier: J.Identifier, _: any): Promise<J | undefined> {
-                            if (identifier.simpleName === 'multiply' && identifier.type) {
+                        async visitMethodDeclaration(method: J.MethodDeclaration, _: any): Promise<J | undefined> {
+                            if (method.name.simpleName === 'multiply' && method.methodType) {
                                 foundMultiply = true;
-                                assertFunctionType(identifier.type, 2, ['x', 'y'], 'double');
+                                expect(method.methodType.name).toBe('multiply');
+                                expect(method.methodType.parameterNames).toEqual(['x', 'y']);
+                                expect(method.methodType.parameterTypes.length).toBe(2);
+                                expect(Type.isPrimitive(method.methodType.returnType)).toBeTruthy();
+                                expect((method.methodType.returnType as Type.Primitive).keyword).toBe('double');
+                                // name.type should be referentially equal to methodType
+                                expect(method.name.type).toBe(method.methodType);
                             }
-                            return identifier;
+                            return super.visitMethodDeclaration(method, _);
                         }
                     }).visit(cu, 0);
 

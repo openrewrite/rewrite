@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import ts from "typescript";
+import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 
@@ -30,7 +31,8 @@ export class JavaScriptTypeMapping {
 
 
     constructor(
-        private readonly checker: ts.TypeChecker
+        private readonly checker: ts.TypeChecker,
+        private readonly sourceRoot?: string
     ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
@@ -69,11 +71,14 @@ export class JavaScriptTypeMapping {
             // Fall through to regular type checking if not a variable
         }
 
+        // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
+        // Everything else — expressions, declarations, specifiers, bindings, etc. —
+        // uses getTypeAtLocation which works for virtually all node kinds.
         let type: ts.Type | undefined;
-        if (ts.isExpression(node)) {
-            type = this.checker.getTypeAtLocation(node);
-        } else if (ts.isTypeNode(node)) {
+        if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);
+        } else {
+            type = this.checker.getTypeAtLocation(node);
         }
         return type && this.getType(type);
     }
@@ -915,6 +920,22 @@ export class JavaScriptTypeMapping {
                     declaredFormalTypeNames.push(tp.name.getText());
                 }
             }
+        } else if (ts.isConstructorDeclaration(node)) {
+            // For constructor declarations
+            signature = this.checker.getSignatureFromDeclaration(node);
+            if (!signature) {
+                return undefined;
+            }
+
+            methodName = "<constructor>";
+
+            const parent = node.parent;
+            if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) {
+                const parentType = this.checker.getTypeAtLocation(parent);
+                declaringType = this.getType(parentType) as Type.FullyQualified;
+            } else {
+                declaringType = Type.unknownType as Type.FullyQualified;
+            }
         } else if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)) {
             // For function declarations/expressions
             signature = this.checker.getSignatureFromDeclaration(node);
@@ -1031,6 +1052,14 @@ export class JavaScriptTypeMapping {
                 } else {
                     cleanedName = packageName;
                 }
+            }
+        } else if (path.isAbsolute(cleanedName)) {
+            // TypeScript returns absolute file paths as module names for project source files
+            // that are ES modules (have imports/exports). Relativize using sourceRoot.
+            // Example: /var/moderne/.../BookStack/resources/js/foo.MyClass
+            // Should become: resources/js/foo.MyClass
+            if (this.sourceRoot) {
+                cleanedName = path.relative(this.sourceRoot, cleanedName);
             }
         }
 
