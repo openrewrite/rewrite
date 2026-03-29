@@ -167,59 +167,51 @@ public class AutoFormatTests : RewriteTest
     }
 
     [Fact]
-    public void FormatStyleDetectsSpaces()
-    {
-        const string source = """
-            class Foo
-            {
-                void Bar()
-                {
-                    int x = 1;
-                }
-            }
-            """;
-
-        var style = FormatStyle.DetectStyle(source);
-        Assert.False(style.UseTabs);
-        Assert.Equal(4, style.IndentationSize);
-    }
-
-    [Fact]
-    public void FormatStyleDetectsTabs()
-    {
-        var source = "class Foo\n{\n\tvoid Bar()\n\t{\n\t\tint x = 1;\n\t}\n}\n";
-        var style = FormatStyle.DetectStyle(source);
-        Assert.True(style.UseTabs);
-    }
-
-    [Fact]
-    public void FormatStyleDetectsTwoSpaceIndent()
-    {
-        const string source = """
-            class Foo
-            {
-              void Bar()
-              {
-                int x = 1;
-              }
-            }
-            """;
-
-        var style = FormatStyle.DetectStyle(source);
-        Assert.False(style.UseTabs);
-        Assert.Equal(2, style.IndentationSize);
-    }
-
-    [Fact]
     public void RoslynFormatterExpandsSingleLineBlocks()
     {
         const string before = "class Foo{void Bar(){int x=1;}}";
-        var style = new FormatStyle(false, 4, "\n");
-        var formatted = RoslynFormatter.FormatWithRoslyn(before, style);
+        var formatted = RoslynFormatter.FormatWithRoslyn(before, CSharpFormatStyle.Default);
 
         // With WrappingPreserveSingleLine=false, Roslyn expands single-line blocks
         Assert.Contains("class Foo", formatted);
         Assert.NotEqual(before, formatted);
+    }
+
+    [Fact]
+    public void RoslynFormatterRespectsKnrBraceStyle()
+    {
+        const string source = "class Foo\n{\n    void Bar()\n    {\n    }\n}\n";
+
+        // Default (Allman) keeps braces on new lines
+        var allman = RoslynFormatter.FormatWithRoslyn(source, CSharpFormatStyle.Default);
+        Assert.Contains("class Foo\n{", allman);
+        Assert.Contains("void Bar()\n    {", allman);
+
+        // K&R style: braces on same line as declaration
+        var knrStyle = new CSharpFormatStyle(Guid.NewGuid(),
+            newLinesForBracesInTypes: false,
+            newLinesForBracesInMethods: false,
+            newLinesForBracesInControlBlocks: false);
+
+        var knr = RoslynFormatter.FormatWithRoslyn(source, knrStyle);
+        Assert.Contains("class Foo {", knr);
+        Assert.Contains("void Bar() {", knr);
+    }
+
+    [Fact]
+    public void RoslynFormatterRespectsSpaceAfterCast()
+    {
+        const string source = "class C { void M() { var x = (int)y; } }";
+
+        // Default: no space after cast
+        var noSpace = RoslynFormatter.FormatWithRoslyn(source, CSharpFormatStyle.Default);
+        Assert.Contains("(int)y", noSpace);
+
+        // With SpaceAfterCast=true
+        var withSpaceStyle = new CSharpFormatStyle(Guid.NewGuid(), spaceAfterCast: true);
+
+        var withSpace = RoslynFormatter.FormatWithRoslyn(source, withSpaceStyle);
+        Assert.Contains("(int) y", withSpace);
     }
     [Fact]
     public void IntegrationAutoFormatVisitorOnIllFormattedSource()

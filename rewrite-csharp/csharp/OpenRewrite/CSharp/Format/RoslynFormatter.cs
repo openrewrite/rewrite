@@ -74,8 +74,8 @@ public static class RoslynFormatter
             source = printer.Print(mvsCu);
         }
 
-        // 3. Detect style
-        var style = FormatStyle.DetectStyle(source);
+        // 3. Get style from marker (attached during parsing) or fall back to defaults
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
 
         // 4. Format with Roslyn (scoped to the target span when available)
         var formattedSource = FormatWithRoslyn(source, style, formatSpan);
@@ -91,8 +91,6 @@ public static class RoslynFormatter
             // MVS made changes — reconcile them within the target subtree
             var mvsReconciler = new WhitespaceReconciler();
             var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, targetSubtree, stopAfter);
-            if (!mvsReconciler.IsCompatible)
-                return originalCu;
             return mvsResult as CompilationUnit ?? originalCu;
         }
 
@@ -110,12 +108,11 @@ public static class RoslynFormatter
         }
 
         // 7. Reconcile whitespace against the original CU so MVS artifacts
-        // outside the target subtree are discarded.
+        // outside the target subtree are discarded. Mismatched subtrees
+        // (e.g., recipe-constructed nodes with different types than the parser
+        // would produce) are skipped — they keep their original whitespace.
         var reconciler = new WhitespaceReconciler();
         var result = reconciler.Reconcile(originalCu, formattedCu, targetSubtree, stopAfter);
-
-        if (!reconciler.IsCompatible)
-            return originalCu;
 
         return result as CompilationUnit ?? originalCu;
     }
@@ -251,8 +248,8 @@ public static class RoslynFormatter
         if (spans.Count == 0)
             return originalCu;
 
-        // 3. Detect style
-        var style = FormatStyle.DetectStyle(source);
+        // 3. Get style from marker (attached during parsing) or fall back to defaults
+        var style = cu.Markers.FindFirst<CSharpFormatStyle>() ?? CSharpFormatStyle.Default;
 
         // 4. Format with Roslyn, scoped to all target spans
         var formattedSource = FormatWithRoslyn(source, style, spans);
@@ -268,8 +265,6 @@ public static class RoslynFormatter
             // MVS made changes — reconcile them within the target subtrees
             var mvsReconciler = new WhitespaceReconciler();
             var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, nodeIds);
-            if (!mvsReconciler.IsCompatible)
-                return originalCu;
             cu = mvsResult as CompilationUnit ?? originalCu;
 
             // Restore preserved prefixes
@@ -299,9 +294,6 @@ public static class RoslynFormatter
         // Reconcile against the original CU so MVS artifacts outside targets are discarded.
         var reconciler = new WhitespaceReconciler();
         var result = reconciler.Reconcile(originalCu, formattedCu, nodeIds);
-
-        if (!reconciler.IsCompatible)
-            return originalCu;
 
         cu = result as CompilationUnit ?? originalCu;
 
@@ -512,13 +504,13 @@ public static class RoslynFormatter
         }
     }
 
-    internal static string FormatWithRoslyn(string source, FormatStyle style, TextSpan? span = null)
+    internal static string FormatWithRoslyn(string source, CSharpFormatStyle style, TextSpan? span = null)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var root = syntaxTree.GetRoot();
 
         using var workspace = CreateWorkspace();
-        var options = BuildOptions(workspace, style);
+        var options = style.GetOrBuildOptionSet(workspace.Options);
 
         var formatted = span != null
             ? Formatter.Format(root, span.Value, workspace, options)
@@ -526,13 +518,13 @@ public static class RoslynFormatter
         return formatted.ToFullString();
     }
 
-    internal static string FormatWithRoslyn(string source, FormatStyle style, IEnumerable<TextSpan> spans)
+    internal static string FormatWithRoslyn(string source, CSharpFormatStyle style, IEnumerable<TextSpan> spans)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(source);
         var root = syntaxTree.GetRoot();
 
         using var workspace = CreateWorkspace();
-        var options = BuildOptions(workspace, style);
+        var options = style.GetOrBuildOptionSet(workspace.Options);
 
         var formatted = Formatter.Format(root, spans, workspace, options);
         return formatted.ToFullString();
@@ -565,13 +557,64 @@ public static class RoslynFormatter
 
     private static AdhocWorkspace CreateWorkspace() => new(HostServices);
 
-    private static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(AdhocWorkspace workspace, FormatStyle style)
+    internal static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(Microsoft.CodeAnalysis.Options.OptionSet baseOptions, CSharpFormatStyle style)
     {
-        return workspace.Options
+        return baseOptions
             .WithChangedOption(FormattingOptions.UseTabs, LanguageNames.CSharp, style.UseTabs)
-            .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentationSize)
-            .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.IndentationSize)
+            .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentSize)
+            .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.TabSize)
             .WithChangedOption(FormattingOptions.NewLine, LanguageNames.CSharp, style.NewLine)
+            // Indentation
+            .WithChangedOption(CSharpFormattingOptions.IndentBlock, style.IndentBlock)
+            .WithChangedOption(CSharpFormattingOptions.IndentBraces, style.IndentBraces)
+            .WithChangedOption(CSharpFormattingOptions.IndentSwitchCaseSection, style.IndentSwitchCaseSection)
+            .WithChangedOption(CSharpFormattingOptions.IndentSwitchCaseSectionWhenBlock, style.IndentSwitchCaseSectionWhenBlock)
+            .WithChangedOption(CSharpFormattingOptions.IndentSwitchSection, style.IndentSwitchSection)
+            .WithChangedOption(CSharpFormattingOptions.LabelPositioning, (LabelPositionOptions)style.LabelPositioning)
+            // Brace placement
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInTypes, style.NewLinesForBracesInTypes)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInMethods, style.NewLinesForBracesInMethods)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInProperties, style.NewLinesForBracesInProperties)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInAccessors, style.NewLinesForBracesInAccessors)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInAnonymousMethods, style.NewLinesForBracesInAnonymousMethods)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInAnonymousTypes, style.NewLinesForBracesInAnonymousTypes)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInControlBlocks, style.NewLinesForBracesInControlBlocks)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInLambdaExpressionBody, style.NewLinesForBracesInLambdaExpressionBody)
+            .WithChangedOption(CSharpFormattingOptions.NewLinesForBracesInObjectCollectionArrayInitializers, style.NewLinesForBracesInObjectCollectionArrayInitializers)
+            // Note: NewLinesForBracesInLocalFunctions is stored in the marker for .editorconfig fidelity
+            // but Roslyn 5.0's CSharpFormattingOptions does not expose this option.
+            // New line before keywords / members
+            .WithChangedOption(CSharpFormattingOptions.NewLineForElse, style.NewLineBeforeElse)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForCatch, style.NewLineBeforeCatch)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForFinally, style.NewLineBeforeFinally)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForClausesInQuery, style.NewLineForClausesInQuery)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForMembersInAnonymousTypes, style.NewLineForMembersInAnonymousTypes)
+            .WithChangedOption(CSharpFormattingOptions.NewLineForMembersInObjectInit, style.NewLineForMembersInObjectInit)
+            // Spacing
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterCast, style.SpaceAfterCast)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterColonInBaseTypeDeclaration, style.SpaceAfterColonInBaseTypeDeclaration)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterComma, style.SpaceAfterComma)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterControlFlowStatementKeyword, style.SpaceAfterControlFlowStatementKeyword)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterDot, style.SpaceAfterDot)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterMethodCallName, style.SpaceAfterMethodCallName)
+            .WithChangedOption(CSharpFormattingOptions.SpaceAfterSemicolonsInForStatement, style.SpaceAfterSemicolonsInForStatement)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeColonInBaseTypeDeclaration, style.SpaceBeforeColonInBaseTypeDeclaration)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeComma, style.SpaceBeforeComma)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeDot, style.SpaceBeforeDot)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeOpenSquareBracket, style.SpaceBeforeOpenSquareBracket)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBeforeSemicolonsInForStatement, style.SpaceBeforeSemicolonsInForStatement)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBetweenEmptyMethodCallParentheses, style.SpaceBetweenEmptyMethodCallParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBetweenEmptyMethodDeclarationParentheses, style.SpaceBetweenEmptyMethodDeclarationParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceBetweenEmptySquareBrackets, style.SpaceBetweenEmptySquareBrackets)
+            .WithChangedOption(CSharpFormattingOptions.SpacesIgnoreAroundVariableDeclaration, style.SpacesIgnoreAroundVariableDeclaration)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinCastParentheses, style.SpaceWithinCastParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinExpressionParentheses, style.SpaceWithinExpressionParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinMethodCallParentheses, style.SpaceWithinMethodCallParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinMethodDeclarationParenthesis, style.SpaceWithinMethodDeclarationParenthesis)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinOtherParentheses, style.SpaceWithinOtherParentheses)
+            .WithChangedOption(CSharpFormattingOptions.SpaceWithinSquareBrackets, style.SpaceWithinSquareBrackets)
+            .WithChangedOption(CSharpFormattingOptions.SpacingAfterMethodDeclarationName, style.SpacingAfterMethodDeclarationName)
+            .WithChangedOption(CSharpFormattingOptions.SpacingAroundBinaryOperator, (BinaryOperatorSpacingOptions)style.SpacingAroundBinaryOperator)
             // Don't preserve single-line formatting — synthesized nodes may have no newlines,
             // and Roslyn must insert structural newlines (after {, before }, before else, etc.)
             .WithChangedOption(CSharpFormattingOptions.WrappingPreserveSingleLine, false)

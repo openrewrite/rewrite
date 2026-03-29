@@ -67,6 +67,7 @@ public abstract class RewriteTest
             : null;
 
         // 1. Parse all sources and validate round-trip
+        var validations = recipeSpec.Validations;
         var parsed = new List<(SourceSpec Spec, SourceFile Source)>();
         foreach (var spec in specs)
         {
@@ -84,23 +85,32 @@ public abstract class RewriteTest
             var source = parser.Parse(spec.Before, semanticModel: semanticModel);
 
             // Verify no non-whitespace content leaked into Space fields
-            var whitespaceViolations = new List<WhitespaceViolation>();
-            new WhitespaceValidator().Visit(source, whitespaceViolations);
-            Assert.True(whitespaceViolations.Count == 0,
-                $"Found non-whitespace content in Space fields:\n" +
-                string.Join("\n", whitespaceViolations));
+            if (validations.WhitespaceInSpaces)
+            {
+                var whitespaceViolations = new List<WhitespaceViolation>();
+                new WhitespaceValidator().Visit(source, whitespaceViolations);
+                Assert.True(whitespaceViolations.Count == 0,
+                    $"Found non-whitespace content in Space fields:\n" +
+                    string.Join("\n", whitespaceViolations));
+            }
 
             // Verify round-trip: printed should match input
             var printed = printer.Print(source);
-            AssertContentEquals(spec.Before, printed, source.SourcePath,
-                "The printed source didn't match the original source code. " +
-                "This means there is a bug in the parser implementation itself.");
+            if (validations.PrintEqualsInput)
+            {
+                AssertContentEquals(spec.Before, printed, source.SourcePath,
+                    "The printed source didn't match the original source code. " +
+                    "This means there is a bug in the parser implementation itself.");
+            }
 
             // Verify idempotence: reparse and reprint should match
-            var reparsed = parser.Parse(printed);
-            var reprinted = printer.Print(reparsed);
-            AssertContentEquals(printed, reprinted, source.SourcePath,
-                "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+            if (validations.PrintIdempotence)
+            {
+                var reparsed = parser.Parse(printed);
+                var reprinted = printer.Print(reparsed);
+                AssertContentEquals(printed, reprinted, source.SourcePath,
+                    "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+            }
 
             parsed.Add((spec, source));
         }
@@ -109,7 +119,17 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
-            var results = RecipeScheduler.Run(recipeSpec.Recipe, sources, new ExecutionContext());
+            var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
+            WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
+            List<Result> results;
+            try
+            {
+                results = RecipeScheduler.Run(recipeSpec.Recipe, sources, new ExecutionContext());
+            }
+            finally
+            {
+                WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
+            }
 
             foreach (var (spec, source) in parsed)
             {
@@ -201,6 +221,7 @@ public class RecipeSpec
 {
     public Recipe? Recipe { get; private set; }
     public ReferenceAssemblies? ReferenceAssemblies { get; private set; } = Assemblies.Net90;
+    public Validations Validations { get; private set; } = Validations.All;
 
     public RecipeSpec SetRecipe(Recipe recipe)
     {
@@ -211,6 +232,12 @@ public class RecipeSpec
     public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies? referenceAssemblies)
     {
         ReferenceAssemblies = referenceAssemblies;
+        return this;
+    }
+
+    public RecipeSpec SetValidations(Validations validations)
+    {
+        Validations = validations;
         return this;
     }
 }

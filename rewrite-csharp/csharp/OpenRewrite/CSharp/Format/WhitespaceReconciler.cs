@@ -26,8 +26,10 @@ namespace OpenRewrite.CSharp.Format;
 /// from the formatted tree to the original. Preserves the original tree's IDs,
 /// types, and all non-whitespace state.
 ///
-/// If the trees diverge structurally, returns the original unchanged and sets
-/// <see cref="IsCompatible"/> to false.
+/// When a subtree diverges structurally (e.g., a recipe used J.Identifier where
+/// the parser produces J.Primitive), that subtree is skipped — the original is
+/// kept unchanged — and reconciliation continues with the remaining siblings.
+/// <see cref="IsCompatible"/> is set to false to signal that mismatches occurred.
 /// </summary>
 public class WhitespaceReconciler
 {
@@ -131,7 +133,7 @@ public class WhitespaceReconciler
 
     private object? VisitProperty(object? original, object? formatted)
     {
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         // Handle null: if one is null and the other isn't, check whether it's a
         // structural type (J, padded wrapper, list) where a mismatch is fatal.
@@ -203,7 +205,7 @@ public class WhitespaceReconciler
 
     private object? VisitTree(J original, J formatted)
     {
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         // Check structural type compatibility
         if (original.GetType() != formatted.GetType())
@@ -244,7 +246,7 @@ public class WhitespaceReconciler
 
                 var visited = VisitProperty(origVal, fmtVal);
                 PopPath();
-                if (!_compatible && !_throwOnMismatch) return original;
+        
 
                 if (!ReferenceEquals(visited, origVal))
                 {
@@ -275,7 +277,7 @@ public class WhitespaceReconciler
 
     private object? VisitRightPadded(object original, object formatted)
     {
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
@@ -290,7 +292,7 @@ public class WhitespaceReconciler
         PushPath("Element");
         var visitedElement = VisitProperty(origElement, fmtElement);
         PopPath();
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         var origAfter = afterProp.GetValue(original) as Space;
         var fmtAfter = afterProp.GetValue(formatted) as Space;
@@ -326,7 +328,7 @@ public class WhitespaceReconciler
 
     private object? VisitLeftPadded(object original, object formatted)
     {
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
@@ -346,7 +348,7 @@ public class WhitespaceReconciler
         PushPath("Element");
         var visitedElement = VisitProperty(origElement, fmtElement);
         PopPath();
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         if (ReferenceEquals(visitedBefore, origBefore) &&
             ReferenceEquals(visitedElement, origElement))
@@ -366,7 +368,7 @@ public class WhitespaceReconciler
 
     private object? VisitContainer(object original, object formatted)
     {
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
@@ -387,7 +389,7 @@ public class WhitespaceReconciler
         PushPath("Elements");
         var visitedElements = VisitList(origElements!, fmtElements!);
         PopPath();
-        if (!_compatible && !_throwOnMismatch) return original;
+
 
         var origMarkers = markersProp.GetValue(original) as Markers;
         var fmtMarkers = markersProp.GetValue(formatted) as Markers;
@@ -428,7 +430,7 @@ public class WhitespaceReconciler
             PushPath($"[{i}]");
             var visited = VisitProperty(original[i], formatted[i]);
             PopPath();
-            if (!_compatible && !_throwOnMismatch) return original;
+    
             newList.Add(visited);
             if (!ReferenceEquals(visited, original[i]))
                 changed = true;
