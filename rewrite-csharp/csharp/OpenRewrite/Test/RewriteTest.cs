@@ -20,6 +20,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
+using OpenRewrite.CSharp.Format;
 using OpenRewrite.Java;
 using Rewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -61,6 +62,7 @@ public abstract class RewriteTest
             : null;
 
         // 1. Parse all sources and validate round-trip
+        var validations = recipeSpec.Validations;
         var parsed = new List<(SourceSpec Spec, SourceFile Source)>();
         foreach (var spec in specs)
         {
@@ -76,7 +78,6 @@ public abstract class RewriteTest
             }
 
             var source = parser.Parse(spec.Before, semanticModel: semanticModel);
-            var validations = recipeSpec.Validations;
 
             // Verify no non-whitespace content leaked into Space fields
             if (validations.WhitespaceInSpaces)
@@ -113,7 +114,17 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
-            var results = RecipeScheduler.Run(recipeSpec.Recipe, sources, new ExecutionContext());
+            var prevMaxMismatches = WhitespaceReconciler.DefaultMaxMismatches;
+            WhitespaceReconciler.DefaultMaxMismatches = validations.MaxWhitespaceMismatches;
+            List<Result> results;
+            try
+            {
+                results = RecipeScheduler.Run(recipeSpec.Recipe, sources, new ExecutionContext());
+            }
+            finally
+            {
+                WhitespaceReconciler.DefaultMaxMismatches = prevMaxMismatches;
+            }
 
             foreach (var (spec, source) in parsed)
             {

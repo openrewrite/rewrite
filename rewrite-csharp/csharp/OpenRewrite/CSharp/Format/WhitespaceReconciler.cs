@@ -40,9 +40,15 @@ public class WhitespaceReconciler
     private static readonly HashSet<string> SkipProperties =
         ["Id", "SourcePath"];
 
+    /// <summary>
+    /// Max mismatches for new reconciler instances. Set by test infrastructure
+    /// before recipe execution. Default 0 = unlimited (production behavior).
+    /// </summary>
+    internal static int DefaultMaxMismatches;
+
     private bool _compatible = true;
     private int _mismatchCount;
-    private int _maxMismatches = int.MaxValue;
+    private int _maxMismatches = DefaultMaxMismatches > 0 ? DefaultMaxMismatches : int.MaxValue;
     private J? _targetSubtree;
     private J? _stopAfter;
     private HashSet<Guid>? _targetIds;
