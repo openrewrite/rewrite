@@ -44,6 +44,11 @@ public class CSharpFormatStyle extends NamedStyles implements RpcCodec<CSharpFor
     private static final String DISPLAY_NAME = "C# Format Style";
     private static final String DESCRIPTION = "C# formatting style from .editorconfig or Roslyn defaults.";
 
+    /**
+     * Roslyn default flags: 27 of 47 bits set (Allman style, standard spacing).
+     */
+    public static final long DEFAULT_FLAGS = 0x0000600033BFFFFAL;
+
     // Bit positions — must match C# side exactly (append-only, do not reorder)
     private static final int BIT_USE_TABS = 0;
     private static final int BIT_INDENT_BLOCK = 1;

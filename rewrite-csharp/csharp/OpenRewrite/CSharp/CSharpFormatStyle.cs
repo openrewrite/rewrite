@@ -30,6 +30,9 @@ namespace OpenRewrite.CSharp;
 /// </summary>
 public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IEquatable<CSharpFormatStyle>
 {
+    /// <summary>Roslyn default flags: 27 of 47 bits set (Allman style, standard spacing).</summary>
+    internal const long DefaultFlags = 0x0000600033BFFFFAL;
+
     // ── Bit positions for boolean flags (append-only — do not reorder) ──
     private const int BitUseTabs = 0;
     private const int BitIndentBlock = 1;
@@ -222,31 +225,8 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
 
     /// <summary>Default style matching Roslyn/Visual Studio defaults (Allman style).</summary>
     public static CSharpFormatStyle Default { get; } = new(
-        Guid.NewGuid(),
-        useTabs: false, indentSize: 4, tabSize: 4, newLine: "\n",
-        indentBlock: true, indentBraces: false, indentSwitchCaseSection: true,
-        indentSwitchCaseSectionWhenBlock: true, indentSwitchSection: true, labelPositioning: 1,
-        newLinesForBracesInTypes: true, newLinesForBracesInMethods: true,
-        newLinesForBracesInProperties: true, newLinesForBracesInAccessors: true,
-        newLinesForBracesInAnonymousMethods: true, newLinesForBracesInAnonymousTypes: true,
-        newLinesForBracesInControlBlocks: true, newLinesForBracesInLambdaExpressionBody: true,
-        newLinesForBracesInObjectCollectionArrayInitializers: true, newLinesForBracesInLocalFunctions: true,
-        newLineBeforeElse: true, newLineBeforeCatch: true, newLineBeforeFinally: true,
-        newLineForClausesInQuery: true, newLineForMembersInAnonymousTypes: true,
-        newLineForMembersInObjectInit: true,
-        spaceAfterCast: false, spaceAfterColonInBaseTypeDeclaration: true, spaceAfterComma: true,
-        spaceAfterControlFlowStatementKeyword: true, spaceAfterDot: false, spaceAfterMethodCallName: false,
-        spaceAfterSemicolonsInForStatement: true, spaceBeforeColonInBaseTypeDeclaration: true,
-        spaceBeforeComma: false, spaceBeforeDot: false, spaceBeforeOpenSquareBracket: false,
-        spaceBeforeSemicolonsInForStatement: false, spaceBetweenEmptyMethodCallParentheses: false,
-        spaceBetweenEmptyMethodDeclarationParentheses: false, spaceBetweenEmptySquareBrackets: false,
-        spacesIgnoreAroundVariableDeclaration: false, spaceWithinCastParentheses: false,
-        spaceWithinExpressionParentheses: false, spaceWithinMethodCallParentheses: false,
-        spaceWithinMethodDeclarationParenthesis: false, spaceWithinOtherParentheses: false,
-        spaceWithinSquareBrackets: false, spacingAfterMethodDeclarationName: false,
-        spacingAroundBinaryOperator: 0,
-        wrappingPreserveSingleLine: true, wrappingKeepStatementsOnSingleLine: true
-    );
+        Guid.NewGuid(), DefaultFlags, indentSize: 4, tabSize: 4, newLine: "\n",
+        labelPositioning: 1, spacingAroundBinaryOperator: 0);
 
     public CSharpFormatStyle WithId(Guid id) =>
         id == Id ? this : new(id, _flags, IndentSize, TabSize, NewLine, LabelPositioning, SpacingAroundBinaryOperator);
