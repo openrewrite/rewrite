@@ -328,6 +328,17 @@ internal class PatternMatchingComparator
                     && MatchValue(p.DimensionsBeforeName, c.DimensionsBeforeName, cursor)
                     && MatchValue(p.Variables, c.Variables, cursor);
             }
+            case IsPattern p:
+            {
+                var c = (IsPattern)candidate;
+                return MatchValue(p.Expression, c.Expression, cursor)
+                    && MatchValue(p.Pattern, c.Pattern, cursor);
+            }
+            case ConstantPattern p:
+            {
+                var c = (ConstantPattern)candidate;
+                return MatchValue(p.Value, c.Value, cursor);
+            }
             default:
                 return MatchPropertiesViaReflection(pattern, candidate, cursor);
         }
@@ -500,7 +511,7 @@ internal class PatternMatchingComparator
         if (patternBinary.Operator.Element != Binary.OperatorType.Equal)
             return false;
 
-        if (candidateIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+        if (candidateIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
             return false;
 
         // pattern: {s} == null → match {s} against candidate's expression
@@ -522,7 +533,7 @@ internal class PatternMatchingComparator
         if (candidateBinary.Operator.Element != Binary.OperatorType.Equal)
             return false;
 
-        if (patternIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+        if (patternIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
             return false;
 
         // candidate: expr == null → match pattern's expression against candidate's left
