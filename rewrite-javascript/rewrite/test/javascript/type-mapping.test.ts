@@ -1949,7 +1949,8 @@ describe('JavaScript type mapping', () => {
                     async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: ExecutionContext): Promise<J.VariableDeclarations.NamedVariable> {
                         const v = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
                         if (!this.isWellFormed(v.variableType)) {
-                            findings.push(`Variable '${v.name.simpleName}' type is missing`);
+                            const name = v.name.kind === J.Kind.Identifier ? (v.name as J.Identifier).simpleName : '?';
+                            findings.push(`Variable '${name}' type is missing`);
                         }
                         return v;
                     }
