@@ -20,6 +20,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
+using OpenRewrite.CSharp.Format;
 using OpenRewrite.Java;
 using Rewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
@@ -31,6 +32,11 @@ namespace OpenRewrite.Test;
 /// </summary>
 public abstract class RewriteTest
 {
+    static RewriteTest()
+    {
+        WhitespaceReconciler.ThrowOnMismatchDefault = true;
+    }
+
     private static readonly ConcurrentDictionary<ReferenceAssemblies, ImmutableArray<MetadataReference>>
         ResolvedAssembliesCache = new();
 

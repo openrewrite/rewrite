@@ -129,7 +129,7 @@ public class WhitespaceReconcilerTests
         var original = _parser.Parse(source1);
         var formatted = _parser.Parse(source2);
 
-        var reconciler = new WhitespaceReconciler();
+        var reconciler = new WhitespaceReconciler(throwOnMismatch: false);
         var result = reconciler.Reconcile(original, formatted);
 
         Assert.False(reconciler.IsCompatible);

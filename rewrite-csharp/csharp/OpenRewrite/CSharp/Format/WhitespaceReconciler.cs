@@ -40,9 +40,14 @@ public class WhitespaceReconciler
     public static bool ThrowOnMismatchDefault { get; set; }
 
     private const int MaxMismatches = 5;
-    private readonly bool _throwOnMismatch = ThrowOnMismatchDefault;
+    private readonly bool _throwOnMismatch;
     private List<MismatchEntry>? _mismatches;
     private readonly Stack<string> _path = new();
+
+    public WhitespaceReconciler(bool? throwOnMismatch = null)
+    {
+        _throwOnMismatch = throwOnMismatch ?? ThrowOnMismatchDefault;
+    }
 
     private bool _compatible = true;
     private J? _targetSubtree;
@@ -69,6 +74,7 @@ public class WhitespaceReconciler
         _state = targetSubtree != null ? ReconcileState.Searching : ReconcileState.Reconciling;
 
         var result = VisitTree(original, formatted);
+        ThrowIfMismatches();
         return result as J ?? original;
     }
 
@@ -86,7 +92,14 @@ public class WhitespaceReconciler
         _state = ReconcileState.Searching;
 
         var result = VisitTree(original, formatted);
+        ThrowIfMismatches();
         return result as J ?? original;
+    }
+
+    private void ThrowIfMismatches()
+    {
+        if (_mismatches is { Count: > 0 })
+            throw new WhitespaceReconcileMismatchException(_mismatches);
     }
 
     private bool ShouldReconcile() => _state == ReconcileState.Reconciling;
