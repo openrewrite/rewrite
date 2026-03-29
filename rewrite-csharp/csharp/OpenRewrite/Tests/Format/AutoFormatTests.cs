@@ -727,6 +727,29 @@ public class AutoFormatTests : RewriteTest
     }
 
     /// <summary>
+    /// Verifies that WhitespaceReconciler throws with property paths when
+    /// a recipe produces a tree that doesn't match what the parser produces.
+    /// </summary>
+    [Fact]
+    public void ReconcilerMismatchReportsPropertyPath()
+    {
+        var ex = Assert.Throws<WhitespaceReconciler.WhitespaceReconcileMismatchException>(() =>
+        {
+            RewriteRun(
+                spec => spec.SetRecipe(new MismatchingTypeRecipe()),
+                CSharp(
+                    "class Foo\n{\n}\n",
+                    "class Foo\n{\n    string x;\n}\n"
+                )
+            );
+        });
+
+        Assert.Contains("Identifier", ex.Message);
+        Assert.Contains("Primitive", ex.Message);
+        Assert.Contains("TypeExpression", ex.Message);
+    }
+
+    /// <summary>
     /// Reproduces the AvoidNestingTernary pattern: manually constructed if/else chain with
     /// Space.Empty, conditions extracted from the original ternary, MaybeAutoFormat at Block level.
     /// Surrounding formatting quirks must be preserved — only the spliced subtree is reformatted.
@@ -839,6 +862,132 @@ public class AutoFormatTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// Trace the FormatSpans pipeline to verify the WhitespaceReconciler
+    /// correctly applies Roslyn's formatting to synthesized nodes.
+    /// </summary>
+    [Fact]
+    public void FormatSpansReconcilerAppliesFormattingToSynthesizedNodes()
+    {
+        var input = "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n";
+        var cu = _parser.Parse(input, "source.cs");
+
+        // Add a synthesized constructor with Space.Empty everywhere
+        var classDecl = cu.Members[0].Element as ClassDeclaration;
+        Assert.NotNull(classDecl);
+
+        var body = new Block(
+            Guid.NewGuid(), Space.Empty, Markers.Empty,
+            new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+            [], Space.Empty);
+        // Use Space.Empty for prefix too — the recipe might not provide newlines
+        var method = new MethodDeclaration(
+            Guid.NewGuid(), Space.Empty, Markers.Empty, [],
+            [new Modifier(Guid.NewGuid(), Space.Empty, Markers.Empty, Modifier.ModifierType.Public, [])],
+            null, null,
+            new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], "Foo", null, null),
+            new JContainer<Statement>(Space.Empty, [], Markers.Empty),
+            null, body,
+            new JLeftPadded<Expression>(Space.SingleSpace,
+                new MethodInvocation(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, null,
+                    new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "base", null, null),
+                    null, new JContainer<Expression>(Space.Empty, [], Markers.Empty), null)),
+            null);
+
+        var newStatements = new List<JRightPadded<Statement>>(classDecl.Body!.Statements)
+        {
+            new(method, Space.Empty, Markers.Empty)
+        };
+        var modifiedClassDecl = classDecl.WithBody(classDecl.Body.WithStatements(newStatements));
+        cu = cu.WithMembers([new JRightPadded<Statement>(modifiedClassDecl, cu.Members[0].After, cu.Members[0].Markers)]);
+
+        // Call FormatSpans directly (same as DeferredFormatVisitor does)
+        var nodeIds = new HashSet<Guid> { modifiedClassDecl.Id };
+        var preservedPrefixes = new Dictionary<Guid, Space> { { modifiedClassDecl.Id, modifiedClassDecl.Prefix } };
+        var result = RoslynFormatter.FormatSpans(cu, nodeIds, preservedPrefixes);
+
+        var printed = _printer.Print(result);
+
+        // The existing constructor should be preserved as-is
+        Assert.Contains("public Foo(string m) : base(m) { }", printed);
+
+        // The synthesized constructor should have proper indentation (at minimum)
+        Assert.DoesNotContain("base(){}", printed);
+        // Roslyn should have indented the constructor
+        Assert.Contains("    public Foo() : base()", printed);
+    }
+
+    /// <summary>
+    /// End-to-end test: recipe adds a constructor via MaybeAutoFormat at class level.
+    /// This is the exact pattern from the bug report.
+    /// </summary>
+    [Fact]
+    public void MaybeAutoFormatAtClassLevelWithSynthesizedConstructor()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new AddConstructorWithMaybeAutoFormatRecipe()),
+            CSharp(
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n}\n",
+                "class Foo : Exception\n{\n    public Foo(string m) : base(m) { }\n\n    public Foo() : base()\n    {\n    }\n}\n"
+            )
+        );
+    }
+
+}
+
+/// <summary>
+/// Recipe that adds a constructor with Space.Empty on synthesized nodes and
+/// calls MaybeAutoFormat at ClassDeclaration level — the exact pattern from the bug report.
+/// </summary>
+file class AddConstructorWithMaybeAutoFormatRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Add constructor with MaybeAutoFormat";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitClassDeclaration(ClassDeclaration classDecl, ExecutionContext ctx)
+        {
+            var before = classDecl;
+            classDecl = (ClassDeclaration)base.VisitClassDeclaration(classDecl, ctx);
+            if (classDecl.Body == null) return classDecl;
+
+            // Check if parameterless constructor already exists
+            foreach (var stmt in classDecl.Body.Statements)
+                if (stmt.Element is MethodDeclaration md && md.Parameters.Elements.Count == 0 &&
+                    md.Name.SimpleName == classDecl.Name.SimpleName)
+                    return classDecl;
+
+            var className = classDecl.Name.SimpleName;
+
+            var body = new Block(
+                Guid.NewGuid(), Space.Empty, Markers.Empty,
+                new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
+                [], Space.Empty);
+
+            var method = new MethodDeclaration(
+                Guid.NewGuid(), Space.Format("\n\n"), Markers.Empty, [],
+                [new Modifier(Guid.NewGuid(), Space.Empty, Markers.Empty, Modifier.ModifierType.Public, [])],
+                null, null,
+                new Identifier(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, [], className, null, null),
+                new JContainer<Statement>(Space.Empty, [], Markers.Empty),
+                null, body,
+                new JLeftPadded<Expression>(Space.SingleSpace,
+                    new MethodInvocation(Guid.NewGuid(), Space.SingleSpace, Markers.Empty, null,
+                        new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "base", null, null),
+                        null, new JContainer<Expression>(Space.Empty, [], Markers.Empty), null)),
+                null);
+
+            var newStatements = new List<JRightPadded<Statement>>(classDecl.Body.Statements)
+            {
+                new(method, Space.Empty, Markers.Empty)
+            };
+            classDecl = classDecl.WithBody(classDecl.Body.WithStatements(newStatements));
+            return MaybeAutoFormat(before, classDecl, ctx, Cursor);
+        }
+    }
 }
 
 /// <summary>
@@ -981,6 +1130,46 @@ file class ManualIfElseAtBlockLevelRecipe : OpenRewrite.Core.Recipe
                 new JRightPadded<bool>(false, Space.Empty, Markers.Empty),
                 [new JRightPadded<Statement>(ret, Space.Empty, Markers.Empty)],
                 Space.Empty);
+        }
+    }
+}
+
+/// <summary>
+/// Recipe that intentionally creates a type mismatch: uses Identifier("string")
+/// instead of Primitive(String). Used to test mismatch reporting.
+/// </summary>
+file class MismatchingTypeRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "Mismatching type recipe";
+    public override string Description => "Test recipe.";
+
+    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
+
+    private class Visitor : CSharpVisitor<ExecutionContext>
+    {
+        public override J VisitClassDeclaration(ClassDeclaration classDecl, ExecutionContext ctx)
+        {
+            var before = classDecl;
+            classDecl = (ClassDeclaration)base.VisitClassDeclaration(classDecl, ctx);
+            if (classDecl.Body == null || classDecl.Body.Statements.Count > 0) return classDecl;
+
+            // Deliberately use Identifier("string") — the parser produces Primitive(String)
+            var typeExpr = new Identifier(
+                Guid.NewGuid(), Space.Empty, Markers.Empty, [], "string", null, null);
+            var variable = new NamedVariable(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "x", null, null),
+                [], null, null);
+            var field = new VariableDeclarations(
+                Guid.NewGuid(), Space.Empty, Markers.Empty, [], [], typeExpr, null, [],
+                [new JRightPadded<NamedVariable>(variable, Space.Empty, Markers.Empty)]);
+
+            var newStatements = new List<JRightPadded<Statement>>(classDecl.Body.Statements)
+            {
+                new(field, Space.Empty, Markers.Empty)
+            };
+            classDecl = classDecl.WithBody(classDecl.Body.WithStatements(newStatements));
+            return MaybeAutoFormat(before, classDecl, ctx, Cursor);
         }
     }
 }
