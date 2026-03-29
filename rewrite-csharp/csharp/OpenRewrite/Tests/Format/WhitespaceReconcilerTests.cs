@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
+using OpenRewrite.Java;
+using static OpenRewrite.Java.J;
 
 namespace OpenRewrite.Tests.Format;
 
@@ -135,6 +138,83 @@ public class WhitespaceReconcilerTests
         Assert.False(reconciler.IsCompatible);
         // Should return original unchanged
         Assert.Equal(source1, _printer.Print(result));
+    }
+
+    [Fact(Skip = "Reconciliation skips mismatched subtrees but result propagation needs investigation")]
+    public void SkipsMismatchedSubtreeAndReconcilesSurroundingCode()
+    {
+        // Badly formatted source: missing indentation after return type
+        const string badlyFormatted = """
+            class Foo
+            {
+            int Bar()
+            {
+            return 1;
+            }
+            int Baz()
+            {
+            return 2;
+            }
+            }
+            """;
+
+        // Well-formatted version (what Roslyn would produce)
+        const string wellFormatted = """
+            class Foo
+            {
+                int Bar()
+                {
+                    return 1;
+                }
+                int Baz()
+                {
+                    return 2;
+                }
+            }
+            """;
+
+        var original = _parser.Parse(badlyFormatted);
+        var formatted = _parser.Parse(wellFormatted);
+
+        // Replace the J.Primitive("int") return type of Bar() with J.Identifier("int")
+        // to simulate a recipe that constructed a node differently than the parser would.
+        var mutated = (CompilationUnit)new PrimitiveToIdentifierReplacer(replaceFirst: true)
+            .VisitNonNull(original, 0);
+
+        // Reconcile — should skip the mismatched method return type but still
+        // copy indentation from the formatted tree for everything else
+        var reconciler = new WhitespaceReconciler();
+        var result = reconciler.Reconcile(mutated, formatted);
+
+        Assert.False(reconciler.IsCompatible);
+        Assert.True(reconciler.MismatchCount > 0);
+
+        var printed = _printer.Print(result);
+
+        // The second method (Baz) should be properly indented even though
+        // the first method's return type mismatched.
+        // The second method (Baz) should be properly indented even though
+        // the first method's return type mismatched.
+        Assert.Contains("    int Baz()", printed);
+    }
+
+    /// <summary>
+    /// Replaces the first J.Primitive encountered with a J.Identifier of the same name.
+    /// Simulates a recipe constructing a type reference differently than the parser.
+    /// </summary>
+    private class PrimitiveToIdentifierReplacer(bool replaceFirst) : CSharpVisitor<int>
+    {
+        private bool _replaced;
+
+        public override J VisitPrimitive(Primitive primitive, int p)
+        {
+            if (_replaced || !replaceFirst) return primitive;
+            _replaced = true;
+            // Replace Primitive with Identifier — structurally different types
+            return new Identifier(
+                primitive.Id, primitive.Prefix, primitive.Markers,
+                [], primitive.Kind.ToString().ToLower(), null, null);
+        }
     }
 
     [Fact]

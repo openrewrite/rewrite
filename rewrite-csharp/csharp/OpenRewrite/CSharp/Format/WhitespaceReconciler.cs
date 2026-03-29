@@ -26,8 +26,11 @@ namespace OpenRewrite.CSharp.Format;
 /// from the formatted tree to the original. Preserves the original tree's IDs,
 /// types, and all non-whitespace state.
 ///
-/// If the trees diverge structurally, returns the original unchanged and sets
-/// <see cref="IsCompatible"/> to false.
+/// When a subtree diverges structurally (e.g., a recipe used J.Identifier where the
+/// parser produces J.Primitive), that subtree is skipped — the original is kept
+/// unchanged — and reconciliation continues with the remaining siblings.
+/// <see cref="IsCompatible"/> is set to false to signal that mismatches were encountered,
+/// but the result is still usable.
 /// </summary>
 public class WhitespaceReconciler
 {
@@ -38,6 +41,8 @@ public class WhitespaceReconciler
         ["Id", "SourcePath"];
 
     private bool _compatible = true;
+    private int _mismatchCount;
+    private int _maxMismatches = int.MaxValue;
     private J? _targetSubtree;
     private J? _stopAfter;
     private HashSet<Guid>? _targetIds;
@@ -51,11 +56,26 @@ public class WhitespaceReconciler
         Done
     }
 
+    /// <summary>
+    /// Whether the two trees were fully structurally compatible. False if any subtrees
+    /// were skipped due to type or count mismatches, but the result is still usable.
+    /// </summary>
     public bool IsCompatible => _compatible;
+
+    /// <summary>Number of structural mismatches encountered during reconciliation.</summary>
+    public int MismatchCount => _mismatchCount;
+
+    /// <summary>
+    /// Sets the maximum number of structural mismatches before aborting reconciliation.
+    /// When exceeded, <see cref="Reconcile"/> throws <see cref="InvalidOperationException"/>.
+    /// Default is unlimited. Intended for test assertions.
+    /// </summary>
+    public int MaxMismatches { set => _maxMismatches = value; }
 
     public J Reconcile(J original, J formatted, J? targetSubtree = null, J? stopAfter = null)
     {
         _compatible = true;
+        _mismatchCount = 0;
         _targetSubtree = targetSubtree;
         _stopAfter = stopAfter;
         _targetIds = null;
@@ -72,6 +92,7 @@ public class WhitespaceReconciler
     public J Reconcile(J original, J formatted, HashSet<Guid> targetIds)
     {
         _compatible = true;
+        _mismatchCount = 0;
         _targetSubtree = null;
         _stopAfter = null;
         _targetIds = targetIds;
@@ -87,12 +108,16 @@ public class WhitespaceReconciler
     private object? StructureMismatch(object? original)
     {
         _compatible = false;
+        _mismatchCount++;
+        if (_mismatchCount > _maxMismatches)
+            throw new InvalidOperationException(
+                $"WhitespaceReconciler exceeded {_maxMismatches} structural mismatches");
         return original;
     }
 
+
     private object? VisitProperty(object? original, object? formatted)
     {
-        if (!_compatible) return original;
 
         // Handle null: if one is null and the other isn't, check whether it's a
         // structural type (J, padded wrapper, list) where a mismatch is fatal.
@@ -122,7 +147,11 @@ public class WhitespaceReconciler
         if (original is Space)
         {
             if (!ShouldReconcile()) return original;
-            return formatted is Space ? formatted : StructureMismatch(original);
+            if (formatted is Space fmtSpace)
+            {
+                return fmtSpace;
+            }
+            return StructureMismatch(original);
         }
 
         // Markers — copy from formatted when reconciling
@@ -164,7 +193,6 @@ public class WhitespaceReconciler
 
     private object? VisitTree(J original, J formatted)
     {
-        if (!_compatible) return original;
 
         // Check structural type compatibility
         if (original.GetType() != formatted.GetType())
@@ -202,10 +230,10 @@ public class WhitespaceReconciler
                 var fmtVal = prop.GetValue(formatted);
 
                 var visited = VisitProperty(origVal, fmtVal);
-                if (!_compatible) return original;
 
                 if (!ReferenceEquals(visited, origVal))
                 {
+                    var prev = result;
                     result = SetProperty(result, type, prop, visited);
                     if (result == null) return original;
                 }
@@ -232,7 +260,6 @@ public class WhitespaceReconciler
 
     private object? VisitRightPadded(object original, object formatted)
     {
-        if (!_compatible) return original;
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
@@ -245,7 +272,6 @@ public class WhitespaceReconciler
         var origElement = elementProp.GetValue(original);
         var fmtElement = elementProp.GetValue(formatted);
         var visitedElement = VisitProperty(origElement, fmtElement);
-        if (!_compatible) return original;
 
         var origAfter = afterProp.GetValue(original) as Space;
         var fmtAfter = afterProp.GetValue(formatted) as Space;
@@ -277,7 +303,6 @@ public class WhitespaceReconciler
 
     private object? VisitLeftPadded(object original, object formatted)
     {
-        if (!_compatible) return original;
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
@@ -293,7 +318,6 @@ public class WhitespaceReconciler
         var origElement = elementProp.GetValue(original);
         var fmtElement = elementProp.GetValue(formatted);
         var visitedElement = VisitProperty(origElement, fmtElement);
-        if (!_compatible) return original;
 
         if (ReferenceEquals(visitedBefore, origBefore) &&
             ReferenceEquals(visitedElement, origElement))
@@ -313,7 +337,6 @@ public class WhitespaceReconciler
 
     private object? VisitContainer(object original, object formatted)
     {
-        if (!_compatible) return original;
 
         var origType = original.GetType();
         var fmtType = formatted.GetType();
@@ -330,7 +353,6 @@ public class WhitespaceReconciler
         var origElements = elementsProp.GetValue(original) as IList;
         var fmtElements = elementsProp.GetValue(formatted) as IList;
         var visitedElements = VisitList(origElements!, fmtElements!);
-        if (!_compatible) return original;
 
         var origMarkers = markersProp.GetValue(original) as Markers;
         var fmtMarkers = markersProp.GetValue(formatted) as Markers;

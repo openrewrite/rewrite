@@ -91,8 +91,6 @@ public static class RoslynFormatter
             // MVS made changes — reconcile them within the target subtree
             var mvsReconciler = new WhitespaceReconciler();
             var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, targetSubtree, stopAfter);
-            if (!mvsReconciler.IsCompatible)
-                return originalCu;
             return mvsResult as CompilationUnit ?? originalCu;
         }
 
@@ -110,12 +108,11 @@ public static class RoslynFormatter
         }
 
         // 7. Reconcile whitespace against the original CU so MVS artifacts
-        // outside the target subtree are discarded.
+        // outside the target subtree are discarded. Mismatched subtrees
+        // (e.g., recipe-constructed nodes with different types than the parser
+        // would produce) are skipped — they keep their original whitespace.
         var reconciler = new WhitespaceReconciler();
         var result = reconciler.Reconcile(originalCu, formattedCu, targetSubtree, stopAfter);
-
-        if (!reconciler.IsCompatible)
-            return originalCu;
 
         return result as CompilationUnit ?? originalCu;
     }
@@ -268,8 +265,6 @@ public static class RoslynFormatter
             // MVS made changes — reconcile them within the target subtrees
             var mvsReconciler = new WhitespaceReconciler();
             var mvsResult = mvsReconciler.Reconcile(originalCu, mvsCu, nodeIds);
-            if (!mvsReconciler.IsCompatible)
-                return originalCu;
             cu = mvsResult as CompilationUnit ?? originalCu;
 
             // Restore preserved prefixes
@@ -299,9 +294,6 @@ public static class RoslynFormatter
         // Reconcile against the original CU so MVS artifacts outside targets are discarded.
         var reconciler = new WhitespaceReconciler();
         var result = reconciler.Reconcile(originalCu, formattedCu, nodeIds);
-
-        if (!reconciler.IsCompatible)
-            return originalCu;
 
         cu = result as CompilationUnit ?? originalCu;
 
