@@ -518,7 +518,7 @@ public static class RoslynFormatter
         var root = syntaxTree.GetRoot();
 
         using var workspace = CreateWorkspace();
-        var options = BuildOptions(workspace, style);
+        var options = style.GetOrBuildOptionSet(workspace.Options);
 
         var formatted = span != null
             ? Formatter.Format(root, span.Value, workspace, options)
@@ -532,7 +532,7 @@ public static class RoslynFormatter
         var root = syntaxTree.GetRoot();
 
         using var workspace = CreateWorkspace();
-        var options = BuildOptions(workspace, style);
+        var options = style.GetOrBuildOptionSet(workspace.Options);
 
         var formatted = Formatter.Format(root, spans, workspace, options);
         return formatted.ToFullString();
@@ -565,9 +565,9 @@ public static class RoslynFormatter
 
     private static AdhocWorkspace CreateWorkspace() => new(HostServices);
 
-    private static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(AdhocWorkspace workspace, CSharpFormatStyle style)
+    internal static Microsoft.CodeAnalysis.Options.OptionSet BuildOptions(Microsoft.CodeAnalysis.Options.OptionSet baseOptions, CSharpFormatStyle style)
     {
-        return workspace.Options
+        return baseOptions
             .WithChangedOption(FormattingOptions.UseTabs, LanguageNames.CSharp, style.UseTabs)
             .WithChangedOption(FormattingOptions.IndentationSize, LanguageNames.CSharp, style.IndentSize)
             .WithChangedOption(FormattingOptions.TabSize, LanguageNames.CSharp, style.TabSize)

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis.Options;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 
@@ -93,6 +94,22 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
     public int LabelPositioning { get; }
     /// <summary>Binary operator spacing: 0=Single (before_and_after), 1=Ignore, 2=Remove (none).</summary>
     public int SpacingAroundBinaryOperator { get; }
+
+    /// <summary>
+    /// Lazily-cached Roslyn <see cref="OptionSet"/> built from this style's values.
+    /// Transient — not part of RPC serialization or equality.
+    /// </summary>
+    private volatile OptionSet? _cachedOptionSet;
+
+    /// <summary>
+    /// Returns a cached Roslyn <see cref="OptionSet"/> built from this style.
+    /// The <paramref name="baseOptions"/> is only used on first call to seed the option set;
+    /// subsequent calls return the cached instance regardless of the argument.
+    /// </summary>
+    internal OptionSet GetOrBuildOptionSet(OptionSet baseOptions)
+    {
+        return _cachedOptionSet ??= Format.RoslynFormatter.BuildOptions(baseOptions, this);
+    }
 
     // ── Boolean flag accessors ──
     private bool Flag(int bit) => (_flags & (1L << bit)) != 0;
