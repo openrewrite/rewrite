@@ -32,6 +32,11 @@ namespace OpenRewrite.Test;
 /// </summary>
 public abstract class RewriteTest
 {
+    static RewriteTest()
+    {
+        WhitespaceReconciler.ThrowOnMismatchDefault = true;
+    }
+
     private static readonly ConcurrentDictionary<ReferenceAssemblies, ImmutableArray<MetadataReference>>
         ResolvedAssembliesCache = new();
 
@@ -114,8 +119,8 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
-            var prevThrow = WhitespaceReconciler.ThrowOnMismatch;
-            WhitespaceReconciler.ThrowOnMismatch = validations.FormattingReconciliation;
+            var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
+            WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
             List<Result> results;
             try
             {
@@ -123,7 +128,7 @@ public abstract class RewriteTest
             }
             finally
             {
-                WhitespaceReconciler.ThrowOnMismatch = prevThrow;
+                WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
             }
 
             foreach (var (spec, source) in parsed)

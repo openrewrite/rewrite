@@ -201,8 +201,153 @@ internal class PatternMatchingComparator
 
     /// <summary>
     /// Compare all structural properties of two same-type nodes.
+    /// Dispatches to direct property access for common AST node types to avoid
+    /// reflection overhead, falling back to reflection for less common types.
     /// </summary>
     private bool MatchProperties(J pattern, J candidate, Cursor cursor)
+    {
+        switch (pattern)
+        {
+            case MethodInvocation p:
+            {
+                var c = (MethodInvocation)candidate;
+                return MatchValue(p.Select, c.Select, cursor)
+                    && MatchValue(p.Name, c.Name, cursor)
+                    && MatchValue(p.TypeParameters, c.TypeParameters, cursor)
+                    && MatchValue(p.Arguments, c.Arguments, cursor);
+            }
+            case Identifier p:
+            {
+                var c = (Identifier)candidate;
+                return MatchValue(p.Annotations, c.Annotations, cursor)
+                    && p.SimpleName == c.SimpleName;
+            }
+            case Binary p:
+            {
+                var c = (Binary)candidate;
+                return MatchValue(p.Left, c.Left, cursor)
+                    && MatchValue(p.Operator, c.Operator, cursor)
+                    && MatchValue(p.Right, c.Right, cursor);
+            }
+            case Literal p:
+            {
+                var c = (Literal)candidate;
+                return Equals(p.Value, c.Value)
+                    && p.ValueSource == c.ValueSource
+                    && MatchValue(p.UnicodeEscapes, c.UnicodeEscapes, cursor);
+            }
+            case FieldAccess p:
+            {
+                var c = (FieldAccess)candidate;
+                return MatchValue(p.Target, c.Target, cursor)
+                    && MatchValue(p.Name, c.Name, cursor);
+            }
+            case Block p:
+            {
+                var c = (Block)candidate;
+                return MatchValue(p.Static, c.Static, cursor)
+                    && MatchValue(p.Statements, c.Statements, cursor);
+            }
+            case If p:
+            {
+                var c = (If)candidate;
+                return MatchValue(p.Condition, c.Condition, cursor)
+                    && MatchValue(p.ThenPart, c.ThenPart, cursor)
+                    && MatchValue(p.ElsePart, c.ElsePart, cursor);
+            }
+            case NewClass p:
+            {
+                var c = (NewClass)candidate;
+                return MatchValue(p.Enclosing, c.Enclosing, cursor)
+                    && MatchValue(p.Clazz, c.Clazz, cursor)
+                    && MatchValue(p.Arguments, c.Arguments, cursor)
+                    && MatchValue(p.Body, c.Body, cursor);
+            }
+            case Unary p:
+            {
+                var c = (Unary)candidate;
+                return MatchValue(p.Operator, c.Operator, cursor)
+                    && MatchValue(p.Expression, c.Expression, cursor);
+            }
+            case ArrayAccess p:
+            {
+                var c = (ArrayAccess)candidate;
+                return MatchValue(p.Indexed, c.Indexed, cursor)
+                    && MatchValue(p.Dimension, c.Dimension, cursor);
+            }
+            case Assignment p:
+            {
+                var c = (Assignment)candidate;
+                return MatchValue(p.Variable, c.Variable, cursor)
+                    && MatchValue(p.AssignmentValue, c.AssignmentValue, cursor);
+            }
+            case AssignmentOperation p:
+            {
+                var c = (AssignmentOperation)candidate;
+                return MatchValue(p.Variable, c.Variable, cursor)
+                    && MatchValue(p.Operator, c.Operator, cursor)
+                    && MatchValue(p.AssignmentValue, c.AssignmentValue, cursor);
+            }
+            case Ternary p:
+            {
+                var c = (Ternary)candidate;
+                return MatchValue(p.Condition, c.Condition, cursor)
+                    && MatchValue(p.TruePart, c.TruePart, cursor)
+                    && MatchValue(p.FalsePart, c.FalsePart, cursor);
+            }
+            case TypeCast p:
+            {
+                var c = (TypeCast)candidate;
+                return MatchValue(p.Clazz, c.Clazz, cursor)
+                    && MatchValue(p.Expression, c.Expression, cursor);
+            }
+            case Return p:
+            {
+                var c = (Return)candidate;
+                return MatchValue(p.Expression, c.Expression, cursor);
+            }
+            case Lambda p:
+            {
+                var c = (Lambda)candidate;
+                return MatchValue(p.Params, c.Params, cursor)
+                    && MatchValue(p.Body, c.Body, cursor);
+            }
+            case MemberReference p:
+            {
+                var c = (MemberReference)candidate;
+                return MatchValue(p.Containing, c.Containing, cursor)
+                    && MatchValue(p.TypeParameters, c.TypeParameters, cursor)
+                    && MatchValue(p.Reference, c.Reference, cursor);
+            }
+            case VariableDeclarations p:
+            {
+                var c = (VariableDeclarations)candidate;
+                return MatchValue(p.LeadingAnnotations, c.LeadingAnnotations, cursor)
+                    && MatchValue(p.Modifiers, c.Modifiers, cursor)
+                    && MatchValue(p.TypeExpression, c.TypeExpression, cursor)
+                    && MatchValue(p.DimensionsBeforeName, c.DimensionsBeforeName, cursor)
+                    && MatchValue(p.Variables, c.Variables, cursor);
+            }
+            case IsPattern p:
+            {
+                var c = (IsPattern)candidate;
+                return MatchValue(p.Expression, c.Expression, cursor)
+                    && MatchValue(p.Pattern, c.Pattern, cursor);
+            }
+            case ConstantPattern p:
+            {
+                var c = (ConstantPattern)candidate;
+                return MatchValue(p.Value, c.Value, cursor);
+            }
+            default:
+                return MatchPropertiesViaReflection(pattern, candidate, cursor);
+        }
+    }
+
+    /// <summary>
+    /// Reflection-based fallback for types without direct property access overloads.
+    /// </summary>
+    private bool MatchPropertiesViaReflection(J pattern, J candidate, Cursor cursor)
     {
         var properties = TreeHelper.GetStructuralProperties(pattern.GetType());
         foreach (var prop in properties)
@@ -366,7 +511,7 @@ internal class PatternMatchingComparator
         if (patternBinary.Operator.Element != Binary.OperatorType.Equal)
             return false;
 
-        if (candidateIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+        if (candidateIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
             return false;
 
         // pattern: {s} == null → match {s} against candidate's expression
@@ -388,7 +533,7 @@ internal class PatternMatchingComparator
         if (candidateBinary.Operator.Element != Binary.OperatorType.Equal)
             return false;
 
-        if (patternIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+        if (patternIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
             return false;
 
         // candidate: expr == null → match pattern's expression against candidate's left

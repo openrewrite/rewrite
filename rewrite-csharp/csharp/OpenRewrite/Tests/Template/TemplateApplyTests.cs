@@ -120,6 +120,126 @@ public class TemplateApplyTests : RewriteTest
         );
     }
 
+    /// <summary>
+    /// Substituting an IsPattern (e.g., x is null) into an expression-position capture
+    /// must preserve its Pattern field (JLeftPadded&lt;Pattern&gt;). A second recipe that
+    /// pattern-matches the resulting IsPattern should not crash.
+    /// </summary>
+    [Fact]
+    public void SubstitutingIsPatternPreservesPatternField()
+    {
+        var left = Capture.Expression("left");
+        var right = Capture.Expression("right");
+        RewriteRun(
+            spec => spec.SetRecipe(Replace<Binary>(
+                $"{left} && {right}",
+                $"{left} || {right}")),
+            CSharp(
+                "class C { void M(object x, bool b) { var r = b && x is null; } }",
+                "class C { void M(object x, bool b) { var r = b || x is null; } }"
+            )
+        );
+    }
+
+    /// <summary>
+    /// A composite recipe where recipe 1 captures an IsPattern and substitutes it
+    /// into a new binary, and recipe 2 pattern-matches the resulting IsPattern.
+    /// This verifies the Pattern field survives multi-recipe pipelines.
+    /// </summary>
+    [Fact]
+    public void IsPatternSurvivesCompositeRecipePipeline()
+    {
+        RewriteRun(
+            spec => spec.SetRecipe(new IsPatternCompositeRecipe()),
+            CSharp(
+                """
+                class C
+                {
+                    void M(object x, bool b)
+                    {
+                        var r = b && x is null;
+                    }
+                }
+                """,
+                """
+                class C
+                {
+                    void M(object x, bool b)
+                    {
+                        var r = b || x == null;
+                    }
+                }
+                """
+            )
+        );
+    }
+
+    /// <summary>
+    /// Directly verifies that template substitution preserves the
+    /// <see cref="IsPattern.Pattern"/> field when an IsPattern is substituted into
+    /// an expression capture position.
+    /// </summary>
+    [Fact]
+    public void ApplySubstitutionsPreservesIsPatternFields()
+    {
+        // Parse "x is null" to get an IsPattern node
+        var parser = new CSharpParser();
+        var cu = parser.Parse("class C { void M(object x) { var r = x is null; } }");
+        var isPattern = FindFirst<IsPattern>(cu)!;
+        Assert.NotNull(isPattern);
+        Assert.NotNull(isPattern.Pattern);
+
+        // Parse a "b" identifier to use as the left operand
+        var cu2 = parser.Parse("class C { void M(bool b) { var r = b; } }");
+        var bIdent = FindFirst<Identifier>(cu2)!;
+
+        // Build template and substitute
+        var left = Capture.Expression("left");
+        var right = Capture.Expression("right");
+        var tmpl = CSharpTemplate.Expression($"{left} && {right}");
+
+        var values = new MatchResult(
+            new Dictionary<string, object>
+            {
+                ["left"] = bIdent,
+                ["right"] = isPattern,
+            }, null);
+
+        var cursor = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), cu);
+        var result = tmpl.Apply(cursor, values: values);
+
+        Assert.NotNull(result);
+        Assert.IsType<Binary>(result);
+        var binary = (Binary)result;
+        Assert.IsType<IsPattern>(binary.Right);
+        var resultIsPattern = (IsPattern)binary.Right;
+
+        // This is the key assertion: Pattern must NOT be null
+        Assert.NotNull(resultIsPattern.Pattern);
+        Assert.IsType<ConstantPattern>(resultIsPattern.Pattern.Element);
+    }
+
+    /// <summary>
+    /// Cross-type matching: a pattern like <c>x == null</c> (Binary) should match
+    /// a candidate <c>x is null</c> (IsPattern) via PatternMatchingComparator.
+    /// This exercises the MatchBinaryPatternToIsNullCandidate code path.
+    /// </summary>
+    [Fact]
+    public void CrossTypeMatchIsPatternToBinaryEqNull()
+    {
+        var x = Capture.Expression("x");
+        RewriteRun(
+            spec => spec.SetRecipe(new RewriteVisitorRecipe(
+                CSharpTemplate.Rewrite(
+                    CSharpPattern.Expression($"{x} == null"),
+                    CSharpTemplate.Expression($"{x} == null")))),
+            CSharp(
+                "class C { void M(object o) { var r = o is null; } }",
+                "class C { void M(object o) { var r = o == null; } }"
+            )
+        );
+    }
+
     [Fact]
     public void ReplacesBinaryExpression()
     {
@@ -733,4 +853,31 @@ file class RewriteVisitorRecipe(CSharpVisitor<ExecutionContext> visitor) : OpenR
     public override string Description => "Applies a CSharpTemplate.Rewrite() visitor.";
 
     public override JavaVisitor<ExecutionContext> GetVisitor() => visitor;
+}
+
+/// <summary>
+/// Composite recipe: (1) swap && to || via capture/substitute, (2) convert 'is null' to '== null'.
+/// Tests that IsPattern.Pattern survives template substitution across recipe boundaries.
+/// </summary>
+file class IsPatternCompositeRecipe : OpenRewrite.Core.Recipe
+{
+    public override string DisplayName => "IsPattern composite";
+    public override string Description => "Swap && to || then convert is-null to ==-null.";
+
+    public override List<OpenRewrite.Core.Recipe> GetRecipeList()
+    {
+        var left = Capture.Expression("left");
+        var right = Capture.Expression("right");
+        var x = Capture.Expression("x");
+
+        return
+        [
+            new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"{left} && {right}"),
+                CSharpTemplate.Expression($"{left} || {right}"))),
+            new RewriteVisitorRecipe(CSharpTemplate.Rewrite(
+                CSharpPattern.Expression($"{x} is null"),
+                CSharpTemplate.Expression($"{x} == null"))),
+        ];
+    }
 }
