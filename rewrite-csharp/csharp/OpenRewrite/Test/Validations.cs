@@ -45,14 +45,14 @@ public sealed class Validations
     public bool PrintIdempotence { get; init; } = true;
 
     /// <summary>
-    /// Maximum number of structural mismatches allowed in the whitespace reconciler
-    /// before it throws. Set to 0 to require perfect structural alignment between
-    /// recipe output and Roslyn-formatted output. Set to <c>int.MaxValue</c> to
-    /// allow unlimited mismatches (production behavior).
-    /// Default: 5 — enough to catch systematic issues while tolerating minor
-    /// type mismatches from recipe-constructed nodes.
+    /// Whether structural mismatches in the whitespace reconciler are allowed.
+    /// When false (default), the reconciler collects all mismatches during the walk
+    /// and throws after completion with a report of the first few.
+    /// When true, mismatches are silently skipped (production behavior).
+    /// Set to true for recipes that intentionally construct nodes with different types
+    /// than the parser would produce (e.g., J.Identifier where J.Primitive is expected).
     /// </summary>
-    public int MaxWhitespaceMismatches { get; init; } = 5;
+    public bool AllowWhitespaceMismatches { get; init; } = false;
 
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
@@ -63,6 +63,6 @@ public sealed class Validations
         WhitespaceInSpaces = false,
         PrintEqualsInput = false,
         PrintIdempotence = false,
-        MaxWhitespaceMismatches = int.MaxValue
+        AllowWhitespaceMismatches = true
     };
 }

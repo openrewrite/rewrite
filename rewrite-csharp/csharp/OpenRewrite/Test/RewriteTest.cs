@@ -114,8 +114,8 @@ public abstract class RewriteTest
         if (recipeSpec.Recipe != null)
         {
             var sources = parsed.Select(p => p.Source).ToList();
-            var prevMaxMismatches = WhitespaceReconciler.DefaultMaxMismatches;
-            WhitespaceReconciler.DefaultMaxMismatches = validations.MaxWhitespaceMismatches;
+            var prevThrow = WhitespaceReconciler.ThrowOnMismatch;
+            WhitespaceReconciler.ThrowOnMismatch = !validations.AllowWhitespaceMismatches;
             List<Result> results;
             try
             {
@@ -123,7 +123,7 @@ public abstract class RewriteTest
             }
             finally
             {
-                WhitespaceReconciler.DefaultMaxMismatches = prevMaxMismatches;
+                WhitespaceReconciler.ThrowOnMismatch = prevThrow;
             }
 
             foreach (var (spec, source) in parsed)

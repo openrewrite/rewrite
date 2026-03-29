@@ -41,14 +41,15 @@ public class WhitespaceReconciler
         ["Id", "SourcePath"];
 
     /// <summary>
-    /// Max mismatches for new reconciler instances. Set by test infrastructure
-    /// before recipe execution. Default 0 = unlimited (production behavior).
+    /// When true, mismatches cause an exception to be thrown after reconciliation
+    /// completes, reporting the first few mismatches. Set by test infrastructure.
+    /// Default: false (production — mismatches are silently skipped).
     /// </summary>
-    internal static int DefaultMaxMismatches;
+    internal static bool ThrowOnMismatch;
 
     private bool _compatible = true;
     private int _mismatchCount;
-    private int _maxMismatches = DefaultMaxMismatches > 0 ? DefaultMaxMismatches : int.MaxValue;
+    private List<string>? _mismatchDetails;
     private J? _targetSubtree;
     private J? _stopAfter;
     private HashSet<Guid>? _targetIds;
@@ -71,23 +72,18 @@ public class WhitespaceReconciler
     /// <summary>Number of structural mismatches encountered during reconciliation.</summary>
     public int MismatchCount => _mismatchCount;
 
-    /// <summary>
-    /// Sets the maximum number of structural mismatches before aborting reconciliation.
-    /// When exceeded, <see cref="Reconcile"/> throws <see cref="InvalidOperationException"/>.
-    /// Default is unlimited. Intended for test assertions.
-    /// </summary>
-    public int MaxMismatches { set => _maxMismatches = value; }
-
     public J Reconcile(J original, J formatted, J? targetSubtree = null, J? stopAfter = null)
     {
         _compatible = true;
         _mismatchCount = 0;
+        _mismatchDetails = null;
         _targetSubtree = targetSubtree;
         _stopAfter = stopAfter;
         _targetIds = null;
         _state = targetSubtree != null ? ReconcileState.Searching : ReconcileState.Reconciling;
 
         var result = VisitTree(original, formatted);
+        ThrowIfMismatches();
         return result as J ?? original;
     }
 
@@ -99,6 +95,7 @@ public class WhitespaceReconciler
     {
         _compatible = true;
         _mismatchCount = 0;
+        _mismatchDetails = null;
         _targetSubtree = null;
         _stopAfter = null;
         _targetIds = targetIds;
@@ -106,19 +103,35 @@ public class WhitespaceReconciler
         _state = ReconcileState.Searching;
 
         var result = VisitTree(original, formatted);
+        ThrowIfMismatches();
         return result as J ?? original;
     }
 
     private bool ShouldReconcile() => _state == ReconcileState.Reconciling;
 
-    private object? StructureMismatch(object? original)
+    private object? StructureMismatch(object? original, object? formatted = null)
     {
         _compatible = false;
         _mismatchCount++;
-        if (_mismatchCount > _maxMismatches)
-            throw new InvalidOperationException(
-                $"WhitespaceReconciler exceeded {_maxMismatches} structural mismatches");
+        if (ThrowOnMismatch && _mismatchCount <= 5)
+        {
+            _mismatchDetails ??= [];
+            var origType = original?.GetType().Name ?? "null";
+            var fmtType = formatted?.GetType().Name ?? "null";
+            _mismatchDetails.Add($"  #{_mismatchCount}: {origType} vs {fmtType}");
+        }
         return original;
+    }
+
+    private void ThrowIfMismatches()
+    {
+        if (ThrowOnMismatch && _mismatchDetails is { Count: > 0 })
+        {
+            var details = string.Join("\n", _mismatchDetails);
+            var suffix = _mismatchCount > 5 ? $"\n  ... and {_mismatchCount - 5} more" : "";
+            throw new InvalidOperationException(
+                $"WhitespaceReconciler found {_mismatchCount} structural mismatch(es):\n{details}{suffix}");
+        }
     }
 
 
@@ -201,7 +214,7 @@ public class WhitespaceReconciler
     {
         // Check structural type compatibility
         if (original.GetType() != formatted.GetType())
-            return StructureMismatch(original);
+            return StructureMismatch(original, formatted);
 
         // Track target subtree (single-target mode)
         var isTarget = _targetSubtree != null && ReferenceEquals(original, _targetSubtree);
