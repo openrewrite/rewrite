@@ -1493,6 +1493,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             returnType,
             name,
             paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             null, // DefaultValue
@@ -1651,6 +1652,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null, // ReturnTypeExpression (constructors have none)
             name,
             paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             defaultValue,
@@ -1735,6 +1737,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null, // TypeParameters
             null, // ReturnTypeExpression (destructors have none)
             name, paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             null, // DefaultValue
@@ -7730,6 +7733,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             null,    // ReturnType (constructors don't have return types)
             methodName,
             paramsContainer,
+            [],      // DimensionsAfterName
             null,    // Throws
             null,    // Body
             null,    // DefaultValue
@@ -8420,6 +8424,7 @@ internal class CSharpParserVisitor : CSharpSyntaxVisitor<J>
             returnType,
             name,
             paramsContainer,
+            [], // DimensionsAfterName
             null, // Throws
             body,
             null, // DefaultValue

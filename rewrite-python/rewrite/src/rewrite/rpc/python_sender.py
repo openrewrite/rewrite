@@ -705,6 +705,9 @@ class PythonRpcSender:
         q.get_and_send(method, lambda x: x.name, lambda el: self._visit(el, q) if el else None)
         q.get_and_send(method, lambda x: x.padding.parameters,
                       lambda c: self._visit_container(c, q) if c else None)
+        q.get_and_send_list(method, lambda x: x.dimensions_after_name,
+                           lambda el: str(el.element),
+                           lambda el: self._visit_left_padded(el, q))
         q.get_and_send(method, lambda x: x.padding.throws if hasattr(x.padding, 'throws') else None,
                       lambda c: self._visit_container(c, q) if c else None)
         q.get_and_send(method, lambda x: x.body, lambda el: self._visit(el, q))

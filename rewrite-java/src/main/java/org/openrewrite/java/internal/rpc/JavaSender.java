@@ -356,6 +356,7 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         q.getAndSendList(method, m -> m.getAnnotations().getName().getAnnotations(), J.Annotation::getId, name -> visit(name, q));
         q.getAndSend(method, J.MethodDeclaration::getName, name -> visit(name, q));
         q.getAndSend(method, m -> m.getPadding().getParameters(), params -> visitContainer(params, q));
+        q.getAndSendList(method, J.MethodDeclaration::getDimensionsAfterName, l -> l.getElement().toString(), dim -> visitLeftPadded(dim, q));
         q.getAndSend(method, m -> m.getPadding().getThrows(), thr -> visitContainer(thr, q));
         q.getAndSend(method, J.MethodDeclaration::getBody, body -> visit(body, q));
         q.getAndSend(method, m -> m.getPadding().getDefaultValue(), def -> visitLeftPadded(def, q));

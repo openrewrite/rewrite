@@ -1208,6 +1208,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             methodType: this.mapMethodType(node)
         };
     }
@@ -1258,6 +1259,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
         };
@@ -1316,6 +1318,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: this.mapIdentifier(constructorKeyword, constructorKeyword.getText()),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
         };
@@ -1350,6 +1353,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
         };
@@ -1382,6 +1386,7 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
         };
@@ -1407,6 +1412,7 @@ export class JavaScriptParserVisitor {
                 simpleName: "",
             },
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             methodType: this.mapMethodType(node)
         };
     }
@@ -1431,6 +1437,7 @@ export class JavaScriptParserVisitor {
                 simpleName: 'new'
             },
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
+            dimensionsAfterName: [],
             methodType: this.mapMethodType(node)
         };
     }
@@ -3344,6 +3351,7 @@ export class JavaScriptParserVisitor {
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             returnTypeExpression: this.mapTypeInfo(node),
+            dimensionsAfterName: [],
             body: node.body && this.convert<J.Block>(node.body),
             methodType: this.mapMethodType(node)
         };

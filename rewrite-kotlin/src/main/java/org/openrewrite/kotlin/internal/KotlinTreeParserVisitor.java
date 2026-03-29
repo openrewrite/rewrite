@@ -1015,6 +1015,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         emptyList()
                 ),
                 params,
+                emptyList(),
                 null,
                 null,
                 null,
@@ -1089,6 +1090,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         lastAnnotations
                 ),
                 params,
+                emptyList(),
                 null,
                 body,
                 null,
@@ -1200,6 +1202,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params,
+                emptyList(),
                 null,
                 body,
                 null,
@@ -2743,6 +2746,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params,
+                emptyList(),
                 null,
                 body,
                 null,

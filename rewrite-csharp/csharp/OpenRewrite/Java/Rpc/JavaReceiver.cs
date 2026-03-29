@@ -444,11 +444,12 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var nameAnnotations = q.ReceiveList(method.Name?.Annotations ?? [], el => (Annotation)VisitNonNull(el, q));
         var name = q.Receive((J?)method.Name ?? new Identifier(Guid.NewGuid(), Space.Empty, Markers.Empty, [], "", null, null), el => (J)VisitNonNull(el, q));
         var parameters = q.Receive(method.Parameters, c => VisitContainer(c, q));
+        var dimensionsAfterName = q.ReceiveList(method.DimensionsAfterName, lp => VisitLeftPadded(lp, q));
         var throws_ = q.Receive(method.Throws, c => VisitContainer(c, q));
         var body = q.Receive((J?)method.Body, el => (J)VisitNonNull(el!, q));
         var defaultValue = q.Receive(method.DefaultValue, lp => VisitLeftPadded(lp, q));
         var methodType = q.Receive(method.MethodType, t => (JavaType.Method)VisitType(t, q)!);
-        return method.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithTypeParameters(typeParameters).WithReturnTypeExpression((TypeTree?)returnTypeExpression).WithName(((Identifier)name!).WithAnnotations(nameAnnotations!)).WithParameters(parameters!).WithThrows(throws_).WithBody((Block?)body).WithDefaultValue(defaultValue).WithMethodType(methodType);
+        return method.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithTypeParameters(typeParameters).WithReturnTypeExpression((TypeTree?)returnTypeExpression).WithName(((Identifier)name!).WithAnnotations(nameAnnotations!)).WithParameters(parameters!).WithDimensionsAfterName(dimensionsAfterName!).WithThrows(throws_).WithBody((Block?)body).WithDefaultValue(defaultValue).WithMethodType(methodType);
     }
 
     public override J VisitMethodInvocation(MethodInvocation methodInvocation, RpcReceiveQueue q)
