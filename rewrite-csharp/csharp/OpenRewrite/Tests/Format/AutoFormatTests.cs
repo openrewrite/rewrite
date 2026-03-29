@@ -167,55 +167,10 @@ public class AutoFormatTests : RewriteTest
     }
 
     [Fact]
-    public void FormatStyleDetectsSpaces()
-    {
-        const string source = """
-            class Foo
-            {
-                void Bar()
-                {
-                    int x = 1;
-                }
-            }
-            """;
-
-        var style = FormatStyle.DetectStyle(source);
-        Assert.False(style.UseTabs);
-        Assert.Equal(4, style.IndentationSize);
-    }
-
-    [Fact]
-    public void FormatStyleDetectsTabs()
-    {
-        var source = "class Foo\n{\n\tvoid Bar()\n\t{\n\t\tint x = 1;\n\t}\n}\n";
-        var style = FormatStyle.DetectStyle(source);
-        Assert.True(style.UseTabs);
-    }
-
-    [Fact]
-    public void FormatStyleDetectsTwoSpaceIndent()
-    {
-        const string source = """
-            class Foo
-            {
-              void Bar()
-              {
-                int x = 1;
-              }
-            }
-            """;
-
-        var style = FormatStyle.DetectStyle(source);
-        Assert.False(style.UseTabs);
-        Assert.Equal(2, style.IndentationSize);
-    }
-
-    [Fact]
     public void RoslynFormatterExpandsSingleLineBlocks()
     {
         const string before = "class Foo{void Bar(){int x=1;}}";
-        var style = new FormatStyle(false, 4, "\n");
-        var formatted = RoslynFormatter.FormatWithRoslyn(before, style);
+        var formatted = RoslynFormatter.FormatWithRoslyn(before, CSharpFormatStyle.Default);
 
         // With WrappingPreserveSingleLine=false, Roslyn expands single-line blocks
         Assert.Contains("class Foo", formatted);

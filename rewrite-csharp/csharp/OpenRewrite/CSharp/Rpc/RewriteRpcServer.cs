@@ -124,6 +124,8 @@ public class RewriteRpcServer
             "org.openrewrite.java.marker.OmitParentheses");
         RpcSendQueue.RegisterJavaTypeName(typeof(AnonymousMethod),
             "org.openrewrite.csharp.marker.AnonymousMethod");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CSharpFormatStyle),
+            "org.openrewrite.csharp.marker.CSharpFormatStyle");
         RpcSendQueue.RegisterJavaTypeName(typeof(ConditionalBranchMarker),
             "org.openrewrite.csharp.marker.ConditionalBranchMarker");
         RpcSendQueue.RegisterJavaTypeName(typeof(DirectiveBoundaryMarker),

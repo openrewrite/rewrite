@@ -18,6 +18,7 @@ using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using OpenRewrite.Core;
+using OpenRewrite.CSharp.Format;
 using Serilog;
 
 namespace OpenRewrite.CSharp;
@@ -264,6 +265,11 @@ public class SolutionParser
         Log.Debug("ParseProject: {ProjectName} has {UserDocCount} user source files (of {TotalDocCount} total)",
             projectName, userDocs.Count, project.Documents.Count());
 
+        // Create an EditorConfigResolver to detect formatting style from .editorconfig files.
+        // The resolver caches results per directory, so files in the same directory share
+        // the same CSharpFormatStyle marker instance.
+        var editorConfigResolver = new EditorConfigResolver(rootDir);
+
         var results = new List<SourceFile>();
         var fileIndex = 0;
         var projectSw = Stopwatch.StartNew();
@@ -302,6 +308,10 @@ public class SolutionParser
                 {
                     cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked);
                 }
+
+                // Attach formatting style marker from .editorconfig
+                var formatStyle = editorConfigResolver.Resolve(doc.FilePath!);
+                cu = cu.WithMarkers(cu.Markers.Add(formatStyle));
 
                 if (requirePrintEqualsInput)
                 {
