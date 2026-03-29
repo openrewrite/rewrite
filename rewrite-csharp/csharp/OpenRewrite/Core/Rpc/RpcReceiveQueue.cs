@@ -546,6 +546,14 @@ public class RpcReceiveQueue
             return FindType("OpenRewrite.CSharp", name);
         }
 
+        // Style type conventions — styles live in style packages
+        // Pattern: org.openrewrite.csharp.style.ClassName → OpenRewrite.CSharp.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.csharp.style."))
+        {
+            var name = javaTypeName["org.openrewrite.csharp.style.".Length..];
+            return FindType("OpenRewrite.CSharp", name);
+        }
+
         // Pattern: org.openrewrite.java.marker.ClassName → OpenRewrite.Java.ClassName
         if (javaTypeName.StartsWith("org.openrewrite.java.marker."))
         {
