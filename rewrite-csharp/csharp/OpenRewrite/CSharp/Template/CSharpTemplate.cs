@@ -204,7 +204,9 @@ public sealed class CSharpTemplate
             tree = TemplateEngine.ApplySubstitutions(tree, values);
         }
 
-        // Phase 1.5: auto-parenthesization after substitution
+        // Phase 1.5: check if the result needs wrapping when grafted into the cursor position.
+        // Inner precedence is already handled by ApplySubstitutions (which runs a recursive
+        // CSharpParenthesizeVisitor after substitution); this only checks the root vs. cursor parent.
         if (tree is Expression expr && cursorJ != null)
         {
             tree = CSharpParenthesizeVisitor.MaybeParenthesize(expr, cursor);

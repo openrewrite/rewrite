@@ -156,4 +156,60 @@ public class CSharpParenthesizeVisitorTests
 
         Assert.IsType<Parentheses<Expression>>(result);
     }
+
+    [Fact]
+    public void MaybeParenthesize_IsPatternWithOrCombinatorInsideLogicalAnd_AddsParens()
+    {
+        // placeholder && flag => (m is A or B) && flag — or combinator needs parens inside &&
+        var placeholder = MakeId("placeholder");
+        var parent = MakeBinary(Binary.OperatorType.And, placeholder, MakeId("flag"));
+        var cursor = new Cursor(new Cursor(null, "root"), parent);
+        cursor = new Cursor(cursor, placeholder);
+
+        var orPattern = MakeCsBinary(CsBinary.OperatorType.Or, MakeId("A"), MakeId("B"));
+        var newExpr = MakeIsPattern(MakeId("m"), orPattern);
+        var result = CSharpParenthesizeVisitor.MaybeParenthesize(newExpr, cursor);
+
+        Assert.IsType<Parentheses<Expression>>(result);
+    }
+
+    [Fact]
+    public void MaybeParenthesize_IsPatternWithoutCombinatorInsideLogicalAnd_NoParens()
+    {
+        // placeholder && flag => m is A && flag — simple is pattern doesn't need parens inside &&
+        var placeholder = MakeId("placeholder");
+        var parent = MakeBinary(Binary.OperatorType.And, placeholder, MakeId("flag"));
+        var cursor = new Cursor(new Cursor(null, "root"), parent);
+        cursor = new Cursor(cursor, placeholder);
+
+        var newExpr = MakeIsPattern(MakeId("m"), MakeConstantPattern(MakeId("A")));
+        var result = CSharpParenthesizeVisitor.MaybeParenthesize(newExpr, cursor);
+
+        Assert.IsNotType<Parentheses<Expression>>(result);
+    }
+
+    [Fact]
+    public void ParenthesizeDeep_IsPatternWithOrInsideBinaryAnd_AddsParens()
+    {
+        // (m is A or B) && flag — recursive walk should parenthesize inner IsPattern
+        var orPattern = MakeCsBinary(CsBinary.OperatorType.Or, MakeId("A"), MakeId("B"));
+        var isExpr = MakeIsPattern(MakeId("m"), orPattern);
+        var tree = MakeBinary(Binary.OperatorType.And, isExpr, MakeId("flag"));
+
+        var result = (Binary)CSharpParenthesizeVisitor.ParenthesizeDeep(tree);
+
+        Assert.IsType<Parentheses<Expression>>(result.Left);
+    }
+
+    [Fact]
+    public void ParenthesizeDeep_SimpleIsPatternInsideBinaryAnd_NoParens()
+    {
+        // m is A && flag — no inner parens needed
+        var isExpr = MakeIsPattern(MakeId("m"), MakeConstantPattern(MakeId("A")));
+        var tree = MakeBinary(Binary.OperatorType.And, isExpr, MakeId("flag"));
+
+        var result = (Binary)CSharpParenthesizeVisitor.ParenthesizeDeep(tree);
+
+        Assert.IsType<IsPattern>(result.Left);
+    }
 }
