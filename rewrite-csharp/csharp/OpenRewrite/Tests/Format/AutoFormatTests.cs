@@ -188,31 +188,10 @@ public class AutoFormatTests : RewriteTest
         Assert.Contains("void Bar()\n    {", allman);
 
         // K&R style: braces on same line as declaration
-        var knrStyle = new CSharpFormatStyle(
-            Guid.NewGuid(),
-            useTabs: false, indentSize: 4, tabSize: 4, newLine: "\n",
-            indentBlock: true, indentBraces: false, indentSwitchCaseSection: true,
-            indentSwitchCaseSectionWhenBlock: true, indentSwitchSection: true, labelPositioning: 1,
-            newLinesForBracesInTypes: false, newLinesForBracesInMethods: false,
-            newLinesForBracesInProperties: true, newLinesForBracesInAccessors: true,
-            newLinesForBracesInAnonymousMethods: true, newLinesForBracesInAnonymousTypes: true,
-            newLinesForBracesInControlBlocks: false, newLinesForBracesInLambdaExpressionBody: true,
-            newLinesForBracesInObjectCollectionArrayInitializers: true, newLinesForBracesInLocalFunctions: true,
-            newLineBeforeElse: true, newLineBeforeCatch: true, newLineBeforeFinally: true,
-            newLineForClausesInQuery: true, newLineForMembersInAnonymousTypes: true,
-            newLineForMembersInObjectInit: true,
-            spaceAfterCast: false, spaceAfterColonInBaseTypeDeclaration: true, spaceAfterComma: true,
-            spaceAfterControlFlowStatementKeyword: true, spaceAfterDot: false, spaceAfterMethodCallName: false,
-            spaceAfterSemicolonsInForStatement: true, spaceBeforeColonInBaseTypeDeclaration: true,
-            spaceBeforeComma: false, spaceBeforeDot: false, spaceBeforeOpenSquareBracket: false,
-            spaceBeforeSemicolonsInForStatement: false, spaceBetweenEmptyMethodCallParentheses: false,
-            spaceBetweenEmptyMethodDeclarationParentheses: false, spaceBetweenEmptySquareBrackets: false,
-            spacesIgnoreAroundVariableDeclaration: false, spaceWithinCastParentheses: false,
-            spaceWithinExpressionParentheses: false, spaceWithinMethodCallParentheses: false,
-            spaceWithinMethodDeclarationParenthesis: false, spaceWithinOtherParentheses: false,
-            spaceWithinSquareBrackets: false, spacingAfterMethodDeclarationName: false,
-            spacingAroundBinaryOperator: 0,
-            wrappingPreserveSingleLine: true, wrappingKeepStatementsOnSingleLine: true);
+        var knrStyle = new CSharpFormatStyle(Guid.NewGuid(),
+            newLinesForBracesInTypes: false,
+            newLinesForBracesInMethods: false,
+            newLinesForBracesInControlBlocks: false);
 
         var knr = RoslynFormatter.FormatWithRoslyn(source, knrStyle);
         Assert.Contains("class Foo {", knr);
@@ -229,11 +208,7 @@ public class AutoFormatTests : RewriteTest
         Assert.Contains("(int)y", noSpace);
 
         // With SpaceAfterCast=true
-        var withSpaceStyle = new CSharpFormatStyle(
-            Guid.NewGuid(),
-            CSharpFormatStyle.DefaultFlags | (1L << 22), // bit 22 = SpaceAfterCast
-            indentSize: 4, tabSize: 4, newLine: "\n",
-            labelPositioning: 1, spacingAroundBinaryOperator: 0);
+        var withSpaceStyle = new CSharpFormatStyle(Guid.NewGuid(), spaceAfterCast: true);
 
         var withSpace = RoslynFormatter.FormatWithRoslyn(source, withSpaceStyle);
         Assert.Contains("(int) y", withSpace);

@@ -183,31 +183,44 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
 
     /// <summary>
     /// Convenience constructor accepting individual boolean parameters.
+    /// All parameters default to Roslyn/Visual Studio defaults so callers only need to
+    /// specify the values they want to override.
     /// </summary>
     public CSharpFormatStyle(
-        Guid id, bool useTabs, int indentSize, int tabSize, string newLine,
-        bool indentBlock, bool indentBraces, bool indentSwitchCaseSection,
-        bool indentSwitchCaseSectionWhenBlock, bool indentSwitchSection, int labelPositioning,
-        bool newLinesForBracesInTypes, bool newLinesForBracesInMethods,
-        bool newLinesForBracesInProperties, bool newLinesForBracesInAccessors,
-        bool newLinesForBracesInAnonymousMethods, bool newLinesForBracesInAnonymousTypes,
-        bool newLinesForBracesInControlBlocks, bool newLinesForBracesInLambdaExpressionBody,
-        bool newLinesForBracesInObjectCollectionArrayInitializers, bool newLinesForBracesInLocalFunctions,
-        bool newLineBeforeElse, bool newLineBeforeCatch, bool newLineBeforeFinally,
-        bool newLineForClausesInQuery, bool newLineForMembersInAnonymousTypes,
-        bool newLineForMembersInObjectInit,
-        bool spaceAfterCast, bool spaceAfterColonInBaseTypeDeclaration, bool spaceAfterComma,
-        bool spaceAfterControlFlowStatementKeyword, bool spaceAfterDot, bool spaceAfterMethodCallName,
-        bool spaceAfterSemicolonsInForStatement, bool spaceBeforeColonInBaseTypeDeclaration,
-        bool spaceBeforeComma, bool spaceBeforeDot, bool spaceBeforeOpenSquareBracket,
-        bool spaceBeforeSemicolonsInForStatement, bool spaceBetweenEmptyMethodCallParentheses,
-        bool spaceBetweenEmptyMethodDeclarationParentheses, bool spaceBetweenEmptySquareBrackets,
-        bool spacesIgnoreAroundVariableDeclaration, bool spaceWithinCastParentheses,
-        bool spaceWithinExpressionParentheses, bool spaceWithinMethodCallParentheses,
-        bool spaceWithinMethodDeclarationParenthesis, bool spaceWithinOtherParentheses,
-        bool spaceWithinSquareBrackets, bool spacingAfterMethodDeclarationName,
-        int spacingAroundBinaryOperator,
-        bool wrappingPreserveSingleLine, bool wrappingKeepStatementsOnSingleLine)
+        Guid id,
+        bool useTabs = false, int indentSize = 4, int tabSize = 4, string? newLine = null,
+        // Indentation
+        bool indentBlock = true, bool indentBraces = false, bool indentSwitchCaseSection = true,
+        bool indentSwitchCaseSectionWhenBlock = true, bool indentSwitchSection = true,
+        int labelPositioning = 1,
+        // Brace placement
+        bool newLinesForBracesInTypes = true, bool newLinesForBracesInMethods = true,
+        bool newLinesForBracesInProperties = true, bool newLinesForBracesInAccessors = true,
+        bool newLinesForBracesInAnonymousMethods = true, bool newLinesForBracesInAnonymousTypes = true,
+        bool newLinesForBracesInControlBlocks = true, bool newLinesForBracesInLambdaExpressionBody = true,
+        bool newLinesForBracesInObjectCollectionArrayInitializers = true,
+        bool newLinesForBracesInLocalFunctions = true,
+        // New line before keywords / members
+        bool newLineBeforeElse = true, bool newLineBeforeCatch = true, bool newLineBeforeFinally = true,
+        bool newLineForClausesInQuery = true, bool newLineForMembersInAnonymousTypes = true,
+        bool newLineForMembersInObjectInit = true,
+        // Spacing
+        bool spaceAfterCast = false, bool spaceAfterColonInBaseTypeDeclaration = true,
+        bool spaceAfterComma = true, bool spaceAfterControlFlowStatementKeyword = true,
+        bool spaceAfterDot = false, bool spaceAfterMethodCallName = false,
+        bool spaceAfterSemicolonsInForStatement = true, bool spaceBeforeColonInBaseTypeDeclaration = true,
+        bool spaceBeforeComma = false, bool spaceBeforeDot = false,
+        bool spaceBeforeOpenSquareBracket = false, bool spaceBeforeSemicolonsInForStatement = false,
+        bool spaceBetweenEmptyMethodCallParentheses = false,
+        bool spaceBetweenEmptyMethodDeclarationParentheses = false,
+        bool spaceBetweenEmptySquareBrackets = false,
+        bool spacesIgnoreAroundVariableDeclaration = false, bool spaceWithinCastParentheses = false,
+        bool spaceWithinExpressionParentheses = false, bool spaceWithinMethodCallParentheses = false,
+        bool spaceWithinMethodDeclarationParenthesis = false, bool spaceWithinOtherParentheses = false,
+        bool spaceWithinSquareBrackets = false, bool spacingAfterMethodDeclarationName = false,
+        int spacingAroundBinaryOperator = 0,
+        // Wrapping
+        bool wrappingPreserveSingleLine = true, bool wrappingKeepStatementsOnSingleLine = true)
         : this(id, PackFlags(
             useTabs, indentBlock, indentBraces, indentSwitchCaseSection,
             indentSwitchCaseSectionWhenBlock, indentSwitchSection,
@@ -229,7 +242,7 @@ public sealed class CSharpFormatStyle : Marker, IRpcCodec<CSharpFormatStyle>, IE
             spaceWithinMethodDeclarationParenthesis, spaceWithinOtherParentheses,
             spaceWithinSquareBrackets, spacingAfterMethodDeclarationName,
             wrappingPreserveSingleLine, wrappingKeepStatementsOnSingleLine),
-            indentSize, tabSize, newLine, labelPositioning, spacingAroundBinaryOperator)
+            indentSize, tabSize, newLine ?? "\n", labelPositioning, spacingAroundBinaryOperator)
     { }
 
     private static long PackFlags(params bool[] bits)
