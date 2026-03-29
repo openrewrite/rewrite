@@ -137,7 +137,10 @@ public class EditorConfigResolver
             if (eqIndex < 0) continue;
 
             var key = line[..eqIndex].Trim();
-            var value = line[(eqIndex + 1)..].Trim();
+            var rawValue = line[(eqIndex + 1)..].Trim();
+            // Strip optional :severity suffix (e.g., "true:error", "all:suggestion")
+            var colonIdx = rawValue.IndexOf(':');
+            var value = colonIdx >= 0 ? rawValue[..colonIdx].Trim() : rawValue;
 
             // root = true can appear in preamble (before any section)
             if (inPreamble && key.Equals("root", StringComparison.OrdinalIgnoreCase) &&

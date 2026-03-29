@@ -426,6 +426,25 @@ public class EditorConfigResolverTests : IDisposable
     }
 
     [Fact]
+    public void SeveritySuffixesAreStripped()
+    {
+        CreateFile(".editorconfig", """
+            root = true
+
+            [*.cs]
+            csharp_new_line_before_open_brace = all:error
+            csharp_new_line_before_else = false:suggestion
+            """);
+        var csFile = CreateFile("Program.cs", "");
+        var resolver = new EditorConfigResolver(_tempDir);
+        var style = resolver.Resolve(csFile);
+
+        Assert.True(style.NewLinesForBracesInTypes);
+        Assert.True(style.NewLinesForBracesInMethods);
+        Assert.False(style.NewLineBeforeElse);
+    }
+
+    [Fact]
     public void WrappingOptions()
     {
         CreateFile(".editorconfig", """
