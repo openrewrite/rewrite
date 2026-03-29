@@ -45,14 +45,13 @@ public sealed class Validations
     public bool PrintIdempotence { get; init; } = true;
 
     /// <summary>
-    /// Whether structural mismatches in the whitespace reconciler are allowed.
-    /// When false (default), the reconciler collects all mismatches during the walk
-    /// and throws after completion with a report of the first few.
-    /// When true, mismatches are silently skipped (production behavior).
-    /// Set to true for recipes that intentionally construct nodes with different types
-    /// than the parser would produce (e.g., J.Identifier where J.Primitive is expected).
+    /// Whether the formatting reconciler validates structural compatibility between
+    /// recipe output and Roslyn-formatted output. When enabled (default), the reconciler
+    /// reports mismatches as test failures. When disabled, mismatches are silently
+    /// skipped (production behavior). Disable for recipes that intentionally construct
+    /// nodes with different types than the parser would produce.
     /// </summary>
-    public bool AllowWhitespaceMismatches { get; init; } = false;
+    public bool FormattingReconciliation { get; init; } = true;
 
     /// <summary>All validations enabled with default settings.</summary>
     public static Validations All { get; } = new();
@@ -63,6 +62,6 @@ public sealed class Validations
         WhitespaceInSpaces = false,
         PrintEqualsInput = false,
         PrintIdempotence = false,
-        AllowWhitespaceMismatches = true
+        FormattingReconciliation = false
     };
 }

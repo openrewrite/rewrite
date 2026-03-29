@@ -115,7 +115,7 @@ public abstract class RewriteTest
         {
             var sources = parsed.Select(p => p.Source).ToList();
             var prevThrow = WhitespaceReconciler.ThrowOnMismatch;
-            WhitespaceReconciler.ThrowOnMismatch = !validations.AllowWhitespaceMismatches;
+            WhitespaceReconciler.ThrowOnMismatch = validations.FormattingReconciliation;
             List<Result> results;
             try
             {
