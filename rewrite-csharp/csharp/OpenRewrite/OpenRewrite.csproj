@@ -32,11 +32,11 @@
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="StreamJsonRpc" Version="2.20.20" />
     <PackageReference Include="Microsoft.CodeAnalysis.Analyzer.Testing" Version="1.1.3" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageReference Include="coverlet.collector" Version="6.0.2" />
-    <PackageReference Include="JunitXml.TestLogger" Version="4.0.254" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" PrivateAssets="all" />
+    <PackageReference Include="xunit" Version="2.9.3" PrivateAssets="all" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" PrivateAssets="all" />
+    <PackageReference Include="JunitXml.TestLogger" Version="4.0.254" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
