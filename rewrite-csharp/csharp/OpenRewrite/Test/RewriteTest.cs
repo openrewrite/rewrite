@@ -76,25 +76,35 @@ public abstract class RewriteTest
             }
 
             var source = parser.Parse(spec.Before, semanticModel: semanticModel);
+            var validations = recipeSpec.Validations;
 
             // Verify no non-whitespace content leaked into Space fields
-            var whitespaceViolations = new List<WhitespaceViolation>();
-            new WhitespaceValidator().Visit(source, whitespaceViolations);
-            Assert.True(whitespaceViolations.Count == 0,
-                $"Found non-whitespace content in Space fields:\n" +
-                string.Join("\n", whitespaceViolations));
+            if (validations.WhitespaceInSpaces)
+            {
+                var whitespaceViolations = new List<WhitespaceViolation>();
+                new WhitespaceValidator().Visit(source, whitespaceViolations);
+                Assert.True(whitespaceViolations.Count == 0,
+                    $"Found non-whitespace content in Space fields:\n" +
+                    string.Join("\n", whitespaceViolations));
+            }
 
             // Verify round-trip: printed should match input
             var printed = printer.Print(source);
-            AssertContentEquals(spec.Before, printed, source.SourcePath,
-                "The printed source didn't match the original source code. " +
-                "This means there is a bug in the parser implementation itself.");
+            if (validations.PrintEqualsInput)
+            {
+                AssertContentEquals(spec.Before, printed, source.SourcePath,
+                    "The printed source didn't match the original source code. " +
+                    "This means there is a bug in the parser implementation itself.");
+            }
 
             // Verify idempotence: reparse and reprint should match
-            var reparsed = parser.Parse(printed);
-            var reprinted = printer.Print(reparsed);
-            AssertContentEquals(printed, reprinted, source.SourcePath,
-                "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+            if (validations.PrintIdempotence)
+            {
+                var reparsed = parser.Parse(printed);
+                var reprinted = printer.Print(reparsed);
+                AssertContentEquals(printed, reprinted, source.SourcePath,
+                    "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+            }
 
             parsed.Add((spec, source));
         }
@@ -195,6 +205,7 @@ public class RecipeSpec
 {
     public Recipe? Recipe { get; private set; }
     public ReferenceAssemblies? ReferenceAssemblies { get; private set; } = Assemblies.Net90;
+    public Validations Validations { get; private set; } = Validations.All;
 
     public RecipeSpec SetRecipe(Recipe recipe)
     {
@@ -205,6 +216,12 @@ public class RecipeSpec
     public RecipeSpec SetReferenceAssemblies(ReferenceAssemblies? referenceAssemblies)
     {
         ReferenceAssemblies = referenceAssemblies;
+        return this;
+    }
+
+    public RecipeSpec SetValidations(Validations validations)
+    {
+        Validations = validations;
         return this;
     }
 }
