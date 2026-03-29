@@ -140,7 +140,7 @@ public class WhitespaceReconcilerTests
         Assert.Equal(source1, _printer.Print(result));
     }
 
-    [Fact(Skip = "Reconciliation skips mismatched subtrees but result propagation needs investigation")]
+    [Fact]
     public void SkipsMismatchedSubtreeAndReconcilesSurroundingCode()
     {
         // Badly formatted source: missing indentation after return type
@@ -193,9 +193,8 @@ public class WhitespaceReconcilerTests
 
         // The second method (Baz) should be properly indented even though
         // the first method's return type mismatched.
-        // The second method (Baz) should be properly indented even though
-        // the first method's return type mismatched.
         Assert.Contains("    int Baz()", printed);
+        Assert.Contains("        return 2;", printed);
     }
 
     /// <summary>

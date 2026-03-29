@@ -193,7 +193,6 @@ public class WhitespaceReconciler
 
     private object? VisitTree(J original, J formatted)
     {
-
         // Check structural type compatibility
         if (original.GetType() != formatted.GetType())
             return StructureMismatch(original);
@@ -233,7 +232,6 @@ public class WhitespaceReconciler
 
                 if (!ReferenceEquals(visited, origVal))
                 {
-                    var prev = result;
                     result = SetProperty(result, type, prop, visited);
                     if (result == null) return original;
                 }
@@ -389,7 +387,6 @@ public class WhitespaceReconciler
         for (var i = 0; i < original.Count; i++)
         {
             var visited = VisitProperty(original[i], formatted[i]);
-            if (!_compatible) return original;
             newList.Add(visited);
             if (!ReferenceEquals(visited, original[i]))
                 changed = true;
