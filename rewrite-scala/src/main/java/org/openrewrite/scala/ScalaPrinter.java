@@ -29,6 +29,8 @@ import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.scala.marker.BlockArgument;
+import org.openrewrite.scala.marker.IndentedBlock;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
@@ -247,12 +249,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append("import ");
         
         // Visit the import expression
-        // Need to handle wildcard imports specially for Scala (_ instead of *)
+        // Wildcard imports: Scala 2 uses `._`, Scala 3 uses `.*`
+        // The name field preserves which was used in source.
         J.FieldAccess qualid = import_.getQualid();
         if (isWildcardImport(qualid)) {
-            // Print the package part
             visitFieldAccessUpToWildcard(qualid, p);
-            p.append("._");
+            // Preserve the original wildcard syntax from the name
+            String wildcardName = qualid.getName().getSimpleName();
+            p.append("." + wildcardName);
         } else {
             visit(qualid, p);
         }
@@ -270,7 +274,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     
     private boolean isWildcardImport(J.FieldAccess qualid) {
         J.Identifier name = qualid.getName();
-        return "*".equals(name.getSimpleName());
+        return "*".equals(name.getSimpleName()) || "_".equals(name.getSimpleName());
     }
     
     private void visitFieldAccessUpToWildcard(J.FieldAccess qualid, PrintOutputCapture<P> p) {
@@ -500,7 +504,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
         // Check if this block has the OmitBraces marker (for objects without body)
         if (block.getMarkers().findFirst(org.openrewrite.scala.marker.OmitBraces.class).isPresent()) {
-            // Don't print the block at all
+            return block;
+        }
+        // Scala 3 braceless (indentation-based) blocks use `:` instead of `{}`
+        if (block.getMarkers().findFirst(IndentedBlock.class).isPresent()) {
+            beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+            p.append(':');
+            visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+            visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            afterSyntax(block, p);
             return block;
         }
         return super.visitBlock(block, p);
@@ -685,6 +697,34 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     @Override
+    public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
+        // When the target is Empty (used in import qualids for single-segment packages
+        // or source-text-based imports), don't print the dot separator.
+        if (fieldAccess.getTarget() instanceof J.Empty) {
+            beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
+            visit(fieldAccess.getName(), p);
+            afterSyntax(fieldAccess, p);
+            return fieldAccess;
+        }
+        return super.visitFieldAccess(fieldAccess, p);
+    }
+
+    @Override
+    public J visitModifier(J.Modifier mod, PrintOutputCapture<P> p) {
+        // For Private and Protected, use the keyword field which may contain
+        // scope qualifiers like private[testing] or protected[this]
+        if ((mod.getType() == J.Modifier.Type.Private || mod.getType() == J.Modifier.Type.Protected)
+                && mod.getKeyword() != null && mod.getKeyword().contains("[")) {
+            visit(mod.getAnnotations(), p);
+            beforeSyntax(mod, Space.Location.MODIFIER_PREFIX, p);
+            p.append(mod.getKeyword());
+            afterSyntax(mod, p);
+            return mod;
+        }
+        return super.visitModifier(mod, p);
+    }
+
+    @Override
     public J visitNewArray(J.NewArray newArray, PrintOutputCapture<P> p) {
         beforeSyntax(newArray, Space.Location.NEW_ARRAY_PREFIX, p);
         
@@ -727,6 +767,29 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return method;
         }
         
+        // Check if this is a block argument call: list.foreach { x => println(x) }
+        if (method.getMarkers().findFirst(BlockArgument.class).isPresent()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+
+            // Print the select with dot: "list."
+            if (method.getPadding().getSelect() != null) {
+                visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+            }
+
+            // Print the method name: "foreach"
+            visit(method.getName(), p);
+
+            // Print the block argument directly (no parentheses)
+            if (method.getArguments() != null) {
+                for (Expression arg : method.getArguments()) {
+                    visit(arg, p);
+                }
+            }
+
+            afterSyntax(method, p);
+            return method;
+        }
+
         // Check if this is infix notation (list map func instead of list.map(func))
         if (method.getMarkers().findFirst(org.openrewrite.scala.marker.InfixNotation.class).isPresent()) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);

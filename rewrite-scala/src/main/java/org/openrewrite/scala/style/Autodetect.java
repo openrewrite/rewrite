@@ -16,6 +16,7 @@
 package org.openrewrite.scala.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.scala.tree.S;
@@ -30,7 +31,7 @@ import static java.util.Collections.emptySet;
 
 public class Autodetect extends NamedStyles {
     @JsonCreator
-    public Autodetect(UUID id, Collection<Style> styles) {
+    public Autodetect(@JsonProperty("id") UUID id, @JsonProperty("styles") Collection<Style> styles) {
         super(id,
                 "org.openrewrite.scala.Autodetect",
                 "Auto-detected",
