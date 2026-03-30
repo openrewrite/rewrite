@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -28,25 +29,17 @@ import static java.util.Collections.singleton;
 import static org.openrewrite.maven.MavenTagInsertionComparator.canonicalOrdering;
 
 public class OrderPomElements extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Order POM elements";
-    }
+    @Getter
+    final String displayName = "Order POM elements";
 
-    @Override
-    public String getDescription() {
-        return "Order POM elements according to the [recommended](https://maven.apache.org/developers/conventions/code.html#pom-code-convention) order.";
-    }
+    @Getter
+    final String description = "Order POM elements according to the [recommended](https://maven.apache.org/developers/conventions/code.html#pom-code-convention) order.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S3423");
-    }
+    @Getter
+    final Set<String> tags = singleton("RSPEC-S3423");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(10);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(10);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

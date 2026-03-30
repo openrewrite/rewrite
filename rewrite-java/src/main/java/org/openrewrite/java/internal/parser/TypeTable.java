@@ -43,6 +43,7 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.sort;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
@@ -100,22 +101,27 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
-            ClassLoader classLoader = findCaller().getClassLoader();
-            Vector<URL> combinedResources = new Vector<>();
-            for (Enumeration<URL> e = classLoader.getResources(DEFAULT_RESOURCE_PATH); e.hasMoreElements(); ) {
-                combinedResources.add(e.nextElement());
-            }
-            // TO-BE-REMOVED(2025-10-31) In the future we only want to support the `.gz` extension
-            for (Enumeration<URL> e = classLoader.getResources(DEFAULT_RESOURCE_PATH.replace(".gz", ".zip")); e.hasMoreElements(); ) {
-                combinedResources.add(e.nextElement());
+            ClassLoader callerClassLoader = findCaller().getClassLoader();
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+
+            Set<URL> seen = new LinkedHashSet<>();
+            collectResources(callerClassLoader, DEFAULT_RESOURCE_PATH, seen);
+            if (contextClassLoader != null && contextClassLoader != callerClassLoader) {
+                collectResources(contextClassLoader, DEFAULT_RESOURCE_PATH, seen);
             }
 
-            if (!combinedResources.isEmpty()) {
-                return new TypeTable(ctx, combinedResources.elements(), artifactNames);
+            if (!seen.isEmpty()) {
+                return new TypeTable(ctx, new Vector<>(seen).elements(), artifactNames);
             }
             return null;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void collectResources(ClassLoader classLoader, String resourcePath, Set<URL> target) throws IOException {
+        for (Enumeration<URL> e = classLoader.getResources(resourcePath); e.hasMoreElements(); ) {
+            target.add(e.nextElement());
         }
     }
 
@@ -240,10 +246,10 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
 
         /**
-         * Common TSV parsing logic used by both read() and readWithVisitors().
+         * Common TSV parsing logic used by both read() methods.
          * Parses the TSV and calls the processor for each GAV's classes.
          */
-        private void parseTsvAndProcess(InputStream is, Options options,
+        public void parseTsvAndProcess(InputStream is, Options options,
                                         ClassesProcessor processor) throws IOException {
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
             Map<String, ClassDefinition> classesByName = new HashMap<>();
@@ -303,7 +309,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[13].isEmpty() ? null : fields[13].split("\\|"),
                                     fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string
                                     fields.length > 15 && !fields[15].isEmpty() ? fields[15] : null,
-                                    fields.length > 16 && !fields[16].isEmpty() ? fields[16].split("\\|") : null,  // typeAnnotations - keep | delimiter between different type contexts
+                                    fields.length > 16 && !fields[16].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[16], '|') : null,  // typeAnnotations - keep `|` delimiter between different type contexts
                                     fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null
                             ));
                         }
@@ -318,7 +324,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
 
         @FunctionalInterface
-        private interface ClassesProcessor {
+        interface ClassesProcessor {
             void accept(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes,
                         Map<String, List<ClassDefinition>> nestedTypes);
         }
@@ -604,6 +610,16 @@ public class TypeTable implements JavaParserClasspathLoader {
             }
         }
         return null;
+    }
+
+    @Override
+    public Collection<String> availableArtifacts() {
+        List<String> available = new ArrayList<>(classesDirByArtifact.size());
+        for (GroupArtifactVersion gav : classesDirByArtifact.keySet()) {
+            available.add(gav.getArtifactId() + "-" + gav.getVersion());
+        }
+        sort(available);
+        return available;
     }
 
     public static class Writer implements AutoCloseable {
@@ -962,7 +978,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     @Value
-    private static class GroupArtifactVersion {
+    static class GroupArtifactVersion {
         String groupId;
         String artifactId;
         String version;
@@ -970,7 +986,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     @Value
     @RequiredArgsConstructor
-    private static class ClassDefinition {
+    static class ClassDefinition {
         int access;
         String name;
 
@@ -1006,7 +1022,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     @Value
-    private static class Member {
+    static class Member {
         ClassDefinition classDefinition;
         int access;
         String name;

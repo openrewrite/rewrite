@@ -16,6 +16,10 @@
 package org.openrewrite.maven;
 
 import com.google.common.collect.Lists;
+import okhttp3.mockwebserver.Dispatcher;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,11 +27,14 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -79,99 +86,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void doNotOverrideImplicitProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.dropwizard.metrics", "metrics-annotation", "4.2.9", null,
-            true, null)),
-          pomXml(
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>explicit-deps-app</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <name>explicit-deps-app</name>
-                  <description>explicit-deps-app</description>
-                  <properties>
-                      <java.version>17</java.version>
-                      <maven.compiler.source>17</maven.compiler.source>
-                      <maven.compiler.target>17</maven.compiler.target>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>spring-milestone</id>
-                          <url>https://repo.spring.io/milestone</url>
-                          <snapshots>
-                              <enabled>false</enabled>
-                          </snapshots>
-                      </repository>
-                  </repositories>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-dependencies</artifactId>
-                              <version>2.4.0</version>
-                              <type>pom</type>
-                              <scope>import</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.dropwizard.metrics</groupId>
-                          <artifactId>metrics-annotation</artifactId>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>explicit-deps-app</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <name>explicit-deps-app</name>
-                  <description>explicit-deps-app</description>
-                  <properties>
-                      <java.version>17</java.version>
-                      <maven.compiler.source>17</maven.compiler.source>
-                      <maven.compiler.target>17</maven.compiler.target>
-                  </properties>
-                  <repositories>
-                      <repository>
-                          <id>spring-milestone</id>
-                          <url>https://repo.spring.io/milestone</url>
-                          <snapshots>
-                              <enabled>false</enabled>
-                          </snapshots>
-                      </repository>
-                  </repositories>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.springframework.boot</groupId>
-                              <artifactId>spring-boot-dependencies</artifactId>
-                              <version>2.4.0</version>
-                              <type>pom</type>
-                              <scope>import</scope>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.dropwizard.metrics</groupId>
-                          <artifactId>metrics-annotation</artifactId>
-                          <version>4.2.9</version>
-                      </dependency>
-                  </dependencies>
               </project>
               """
           )
@@ -325,6 +239,91 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    void doesNotClobberDirectLatestWithSpecificVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>latest</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotClobberManagedLatestWithSpecificVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>latest</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotClobberManagedSpecificWithLowerSpecificVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
           )
         );
     }
@@ -626,6 +625,94 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </build>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void upgradeAnnotationProcessors() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.mapstruct</groupId>
+                        <artifactId>mapstruct</artifactId>
+                        <version>1.4.1.Final</version>
+                    </dependency>
+                </dependencies>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                        <annotationProcessorPaths>
+                          <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>1.4.1.Final</version>
+                          </path>
+                        </annotationProcessorPaths>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("<version>1.6.\\d+(.\\d+)?</version>")
+                .actual())
+          )
+        );
+    }
+
+    @Test
+    void upgradeAnnotationProcessorsVersionProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                    <org.mapstruct.version>1.4.1.Final</org.mapstruct.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <configuration>
+                        <annotationProcessorPaths>
+                          <path>
+                            <groupId>org.mapstruct</groupId>
+                            <artifactId>mapstruct-processor</artifactId>
+                            <version>${org.mapstruct.version}</version>
+                          </path>
+                        </annotationProcessorPaths>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("<org.mapstruct.version>1.6.\\d+(.\\d+)?</org.mapstruct.version>")
+                .actual())
           )
         );
     }
@@ -1176,7 +1263,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """,
-                """
+              """
                 <project>
                     <parent>
                         <groupId>com.mycompany</groupId>
@@ -1592,6 +1679,31 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           <dependency>
                               <groupId>net.sourceforge.orbroker</groupId>
                               <artifactId>orbroker</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void badManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>net.sourceforge.orbroker</groupId>
+                              <artifactId>orbroker</artifactId>
+                              <version>blah</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -2266,4 +2378,626 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeBomInsteadOfOverridingDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-core", "2.15.0", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.14.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.15.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1968")
+    @Test
+    void upgradeBomWhenBomVersioningDiffersFromDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.4.2", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.13.4</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson</groupId>
+                              <artifactId>jackson-bom</artifactId>
+                              <version>2.13.4.20221013</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-databind</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void upgradeVersionForEjbTypeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencies>
+                <dependency>
+              	  <groupId>org.codeartisans.asadmin</groupId>
+              	  <artifactId>ejb-example</artifactId>
+              	  <version>0.11</version>
+              	  <type>ejb</type>
+                </dependency>
+               </dependencies>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencies>
+                <dependency>
+              	  <groupId>org.codeartisans.asadmin</groupId>
+              	  <artifactId>ejb-example</artifactId>
+              	  <version>0.12</version>
+              	  <type>ejb</type>
+                </dependency>
+               </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void upgradeVersionForEjbTypeManagedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.codeartisans.asadmin", "ejb-example", "0.12", null,
+            null, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.codeartisans.asadmin</groupId>
+              		  <artifactId>ejb-example</artifactId>
+              		  <version>0.11</version>
+              		  <type>ejb</type>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.codeartisans.asadmin</groupId>
+              		  <artifactId>ejb-example</artifactId>
+              		  <version>0.12</version>
+              		  <type>ejb</type>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldNotAddVersionToChildWhenParentDefinesInDependencyManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "spring-security-core", "4.2.16.RELEASE", null,
+            true, null)),
+          pomXml(
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>parent</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.springframework.security</groupId>
+              		  <artifactId>spring-security-core</artifactId>
+              		  <version>4.2.13.RELEASE</version>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>parent</artifactId>
+               <version>1</version>
+               <dependencyManagement>
+                <dependencies>
+              	  <dependency>
+              		  <groupId>org.springframework.security</groupId>
+              		  <artifactId>spring-security-core</artifactId>
+              		  <version>4.2.16.RELEASE</version>
+              	  </dependency>
+                </dependencies>
+               </dependencyManagement>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                	<parent>
+                		<groupId>com.mycompany.app</groupId>
+                		<artifactId>parent</artifactId>
+                		<version>1</version>
+                	</parent>
+                	<groupId>com.mycompany.app</groupId>
+                	<artifactId>child</artifactId>
+                	<version>1</version>
+                	<dependencies>
+                		<dependency>
+                			<groupId>org.springframework.security</groupId>
+                			<artifactId>spring-security-core</artifactId>
+                		</dependency>
+                		<dependency>
+                			<groupId>org.apache.logging.log4j</groupId>
+                			<artifactId>log4j</artifactId>
+                			<version>2.13.1</version>
+                		</dependency>
+                	</dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6321")
+    @Test
+    void upgradeMultipleManagedDependenciesWithWildcards() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.6.2</version>
+                              <scope>test</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.slf4j</groupId>
+                              <artifactId>slf4j-api</artifactId>
+                              <version>1.7.30</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.6.3</version>
+                              <scope>test</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.slf4j</groupId>
+                              <artifactId>slf4j-api</artifactId>
+                              <version>1.7.36</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldPreserveProjectParentVersionPropertyInDependencyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>13.0</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>${project.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            SourceSpec::skip
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>13.0</version>
+                    </parent>
+                    <artifactId>my-child</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>${project.parent.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void shouldPreserveProjectVersionPropertyInDependencyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>13.0</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>${project.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void shouldPreserveRevisionPropertyInDependencyVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", null, null, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>${revision}</version>
+                  <properties>
+                      <revision>13.0</revision>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>${revision}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void bomUpgradeSkipsSnapshotVersions() throws Exception {
+        try (var mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest request) {
+                    String path = request.getPath();
+                    if (path == null) {
+                        return new MockResponse().setResponseCode(404);
+                    }
+                    // BOM metadata includes a SNAPSHOT version
+                    if (path.contains("com/example/my-bom/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <metadata>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-bom</artifactId>
+                            <versioning>
+                              <versions>
+                                <version>1.0.0</version>
+                                <version>2.0.0-SNAPSHOT</version>
+                                <version>2.0.0</version>
+                              </versions>
+                            </versioning>
+                          </metadata>
+                          """);
+                    }
+                    // BOM 1.0.0 manages my-lib at 1.0.0
+                    if (path.contains("com/example/my-bom/1.0.0/my-bom-1.0.0.pom")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-bom</artifactId>
+                            <version>1.0.0</version>
+                            <packaging>pom</packaging>
+                            <dependencyManagement>
+                              <dependencies>
+                                <dependency>
+                                  <groupId>com.example</groupId>
+                                  <artifactId>my-lib</artifactId>
+                                  <version>1.0.0</version>
+                                </dependency>
+                              </dependencies>
+                            </dependencyManagement>
+                          </project>
+                          """);
+                    }
+                    // BOM 2.0.0 manages my-lib at 2.0.0
+                    if (path.contains("com/example/my-bom/2.0.0/my-bom-2.0.0.pom")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-bom</artifactId>
+                            <version>2.0.0</version>
+                            <packaging>pom</packaging>
+                            <dependencyManagement>
+                              <dependencies>
+                                <dependency>
+                                  <groupId>com.example</groupId>
+                                  <artifactId>my-lib</artifactId>
+                                  <version>2.0.0</version>
+                                </dependency>
+                              </dependencies>
+                            </dependencyManagement>
+                          </project>
+                          """);
+                    }
+                    // SNAPSHOT BOM should never be requested — return 404
+                    if (path.contains("2.0.0-SNAPSHOT")) {
+                        return new MockResponse().setResponseCode(404);
+                    }
+                    // Dependency metadata
+                    if (path.contains("com/example/my-lib/maven-metadata.xml")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <metadata>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-lib</artifactId>
+                            <versioning>
+                              <versions>
+                                <version>1.0.0</version>
+                                <version>2.0.0</version>
+                              </versions>
+                            </versioning>
+                          </metadata>
+                          """);
+                    }
+                    // Dependency POM
+                    if (path.contains("com/example/my-lib/1.0.0/my-lib-1.0.0.pom")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-lib</artifactId>
+                            <version>1.0.0</version>
+                          </project>
+                          """);
+                    }
+                    if (path.contains("com/example/my-lib/2.0.0/my-lib-2.0.0.pom")) {
+                        return new MockResponse().setResponseCode(200).setBody("""
+                          <project>
+                            <modelVersion>4.0.0</modelVersion>
+                            <groupId>com.example</groupId>
+                            <artifactId>my-lib</artifactId>
+                            <version>2.0.0</version>
+                          </project>
+                          """);
+                    }
+                    return new MockResponse().setResponseCode(404);
+                }
+            });
+            mockRepo.start();
+
+            @SuppressWarnings("ConstantConditions")
+            MavenSettings settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>mock</name>
+                            <url>http://%s:%d</url>
+                            <id>mock</id>
+                        </mirror>
+                    </mirrors>
+                </settings>
+                """.formatted(mockRepo.getHostName(), mockRepo.getPort())
+            ), new InMemoryExecutionContext());
+
+            rewriteRun(
+              spec -> spec
+                .recipe(new UpgradeDependencyVersion("com.example", "my-lib", "2.x", null, true, null))
+                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                  .setMavenSettings(settings, "mock")),
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.example</groupId>
+                                  <artifactId>my-bom</artifactId>
+                                  <version>1.0.0</version>
+                                  <type>pom</type>
+                                  <scope>import</scope>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>my-lib</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.example</groupId>
+                                  <artifactId>my-bom</artifactId>
+                                  <version>2.0.0</version>
+                                  <type>pom</type>
+                                  <scope>import</scope>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>my-lib</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            );
+            mockRepo.shutdown();
+        }
+    }
+
 }

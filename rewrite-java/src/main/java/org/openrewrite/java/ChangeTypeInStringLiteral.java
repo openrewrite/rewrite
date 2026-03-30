@@ -38,10 +38,7 @@ public class ChangeTypeInStringLiteral extends Recipe {
             example = "org.junit.jupiter.api.Assumptions")
     String newFullyQualifiedTypeName;
 
-    @Override
-    public String getDisplayName() {
-        return "Change type in String literals";
-    }
+    String displayName = "Change type in String literals";
 
 
     @Override
@@ -51,10 +48,7 @@ public class ChangeTypeInStringLiteral extends Recipe {
                 .and(Validated.required("newPackageName", newFullyQualifiedTypeName));
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a given type to another when used in a String literal.";
-    }
+    String description = "Change a given type to another when used in a String literal.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

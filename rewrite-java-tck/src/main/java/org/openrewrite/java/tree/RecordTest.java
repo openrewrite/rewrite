@@ -123,4 +123,58 @@ class RecordTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6401")
+    @Test
+    void annotationsAndRecords() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.RECORD_COMPONENT})
+              @interface Select {
+                  String value() default "";
+              }
+              
+              public record File(@Select("native") String value) {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6401")
+    @Test
+    void recordWithMultipleAnnotations() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.RECORD_COMPONENT})
+              @interface A {
+                  String value() default "";
+              }
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.RECORD_COMPONENT})
+              @interface B {
+                  String value() default "";
+              }
+              
+              public record File(@A("a") @B("b") String value) {
+              }
+              """
+          )
+        );
+    }
 }

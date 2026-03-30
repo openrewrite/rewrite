@@ -136,6 +136,9 @@ public class TypeValidation {
     @Builder.Default
     private boolean allowNonWhitespaceInWhitespace = false;
 
+    @Builder.Default
+    private boolean parseAndPrintEquality = true;
+
     /**
      * Enable all invariant validation checks.
      */
@@ -147,7 +150,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

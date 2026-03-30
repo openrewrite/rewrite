@@ -131,6 +131,10 @@ public class StringUtils {
      * @return The minimum count of white space characters preceding each line of content.
      */
     public static int minCommonIndentLevel(String text) {
+        return minCommonIndentLevel(text, 1);
+    }
+
+    public static int minCommonIndentLevel(String text, int tabSize) {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
         boolean contentEncountered = false;
@@ -146,7 +150,11 @@ public class StringUtils {
                 whiteSpaceCount = 0;
                 contentEncountered = false;
             } else if (!contentEncountered && Character.isWhitespace(c)) {
-                whiteSpaceCount++;
+                if (c == '\t') {
+                    whiteSpaceCount += tabSize;
+                } else {
+                    whiteSpaceCount++;
+                }
             } else {
                 contentEncountered = true;
             }
@@ -391,15 +399,13 @@ public class StringUtils {
      * which properly interprets '*' and '**' wildcards for file paths.
      *
      * @param str the input string to match against the pattern, can be null
-     * @param pattern the glob pattern to evaluate, can be null
+     * @param pattern the glob pattern to evaluate. null and "*" both match everything.
      * @return true if the input string matches the glob pattern, false otherwise
      * @see org.openrewrite.PathUtils#matchesGlob(Path, String)
      */
     public static boolean matchesGlob(@Nullable String str, @Nullable String pattern) {
-        if ("*".equals(pattern)) {
+        if ("*".equals(pattern) || pattern == null) {
             return true;
-        } else if (pattern == null) {
-            return false;
         }
 
         if (str == null) {
@@ -606,6 +612,11 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
+        // Special case: a single * matches any type
+        if ("*".equals(name)) {
+            return ".*";
+        }
+
         int length = name.length();
         StringBuilder sb = new StringBuilder(length);
         char prev = 0;

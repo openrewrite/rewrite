@@ -30,30 +30,12 @@ public class Preconditions {
         return new RecipeCheck(check, v);
     }
 
-    public static TreeVisitor<?, ExecutionContext> check(TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
-        return new Check(check, v);
+    public static TreeVisitor<?, ExecutionContext> check(@Nullable TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
+        return check == null ? v : new Check(check, v);
     }
 
     public static TreeVisitor<?, ExecutionContext> check(boolean check, TreeVisitor<?, ExecutionContext> v) {
         return check ? v : TreeVisitor.noop();
-    }
-
-    @Incubating(since = "8.0.0")
-    @SafeVarargs
-    public static TreeVisitor<?, ExecutionContext> firstAcceptable(TreeVisitor<?, ExecutionContext>... vs) {
-        return new TreeVisitor<Tree, ExecutionContext>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof SourceFile) {
-                    for (TreeVisitor<?, ExecutionContext> v : vs) {
-                        if (v.isAcceptable((SourceFile) tree, ctx)) {
-                            return v.visit(tree, ctx);
-                        }
-                    }
-                }
-                return tree;
-            }
-        };
     }
 
     public static TreeVisitor<?, ExecutionContext> not(TreeVisitor<?, ExecutionContext> v) {
@@ -65,7 +47,7 @@ public class Preconditions {
                 if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
                     return SearchResult.found(tree);
                 }
-                Tree t2 = v.visit(tree, ctx);
+                Tree t2 = v.visit(tree, DataTableSuppressingExecutionContextView.view(ctx));
                 return tree == t2 && tree != null ?
                         SearchResult.found(tree) :
                         tree;
@@ -79,12 +61,13 @@ public class Preconditions {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : null;
+                DataTableSuppressingExecutionContextView suppressingCtx = DataTableSuppressingExecutionContextView.view(ctx);
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
                     // calling `isAcceptable()` in case `v` overrides `visit(Tree, P)`
                     if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
                         continue;
                     }
-                    Tree t2 = v.visit(tree, ctx);
+                    Tree t2 = v.visit(tree, suppressingCtx);
                     if (tree != t2) {
                         return t2;
                     }
@@ -100,13 +83,14 @@ public class Preconditions {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : null;
+                DataTableSuppressingExecutionContextView suppressingCtx = DataTableSuppressingExecutionContextView.view(ctx);
                 Tree t2 = tree;
                 for (TreeVisitor<?, ExecutionContext> v : vs) {
                     // calling `isAcceptable()` in case `v` overrides `visit(Tree, P)`
                     if (sourceFile != null && !v.isAcceptable(sourceFile, ctx)) {
                         continue;
                     }
-                    t2 = v.visit(tree, ctx);
+                    t2 = v.visit(tree, suppressingCtx);
                     if (tree == t2) {
                         return tree;
                     }
@@ -160,20 +144,46 @@ public class Preconditions {
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            // if tree isn't an instanceof SourceFile, then a precondition visitor may
-            // not be able to do its work because it may assume we are starting from the root level
-            return !(tree instanceof SourceFile) || check.visit(tree, ctx) != tree ?
+            // Preconditions expect to begin evaluating a tree at the root
+            return !(tree instanceof SourceFile) || check.visit(tree, DataTableSuppressingExecutionContextView.view(ctx)) != tree ?
                     v.visit(tree, ctx) :
                     tree;
         }
 
         @Override
         public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
-            // if tree isn't an instanceof SourceFile, then a precondition visitor may
+            // if tree isn't an instanceof of SourceFile, then a precondition visitor may
             // not be able to do its work because it may assume we are starting from the root level
-            return !(tree instanceof SourceFile) || check.visit(tree, ctx, parent) != tree ?
+            return !(tree instanceof SourceFile) || check.visit(tree, DataTableSuppressingExecutionContextView.view(ctx), parent) != tree ?
                     v.visit(tree, ctx, parent) :
                     tree;
+        }
+    }
+
+    /**
+     * An ExecutionContext view that suppresses data table row insertion.
+     * Installs a no-op {@link DataTableStore} that silently drops inserts
+     * while delegating reads to the real store.
+     */
+    private static class DataTableSuppressingExecutionContextView extends DelegatingExecutionContext {
+        private DataTableSuppressingExecutionContextView(ExecutionContext delegate) {
+            super(delegate);
+        }
+
+        public static DataTableSuppressingExecutionContextView view(ExecutionContext ctx) {
+            if (ctx instanceof DataTableSuppressingExecutionContextView) {
+                return (DataTableSuppressingExecutionContextView) ctx;
+            }
+            return new DataTableSuppressingExecutionContextView(ctx);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> @Nullable T getMessage(String key) {
+            if (DataTableExecutionContextView.DATA_TABLE_STORE.equals(key)) {
+                return (T) DataTableStore.noop();
+            }
+            return super.getMessage(key);
         }
     }
 }

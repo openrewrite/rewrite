@@ -15,12 +15,14 @@
  */
 // Generated from ~/git/rewrite/rewrite-protobuf/src/main/antlr/Protobuf2Lexer.g4 by ANTLR 4.13.2
 package org.openrewrite.protobuf.internal.grammar;
+import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.LexerATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class Protobuf2Lexer extends Lexer {
@@ -30,15 +32,15 @@ public class Protobuf2Lexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8,
-		FIXED64=9, FLOAT=10, IMPORT=11, INT32=12, INT64=13, MAP=14, MESSAGE=15,
-		ONEOF=16, OPTION=17, PACKAGE=18, PUBLIC=19, REPEATED=20, REQUIRED=21,
-		RESERVED=22, RETURNS=23, RPC=24, SERVICE=25, SFIXED32=26, SFIXED64=27,
-		SINT32=28, SINT64=29, STREAM=30, STRING=31, SYNTAX=32, TO=33, UINT32=34,
-		UINT64=35, WEAK=36, OPTIONAL=37, Ident=38, IntegerLiteral=39, NumericLiteral=40,
-		FloatLiteral=41, BooleanLiteral=42, StringLiteral=43, Quote=44, LPAREN=45,
-		RPAREN=46, LBRACE=47, RBRACE=48, LBRACK=49, RBRACK=50, LCHEVR=51, RCHEVR=52,
-		COMMA=53, DOT=54, MINUS=55, PLUS=56, ASSIGN=57, WS=58, UTF_8_BOM=59, COMMENT=60,
+		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8, 
+		FIXED64=9, FLOAT=10, IMPORT=11, INT32=12, INT64=13, MAP=14, MESSAGE=15, 
+		ONEOF=16, OPTION=17, PACKAGE=18, PUBLIC=19, REPEATED=20, REQUIRED=21, 
+		RESERVED=22, RETURNS=23, RPC=24, SERVICE=25, SFIXED32=26, SFIXED64=27, 
+		SINT32=28, SINT64=29, STREAM=30, STRING=31, SYNTAX=32, TO=33, UINT32=34, 
+		UINT64=35, WEAK=36, OPTIONAL=37, Ident=38, IntegerLiteral=39, NumericLiteral=40, 
+		FloatLiteral=41, BooleanLiteral=42, StringLiteral=43, Quote=44, LPAREN=45, 
+		RPAREN=46, LBRACE=47, RBRACE=48, LBRACK=49, RBRACK=50, LCHEVR=51, RCHEVR=52, 
+		COMMA=53, DOT=54, MINUS=55, PLUS=56, ASSIGN=57, WS=58, UTF_8_BOM=59, COMMENT=60, 
 		LINE_COMMENT=61;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -50,16 +52,16 @@ public class Protobuf2Lexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "EXTEND", "FIXED32",
-			"FIXED64", "FLOAT", "IMPORT", "INT32", "INT64", "MAP", "MESSAGE", "ONEOF",
-			"OPTION", "PACKAGE", "PUBLIC", "REPEATED", "REQUIRED", "RESERVED", "RETURNS",
-			"RPC", "SERVICE", "SFIXED32", "SFIXED64", "SINT32", "SINT64", "STREAM",
-			"STRING", "SYNTAX", "TO", "UINT32", "UINT64", "WEAK", "OPTIONAL", "Letter",
-			"DecimalDigit", "OctalDigit", "HexDigit", "Ident", "IntegerLiteral",
-			"NumericLiteral", "DecimalLiteral", "OctalLiteral", "HexLiteral", "FloatLiteral",
-			"Decimals", "Exponent", "BooleanLiteral", "StringLiteral", "CharValue",
-			"HexEscape", "OctEscape", "CharEscape", "Quote", "LPAREN", "RPAREN",
-			"LBRACE", "RBRACE", "LBRACK", "RBRACK", "LCHEVR", "RCHEVR", "COMMA",
+			"SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "EXTEND", "FIXED32", 
+			"FIXED64", "FLOAT", "IMPORT", "INT32", "INT64", "MAP", "MESSAGE", "ONEOF", 
+			"OPTION", "PACKAGE", "PUBLIC", "REPEATED", "REQUIRED", "RESERVED", "RETURNS", 
+			"RPC", "SERVICE", "SFIXED32", "SFIXED64", "SINT32", "SINT64", "STREAM", 
+			"STRING", "SYNTAX", "TO", "UINT32", "UINT64", "WEAK", "OPTIONAL", "Letter", 
+			"DecimalDigit", "OctalDigit", "HexDigit", "Ident", "IntegerLiteral", 
+			"NumericLiteral", "DecimalLiteral", "OctalLiteral", "HexLiteral", "FloatLiteral", 
+			"Decimals", "Exponent", "BooleanLiteral", "StringLiteral", "CharValue", 
+			"HexEscape", "OctEscape", "CharEscape", "Quote", "LPAREN", "RPAREN", 
+			"LBRACE", "RBRACE", "LBRACK", "RBRACK", "LCHEVR", "RCHEVR", "COMMA", 
 			"DOT", "MINUS", "PLUS", "ASSIGN", "WS", "UTF_8_BOM", "COMMENT", "LINE_COMMENT"
 		};
 	}
@@ -67,27 +69,27 @@ public class Protobuf2Lexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "';'", "':'", "'bool'", "'bytes'", "'double'", "'enum'", "'extend'",
-			"'fixed32'", "'fixed64'", "'float'", "'import'", "'int32'", "'int64'",
-			"'map'", "'message'", "'oneof'", "'option'", "'package'", "'public'",
-			"'repeated'", "'required'", "'reserved'", "'returns'", "'rpc'", "'service'",
-			"'sfixed32'", "'sfixed64'", "'sint32'", "'sint64'", "'stream'", "'string'",
-			"'syntax'", "'to'", "'uint32'", "'uint64'", "'weak'", "'optional'", null,
-			null, null, null, null, null, null, "'('", "')'", "'{'", "'}'", "'['",
+			null, "';'", "':'", "'bool'", "'bytes'", "'double'", "'enum'", "'extend'", 
+			"'fixed32'", "'fixed64'", "'float'", "'import'", "'int32'", "'int64'", 
+			"'map'", "'message'", "'oneof'", "'option'", "'package'", "'public'", 
+			"'repeated'", "'required'", "'reserved'", "'returns'", "'rpc'", "'service'", 
+			"'sfixed32'", "'sfixed64'", "'sint32'", "'sint64'", "'stream'", "'string'", 
+			"'syntax'", "'to'", "'uint32'", "'uint64'", "'weak'", "'optional'", null, 
+			null, null, null, null, null, null, "'('", "')'", "'{'", "'}'", "'['", 
 			"']'", "'<'", "'>'", "','", "'.'", "'-'", "'+'", "'='", null, "'\\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "EXTEND", "FIXED32",
-			"FIXED64", "FLOAT", "IMPORT", "INT32", "INT64", "MAP", "MESSAGE", "ONEOF",
-			"OPTION", "PACKAGE", "PUBLIC", "REPEATED", "REQUIRED", "RESERVED", "RETURNS",
-			"RPC", "SERVICE", "SFIXED32", "SFIXED64", "SINT32", "SINT64", "STREAM",
-			"STRING", "SYNTAX", "TO", "UINT32", "UINT64", "WEAK", "OPTIONAL", "Ident",
-			"IntegerLiteral", "NumericLiteral", "FloatLiteral", "BooleanLiteral",
-			"StringLiteral", "Quote", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACK",
-			"RBRACK", "LCHEVR", "RCHEVR", "COMMA", "DOT", "MINUS", "PLUS", "ASSIGN",
+			null, "SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "EXTEND", "FIXED32", 
+			"FIXED64", "FLOAT", "IMPORT", "INT32", "INT64", "MAP", "MESSAGE", "ONEOF", 
+			"OPTION", "PACKAGE", "PUBLIC", "REPEATED", "REQUIRED", "RESERVED", "RETURNS", 
+			"RPC", "SERVICE", "SFIXED32", "SFIXED64", "SINT32", "SINT64", "STREAM", 
+			"STRING", "SYNTAX", "TO", "UINT32", "UINT64", "WEAK", "OPTIONAL", "Ident", 
+			"IntegerLiteral", "NumericLiteral", "FloatLiteral", "BooleanLiteral", 
+			"StringLiteral", "Quote", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACK", 
+			"RBRACK", "LCHEVR", "RCHEVR", "COMMA", "DOT", "MINUS", "PLUS", "ASSIGN", 
 			"WS", "UTF_8_BOM", "COMMENT", "LINE_COMMENT"
 		};
 	}

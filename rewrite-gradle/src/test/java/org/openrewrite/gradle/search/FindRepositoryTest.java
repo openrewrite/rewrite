@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 
 class FindRepositoryTest implements RewriteTest {
     @DocumentExample
@@ -195,6 +194,126 @@ class FindRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindRepository("mavenCentral", null, null)),
           buildGradle(
+            """
+              repositories {
+                mavenCentral()
+              }
+              """,
+            """
+              repositories {
+                /*~~>*/mavenCentral()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryByUrlAndPurposeProjectKts() {
+        rewriteRun(
+          spec -> spec.recipe(new FindRepository(null, "https://central.sonatype.com/repository/maven-snapshots", FindRepository.Purpose.Project)),
+          buildGradleKts(
+            """
+              buildscript {
+                repositories {
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                }
+              }
+
+              repositories {
+                maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+              }
+              """,
+            """
+              buildscript {
+                repositories {
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                }
+              }
+
+              repositories {
+                /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryByUrlAndPurposePluginKts() {
+        rewriteRun(
+          spec -> spec.recipe(new FindRepository(null, "https://central.sonatype.com/repository/maven-snapshots", FindRepository.Purpose.Plugin)),
+          buildGradleKts(
+            """
+              buildscript {
+                repositories {
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                }
+              }
+
+              repositories {
+                maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+              }
+              """,
+            """
+              buildscript {
+                repositories {
+                  /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                }
+              }
+
+              repositories {
+                maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+              }
+              """
+          ),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                repositories {
+                  maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                }
+              }
+              """,
+            """
+              pluginManagement {
+                repositories {
+                  /*~~>*/maven { url = "https://central.sonatype.com/repository/maven-snapshots" }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyStringRepositoryKts() {
+        rewriteRun(
+          spec -> spec.recipe(new FindRepository(null, "${NEXUS_URL}/content/repositories/snapshots", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                repositories {
+                  maven { url = uri("${NEXUS_URL}/content/repositories/snapshots") }
+                }
+              }
+              """,
+            """
+              pluginManagement {
+                repositories {
+                  /*~~>*/maven { url = uri("${NEXUS_URL}/content/repositories/snapshots") }
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void repositoryByTypeKts() {
+        rewriteRun(
+          spec -> spec.recipe(new FindRepository("mavenCentral", null, null)),
+          buildGradleKts(
             """
               repositories {
                 mavenCentral()

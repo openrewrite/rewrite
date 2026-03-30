@@ -1,0 +1,80 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.maven.table;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreType;
+import lombok.NonNull;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.Column;
+import org.openrewrite.DataTable;
+import org.openrewrite.Recipe;
+
+@JsonIgnoreType
+public class ExplainDependenciesInUse extends DataTable<ExplainDependenciesInUse.@NonNull Row> {
+
+    public ExplainDependenciesInUse(Recipe recipe) {
+        super(
+                recipe,
+                "Explain dependencies in use",
+                "A dependency graph explainer similar to that shown by " +
+                "`gradle dependencyInsight` for each matching dependency. " +
+                "This table will contain a row per matching dependency per configuration " +
+                "per (sub)project."
+        );
+    }
+
+    @Value
+    public static class Row {
+        @Column(displayName = "Project name",
+                description = "The name of the project that contains the dependency.")
+        String projectName;
+
+        @Column(displayName = "Source set",
+                description = "The source set that contains the dependency.")
+        String sourceSet;
+
+        @Column(displayName = "Group",
+                description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.")
+        String groupId;
+
+        @Column(displayName = "Artifact",
+                description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.")
+        String artifactId;
+
+        @Column(displayName = "Version",
+                description = "The resolved version.")
+        String version;
+
+        @Column(displayName = "Dated snapshot version",
+                description = "The resolved dated snapshot version or `null` if this dependency is not a snapshot.")
+        @Nullable
+        String datedSnapshotVersion;
+
+        @Column(displayName = "Scope",
+                description = "Dependency scope. This will be `compile` if the dependency is direct and a scope is not explicitly " +
+                              "specified in the POM.")
+        String scope;
+
+        @Column(displayName = "Count",
+                description = "How many times does this dependency appear.")
+        Integer count;
+
+        @Column(displayName = "Dependency graph",
+                description = "The dependency paths that requested the dependency.")
+        String dependencyGraph;
+    }
+}

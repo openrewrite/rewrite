@@ -28,15 +28,9 @@ import static org.openrewrite.Preconditions.or;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveExtension extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove build extension by name";
-    }
+    String displayName = "Remove build extension by name";
 
-    @Override
-    public String getDescription() {
-        return "Remove a Gradle build extension from `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
-    }
+    String description = "Remove a Gradle build extension from `settings.gradle(.kts)` or `build.gradle(.kts)` files.";
 
     @Option(displayName = "Method name",
             description = "The name of the build extension to remove, e.g., `buildCache`.",

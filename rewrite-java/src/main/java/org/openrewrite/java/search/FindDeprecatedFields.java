@@ -58,10 +58,7 @@ public class FindDeprecatedFields extends Recipe {
     @Nullable
     Boolean ignoreDeprecatedScopes;
 
-    @Override
-    public String getDisplayName() {
-        return "Find uses of deprecated fields";
-    }
+    String displayName = "Find uses of deprecated fields";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -71,10 +68,7 @@ public class FindDeprecatedFields extends Recipe {
         return super.getInstanceNameSuffix();
     }
 
-    @Override
-    public String getDescription() {
-        return "Find uses of deprecated fields in any API.";
-    }
+    String description = "Find uses of deprecated fields in any API.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

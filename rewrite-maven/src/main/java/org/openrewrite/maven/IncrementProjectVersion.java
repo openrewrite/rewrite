@@ -62,21 +62,15 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
         PATCH
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Increment Maven project version";
-    }
+    String displayName = "Increment Maven project version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, digit);
     }
 
-    @Override
-    public String getDescription() {
-        return "Increase Maven project version by incrementing either the major, minor, or patch version as defined by " +
+    String description = "Increase Maven project version by incrementing either the major, minor, or patch version as defined by " +
                "[semver](https://semver.org/). Other versioning schemes are not supported.";
-    }
 
     @Override
     public Map<GroupArtifact, String> getInitialValue(ExecutionContext ctx) {

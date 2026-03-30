@@ -29,15 +29,9 @@ import org.openrewrite.java.tree.J;
 public class MethodDefinitionLength extends Recipe {
     transient TokenCount tokens = new TokenCount(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Calculate token length of method definitions";
-    }
+    String displayName = "Calculate token length of method definitions";
 
-    @Override
-    public String getDescription() {
-        return "Locates method definitions and predicts the number of token in each.";
-    }
+    String description = "Locates method definitions and predicts the number of token in each.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -17,8 +17,10 @@ package org.openrewrite.java.isolated;
 
 import com.sun.source.doctree.*;
 import com.sun.source.doctree.ErroneousTree;
+import com.sun.source.doctree.EscapeTree;
 import com.sun.source.doctree.LiteralTree;
 import com.sun.source.doctree.ProvidesTree;
+import com.sun.source.doctree.RawTextTree;
 import com.sun.source.doctree.ReturnTree;
 import com.sun.source.doctree.SnippetTree;
 import com.sun.source.doctree.UsesTree;
@@ -44,6 +46,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
@@ -63,6 +66,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     private final ReloadableJava25TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
+    private final boolean markdown;
 
     /**
      * The whitespace on the first line terminated by a newline (if any)
@@ -73,9 +77,14 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     private int cursor = 0;
 
     public ReloadableJava25JavadocVisitor(Context context, TreePath scope, ReloadableJava25TypeMapping typeMapping, String source, JCTree tree) {
+        this(context, scope, typeMapping, source, tree, false);
+    }
+
+    public ReloadableJava25JavadocVisitor(Context context, TreePath scope, ReloadableJava25TypeMapping typeMapping, String source, JCTree tree, boolean markdown) {
         this.attr = Attr.instance(context);
         this.typeMapping = typeMapping;
         this.source = source;
+        this.markdown = markdown;
 
         if (scope.getLeaf() instanceof JCTree.JCCompilationUnit) {
             this.enclosingClassType = tree.type;
@@ -96,6 +105,84 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private void init() {
+        if (markdown) {
+            initMarkdown();
+        } else {
+            initTraditional();
+        }
+    }
+
+    private void initMarkdown() {
+        StringBuilder firstPrefixBuilder = new StringBuilder();
+        StringBuilder javadocContent = new StringBuilder();
+        boolean inFirstPrefix = true;
+
+        // skip past the opening '///'
+        int i = 3;
+        for (; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (inFirstPrefix) {
+                if (Character.isWhitespace(c) && c != '\n' && c != '\r') {
+                    firstPrefixBuilder.append(c);
+                } else {
+                    firstPrefix = firstPrefixBuilder.toString();
+                    inFirstPrefix = false;
+                }
+            }
+
+            if (c == '\r') {
+                continue;
+            }
+
+            if (c == '\n') {
+                if (inFirstPrefix) {
+                    firstPrefix = firstPrefixBuilder.toString();
+                    inFirstPrefix = false;
+                }
+
+                // Append the newline to javadocContent (visitText needs this to detect line breaks)
+                javadocContent.append('\n');
+
+                // Build the margin: newline + whitespace + '///'
+                StringBuilder marginBuilder = new StringBuilder();
+                char prev = i > 0 ? source.charAt(i - 1) : '\n';
+                String newLine = prev == '\r' ? "\r\n" : "\n";
+                marginBuilder.append(newLine);
+                i++;
+                // consume whitespace before next ///
+                while (i < source.length() && source.charAt(i) != '/' && Character.isWhitespace(source.charAt(i)) && source.charAt(i) != '\n' && source.charAt(i) != '\r') {
+                    marginBuilder.append(source.charAt(i));
+                    i++;
+                }
+                // consume the '///'
+                if (i + 2 < source.length() && source.charAt(i) == '/' && source.charAt(i + 1) == '/' && source.charAt(i + 2) == '/') {
+                    marginBuilder.append("///");
+                    i += 3;
+                    lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
+                            marginBuilder.toString(), Markers.EMPTY));
+                    // skip single space after /// if present (conventional formatting)
+                    if (i < source.length() && source.charAt(i) == ' ') {
+                        javadocContent.append(source.charAt(i));
+                    } else {
+                        i--; // will be incremented by the for loop
+                    }
+                } else {
+                    // not a continuation line — shouldn't happen with well-formed input
+                    i--;
+                }
+            } else if (!inFirstPrefix) {
+                javadocContent.append(c);
+            }
+        }
+
+        if (inFirstPrefix) {
+            javadocContent.append(firstPrefixBuilder);
+        }
+
+        source = javadocContent.toString();
+    }
+
+    private void initTraditional() {
         StringBuilder firstPrefixBuilder = new StringBuilder();
         StringBuilder javadocContent = new StringBuilder();
         StringBuilder marginBuilder = null;
@@ -297,6 +384,8 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 body.addAll(visitText(textNode.getBody()));
             } else if (docTree instanceof DCTree.DCComment commentNode) {
                 body.addAll(visitText(commentNode.getBody()));
+            } else if (docTree instanceof DCTree.DCRawText rawTextNode) {
+                body.addAll(visitText(rawTextNode.getContent()));
             } else {
                 body.add((Javadoc) scan(docTree, body));
             }
@@ -970,7 +1059,7 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 cursor++;
                 Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
                 texts.add(lineBreak);
-            } else if (source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
+            } else if (cursor < source.length() && source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
                 int escapedCharLength = unicodeEscaped(c).length();
                 text.append(source, cursor, cursor + escapedCharLength);
                 cursor += escapedCharLength;
@@ -980,8 +1069,8 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
             // The AST contained unnecessary whitespace for Javadoc, and they got rid of this with Java 25.
             // So now have to manually account for this.
-            if (i+1 <= node.length() -1 && node.charAt(i+1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
-                text.append(whitespaceBeforeAsString());
+            if (cursor < source.length() && i+1 <= node.length() -1 && node.charAt(i+1) != source.charAt(cursor) && Character.isWhitespace(source.charAt(cursor))) {
+                text.append(whitespaceBeforeAsString(Character::isSpaceChar));
             }
         }
 
@@ -990,6 +1079,32 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         return texts;
+    }
+
+    @Override
+    public Tree visitRawText(RawTextTree node, List<Javadoc> body) {
+        List<Javadoc> texts = visitText(node.getContent());
+        if (texts.isEmpty()) {
+            return new Javadoc.Text(randomId(), Markers.EMPTY, "");
+        }
+        // Return the last element; any preceding elements are added via visitDocComment's body list
+        return texts.get(texts.size() - 1);
+    }
+
+    @Override
+    public Tree visitEscape(EscapeTree node, List<Javadoc> body) {
+        String escaped = node.getBody();
+        if (cursor < source.length()) {
+            // Advance cursor past the escape sequence in source
+            int end = cursor;
+            while (end < source.length() && end < cursor + escaped.length()) {
+                end++;
+            }
+            String text = source.substring(cursor, end);
+            cursor = end;
+            return new Javadoc.Text(randomId(), Markers.EMPTY, text);
+        }
+        return new Javadoc.Text(randomId(), Markers.EMPTY, escaped);
     }
 
     private static String unicodeEscaped(char c) {
@@ -1085,13 +1200,17 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private String whitespaceBeforeAsString() {
+        return whitespaceBeforeAsString(Character::isWhitespace);
+    }
+
+    private String whitespaceBeforeAsString(Predicate<Character> whitespace) {
         if (cursor >= source.length()) {
             return "";
         }
 
         int i = cursor;
         for (; i < source.length(); i++) {
-            if (!Character.isWhitespace(source.charAt(i))) {
+            if (!whitespace.test(source.charAt(i))) {
                 break;
             }
         }
@@ -1162,9 +1281,13 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
         for (int i = 0; i < dts.size(); i++) {
             DocTree dt = dts.get(i);
-            if (i > 0 && dt instanceof DCTree.DCText) {
+            if (i > 0 && (dt instanceof DCTree.DCText || dt instanceof DCTree.DCRawText)) {
                 // the whitespace is part of the text
-                js.addAll(visitText(((DCTree.DCText) dt).getBody()));
+                if (dt instanceof DCTree.DCText textNode) {
+                    js.addAll(visitText(textNode.getBody()));
+                } else {
+                    js.addAll(visitText(((DCTree.DCRawText) dt).getContent()));
+                }
             } else {
                 while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
                     cursor++;
@@ -1172,8 +1295,10 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 }
 
                 js.addAll(whitespaceBefore());
-                if (dt instanceof DCTree.DCText) {
-                    js.addAll(visitText(((DCTree.DCText) dt).getBody()));
+                if (dt instanceof DCTree.DCText textNode) {
+                    js.addAll(visitText(textNode.getBody()));
+                } else if (dt instanceof DCTree.DCRawText rawTextNode) {
+                    js.addAll(visitText(rawTextNode.getContent()));
                 } else {
                     js.add((Javadoc) scan(dt, emptyList()));
                 }
@@ -1212,17 +1337,21 @@ public class ReloadableJava25JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         public J visitMemberSelect(MemberSelectTree node, Space fmt) {
             JCTree.JCFieldAccess fieldAccess = (JCTree.JCFieldAccess) node;
             Expression selected = (Expression) scan(fieldAccess.selected, Space.EMPTY);
-            sourceBefore(".");
-            // Capture any whitespace (including newlines) between the dot and the name
+            // Capture whitespace before the dot - this goes in JLeftPadded.before
+            String whitespaceBeforeDot = sourceBeforeAsString(".");
+            // Capture whitespace after the dot - this goes in Identifier.prefix
             String whitespaceAfterDot = whitespaceBeforeAsString();
             cursor += fieldAccess.name.toString().length();
             return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                     selected,
-                    JLeftPadded.build(new J.Identifier(randomId(),
-                            Space.build(whitespaceAfterDot, emptyList()),
-                            Markers.EMPTY,
-                            emptyList(),
-                            fieldAccess.name.toString(), null, null)),
+                    new JLeftPadded<>(
+                            Space.build(whitespaceBeforeDot, emptyList()),
+                            new J.Identifier(randomId(),
+                                    Space.build(whitespaceAfterDot, emptyList()),
+                                    Markers.EMPTY,
+                                    emptyList(),
+                                    fieldAccess.name.toString(), null, null),
+                            Markers.EMPTY),
                     typeMapping.type(node));
         }
 

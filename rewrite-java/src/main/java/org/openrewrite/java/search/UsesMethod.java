@@ -19,8 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
@@ -61,7 +61,8 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public J preVisit(@NonNull J tree, P p) {
+        stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
             for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
@@ -69,39 +70,14 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
                     return found(cu);
                 }
             }
-            return (J) tree;
         }
-        return super.visit(tree, p);
+        return tree;
     }
 
     private <J2 extends J> J2 found(J2 j) {
         // also adding a `SearchResult` marker to get a visible diff
         return SearchResult.found(j.withMarkers(j.getMarkers()
                 .compute(new MethodMatch(randomId(), methodPattern), (s1, s2) -> s1 == null ? s2 : s1)));
-    }
-
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        if (methodMatcher.matches(method)) {
-            return found(method);
-        }
-        return super.visitMethodInvocation(method, p);
-    }
-
-    @Override
-    public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
-        if (methodMatcher.matches(memberRef)) {
-            return found(memberRef);
-        }
-        return super.visitMemberReference(memberRef, p);
-    }
-
-    @Override
-    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
-        if (methodMatcher.matches(newClass)) {
-            return found(newClass);
-        }
-        return super.visitNewClass(newClass, p);
     }
 
     @Value

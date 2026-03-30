@@ -50,7 +50,7 @@ class ResultTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(before -> {
-                J.CompilationUnit after = (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+                var after = (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
                     @Override
                     public J.Block visitBlock(J.Block block, Integer p) {
                         // intentional inappropriate creation of a new list

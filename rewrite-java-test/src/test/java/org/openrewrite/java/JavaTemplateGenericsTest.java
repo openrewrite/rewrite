@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
@@ -348,7 +347,6 @@ class JavaTemplateGenericsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void replaceLambdaToMemberReference() {
         //noinspection Convert2MethodRef
@@ -401,6 +399,162 @@ class JavaTemplateGenericsTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void replaceLambdaToMemberReferenceWithSpecificType() {
+        // Even when the context has Function<String, String>, the template's T is unbounded,
+        // so its erasure is Object. Object::toString is valid in any Function<X, String> context.
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.toString()")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::toString")
+                  .bindType("java.util.function.Function<T, String>")
+                  .genericTypes("T")
+                  .build();
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitLambda(lambda, ctx);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.Function;
+
+              class Foo {
+                  void test() {
+                      test(e -> e.toString());
+                  }
+
+                  void test(Function<String, String> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+
+              class Foo {
+                  void test() {
+                      test(Object::toString);
+                  }
+
+                  void test(Function<String, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceLambdaToMemberReferenceWithBoundedTypeVariable() {
+        // When T has a bound (T extends Number), the erasure is Number.
+        //noinspection Convert2MethodRef
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(1).cycles(1)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                final JavaTemplate lambdaTemplate = JavaTemplate.builder("e -> e.intValue()")
+                  .bindType("java.util.function.ToIntFunction<T>")
+                  .genericTypes("T extends java.lang.Number")
+                  .build();
+                final JavaTemplate refTemplate = JavaTemplate.builder("T::intValue")
+                  .bindType("java.util.function.ToIntFunction<T>")
+                  .genericTypes("T extends java.lang.Number")
+                  .build();
+
+                @Override
+                public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                    JavaTemplate.Matcher matcher = lambdaTemplate.matcher(getCursor());
+                    if (matcher.find()) {
+                        return refTemplate.apply(getCursor(), lambda.getCoordinates().replace(), matcher.getMatchResult().getMatchedParameters().toArray());
+                    } else {
+                        return super.visitLambda(lambda, ctx);
+                    }
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.function.ToIntFunction;
+
+              class Foo {
+                  void test() {
+                      test(e -> e.intValue());
+                  }
+
+                  void test(ToIntFunction<Integer> fn) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.ToIntFunction;
+
+              class Foo {
+                  void test() {
+                      test(Number::intValue);
+                  }
+
+                  void test(ToIntFunction<Integer> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void templateShouldNotMatchWhenWildcardCaptureBreaksAfterTemplate() {
+        // Simulates the AssertJMapRules.AbstractMapAssertContainsExactlyInAnyOrderEntriesOf Refaster rule.
+        // The before template matches mapAssert.isEqualTo(map), but when the map assert's value type
+        // is a wildcard (? extends Class<?>), the after template's containsExactlyInAnyOrderEntriesOf()
+        // produces uncompilable code due to Java's wildcard capture rules.
+        var beforeTemplate = JavaTemplate
+          .builder("#{mapAssert:any(org.assertj.core.api.AbstractMapAssert<?, ?, K, V>)}.isEqualTo(#{map:any(java.util.Map<? extends K, ? extends V>)})")
+          .bindType("org.assertj.core.api.AbstractMapAssert<?, ?, K, V>")
+          .genericTypes("K", "V")
+          .javaParser(JavaParser.fromJavaVersion().classpath("assertj-core"))
+          .build();
+
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return beforeTemplate.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.Map;
+              import static org.assertj.core.api.Assertions.assertThat;
+
+              class Test {
+                  Map<String, ? extends Class<?>> getArgumentDefinitions() {
+                      return Collections.singletonMap("arg", String.class);
+                  }
+                  void test() {
+                      // V binds to "? extends Class<?>" — containsExactlyInAnyOrderEntriesOf would not compile
+                      assertThat(getArgumentDefinitions()).isEqualTo(Collections.singletonMap("arg", String.class));
+                  }
+              }
+              """
+            // No expected output — the template should NOT match, so no SearchResult marker
           )
         );
     }

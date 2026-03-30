@@ -42,15 +42,11 @@ public class UseStaticImport extends Recipe {
             example = "java.util.Collections emptyList()")
     String methodPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Use static import";
-    }
+    @Getter
+    final String displayName = "Use static import";
 
-    @Override
-    public String getDescription() {
-        return "Removes unnecessary receiver types from static method invocations. For example, `Collections.emptyList()` becomes `emptyList()`.";
-    }
+    @Getter
+    final String description = "Removes unnecessary receiver types from static method invocations. For example, `Collections.emptyList()` becomes `emptyList()`.";
 
     @Override
     public Validated<Object> validate() {
@@ -88,11 +84,10 @@ public class UseStaticImport extends Recipe {
                     return m;
                 }
 
-                JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
-                maybeRemoveImport(receiverType);
-                maybeAddImport(receiverType.getFullyQualifiedName(), m.getSimpleName(), false);
-
                 if (m.getSelect() != null) {
+                    JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+                    maybeRemoveImport(receiverType);
+                    maybeAddImport(receiverType.getFullyQualifiedName(), m.getSimpleName(), false);
                     return m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
                 }
             }

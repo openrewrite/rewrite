@@ -29,15 +29,9 @@ import org.openrewrite.java.tree.J;
 public class ClassDefinitionLength extends Recipe {
     transient TokenCount tokens = new TokenCount(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Calculate token length of classes";
-    }
+    String displayName = "Calculate token length of classes";
 
-    @Override
-    public String getDescription() {
-        return "Locates class definitions and predicts the number of token in each.";
-    }
+    String description = "Locates class definitions and predicts the number of token in each.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

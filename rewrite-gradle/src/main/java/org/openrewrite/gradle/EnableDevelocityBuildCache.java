@@ -31,15 +31,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @EqualsAndHashCode(callSuper = false)
 public class EnableDevelocityBuildCache extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Enable Develocity build cache";
-    }
+    String displayName = "Enable Develocity build cache";
 
-    @Override
-    public String getDescription() {
-        return "Adds `buildCache` configuration to `develocity` where not yet present.";
-    }
+    String description = "Adds `buildCache` configuration to `develocity` where not yet present.";
 
     @Option(displayName = "Enable remote build cache",
             description = "Value for `//develocity/buildCache/remote/enabled`.",

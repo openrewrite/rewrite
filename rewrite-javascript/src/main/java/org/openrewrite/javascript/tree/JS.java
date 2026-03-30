@@ -24,14 +24,12 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.javascript.JavaScriptVisitor;
-import org.openrewrite.javascript.internal.rpc.JavaScriptReceiver;
-import org.openrewrite.javascript.internal.rpc.JavaScriptSender;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
+import org.openrewrite.javascript.service.JavaScriptAutoFormatService;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
@@ -74,16 +72,6 @@ public interface JS extends J {
     @Override
     default List<Comment> getComments() {
         return getPrefix().getComments();
-    }
-
-    @Override
-    default void rpcSend(J after, RpcSendQueue q) {
-        new JavaScriptSender().visit(after, q);
-    }
-
-    @Override
-    default J rpcReceive(J before, RpcReceiveQueue q) {
-        return new JavaScriptReceiver().visitNonNull(before, q);
     }
 
     @ToString
@@ -235,10 +223,17 @@ public interface JS extends J {
         }
 
         @Override
+        @SuppressWarnings("unchecked")
         public <S, T extends S> T service(Class<S> service) {
             String serviceName = service.getName();
             try {
-                return JavaSourceFile.super.service(service);
+                Class<S> serviceClass;
+                if (AutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(JavaScriptAutoFormatService.class.getName());
+                } else {
+                    return JavaSourceFile.super.service(service);
+                }
+                return (T) serviceClass.getConstructor().newInstance();
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -2622,6 +2617,72 @@ public interface JS extends J {
             public ScopedVariableDeclarations withVariables(List<JRightPadded<J>> variables) {
                 return t.variables == variables ? t : new ScopedVariableDeclarations(t.id, t.prefix, t.markers, t.modifiers, variables);
             }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class Shebang implements JS, Statement {
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        String text;
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitShebang(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents the spread syntax (...) applied to an expression.
+     * Used in array literals, object literals, function call arguments,
+     * and rest syntax in function parameters and destructuring patterns.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class Spread implements JS, Expression, Statement, VariableDeclarator {
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Expression expression;
+
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptJavaScript(JavaScriptVisitor<P> v, P p) {
+            return v.visitSpread(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            if (expression instanceof VariableDeclarator) {
+                return ((VariableDeclarator) expression).getNames();
+            }
+            return emptyList();
         }
     }
 

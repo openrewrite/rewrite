@@ -25,10 +25,8 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
-import org.openrewrite.rpc.RpcCodec;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.*;
 import java.util.function.Function;
@@ -76,6 +74,7 @@ public interface JavaType {
         return ShallowClass.build(typeName);
     }
 
+    @Deprecated
     default boolean isAssignableFrom(Pattern pattern) {
         if (this instanceof FullyQualified) {
             FullyQualified fq = (FullyQualified) this;
@@ -95,6 +94,32 @@ public interface JavaType {
             GenericTypeVariable generic = (GenericTypeVariable) this;
             for (JavaType bound : generic.getBounds()) {
                 if (bound.isAssignableFrom(pattern)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    default boolean isAssignableFrom(TypeNameMatcher matcher) {
+        if (this instanceof FullyQualified) {
+            FullyQualified fq = (FullyQualified) this;
+            if (matcher.matches(fq.getFullyQualifiedName())) {
+                return true;
+            }
+            if (fq.getSupertype() != null && fq.getSupertype().isAssignableFrom(matcher)) {
+                return true;
+            }
+            for (FullyQualified anInterface : fq.getInterfaces()) {
+                if (anInterface.isAssignableFrom(matcher)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (this instanceof GenericTypeVariable) {
+            GenericTypeVariable generic = (GenericTypeVariable) this;
+            for (JavaType bound : generic.getBounds()) {
+                if (bound.isAssignableFrom(matcher)) {
                     return true;
                 }
             }
@@ -132,7 +157,7 @@ public interface JavaType {
             return new MultiCatch(throwableTypesArray);
         }
 
-        public MultiCatch unsafeSet(List<JavaType> throwableTypes) {
+        public MultiCatch unsafeSet(@Nullable List<JavaType> throwableTypes) {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
@@ -140,6 +165,11 @@ public interface JavaType {
         public MultiCatch unsafeSet(JavaType[] throwableTypes) {
             this.throwableTypes = ListUtils.nullIfEmpty(throwableTypes);
             return this;
+        }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
     }
 
@@ -173,7 +203,7 @@ public interface JavaType {
             return new Intersection(boundsArray);
         }
 
-        public Intersection unsafeSet(List<JavaType> bounds) {
+        public Intersection unsafeSet(@Nullable List<JavaType> bounds) {
             this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
             return this;
         }
@@ -181,6 +211,11 @@ public interface JavaType {
         public Intersection unsafeSet(JavaType[] bounds) {
             this.bounds = ListUtils.nullIfEmpty(bounds);
             return this;
+        }
+
+        @Override
+        public String toString() {
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
     }
 
@@ -240,6 +275,8 @@ public interface JavaType {
             private final Function<FullyQualified, Iterator<E>> recursive;
 
             private FullyQualified rec;
+
+            @SuppressWarnings("NotNullFieldNotInitialized")
             private E peek;
 
             private Iterator<E> current;
@@ -312,9 +349,12 @@ public interface JavaType {
          * @return The class name without package qualification. If an inner class, outer/inner classes are separated by '.'.
          */
         public String getClassName() {
+            return TypeUtils.toFullyQualifiedName(getRawClassName());
+        }
+
+        public String getRawClassName() {
             String fqn = getFullyQualifiedName();
-            String className = fqn.substring(fqn.lastIndexOf('.') + 1);
-            return TypeUtils.toFullyQualifiedName(className);
+            return fqn.substring(fqn.lastIndexOf('.') + 1);
         }
 
         public String getPackageName() {
@@ -573,6 +613,24 @@ public interface JavaType {
             return this;
         }
 
+        public Class unsafeSet(long flags, Kind kind, String fullyQualifiedName, @Nullable List<JavaType> typeParameters,
+                               @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                               @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
+                               @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            //noinspection DuplicatedCode
+            this.kind = kind;
+            this.flagsBitMap = flags;
+            this.fullyQualifiedName = fullyQualifiedName;
+            this.typeParameters = arrayOrNullIfEmpty(typeParameters, EMPTY_JAVA_TYPE_ARRAY);
+            this.supertype = supertype;
+            this.owningClass = owningClass;
+            this.annotations = arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY);
+            this.interfaces = arrayOrNullIfEmpty(interfaces, EMPTY_FULLY_QUALIFIED_ARRAY);
+            this.members = arrayOrNullIfEmpty(members, EMPTY_VARIABLE_ARRAY);
+            this.methods = arrayOrNullIfEmpty(methods, EMPTY_METHOD_ARRAY);
+            return this;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -631,14 +689,13 @@ public interface JavaType {
         }
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @FieldDefaults(level = AccessLevel.PRIVATE)
     class Annotation extends FullyQualified {
-
         @Getter
         @With
-        final FullyQualified type;
+        FullyQualified type;
 
-        final ElementValue @Nullable [] values;
+        ElementValue @Nullable [] values;
 
         public Annotation(FullyQualified type, List<ElementValue> values) {
             this(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
@@ -749,6 +806,7 @@ public interface JavaType {
 
             @Override
             public Object getValue() {
+                //noinspection DataFlowIssue
                 return constantValue != null ? constantValue : referenceValue;
             }
         }
@@ -773,8 +831,15 @@ public interface JavaType {
             }
 
             public List<?> getValues() {
+                //noinspection DataFlowIssue
                 return Arrays.asList(constantValues != null ? constantValues : referenceValues);
             }
+        }
+
+        public JavaType.Annotation unsafeSet(FullyQualified type, ElementValue @Nullable [] values) {
+            this.type = type;
+            this.values = values;
+            return this;
         }
     }
 
@@ -907,7 +972,7 @@ public interface JavaType {
         }
 
         @Override
-        public FullyQualified getSupertype() {
+        public @Nullable FullyQualified getSupertype() {
             return type.getSupertype();
         }
 
@@ -1088,7 +1153,7 @@ public interface JavaType {
         }
     }
 
-    enum Primitive implements JavaType, RpcCodec<Primitive> {
+    enum Primitive implements JavaType {
         Boolean,
         Byte,
         Char,
@@ -1226,22 +1291,15 @@ public interface JavaType {
         public boolean isNumeric() {
             return this == Double || this == Int || this == Float || this == Long || this == Short;
         }
-
-        @Override
-        public void rpcSend(Primitive after, RpcSendQueue q) {
-            q.getAndSend(after, Primitive::getKeyword);
-        }
-
-        @Override
-        public Primitive rpcReceive(Primitive before, RpcReceiveQueue q) {
-            String keyword = q.receiveAndGet(null, java.lang.String::toString);
-            return fromKeyword(keyword);
-        }
     }
 
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     class Method implements JavaType {
+        // C#-specific: marks extension methods (bit 20, not used by Java Flag enum)
+        private static final long EXTENSION_METHOD_FLAG = 1L << 20;
+        private static final long VALID_METHOD_FLAGS = Flag.VALID_FLAGS | EXTENSION_METHOD_FLAG;
+
         @With
         @Nullable
         @NonFinal
@@ -1333,7 +1391,7 @@ public interface JavaType {
                       FullyQualified @Nullable [] annotations, @Nullable List<String> defaultValue,
                       String @Nullable [] declaredFormalTypeNames) {
             this.managedReference = managedReference;
-            this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
+            this.flagsBitMap = flagsBitMap & VALID_METHOD_FLAGS;
             this.declaringType = unknownIfNull(declaringType);
             this.name = name;
             this.returnType = unknownIfNull(returnType);
@@ -1378,6 +1436,28 @@ public interface JavaType {
             this.parameterTypes = ListUtils.nullIfEmpty(parameterTypes);
             this.thrownExceptions = ListUtils.nullIfEmpty(thrownExceptions);
             this.annotations = ListUtils.nullIfEmpty(annotations);
+            this.declaredFormalTypeNames = ListUtils.nullIfEmpty(declaredFormalTypeNames);
+            return this;
+        }
+
+        public Method unsafeSet(String name, long flagsBitMap,
+                                @Nullable FullyQualified declaringType,
+                                @Nullable JavaType returnType,
+                                String @Nullable [] parameterNames,
+                                JavaType @Nullable [] parameterTypes,
+                                JavaType @Nullable [] thrownExceptions,
+                                FullyQualified @Nullable [] annotations,
+                                @Nullable List<String> defaultValue,
+                                String @Nullable [] declaredFormalTypeNames) {
+            this.name = name;
+            this.flagsBitMap = flagsBitMap;
+            this.declaringType = unknownIfNull(declaringType);
+            this.returnType = unknownIfNull(returnType);
+            this.parameterNames = parameterNames;
+            this.parameterTypes = ListUtils.nullIfEmpty(parameterTypes);
+            this.thrownExceptions = ListUtils.nullIfEmpty(thrownExceptions);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
+            this.defaultValue = defaultValue;
             this.declaredFormalTypeNames = ListUtils.nullIfEmpty(declaredFormalTypeNames);
             return this;
         }
@@ -1560,6 +1640,13 @@ public interface JavaType {
             return withFlagsBitMap(Flag.flagsToBitMap(flags));
         }
 
+        /**
+         * @return {@code true} if this method is a C# extension method.
+         */
+        public boolean isExtensionMethod() {
+            return (flagsBitMap & EXTENSION_METHOD_FLAG) != 0;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -1575,7 +1662,6 @@ public interface JavaType {
         public String toString() {
             return new DefaultJavaTypeSignatureBuilder().methodSignature(this);
         }
-
     }
 
     @Getter
@@ -1664,6 +1750,15 @@ public interface JavaType {
         @Override
         public Variable unsafeSetManagedReference(Integer id) {
             this.managedReference = id;
+            return this;
+        }
+
+        public Variable unsafeSet(String name, JavaType owner, @Nullable JavaType type,
+                                  FullyQualified @Nullable [] annotations) {
+            this.name = name;
+            this.owner = owner;
+            this.type = unknownIfNull(type);
+            this.annotations = annotations;
             return this;
         }
 
@@ -1773,8 +1868,14 @@ public interface JavaType {
             return "Unknown";
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public boolean isAssignableFrom(Pattern pattern) {
+            return false;
+        }
+
+        @Override
+        public boolean isAssignableFrom(org.openrewrite.java.TypeNameMatcher matcher) {
             return false;
         }
 
@@ -1788,5 +1889,4 @@ public interface JavaType {
             return false;
         }
     }
-
 }

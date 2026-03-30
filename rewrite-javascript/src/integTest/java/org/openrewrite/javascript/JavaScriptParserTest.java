@@ -24,6 +24,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.tree.JS;
 
@@ -42,7 +43,7 @@ class JavaScriptParserTest {
 
     @BeforeEach
     void before() {
-//        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder().trace(true));
+//        JavaScriptRewriteRpc.setFactory(JavaScriptRewriteRpc.builder().inspectBrk(Paths.get("rewrite")));
         this.parser = JavaScriptParser.builder().build();
         this.ctx = new InMemoryExecutionContext();
     }
@@ -56,7 +57,7 @@ class JavaScriptParserTest {
     void helloJavaScript() {
         @Language("js")
         String helloWorld = """
-          console.info("Hello world!")
+          console.info("Hello " + 123n)
           """;
         Parser.Input input = Parser.Input.fromString(Path.of("helloworld.js"), helloWorld);
         Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
@@ -178,6 +179,44 @@ class JavaScriptParserTest {
         assertThat(typescript).containsInstanceOf(JS.CompilationUnit.class);
         assertThat(typescript.get()).satisfies(cu ->
           assertThat(cu.getSourcePath()).isEqualTo(input.getPath()));
+
+        // Shutdown RPC to force sending full LST for print
+        JavaScriptRewriteRpc.shutdownCurrent();
+        assertThat(typescript.get()).satisfies(cu ->
+          assertThat(cu.printAll()).isEqualTo(script));
+    }
+
+    @Test
+    void unicodeEscapes() {
+        @Language("js")
+        String script = """
+          const greeting = "\\u0048\\u0065\\u006C\\u006C\\u006F";
+          console.log(greeting);
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("unicode.js"), script);
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
+        assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
+        assertThat(javascript.get().printAll()).isEqualTo(script);
+    }
+
+    @Test
+    void surrogatePairUnicodeEscapes() {
+        @Language("js")
+        String script = """
+          const emoji = "\\uD83D\\uDE00";
+          console.log(emoji);
+          """;
+        Parser.Input input = Parser.Input.fromString(Path.of("unicode-surrogate.js"), script);
+        Optional<SourceFile> javascript = parser.parseInputs(List.of(input), null, ctx).findFirst();
+        assertThat(javascript).containsInstanceOf(JS.CompilationUnit.class);
+        JS.CompilationUnit cu = (JS.CompilationUnit) javascript.get();
+        J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getStatements().get(0);
+        J.Literal literal = (J.Literal) varDecl.getVariables().get(0).getInitializer();
+        assertThat(literal.getUnicodeEscapes()).satisfiesExactly(
+          esc -> assertThat(esc.getCodePoint()).isEqualTo("D83D"),
+          esc -> assertThat(esc.getCodePoint()).isEqualTo("DE00")
+        );
+        assertThat(cu.printAll()).isEqualTo(script);
     }
 
     @Test

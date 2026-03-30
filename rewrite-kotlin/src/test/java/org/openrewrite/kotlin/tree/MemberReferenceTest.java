@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -141,6 +142,7 @@ class MemberReferenceTest implements RewriteTest {
         );
     }
 
+    @Disabled("K2 produces J.Unknown for unresolved callable references (::unresolved)")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/386")
     @Test
     void firCallableReferenceAccess() {

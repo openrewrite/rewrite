@@ -140,6 +140,10 @@ public class MavenRepositoryMirror {
         if (mirrorOf == null) {
             return false;
         }
+        // Mirrors do not apply to the local m2 repository
+        if ("local".equals(repository.getId())) {
+            return false;
+        }
         if ("*".equals(mirrorOf)) {
             return true;
         }

@@ -33,15 +33,9 @@ import static java.time.ZoneOffset.UTC;
 @EqualsAndHashCode(callSuper = false)
 public class FindDeserializationErrors extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find deserialization errors";
-    }
+    String displayName = "Find deserialization errors";
 
-    @Override
-    public String getDescription() {
-        return "Produces a data table collecting all deserialization errors of serialized LSTs.";
-    }
+    String description = "Produces a data table collecting all deserialization errors of serialized LSTs.";
 
     transient DeserializationErrorTable dataTable = new DeserializationErrorTable(this);
 

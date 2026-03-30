@@ -33,16 +33,10 @@ import static java.util.stream.Collectors.joining;
 public class FindClassHierarchy extends Recipe {
     transient ClassHierarchy classHierarchy = new ClassHierarchy(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find class hierarchy";
-    }
+    String displayName = "Find class hierarchy";
 
-    @Override
-    public String getDescription() {
-        return "Discovers all class declarations within a project, recording which files they appear in, their superclasses, and interfaces. " +
+    String description = "Discovers all class declarations within a project, recording which files they appear in, their superclasses, and interfaces. " +
                "That information is then recorded in a data table.";
-    }
 
 
     @Override

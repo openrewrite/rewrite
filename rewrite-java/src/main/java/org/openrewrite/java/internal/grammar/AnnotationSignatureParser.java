@@ -13,20 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class AnnotationSignatureParser extends Parser {
@@ -36,18 +32,18 @@ public class AnnotationSignatureParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4,
-		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11,
-		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19,
-		DOTDOT=20, WS=21, Identifier=22;
+		IntegerLiteral=1, FloatingPointLiteral=2, BooleanLiteral=3, CharacterLiteral=4, 
+		StringLiteral=5, LPAREN=6, RPAREN=7, LBRACK=8, RBRACK=9, COMMA=10, DOT=11, 
+		ASSIGN=12, COLON=13, ADD=14, SUB=15, AND=16, OR=17, AT=18, ELLIPSIS=19, 
+		DOTDOT=20, COLONCOLON=21, WS=22, Identifier=23;
 	public static final int
-		RULE_annotation = 0, RULE_annotationName = 1, RULE_qualifiedName = 2,
-		RULE_elementValuePairs = 3, RULE_elementValuePair = 4, RULE_elementValue = 5,
+		RULE_annotation = 0, RULE_annotationName = 1, RULE_qualifiedName = 2, 
+		RULE_elementValuePairs = 3, RULE_elementValuePair = 4, RULE_elementValue = 5, 
 		RULE_primary = 6, RULE_type = 7, RULE_classOrInterfaceType = 8, RULE_literal = 9;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"annotation", "annotationName", "qualifiedName", "elementValuePairs",
-			"elementValuePair", "elementValue", "primary", "type", "classOrInterfaceType",
+			"annotation", "annotationName", "qualifiedName", "elementValuePairs", 
+			"elementValuePair", "elementValue", "primary", "type", "classOrInterfaceType", 
 			"literal"
 		};
 	}
@@ -55,17 +51,18 @@ public class AnnotationSignatureParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','",
-			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'"
+			null, null, null, null, null, null, "'('", "')'", "'['", "']'", "','", 
+			"'.'", "'='", "':'", "'+'", "'-'", "'&&'", "'||'", "'@'", "'...'", "'..'", 
+			"'::'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral",
-			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT",
-			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT",
-			"WS", "Identifier"
+			null, "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
+			"StringLiteral", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", "DOT", 
+			"ASSIGN", "COLON", "ADD", "SUB", "AND", "OR", "AT", "ELLIPSIS", "DOTDOT", 
+			"COLONCOLON", "WS", "Identifier"
 		};
 	}
 	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
@@ -652,6 +649,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TerminalNode DOTDOT(int i) {
 			return getToken(AnnotationSignatureParser.DOTDOT, i);
 		}
+		public List<TerminalNode> COLONCOLON() { return getTokens(AnnotationSignatureParser.COLONCOLON); }
+		public TerminalNode COLONCOLON(int i) {
+			return getToken(AnnotationSignatureParser.COLONCOLON, i);
+		}
 		public ClassOrInterfaceTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -683,12 +684,12 @@ public class AnnotationSignatureParser extends Parser {
 			setState(73);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (_la==DOT || _la==DOTDOT) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 3147776L) != 0)) {
 				{
 				{
 				setState(69);
 				_la = _input.LA(1);
-				if ( !(_la==DOT || _la==DOTDOT) ) {
+				if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 3147776L) != 0)) ) {
 				_errHandler.recoverInline(this);
 				}
 				else {
@@ -774,7 +775,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\u0004\u0001\u0016O\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0004\u0001\u0017O\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
 		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
 		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0002\u0007\u0007\u0007\u0002"+
 		"\b\u0007\b\u0002\t\u0007\t\u0001\u0000\u0003\u0000\u0016\b\u0000\u0001"+
@@ -786,39 +787,40 @@ public class AnnotationSignatureParser extends Parser {
 		"\u0005\u0001\u0006\u0001\u0006\u0003\u0006;\b\u0006\u0001\u0007\u0001"+
 		"\u0007\u0001\u0007\u0005\u0007@\b\u0007\n\u0007\f\u0007C\t\u0007\u0001"+
 		"\b\u0001\b\u0001\b\u0005\bH\b\b\n\b\f\bK\t\b\u0001\t\u0001\t\u0001\t\u0000"+
-		"\u0000\n\u0000\u0002\u0004\u0006\b\n\f\u000e\u0010\u0012\u0000\u0002\u0002"+
-		"\u0000\u000b\u000b\u0014\u0014\u0001\u0000\u0001\u0005M\u0000\u0015\u0001"+
-		"\u0000\u0000\u0000\u0002 \u0001\u0000\u0000\u0000\u0004\"\u0001\u0000"+
-		"\u0000\u0000\u0006*\u0001\u0000\u0000\u0000\b2\u0001\u0000\u0000\u0000"+
-		"\n6\u0001\u0000\u0000\u0000\f:\u0001\u0000\u0000\u0000\u000e<\u0001\u0000"+
-		"\u0000\u0000\u0010D\u0001\u0000\u0000\u0000\u0012L\u0001\u0000\u0000\u0000"+
-		"\u0014\u0016\u0005\u0012\u0000\u0000\u0015\u0014\u0001\u0000\u0000\u0000"+
-		"\u0015\u0016\u0001\u0000\u0000\u0000\u0016\u0017\u0001\u0000\u0000\u0000"+
-		"\u0017\u001e\u0003\u0002\u0001\u0000\u0018\u001b\u0005\u0006\u0000\u0000"+
-		"\u0019\u001c\u0003\u0006\u0003\u0000\u001a\u001c\u0003\n\u0005\u0000\u001b"+
-		"\u0019\u0001\u0000\u0000\u0000\u001b\u001a\u0001\u0000\u0000\u0000\u001b"+
-		"\u001c\u0001\u0000\u0000\u0000\u001c\u001d\u0001\u0000\u0000\u0000\u001d"+
-		"\u001f\u0005\u0007\u0000\u0000\u001e\u0018\u0001\u0000\u0000\u0000\u001e"+
-		"\u001f\u0001\u0000\u0000\u0000\u001f\u0001\u0001\u0000\u0000\u0000 !\u0003"+
-		"\u0004\u0002\u0000!\u0003\u0001\u0000\u0000\u0000\"\'\u0005\u0016\u0000"+
-		"\u0000#$\u0007\u0000\u0000\u0000$&\u0005\u0016\u0000\u0000%#\u0001\u0000"+
-		"\u0000\u0000&)\u0001\u0000\u0000\u0000\'%\u0001\u0000\u0000\u0000\'(\u0001"+
-		"\u0000\u0000\u0000(\u0005\u0001\u0000\u0000\u0000)\'\u0001\u0000\u0000"+
-		"\u0000*/\u0003\b\u0004\u0000+,\u0005\n\u0000\u0000,.\u0003\b\u0004\u0000"+
-		"-+\u0001\u0000\u0000\u0000.1\u0001\u0000\u0000\u0000/-\u0001\u0000\u0000"+
-		"\u0000/0\u0001\u0000\u0000\u00000\u0007\u0001\u0000\u0000\u00001/\u0001"+
-		"\u0000\u0000\u000023\u0005\u0016\u0000\u000034\u0005\f\u0000\u000045\u0003"+
-		"\n\u0005\u00005\t\u0001\u0000\u0000\u000067\u0003\f\u0006\u00007\u000b"+
-		"\u0001\u0000\u0000\u00008;\u0003\u0012\t\u00009;\u0003\u000e\u0007\u0000"+
-		":8\u0001\u0000\u0000\u0000:9\u0001\u0000\u0000\u0000;\r\u0001\u0000\u0000"+
-		"\u0000<A\u0003\u0010\b\u0000=>\u0005\b\u0000\u0000>@\u0005\t\u0000\u0000"+
-		"?=\u0001\u0000\u0000\u0000@C\u0001\u0000\u0000\u0000A?\u0001\u0000\u0000"+
-		"\u0000AB\u0001\u0000\u0000\u0000B\u000f\u0001\u0000\u0000\u0000CA\u0001"+
-		"\u0000\u0000\u0000DI\u0005\u0016\u0000\u0000EF\u0007\u0000\u0000\u0000"+
-		"FH\u0005\u0016\u0000\u0000GE\u0001\u0000\u0000\u0000HK\u0001\u0000\u0000"+
-		"\u0000IG\u0001\u0000\u0000\u0000IJ\u0001\u0000\u0000\u0000J\u0011\u0001"+
-		"\u0000\u0000\u0000KI\u0001\u0000\u0000\u0000LM\u0007\u0001\u0000\u0000"+
-		"M\u0013\u0001\u0000\u0000\u0000\b\u0015\u001b\u001e\'/:AI";
+		"\u0000\n\u0000\u0002\u0004\u0006\b\n\f\u000e\u0010\u0012\u0000\u0003\u0002"+
+		"\u0000\u000b\u000b\u0014\u0014\u0002\u0000\u000b\u000b\u0014\u0015\u0001"+
+		"\u0000\u0001\u0005M\u0000\u0015\u0001\u0000\u0000\u0000\u0002 \u0001\u0000"+
+		"\u0000\u0000\u0004\"\u0001\u0000\u0000\u0000\u0006*\u0001\u0000\u0000"+
+		"\u0000\b2\u0001\u0000\u0000\u0000\n6\u0001\u0000\u0000\u0000\f:\u0001"+
+		"\u0000\u0000\u0000\u000e<\u0001\u0000\u0000\u0000\u0010D\u0001\u0000\u0000"+
+		"\u0000\u0012L\u0001\u0000\u0000\u0000\u0014\u0016\u0005\u0012\u0000\u0000"+
+		"\u0015\u0014\u0001\u0000\u0000\u0000\u0015\u0016\u0001\u0000\u0000\u0000"+
+		"\u0016\u0017\u0001\u0000\u0000\u0000\u0017\u001e\u0003\u0002\u0001\u0000"+
+		"\u0018\u001b\u0005\u0006\u0000\u0000\u0019\u001c\u0003\u0006\u0003\u0000"+
+		"\u001a\u001c\u0003\n\u0005\u0000\u001b\u0019\u0001\u0000\u0000\u0000\u001b"+
+		"\u001a\u0001\u0000\u0000\u0000\u001b\u001c\u0001\u0000\u0000\u0000\u001c"+
+		"\u001d\u0001\u0000\u0000\u0000\u001d\u001f\u0005\u0007\u0000\u0000\u001e"+
+		"\u0018\u0001\u0000\u0000\u0000\u001e\u001f\u0001\u0000\u0000\u0000\u001f"+
+		"\u0001\u0001\u0000\u0000\u0000 !\u0003\u0004\u0002\u0000!\u0003\u0001"+
+		"\u0000\u0000\u0000\"\'\u0005\u0017\u0000\u0000#$\u0007\u0000\u0000\u0000"+
+		"$&\u0005\u0017\u0000\u0000%#\u0001\u0000\u0000\u0000&)\u0001\u0000\u0000"+
+		"\u0000\'%\u0001\u0000\u0000\u0000\'(\u0001\u0000\u0000\u0000(\u0005\u0001"+
+		"\u0000\u0000\u0000)\'\u0001\u0000\u0000\u0000*/\u0003\b\u0004\u0000+,"+
+		"\u0005\n\u0000\u0000,.\u0003\b\u0004\u0000-+\u0001\u0000\u0000\u0000."+
+		"1\u0001\u0000\u0000\u0000/-\u0001\u0000\u0000\u0000/0\u0001\u0000\u0000"+
+		"\u00000\u0007\u0001\u0000\u0000\u00001/\u0001\u0000\u0000\u000023\u0005"+
+		"\u0017\u0000\u000034\u0005\f\u0000\u000045\u0003\n\u0005\u00005\t\u0001"+
+		"\u0000\u0000\u000067\u0003\f\u0006\u00007\u000b\u0001\u0000\u0000\u0000"+
+		"8;\u0003\u0012\t\u00009;\u0003\u000e\u0007\u0000:8\u0001\u0000\u0000\u0000"+
+		":9\u0001\u0000\u0000\u0000;\r\u0001\u0000\u0000\u0000<A\u0003\u0010\b"+
+		"\u0000=>\u0005\b\u0000\u0000>@\u0005\t\u0000\u0000?=\u0001\u0000\u0000"+
+		"\u0000@C\u0001\u0000\u0000\u0000A?\u0001\u0000\u0000\u0000AB\u0001\u0000"+
+		"\u0000\u0000B\u000f\u0001\u0000\u0000\u0000CA\u0001\u0000\u0000\u0000"+
+		"DI\u0005\u0017\u0000\u0000EF\u0007\u0001\u0000\u0000FH\u0005\u0017\u0000"+
+		"\u0000GE\u0001\u0000\u0000\u0000HK\u0001\u0000\u0000\u0000IG\u0001\u0000"+
+		"\u0000\u0000IJ\u0001\u0000\u0000\u0000J\u0011\u0001\u0000\u0000\u0000"+
+		"KI\u0001\u0000\u0000\u0000LM\u0007\u0002\u0000\u0000M\u0013\u0001\u0000"+
+		"\u0000\u0000\b\u0015\u001b\u001e\'/:AI";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

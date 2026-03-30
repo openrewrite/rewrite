@@ -31,6 +31,7 @@ public class Parse implements RpcRequest {
     String relativeTo;
 
     public interface Input {
+        Path getSourcePath();
     }
 
     @Value

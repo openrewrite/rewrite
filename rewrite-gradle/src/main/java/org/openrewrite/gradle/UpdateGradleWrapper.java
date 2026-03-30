@@ -20,10 +20,16 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
@@ -46,54 +52,46 @@ import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
+@Getter
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false)
 public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.GradleWrapperState> {
 
-    @Override
-    public String getDisplayName() {
-        return "Update Gradle wrapper";
-    }
+    String displayName = "Update Gradle wrapper";
 
-    @Override
-    public String getDescription() {
-        return "Update the version of Gradle used in an existing Gradle wrapper. " +
-               "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
-               "which already exists within the wrapper properties file. " +
-               "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
-               "then the recipe may suggest a version which is not available in your artifact repository.";
-    }
+    String description = "Update the version of Gradle used in an existing Gradle wrapper. " +
+        "Queries `downloads.gradle.org` to determine the available releases, but prefers the artifact repository URL " +
+        "which already exists within the wrapper properties file. " +
+        "If your artifact repository does not contain the same Gradle distributions as `downloads.gradle.org`, " +
+        "then the recipe may suggest a version which is not available in your artifact repository.";
 
-    @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to the latest release available from services.gradle.org if not specified.",
+                          "Defaults to the latest release available from `downloads.gradle.org` if not specified.",
             example = "7.x",
             required = false)
     @Nullable
-    final String version;
+    String version;
 
-    @Getter
     @Option(displayName = "Distribution type",
             description = "The distribution of Gradle to use. \"bin\" includes Gradle binaries. " +
                           "\"all\" includes Gradle binaries, source code, and documentation. " +
-                          "Defaults to \"bin\".",
+                          "Defaults to the distribution type of the existing wrapper properties file, " +
+                          "or \"bin\" if no wrapper properties file exists.",
             valid = {"bin", "all"},
             required = false
     )
     @Nullable
-    final String distribution;
+    String distribution;
 
-    @Getter
     @Option(displayName = "Add if missing",
             description = "Add a Gradle wrapper, if it's missing. Defaults to `true`.",
             required = false)
     @Nullable
-    final Boolean addIfMissing;
+    Boolean addIfMissing;
 
-    @Getter
-    @Option(example = "https://services.gradle.org/distributions/gradle-8.5-bin.zip",
+    @Option(example = "https://downloads.gradle.org/distributions/gradle-8.5-bin.zip",
             displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution.\n" +
                     "Specifies a custom location from which to download the Gradle wrapper scripts (gradlew, gradlew.bat, etc.). This is useful for setting up the Gradle wrapper without relying on Gradle's official distribution services.\n\n" +
@@ -102,16 +100,20 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     "If the URI is inaccessible, the recipe will leave the existing wrapper files in the repository unchanged, as they are generally compatible with various Gradle versions.",
             required = false)
     @Nullable
-    final String wrapperUri;
+    String wrapperUri;
 
-    @Getter
     @Option(example = "29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda",
             displayName = "SHA-256 checksum",
             description = "The SHA-256 checksum of the Gradle distribution. " +
-                          "If specified, the recipe will add the checksum along with the custom distribution URL.",
+                    "If specified, the recipe will add the checksum along with the custom distribution URL.",
             required = false)
     @Nullable
-    final String distributionChecksum;
+    String distributionChecksum;
+
+    @Override
+    public String getInstanceNameSuffix() {
+        return version == null ? "" : version + '-' + (distribution == null ? "bin" : distribution);
+    }
 
     @Override
     public Validated<Object> validate() {
@@ -201,14 +203,19 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return entry;
                         }
 
-                        // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
+                        // Typical example: https://downloads.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
                         acc.currentDistributionUrl = currentDistributionUrl;
+
+                        String newVersion = isBlank(version) ? "latest.release" : version;
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, null).getValue());
+                        if (versionComparator.compare(null, acc.currentMarker.getVersion(), newVersion) > 0) {
+                            return entry;
+                        }
 
                         GradleWrapper gradleWrapper = getGradleWrapper(currentDistributionUrl, ctx);
                         String gradleWrapperVersion = gradleWrapper.getVersion();
 
-                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
                         int compare = versionComparator.compare(null, acc.currentMarker.getVersion(), gradleWrapperVersion);
                         // maybe we want to update the distribution type or url
                         if (compare < 0) {
@@ -230,7 +237,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         }
 
                         if ((sourceFile instanceof Quark || sourceFile instanceof Remote) &&
-                            equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
+                                equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                             acc.addGradleWrapperJar = false;
                             return true;
                         }
@@ -285,11 +292,11 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
                             "distributionBase=GRADLE_USER_HOME\n" +
-                            "distributionPath=wrapper/dists\n" +
-                            "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                            (checksum == null ? "" : "distributionSha256Sum=" + checksum + "\n") +
-                            "zipStoreBase=GRADLE_USER_HOME\n" +
-                            "zipStorePath=wrapper/dists")
+                                    "distributionPath=wrapper/dists\n" +
+                                    "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
+                                    (checksum == null ? "" : "distributionSha256Sum=" + checksum + "\n") +
+                                    "zipStoreBase=GRADLE_USER_HOME\n" +
+                                    "zipStorePath=wrapper/dists")
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as properties"))
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);
@@ -380,6 +387,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
                     return gradleWrapper.wrapperJar(sourceFile);
                 }
+                if (sourceFile instanceof JavaSourceFile && IsBuildGradle.matches(sourceFile.getSourcePath())) {
+                    SourceFile visited = (SourceFile) new WrapperDslVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
+                    if (visited != sourceFile) {
+                        return visited;
+                    }
+                }
                 return sourceFile;
             }
         };
@@ -397,59 +410,130 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     }
 
     private String unixScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
-        Map<String, String> binding = new HashMap<>();
-        String defaultJvmOpts = defaultJvmOpts(gradleWrapper);
-        binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
-        binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
-
-        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx));
-        return renderTemplate(gradlewTemplate, binding, "\n");
+        return StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx)).replaceAll("\r\n|\r|\n", "\n");
     }
 
     private String batchScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
-        Map<String, String> binding = new HashMap<>();
-        binding.put("defaultJvmOpts", defaultJvmOpts(gradleWrapper));
-        binding.put("classpath", "%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar");
-
-        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx));
-        return renderTemplate(gradlewBatTemplate, binding, "\r\n");
+        return StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx)).replaceAll("\r\n|\r|\n", "\r\n");
     }
 
-    private String defaultJvmOpts(GradleWrapper gradleWrapper) {
-        VersionComparator gradle53VersionComparator = requireNonNull(Semver.validate("[5.3,)", null).getValue());
-        VersionComparator gradle50VersionComparator = requireNonNull(Semver.validate("[5.0,)", null).getValue());
+    private static class WrapperDslVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-        if (gradle53VersionComparator.isValid(null, gradleWrapper.getVersion())) {
-            return "\"-Xmx64m\" \"-Xms64m\"";
-        } else if (gradle50VersionComparator.isValid(null, gradleWrapper.getVersion())) {
-            return "\"-Xmx64m\"";
-        }
-        return "";
-    }
+        private final GradleWrapper gradleWrapper;
 
-    private String renderTemplate(String source, Map<String, String> parameters, String lineSeparator) {
-        Map<String, String> binding = new HashMap<>(parameters);
-        binding.put("applicationName", "Gradle");
-        binding.put("optsEnvironmentVar", "GRADLE_OPTS");
-        binding.put("exitEnvironmentVar", "GRADLE_EXIT_CONSOLE");
-        binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
-        binding.put("appNameSystemProperty", "org.gradle.appname");
-        binding.put("appHomeRelativePath", "");
-        binding.put("modulePath", "");
-
-        String script = source;
-        for (Map.Entry<String, String> variable : binding.entrySet()) {
-            script = script.replace("${" + variable.getKey() + "}", variable.getValue())
-                    .replace("$" + variable.getKey(), variable.getValue());
+        public WrapperDslVisitor(GradleWrapper gradleWrapper) {
+            this.gradleWrapper = gradleWrapper;
         }
 
-        script = script.replaceAll("(?sm)<% /\\*.*?\\*/ %>", "");
-        script = script.replaceAll("(?sm)<% if \\( mainClassName\\.startsWith\\('--module '\\) \\) \\{.*?} %>", "");
-        script = script.replaceAll("(?sm)<% if \\( appNameSystemProperty \\) \\{.*?%>(.*?)<% } %>", "$1");
-        script = script.replace("\\$", "$");
-        script = script.replaceAll("DIRNAME=\\.\\\\[\r\n]", "DIRNAME=.");
-        script = script.replace("\\\\", "\\");
-        return script.replaceAll("\r\n|\r|\n", lineSeparator);
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+            J.Assignment a = super.visitAssignment(assignment, ctx);
+            if (!isInsideWrapperTaskConfiguration()) {
+                return a;
+            }
+
+            String variableName = getAssignmentVariableName(a);
+            if (variableName == null) {
+                return a;
+            }
+
+            switch (variableName) {
+                case "gradleVersion":
+                    return updateStringAssignment(a, gradleWrapper.getVersion());
+                case "distributionUrl":
+                    return updateStringAssignment(a, gradleWrapper.getDistributionUrl());
+                case "distributionType":
+                    return updateDistributionTypeAssignment(a);
+                default:
+                    return a;
+            }
+        }
+
+        private boolean isInsideWrapperTaskConfiguration() {
+            Cursor cursor = getCursor();
+            while (cursor.getParent() != null) {
+                Object value = cursor.getValue();
+                if (value instanceof J.MethodInvocation && isWrapperTaskConfiguration((J.MethodInvocation) value)) {
+                    return true;
+                }
+                cursor = cursor.getParent();
+            }
+            return false;
+        }
+
+        private static boolean isWrapperTaskConfiguration(J.MethodInvocation m) {
+            // Pattern: tasks.named('wrapper') { ... } or tasks.named("wrapper") { ... }
+            if ("named".equals(m.getSimpleName()) && m.getSelect() instanceof J.Identifier &&
+                    "tasks".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                List<Expression> args = m.getArguments();
+                if (!args.isEmpty() && args.get(0) instanceof J.Literal) {
+                    return "wrapper".equals(((J.Literal) args.get(0)).getValue());
+                }
+            }
+            // Pattern: wrapper { ... } (direct method invocation)
+            if ("wrapper".equals(m.getSimpleName()) && m.getSelect() == null &&
+                    m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+                return true;
+            }
+            // Pattern: tasks.wrapper { ... } (property-style access on TaskContainer)
+            if ("wrapper".equals(m.getSimpleName()) && m.getSelect() instanceof J.Identifier &&
+                    "tasks".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                return true;
+            }
+            // Pattern: tasks.withType(Wrapper) { ... } or tasks.withType<Wrapper> { ... }
+            if ("withType".equals(m.getSimpleName()) && m.getSelect() instanceof J.Identifier &&
+                    "tasks".equals(((J.Identifier) m.getSelect()).getSimpleName())) {
+                List<Expression> args = m.getArguments();
+                // Groovy: tasks.withType(Wrapper) { ... }
+                if (!args.isEmpty() && args.get(0) instanceof J.Identifier &&
+                        "Wrapper".equals(((J.Identifier) args.get(0)).getSimpleName())) {
+                    return true;
+                }
+                // Kotlin: tasks.withType<Wrapper> { ... } (type param, single lambda arg)
+                if (m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {
+                    return m.getTypeParameters().stream()
+                            .anyMatch(tp -> tp instanceof J.Identifier && "Wrapper".equals(((J.Identifier) tp).getSimpleName()));
+                }
+            }
+            return false;
+        }
+
+        private static @Nullable String getAssignmentVariableName(J.Assignment a) {
+            if (a.getVariable() instanceof J.Identifier) {
+                return ((J.Identifier) a.getVariable()).getSimpleName();
+            }
+            if (a.getVariable() instanceof J.FieldAccess) {
+                return ((J.FieldAccess) a.getVariable()).getSimpleName();
+            }
+            return null;
+        }
+
+        private J.Assignment updateStringAssignment(J.Assignment a, String newValue) {
+            Expression rhs = a.getAssignment();
+            if (rhs instanceof J.Literal) {
+                J.Literal literal = (J.Literal) rhs;
+                if (literal.getType() == JavaType.Primitive.String) {
+                    String currentValue = (String) literal.getValue();
+                    if (!newValue.equals(currentValue)) {
+                        return a.withAssignment(ChangeStringLiteral.withStringValue(literal, newValue));
+                    }
+                }
+            }
+            return a;
+        }
+
+        private J.Assignment updateDistributionTypeAssignment(J.Assignment a) {
+            Expression rhs = a.getAssignment();
+            if (rhs instanceof J.FieldAccess) {
+                J.FieldAccess fieldAccess = (J.FieldAccess) rhs;
+                String currentType = fieldAccess.getSimpleName();
+                String newType = gradleWrapper.getDistributionUrl().contains("-all.zip") ? "ALL" : "BIN";
+                if (!newType.equals(currentType)) {
+                    return a.withAssignment(fieldAccess.withName(fieldAccess.getName().withSimpleName(newType)));
+                }
+            }
+            return a;
+        }
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {

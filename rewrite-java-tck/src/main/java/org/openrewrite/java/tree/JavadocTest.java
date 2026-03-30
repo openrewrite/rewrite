@@ -18,10 +18,13 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.MinimumJava11;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
@@ -2167,6 +2170,55 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6168")
+    @Test
+    void malformedQualifiedNamesInJavadoc() {
+        rewriteRun(
+          // The parser should be able to parse malformed qualified names without issues
+          java(
+            """
+              public class Test {
+                  /**
+                   * @see Test#methodC(java.lang .String)
+                   */
+                  public void methodA() {
+
+                  }
+
+                  /**
+                   * @see Test#methodC(java.lang
+                   *     .String)
+                   */
+                  public void methodB(String aString) {
+
+                  }
+
+
+                  public void methodC(String aString) {
+
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void redundantSpacing() {
+        rewriteRun(
+          java(
+            """
+            /**
+            * <p>Some text.
+            *\s
+            * <p>More text.
+            */
+            class SomeClass {}
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/5855")
     @Nested
     class GenericWildcard {
@@ -2553,6 +2605,180 @@ class JavadocTest implements RewriteTest {
                        * }
                        */
                       void method() {}
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    @MinimumJava25
+    class MarkdownDocComment {
+        @Test
+        void tripleSlashRoundTrip() {
+            rewriteRun(
+              java(
+                """
+                  /// A simple doc comment.
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashMultiLine() {
+            rewriteRun(
+              java(
+                """
+                  /// First line.
+                  /// Second line.
+                  /// Third line.
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashParsedAsDocComment() {
+            rewriteRun(
+              java(
+                """
+                  /// A simple doc comment.
+                  class Test {}
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var comments = cu.getClasses().get(0).getPrefix().getComments();
+                    assertThat(comments).hasSize(1);
+                    assertThat(comments.get(0)).isInstanceOf(Javadoc.DocComment.class);
+                })
+              )
+            );
+        }
+
+        @Test
+        void multiLineTripleSlashMergedIntoSingleDocComment() {
+            rewriteRun(
+              java(
+                """
+                  /// First line.
+                  /// Second line.
+                  class Test {}
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var comments = cu.getClasses().get(0).getPrefix().getComments();
+                    assertThat(comments).hasSize(1);
+                    assertThat(comments.get(0)).isInstanceOf(Javadoc.DocComment.class);
+                })
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithParam() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /// Returns the sum.
+                      /// @param a first number
+                      /// @param b second number
+                      /// @return the sum
+                      int add(int a, int b) { return a + b; }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+                  /// See {@link List} for details.
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithMarkdownCodeBlock() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+                  import java.util.ArrayList;
+                  /// Example:
+                  /// ```java
+                  /// List<String> items = new ArrayList<>();
+                  /// ```
+                  class Test {
+                      List<String> field;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeTypeInTripleSlashLink() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", null)),
+              java(
+                """
+                  import java.util.List;
+
+                  /// See {@link List} for details.
+                  class Test {
+                      List<String> field;
+                  }
+                  """,
+                """
+                  import java.util.Collection;
+
+                  /// See {@link Collection} for details.
+                  class Test {
+                      Collection<String> field;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeTypeIgnoresMarkdownCodeBlock() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", null)),
+              java(
+                """
+                  import java.util.List;
+                  import java.util.ArrayList;
+
+                  /// Example:
+                  /// ```java
+                  /// List<String> items = new ArrayList<>();
+                  /// ```
+                  /// See {@link List}.
+                  class Test {
+                      List<String> field;
+                  }
+                  """,
+                """
+                  import java.util.ArrayList;
+                  import java.util.Collection;
+
+                  /// Example:
+                  /// ```java
+                  /// List<String> items = new ArrayList<>();
+                  /// ```
+                  /// See {@link Collection}.
+                  class Test {
+                      Collection<String> field;
                   }
                   """
               )

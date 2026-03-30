@@ -3,7 +3,7 @@ parser grammar Protobuf2Parser;
 options { tokenVocab=Protobuf2Lexer; }
 
 proto
-  : syntax (importStatement | packageStatement | optionDef | topLevelDef | emptyStatement)* EOF
+  : syntax? (importStatement | packageStatement | optionDef | topLevelDef | emptyStatement)* EOF
   ;
 
 stringLiteral

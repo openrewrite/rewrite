@@ -45,7 +45,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
     private final JavaTypeCache typeCache;
 
-    public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
+    public JavaType type(@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
                 type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
@@ -458,12 +458,12 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(@Nullable Type selectType, @Nullable Symbol symbol) {
         if (selectType instanceof Type.ErrorType) {
             try {
                 // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
                 for (Class<?> targetClass : Class.forName(AttrRecover.class.getCanonicalName()).getDeclaredClasses()) {
-                    if ("RecoveryErrorType".equals(targetClass.getSimpleName())) {
+                    if ("RecoveryErrorType".equals(targetClass.getSimpleName()) && targetClass.isInstance(selectType)) {
                         Field field = targetClass.getDeclaredField("candidateSymbol");
                         field.setAccessible(true);
                         Symbol originalSymbol = (Symbol) field.get(selectType);

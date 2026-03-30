@@ -502,8 +502,8 @@ public final class ListUtils {
      * @param <T>   The type of elements in the list.
      * @return The array representation of the list, or null if the list is empty.
      */
-    public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T[] array) {
-        if (list == null || list.isEmpty()) {
+    public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T @Nullable [] array) {
+        if (list == null || array == null || list.isEmpty()) {
             return null;
         }
         return list.toArray(array);

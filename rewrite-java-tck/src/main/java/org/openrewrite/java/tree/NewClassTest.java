@@ -113,8 +113,8 @@ class NewClassTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 J.VariableDeclarations.NamedVariable l =
                   ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
-                J.NewClass arrayList = (J.NewClass) l.getInitializer();
-                JavaType.Parameterized javaType = (JavaType.Parameterized) arrayList.getType();
+                var arrayList = (J.NewClass) l.getInitializer();
+                var javaType = (JavaType.Parameterized) arrayList.getType();
                 assertThat(javaType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
                 assertThat(javaType.getTypeParameters()).satisfiesExactly(
                   p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
@@ -138,9 +138,9 @@ class NewClassTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 J.VariableDeclarations.NamedVariable l =
                   ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
-                J.NewClass arrayList = (J.NewClass) l.getInitializer();
-                JavaType.Class javaType = (JavaType.Class) arrayList.getType();
-                JavaType.Parameterized arrayListType = (JavaType.Parameterized) javaType.getSupertype();
+                var arrayList = (J.NewClass) l.getInitializer();
+                var javaType = (JavaType.Class) arrayList.getType();
+                var arrayListType = (JavaType.Parameterized) javaType.getSupertype();
                 assertThat(arrayListType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
                 assertThat(arrayListType.getTypeParameters()).satisfiesExactly(
                   p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")

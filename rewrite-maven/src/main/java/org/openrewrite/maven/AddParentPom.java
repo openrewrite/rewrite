@@ -70,20 +70,14 @@ public class AddParentPom extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven parent";
-    }
+    String displayName = "Add Maven parent";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a parent pom to a Maven pom.xml. Does nothing if a parent pom is already present.";
-    }
+    String description = "Add a parent pom to a Maven pom.xml. Does nothing if a parent pom is already present.";
 
     @Override
     public Validated<Object> validate() {

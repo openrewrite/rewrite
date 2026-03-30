@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
-import {ParseError, ParseErrorKind} from "./parse-error";
-import {createDraft, Draft, finishDraft} from "immer";
 
 export class ExecutionContext {
-    readonly kind: string = "org.openrewrite.ExecutionContext"
+    readonly kind: string = "org.openrewrite.InMemoryExecutionContext"
 
     constructor(public readonly messages: { [key: string | symbol]: any } = {}) {
     }
 }
 
 const executionContextCodec: RpcCodec<ExecutionContext> = {
+    rpcNew(): ExecutionContext {
+        return new ExecutionContext();
+    },
+
     async rpcSend(_after: ExecutionContext, _q: RpcSendQueue): Promise<void> {
     },
 
@@ -33,4 +35,4 @@ const executionContextCodec: RpcCodec<ExecutionContext> = {
     }
 }
 
-RpcCodecs.registerCodec("org.openrewrite.ExecutionContext", executionContextCodec);
+RpcCodecs.registerCodec("org.openrewrite.InMemoryExecutionContext", executionContextCodec);

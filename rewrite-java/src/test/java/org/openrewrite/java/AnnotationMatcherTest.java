@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.java.Assertions.java;
 
 class AnnotationMatcherTest implements RewriteTest {
@@ -29,7 +30,7 @@ class AnnotationMatcherTest implements RewriteTest {
     class Whitespace {
         @Test
         void spacesAroundEquals() {
-            AnnotationMatcher matcher = new AnnotationMatcher("@java.lang.SuppressWarnings(value = \"foo\")");
+            var matcher = new AnnotationMatcher("@java.lang.SuppressWarnings(value = \"foo\")");
             rewriteRun(
               java(
                 """
@@ -52,7 +53,7 @@ class AnnotationMatcherTest implements RewriteTest {
 
         @Test
         void spacesAroundDots() {
-            AnnotationMatcher matcher = new AnnotationMatcher("@ java .lang. SuppressWarnings");
+            var matcher = new AnnotationMatcher("@ java .lang. SuppressWarnings");
             rewriteRun(
               java(
                 """
@@ -72,5 +73,11 @@ class AnnotationMatcherTest implements RewriteTest {
               )
             );
         }
+    }
+
+    @Test
+    void failsToParse() {
+        assertThatThrownBy(() -> new AnnotationMatcher("@foo|bar"))
+          .isInstanceOf(IllegalArgumentException.class);
     }
 }

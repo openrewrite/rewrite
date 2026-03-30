@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -27,16 +28,12 @@ import org.openrewrite.style.Style;
 import static java.util.Objects.requireNonNull;
 
 public class NoWhitespaceBefore extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "No whitespace before";
-    }
+    @Getter
+    final String displayName = "No whitespace before";
 
-    @Override
-    public String getDescription() {
-        return "Removes unnecessary whitespace preceding a token. " +
-               "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
-    }
+    @Getter
+    final String description = "Removes unnecessary whitespace preceding a token. " +
+        "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -45,6 +42,7 @@ public class NoWhitespaceBefore extends Recipe {
 
     private static class NoWhitespaceBeforeVisitor extends JavaIsoVisitor<ExecutionContext> {
         SpacesStyle spacesStyle;
+        WrappingAndBracesStyle wrappingAndBracesStyle;
         NoWhitespaceBeforeStyle noWhitespaceBeforeStyle;
 
         @Nullable
@@ -64,6 +62,7 @@ public class NoWhitespaceBefore extends Recipe {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
                 spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                wrappingAndBracesStyle = Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces);
                 noWhitespaceBeforeStyle = Style.from(NoWhitespaceBeforeStyle.class, cu, Checkstyle::noWhitespaceBeforeStyle);
                 emptyForInitializerPadStyle = Style.from(EmptyForInitializerPadStyle.class, cu);
                 emptyForIteratorPadStyle = Style.from(EmptyForIteratorPadStyle.class, cu);
@@ -101,7 +100,7 @@ public class NoWhitespaceBefore extends Recipe {
                 }
             }
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getComma())) {
-                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(m, ctx);
+                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(m, ctx);
             }
             return m;
         }
@@ -110,7 +109,7 @@ public class NoWhitespaceBefore extends Recipe {
         public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
             J.ForLoop f = super.visitForLoop(forLoop, ctx);
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getSemi())) {
-                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(f, ctx);
+                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(f, ctx);
             }
             return f;
         }
@@ -122,9 +121,7 @@ public class NoWhitespaceBefore extends Recipe {
                 if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getAllowLineBreaks()) && vd.getPadding().getVariables().stream().anyMatch(v -> v.getAfter().getWhitespace().contains("\n"))) {
                     return vd;
                 }
-                vd = vd.getPadding().withVariables(ListUtils.map(vd.getPadding().getVariables(), v -> {
-                    return v.withAfter(v.getAfter().withWhitespace(""));
-                }));
+                vd = vd.getPadding().withVariables(ListUtils.map(vd.getPadding().getVariables(), v -> v.withAfter(v.getAfter().withWhitespace(""))));
             }
             return vd;
         }
@@ -134,11 +131,11 @@ public class NoWhitespaceBefore extends Recipe {
             J.Unary u = super.visitUnary(unary, ctx);
             J.Unary.Type op = u.getOperator();
             if ((Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostInc()) && op == J.Unary.Type.PostIncrement) ||
-                (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostDec() && op == J.Unary.Type.PostDecrement))) {
+                    (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostDec() && op == J.Unary.Type.PostDecrement))) {
                 if (Boolean.FALSE.equals(noWhitespaceBeforeStyle.getAllowLineBreaks()) && u.getPadding().getOperator().getBefore().getWhitespace().contains("\n")) {
                     u = u.getPadding().withOperator(u.getPadding().getOperator().withBefore(u.getPadding().getOperator().getBefore().withWhitespace("")));
                 }
-                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(u, ctx);
+                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, null).visitNonNull(u, ctx);
             }
             return u;
         }
@@ -156,9 +153,7 @@ public class NoWhitespaceBefore extends Recipe {
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getGenericEnd())) {
                 if (p.getPadding().getTypeParameters() != null) {
                     p = p.getPadding().withTypeParameters(p.getPadding().getTypeParameters().getPadding().withElements(
-                            ListUtils.map(p.getPadding().getTypeParameters().getPadding().getElements(), e -> {
-                                return e.withAfter(e.getAfter().withWhitespace(""));
-                            })
+                            ListUtils.map(p.getPadding().getTypeParameters().getPadding().getElements(), e -> e.withAfter(e.getAfter().withWhitespace("")))
                     ));
                 }
             }

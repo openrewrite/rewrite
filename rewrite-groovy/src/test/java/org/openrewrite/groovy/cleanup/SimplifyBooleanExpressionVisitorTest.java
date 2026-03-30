@@ -149,6 +149,22 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void doubleNegationPreservedForTruthinessCoercion() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def m(String s) {
+                      boolean a = !!s
+                      boolean b = !(!s)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doubleNegatedBinaryWithParentheses() {
         rewriteRun(
           groovy(
@@ -167,12 +183,12 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               class A {
                   def m() {
-                      boolean a1 = 1 != 1
-                      boolean a2 = 1 == 1
-                      boolean a3 = 1 >= 1
-                      boolean a4 = 1 > 1
-                      boolean a5 = 1 <= 1
-                      boolean a6 = 1 < 1
+                      boolean a1 = false
+                      boolean a2 = true
+                      boolean a3 = true
+                      boolean a4 = false
+                      boolean a5 = true
+                      boolean a6 = false
                   }
               }
               """

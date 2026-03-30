@@ -134,11 +134,11 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
-                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().getFirst().getInitializer();
+                var varDecl = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                var sizeMi = (J.MethodInvocation) varDecl.getVariables().getFirst().getInitializer();
                 assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
                   "java.util.ArrayList")).isTrue();
-                J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();
+                var emptyListMi = (J.MethodInvocation) sizeMi.getSelect();
                 assertThat(TypeUtils.isOfClassType(emptyListMi.getMethodType().getReturnType(),
                   "java.util.ArrayList")).isTrue();
             })

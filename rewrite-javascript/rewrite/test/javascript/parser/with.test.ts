@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {RecipeSpec} from "../../../src/test";
-import {typescript} from "../../../src/javascript";
+import {javascript} from "../../../src/javascript";
 
 describe('with mapping', () => {
     const spec = new RecipeSpec();
@@ -22,8 +22,8 @@ describe('with mapping', () => {
     // noinspection WithStatementJS
     test('with statement', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                  with (0) {
                      console.log("aaa");
                  }
@@ -33,8 +33,8 @@ describe('with mapping', () => {
     // noinspection WithStatementJS
     test('with statement with comments', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                  /*a*/with /*b*/ (/*c*/0 /*d*/) /*e*/{/*f*/
                      console.log("aaa");
                      /*g*/}/*h*/
@@ -44,8 +44,8 @@ describe('with mapping', () => {
     // noinspection TypeScriptUnresolvedReference,WithStatementJS
     test('with statement with try-catch', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                 with (ctx) try {
                     return eval("(" + str + ")")
                 } catch (e) {
@@ -55,8 +55,8 @@ describe('with mapping', () => {
 
     test('with statement with empty body', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                  with (0) {/*a*/}
              `)
         ));
@@ -64,8 +64,8 @@ describe('with mapping', () => {
     // noinspection WithStatementJS
     test('with statement with body without braces', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                  with (0) 1;
              `)
         ));
@@ -73,8 +73,8 @@ describe('with mapping', () => {
     // noinspection TypeScriptUnresolvedReference
     test('with statement with await expr', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                 export {};
                 // noinspection JSAnnotator
                 with (await obj?.foo) {
@@ -84,16 +84,16 @@ describe('with mapping', () => {
 
     test('with statement with empty expr and body', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                  with({/*a*/}) {/*b*/}
              `)
         ));
 
     test('with statement with multiline statement', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                  with ([]) {
                      console.log("aaa");
                      console.log("bbb")
@@ -104,8 +104,8 @@ describe('with mapping', () => {
     // noinspection TypeScriptUnresolvedReference,WithStatementJS
     test('with statement with internal with statements', () =>
         spec.rewriteRun(
-            //language=typescript
-            typescript(`
+            //language=javascript
+            javascript(`
                  with (bindingContext) {
                      with (data || {}) {
                          with (options.templateRenderingVariablesInScope || {}) {

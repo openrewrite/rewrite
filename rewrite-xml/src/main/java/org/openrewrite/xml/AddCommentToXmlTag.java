@@ -42,15 +42,9 @@ public class AddCommentToXmlTag extends Recipe {
             example = "This is excluded due to CVE <X> and will be removed when we upgrade the next version is available.")
     String commentText;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a comment to an XML tag";
-    }
+    String displayName = "Add a comment to an XML tag";
 
-    @Override
-    public String getDescription() {
-        return "Adds a comment as the first element in an XML tag.";
-    }
+    String description = "Adds a comment as the first element in an XML tag.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

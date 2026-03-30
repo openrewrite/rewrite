@@ -15,25 +15,54 @@
  */
 package org.openrewrite.rpc.request;
 
+import io.moderne.jsonrpc.JsonRpcMethod;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.PrintOutputCapture;
+import org.objenesis.ObjenesisStd;
+import org.openrewrite.*;
 
-import java.util.List;
+import java.nio.file.Path;
+import java.util.function.BiFunction;
 
 @Value
 public class Print implements RpcRequest {
     String treeId;
-
-    /**
-     * A list of IDs representing the cursor whose objects are stored in the
-     * caller's local object cache.
-     */
-    @Nullable
-    List<String> cursor;
+    Path sourcePath;
+    String sourceFileType;
 
     @Nullable
     MarkerPrinter markerPrinter;
+
+    @RequiredArgsConstructor
+    public static class Handler extends JsonRpcMethod<Print> {
+        private final BiFunction<String, @Nullable String, ?> getObject;
+
+        @Override
+        protected Object handle(Print request) throws Exception {
+            Tree tree = (Tree) getObject.apply(request.getTreeId(), request.sourceFileType);
+
+            try {
+                // Create an instance of the SourceFile type using Objenesis
+                Class<?> sourceFileClass = Class.forName(request.getSourceFileType());
+                SourceFile dummySourceFile = (SourceFile) new ObjenesisStd().newInstance(sourceFileClass);
+
+                // Create the appropriate PrintOutputCapture
+                PrintOutputCapture<Integer> outputCapture = request.getMarkerPrinter() != null ?
+                        new PrintOutputCapture<>(0, request.getMarkerPrinter().toPrintOutputCapture()) :
+                        new PrintOutputCapture<>(0);
+
+                // Get the printer from the dummy SourceFile and use it to print the tree
+                Cursor dummyCursor = new Cursor(null, dummySourceFile);
+                TreeVisitor<?, PrintOutputCapture<Integer>> printer = dummySourceFile.printer(dummyCursor);
+                printer.visit(tree, outputCapture);
+
+                return outputCapture.getOut();
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException("Unknown source file type: " + request.getSourceFileType(), e);
+            }
+        }
+    }
 
     public enum MarkerPrinter {
         DEFAULT,
@@ -53,6 +82,21 @@ public class Print implements RpcRequest {
                 return SANITIZED;
             }
             throw new IllegalArgumentException("Unknown marker printer " + markerPrinter);
+        }
+
+        private PrintOutputCapture.MarkerPrinter toPrintOutputCapture() {
+            switch (this) {
+                case DEFAULT:
+                    return PrintOutputCapture.MarkerPrinter.DEFAULT;
+                case SEARCH_MARKERS_ONLY:
+                    return PrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY;
+                case FENCED:
+                    return PrintOutputCapture.MarkerPrinter.FENCED;
+                case SANITIZED:
+                    return PrintOutputCapture.MarkerPrinter.SANITIZED;
+                default:
+                    throw new IllegalArgumentException("Unknown marker printer: " + this);
+            }
         }
     }
 }

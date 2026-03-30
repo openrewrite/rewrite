@@ -199,7 +199,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     String partOne = substringOfBeforeFirstLineBreak(afterInsertEntry.getPrefix());
                     String partTwo = substringOfAfterFirstLineBreak(afterInsertEntry.getPrefix());
 
-                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(partOne + firstNewlyAddedEntry.getPrefix()));
+                    String newFirstPrefix = partOne + firstNewlyAddedEntry.getPrefix();
+                    if (afterInsertEntry.getPrefix().isEmpty() && partOne.isEmpty() && newFirstPrefix.startsWith("\n")) {
+                        // Remove leading newline since the previous element already provides line separation
+                        newFirstPrefix = newFirstPrefix.substring(1);
+                    }
+
+                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(newFirstPrefix));
                     mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + partTwo));
                 }
             } else {
@@ -219,7 +225,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
                 String comment = null;
                 if (c.getValue() instanceof Yaml.Document) {
-                    comment = c.<Yaml.Document>getValue().getEnd().getPrefix();
+                    Yaml.Document doc = c.getValue();
+                    // Don't treat document end prefix as comment if it contains a document separator
+                    if (!preserveDocumentSeparator(doc)) {
+                        comment = doc.getEnd().getPrefix();
+                    }
                 } else if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
@@ -286,7 +296,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
             String currentIndent = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
             List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(currentIndent));
-            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> ((Yaml.Scalar) it.getBlock()).getValue()).ls;
+            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> {
+                if (it.getBlock() instanceof Yaml.Scalar) {
+                    return ((Yaml.Scalar) it.getBlock()).getValue();
+                } else if (it.getBlock() instanceof Yaml.Mapping) {
+                    Yaml.Mapping.Entry entry = ((Yaml.Mapping) it.getBlock()).getEntries().get(0);
+                    return entry.getKey().getValue();
+                }
+                return "";
+            }).ls;
 
             return s1.withEntries(mutatedEntries);
         }
@@ -384,5 +402,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         int keyIndent = (lines.length > 1 ? lines[lines.length - 1] : "").length();
         int indent = minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
         return Math.max(indent - keyIndent, 0);
+    }
+
+    private boolean preserveDocumentSeparator(Yaml.Document document) {
+        // Check if this document is part of a multi-document YAML with a following explicit document
+        Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
+        if (documents != null) {
+            int currentIndex = documents.getDocuments().indexOf(document);
+            // Preserve a newline before the next document separator
+            if (0 <= currentIndex && currentIndex < documents.getDocuments().size() - 1) {
+                return documents.getDocuments().get(currentIndex + 1).isExplicit();
+            }
+            // Or if this is the last document and it has an explicit end
+            return currentIndex == documents.getDocuments().size() - 1 && document.getEnd().isExplicit();
+        }
+        return false;
     }
 }

@@ -44,7 +44,7 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 @Builder
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<PlainText> {
+public class PlainText implements SourceFileWithReferences, Tree {
 
     @Builder.Default
     @With
@@ -59,7 +59,7 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
     Markers markers = Markers.EMPTY;
 
     @Nullable // for backwards compatibility
-    @With(AccessLevel.PRIVATE)
+    @With(AccessLevel.PACKAGE)
     String charsetName;
 
     @With
@@ -158,39 +158,6 @@ public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<Plain
             return this;
         }
         return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets, null);
-    }
-
-    @Override
-    public void rpcSend(PlainText after, RpcSendQueue q) {
-        q.getAndSend(after, Tree::getId);
-        q.getAndSend(after, Tree::getMarkers);
-        q.getAndSend(after, (PlainText d) -> d.getSourcePath().toString());
-        q.getAndSend(after, (PlainText d) -> d.getCharset().name());
-        q.getAndSend(after, PlainText::isCharsetBomMarked);
-        q.getAndSend(after, PlainText::getChecksum);
-        q.getAndSend(after, PlainText::getFileAttributes);
-        q.getAndSend(after, PlainText::getText);
-        q.getAndSendList(after, PlainText::getSnippets, Tree::getId, snippet -> {
-            q.getAndSend(snippet, Tree::getId);
-            q.getAndSend(snippet, Tree::getMarkers);
-            q.getAndSend(snippet, Snippet::getText);
-        });
-    }
-
-    @Override
-    public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
-        return t.withId(q.receiveAndGet(t.getId(), UUID::fromString))
-                .withMarkers(q.receive(t.getMarkers()))
-                .withSourcePath(q.<Path, String>receiveAndGet(t.getSourcePath(), Paths::get))
-                .withCharsetName(q.receiveAndGet(t.getCharsetName(), String::toString))
-                .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
-                .withChecksum(q.receive(t.getChecksum()))
-                .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))
-                .withText(q.receive(t.getText()))
-                .withSnippets(q.receiveList(t.getSnippets(), s -> s
-                        .withId(q.receiveAndGet(s.getId(), UUID::fromString))
-                        .withMarkers(q.receive(s.getMarkers()))
-                        .withText(q.receive(s.getText()))));
     }
 
     @Value

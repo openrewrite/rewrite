@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
@@ -67,9 +68,11 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
 
     private final Map<Content, Integer> existingIndices = new IdentityHashMap<>();
 
-    public MavenTagInsertionComparator(List<? extends Content> existingTags) {
-        for (int i = 0; i < existingTags.size(); i++) {
-            existingIndices.put(existingTags.get(i), i);
+    public MavenTagInsertionComparator(@Nullable List<? extends Content> existingTags) {
+        if (existingTags != null) {
+            for (int i = 0; i < existingTags.size(); i++) {
+                existingIndices.put(existingTags.get(i), i);
+            }
         }
     }
 

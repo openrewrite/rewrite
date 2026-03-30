@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 import * as rpc from "vscode-jsonrpc/node";
-import {Cursor, isSourceFile, Tree} from "../../tree";
+import {isSourceFile, Tree} from "../../tree";
 import {MarkerPrinter as PrintMarkerPrinter, printer, PrintOutputCapture} from "../../print";
 import {UUID} from "../../uuid";
+import {extractSourcePath, withMetrics} from "./metrics";
 
 export const enum MarkerPrinter {
     DEFAULT = "DEFAULT",
@@ -25,21 +26,36 @@ export const enum MarkerPrinter {
 }
 
 export class Print {
-    constructor(private readonly treeId: UUID, private readonly cursor?: string[], readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
+    constructor(private readonly treeId: UUID,
+                private readonly sourceFileType: string,
+                readonly markerPrinter: MarkerPrinter = MarkerPrinter.DEFAULT) {
     }
 
     static handle(connection: rpc.MessageConnection,
-                  getObject: (id: string) => any,
-                  getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
-        connection.onRequest(new rpc.RequestType<Print, string, Error>("Print"), async request => {
-            const tree: Tree = await getObject(request.treeId.toString());
-            const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
-            if (isSourceFile(tree)) {
-                return await printer(tree).print(tree, out);
-            } else {
-                const cursor = await getCursor(request.cursor);
-                return await printer(cursor).print(tree, out);
-            }
-        });
+                  getObject: (id: string, sourceFileType: string) => any,
+                  logger?: rpc.Logger,
+                  metricsCsv?: string): void {
+        connection.onRequest(
+            new rpc.RequestType<Print, string, Error>("Print"),
+            withMetrics<Print, string>(
+                "Print",
+                metricsCsv,
+                (context) => async request => {
+                    const tree: Tree = await getObject(request.treeId.toString(), request.sourceFileType);
+                    context.target = extractSourcePath(tree);
+                    if (logger) {
+                        logger.log("Printing " + (isSourceFile(tree) ? tree.sourcePath : `tree of type ${tree.kind} in ${context.target}`));
+                    }
+                    const out = new PrintOutputCapture(PrintMarkerPrinter[request.markerPrinter]);
+                    let result: string;
+                    if (isSourceFile(tree)) {
+                        result = await printer(tree).print(tree, out);
+                    } else {
+                        result = await printer(request.sourceFileType).print(tree, out);
+                    }
+                    return result;
+                }
+            )
+        );
     }
 }

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -29,16 +31,12 @@ import java.util.List;
 
 public class SimplifySingleElementAnnotation extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Simplify single-element annotation";
-    }
+    @Getter
+    final String displayName = "Simplify single-element annotation";
 
-    @Override
-    public String getDescription() {
-        return "This recipe will remove the attribute `value` on single-element annotations. " +
-                "According to JLS, a _single-element annotation_, is a shorthand designed for use with single-element annotation types.";
-    }
+    @Getter
+    final String description = "This recipe will remove the attribute `value` on single-element annotations. " +
+        "According to JLS, a _single-element annotation_, is a shorthand designed for use with single-element annotation types.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -50,6 +48,7 @@ public class SimplifySingleElementAnnotation extends Recipe {
     }
 
     @Value
+    @EqualsAndHashCode(callSuper = false)
     private static class SimplifySingleElementAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Nullable
         J scope;

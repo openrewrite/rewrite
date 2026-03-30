@@ -98,4 +98,30 @@ class SetRangeTest {
         assertThat(setRange.isValid(null, "2.0")).isTrue();
         assertThat(setRange.isValid(null, "9999.0")).isTrue();
     }
+
+    @Test
+    void compare() {
+        SetRange setRange = SetRange.build("[1,2)", null).getValue();
+
+        assertThat(setRange).isNotNull();
+        assertThat(setRange.compare(null, "0.9", "[1,2)")).isNegative();
+        assertThat(setRange.compare(null, "[1,2)", "0.9")).isPositive();
+        assertThat(setRange.compare(null, "1.0", "[1,2)")).isZero();
+        assertThat(setRange.compare(null, "[1,2)", "1.0")).isZero();
+        assertThat(setRange.compare(null, "1.0", "(1,2)")).isNegative();
+        assertThat(setRange.compare(null, "(1,2)", "1.0")).isPositive();
+        assertThat(setRange.compare(null, "2.1", "(1,2]")).isPositive();
+        assertThat(setRange.compare(null, "(1,2]", "2.1")).isNegative();
+        assertThat(setRange.compare(null, "2.0", "(1,2]")).isZero();
+        assertThat(setRange.compare(null, "(1,2]", "2.0")).isZero();
+        assertThat(setRange.compare(null, "2.0", "(1,2)")).isPositive();
+        assertThat(setRange.compare(null, "(1,2)", "2.0")).isNegative();
+        assertThat(setRange.compare(null, "[1,2)", "[1,2)")).isZero();
+        assertThat(setRange.compare(null, "[1.0.1,2)", "[1,2)")).isPositive();
+        assertThat(setRange.compare(null, "[0.9,2)", "[1,2)")).isNegative();
+        assertThat(setRange.compare(null, "[1,2.0.1)", "[1,2)")).isPositive();
+        assertThat(setRange.compare(null, "[1,1.9)", "[1,2)")).isNegative();
+        assertThat(setRange.compare(null, "[1,2]", "[1,2)")).isPositive();
+        assertThat(setRange.compare(null, "(1,2)", "[1,2)")).isPositive();
+    }
 }

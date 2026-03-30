@@ -17,17 +17,25 @@ package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.test.RewriteTest.fromRuntimeClasspath;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class FindDependencyHandlerTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new FindDependencyHandler())
+          .beforeRecipe(withToolingApi());
+    }
+
     @DocumentExample
     @Test
     void findDependenciesBlock() {
         rewriteRun(
-          spec -> spec.recipe(fromRuntimeClasspath("org.openrewrite.gradle.search.FindDependencyHandler")),
           buildGradle(
             """
               plugins {
@@ -53,6 +61,40 @@ class FindDependencyHandlerTest implements RewriteTest {
 
               /*~~>*/dependencies {
                   api 'com.google.guava:guava:23.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findDependenciesBlockKotlin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  api("com.google.guava:guava:23.0")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              /*~~>*/dependencies {
+                  api("com.google.guava:guava:23.0")
               }
               """
           )

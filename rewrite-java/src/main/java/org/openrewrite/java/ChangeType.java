@@ -54,10 +54,7 @@ public class ChangeType extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
-    @Override
-    public String getDisplayName() {
-        return "Change type";
-    }
+    String displayName = "Change type";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -81,10 +78,7 @@ public class ChangeType extends Recipe {
         }
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a given type to another.";
-    }
+    String description = "Change a given type to another.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -237,13 +231,19 @@ public class ChangeType extends Recipe {
                             continue;
                         }
 
-                        JavaType maybeType = anImport.getQualid().getType();
-                        if (maybeType instanceof JavaType.FullyQualified) {
-                            JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
-                            if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
-                            } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                        if ("*".equals(anImport.getClassName()) &&
+                                anImport.getPackageName().equals(originalType.getPackageName()) &&
+                                !originalType.getPackageName().equals(((JavaType.FullyQualified) targetType).getPackageName())) {
+                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                        } else {
+                            JavaType maybeType = anImport.getQualid().getType();
+                            if (maybeType instanceof JavaType.FullyQualified) {
+                                JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
+                                if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                    sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                    sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                }
                             }
                         }
                     }
@@ -487,7 +487,7 @@ public class ChangeType extends Recipe {
                 pt = pt.withTypeParameters(ListUtils.map(pt.getTypeParameters(), tp -> {
                     if (tp instanceof JavaType.FullyQualified) {
                         JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
-                        if (isTargetFullyQualifiedType(tpFq)) {
+                        if (isTargetFullyQualifiedType(tpFq) || isNestedTypeOfOriginal(tpFq)) {
                             return updateType(tpFq);
                         }
                     }
@@ -496,6 +496,8 @@ public class ChangeType extends Recipe {
 
                 if (isTargetFullyQualifiedType(pt)) {
                     pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
+                } else if (isNestedTypeOfOriginal(pt)) {
+                    pt = pt.withType(updateNestedType(pt.getType()));
                 }
                 oldNameToChangedType.put(oldType, pt);
                 oldNameToChangedType.put(pt, pt);
@@ -505,12 +507,26 @@ public class ChangeType extends Recipe {
                 if (isTargetFullyQualifiedType(original)) {
                     oldNameToChangedType.put(oldType, targetType);
                     return targetType;
+                } else if (isNestedTypeOfOriginal(original)) {
+                    JavaType.FullyQualified updatedNestedType = updateNestedType(original);
+                    oldNameToChangedType.put(oldType, updatedNestedType);
+                    return updatedNestedType;
+                } else if (oldType instanceof JavaType.Class) {
+                    JavaType.Class clazz = ((JavaType.Class) oldType)
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
+                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
+                    oldNameToChangedType.put(oldType, clazz);
+                    oldNameToChangedType.put(clazz, clazz);
+                    return clazz;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
                 gtv = gtv.withBounds(ListUtils.map(gtv.getBounds(), b -> {
-                    if (b instanceof JavaType.FullyQualified && isTargetFullyQualifiedType((JavaType.FullyQualified) b)) {
-                        return updateType(b);
+                    if (b instanceof JavaType.FullyQualified) {
+                        JavaType.FullyQualified fq = (JavaType.FullyQualified) b;
+                        if (isTargetFullyQualifiedType(fq) || isNestedTypeOfOriginal(fq)) {
+                            return updateType(b);
+                        }
                     }
                     return b;
                 }));
@@ -558,6 +574,25 @@ public class ChangeType extends Recipe {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
         }
 
+        private boolean isNestedTypeOfOriginal(JavaType.@Nullable FullyQualified fq) {
+            if (fq == null || !(targetType instanceof JavaType.FullyQualified)) {
+                return false;
+            }
+            String fqn = fq.getFullyQualifiedName();
+            String originalFqn = originalType.getFullyQualifiedName();
+            // Check if fq is a nested class of the original type (e.g., a.b.c.A$Nested when original is a.b.c.A)
+            return fqn.startsWith(originalFqn + "$");
+        }
+
+        private JavaType.FullyQualified updateNestedType(JavaType.FullyQualified nestedType) {
+            String nestedFqn = nestedType.getFullyQualifiedName();
+            String originalFqn = originalType.getFullyQualifiedName();
+            String targetFqn = ((JavaType.FullyQualified) targetType).getFullyQualifiedName();
+            // Replace the original type prefix with the target type prefix
+            String newNestedFqn = targetFqn + nestedFqn.substring(originalFqn.length());
+            return JavaType.ShallowClass.build(newNestedFqn);
+        }
+
         private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf) {
             JavaType.FullyQualified oldType = TypeUtils.asFullyQualified(originalType);
             JavaType.FullyQualified newType = TypeUtils.asFullyQualified(targetType);
@@ -601,7 +636,7 @@ public class ChangeType extends Recipe {
         private ChangeClassDefinition(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.ShallowClass.build(newFullyQualifiedTypeName);
-            this.originalConstructor = new MethodMatcher(oldFullyQualifiedTypeName + "<constructor>(..)");
+            this.originalConstructor = new MethodMatcher(oldFullyQualifiedTypeName + " <constructor>(..)");
         }
 
         @Override
@@ -664,7 +699,7 @@ public class ChangeType extends Recipe {
                 }
             }
             //noinspection ConstantConditions
-            return pkg;
+            return super.visitPackage(pkg, ctx);
         }
 
         @Override
@@ -711,6 +746,8 @@ public class ChangeType extends Recipe {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
                     return targetType;
+                } else if (isNestedTypeOfOriginal(original)) {
+                    return updateNestedType(original);
                 }
             }
 
@@ -729,6 +766,25 @@ public class ChangeType extends Recipe {
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName());
+        }
+
+        private boolean isNestedTypeOfOriginal(JavaType.@Nullable FullyQualified fq) {
+            if (fq == null) {
+                return false;
+            }
+            String fqn = fq.getFullyQualifiedName();
+            String originalFqn = originalType.getFullyQualifiedName();
+            // Check if fq is a nested class of the original type (e.g., a.b.c.A$Nested when original is a.b.c.A)
+            return fqn.startsWith(originalFqn + "$");
+        }
+
+        private JavaType.FullyQualified updateNestedType(JavaType.FullyQualified nestedType) {
+            String nestedFqn = nestedType.getFullyQualifiedName();
+            String originalFqn = originalType.getFullyQualifiedName();
+            String targetFqn = targetType.getFullyQualifiedName();
+            // Replace the original type prefix with the target type prefix
+            String newNestedFqn = targetFqn + nestedFqn.substring(originalFqn.length());
+            return JavaType.ShallowClass.build(newNestedFqn);
         }
     }
 

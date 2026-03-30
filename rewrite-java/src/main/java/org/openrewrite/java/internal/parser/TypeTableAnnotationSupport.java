@@ -328,11 +328,11 @@ class AnnotationDeserializer {
 
         private String inputWithErrorIndicator(int errorPos) {
             StringBuilder errorMsg = new StringBuilder();
-            errorMsg.append("\nInput string: ").append(input);
+            errorMsg.append("\nInput string:       ").append(input);
 
             // Add a visual indicator of the error position
             errorMsg.append("\nPosition indicator: ");
-            for (int i = 0; i < errorPos - 6; i++) {
+            for (int i = 0; i < errorPos; i++) {
                 errorMsg.append(' ');
             }
             errorMsg.append('^');
@@ -536,6 +536,12 @@ class AnnotationDeserializer {
                         case 't':
                             sb.append('\t');
                             break;
+                        case 'b':
+                            sb.append('\b');
+                            break;
+                        case 'f':
+                            sb.append('\f');
+                            break;
                         case '|':
                             sb.append('|');
                             break; // TypeTable-specific escape
@@ -604,6 +610,16 @@ class AnnotationDeserializer {
             if (peek() == '-' || peek() == '+') {
                 consume();
                 hasSign = true;
+            }
+
+            // Check for special floating-point values (Infinity, NaN)
+            if (matchesAtPosition("Infinity")) {
+                pos += 8;
+                return input.substring(start, pos);
+            }
+            if (matchesAtPosition("NaN")) {
+                pos += 3;
+                return input.substring(start, pos);
             }
 
             // Parse digits and decimal point

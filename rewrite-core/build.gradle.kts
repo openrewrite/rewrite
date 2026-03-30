@@ -15,10 +15,14 @@ dependencies {
 
     api("org.jspecify:jspecify:latest.release")
 
+    // Recipe marketplace
+    implementation("com.univocity:univocity-parsers:latest.release")
+
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
-    implementation("org.apache.commons:commons-lang3:latest.release")
+    // For Levenshtein distance of mismatched recipes
+    implementation("org.apache.commons:commons-text:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")
@@ -28,6 +32,7 @@ dependencies {
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation(project(":rewrite-test"))
 }
 
@@ -42,5 +47,5 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/RpcObjectData.java")
+    exclude("**/RpcObjectData.java", "**/RecipeDescriptor.java")
 }

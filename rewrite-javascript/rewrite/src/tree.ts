@@ -77,6 +77,21 @@ export class Cursor {
         return path;
     }
 
+    parentTree(level: number = 1): Cursor | undefined {
+        let c: Cursor | undefined = this.parent;
+        let treeCount = 0;
+        while (c) {
+            if (isTree(c.value)) {
+                treeCount++;
+                if (treeCount === level) {
+                    return c;
+                }
+            }
+            c = c.parent;
+        }
+        return undefined;
+    }
+
     firstEnclosing<T>(match: (value: any) => value is T): T | undefined {
         let c: Cursor | undefined = this;
         while (c) {

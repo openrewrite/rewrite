@@ -19,9 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -31,6 +33,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -98,21 +101,15 @@ public class UpgradePluginVersion extends Recipe {
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Maven plugin version";
-    }
+    String displayName = "Upgrade Maven plugin version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Upgrade the version of a plugin using Node Semver advanced range selectors, " +
+    String description = "Upgrade the version of a plugin using Node Semver advanced range selectors, " +
                "allowing more precise control over version updates to patch or minor releases.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -124,22 +121,26 @@ public class UpgradePluginVersion extends Recipe {
                     Optional<Xml.Tag> versionTag = tag.getChild("version");
                     Optional<String> maybeVersionValue = versionTag.flatMap(Xml.Tag::getValue);
                     if (maybeVersionValue.isPresent() || Boolean.TRUE.equals(addVersionIfMissing)) {
-                        final String versionLookup;
-                        if (maybeVersionValue.isPresent()) {
-                            String versionValue = maybeVersionValue.get();
-                            versionLookup = versionValue.startsWith("${") ?
-                                    super.getResolutionResult().getPom().getValue(versionValue.trim()) :
-                                    versionValue;
-                        } else {
-                            versionLookup = "0.0.0";
-                        }
-
                         try {
                             ResolvedPom resolvedPom = getResolutionResult().getPom();
                             String tagGroupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(groupId));
                             String tagArtifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(artifactId));
                             assert tagGroupId != null;
                             assert tagArtifactId != null;
+
+                            final String versionLookup;
+                            if (maybeVersionValue.isPresent()) {
+                                String versionValue = maybeVersionValue.get();
+                                versionLookup = versionValue.startsWith("${") ?
+                                        resolvedPom.getValue(versionValue.trim()) :
+                                        versionValue;
+                            } else {
+                                if (hasManagedPluginVersion(resolvedPom, tagGroupId, tagArtifactId)) {
+                                    return tag;
+                                }
+                                versionLookup = "0.0.0";
+                            }
+
                             findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer ->
                                     doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer, Boolean.TRUE.equals(addVersionIfMissing)))
                             );
@@ -150,6 +151,18 @@ public class UpgradePluginVersion extends Recipe {
                     return tag;
                 }
                 return super.visitTag(tag, ctx);
+            }
+
+            private boolean hasManagedPluginVersion(ResolvedPom resolvedPom, String groupId, String artifactId) {
+                for (Plugin p : ListUtils.concatAll(resolvedPom.getPluginManagement(),
+                        resolvedPom.getRequested().getPluginManagement())) {
+                    if (p.getGroupId().equals(groupId) &&
+                            p.getArtifactId().equals(artifactId) &&
+                            p.getVersion() != null) {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId,

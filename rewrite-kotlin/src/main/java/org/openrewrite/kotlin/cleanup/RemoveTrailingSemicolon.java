@@ -38,16 +38,10 @@ import java.util.regex.Pattern;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveTrailingSemicolon extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove unnecessary trailing semicolon";
-    }
+    String displayName = "Remove unnecessary trailing semicolon";
 
-    @Override
-    public String getDescription() {
-        return "Some Java programmers may mistakenly add semicolons at the end when writing Kotlin code, but in " +
+    String description = "Some Java programmers may mistakenly add semicolons at the end when writing Kotlin code, but in " +
                "reality, they are not necessary.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

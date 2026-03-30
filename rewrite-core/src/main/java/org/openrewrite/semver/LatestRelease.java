@@ -87,13 +87,21 @@ public class LatestRelease implements VersionComparator {
     public int compare(@Nullable String currentVersion, String v1, String v2) {
         if (v1.equalsIgnoreCase(v2)) {
             return 0;
-        } else if ("LATEST".equalsIgnoreCase(v1) || "latest.integration".equalsIgnoreCase(v1)) {
+        } else if ("LATEST".equalsIgnoreCase(v1) || "latest.integration".equalsIgnoreCase(v1) || "latest.snapshot".equalsIgnoreCase(v1)) {
             return 1;
-        } else if ("LATEST".equalsIgnoreCase(v2) || "latest.integration".equalsIgnoreCase(v2)) {
+        } else if ("LATEST".equalsIgnoreCase(v2) || "latest.integration".equalsIgnoreCase(v2) || "latest.snapshot".equalsIgnoreCase(v2)) {
             return -1;
-        } else if ("RELEASE".equalsIgnoreCase(v1) || "latest.release".equalsIgnoreCase(v1)) {
+        } else if ("RELEASE".equalsIgnoreCase(v1) || "latest.release".equalsIgnoreCase(v1) || "latest.major".equalsIgnoreCase(v1)) {
             return 1;
-        } else if ("RELEASE".equalsIgnoreCase(v2) || "latest.release".equalsIgnoreCase(v2)) {
+        } else if ("RELEASE".equalsIgnoreCase(v2) || "latest.release".equalsIgnoreCase(v2) || "latest.major".equalsIgnoreCase(v2)) {
+            return -1;
+        } else if ("latest.minor".equalsIgnoreCase(v1)) {
+            return 1;
+        } else if ("latest.minor".equalsIgnoreCase(v2)) {
+            return -1;
+        } else if ("latest.patch".equalsIgnoreCase(v1)) {
+            return 1;
+        } else if ("latest.patch".equalsIgnoreCase(v2)) {
             return -1;
         }
 

@@ -32,7 +32,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
-public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumulator> {
+public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumulator> implements RecipePreconditions {
     @Getter
     private final String name;
 
@@ -66,13 +66,13 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
 
     @Setter
-    private List<Recipe> recipeList = new ArrayList<>();
+    private volatile List<Recipe> recipeList = Collections.emptyList();
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
     @Getter
     @Setter
-    private List<Recipe> preconditions = new ArrayList<>();
+    private volatile List<Recipe> preconditions = Collections.emptyList();
 
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
@@ -93,28 +93,31 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     public void initialize(Collection<Recipe> availableRecipes) {
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
-        initialize(uninitializedRecipes, recipeList, recipeMap::get);
-        initialize(uninitializedPreconditions, preconditions, recipeMap::get);
+        Set<String> initializingRecipes = new HashSet<>();
+        recipeList = initialize(uninitializedRecipes, recipeMap::get, initializingRecipes);
+        preconditions = initialize(uninitializedPreconditions, recipeMap::get, initializingRecipes);
     }
 
     @Deprecated
-    public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    public void initialize(Collection<Recipe> availableRecipes,
+                           @SuppressWarnings("unused") Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
-        initialize(uninitializedRecipes, recipeList, availableRecipes);
-        initialize(uninitializedPreconditions, preconditions, availableRecipes);
+        Set<String> initializingRecipes = new HashSet<>();
+        recipeList = initialize(uninitializedRecipes, availableRecipes, initializingRecipes);
+        preconditions = initialize(uninitializedPreconditions, availableRecipes, initializingRecipes);
     }
 
-    @SuppressWarnings("unused")
     @Deprecated
-    public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes,
+                           @SuppressWarnings("unused") Map<String, List<Contributor>> recipeToContributors) {
         this.initialize(availableRecipes);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes) {
-        initialized.clear();
+    private List<Recipe> initialize(List<Recipe> uninitialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+        List<Recipe> result = new ArrayList<>();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
@@ -122,9 +125,9 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 Recipe subRecipe = availableRecipes.apply(recipeFqn);
                 if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
-                        ((DeclarativeRecipe) subRecipe).initialize(availableRecipes);
+                        initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes);
                     }
-                    initialized.add(subRecipe);
+                    result.add(subRecipe);
                 } else {
                     initValidation = initValidation.and(
                             invalid(name + ".recipeList" +
@@ -135,46 +138,75 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 }
             } else {
                 if (recipe instanceof DeclarativeRecipe) {
-                    ((DeclarativeRecipe) recipe).initialize(availableRecipes);
+                    initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipe.getName(), availableRecipes, initializingRecipes);
                 }
-                initialized.add(recipe);
+                result.add(recipe);
             }
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
+                                             Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+        String recipeName = declarativeRecipe.getName();
+        if (initializingRecipes.contains(recipeName)) {
+            // Cycle detected - throw exception to fail fast
+            String cycle = String.join(" -> ", initializingRecipes) + " -> " + recipeName;
+            throw new RecipeIntrospectionException(
+                    "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
+        } else {
+            initializingRecipes.add(recipeName);
+            declarativeRecipe.recipeList = initialize(declarativeRecipe.uninitializedRecipes, availableRecipes, initializingRecipes);
+            declarativeRecipe.preconditions = initialize(declarativeRecipe.uninitializedPreconditions, availableRecipes, initializingRecipes);
+            initializingRecipes.remove(recipeName);
         }
     }
 
-    @SuppressWarnings("NotNullFieldNotInitialized")
     @JsonIgnore
-    private transient Accumulator accumulator;
+    private transient ThreadLocal<Accumulator> accumulator = new ThreadLocal<>();
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
         Accumulator acc = new Accumulator();
         for (Recipe precondition : preconditions) {
-            if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
-                acc.recipeToAccumulator.put(precondition, ((ScanningRecipe<?>) precondition).getInitialValue(ctx));
-            }
+            registerNestedScanningRecipes(precondition, acc, ctx);
         }
-        accumulator = acc;
+        accumulator.set(acc);
         return acc;
+    }
+
+    private void registerNestedScanningRecipes(Recipe recipe, Accumulator acc, ExecutionContext ctx) {
+        if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
+            acc.recipeToAccumulator.put(recipe, ((ScanningRecipe<?>) recipe).getInitialValue(ctx));
+        }
+        for (Recipe nested : recipe.getRecipeList()) {
+            registerNestedScanningRecipes(nested, acc, ctx);
+        }
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
-            @SuppressWarnings({"rawtypes", "unchecked"})
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 for (Recipe precondition : preconditions) {
-                    if (precondition instanceof ScanningRecipe && isScanningRequired(precondition)) {
-                        ScanningRecipe preconditionRecipe = (ScanningRecipe) precondition;
-                        Object preconditionAcc = acc.recipeToAccumulator.get(precondition);
-                        preconditionRecipe.getScanner(preconditionAcc)
-                                .visit(tree, ctx);
-                    }
+                    scanNestedScanningRecipes(precondition, acc, tree, ctx);
                 }
                 return tree;
             }
         };
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void scanNestedScanningRecipes(Recipe recipe, Accumulator acc, @Nullable Tree tree, ExecutionContext ctx) {
+        if (recipe instanceof ScanningRecipe && isScanningRequired(recipe)) {
+            ScanningRecipe scanningRecipe = (ScanningRecipe) recipe;
+            Object recipeAcc = acc.recipeToAccumulator.get(recipe);
+            scanningRecipe.getScanner(recipeAcc).visit(tree, ctx);
+        }
+        for (Recipe nested : recipe.getRecipeList()) {
+            scanNestedScanningRecipes(nested, acc, tree, ctx);
+        }
     }
 
     public static class Accumulator {
@@ -186,16 +218,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     @RequiredArgsConstructor
     static class PreconditionBellwether extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Precondition bellwether";
-        }
+        String displayName = "Precondition bellwether";
 
-        @Override
-        public String getDescription() {
-            return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
+        String description = "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
-        }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;
 
@@ -224,7 +250,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     @EqualsAndHashCode(callSuper = false)
     @Value
-    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe {
+    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe, RecipePreconditions {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         Recipe delegate;
@@ -245,6 +271,16 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
 
         @Override
+        public String getInstanceName() {
+            return delegate.getInstanceName();
+        }
+
+        @Override
+        public String getInstanceNameSuffix() {
+            return delegate.getInstanceNameSuffix();
+        }
+
+        @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor());
         }
@@ -258,14 +294,102 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         public boolean causesAnotherCycle() {
             return delegate.causesAnotherCycle();
         }
+
+        @Override
+        public @Nullable Duration getEstimatedEffortPerOccurrence() {
+            return delegate.getEstimatedEffortPerOccurrence();
+        }
+
+        @Override
+        public List<Maintainer> getMaintainers() {
+            return delegate.getMaintainers();
+        }
+
+        @Override
+        public List<Contributor> getContributors() {
+            return delegate.getContributors();
+        }
+
+        @Override
+        public List<org.openrewrite.config.RecipeExample> getExamples() {
+            return delegate.getExamples();
+        }
+
+        @Override
+        public Set<String> getTags() {
+            return delegate.getTags();
+        }
+
+        @Override
+        public int maxCycles() {
+            return delegate.maxCycles();
+        }
+
+        @Override
+        public List<DataTableDescriptor> getDataTableDescriptors() {
+            return delegate.getDataTableDescriptors();
+        }
+
+        @Override
+        public void onComplete(ExecutionContext ctx) {
+            delegate.onComplete(ctx);
+        }
+
+        @Override
+        public Validated<Object> validate() {
+            return delegate.validate();
+        }
+
+        @Override
+        public Validated<Object> validate(ExecutionContext ctx) {
+            return delegate.validate(ctx);
+        }
+
+        @Override
+        public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
+            return delegate.validateAll(ctx, acc);
+        }
+
+        @Override
+        public List<Recipe> getPreconditions() {
+            if (delegate instanceof RecipePreconditions) {
+                return ((RecipePreconditions) delegate).getPreconditions();
+            }
+            return emptyList();
+        }
     }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe {
+    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe, RecipePreconditions {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         ScanningRecipe<T> delegate;
+
+        @Override
+        public T getAccumulator(Cursor cursor, ExecutionContext ctx) {
+            return delegate.getAccumulator(cursor, ctx);
+        }
+
+        @Override
+        public T getInitialValue(ExecutionContext ctx) {
+            return delegate.getInitialValue(ctx);
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
+            return delegate.getScanner(acc);
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
+            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
+        }
+
+        @Override
+        public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
+            return delegate.generate(acc, ctx);
+        }
 
         @Override
         public String getName() {
@@ -283,23 +407,18 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
 
         @Override
-        public T getInitialValue(ExecutionContext ctx) {
-            return delegate.getInitialValue(ctx);
+        public String getInstanceName() {
+            return delegate.getInstanceName();
         }
 
         @Override
-        public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
-            return delegate.getScanner(acc);
+        public String getInstanceNameSuffix() {
+            return delegate.getInstanceNameSuffix();
         }
 
         @Override
-        public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
-            return delegate.generate(acc, ctx);
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
-            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
+        public List<Recipe> getRecipeList() {
+            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
         }
 
         @Override
@@ -308,8 +427,66 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         }
 
         @Override
-        public List<Recipe> getRecipeList() {
-            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        public @Nullable Duration getEstimatedEffortPerOccurrence() {
+            return delegate.getEstimatedEffortPerOccurrence();
+        }
+
+        @Override
+        public List<Maintainer> getMaintainers() {
+            return delegate.getMaintainers();
+        }
+
+        @Override
+        public List<Contributor> getContributors() {
+            return delegate.getContributors();
+        }
+
+        @Override
+        public List<org.openrewrite.config.RecipeExample> getExamples() {
+            return delegate.getExamples();
+        }
+
+        @Override
+        public Set<String> getTags() {
+            return delegate.getTags();
+        }
+
+        @Override
+        public int maxCycles() {
+            return delegate.maxCycles();
+        }
+
+        @Override
+        public List<DataTableDescriptor> getDataTableDescriptors() {
+            return delegate.getDataTableDescriptors();
+        }
+
+        @Override
+        public void onComplete(ExecutionContext ctx) {
+            delegate.onComplete(ctx);
+        }
+
+        @Override
+        public Validated<Object> validate() {
+            return delegate.validate();
+        }
+
+        @Override
+        public Validated<Object> validate(ExecutionContext ctx) {
+            return delegate.validate(ctx);
+        }
+
+        @Override
+        public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
+            return delegate.validateAll(ctx, acc);
+        }
+
+        @Override
+        public List<Recipe> getPreconditions() {
+            if (delegate instanceof RecipePreconditions) {
+                return ((RecipePreconditions) delegate).getPreconditions();
+            }
+            return emptyList();
         }
     }
 
@@ -337,7 +514,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             //noinspection rawtypes
             ScanningRecipe scanning = (ScanningRecipe) recipe;
             //noinspection unchecked
-            conditions.add(scanning.getVisitor(accumulator.recipeToAccumulator.get(scanning)));
+            Accumulator acc = accumulator.get();
+            conditions.add(scanning.getVisitor(acc != null ? acc.recipeToAccumulator.get(scanning) : null));
         } else {
             conditions.add(recipe.getVisitor());
         }
@@ -425,26 +603,36 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private static class LazyLoadedRecipe extends Recipe {
         String recipeFqn;
 
-        @Override
-        public String getDisplayName() {
-            return "Lazy loaded recipe";
-        }
+        String displayName = "Lazy loaded recipe";
 
-        @Override
-        public String getDescription() {
-            return "Recipe that is loaded lazily.";
-        }
+        String description = "Recipe that is loaded lazily.";
+    }
+
+    @Override
+    public void onComplete(ExecutionContext ctx) {
+        accumulator.remove();
+    }
+
+    @Override
+    public DeclarativeRecipe clone() {
+        DeclarativeRecipe cloned = (DeclarativeRecipe) super.clone();
+        cloned.accumulator = new ThreadLocal<>();
+        return cloned;
     }
 
     @Override
     protected RecipeDescriptor createRecipeDescriptor() {
-        List<RecipeDescriptor> recipeList = new ArrayList<>();
-        for (Recipe childRecipe : getRecipeList()) {
-            recipeList.add(childRecipe.getDescriptor());
+        List<RecipeDescriptor> preconditionDescriptors = new ArrayList<>();
+        for (Recipe childRecipe : preconditions) {
+            preconditionDescriptors.add(childRecipe.getDescriptor());
+        }
+        List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+        for (Recipe childRecipe : recipeList) {
+            recipeDescriptors.add(childRecipe.getDescriptor());
         }
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
-                emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
+                emptyList(), preconditionDescriptors, recipeDescriptors, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);
     }
 

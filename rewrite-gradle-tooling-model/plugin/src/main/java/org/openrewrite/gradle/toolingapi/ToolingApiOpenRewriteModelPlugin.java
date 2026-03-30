@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.toolingapi;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -26,6 +27,7 @@ import org.openrewrite.RecipeSerializer;
 import org.openrewrite.gradle.marker.GradleProjectBuilder;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.marker.GradleSettingsBuilder;
+import org.openrewrite.maven.tree.MavenRepository;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -44,7 +46,7 @@ public class ToolingApiOpenRewriteModelPlugin implements Plugin<Project> {
         registry.register(new OpenRewriteModelBuilder());
     }
 
-    private static final ObjectMapper mapper = new RecipeSerializer().getMapper();
+    private static final ObjectMapper mapper = new RecipeSerializer().getMapper().copy().addMixIn(MavenRepository.class, MavenRepositoryMixin.class);
 
     private static class OpenRewriteModelBuilder implements ToolingModelBuilder {
         @Override
@@ -70,5 +72,13 @@ public class ToolingApiOpenRewriteModelPlugin implements Plugin<Project> {
                 throw new RuntimeException("Failed to serialize Gradle model to JSON", e);
             }
         }
+    }
+
+    interface MavenRepositoryMixin {
+        @JsonProperty(access = JsonProperty.Access.READ_WRITE)
+        String getUsername();
+
+        @JsonProperty(access = JsonProperty.Access.READ_WRITE)
+        String getPassword();
     }
 }

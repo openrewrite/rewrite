@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava21;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -172,5 +174,124 @@ class ConstructorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Issue("https://openjdk.org/jeps/513")
+    @MinimumJava25
+    @Nested
+    class FlexibleConstructors {
+
+        @Test
+        void constructorThisWithPrologueAndEpilogue() {
+            rewriteRun(
+              java(
+                """
+                  class A {
+                      String stringA;
+                      A(){}
+                      A(String a) {
+                          String validated = a.trim();
+                          this();
+                          this.stringA = validated;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void constructorSuperWithPrologueAndEpilogue() {
+            rewriteRun(
+              java(
+                """
+                  class Parent {
+                      String parentString;
+                      Parent(String value) {
+                          this.parentString = value;
+                      }
+                  }
+                  
+                  class Child extends Parent {
+                      String childString;
+                      Child(int number, String value) {
+                          String formatted = String.format("Number: %d", number);
+                          super(formatted);
+                          this.childString = value;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void recordConstructorWithValidation() {
+            rewriteRun(
+              java(
+                """
+                  record Point(int x, int y) {
+                      Point {
+                          if (x < 0 || y < 0) {
+                              throw new IllegalArgumentException("Coordinates must be non-negative");
+                          }
+                      }
+                  
+                      Point(String coords) {
+                          String[] parts = coords.split(",");
+                          int parsedX = Integer.parseInt(parts[0].trim());
+                          int parsedY = Integer.parseInt(parts[1].trim());
+                          this(parsedX, parsedY);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void constructorWithEarlyReturn() {
+            rewriteRun(
+              java(
+                """
+                  class A {
+                      String value;
+                      A(){}
+                      A(String input) {
+                          if (input == null) {
+                              this();
+                              return;
+                          }
+                          if (input.isEmpty()) {
+                              throw new IllegalArgumentException("Empty input");
+                          }
+                          this();
+                          this.value = input;
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void assertStatementBeforeConstructor() {
+            rewriteRun(
+              java(
+                """
+                  class A {
+                      String someString;
+                      A(){}
+                      A(String input) {
+                          assert input != null : "Input must not be null";
+                          assert !input.isEmpty() : "Input must not be empty";
+                          this();
+                          someString = input;
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 }

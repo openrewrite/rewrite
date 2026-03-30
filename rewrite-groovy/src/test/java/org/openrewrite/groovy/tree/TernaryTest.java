@@ -65,6 +65,13 @@ class TernaryTest implements RewriteTest {
     }
 
     @Test
+    void elvisOperatorSpacing() {
+        rewriteRun(
+          groovy("x ?: y")
+        );
+    }
+
+    @Test
     void complex() {
         rewriteRun(
           groovy(

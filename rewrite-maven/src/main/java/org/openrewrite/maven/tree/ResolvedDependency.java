@@ -148,11 +148,11 @@ public class ResolvedDependency implements Serializable {
         return dependencies;
     }
 
-    public @Nullable ResolvedDependency findDependency(String groupId, String artifactId) {
+    public @Nullable ResolvedDependency findDependency(@Nullable String groupId, @Nullable String artifactId) {
         return findDependency0(groupId, artifactId, newSetFromMap(new IdentityHashMap<>()));
     }
 
-    private @Nullable ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
+    private @Nullable ResolvedDependency findDependency0(@Nullable String groupId, @Nullable String artifactId, Set<ResolvedDependency> visited) {
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             return this;
         } else if (!visited.add(this)) {

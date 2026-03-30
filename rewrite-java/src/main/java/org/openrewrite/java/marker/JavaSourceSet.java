@@ -222,6 +222,7 @@ public class JavaSourceSet implements SourceSet {
         List<String> pathParts = Arrays.asList(pathStr.split("/"));
         // Example maven path: ~/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar
         // Example gradle path: ~/.gradle/caches/modules-2/files-2.1/org.openrewrite/rewrite-core/8.32.0/64ddcc371f1bf29593b4b27e907757d5554d1a83/rewrite-core-8.32.0.jar
+        // Example typetable path: ~/.rewrite/classpath/.tt/org/junit/jupiter/junit-jupiter-api/6.0.0-RC3
 
         // Either of these directories may be relocated, so a fixed index is unreliable
         String groupId = null;
@@ -232,6 +233,13 @@ public class JavaSourceSet implements SourceSet {
                 groupId = pathParts.get(pathParts.size() - 5);
                 artifactId = pathParts.get(pathParts.size() - 4);
                 version = pathParts.get(pathParts.size() - 3);
+            } else if (pathParts.contains(".tt")) {
+                int ttIndex = pathParts.indexOf(".tt");
+                if (pathParts.size() - ttIndex > 3) {
+                    groupId = String.join(".", pathParts.subList(ttIndex + 1, pathParts.size() - 2));
+                    artifactId = pathParts.get(pathParts.size() - 2);
+                    version = pathParts.get(pathParts.size() - 1);
+                }
             } else if (pathParts.size() >= 4) {
                 version = pathParts.get(pathParts.size() - 2);
                 artifactId = pathParts.get(pathParts.size() - 3);
@@ -282,8 +290,8 @@ public class JavaSourceSet implements SourceSet {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
-                        String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
-                        if (pathStr.endsWith(".class")) {
+                        if (file.getFileName().toString().endsWith(".class")) {
+                            String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
                             String s = entryNameToClassName(pathStr);
                             if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
@@ -313,16 +321,13 @@ public class JavaSourceSet implements SourceSet {
     }
 
     private static String entryNameToClassName(String entryName) {
-        String result = entryName;
-        if (entryName.startsWith("modules/java.base/")) {
-            result = entryName.substring("modules/java.base/".length());
-        }
-        return result.substring(0, result.length() - ".class".length())
+        int start = entryName.startsWith("modules/java.base/") ? "modules/java.base/".length() : 0;
+        return entryName.substring(start, entryName.length() - ".class".length())
                 .replace('/', '.');
     }
 
     static boolean isDeclarable(String className) {
         int dotIndex = Math.max(className.lastIndexOf("."), className.lastIndexOf('$'));
-        return dotIndex != -1 && dotIndex < className.length() -1 && Character.isJavaIdentifierStart(className.charAt(dotIndex + 1));
+        return dotIndex != -1 && dotIndex < className.length() - 1 && Character.isJavaIdentifierStart(className.charAt(dotIndex + 1));
     }
 }

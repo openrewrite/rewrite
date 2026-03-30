@@ -15,21 +15,18 @@
  */
 package org.openrewrite.xml;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 public class RemoveEmptyXmlTags extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove empty XML Tag";
-    }
+    @Getter
+    final String displayName = "Remove empty XML Tag";
 
-    @Override
-    public String getDescription() {
-        return "Removes XML tags that do not have attributes or children, including self closing tags.";
-    }
+    @Getter
+    final String description = "Removes XML tags that do not have attributes or children, including self closing tags.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

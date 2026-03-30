@@ -27,11 +27,10 @@ import org.openrewrite.test.RewriteTest;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions", "UnnecessaryLocalVariable", "LocalVariableUsedAndDeclaredInDifferentSwitchBranches", "Convert2Diamond", "UnusedAssignment"})
+@SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions", "UnnecessaryLocalVariable", "LocalVariableUsedAndDeclaredInDifferentSwitchBranches", "Convert2Diamond", "UnusedAssignment", "MismatchedReadAndWriteOfArray"})
 class RenameVariableTest implements RewriteTest {
 
     @DocumentExample
@@ -42,7 +41,7 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   int fooA() {
                       v++;
@@ -58,7 +57,7 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   int fooA() {
                       VALUE++;
@@ -75,25 +74,26 @@ class RenameVariableTest implements RewriteTest {
           )
         );
     }
+
     private static Recipe renameVariableTest(String hasName, String toName, boolean includeMethodParameters) {
         return toRecipe(() -> new JavaVisitor<>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if ("A".equals(classDecl.getSimpleName())) {
-                    List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
+                    List<J.VariableDeclarations> variableDecls = new ArrayList<>(classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)
-                      .collect(toList());
+                      .toList());
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
-                          classDecl.getBody().getStatements().stream()
+                            classDecl.getBody().getStatements().stream()
                             .filter(J.MethodDeclaration.class::isInstance)
                             .map(J.MethodDeclaration.class::cast)
                             .flatMap(it -> it.getParameters().stream())
                             .filter(J.VariableDeclarations.class::isInstance)
                             .map(J.VariableDeclarations.class::cast)
-                            .collect(toList())
+                            .toList()
                         );
                     }
 
@@ -122,7 +122,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String name;
-
+              
                   /**
                    * The length of <code>name</code> added to the length of {@link #name}.
                    *
@@ -136,7 +136,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private String _name;
-
+              
                   /**
                    * The length of <code>name</code> added to the length of {@link #_name}.
                    *
@@ -223,11 +223,11 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A<T> {
                   private String _val;
                   private String name;
-
+              
                   A(String name, String _val) {
                       this._val = _val;
                       this.name = name;
@@ -236,11 +236,11 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A<T> {
                   private String v;
                   private String name;
-
+              
                   A(String name, String v) {
                       this.v = v;
                       this.name = name;
@@ -258,7 +258,7 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   int fooA() {
                       v++;
@@ -283,7 +283,7 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   int fooA() {
                       // refers to class declaration scope.
@@ -299,7 +299,7 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   int fooA() {
                       // refers to class declaration scope.
@@ -324,11 +324,11 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   // Scoped to ClassDeclaration regardless of statement order.
                   public int v = 1;
-
+              
                   class X {
                       int v = 0;
                   }
@@ -336,11 +336,11 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   // Scoped to ClassDeclaration regardless of statement order.
                   public int VALUE = 1;
-
+              
                   class X {
                       int v = 0;
                   }
@@ -357,10 +357,10 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   public int v = 0;
-
+              
                   class X {
                       int foo() {
                           v = 10;
@@ -371,10 +371,10 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   public int VALUE = 0;
-
+              
                   class X {
                       int foo() {
                           VALUE = 10;
@@ -394,13 +394,13 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               import java.io.FileInputStream;
               import java.io.FileDescriptor;
-
+              
               public class A {
                   public int v = 0;
-
+              
                   int foo() {
                       try (FileInputStream fs = new FileInputStream("file")) {
                           FileDescriptor fd = fs.getFD();
@@ -414,13 +414,13 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               import java.io.FileInputStream;
               import java.io.FileDescriptor;
-
+              
               public class A {
                   public int VALUE = 0;
-
+              
                   int foo() {
                       try (FileInputStream fs = new FileInputStream("file")) {
                           FileDescriptor fd = fs.getFD();
@@ -443,13 +443,13 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               import java.io.FileDescriptor;
               import java.io.FileInputStream;
-
+              
               public class A {
                   public int v = 0;
-
+              
                   int foo() {
                       try {
                           v++;
@@ -464,13 +464,13 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               import java.io.FileDescriptor;
               import java.io.FileInputStream;
-
+              
               public class A {
                   public int VALUE = 0;
-
+              
                   int foo() {
                       try {
                           VALUE++;
@@ -494,13 +494,13 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               import java.io.FileDescriptor;
               import java.io.FileInputStream;
-
+              
               public class A {
                   public int v = 0;
-
+              
                   int foo() {
                       FileDescriptor fd;
                       try (FileInputStream v = new FileInputStream("file")) {
@@ -514,13 +514,13 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               import java.io.FileDescriptor;
               import java.io.FileInputStream;
-
+              
               public class A {
                   public int VALUE = 0;
-
+              
                   int foo() {
                       FileDescriptor fd;
                       try (FileInputStream v = new FileInputStream("file")) {
@@ -543,16 +543,16 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               import java.util.function.BiFunction;
-
+              
               public class A {
                   public Integer v = 1;
-
+              
                   int onlyChangeInScope() {
                       BiFunction<String, Integer, Integer> x = (String j, Integer k) ->
                             v == null ? 42 : v + 41;
-
+              
                       // Class scope.
                       v = 10;
                       // Method scope.
@@ -563,16 +563,16 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               import java.util.function.BiFunction;
-
+              
               public class A {
                   public Integer VALUE = 1;
-
+              
                   int onlyChangeInScope() {
                       BiFunction<String, Integer, Integer> x = (String j, Integer k) ->
                             VALUE == null ? 42 : VALUE + 41;
-
+              
                       // Class scope.
                       VALUE = 10;
                       // Method scope.
@@ -592,16 +592,16 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               import java.util.function.BiFunction;
-
+              
               public class A {
                   public Integer v = 1;
-
+              
                   int onlyChangeInScope() {
                       BiFunction<String, Integer, Integer> x = (String k, Integer v) ->
                       v == null ? 42 : v + 41;
-
+              
                       // Class scope.
                       v = 10;
                   }
@@ -609,16 +609,16 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               import java.util.function.BiFunction;
-
+              
               public class A {
                   public Integer VALUE = 1;
-
+              
                   int onlyChangeInScope() {
                       BiFunction<String, Integer, Integer> x = (String k, Integer v) ->
                       v == null ? 42 : v + 41;
-
+              
                       // Class scope.
                       VALUE = 10;
                   }
@@ -636,10 +636,10 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   public int v = 1;
-
+              
                   int newScopeDoNotChange() {
                       switch (v) {
                           case 1:
@@ -661,10 +661,10 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   public int VALUE = 1;
-
+              
                   int newScopeDoNotChange() {
                       switch (VALUE) {
                           case 1:
@@ -695,10 +695,10 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   public int v = 1;
-
+              
                   int newScopeDoNotChange(int v) {
                       return v;
                   }
@@ -713,10 +713,10 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   public int VALUE = 1;
-
+              
                   int newScopeDoNotChange(int v) {
                       return v;
                   }
@@ -749,7 +749,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   public ClassWithPublicField v = new ClassWithPublicField();
-
+              
                   int getNumberTwice() {
                       v.publicField = this.v.publicField + 10;
                       return v.publicField;
@@ -759,7 +759,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   public ClassWithPublicField VALUE = new ClassWithPublicField();
-
+              
                   int getNumberTwice() {
                       VALUE.publicField = this.VALUE.publicField + 10;
                       return VALUE.publicField;
@@ -779,7 +779,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private int v;
-
+              
                   static A getInstance() {
                       A a = new A();
                       a.v = 12;
@@ -790,7 +790,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   private int VALUE;
-
+              
                   static A getInstance() {
                       A a = new A();
                       a.VALUE = 12;
@@ -821,7 +821,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-
+              
                   {
                       n++; // do not change.
                       int n;
@@ -830,7 +830,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n + 1 == 2) {}
                       n++;
                   }
-
+              
                   public int foo(int n) {
                       return n + this.n;
                   }
@@ -839,7 +839,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class B {
                   int n;
-
+              
                   {
                       n++; // do not change.
                       int n1;
@@ -848,7 +848,7 @@ class RenameVariableTest implements RewriteTest {
                       if(n1 + 1 == 2) {}
                       n1++;
                   }
-
+              
                   public int foo(int n2) {
                       return n2 + this.n;
                   }
@@ -865,7 +865,7 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   public boolean contains(String string, String c) {
                       return string.contains(c);
@@ -874,7 +874,7 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   public boolean contains(String string, String foobar) {
                       return string.contains(foobar);
@@ -893,7 +893,7 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-
+              
               public class A {
                   public boolean contains(String string, String contains) {
                       return string.contains(contains) && string.contains(string);
@@ -902,7 +902,7 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               package org.openrewrite;
-
+              
               public class A {
                   public boolean contains(String string, String foobar) {
                       return string.contains(foobar) && string.contains(string);
@@ -989,14 +989,14 @@ class RenameVariableTest implements RewriteTest {
           java(
             """
               import java.util.Arrays;
-
+              
               public class A {
                 private Object[] objArray;
-
+              
                 public boolean isEqualTo(Object object) {
                   return Arrays.equals(objArray, ((A) object).objArray);
                 }
-
+              
                 public int length() {
                   return objArray.length;
                 }
@@ -1004,14 +1004,14 @@ class RenameVariableTest implements RewriteTest {
               """,
             """
               import java.util.Arrays;
-
+              
               public class A {
                 private Object[] objects;
-
+              
                 public boolean isEqualTo(Object object) {
                   return Arrays.equals(objects, ((A) object).objects);
                 }
-
+              
                 public int length() {
                   return objects.length;
                 }
@@ -1026,19 +1026,19 @@ class RenameVariableTest implements RewriteTest {
     void hiddenVariablesGetRenamedCorrectly() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-                @Override
-                public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                    if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
-                        doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "n1"));
-                    }
-                    return super.visitVariableDeclarations(multiVariable, ctx);
-                }
-            })),
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().getFirst(), "n1"));
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          })),
           java(
             """
               public class A {
                 private int n;
-
+              
                 public A setN(int n) {
                   this.n = n;
                   return this;
@@ -1048,7 +1048,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                 private int n;
-
+              
                 public A setN(int n1) {
                   this.n = n1;
                   return this;
@@ -1078,25 +1078,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-
+              
                   Base base() {
                       return hidden;
                   }
               }
-
+              
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-
+              
               class Extended extends Middle {
                   private Base hidden;
-
+              
                   Extended extended() {
                       return (Extended) hidden;
                   }
-
+              
                   public Extended test(Base hidden) {
                       this.hidden = super.hidden;
                       this.hidden = hidden.hidden;
@@ -1116,25 +1116,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base changed;
-
+              
                   Base base() {
                       return changed;
                   }
               }
-
+              
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) changed;
                   }
               }
-
+              
               class Extended extends Middle {
                   private Base hidden;
-
+              
                   Extended extended() {
                       return (Extended) hidden;
                   }
-
+              
                   public Extended test(Base hidden) {
                       this.hidden = super.changed;
                       this.hidden = hidden.changed;
@@ -1173,25 +1173,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-
+              
                   Base base() {
                       return hidden;
                   }
               }
-
+              
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-
+              
               class Extended extends Middle {
                   private Base hidden;
-
+              
                   Extended extended() {
                       return (Extended) hidden;
                   }
-
+              
                   public Extended test(Base hidden) {
                       this.hidden = super.hidden;
                       this.hidden = hidden.hidden;
@@ -1211,25 +1211,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-
+              
                   Base base() {
                       return hidden;
                   }
               }
-
+              
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-
+              
               class Extended extends Middle {
                   private Base changed;
-
+              
                   Extended extended() {
                       return (Extended) changed;
                   }
-
+              
                   public Extended test(Base hidden) {
                       this.changed = super.hidden;
                       this.changed = hidden.hidden;
@@ -1268,25 +1268,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-
+              
                   Base base() {
                       return hidden;
                   }
               }
-
+              
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-
+              
               class Extended extends Middle {
                   private Base hidden;
-
+              
                   Extended extended() {
                       return (Extended) hidden;
                   }
-
+              
                   public Extended test(Base hidden) {
                       this.hidden = super.hidden;
                       this.hidden = hidden.hidden;
@@ -1306,25 +1306,25 @@ class RenameVariableTest implements RewriteTest {
               class Base {
                   protected Base visible;
                   protected Base hidden;
-
+              
                   Base base() {
                       return hidden;
                   }
               }
-
+              
               class Middle extends Base {
                   Middle middle() {
                       return (Middle) hidden;
                   }
               }
-
+              
               class Extended extends Middle {
                   private Base hidden;
-
+              
                   Extended extended() {
                       return (Extended) hidden;
                   }
-
+              
                   public Extended test(Base changed) {
                       this.hidden = super.hidden;
                       this.hidden = changed.hidden;
@@ -1362,7 +1362,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n;
-
+              
                   public void blocks() {
                       {
                           //only this one is in scope
@@ -1379,7 +1379,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n;
-
+              
                   public void blocks() {
                       {
                           //only this one is in scope
@@ -1419,7 +1419,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n;
-
+              
                   public void blocks() {
                       {
                           int n = 0;
@@ -1435,7 +1435,7 @@ class RenameVariableTest implements RewriteTest {
             """
               public class A {
                   int n1;
-
+              
                   public void blocks() {
                       {
                           int n = 0;
@@ -1446,6 +1446,88 @@ class RenameVariableTest implements RewriteTest {
                           int x = n;
                       }
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/3051")
+    @Test
+    void mustNotRenameMethod() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("foo", "baz", false)),
+          // language=java
+          java(
+            """
+               package com.helloworld;
+
+               public class A {
+                 private final String foo = "";
+
+                 public String foo() {
+                  return this.foo;
+                 }
+              }""",
+            """
+               package com.helloworld;
+
+               public class A {
+                 private final String baz = "";
+
+                 public String foo() {
+                  return this.baz;
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6153")
+    @Test
+    void renameVariableWithLambdaAssignedToField() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations.NamedVariable visitVariable(
+                J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
+                  if ("foo".equals(variable.getSimpleName())) {
+                      doAfterVisit(new RenameVariable<>(variable, "FOO"));
+                  }
+                  return super.visitVariable(variable, executionContext);
+              }
+          })),
+          java(
+            """
+              import java.util.function.BiFunction;
+
+              public class Foo {
+                public BiFunction<String, String, Boolean> baz;
+                public String baz2;
+              }
+
+              """
+          ),
+          java(
+            """
+              public class Bar {
+                private static final Foo foo = new Foo();
+
+                public void bar() {
+                  foo.baz = (a, b) -> true;
+                  foo.baz2 = "hello";
+                }
+              }
+              """,
+            """
+              public class Bar {
+                private static final Foo FOO = new Foo();
+
+                public void bar() {
+                  FOO.baz = (a, b) -> true;
+                  FOO.baz2 = "hello";
+                }
               }
               """
           )

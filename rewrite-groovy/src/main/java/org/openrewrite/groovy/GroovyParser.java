@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
+import org.codehaus.groovy.ast.tools.GenericsUtils;
 import org.codehaus.groovy.control.*;
 import org.codehaus.groovy.control.io.InputStreamReaderSource;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -181,6 +182,7 @@ public class GroovyParser implements Parser {
     @Override
     public GroovyParser reset() {
         typeCache.clear();
+        GenericsUtils.clearParameterizedTypeCache();
         return this;
     }
 

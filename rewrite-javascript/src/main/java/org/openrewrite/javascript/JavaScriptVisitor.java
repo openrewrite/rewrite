@@ -447,6 +447,31 @@ public class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return vd.getPadding().withVariables(requireNonNull(ListUtils.map(vd.getPadding().getVariables(), e -> visitRightPadded(e, JsRightPadded.Location.SCOPED_VARIABLE_DECLARATIONS_VARIABLE, p))));
     }
 
+    public J visitShebang(JS.Shebang shebang, P p) {
+        JS.Shebang s = shebang;
+        s = s.withPrefix(visitSpace(s.getPrefix(), JsSpace.Location.SHEBANG_PREFIX, p));
+        return s.withMarkers(visitMarkers(s.getMarkers(), p));
+    }
+
+    public J visitSpread(JS.Spread spread, P p) {
+        JS.Spread sp = spread;
+        sp = sp.withPrefix(visitSpace(sp.getPrefix(), JsSpace.Location.SPREAD_PREFIX, p));
+        sp = sp.withMarkers(visitMarkers(sp.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(sp, p);
+        if (!(temp instanceof JS.Spread)) {
+            return temp;
+        } else {
+            sp = (JS.Spread) temp;
+        }
+        Statement tempStatement = (Statement) visitStatement(sp, p);
+        if (!(tempStatement instanceof JS.Spread)) {
+            return tempStatement;
+        } else {
+            sp = (JS.Spread) tempStatement;
+        }
+        return sp.withExpression(requireNonNull(visitAndCast(sp.getExpression(), p)));
+    }
+
     public J visitStatementExpression(JS.StatementExpression expression, P p) {
         JS.StatementExpression se = expression;
         Expression temp = (Expression) visitExpression(se, p);

@@ -17,6 +17,8 @@ package org.openrewrite.semver;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class LatestMinorTest {
@@ -34,10 +36,40 @@ public class LatestMinorTest {
         assertThat(latestMinor.isValid("1.0", "1.0.1")).isTrue();
         assertThat(latestMinor.isValid("1.0.0", "1.1.0")).isTrue();
         assertThat(latestMinor.isValid("1.0.0", "2.0.0")).isFalse();
+        assertThat(latestMinor.isValid("1.0.x", "1.0.1")).isTrue();
     }
 
     @Test
     void noSnapshots() {
         assertThat(latestMinor.isValid("1.0.0", "1.1.0-SNAPSHOT")).isFalse();
+    }
+
+    @Test
+    void compare() {
+        assertThat(latestMinor.compare(null, "1.0", "latest.minor")).isNegative();
+        assertThat(latestMinor.compare(null, "latest.minor", "1.0")).isPositive();
+        assertThat(latestMinor.compare("1.x", "1.0", "1.1")).isNegative();
+    }
+
+    @Test
+    void upgrade() {
+        assertThat(latestMinor.upgrade("2.10.0", List.of("2.9.0"))).isNotPresent();
+
+        assertThat(latestMinor.upgrade("2.10.0", List.of("2.10.1-SNAPSHOT"))).isNotPresent();
+
+        assertThat(latestMinor.upgrade("2.10.0", List.of("2.10.1"))).isPresent()
+          .get().isEqualTo("2.10.1");
+
+        assertThat(latestMinor.upgrade("2.10.0", List.of("2.11.0-SNAPSHOT"))).isNotPresent();
+
+        assertThat(latestMinor.upgrade("2.10.0", List.of("2.11.0"))).isPresent()
+          .get().isEqualTo("2.11.0");
+
+        assertThat(latestMinor.upgrade("2.10.0", List.of("3.0.0-SNAPSHOT"))).isNotPresent();
+
+        assertThat(latestMinor.upgrade("2.10.0", List.of("3.0.0"))).isNotPresent();
+
+        assertThat(latestMinor.upgrade("2.x", List.of("2.9"))).isPresent();
+        assertThat(latestMinor.upgrade("2.x", List.of("3.0"))).isNotPresent();
     }
 }

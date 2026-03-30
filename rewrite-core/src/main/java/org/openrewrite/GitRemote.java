@@ -16,10 +16,10 @@
 package org.openrewrite;
 
 import lombok.Value;
-import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.jgit.transport.URIish;
+import org.openrewrite.jgit.util.StringUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;

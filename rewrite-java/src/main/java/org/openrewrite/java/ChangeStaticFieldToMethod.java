@@ -17,9 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.lang3.StringUtils;
 import org.intellij.lang.annotations.Language;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesField;
@@ -65,15 +63,9 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 shortType, oldFieldName, newMethodName);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change static field access to static method access";
-    }
+    String displayName = "Change static field access to static method access";
 
-    @Override
-    public String getDescription() {
-        return "Migrate accesses to a static field to invocations of a static method.";
-    }
+    String description = "Migrate accesses to a static field to invocations of a static method.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -115,12 +107,10 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 return makeNewMethod(newClass).apply(getCursor(), coordinates);
             }
 
-            @NonNull
             private JavaTemplate makeNewMethod(String newClass) {
-
-                String packageName = StringUtils.substringBeforeLast(newClass, ".");
-                String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
-
+                int lastIndexOfDot = newClass.lastIndexOf('.');
+                String packageName = newClass.substring(0, lastIndexOfDot);
+                String simpleClassName = newClass.substring(lastIndexOfDot + 1);
                 String methodInvocationTemplate = simpleClassName + (newTarget != null ? "." + newTarget + "." : ".") + newMethodName + "()";
 
                 @Language("java") String methodStub;

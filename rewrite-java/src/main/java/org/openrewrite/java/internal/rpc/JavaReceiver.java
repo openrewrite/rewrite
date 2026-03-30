@@ -16,9 +16,9 @@
 package org.openrewrite.java.internal.rpc;
 
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -30,7 +30,7 @@ import java.util.function.Function;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
-@SuppressWarnings("DataFlowIssue")
+@SuppressWarnings({"DataFlowIssue", "ConstantValue"})
 public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
@@ -278,9 +278,9 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public J visitElse(J.If.Else elze, RpcReceiveQueue q) {
-        return elze
-                .getPadding().withBody(q.receive(elze.getPadding().getBody(), b -> visitRightPadded(b, q)));
+    public J visitElse(J.If.Else anElse, RpcReceiveQueue q) {
+        return anElse
+                .getPadding().withBody(q.receive(anElse.getPadding().getBody(), b -> visitRightPadded(b, q)));
     }
 
     @Override
@@ -335,7 +335,11 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return literal
                 .withValue(q.receive(literal.getValue()))
                 .withValueSource(q.receive(literal.getValueSource()))
-                .withUnicodeEscapes(q.receiveList(literal.getUnicodeEscapes(), s -> s))
+                .withUnicodeEscapes(q.receiveList(literal.getUnicodeEscapes(), s -> {
+                    int valueSourceIndex = q.receive(s != null ? s.getValueSourceIndex() : 0);
+                    String codePoint = q.receive(s != null ? s.getCodePoint() : null);
+                    return new J.Literal.UnicodeEscape(valueSourceIndex, codePoint);
+                }))
                 .withType(q.receive(literal.getType(), t -> (JavaType.Primitive) visitType(t, q)));
     }
 
@@ -374,12 +378,14 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, RpcReceiveQueue q) {
-        return method
+        method = method
                 .getPadding().withSelect(q.receive(method.getPadding().getSelect(), s -> visitRightPadded(s, q)))
-                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)))
-                .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
+                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)));
+        J.Identifier name = q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q));
+        return method
                 .getPadding().withArguments(q.receive(method.getPadding().getArguments(), a -> visitContainer(a, q)))
-                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
+                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)))
+                .withName(name);
     }
 
     @Override
@@ -455,7 +461,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitPrimitive(J.Primitive primitive, RpcReceiveQueue q) {
         return primitive
-                .withType(q.receive(primitive.getType()));
+                .withType(q.receive(primitive.getType(), t -> (JavaType.Primitive) visitType(t, q)));
     }
 
     @Override
@@ -647,27 +653,32 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
+        T element = q.receive(right.getElement(), t -> {
+            if (t instanceof J) {
+                //noinspection unchecked
+                return (T) visitNonNull((J) t, q);
+            } else if (t instanceof Space) {
+                //noinspection unchecked
+                return (T) visitSpace((Space) t, q);
+            }
+            return t;
+        });
         return right
-                .withElement(q.receive(right.getElement(), t -> {
-                    if (t instanceof J) {
-                        //noinspection unchecked
-                        return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
-                        //noinspection unchecked
-                        return (T) visitSpace((Space) t, q);
-                    }
-                    return t;
-                }))
+                .withElement(element)
                 .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
                 .withMarkers(q.receive(right.getMarkers()));
     }
 
+    private final JavaTypeReceiver javaTypeReceiver = new JavaTypeReceiver();
+
     @Override
-    public JavaType visitType(@SuppressWarnings("NullableProblems") JavaType javaType, RpcReceiveQueue q) {
-        if (javaType instanceof RpcCodec) {
-            //noinspection unchecked
-            return ((RpcCodec<@NonNull JavaType>) javaType).rpcReceive(javaType, q);
+    public @Nullable JavaType visitType(@Nullable JavaType javaType, RpcReceiveQueue q) {
+        if (javaType == null) {
+            return null;
+        } else if (javaType instanceof JavaType.Unknown) {
+            return JavaType.Unknown.getInstance();
         }
-        return requireNonNull(super.visitType(javaType, q));
+        return javaTypeReceiver.visit(javaType, q);
     }
 }
+

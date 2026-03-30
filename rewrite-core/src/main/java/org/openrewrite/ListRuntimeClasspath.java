@@ -19,6 +19,7 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
+import lombok.Getter;
 import org.openrewrite.table.ClasspathReport;
 
 import java.net.URI;
@@ -32,15 +33,11 @@ import static java.util.stream.Collectors.groupingBy;
 public class ListRuntimeClasspath extends ScanningRecipe<Integer> {
     transient ClasspathReport report = new ClasspathReport(this);
 
-    @Override
-    public String getDisplayName() {
-        return "List runtime classpath";
-    }
+    @Getter
+    final String displayName = "List runtime classpath";
 
-    @Override
-    public String getDescription() {
-        return "A diagnostic utility which emits the runtime classpath to a data table.";
-    }
+    @Getter
+    final String description = "A diagnostic utility which emits the runtime classpath to a data table.";
 
     @Override
     public Integer getInitialValue(ExecutionContext ctx) {

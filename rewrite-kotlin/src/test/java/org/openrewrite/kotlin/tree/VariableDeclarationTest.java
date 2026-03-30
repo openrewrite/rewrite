@@ -561,7 +561,6 @@ class VariableDeclarationTest implements RewriteTest {
                 spec -> spec.afterRecipe(cu -> {
                     for (Statement statement : cu.getStatements()) {
                         if (statement instanceof J.VariableDeclarations declarations) {
-                            J.Modifier.hasModifier(declarations.getModifiers(), J.Modifier.Type.Final);
                             assertThat(J.Modifier.hasModifier(declarations.getModifiers(), J.Modifier.Type.Final)).isTrue();
                         }
                     }

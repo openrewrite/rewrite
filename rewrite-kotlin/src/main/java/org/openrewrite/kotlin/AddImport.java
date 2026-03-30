@@ -29,6 +29,7 @@ import org.openrewrite.kotlin.style.IntelliJ;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -182,8 +183,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                 }
             }
 
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
-                    .orElse(IntelliJ.importLayout());
+            ImportLayoutStyle layoutStyle = Style.from(ImportLayoutStyle.class, cu, IntelliJ::importLayout);
 
             List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
                     .map(JavaSourceSet::getClasspath)
@@ -192,8 +192,8 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
 
             // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
-            GeneralFormatStyle generalFormatStyle = Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
-              .orElse(autodetectGeneralFormatStyle(cu));
+            K.CompilationUnit finalCu = cu;
+            GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, cu, ()-> autodetectGeneralFormatStyle(finalCu));
             newImports = checkCRLF(newImports, generalFormatStyle);
 
             cu = cu.getPadding().withImports(newImports);

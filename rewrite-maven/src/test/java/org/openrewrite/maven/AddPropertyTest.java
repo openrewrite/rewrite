@@ -22,6 +22,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -381,6 +382,33 @@ class AddPropertyTest implements RewriteTest {
               </properties>
             </project>
             """
+          )
+        );
+    }
+
+    @Test
+    void twiceInARow() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AddProperty("key", "value", null, false),
+            new AddProperty("key", "v", null, false)
+          ).cycles(1).expectedCyclesThatMakeChanges(1),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>v</key>
+                </properties>
+              </project>
+              """,
+            sourceSpecs -> sourceSpecs.after(actual ->
+              assertThat(actual)
+                .contains("<key>v</key>")
+                .actual()
+            )
           )
         );
     }

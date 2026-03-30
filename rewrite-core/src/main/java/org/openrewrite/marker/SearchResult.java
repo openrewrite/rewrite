@@ -63,8 +63,9 @@ public final class SearchResult implements Marker, RpcCodec<SearchResult> {
      * <p>
      * If the there already exists a search result with the same description, the existing search result is returned.
      */
+    @Contract("null, _ -> null; !null, _ -> !null")
     @Incubating(since = "8.0.0")
-    public static <T extends @Nullable Tree> T mergingFound(@Nullable T t, String description) {
+    public static <T extends @Nullable Tree> @Nullable T mergingFound(@Nullable T t, String description) {
         return mergingFound(t, description, ", ");
     }
 
@@ -75,6 +76,7 @@ public final class SearchResult implements Marker, RpcCodec<SearchResult> {
      *
      * @param delimiter The delimiter to use when merging descriptions.
      */
+    @Contract("null, _, _ -> null; !null, _, _ -> !null")
     @Incubating(since = "8.0.0")
     public static <T extends Tree> @Nullable T mergingFound(@Nullable T t, String description, String delimiter) {
         Objects.requireNonNull(delimiter, "delimiter must not be null");

@@ -1,0 +1,27 @@
+#
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.MigrateToGradle9
+displayName: Migrate to Gradle 9 from Gradle 8
+description: Migrate to version 9.x. See the Gradle upgrade guide from [version 8.x to 9.0](https://docs.gradle.org/9.0.0/userguide/upgrading_major_version_9.html) for more information.
+recipeList:
+  - org.openrewrite.gradle.MigrateToGradle8
+  - org.openrewrite.gradle.UpdateGradleWrapper:
+      version: 9.x
+      addIfMissing: false
+  # Map notation has been deprecated in 9.1+
+  - org.openrewrite.gradle.DependencyUseStringNotation

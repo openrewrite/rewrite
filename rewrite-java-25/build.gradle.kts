@@ -34,7 +34,6 @@ java {
 tasks.named("licenseFormat") { enabled = false }
 
 tasks.withType<JavaCompile>().configureEach {
-    // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_25.toString()
     targetCompatibility = JavaVersion.VERSION_25.toString()
 
@@ -45,6 +44,7 @@ tasks.withType<JavaCompile>().configureEach {
             "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+            "--add-exports", "jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
         )

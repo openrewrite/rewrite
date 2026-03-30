@@ -17,7 +17,7 @@ import {Minutes, Recipe, RecipeDescriptor, ScanningRecipe} from "../recipe";
 import {RewriteRpc} from "./rewrite-rpc";
 import {noopVisitor, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
-import {SourceFile} from "../tree";
+import {SourceFile, Tree} from "../tree";
 
 export class RpcRecipe extends ScanningRecipe<number> {
     name: string = this._descriptor.name;
@@ -29,8 +29,8 @@ export class RpcRecipe extends ScanningRecipe<number> {
     constructor(private readonly rpc: RewriteRpc,
                 private readonly remoteId: string,
                 private readonly _descriptor: RecipeDescriptor,
-                private readonly editVisitor: string,
-                private readonly scanVisitor?: string) {
+                readonly editVisitor: string,
+                readonly scanVisitor?: string) {
         super();
     }
 
@@ -46,31 +46,12 @@ export class RpcRecipe extends ScanningRecipe<number> {
         return 0
     }
 
-    editorWithData(_acc: number): TreeVisitor<any, ExecutionContext> {
-        const rpc = this.rpc;
-        const editVisitor = this.editVisitor;
-        return new class extends TreeVisitor<any, ExecutionContext> {
-            protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
-                const t = await rpc.visit(tree, editVisitor, ctx);
-                this.stopAfterPreVisit();
-                return t;
-            }
-        };
+    async editorWithData(_acc: number): Promise<TreeVisitor<any, ExecutionContext>> {
+        return this.editVisitor ? new RpcVisitor(this.rpc, this.editVisitor) : noopVisitor();
     }
 
-    scanner(_acc: number): TreeVisitor<any, ExecutionContext> {
-        const rpc = this.rpc;
-        const scanVisitor = this.scanVisitor;
-        if (scanVisitor) {
-            return new class extends TreeVisitor<any, ExecutionContext> {
-                protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
-                    await rpc.scan(tree, scanVisitor, ctx);
-                    this.stopAfterPreVisit();
-                    return tree;
-                }
-            };
-        }
-        return noopVisitor();
+    async scanner(_acc: number): Promise<TreeVisitor<any, ExecutionContext>> {
+        return this.scanVisitor ? new RpcVisitor(this.rpc, this.scanVisitor) : noopVisitor();
     }
 
     async generate(_acc: number, ctx: ExecutionContext): Promise<SourceFile[]> {
@@ -98,5 +79,23 @@ export class RpcRecipe extends ScanningRecipe<number> {
             const updated = await this.rpc.getObject(ctx.messages["org.openrewrite.rpc.id"]);
             Object.assign(ctx, updated);
         }
+    }
+}
+
+export class RpcVisitor extends TreeVisitor<Tree, ExecutionContext> {
+    constructor(
+        private readonly rpc: RewriteRpc,
+        private readonly visitorName: string
+    ) {
+        super();
+    }
+
+    async isAcceptable(sourceFile: SourceFile, _: ExecutionContext): Promise<boolean> {
+        return (await this.rpc.languages()).includes(sourceFile.kind);
+    }
+
+    protected async preVisit(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
+        this.stopAfterPreVisit();
+        return this.rpc.visit(tree as SourceFile, this.visitorName, ctx);
     }
 }

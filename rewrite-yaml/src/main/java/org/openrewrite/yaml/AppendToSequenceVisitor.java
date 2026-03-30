@@ -19,12 +19,15 @@ package org.openrewrite.yaml;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static java.util.Collections.sort;
 import static java.util.stream.Collectors.toList;
@@ -115,9 +118,51 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
             }
         }
-        Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
+
+        Yaml.Block newItem = parseYamlValue(value, itemPrefix, entryPrefix, style);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
         return newSequence.withMarkers(existingSequence.getMarkers().addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
+    }
+
+    private Yaml.Block parseYamlValue(String value, String itemPrefix, String entryPrefix, Yaml.Scalar.Style style) {
+        // Try to parse the value as YAML to detect if it's a complex structure (mapping/sequence)
+        return YamlParser.builder()
+                .build()
+                .parse(value)
+                .findFirst()
+                .filter(Yaml.Documents.class::isInstance)
+                .map(Yaml.Documents.class::cast)
+                .map(docs -> docs.getDocuments().get(0).getBlock())
+                .<Yaml.Block>flatMap(block -> {
+                    if (block instanceof Yaml.Mapping) {
+                        // Calculate the base indentation for the new item
+                        String baseIndent = StringUtils.indent(entryPrefix.replace("\n", ""));
+                        return Optional.of(adjustMappingIndentation((Yaml.Mapping) block, itemPrefix, baseIndent));
+                    }
+                    return Optional.empty();
+                })
+                .orElseGet(() -> new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value));
+    }
+
+    /**
+     * Recursively adjust indentation for a mapping and all nested structures.
+     */
+    private Yaml.Mapping adjustMappingIndentation(Yaml.Mapping mapping, String firstEntryPrefix, String baseIndent) {
+        String subsequentEntryPrefix = "\n" + baseIndent + "  ";
+        List<Yaml.Mapping.Entry> adjustedEntries = ListUtils.map(mapping.getEntries(), (index, entry) -> {
+            String newPrefix = index == 0 ? firstEntryPrefix : subsequentEntryPrefix;
+            Yaml.Mapping.Entry adjusted = entry.withPrefix(newPrefix);
+            // Recursively adjust nested mappings in the value
+            if (entry.getValue() instanceof Yaml.Mapping) {
+                String nestedBaseIndent = baseIndent + "    "; // Add 4 more spaces for nested level
+                String nestedFirstEntryPrefix = "\n" + nestedBaseIndent; // Nested mapping starts on new line
+                Yaml.Mapping nestedMapping = adjustMappingIndentation(
+                        (Yaml.Mapping) entry.getValue(), nestedFirstEntryPrefix, nestedBaseIndent);
+                return adjusted.withValue(nestedMapping);
+            }
+            return adjusted;
+        });
+        return mapping.withEntries(adjustedEntries);
     }
 }

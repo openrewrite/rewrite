@@ -19,8 +19,10 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,6 +31,7 @@ import org.openrewrite.test.SourceSpec;
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
@@ -1786,6 +1789,126 @@ class ChangePackageTest implements RewriteTest {
                   org.apache.hc.core5.http: debug
               """,
             spec -> spec.path("application.yaml")
+          )
+        );
+    }
+
+    @Test
+    void innerType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePackage("com.demo", "com.newdemo", true),
+            new ChangeType("com.newdemo.A.B", "some.thing.X.Y", true)
+          ).parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package com.demo;
+
+              public class A {
+                  public static class B {}
+              }
+              """
+          )),
+          java(
+            """
+              package app;
+
+              import com.demo.A.B;
+
+              interface Test {
+                  B foo();
+              }
+              """,
+            """
+              package app;
+
+              import some.thing.X.Y;
+
+              interface Test {
+                  Y foo();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inheritedTypesUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.before", "com.after", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.before;
+                  
+                  public class A { }
+                  """
+              )
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.before.A;
+              
+              class X extends A { }
+              """,
+            """
+              package app;
+              
+              import com.after.A;
+              
+              class X extends A { }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type-> TypeUtils.isAssignableTo("com.after.A", type), "Assignable to updated type")
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6513")
+    @Test
+    void changePackageUpdatesNestedClassImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "dev.nipafx.rewrite_bug",
+            "dev.nipafx.rewrite_changepackage_bug",
+            null
+          )),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              import dev.nipafx.rewrite_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              import dev.nipafx.rewrite_changepackage_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """
           )
         );
     }

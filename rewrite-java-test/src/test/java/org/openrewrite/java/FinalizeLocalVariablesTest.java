@@ -193,7 +193,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                 }
                 J.Assignment a = super.visitAssignment(assignment, hasAssignment);
                 if (a.getVariable() instanceof J.Identifier) {
-                    J.Identifier i = (J.Identifier) a.getVariable();
+                    var i = (J.Identifier) a.getVariable();
                     if (i.getSimpleName().equals(variable.getSimpleName())) {
                         hasAssignment.set(true);
                     }
@@ -210,7 +210,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
 
                 J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, hasAssignment);
                 if (a.getVariable() instanceof J.Identifier) {
-                    J.Identifier i = (J.Identifier) a.getVariable();
+                    var i = (J.Identifier) a.getVariable();
                     if (i.getSimpleName().equals(variable.getSimpleName())) {
                         hasAssignment.set(true);
                     }
@@ -226,7 +226,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
 
                 J.Unary u = super.visitUnary(unary, hasAssignment);
                 if (u.getOperator().isModifying() && u.getExpression() instanceof J.Identifier) {
-                    J.Identifier i = (J.Identifier) u.getExpression();
+                    var i = (J.Identifier) u.getExpression();
                     if (i.getSimpleName().equals(variable.getSimpleName())) {
                         hasAssignment.set(true);
                     }

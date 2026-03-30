@@ -36,15 +36,9 @@ public class FindBuildMetadata extends Recipe {
             example = "2")
     String value;
 
-    @Override
-    public String getDisplayName() {
-        return "Find build metadata";
-    }
+    String displayName = "Find build metadata";
 
-    @Override
-    public String getDescription() {
-        return "Find source files with matching build metadata.";
-    }
+    String description = "Find source files with matching build metadata.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

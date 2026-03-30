@@ -19,6 +19,9 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 
+import java.util.List;
+import java.util.Map;
+
 @Value
 public class PrepareRecipeResponse {
     /**
@@ -29,7 +32,30 @@ public class PrepareRecipeResponse {
 
     RecipeDescriptor descriptor;
     String editVisitor;
+    List<Precondition> editPreconditions;
 
     @Nullable
     String scanVisitor;
+
+    List<Precondition> scanPreconditions;
+
+    /**
+     * When non-null, the remote declares that this recipe delegates entirely
+     * to a Java recipe. The host should load the recipe locally via the
+     * marketplace instead of wrapping it in an RpcRecipe.
+     */
+    @Nullable
+    DelegatesTo delegatesTo;
+
+    @Value
+    public static class DelegatesTo {
+        String recipeName;
+        Map<String, Object> options;
+    }
+
+    @Value
+    public static class Precondition {
+        String visitorName;
+        Map<String, Object> visitorOptions;
+    }
 }

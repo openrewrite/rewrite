@@ -73,6 +73,12 @@ class JavaSourceSetTest {
     }
 
     @Test
+    void gavCoordinateFromTypeTable() {
+        assertThat(gavFromPath(Paths.get("/home/tim/.rewrite/classpath/.tt/org/junit/jupiter/junit-jupiter-api/6.0.0-RC3")))
+          .isEqualTo("org.junit.jupiter:junit-jupiter-api:6.0.0-RC3");
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4401")
     void tolerateWeirdClassNames(){
         assertThat(JavaSourceSet.isDeclarable("fj.data.$")).isFalse();

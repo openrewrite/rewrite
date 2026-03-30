@@ -23,6 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.cleanup.RemoveUnusedVisitor;
 import org.openrewrite.yaml.format.AutoFormatVisitor;
 import org.openrewrite.yaml.tree.Yaml;
+import org.openrewrite.yaml.tree.YamlKey;
 
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
@@ -71,8 +72,15 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitDocument(Yaml.Document document, P p) {
-        return document.withBlock((Yaml.Block) visit(document.getBlock(), p))
+        return document
+                .withDirectives(ListUtils.map(document.getDirectives(), d -> visitAndCast(d, p)))
+                .withBlock((Yaml.Block) visit(document.getBlock(), p))
+                .withEnd((Yaml.Document.End) visit(document.getEnd(), p))
                 .withMarkers(visitMarkers(document.getMarkers(), p));
+    }
+
+    public Yaml visitDirective(Yaml.Directive directive, P p) {
+        return directive.withMarkers(visitMarkers(directive.getMarkers(), p));
     }
 
     public Yaml visitDocumentEnd(Yaml.Document.End end, P p) {
@@ -88,7 +96,10 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = entry;
-        e = e.withKey(visitAndCast(e.getKey(), p));
+        Yaml visitedKey = (Yaml) visit(e.getKey(), p);
+        if (visitedKey instanceof YamlKey) {
+            e = e.withKey((YamlKey) visitedKey);
+        }
         e = e.withValue(visitAndCast(e.getValue(), p));
         return e.withMarkers(visitMarkers(e.getMarkers(), p));
     }

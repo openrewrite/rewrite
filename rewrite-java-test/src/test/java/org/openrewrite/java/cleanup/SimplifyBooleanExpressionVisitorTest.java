@@ -225,12 +225,12 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               public class A {
                   {
-                      boolean a1 = 1 != 1;
-                      boolean a2 = 1 == 1;
-                      boolean a3 = 1 >= 1;
-                      boolean a4 = 1 > 1;
-                      boolean a5 = 1 <= 1;
-                      boolean a6 = 1 < 1;
+                      boolean a1 = false;
+                      boolean a2 = true;
+                      boolean a3 = true;
+                      boolean a4 = false;
+                      boolean a5 = true;
+                      boolean a6 = false;
                   }
               }
               """
@@ -544,7 +544,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               class A {
                   boolean orElse(Boolean nullable, boolean nonnull) {
-                      return nullable == null ? nonnull : nullable;
+                      return nullable != null ? !nullable : !nonnull;
                   }
               }
               """
@@ -575,10 +575,10 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               public class A {
                   boolean m1(boolean a, boolean b, boolean c) {
-                      return a ? c : b;
+                      return a ? !b : !c;
                   }
                   boolean m2(boolean a, boolean b, boolean c) {
-                      return a ? b : c;
+                      return a ? !c : !b;
                   }
                   boolean m3(boolean a, boolean b, boolean c) {
                       return a ? c : b;
@@ -806,6 +806,151 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                           return;
                       }
                       this.b = b;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void correctlySimplifyNegatedTernaryEqualsNull() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void doSome(String o1, String o2) {
+                      if (!(o1 == null ? o2 == null : o1.equals(o2))) {
+                      }
+                  }
+              }
+              """,
+            """
+              class A {
+                  void doSome(String o1, String o2) {
+                      if (o1 == null ? o2 != null : !o1.equals(o2)) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void simplifyNumericLiteralComparisons() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      boolean a = 1 < 2;
+                      boolean b = 3 == 4;
+                      boolean c = 5 > 3;
+                      boolean d = 2 <= 2;
+                      boolean e = 10 >= 20;
+                      boolean f = 7 != 7;
+                      boolean g = 1.5 < 2.5;
+                      boolean h = 3.0 == 3.0;
+                      boolean i = 100L > 50L;
+                      boolean j = 1 < 1;
+                      boolean k = 5 == 5;
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      boolean a = true;
+                      boolean b = false;
+                      boolean c = true;
+                      boolean d = true;
+                      boolean e = false;
+                      boolean f = false;
+                      boolean g = true;
+                      boolean h = true;
+                      boolean i = true;
+                      boolean j = false;
+                      boolean k = true;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void numericLiteralComparisonsWithEdgeCases() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      // Edge cases with floating point - these are not simplified
+                      // because they involve non-literal expressions (field accesses)
+                      boolean a = Double.NaN == Double.NaN;
+                      boolean b = Double.NaN != Double.NaN;
+                      boolean c = -0.0 == 0.0;
+                      boolean d = -0.0 < 0.0;
+                      boolean e = Double.POSITIVE_INFINITY > 1.0;
+                      boolean f = Double.NEGATIVE_INFINITY < 1.0;
+                      boolean g = Float.NaN == Float.NaN;
+                      boolean h = Float.POSITIVE_INFINITY > Float.NEGATIVE_INFINITY;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6164")
+    @Test
+    void largeLongValuesLosePrecisionInDouble() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      // Large long values that would lose precision if cast to double
+                      // Now correctly handled by comparing as long values
+                      boolean i = 9007199254740992L < 9007199254740993L;
+                      boolean j = 9007199254740992L == 9007199254740993L;
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      // Large long values that would lose precision if cast to double
+                      // Now correctly handled by comparing as long values
+                      boolean i = true;
+                      boolean j = false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotSimplifyNonLiteralComparisons() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      int i = 1;
+                      boolean a = i == 1;
+                      boolean b = i < 2;
+                      boolean c = 1 == i;
+
+                      int j = 2;
+                      boolean d = i == j;
+                      boolean e = i < j;
+
+                      long l = 100L;
+                      boolean f = l > 50L;
+                      boolean g = l == 100L;
                   }
               }
               """

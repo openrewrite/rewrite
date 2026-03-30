@@ -23,9 +23,20 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.Assignment;
+import org.openrewrite.java.tree.J.FieldAccess;
+import org.openrewrite.java.tree.J.Identifier;
+import org.openrewrite.java.tree.J.MethodInvocation;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.marker.Markers;
+
+import static java.util.Collections.emptyList;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.EMPTY;
+import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -33,20 +44,14 @@ public class JacocoReportDeprecations extends Recipe {
 
     private static final String JACOCO_SETTINGS_INDEX = "JACOCO_SETTINGS_INDEX";
 
-    @Override
-    public String getDisplayName() {
-        return "Replace Gradle 8 introduced deprecations in JaCoCo report task";
-    }
+    String displayName = "Replace Gradle 8 introduced deprecations in JaCoCo report task";
 
-    @Override
-    public String getDescription() {
-        return "Set the `enabled` to `required` and the `destination` to `outputLocation` for Reports deprecations that were removed in gradle 8. " +
+    String description = "Set the `enabled` to `required` and the `destination` to `outputLocation` for Reports deprecations that were removed in gradle 8. " +
                 "See [the gradle docs on this topic](https://docs.gradle.org/current/userguide/upgrading_version_7.html#report_and_testreport_api_cleanup).";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                 Integer index = getCursor().getNearestMessage(JACOCO_SETTINGS_INDEX);
@@ -67,17 +72,65 @@ public class JacocoReportDeprecations extends Recipe {
             }
 
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 Integer parent = getCursor().getNearestMessage(JACOCO_SETTINGS_INDEX);
                 if (parent == null) {
                     parent = 0;
                 } else {
                     parent++;
                 }
+
+                // Handle method invocation syntax at various nesting levels
+                if (method.getArguments().size() == 1) {
+                    boolean shouldReplace = false;
+
+                    // xml.enabled(false) or csv.enabled(false) - inside reports closure
+                    if (parent == 2 && method.getSelect() instanceof J.Identifier) {
+                        J.Identifier select = (J.Identifier) method.getSelect();
+                        shouldReplace = isReportType(select.getSimpleName());
+                    }
+                    // reports.xml.enabled(false) - inside jacocoTestReport closure
+                    else if (parent == 1 && method.getSelect() instanceof J.FieldAccess) {
+                        J.FieldAccess selectField = (J.FieldAccess) method.getSelect();
+                        if (selectField.getTarget() instanceof J.Identifier) {
+                            J.Identifier target = (J.Identifier) selectField.getTarget();
+                            shouldReplace = "reports".equalsIgnoreCase(target.getSimpleName()) &&
+                                    isReportType(selectField.getSimpleName());
+                        }
+                    }
+                    // enabled(false) - inside xml/csv/html closure
+                    else if (parent == 3 && method.getSelect() == null) {
+                        shouldReplace = true;
+                    }
+
+                    if (shouldReplace) {
+                        J replacement = replaceDeprecatedMethodInvocation(method);
+                        if (replacement != method) {
+                            return replacement;
+                        }
+                    }
+                }
+
                 if (isPartOfDeprecatedPath(method.getSimpleName(), parent)) {
                     getCursor().putMessage(JACOCO_SETTINGS_INDEX, parent);
 
                     return super.visitMethodInvocation(method, ctx);
+                }
+                return method;
+            }
+
+            private boolean isReportType(String name) {
+                return "xml".equalsIgnoreCase(name) ||
+                       "csv".equalsIgnoreCase(name) ||
+                       "html".equalsIgnoreCase(name);
+            }
+
+            private J replaceDeprecatedMethodInvocation(J.MethodInvocation method) {
+                String methodName = method.getSimpleName();
+                if ("enabled".equalsIgnoreCase(methodName) || "isEnabled".equalsIgnoreCase(methodName) || "setEnabled".equalsIgnoreCase(methodName)) {
+                    return replaceMethodInvocationWithAssignment(method, "required");
+                } else if ("destination".equalsIgnoreCase(methodName) || "setDestination".equalsIgnoreCase(methodName)) {
+                    return replaceMethodInvocationWithAssignment(method, "outputLocation");
                 }
                 return method;
             }
@@ -149,5 +202,43 @@ public class JacocoReportDeprecations extends Recipe {
                 return fieldName;
             }
         });
+    }
+
+    private static Assignment replaceMethodInvocationWithAssignment(MethodInvocation method, String identifierName) {
+        Identifier id = new Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                emptyList(),
+                identifierName,
+                null,
+                null
+        );
+        Expression variable;
+        Expression select = method.getSelect();
+        if (select == null) {
+            variable = id;
+        } else {
+            variable = new FieldAccess(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    select,
+                    new JLeftPadded<>(EMPTY, id, Markers.EMPTY),
+                    null
+            );
+        }
+        return new Assignment(
+                randomId(),
+                method.getPrefix(),
+                Markers.EMPTY,
+                variable,
+                new JLeftPadded<>(
+                        SINGLE_SPACE,
+                        method.getArguments().get(0).withPrefix(SINGLE_SPACE),
+                        Markers.EMPTY
+                ),
+                null
+        );
     }
 }

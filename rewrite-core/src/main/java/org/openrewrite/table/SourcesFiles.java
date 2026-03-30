@@ -36,5 +36,9 @@ public class SourcesFiles extends DataTable<SourcesFiles.Row> {
         @Column(displayName = "LST type",
                 description = "The LST model type that the file is parsed as.")
         String type;
+
+        @Column(displayName = "Character encoding",
+                description = "The detected character encoding of the file")
+        String encoding;
     }
 }

@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 import {JsonVisitor} from "./visitor";
-import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
+import {asRef, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {Json} from "./tree";
-import {produceAsync} from "../visitor";
-import {createDraft, Draft, finishDraft} from "immer";
-import {TreeKind} from "../tree";
+import {updateIfChanged} from "../util";
 
 class JsonSender extends JsonVisitor<RpcSendQueue> {
 
@@ -76,7 +74,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         return obj;
     }
 
-    protected async visitSpace(space: Json.Space, q: RpcSendQueue): Promise<Json.Space> {
+    public async visitSpace(space: Json.Space, q: RpcSendQueue): Promise<Json.Space> {
         await q.getAndSendList(space, s => s.comments, c => c.text + c.suffix, async c => {
             await q.getAndSend(c, c2 => c2.multiline);
             await q.getAndSend(c, c2 => c2.text);
@@ -87,7 +85,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         return space;
     }
 
-    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, q: RpcSendQueue): Promise<Json.RightPadded<T> | undefined> {
+    public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, q: RpcSendQueue): Promise<Json.RightPadded<T> | undefined> {
         await q.getAndSend(right, r => r.element, j => this.visit(j, q));
         await q.getAndSend(right, r => asRef(r.after), async space => await this.visitSpace(space, q));
         await q.getAndSend(right, r => r.markers);
@@ -99,30 +97,30 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
 class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     protected async preVisit(j: Json, q: RpcReceiveQueue): Promise<Json | undefined> {
-        const draft = createDraft(j)
-        draft.id = await q.receive(j.id);
-        draft.prefix = await q.receive(j.prefix, async space => await this.visitSpace(space, q));
-        draft.markers = await q.receive(j.markers);
-        return finishDraft(draft);
+        return updateIfChanged(j, {
+            id: await q.receive(j.id),
+            prefix: await q.receive(j.prefix, async space => await this.visitSpace(space, q)),
+            markers: await q.receive(j.markers),
+        });
     }
 
     protected async visitDocument(document: Json.Document, q: RpcReceiveQueue): Promise<Json | undefined> {
-        const draft = createDraft(document);
-        draft.sourcePath = await q.receive(document.sourcePath);
-        draft.charsetName = await q.receive(document.charsetName);
-        draft.charsetBomMarked = await q.receive(document.charsetBomMarked);
-        draft.checksum = await q.receive(document.checksum);
-        draft.fileAttributes = await q.receive(document.fileAttributes);
-        draft.value = await q.receive<Json.Value>(document.value, async j => await this.visit(j, q)!);
-        draft.eof = await q.receive(document.eof, async space => await this.visitSpace(space, q));
-        return finishDraft(draft);
+        return updateIfChanged(document, {
+            sourcePath: await q.receive(document.sourcePath),
+            charsetName: await q.receive(document.charsetName),
+            charsetBomMarked: await q.receive(document.charsetBomMarked),
+            checksum: await q.receive(document.checksum),
+            fileAttributes: await q.receive(document.fileAttributes),
+            value: await q.receive<Json.Value>(document.value, async j => await this.visit(j, q)!),
+            eof: await q.receive(document.eof, async space => await this.visitSpace(space, q)),
+        });
     }
 
     protected async visitArray(array: Json.Array, q: RpcReceiveQueue): Promise<Json | undefined> {
-        const draft = createDraft(array);
-        draft.values = await q.receiveListDefined(array.values,
-            async j => await this.visitRightPadded(j, q)!)!;
-        return finishDraft(draft);
+        return updateIfChanged(array, {
+            values: await q.receiveListDefined(array.values,
+                async j => await this.visitRightPadded(j, q)!)!,
+        });
     }
 
     protected async visitEmpty(empty: Json.Empty): Promise<Json | undefined> {
@@ -130,72 +128,94 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     }
 
     protected async visitIdentifier(identifier: Json.Identifier, q: RpcReceiveQueue): Promise<Json | undefined> {
-        const draft = createDraft(identifier);
-        draft.name = await q.receive(identifier.name);
-        return finishDraft(draft);
+        return updateIfChanged(identifier, {
+            name: await q.receive(identifier.name),
+        });
     }
 
     protected async visitLiteral(literal: Json.Literal, q: RpcReceiveQueue): Promise<Json | undefined> {
-        const draft = createDraft(literal);
-        draft.source = await q.receive(literal.source);
-        draft.value = await q.receive(literal.value);
-        return finishDraft(draft);
+        return updateIfChanged(literal, {
+            source: await q.receive(literal.source),
+            value: await q.receive(literal.value),
+        });
     }
 
     protected async visitMember(member: Json.Member, q: RpcReceiveQueue): Promise<Json | undefined> {
-        const draft = createDraft(member);
-        draft.key = await q.receive(member.key,
-            async j => await this.visitRightPadded(j, q)!)!;
-        draft.value = await q.receive<Json.Value>(member.value,
-            async j => await this.visit(j, q)!);
-        return finishDraft(draft);
+        return updateIfChanged(member, {
+            key: await q.receive(member.key,
+                async j => await this.visitRightPadded(j, q)!)!,
+            value: await q.receive<Json.Value>(member.value,
+                async j => await this.visit(j, q)!),
+        });
     }
 
     protected async visitObject(obj: Json.Object, q: RpcReceiveQueue): Promise<Json | undefined> {
-        const draft = createDraft(obj);
-        draft.members = await q.receiveListDefined(obj.members,
-            async j => await this.visitRightPadded(j, q));
-        return finishDraft(draft);
-    }
-
-    protected async visitSpace(space: Json.Space, q: RpcReceiveQueue): Promise<Json.Space> {
-        return produceAsync<Json.Space>(space, async draft => {
-            draft.comments = await q.receiveListDefined(space.comments, async c => {
-                return await produceAsync(c, async draft => {
-                    draft.multiline = await q.receive(c.multiline);
-                    draft.text = await q.receive(c.text);
-                    draft.suffix = await q.receive(c.suffix);
-                    draft.markers = await q.receive(c.markers);
-                })
-            });
-            draft.whitespace = await q.receive(space.whitespace);
+        return updateIfChanged(obj, {
+            members: await q.receiveListDefined(obj.members,
+                async j => await this.visitRightPadded(j, q)),
         });
     }
 
-    protected async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: RpcReceiveQueue): Promise<Json.RightPadded<T> | undefined> {
+    public async visitSpace(space: Json.Space, q: RpcReceiveQueue): Promise<Json.Space> {
+        return updateIfChanged(space, {
+            comments: await q.receiveListDefined(space.comments, async c => {
+                return updateIfChanged(c, {
+                    multiline: await q.receive(c.multiline),
+                    text: await q.receive(c.text),
+                    suffix: await q.receive(c.suffix),
+                    markers: await q.receive(c.markers),
+                });
+            }),
+            whitespace: await q.receive(space.whitespace),
+        });
+    }
+
+    public async visitRightPadded<T extends Json>(right: Json.RightPadded<T>, p: RpcReceiveQueue): Promise<Json.RightPadded<T> | undefined> {
         if (!right) {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty padding")
         }
-        return produceAsync<Json.RightPadded<T>>(right, async draft => {
-            draft.element = await p.receive(right.element, async j => await this.visit(j, p)!) as Draft<T>;
-            draft.after = await p.receive(right.after, async space => await this.visitSpace(space, p));
-            draft.markers = await p.receiveMarkers(right.markers);
+        return updateIfChanged(right, {
+            element: await p.receive(right.element, async j => await this.visit(j, p)!) as T,
+            after: await p.receive(right.after, async space => await this.visitSpace(space, p)),
+            markers: await p.receiveMarkers(right.markers),
         });
     }
 }
 
-const jsonCodec: RpcCodec<Json> = {
-    async rpcReceive(before: Json, q: RpcReceiveQueue): Promise<Json> {
-        return (await new JsonReceiver().visit(before, q))!;
-    },
+const receiver = new JsonReceiver();
+const sender = new JsonSender();
 
-    async rpcSend(after: Json, q: RpcSendQueue): Promise<void> {
-        await new JsonSender().visit(after, q);
+// Register codec for all Java AST node types
+for (const kind of Object.values(Json.Kind)) {
+    if (kind === Json.Kind.Space) {
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive(before: Json.Space, q: RpcReceiveQueue): Promise<Json.Space> {
+                return (await receiver.visitSpace(before, q))!;
+            },
+
+            async rpcSend(after: Json.Space, q: RpcSendQueue): Promise<void> {
+                await sender.visitSpace(after, q);
+            }
+        }, Json.Kind.Document);
+    } else if (kind === Json.Kind.RightPadded) {
+        RpcCodecs.registerCodec(kind, {
+            async rpcReceive<T extends Json>(before: Json.RightPadded<T>, q: RpcReceiveQueue): Promise<Json.RightPadded<T>> {
+                return (await receiver.visitRightPadded(before, q))!;
+            },
+
+            async rpcSend<T extends Json>(after: Json.RightPadded<T>, q: RpcSendQueue): Promise<void> {
+                await sender.visitRightPadded(after, q);
+            }
+        }, Json.Kind.Document);
+    } else {
+        RpcCodecs.registerCodec(kind as string, {
+            async rpcReceive(before: Json, q: RpcReceiveQueue): Promise<Json> {
+                return (await receiver.visit(before, q))!;
+            },
+
+            async rpcSend(after: Json, q: RpcSendQueue): Promise<void> {
+                await sender.visit(after, q);
+            }
+        }, Json.Kind.Document);
     }
 }
-
-Object.values(Json.Kind).forEach(kind => {
-    if (!Object.values(TreeKind).includes(kind as any)) {
-        RpcCodecs.registerCodec(kind, jsonCodec);
-    }
-});

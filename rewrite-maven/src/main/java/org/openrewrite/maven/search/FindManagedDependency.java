@@ -21,12 +21,17 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -68,7 +73,7 @@ public class FindManagedDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                    versionIsValid(version, versionPattern, tag, this::findManagedDependency, this::getResolutionResult)) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -77,10 +82,7 @@ public class FindManagedDependency extends Recipe {
         return ds;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Find Maven dependency management entry";
-    }
+    String displayName = "Find Maven dependency management entry";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -88,10 +90,7 @@ public class FindManagedDependency extends Recipe {
         return String.format("`%s:%s%s`", groupId, artifactId, maybeVersionSuffix);
     }
 
-    @Override
-    public String getDescription() {
-        return "Finds first-order dependency management entries, i.e. dependencies that are defined directly in a project.";
-    }
+    String description = "Finds first-order dependency management entries, i.e. dependencies that are defined directly in a project.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -99,7 +98,7 @@ public class FindManagedDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                    versionIsValid(version, versionPattern, tag, this::findManagedDependency, this::getResolutionResult)) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -107,20 +106,29 @@ public class FindManagedDependency extends Recipe {
         };
     }
 
-    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String actualVersion,
-                                          @Nullable String versionPattern) {
+    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern, Xml.Tag tag,
+                                          BiFunction<Xml.Tag, @Nullable Scope, @Nullable ResolvedManagedDependency> findManagedDependency,
+                                          Supplier<MavenResolutionResult> getResolutionResult) {
         if (desiredVersion == null) {
             return true;
         }
+
+        ResolvedManagedDependency resolved = findManagedDependency.apply(tag, null);
+        String actualVersion;
+        if (resolved != null) {
+            actualVersion = resolved.getVersion();
+        } else {
+            actualVersion = tag.getChildValue("version")
+                    .map(v -> getResolutionResult.get().getPom().getValue(v))
+                    .orElse(null);
+        }
         if (actualVersion == null) {
-            // rare but technically valid for a dependencyManagement entry to have no version; bail if so
             return false;
         }
+
         Validated<VersionComparator> validate = Semver.validate(desiredVersion, versionPattern);
-        if (validate.isInvalid()) {
-            return false;
-        }
-        assert validate.getValue() != null;
-        return validate.getValue().isValid(actualVersion, actualVersion);
+        return validate.isValid() &&
+                validate.getValue() != null &&
+                validate.getValue().isValid(actualVersion, actualVersion);
     }
 }

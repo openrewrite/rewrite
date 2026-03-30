@@ -1,0 +1,251 @@
+# Copyright 2025 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.ChangeKey
+examples:
+- description: '`ChangeKeyTest#changeSimpleKey`'
+  parameters:
+  - name
+  - project-name
+  sources:
+  - before: |
+      name = "my-project"
+      version = "1.0.0"
+    after: |
+      project-name = "my-project"
+      version = "1.0.0"
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.ChangeTableRowValue
+examples:
+- description: '`ChangeTableRowValueTest#changeValueInMatchingRow`'
+  parameters:
+  - package.contributors
+  - name
+  - Alice Smith
+  - 'null'
+  - email
+  - '"alice.new@example.com"'
+  sources:
+  - before: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice@example.com"
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+    after: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice.new@example.com"
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.ChangeValue
+examples:
+- description: '`ChangeValueTest#changeStringValue`'
+  parameters:
+  - name
+  - '"new-name"'
+  sources:
+  - before: |
+      name = "old-name"
+      version = "1.0.0"
+    after: |
+      name = "new-name"
+      version = "1.0.0"
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.CreateTomlFile
+examples:
+- description: '`CreateTomlFileTest#createNewTomlFile`'
+  parameters:
+  - pyproject.toml
+  - |
+    [tool.poetry]
+    name = "my-project"
+    version = "0.1.0"
+    description = "A sample project"
+  - 'null'
+  - 'null'
+  sources:
+  - after: |
+      [tool.poetry]
+      name = "my-project"
+      version = "0.1.0"
+      description = "A sample project"
+    path: pyproject.toml
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.DeleteKey
+examples:
+- description: '`DeleteKeyTest#deleteTopLevelKey`'
+  parameters:
+  - description
+  sources:
+  - before: |
+      name = "my-project"
+      description = "A sample project"
+      version = "1.0.0"
+    after: |
+      name = "my-project"
+      version = "1.0.0"
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.DeleteTable
+examples:
+- description: '`DeleteTableTest#deleteArrayOfTables`'
+  parameters:
+  - package.contributors
+  sources:
+  - before: |
+      [package]
+      name = "example-package"
+      version = "1.0.0"
+      authors = ["Alice Smith"]
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+
+      [[package.contributors]]
+      name = "Carol White"
+      email = "carol@example.com"
+    after: |
+      [package]
+      name = "example-package"
+      version = "1.0.0"
+      authors = ["Alice Smith"]
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.DeleteTableRow
+examples:
+- description: '`DeleteTableRowTest#deleteMatchingTableRow`'
+  parameters:
+  - package.contributors
+  - name
+  - Bob Johnson
+  - 'null'
+  sources:
+  - before: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice@example.com"
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+
+      [[package.contributors]]
+      name = "Carol White"
+      email = "carol@example.com"
+    after: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice@example.com"
+
+      [[package.contributors]]
+      name = "Carol White"
+      email = "carol@example.com"
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.FindKey
+examples:
+- description: '`FindKeyTest#findSpecificKey`'
+  parameters:
+  - package.name
+  sources:
+  - before: |
+      [package]
+      name = "my-package"
+      version = "0.1.0"
+    after: |
+      [package]
+      ~~>name = "my-package"
+      version = "0.1.0"
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.MergeTableRow
+examples:
+- description: '`MergeTableRowTest#mergeExistingRow`'
+  parameters:
+  - package.contributors
+  - |-
+    name = "Alice Smith"
+    email = "alice.new@example.com"
+    role = "maintainer"
+  - name
+  sources:
+  - before: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice@example.com"
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+    after: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice.new@example.com"
+      role = "maintainer"
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+    language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.toml.ReplaceTableRow
+examples:
+- description: '`ReplaceTableRowTest#replaceRowRemovingUnspecifiedKeys`'
+  parameters:
+  - package.contributors
+  - |-
+    name = "Alice Smith"
+    email = "alice.new@example.com"
+  - name
+  sources:
+  - before: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice@example.com"
+      role = "maintainer"
+      active = true
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+    after: |
+      [[package.contributors]]
+      name = "Alice Smith"
+      email = "alice.new@example.com"
+
+      [[package.contributors]]
+      name = "Bob Johnson"
+      email = "bob@example.com"
+    language: toml

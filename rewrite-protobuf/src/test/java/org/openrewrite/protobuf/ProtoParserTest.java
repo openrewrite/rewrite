@@ -19,15 +19,72 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.tree.ParseError;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.protobuf.Assertions.proto;
 
 class ProtoParserTest implements RewriteTest {
     @Test
     void noNullsForProto3Files() {
         List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = \"proto3\";").toList();
         assertThat(sources).singleElement().isInstanceOf(PlainText.class);
+    }
+
+    @Test
+    void malformedSyntaxDoesNotThrowNPE() {
+        List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = proto2;").toList();
+        assertThat(sources).singleElement().satisfiesAnyOf(
+                s -> assertThat(s).isInstanceOf(PlainText.class),
+                s -> assertThat(s).isInstanceOf(ParseError.class)
+        );
+    }
+
+    @Test
+    void unicodeInComments() {
+        String protoSource = """
+            syntax = "proto2";
+
+            // 👇 Problem below
+            message Person {
+              required string name /*  👆*/=/* 👆*/ 1; /*👆*/
+              required string emoji = 2 [default = "👇"];
+              // 👆 Problem above
+            }
+            """;
+        List<SourceFile> sources = ProtoParser.builder().build().parse(protoSource).toList();
+        assertThat(sources).hasSize(1);
+        assertThat(sources.get(0).printAll()).isEqualTo(protoSource);
+    }
+
+    @Test
+    void moreUnicodeInComments() {
+        rewriteRun(
+          proto(
+            """
+              syntax = 'proto2';
+              service SearchService {
+                /*👆👆*/ rpc /*👆👆*/ Search /*👆👆*/(/*👆👆*/ SearchRequest ) returns ( SearchResponse );
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void protoWithoutSyntaxDeclaration() {
+        rewriteRun(
+          proto(
+            """
+            message Point {
+              required int32 x = 1;
+              required int32 y = 2;
+              optional string label = 3;
+            }
+            """
+          )
+        );
     }
 }

@@ -78,20 +78,14 @@ public class ChangePlugin extends Recipe {
     @Nullable
     String newVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Change a Gradle plugin";
-    }
+    String displayName = "Change a Gradle plugin";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", pluginId, newPluginId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Changes the selected Gradle plugin to the new plugin.";
-    }
+    String description = "Changes the selected Gradle plugin to the new plugin.";
 
     @Override
     public Validated<Object> validate() {
@@ -104,9 +98,9 @@ public class ChangePlugin extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)");
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)");
-        MethodMatcher applyMatcher = new MethodMatcher("RewriteGradleProject apply(..)");
+        MethodMatcher pluginMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
+        MethodMatcher versionMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
+        MethodMatcher applyMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
         return Preconditions.check(
                 Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
                 new GroovyIsoVisitor<ExecutionContext>() {

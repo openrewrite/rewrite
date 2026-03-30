@@ -22,6 +22,8 @@ import org.codehaus.groovy.control.messages.ExceptionMessage;
 import org.codehaus.groovy.control.messages.Message;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.openrewrite.ParseWarning;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.ExceptionUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,20 +31,26 @@ import java.util.List;
 public class ParseWarningCollector extends ErrorCollector {
 
     private final List<ParseWarning> warningMarkers = new ArrayList<>();
-    private final GroovyParser parser;
+    private final Class<? extends GroovyParser> parserClass;
+
     public ParseWarningCollector(CompilerConfiguration configuration, GroovyParser parser) {
         super(configuration);
-        this.parser = parser;
+        this.parserClass = parser.getClass();
     }
 
     @Override
     public void addErrorAndContinue(Message message) throws CompilationFailedException {
         super.addErrorAndContinue(message);
 
+        Throwable t = null;
         if (message instanceof SyntaxErrorMessage) {
-            warningMarkers.add(ParseWarning.build(parser, ((SyntaxErrorMessage) message).getCause()));
+            t = ((SyntaxErrorMessage) message).getCause();
         } else if (message instanceof ExceptionMessage) {
-            warningMarkers.add(ParseWarning.build(parser, ((ExceptionMessage) message).getCause()));
+            t = ((ExceptionMessage) message).getCause();
+        }
+
+        if (t != null) {
+            warningMarkers.add(new ParseWarning(Tree.randomId(), ExceptionUtils.sanitizeStackTrace(t, parserClass)));
         }
     }
 

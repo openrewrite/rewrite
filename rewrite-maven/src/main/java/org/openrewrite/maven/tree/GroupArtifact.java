@@ -18,6 +18,7 @@ package org.openrewrite.maven.tree;
 
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 
@@ -26,4 +27,9 @@ import java.io.Serializable;
 public class GroupArtifact implements Serializable {
     String groupId;
     String artifactId;
+
+    public GroupArtifact(@Nullable String groupId, String artifactId) {
+        this.groupId = groupId == null ? "" : groupId;
+        this.artifactId = artifactId;
+    }
 }

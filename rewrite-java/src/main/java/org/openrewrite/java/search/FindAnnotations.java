@@ -51,15 +51,9 @@ public class FindAnnotations extends Recipe {
     @Nullable
     Boolean matchMetaAnnotations;
 
-    @Override
-    public String getDisplayName() {
-        return "Find annotations";
-    }
+    String displayName = "Find annotations";
 
-    @Override
-    public String getDescription() {
-        return "Find all annotations matching the annotation pattern.";
-    }
+    String description = "Find all annotations matching the annotation pattern.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

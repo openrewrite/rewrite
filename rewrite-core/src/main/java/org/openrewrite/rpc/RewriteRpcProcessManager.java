@@ -15,6 +15,8 @@
  */
 package org.openrewrite.rpc;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.function.Supplier;
 
 /**
@@ -29,6 +31,10 @@ public class RewriteRpcProcessManager<R extends RewriteRpc> {
         this.factory = ThreadLocal.withInitial(() -> defaultFactory);
     }
 
+    public @Nullable R get() {
+        return rpc.get();
+    }
+
     public R getOrStart() {
         R current = rpc.get();
         //noinspection ConstantValue
@@ -41,6 +47,14 @@ public class RewriteRpcProcessManager<R extends RewriteRpc> {
 
     public void setFactory(Supplier<R> factory) {
         this.factory.set(factory);
+    }
+
+    public void reset() {
+        R current = rpc.get();
+        //noinspection ConstantValue
+        if (current != null) {
+            current.reset();
+        }
     }
 
     public void shutdown() {

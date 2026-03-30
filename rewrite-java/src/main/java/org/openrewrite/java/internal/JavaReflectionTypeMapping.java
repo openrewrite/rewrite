@@ -79,15 +79,13 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
     private JavaType.Array array(Class<?> clazz, String signature) {
         JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
-        arr.unsafeSet(type(clazz.getComponentType()), null);
-        return arr;
+        return arr.unsafeSet(type(clazz.getComponentType()), null);
     }
 
     private JavaType.Array array(GenericArrayType type, String signature) {
         JavaType.Array arr = new JavaType.Array(null, null, null);
         typeCache.put(signature, arr);
-        arr.unsafeSet(type(type.getGenericComponentType()), null);
-        return arr;
+        return arr.unsafeSet(type(type.getGenericComponentType()), null);
     }
 
     private JavaType classType(Class<?> clazz, String signature) {
@@ -107,8 +105,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 typeParameters.add(type(typeParameter));
             }
 
-            pt.unsafeSet(mappedClazz, typeParameters);
-            return pt;
+            return pt.unsafeSet(mappedClazz, typeParameters);
         }
 
         return mappedClazz;
@@ -208,7 +205,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                     typeParameters.add(type(tParam));
                 }
             }
-            mappedClazz.unsafeSet(typeParameters, supertype, owner, annotations, interfaces, members, methods);
+            return mappedClazz.unsafeSet(typeParameters, supertype, owner, annotations, interfaces, members, methods);
         }
 
         return mappedClazz;
@@ -220,8 +217,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         typeCache.put(signature, gtv);
 
         List<JavaType> bounds = genericBounds(typeParameter.getBounds());
-        gtv.unsafeSet(gtv.getName(), bounds == null ? INVARIANT : COVARIANT, bounds);
-        return gtv;
+        return gtv.unsafeSet(gtv.getName(), bounds == null ? INVARIANT : COVARIANT, bounds);
     }
 
     private JavaType.GenericTypeVariable generic(WildcardType wildcard, String signature) {
@@ -244,8 +240,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        gtv.unsafeSet(gtv.getName(), variance, bounds);
-        return gtv;
+        return gtv.unsafeSet(gtv.getName(), variance, bounds);
     }
 
     private @Nullable List<JavaType> genericBounds(Type[] bounds) {
@@ -274,8 +269,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         JavaType.FullyQualified baseType = classTypeWithoutParameters((Class<?>) type.getRawType());
-        pt.unsafeSet(baseType, typeParameters);
-        return pt;
+        return pt.unsafeSet(baseType, typeParameters);
     }
 
     private JavaType.Variable field(Field field) {
@@ -302,8 +296,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getGenericType()), annotations);
-        return mappedVariable;
+        return mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getGenericType()), annotations);
     }
 
     public JavaType.Method method(Method method) {
@@ -374,8 +367,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        mappedMethod.unsafeSet(declaringType, declaringType, parameterTypes, thrownExceptions, annotations);
-        return mappedMethod;
+        return mappedMethod.unsafeSet(declaringType, declaringType, parameterTypes, thrownExceptions, annotations);
     }
 
     private JavaType.Method method(Method method, JavaType.FullyQualified declaringType) {
@@ -491,7 +483,6 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         }
 
         JavaType returnType = type(method.getGenericReturnType());
-        mappedMethod.unsafeSet(declaringType, returnType, parameterTypes, thrownExceptions, annotations);
-        return mappedMethod;
+        return mappedMethod.unsafeSet(declaringType, returnType, parameterTypes, thrownExceptions, annotations);
     }
 }

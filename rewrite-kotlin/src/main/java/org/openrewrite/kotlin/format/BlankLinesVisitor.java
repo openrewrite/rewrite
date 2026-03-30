@@ -19,9 +19,9 @@ package org.openrewrite.kotlin.format;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
-import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.style.BlankLinesStyle;
@@ -338,7 +338,8 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                 K.WhenBranch branch = (K.WhenBranch) s;
                 K.WhenBranch previousBranch = (K.WhenBranch) branches.getStatements().get(index - 1);
                 boolean isPreviousWhenBranchWithBlock = previousBranch.getBody() instanceof J.Block &&
-                        !previousBranch.getBody().getMarkers().findFirst(OmitBraces.class).isPresent();
+                        (!previousBranch.getBody().getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                        !previousBranch.getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent());
                 if (!isPreviousWhenBranchWithBlock) {
                     return s;
                 }

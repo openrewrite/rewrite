@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
@@ -263,7 +264,6 @@ public class Autodetect extends NamedStyles {
     }
     private static class ClassifyWrappingJsonVisitor extends JsonVisitor<WrappingStatistics> {
 
-
         @Override
         public Json visitArray(Json.Array array, WrappingStatistics wrappingStatistics) {
             for (JsonValue value: array.getValues()) {
@@ -275,8 +275,13 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Json visitObject(Json.JsonObject obj, WrappingStatistics wrappingStatistics) {
-            for (Json member: obj.getMembers()) {
-                boolean isWrapped = member.getPrefix().getWhitespace().contains("\n");
+            for (JsonRightPadded<Json> member: obj.getPadding().getMembers()) {
+                boolean isWrapped;
+                if (member.getElement() instanceof Json.Empty) {
+                    isWrapped = member.getAfter().getWhitespace().contains("\n");
+                } else {
+                    isWrapped = member.getElement().getPrefix().getWhitespace().contains("\n");
+                }
                 wrappingStatistics.objectsWrapped.get(isWrapped).incrementAndGet();
             }
             return super.visitObject(obj, wrappingStatistics);

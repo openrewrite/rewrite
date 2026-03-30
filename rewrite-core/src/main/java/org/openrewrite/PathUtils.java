@@ -20,7 +20,6 @@ import org.openrewrite.internal.StringUtils;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -74,6 +73,10 @@ public class PathUtils {
     }
 
     public static boolean matchesGlob(@Nullable Path path, @Nullable String globPattern) {
+        return matchesGlob(path == null ? null : separatorsToUnix(path.toString()), globPattern);
+    }
+
+    public static boolean matchesGlob(@Nullable String path, @Nullable String globPattern) {
         if ("**".equals(globPattern)) {
             return true;
         }
@@ -81,18 +84,17 @@ public class PathUtils {
             return false;
         }
 
-        String relativePath = path.toString();
-        if (relativePath.isEmpty() && globPattern.isEmpty()) {
+        if (path.isEmpty() && globPattern.isEmpty()) {
             return true;
         }
 
         List<String> eitherOrPatterns = getEitherOrPatterns(globPattern);
         List<String> excludedPatterns = getExcludedPatterns(globPattern);
         if (eitherOrPatterns.isEmpty() && excludedPatterns.isEmpty()) {
-            return matchesGlob(globPattern, relativePath);
+            return matchesGlobPattern(globPattern, path);
         } else if (!eitherOrPatterns.isEmpty()) {
             for (String eitherOrPattern : eitherOrPatterns) {
-                if (matchesGlob(Paths.get(relativePath), eitherOrPattern)) {
+                if (matchesGlob(path, eitherOrPattern)) {
                     return true;
                 }
             }
@@ -100,11 +102,11 @@ public class PathUtils {
         } else {
             // When only a segment of a path is negated the other segments must still match
             String wildcard = convertNegationToWildcard(globPattern);
-            if (!matchesGlob(wildcard, relativePath)) {
+            if (!matchesGlobPattern(wildcard, path)) {
                 return false;
             }
             for (String excludedPattern : excludedPatterns) {
-                if (matchesGlob(excludedPattern, relativePath)) {
+                if (matchesGlobPattern(excludedPattern, path)) {
                     return false;
                 }
             }
@@ -112,7 +114,7 @@ public class PathUtils {
         return true;
     }
 
-    private static boolean matchesGlob(String pattern, String path) {
+    private static boolean matchesGlobPattern(String pattern, String path) {
         String[] pattTokens = tokenize(pattern);
         String[] pathTokens = tokenize(path);
         int pattIdxStart = 0;
