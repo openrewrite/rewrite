@@ -24,10 +24,10 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.table.StylesInUse;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A diagnostic recipe that finds and reports the styles attached to each source file.
@@ -84,6 +84,16 @@ public class FindStyles extends Recipe {
         };
     }
 
+    private static final Yaml SNAKE_YAML;
+
+    static {
+        DumperOptions options = new DumperOptions();
+        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+        options.setIndent(2);
+        options.setPrettyFlow(true);
+        SNAKE_YAML = new Yaml(options);
+    }
+
     private static String stylesToYaml(List<NamedStyles> namedStylesList) {
         // Use NamedStyles.merge() to properly merge styles of the same class
         NamedStyles mergedStyles = NamedStyles.merge(namedStylesList);
@@ -91,109 +101,30 @@ public class FindStyles extends Recipe {
             return "";
         }
 
-        StringBuilder yaml = new StringBuilder();
-        yaml.append("---\n");
-        yaml.append("type: specs.openrewrite.org/v1beta/style\n");
-        yaml.append("name: ").append(mergedStyles.getName()).append("\n");
-        yaml.append("displayName: ").append(mergedStyles.getDisplayName()).append("\n");
+        // Build the document structure that matches the rewrite.yml style format
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("type", "specs.openrewrite.org/v1beta/style");
+        doc.put("name", mergedStyles.getName());
+        doc.put("displayName", mergedStyles.getDisplayName());
 
         Collection<Style> styles = mergedStyles.getStyles();
         if (styles != null && !styles.isEmpty()) {
-            yaml.append("styleConfigs:\n");
+            List<Map<String, Object>> styleConfigs = new ArrayList<>();
             for (Style style : styles) {
-                String styleClassName = style.getClass().getName();
-                yaml.append("  - ").append(styleClassName).append(":\n");
-                appendStyleProperties(yaml, style, "      ");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> props = OBJECT_MAPPER.convertValue(style, Map.class);
+                // Remove Jackson metadata properties (@c, @ref, etc.)
+                props.entrySet().removeIf(e -> e.getKey().startsWith("@"));
+                props.values().removeIf(Objects::isNull);
+
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put(style.getClass().getName(), props);
+                styleConfigs.add(entry);
             }
+            doc.put("styleConfigs", styleConfigs);
         }
 
-        return yaml.toString();
-    }
-
-    private static boolean isJacksonMetadataKey(String key) {
-        return key.startsWith("@");
-    }
-
-    private static void appendStyleProperties(StringBuilder yaml, Object obj, String indent) {
-        try {
-            // Convert the style object to a Map using Jackson
-            @SuppressWarnings("unchecked")
-            Map<String, Object> props = OBJECT_MAPPER.convertValue(obj, Map.class);
-
-            for (Map.Entry<String, Object> entry : props.entrySet()) {
-                String key = entry.getKey();
-                Object value = entry.getValue();
-
-                // Skip null values and Jackson metadata properties (@c, @ref, etc.)
-                if (value == null || isJacksonMetadataKey(key)) {
-                    continue;
-                }
-
-                if (value instanceof Map) {
-                    yaml.append(indent).append(key).append(":\n");
-                    appendNestedMap(yaml, (Map<?, ?>) value, indent + "  ");
-                } else if (value instanceof List) {
-                    yaml.append(indent).append(key).append(":\n");
-                    appendList(yaml, (List<?>) value, indent + "  ");
-                } else {
-                    yaml.append(indent).append(key).append(": ").append(formatYamlValue(value)).append("\n");
-                }
-            }
-        } catch (IllegalArgumentException e) {
-            yaml.append(indent).append("# Error serializing style: ").append(e.getMessage()).append("\n");
-        }
-    }
-
-    private static void appendNestedMap(StringBuilder yaml, Map<?, ?> map, String indent) {
-        for (Map.Entry<?, ?> entry : map.entrySet()) {
-            String key = String.valueOf(entry.getKey());
-            Object value = entry.getValue();
-
-            // Skip null values and Jackson metadata properties (@c, @ref, etc.)
-            if (value == null || isJacksonMetadataKey(key)) {
-                continue;
-            }
-
-            if (value instanceof Map) {
-                yaml.append(indent).append(key).append(":\n");
-                appendNestedMap(yaml, (Map<?, ?>) value, indent + "  ");
-            } else if (value instanceof List) {
-                yaml.append(indent).append(key).append(":\n");
-                appendList(yaml, (List<?>) value, indent + "  ");
-            } else {
-                yaml.append(indent).append(key).append(": ").append(formatYamlValue(value)).append("\n");
-            }
-        }
-    }
-
-    private static void appendList(StringBuilder yaml, List<?> list, String indent) {
-        for (Object item : list) {
-            if (item instanceof Map) {
-                yaml.append(indent).append("-\n");
-                appendNestedMap(yaml, (Map<?, ?>) item, indent + "  ");
-            } else {
-                yaml.append(indent).append("- ").append(formatYamlValue(item)).append("\n");
-            }
-        }
-    }
-
-    private static String formatYamlValue(Object value) {
-        if (value instanceof String) {
-            String str = (String) value;
-            // Quote strings that contain special characters or could be misinterpreted
-            if (str.isEmpty() || str.contains(":") || str.contains("#") ||
-                str.contains("'") || str.contains("\"") || str.contains("\n") ||
-                str.startsWith(" ") || str.endsWith(" ") ||
-                "true".equalsIgnoreCase(str) || "false".equalsIgnoreCase(str) ||
-                "null".equalsIgnoreCase(str) || "yes".equalsIgnoreCase(str) ||
-                "no".equalsIgnoreCase(str) || "on".equalsIgnoreCase(str) ||
-                "off".equalsIgnoreCase(str)) {
-                // Use single quotes, escaping any existing single quotes
-                return "'" + str.replace("'", "''") + "'";
-            }
-            return str;
-        }
-        return String.valueOf(value);
+        return "---\n" + SNAKE_YAML.dump(doc);
     }
 
     private static String getStyleNames(List<NamedStyles> namedStylesList) {
