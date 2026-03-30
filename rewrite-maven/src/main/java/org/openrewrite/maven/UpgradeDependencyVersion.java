@@ -316,8 +316,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             /**
              * Check if a local parent POM (in the same repository) also declares a dependency
-             * on the same groupId:artifactId. If so, the parent will also be processed by
-             * this recipe and will handle the property change — the child can skip it.
+             * on the same groupId:artifactId without an explicit version. If so, the parent
+             * will also go through the managed-dependency property path and handle the property
+             * change — the child can skip it.
              */
             private boolean isDeclaredByLocalParent(String groupId, String artifactId) {
                 MavenResolutionResult current = getResolutionResult().getParent();
@@ -327,7 +328,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         break; // Reached a non-local (remote) parent
                     }
                     for (Dependency dep : parentPom.getRequested().getDependencies()) {
-                        if (groupId.equals(dep.getGroupId()) && artifactId.equals(dep.getArtifactId())) {
+                        if (groupId.equals(dep.getGroupId()) && artifactId.equals(dep.getArtifactId())
+                                && dep.getVersion() == null) {
                             return true;
                         }
                     }
