@@ -38,12 +38,15 @@ import javax.tools.ToolProvider;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -151,10 +154,10 @@ class TypeTableTest implements RewriteTest {
      */
     Path createJarFromClasses(String jarName, Path... classFiles) throws Exception {
         Path jarFile = tempDir.resolve(jarName);
-        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(jarFile))) {
+        try (var jos = new JarOutputStream(Files.newOutputStream(jarFile))) {
             for (Path classFile : classFiles) {
                 String relativePath = tempDir.relativize(classFile).toString();
-                JarEntry entry = new JarEntry(relativePath);
+                var entry = new JarEntry(relativePath);
                 jos.putNextEntry(entry);
                 jos.write(Files.readAllBytes(classFile));
                 jos.closeEntry();
@@ -167,7 +170,7 @@ class TypeTableTest implements RewriteTest {
      * Helper method to process a JAR through TypeTable and return the TSV content
      */
     String processJarThroughTypeTable(Path jarFile, String groupId, String artifactId, String version) throws Exception {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        var baos = new ByteArrayOutputStream();
         try (TypeTable.Writer writer = TypeTable.newWriter(baos)) {
             writer.jar(groupId, artifactId, version).write(jarFile);
         }
@@ -175,7 +178,7 @@ class TypeTableTest implements RewriteTest {
         // Decompress and return TSV content
         try (InputStream is = new ByteArrayInputStream(baos.toByteArray());
              InputStream gzis = new GZIPInputStream(is);
-             java.util.Scanner scanner = new java.util.Scanner(gzis)) {
+             var scanner = new java.util.Scanner(gzis)) {
             return scanner.useDelimiter("\\A").next();
         }
     }
@@ -299,7 +302,7 @@ class TypeTableTest implements RewriteTest {
         @Test
         void canCompileAgainstTypeTableGeneratedEnum() throws Exception {
             // Create a simple enum that can be compiled against
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+            var cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
             cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_ENUM,
               "TestEnum", "Ljava/lang/Enum<LTestEnum;>;", "java/lang/Enum", null);
 
@@ -415,8 +418,8 @@ class TypeTableTest implements RewriteTest {
         void writeAllMavenLocal() throws Exception {
             Path m2Repo = Path.of(System.getProperty("user.home"), ".m2", "repository");
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
-                AtomicLong jarsSize = new AtomicLong();
-                AtomicLong jarCount = new AtomicLong();
+                var jarsSize = new AtomicLong();
+                var jarCount = new AtomicLong();
                 Files.walkFileTree(m2Repo, new SimpleFileVisitor<>() {
                     @Override
                     @SneakyThrows
@@ -445,7 +448,7 @@ class TypeTableTest implements RewriteTest {
                 }
             }
 
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("junit-jupiter-api"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("junit-jupiter-api"));
             Path classesDir = table.load("junit-jupiter-api");
             assertThat(Files.walk(requireNonNull(classesDir))).noneMatch(p -> p.getFileName().toString().endsWith("$1.class"));
 
@@ -508,7 +511,7 @@ class TypeTableTest implements RewriteTest {
                 writer.jar("test.group", "test-validation", "1.0").write(testJar);
             }
 
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("test-validation"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("test-validation"));
             Path classesDir = table.load("test-validation");
 
             // Verify that TypeTable can successfully load classes from our JAR
@@ -548,7 +551,7 @@ class TypeTableTest implements RewriteTest {
             }
 
             // Load back via TypeTable
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("validation-rules"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("validation-rules"));
             Path classesDir = table.load("validation-rules");
             assertThat(classesDir).isNotNull();
 
@@ -571,7 +574,7 @@ class TypeTableTest implements RewriteTest {
                     // Verify that the annotation types are properly resolved
                     J.ClassDeclaration clazz = cu.getClasses().getFirst();
                     J.Annotation classAnnotation = clazz.getLeadingAnnotations().getFirst();
-                    JavaType.Class annotationType = (JavaType.Class) classAnnotation.getType();
+                    var annotationType = (JavaType.Class) classAnnotation.getType();
 
                     assertThat(annotationType).isNotNull();
                     assertThat(annotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
@@ -628,9 +631,9 @@ class TypeTableTest implements RewriteTest {
                       );
 
                     // Verify field-level annotation is also properly typed with same default values
-                    J.VariableDeclarations field = (J.VariableDeclarations) clazz.getBody().getStatements().getFirst();
+                    var field = (J.VariableDeclarations) clazz.getBody().getStatements().getFirst();
                     J.Annotation fieldAnnotation = field.getLeadingAnnotations().getFirst();
-                    JavaType.Class fieldAnnotationType = (JavaType.Class) fieldAnnotation.getType();
+                    var fieldAnnotationType = (JavaType.Class) fieldAnnotation.getType();
 
                     assertThat(fieldAnnotationType).isNotNull();
                     assertThat(fieldAnnotationType.getFullyQualifiedName()).isEqualTo("test.annotations.ValidationRule");
@@ -748,7 +751,7 @@ class TypeTableTest implements RewriteTest {
             }
 
             // Load back via TypeTable
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("annotated-library"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("annotated-library"));
             Path classesDir = table.load("annotated-library");
             assertThat(classesDir).isNotNull();
 
@@ -817,7 +820,7 @@ class TypeTableTest implements RewriteTest {
                     assertThat(transactionalAnn.getSimpleName()).isEqualTo("Transactional");
 
                     // Verify the annotation type is resolved
-                    JavaType.Class annotationType = (JavaType.Class) transactionalAnn.getType();
+                    var annotationType = (JavaType.Class) transactionalAnn.getType();
                     assertThat(annotationType).isNotNull();
                     assertThat(annotationType.getFullyQualifiedName()).isEqualTo("test.annotations.Transactional");
 
@@ -830,6 +833,64 @@ class TypeTableTest implements RewriteTest {
             );
         }
 
+    }
+
+    @Nested
+    class ClassloaderResolutionTests {
+
+        /**
+         * Simulates the scenario from <a href="https://github.com/openrewrite/rewrite/issues/6885">#6885</a>:
+         * Recipe JARs are loaded via a custom URLClassLoader (e.g. in Quarkus), so their
+         * classpath.tsv.gz resources are not visible to the caller's classloader.
+         * TypeTable.fromClasspath() should also check the thread context classloader.
+         */
+        @Test
+        void findsResourcesFromThreadContextClassLoader() throws Exception {
+            // Create a simple class, compile it, jar it, and write a classpath.tsv.gz
+            //language=java
+            String source = """
+                package com.example;
+
+                public class SimpleClass {
+                    public static final String VALUE = "hello";
+                }
+                """;
+
+            Path classFile = compileToClassFile(source, "com.example.SimpleClass");
+            Path jarFile = createJarFromClasses("simple.jar", classFile);
+
+            // Create a classpath.tsv.gz in a separate directory that simulates a recipe JAR
+            Path recipeJarDir = tempDir.resolve("recipe-jar");
+            Path metaInfDir = recipeJarDir.resolve("META-INF/rewrite");
+            Files.createDirectories(metaInfDir);
+
+            Path tsvFile = metaInfDir.resolve("classpath.tsv.gz");
+            try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsvFile))) {
+                writer.jar("com.example", "simple", "1.0").write(jarFile);
+            }
+
+            // Create a URLClassLoader that can see the recipe JAR's resources
+            // Use a parent that does NOT have access to any classpath.tsv.gz (the bootstrap classloader)
+            var isolatedLoader = new URLClassLoader(
+                    new URL[]{recipeJarDir.toUri().toURL()},
+                    ClassLoader.getPlatformClassLoader()
+            );
+
+            // Set the isolated classloader as the TCCL
+            ClassLoader originalTccl = Thread.currentThread().getContextClassLoader();
+            try (isolatedLoader) {
+                Thread.currentThread().setContextClassLoader(isolatedLoader);
+
+                // TypeTable.fromClasspath should find the resource via TCCL
+                TypeTable typeTable = TypeTable.fromClasspath(ctx, Set.of("simple"));
+                assertThat(typeTable).isNotNull();
+
+                Path loaded = typeTable.load("simple");
+                assertThat(loaded).isNotNull();
+            } finally {
+                Thread.currentThread().setContextClassLoader(originalTccl);
+            }
+        }
     }
 
     // Helper methods for integration tests
@@ -854,7 +915,7 @@ class TypeTableTest implements RewriteTest {
         if (bytes < unit || Double.isNaN(bytes)) {
             return decimalOrNan(bytes) + " B";
         }
-        int exp = (int) (Math.log(bytes) / Math.log(unit));
+        var exp = (int) (Math.log(bytes) / Math.log(unit));
         String pre = "KMGTPE".charAt(exp - 1) + "i";
         return decimalOrNan(bytes / Math.pow(unit, exp)) + " " + pre + "B";
     }

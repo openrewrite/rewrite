@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {produceAsync} from "../../../src";
 
 describe('template2 replace', () => {

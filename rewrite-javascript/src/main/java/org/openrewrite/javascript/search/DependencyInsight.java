@@ -65,21 +65,15 @@ public class DependencyInsight extends Recipe {
     @Nullable
     Boolean onlyDirect;
 
-    @Override
-    public String getDisplayName() {
-        return "Node.js dependency insight";
-    }
+    String displayName = "Node.js dependency insight";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s`", packageNamePattern);
     }
 
-    @Override
-    public String getDescription() {
-        return "Find direct and transitive npm dependencies matching a package name pattern. " +
+    String description = "Find direct and transitive npm dependencies matching a package name pattern. " +
                "Results include dependencies that either directly match or transitively include a matching dependency.";
-    }
 
     @Override
     public Validated<Object> validate() {

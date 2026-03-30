@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "es2016",
+    "baseUrl": ".",
+    "types": ["vitest/globals"],
+    "paths": {
+      "@openrewrite/rewrite": ["./src/index.ts"],
+      "@openrewrite/rewrite/*": ["./src/*/index.ts"]
+    }
+  },
+  "include": [
+    "src/**/*",
+    "test/**/*",
+    "fixtures/**/*",
+    "vitest.config.mts"
+  ]
+}

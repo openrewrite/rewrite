@@ -36,20 +36,14 @@ public class ChangeKey extends Recipe {
             example = "project-name")
     String newKey;
 
-    @Override
-    public String getDisplayName() {
-        return "Change TOML key";
-    }
+    String displayName = "Change TOML key";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", oldKeyPath, newKey);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a TOML key, while leaving the value intact.";
-    }
+    String description = "Change a TOML key, while leaving the value intact.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

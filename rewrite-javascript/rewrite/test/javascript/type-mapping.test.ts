@@ -1787,6 +1787,291 @@ describe('JavaScript type mapping', () => {
         });
     });
 
+    test('class declaration has JavaType.Class', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((node, type) => {
+            if (node?.kind === J.Kind.ClassDeclaration) {
+                return Type.isClass(type) ? type.fullyQualifiedName : null;
+            }
+            return null;
+        });
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    class Calculator {
+                        add(a: number, b: number): number { return a + b; }
+                    }
+                `,
+                //@formatter:off
+                `
+                    /*~~(Calculator)~~>*/class Calculator {
+                        add(a: number, b: number): number { return a + b; }
+                    }
+                `
+                //@formatter:on
+            )
+        );
+    });
+
+    test('enum declaration has JavaType.Class', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((node, type) => {
+            if (node?.kind === J.Kind.ClassDeclaration) {
+                return Type.isClass(type) ? `${type.fullyQualifiedName}:${type.classKind}` : null;
+            }
+            return null;
+        });
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    enum Direction {
+                        Up,
+                        Down
+                    }
+                `,
+                //@formatter:off
+                `
+                    /*~~(Direction:Enum)~~>*/enum Direction {
+                        Up,
+                        Down
+                    }
+                `
+                //@formatter:on
+            )
+        );
+    });
+
+    test('method declaringType is referentially equal to class type', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new class extends Recipe {
+            name = 'Referential equality check';
+            displayName = 'Check referential equality';
+            description = 'Checks that method declaringType is the same object as class type';
+
+            async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
+                return new class extends JavaScriptVisitor<ExecutionContext> {
+                    async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
+                        const visited = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+                        const classType = visited.type;
+                        if (!Type.isClass(classType)) return visited;
+
+                        // Find method declarations and check referential equality
+                        for (const stmt of visited.body.statements) {
+                            const method = stmt.element;
+                            if (method.kind === J.Kind.MethodDeclaration) {
+                                const methodDecl = method as J.MethodDeclaration;
+                                if (methodDecl.methodType?.declaringType) {
+                                    const same = methodDecl.methodType.declaringType === classType;
+                                    return foundSearchResult(visited, `declaringType===classType: ${same}`);
+                                }
+                            }
+                        }
+                        return visited;
+                    }
+                };
+            }
+        };
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    class Calculator {
+                        add(a: number, b: number): number { return a + b; }
+                    }
+                `,
+                //@formatter:off
+                `
+                    /*~~(declaringType===classType: true)~~>*/class Calculator {
+                        add(a: number, b: number): number { return a + b; }
+                    }
+                `
+                //@formatter:on
+            )
+        );
+    });
+
+    test('FindMissingTypes produces no results on a complex class', async () => {
+        const findings: string[] = [];
+
+        const spec = new RecipeSpec();
+        spec.recipe = new class extends Recipe {
+            name = 'FindMissingTypes';
+            displayName = 'Find missing types';
+            description = 'Finds missing types';
+
+            async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
+                return new class extends JavaScriptVisitor<ExecutionContext> {
+
+                    private isWellFormed(type: Type | undefined): boolean {
+                        return type != null && type.kind !== Type.Kind.Unknown;
+                    }
+
+                    private parentValue(): any {
+                        return this.cursor.parent?.value?.element ?? this.cursor.parent?.value;
+                    }
+
+                    async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
+                        const cd = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+                        if (!this.isWellFormed(cd.type)) {
+                            findings.push(`ClassDeclaration '${cd.name.simpleName}' type is missing`);
+                        }
+                        return cd;
+                    }
+
+                    async visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): Promise<J.MethodDeclaration> {
+                        const md = await super.visitMethodDeclaration(method, p) as J.MethodDeclaration;
+                        if (!this.isWellFormed(md.methodType)) {
+                            findings.push(`MethodDeclaration '${md.name.simpleName}' type is missing`);
+                        } else {
+                            if (md.name.simpleName !== md.methodType!.name && !md.methodType!.name.startsWith('<')) {
+                                findings.push(`MethodDeclaration '${md.name.simpleName}' name doesn't match type name '${md.methodType!.name}'`);
+                            }
+                            if (md.name.type && md.methodType && md.name.type !== md.methodType) {
+                                findings.push(`MethodDeclaration '${md.name.simpleName}' name.type is not referentially equal to methodType`);
+                            }
+                        }
+                        return md;
+                    }
+
+                    async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
+                        const mi = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                        if (mi === method && !this.isWellFormed(mi.methodType)) {
+                            findings.push(`MethodInvocation '${mi.name.simpleName}' type is missing`);
+                        }
+                        return mi;
+                    }
+
+                    async visitVariable(variable: J.VariableDeclarations.NamedVariable, p: ExecutionContext): Promise<J.VariableDeclarations.NamedVariable> {
+                        const v = await super.visitVariable(variable, p) as J.VariableDeclarations.NamedVariable;
+                        if (!this.isWellFormed(v.variableType)) {
+                            const name = v.name.kind === J.Kind.Identifier ? (v.name as J.Identifier).simpleName : '?';
+                            findings.push(`Variable '${name}' type is missing`);
+                        }
+                        return v;
+                    }
+
+                    async visitNewClass(newClass: J.NewClass, p: ExecutionContext): Promise<J.NewClass> {
+                        const nc = await super.visitNewClass(newClass, p) as J.NewClass;
+                        // In the TS model, NewClass uses constructorType (not a separate type field).
+                        // Java's NewClass.getType() derives from constructorType.returnType.
+                        if (!this.isWellFormed(nc.constructorType)) {
+                            findings.push(`NewClass constructorType is missing`);
+                        }
+                        return nc;
+                    }
+
+                    async visitIdentifier(ident: J.Identifier, p: ExecutionContext): Promise<J.Identifier> {
+                        const id = await super.visitIdentifier(ident, p) as J.Identifier;
+                        if (!this.isWellFormed(id.type) && !this.identifierAllowedNullType(id)) {
+                            findings.push(`Identifier '${id.simpleName}' type is missing`);
+                        }
+                        return id;
+                    }
+
+                    private identifierAllowedNullType(ident: J.Identifier): boolean {
+                        const parent = this.parentValue();
+                        if (!parent || !parent.kind) return true;
+                        return parent.kind === J.Kind.ClassDeclaration ||
+                            parent.kind === J.Kind.MethodDeclaration ||
+                            parent.kind === J.Kind.MethodInvocation ||
+                            parent.kind === J.Kind.NamedVariable ||
+                            parent.kind === J.Kind.NewClass ||
+                            parent.kind === J.Kind.Import ||
+                            parent.kind === J.Kind.FieldAccess ||
+                            parent.kind === J.Kind.ParameterizedType ||
+                            parent.kind === J.Kind.TypeParameter ||
+                            parent.kind === J.Kind.Case ||
+                            parent.kind === J.Kind.Label;
+                    }
+                };
+            }
+        };
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    interface Printable {
+                        print(): string;
+                    }
+
+                    class Animal {
+                        name: string;
+                        constructor(name: string) {
+                            this.name = name;
+                        }
+                        speak(): string {
+                            return this.name + " makes a sound";
+                        }
+                    }
+
+                    class Dog extends Animal implements Printable {
+                        private breed: string;
+                        readonly age: number;
+                        static count: number = 0;
+
+                        constructor(name: string, breed: string, age: number) {
+                            super(name);
+                            this.breed = breed;
+                            this.age = age;
+                            Dog.count++;
+                        }
+
+                        speak(): string {
+                            return this.name + " barks";
+                        }
+
+                        print(): string {
+                            return this.name + " (" + this.breed + ")";
+                        }
+
+                        getBreed(): string {
+                            return this.breed;
+                        }
+
+                        isOlderThan(other: Dog): boolean {
+                            return this.age > other.age;
+                        }
+
+                        static createPuppy(breed: string): Dog {
+                            return new Dog("Puppy", breed, 0);
+                        }
+                    }
+
+                    enum Color {
+                        Red,
+                        Green,
+                        Blue
+                    }
+
+                    function processAnimals(animals: Animal[]): string[] {
+                        const results: string[] = [];
+                        for (const animal of animals) {
+                            results.push(animal.speak());
+                        }
+                        return results;
+                    }
+
+                    const dog: Dog = new Dog("Rex", "Shepherd", 5);
+                    const puppy = Dog.createPuppy("Poodle");
+                    const greeting: string = dog.speak();
+                    const animals: Animal[] = [dog, puppy];
+                    const speeches = processAnimals(animals);
+                    const isOlder: boolean = dog.isOlderThan(puppy);
+                `
+            )
+        );
+
+        if (findings.length > 0) {
+            throw new Error(`FindMissingTypes found ${findings.length} issue(s):\n${findings.map(f => `  - ${f}`).join('\n')}`);
+        }
+    });
+
     test('CommonJS require imports distinguish methods with identical signatures', async () => {
         const spec = new RecipeSpec();
         spec.recipe = markTypes((_, type) => {
@@ -1891,6 +2176,15 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
                 async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
                     const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
                     const description = predicate(visited, visited.methodType);
+                    if (description) {
+                        return foundSearchResult(visited, description);
+                    }
+                    return visited;
+                }
+
+                async visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): Promise<J.ClassDeclaration> {
+                    const visited = await super.visitClassDeclaration(classDecl, p) as J.ClassDeclaration;
+                    const description = predicate(visited, visited.type);
                     if (description) {
                         return foundSearchResult(visited, description);
                     }

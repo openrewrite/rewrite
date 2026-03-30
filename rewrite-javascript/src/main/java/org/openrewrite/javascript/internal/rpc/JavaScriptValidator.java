@@ -264,6 +264,12 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
+    public JS.Spread visitSpread(JS.Spread spread, P p) {
+        visitAndValidateNonNull(spread.getExpression(), Expression.class, p);
+        return spread;
+    }
+
+    @Override
     public JS.StatementExpression visitStatementExpression(JS.StatementExpression statementExpression, P p) {
         visitAndValidateNonNull(statementExpression.getStatement(), Statement.class, p);
         return statementExpression;
@@ -721,7 +727,20 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
+    public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        visitAndValidate(parameters.getParameters(), Expression.class, p);
+        return parameters;
+    }
+
+    @Override
     public J.Literal visitLiteral(J.Literal literal, P p) {
+        if (literal.getUnicodeEscapes() != null) {
+            for (Object unicodeEscape : literal.getUnicodeEscapes()) {
+                if (!(unicodeEscape instanceof J.Literal.UnicodeEscape)) {
+                    throw new ClassCastException("Unexpected type: " + unicodeEscape.getClass().getName());
+                }
+            }
+        }
         return literal;
     }
 
@@ -896,6 +915,13 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
         visitAndValidateNonNull(typeCast.getClazz(), J.ControlParentheses.class, p);
         visitAndValidateNonNull(typeCast.getExpression(), Expression.class, p);
         return typeCast;
+    }
+
+    @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        visitAndValidate(typeParameters.getAnnotations(), J.Annotation.class, p);
+        visitAndValidate(typeParameters.getTypeParameters(), J.TypeParameter.class, p);
+        return typeParameters;
     }
 
     @Override

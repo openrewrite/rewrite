@@ -83,7 +83,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
               var methodType = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
               assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
               assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);
@@ -152,7 +152,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               @Override
               public J visitReturn(J.Return return_, ExecutionContext p) {
                   if (return_.getExpression() instanceof J.Binary) {
-                      J.Binary binary = (J.Binary) return_.getExpression();
+                      var binary = (J.Binary) return_.getExpression();
                       if (binary.getRight() instanceof J.Literal &&
                           ((J.Literal) binary.getRight()).getValue().equals(0)) {
                           return t.apply(getCursor(), return_.getCoordinates().replace());
@@ -205,7 +205,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               @Override
               public J visitReturn(J.Return return_, ExecutionContext p) {
                   if (return_.getExpression() instanceof J.Binary) {
-                      J.Binary binary = (J.Binary) return_.getExpression();
+                      var binary = (J.Binary) return_.getExpression();
                       if (binary.getRight() instanceof J.Literal && ((J.Literal) binary.getRight()).getValue().equals(0)) {
                           return t.apply(getCursor(), return_.getCoordinates().replace());
                       }

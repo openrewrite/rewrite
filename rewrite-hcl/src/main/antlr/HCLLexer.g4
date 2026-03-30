@@ -56,10 +56,10 @@ Identifier
 
 // Lexical Elements - Comments and Whitespace
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#comments-and-whitespace
-WS              : [ \t\r\u000C]+                           -> channel(HIDDEN);
+WS              : [ \t\u000C]+                             -> channel(HIDDEN);
 COMMENT         : '/*' .*? '*/'                            -> channel(HIDDEN);
-LINE_COMMENT    : ('//' | '#') ~[\r\n]* '\r'? ('\n' | EOF) -> channel(HIDDEN);
-NEWLINE         : '\n'                                     -> channel(HIDDEN);
+LINE_COMMENT    : ('//' | '#') ~[\r\n]* -> channel(HIDDEN);
+NEWLINE         : ('\r\n' | '\r' | '\n')                   -> channel(HIDDEN);
 
 fragment LetterOrDigit
     : Letter

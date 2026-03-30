@@ -26,6 +26,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -116,20 +117,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Nullable
     Boolean acceptTransitive;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Gradle dependency";
-    }
+    String displayName = "Add Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a gradle dependency to a `build.gradle` file in the correct configuration based on where it is used.";
-    }
+    String description = "Add a gradle dependency to a `build.gradle` file in the correct configuration based on where it is used.";
 
     @Override
     public Validated<Object> validate() {
@@ -156,6 +151,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Nullable
             UsesType<ExecutionContext> usesType = null;
+            final TreeVisitor<?, ExecutionContext> hasTestSourceSet = new HasSourceSet("test").getVisitor();
 
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
                 if (onlyIfUsing == null) {
@@ -173,12 +169,22 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
+                if (sourceFile instanceof JavaSourceFile &&
+                        configuration != null && onlyIfUsing != null &&
+                        configuration.startsWith("test") && configuration.length() > 4 &&
+                        Character.isUpperCase(configuration.charAt(4)) &&
+                        sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
+                    return tree;
+                }
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
-                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || usesType(sourceFile, ctx));
+                    boolean uses = usesType(sourceFile, ctx);
+                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);
 
-                    Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                    sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
-                            configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                    if (uses) {
+                        Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
+                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                    }
                 });
                 return tree;
             }
@@ -187,8 +193,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(!acc.configurationsByProject.isEmpty(),
-                Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        // Allow when configuration is explicitly provided, when onlyIfUsing is not set (default to "implementation"),
+        // or when source files were scanned
+        boolean hasExplicitConfiguration = !StringUtils.isBlank(configuration);
+        return Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
+                Preconditions.check(new IsBuildGradle<>(true), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -198,27 +207,42 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         JavaSourceFile s = (JavaSourceFile) tree;
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
                         Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
-                        if (!maybeJp.isPresent() ||
-                                (onlyIfUsing != null && !acc.usingType.getOrDefault(maybeJp.get(), false)) || !acc.configurationsByProject.containsKey(maybeJp.get()) ||
-                                !maybeGp.isPresent()) {
+
+                        if (!maybeGp.isPresent()) {
                             return s;
                         }
+                        if (onlyIfUsing != null) {
+                            // When onlyIfUsing is set, skip projects that don't use the specified type
+                            if (!maybeJp.isPresent() || !acc.usingType.getOrDefault(maybeJp.get(), false)) {
+                                return s;
+                            }
+                            // When configuration needs to be inferred, also require source set info
+                            if (!hasExplicitConfiguration && !acc.configurationsByProject.containsKey(maybeJp.get())) {
+                                return s;
+                            }
+                        }
 
-                        JavaProject jp = maybeJp.get();
+                        JavaProject jp = maybeJp.orElse(null);
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
-                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) :
-                                new HashSet<>(singletonList(configuration));
+                        Set<String> resolvedConfigurations = hasExplicitConfiguration ?
+                                new HashSet<>(singletonList(configuration)) :
+                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>());
                         if (resolvedConfigurations.isEmpty()) {
                             resolvedConfigurations.add("implementation");
                         }
 
-                        GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
-                        gradleConfigurationFilter.removeTransitiveConfigurations();
-                        gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
-                        gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
-                        resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
+                        // Only apply filtering when the configuration is known to the GradleProject
+                        // (which requires Java sources to have been scanned with the tooling API)
+                        boolean configurationKnown = resolvedConfigurations.stream()
+                                .anyMatch(c -> gp.getConfiguration(c) != null);
+                        if (configurationKnown) {
+                            GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
+                            gradleConfigurationFilter.removeTransitiveConfigurations();
+                            gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                            gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
+                            resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
+                        }
 
                         if (resolvedConfigurations.isEmpty()) {
                             return s;

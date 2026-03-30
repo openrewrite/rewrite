@@ -63,15 +63,9 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 shortType, oldFieldName, newMethodName);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Change static field access to static method access";
-    }
+    String displayName = "Change static field access to static method access";
 
-    @Override
-    public String getDescription() {
-        return "Migrate accesses to a static field to invocations of a static method.";
-    }
+    String description = "Migrate accesses to a static field to invocations of a static method.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

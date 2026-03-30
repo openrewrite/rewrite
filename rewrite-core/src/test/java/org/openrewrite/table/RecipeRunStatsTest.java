@@ -16,6 +16,7 @@
 package org.openrewrite.table;
 
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
@@ -28,15 +29,11 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 @AllArgsConstructor
 class RecipeWithApplicabilityTest extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Recipe with an applicability test";
-    }
+    @Getter
+    final String displayName = "Recipe with an applicability test";
 
-    @Override
-    public String getDescription() {
-        return "This recipe is a test utility which exists to exercise RecipeRunStats.";
-    }
+    @Getter
+    final String description = "This recipe is a test utility which exists to exercise RecipeRunStats.";
 
     @Option(displayName = "New text", example = "txt")
     String newText;

@@ -40,6 +40,7 @@ export interface SourceSpec<T extends SourceFile> {
 
 export class RecipeSpec {
     checkParsePrintIdempotence: boolean = true
+    allowEmptyDiff: boolean = false
 
     recipe: Recipe = new NoopRecipe()
 
@@ -100,6 +101,25 @@ export class RecipeSpec {
             allParsed.push(...parsed);
         }
 
+        // Apply beforeRecipe hooks (after idempotence check, before recipe execution)
+        for (let i = 0; i < allParsed.length; i++) {
+            const [spec, sourceFile] = allParsed[i];
+            if (spec.beforeRecipe) {
+                const b = spec.beforeRecipe(sourceFile);
+                if (b !== undefined) {
+                    if (b instanceof Promise) {
+                        const mapped = await b;
+                        if (mapped === undefined) {
+                            throw new Error("Expected beforeRecipe to return a SourceFile, but got undefined. Did you forget a return statement?");
+                        }
+                        allParsed[i] = [spec, mapped];
+                    } else {
+                        allParsed[i] = [spec, b as SourceFile];
+                    }
+                }
+            }
+        }
+
         const changeset = (await scheduleRun(this.recipe,
             allParsed.map(([_, sourceFile]) => sourceFile),
             this.recipeExecutionContext)).changeset;
@@ -124,27 +144,46 @@ export class RecipeSpec {
     private async expectParsePrintIdempotence(parsed: [SourceSpec<any>, SourceFile][]) {
         for (const [spec, sourceFile] of parsed) {
             const beforeSource = dedent(spec.before!);
-            expect(await TreePrinters.print(sourceFile)).toEqual(beforeSource);
+            const printed = await TreePrinters.print(sourceFile);
+            if (printed !== beforeSource) {
+                throw new Error(
+                    `Parse-print idempotence check failed.\n` +
+                    `Expected:\n${beforeSource}\n\nActual:\n${printed}`
+                );
+            }
         }
     }
 
     private async expectResultsToMatchAfter(specs: SourceSpec<any>[], changeset: Result[], parsed: [SourceSpec<any>, SourceFile][]) {
         for (const spec of specs) {
             const matchingSpec = parsed.find(([s, _]) => s === spec);
-            const after = changeset.find(c => {
+            const result = changeset.find(c => {
                 if (c.before) {
                     return c.before === matchingSpec![1];
                 } else if (c.after) {
                     const matchingSpec = specs.find(s => s.path === c.after!.sourcePath);
                     return !!matchingSpec;
                 }
-            })?.after;
+            });
+            const after = result?.after;
 
             if (!spec.after) {
-                if (after) {
-                    expect(await TreePrinters.print(after)).toEqual(dedent(spec.before!));
-                    // TODO: Consider throwing an error, as there should typically have been no change to the LST
-                    // fail("Expected after to be undefined.");
+                if (after && after !== result?.before) {
+                    const actual = await TreePrinters.print(after);
+                    const expected = dedent(spec.before!);
+                    if (actual === expected) {
+                        if (!this.allowEmptyDiff) {
+                            throw new Error(
+                                "An empty diff was generated. The recipe incorrectly " +
+                                "changed the AST without changing the printed output."
+                            );
+                        }
+                    } else {
+                        throw new Error(
+                            "Expected no change but recipe modified the file.\n" +
+                            `Expected:\n${expected}\n\nActual:\n${actual}`
+                        );
+                    }
                 }
                 if (spec.afterRecipe) {
                     await spec.afterRecipe(matchingSpec![1]);
@@ -172,12 +211,16 @@ export class RecipeSpec {
         if (!after) {
             throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
         }
-        expect(after).toBeDefined();
-        await new ValidateWhitespaceVisitor().visit(after!, this.executionContext);
-        const actualAfter = await TreePrinters.print(after!);
+        await new ValidateWhitespaceVisitor().visit(after, this.executionContext);
+        const actualAfter = await TreePrinters.print(after);
         const afterSource = typeof spec.after === "function" ?
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
-        expect(actualAfter).toEqual(afterSource);
+        if (actualAfter !== afterSource) {
+            throw new Error(
+                `Recipe output does not match expected.\n` +
+                `Expected:\n${afterSource}\n\nActual:\n${actualAfter}`
+            );
+        }
         if (spec.afterRecipe) {
             await spec.afterRecipe(after);
         }
@@ -200,21 +243,7 @@ export class RecipeSpec {
         for await (const sourceFile of parser.parse(...before.map(([_, parserInput]) => parserInput))) {
             parsed.push(sourceFile);
         }
-        const specToParsed: [SourceSpec<any>, SourceFile][] = before.map(([spec, _], i) => [spec, parsed[i]]);
-        return await mapAsync(specToParsed, async ([spec, sourceFile]) => {
-            const b = spec.beforeRecipe ? spec.beforeRecipe(sourceFile) : sourceFile;
-            if (b !== undefined) {
-                if (b instanceof Promise) {
-                    const mapped = await b;
-                    if (mapped === undefined) {
-                        throw new Error("Expected beforeRecipe to return a SourceFile, but got undefined. Did you forget a return statement?");
-                    }
-                    return [spec, mapped];
-                }
-                return [spec, b as SourceFile];
-            }
-            return [spec, sourceFile];
-        });
+        return before.map(([spec, _], i): [SourceSpec<any>, SourceFile] => [spec, parsed[i]]);
     }
 
     private async expectWhitespaceNotToContainNonwhitespaceCharacters(parsed: [SourceSpec<any>, SourceFile][]) {
@@ -228,7 +257,11 @@ export class RecipeSpec {
 class ValidateWhitespaceVisitor extends JavaScriptVisitor<ExecutionContext> {
     public override async visitSpace(space: J.Space, p: ExecutionContext): Promise<J.Space> {
         const ret = super.visitSpace(space, p);
-        expect(space.whitespace).toMatch(/^\s*$/);
+        if (!/^\s*$/.test(space.whitespace)) {
+            throw new Error(
+                `Whitespace contains non-whitespace characters: ${JSON.stringify(space.whitespace)}`
+            );
+        }
         return ret;
     }
 }
@@ -250,37 +283,25 @@ export type AfterRecipeText = string | ((actual: string) => string | undefined) 
  *
  * Behavior:
  * - Removes ONE leading newline if present (for template string ergonomics)
- * - Removes trailing newline + whitespace (for template string ergonomics)
- * - Preserves additional leading/trailing empty lines beyond the first
+ * - Preserves trailing newlines (important for testing formatters like Prettier)
  * - For lines with content: removes common indentation
  * - For lines with only whitespace: removes common indentation, preserving remaining spaces
  *
  * Examples:
  * - `\n  code` → `code` (single leading newline removed)
  * - `\n\n  code` → `\ncode` (first newline removed, second preserved)
- * - `  code\n` → `code` (trailing newline removed)
- * - `  code\n\n` → `code\n` (first trailing newline removed, second preserved)
+ * - `  code\n` → `code\n` (trailing newline preserved)
+ * - `  code\n\n` → `code\n\n` (trailing newlines preserved)
  */
 export function dedent(s: string): string {
     if (!s) return s;
 
     // Remove single leading newline for ergonomics
-    let start = s.charCodeAt(0) === 10 ? 1 : 0;  // 10 = '\n'
+    const start = s.charCodeAt(0) === 10 ? 1 : 0;  // 10 = '\n'
 
-    // Remove trailing newline + any trailing whitespace
-    let end = s.length;
-    for (let i = s.length - 1; i >= start; i--) {
-        const ch = s.charCodeAt(i);
-        if (ch === 10) {  // '\n'
-            end = i;
-            break;
-        }
-        if (ch !== 32 && ch !== 9) break;  // not ' ' or '\t'
-    }
+    if (start >= s.length) return '';
 
-    if (start >= end) return '';
-
-    const str = start > 0 || end < s.length ? s.slice(start, end) : s;
+    const str = start > 0 ? s.slice(start) : s;
     const lines = str.split('\n');
 
     // Always consider all lines for minIndent calculation

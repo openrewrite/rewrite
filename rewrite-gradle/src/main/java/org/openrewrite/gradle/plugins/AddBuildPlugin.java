@@ -64,15 +64,9 @@ public class AddBuildPlugin extends Recipe {
     @Nullable
     Boolean acceptTransitive;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Gradle plugin";
-    }
+    String displayName = "Add Gradle plugin";
 
-    @Override
-    public String getDescription() {
-        return "Add a build plugin to a Gradle build file's `plugins` block.";
-    }
+    String description = "Add a build plugin to a Gradle build file's `plugins` block.";
 
     @Override
     public Validated<Object> validate() {

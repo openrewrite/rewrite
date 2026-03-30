@@ -24,9 +24,12 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleResolver;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.rpc.request.*;
 import org.openrewrite.tree.ParseError;
@@ -61,13 +64,12 @@ import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 @SuppressWarnings("UnusedReturnValue")
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
-    private final AtomicInteger batchSize = new AtomicInteger(200);
+    private final AtomicInteger batchSize = new AtomicInteger(1000);
     private Duration timeout = Duration.ofSeconds(30);
     private Supplier<? extends @Nullable RuntimeException> livenessCheck = () -> null;
-    private final AtomicReference<PrintStream> log = new AtomicReference<>();
+    private final AtomicReference<@Nullable PrintStream> log = new AtomicReference<>();
     private final AtomicReference<TraceGetObject> traceGetObject = new AtomicReference<>(
             new TraceGetObject(false, false));
-    private final AtomicReference<PrepareRecipe.Loader> recipeLoader = new AtomicReference<>();
 
     final PreparedRecipeCache preparedRecipes = new PreparedRecipeCache();
 
@@ -101,19 +103,54 @@ public class RewriteRpc {
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
      */
-    public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
+    public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace) {
+        this(jsonRpc, marketplace, emptyList());
+    }
+
+    /**
+     * Mutable resolver list so it can be updated after construction
+     * (e.g. when the RPC process is started eagerly before all resolvers are built).
+     */
+    private final List<RecipeBundleResolver> resolvers = new ArrayList<>();
+
+    private final RecipeMarketplace marketplace;
+
+    /**
+     * Replace the resolver list. Useful when the RPC process is started before all
+     * resolvers are built (e.g. the NuGet resolver starts the C# RPC during
+     * buildResolvers, but Maven resolvers are added to the list afterward).
+     */
+    public void setResolvers(List<RecipeBundleResolver> resolvers) {
+        this.resolvers.clear();
+        this.resolvers.addAll(resolvers);
+    }
+
+    /**
+     * Creates a new RPC interface that can be used to communicate with a remote.
+     *
+     * @param marketplace The marketplace of recipes that this peer makes available.
+     *                    Even if this peer is the host process, configuring this
+     *                    marketplace allows the remote peer to discover what recipes
+     *                    the host process has available for its use in composite recipes.
+     * @param resolvers   The initial set of recipe bundle resolvers.
+     */
+    public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
+        this.marketplace = marketplace;
+        this.resolvers.addAll(resolvers);
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
+                this::getObject, this::getCursor));
+        jsonRpc.rpc("BatchVisit", new BatchVisit.Handler(localObjects, preparedRecipes,
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes,
                 this::getObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects,
                 localRefs, log, () -> traceGetObject.get().isSend()));
-        jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
+        jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return marketplace.listRecipeDescriptors();
+                return GetMarketplaceResponse.fromMarketplace(marketplace, RewriteRpc.this.resolvers);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
@@ -143,8 +180,28 @@ public class RewriteRpc {
                 }
             }
         });
-        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, recipeLoader));
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
+            RecipeListing listing = marketplace.findRecipe(id);
+            if (listing != null) {
+                return listing.prepare(RewriteRpc.this.resolvers, opts);
+            }
+            // Fall back to loading by class name if not found in marketplace
+            return new RecipeLoader(null).load(id, opts);
+        }));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
+        jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
+            @Override
+            protected Boolean handle(Void noParams) {
+                remoteObjects.clear();
+                localObjects.clear();
+                localObjectIds.clear();
+                remoteRefs.clear();
+                localRefs.clear();
+                preparedRecipes.getInstantiated().clear();
+                preparedRecipes.getRecipeCursors().clear();
+                return true;
+            }
+        });
 
         jsonRpc.bind();
     }
@@ -165,23 +222,34 @@ public class RewriteRpc {
     }
 
     public RewriteRpc log(@Nullable PrintStream logFile) {
-        //noinspection DataFlowIssue
         this.log.set(logFile);
         return this;
     }
 
-    public RewriteRpc recipeLoader(PrepareRecipe.@Nullable Loader recipeLoader) {
-        //noinspection DataFlowIssue
-        this.recipeLoader.set(recipeLoader);
-        return this;
-    }
-
     public void shutdown() {
-        //noinspection ConstantValue
-        if (log.get() != null) {
-            log.get().close();
+        PrintStream logOut = log.get();
+        if (logOut != null) {
+            logOut.close();
         }
         jsonRpc.shutdown();
+    }
+
+    /**
+     * Resets all cached state in both the local and remote RPC processes.
+     * This should be called between operations that don't share state (e.g., between tests)
+     * to prevent unbounded memory growth from accumulated objects.
+     */
+    public void reset() {
+        // Send reset to remote process
+        send("Reset", null, Boolean.class);
+
+        // Clear local caches
+        remoteObjects.clear();
+        localObjects.clear();
+        localObjectIds.clear();
+        remoteRefs.clear();
+        localRefs.clear();
+        remoteLanguages = null;
     }
 
     public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p) {
@@ -202,6 +270,20 @@ public class RewriteRpc {
         return response.isModified() ?
                 getObject(tree.getId().toString(), sourceFileType) :
                 tree;
+    }
+
+    public <P> BatchVisitResponse batchVisit(Tree tree, P p, @Nullable Cursor cursor,
+                                             List<BatchVisit.BatchVisitItem> visitors) {
+        String treeId = tree.getId().toString();
+        localObjects.put(treeId, tree);
+
+        String pId = maybeUnwrapExecutionContext(p);
+        List<String> cursorIds = getCursorIds(cursor);
+
+        String sourceFileType = (tree instanceof SourceFile ? tree : requireNonNull(cursor).firstEnclosingOrThrow(SourceFile.class))
+                .getClass().getName();
+        return send("BatchVisit", new BatchVisit(sourceFileType, treeId, pId, cursorIds, visitors),
+                BatchVisitResponse.class);
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
@@ -240,8 +322,9 @@ public class RewriteRpc {
         return pId;
     }
 
-    public List<RecipeDescriptor> getRecipes() {
-        return send("GetRecipes", null, GetRecipesResponse.class);
+    public RecipeMarketplace getMarketplace(RecipeBundle bundle) {
+        return send("GetMarketplace", null, GetMarketplaceResponse.class)
+                .toMarketplace(bundle);
     }
 
     public List<String> getLanguages() {
@@ -251,12 +334,23 @@ public class RewriteRpc {
         return remoteLanguages;
     }
 
-    public RpcRecipe prepareRecipe(String id) {
+    public Recipe prepareRecipe(String id) {
         return prepareRecipe(id, emptyMap());
     }
 
-    public RpcRecipe prepareRecipe(String id, Map<String, Object> options) {
+    public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+
+        if (r.getDelegatesTo() != null) {
+            PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
+            RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
+            if (listing == null) {
+                throw new IllegalStateException(
+                        "Remote declared delegatesTo " + d.getRecipeName() +
+                        " but no recipe found in marketplace.");
+            }
+            return listing.prepare(resolvers, d.getOptions());
+        }
 
         // FIXME do this validation on the server side instead
         for (OptionDescriptor option : r.getDescriptor().getOptions()) {
@@ -282,12 +376,12 @@ public class RewriteRpc {
 
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 Tree t = tree;
                 for (TreeVisitor<?, ExecutionContext> v : visitors) {
                     //noinspection unchecked
-                    t = ((TreeVisitor<Tree, ExecutionContext>) v).visit(tree, ctx);
+                    t = ((TreeVisitor<Tree, @NonNull ExecutionContext>) v).visit(tree, ctx);
                     if (t == tree) {
                         // One of the preconditions didn't match, so we fail the whole precondition
                         return tree;
@@ -387,14 +481,17 @@ public class RewriteRpc {
     }
 
     public String print(Tree tree, Cursor parent, Print.@Nullable MarkerPrinter markerPrinter) {
-        localObjects.put(tree.getId().toString(), tree);
+        String treeId = tree.getId().toString();
+        localObjects.put(treeId, tree);
         SourceFile sourceFile = tree instanceof SourceFile ? (SourceFile) tree : parent.firstEnclosingOrThrow(SourceFile.class);
+        String sourceFileType = sourceFile.getClass().getName();
+
         return send(
                 "Print",
                 new Print(
-                        tree.getId().toString(),
+                        treeId,
                         sourceFile.getSourcePath(),
-                        sourceFile.getClass().getName(),
+                        sourceFileType,
                         markerPrinter
                 ),
                 String.class
@@ -425,8 +522,11 @@ public class RewriteRpc {
 
     @VisibleForTesting
     public <T> T getObject(String id, @Nullable String sourceFileType) {
-        // Check if we have a cached version of this object
-        Object localObject = localObjects.get(id);
+        // Use the last synced state as the baseline for receiving diffs.
+        // This must match what the remote used as its baseline when computing the diff.
+        // Using localObjects here would be wrong if Java modified the tree locally
+        // (e.g., via a Java-side recipe) since the remote doesn't know about those changes.
+        Object before = remoteObjects.get(id);
 
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
@@ -434,9 +534,18 @@ public class RewriteRpc {
                 sourceFileType,
                 log.get()
         );
-        Object remoteObject = q.receive(localObject, null);
-        if (q.take().getState() != END_OF_OBJECT) {
-            throw new IllegalStateException("Expected END_OF_OBJECT");
+        Object remoteObject;
+        try {
+            remoteObject = q.receive(before, null);
+        } catch (Exception e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            remoteObjects.remove(id);
+            throw e;
+        }
+        RpcObjectData endMarker = q.take();
+        if (endMarker.getState() != END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + endMarker);
         }
 
         //noinspection ConstantValue

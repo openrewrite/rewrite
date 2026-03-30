@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {capture, JavaScriptVisitor, Pattern, pattern, Template, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 describe('variadic statement matching and expansion', () => {
     const spec = new RecipeSpec();

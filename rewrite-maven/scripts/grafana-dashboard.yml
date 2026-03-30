@@ -1,9 +1,0 @@
-apiVersion: 1
-
-providers:
-- name: 'default'
-  folder: 'Rewrite'
-  type: file
-  options:
-    path: /etc/grafana/dashboards
-

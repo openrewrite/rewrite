@@ -66,7 +66,7 @@ describe('JS LST element tree', () => {
         expect(comparatorTsMethods).toEqual(visitorMethods);
     })
 
-    test.each([
+    test.for([
         "JavaScriptVisitor.java",
         "internal/rpc/JavaScriptValidator.java",
         "JavaScriptIsoVisitor.java",
@@ -85,7 +85,7 @@ describe('JS LST element tree', () => {
             [classCode.split(" ")[0], classCode]
         ));
 
-    test.each([
+    test.for([
         "JavaScriptReceiver",
         "JavaScriptSender",
     ])("rpc.ts / %s", (className) => {

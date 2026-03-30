@@ -230,8 +230,7 @@ describe('variadic pattern matching in containers', () => {
                 `
                     function MyInput({ ref: ref, className, ...rest }) {
                         return null;
-                    }
-                `
+                    }`
             )
         );
     });
@@ -269,8 +268,7 @@ describe('variadic pattern matching in containers', () => {
                 `
                     function MyInput({ ref: ref, className, ...rest }) {
                         return null;
-                    }
-                `
+                    }`
             )
         );
     });
@@ -347,7 +345,7 @@ describe('variadic pattern matching in containers', () => {
             //language=typescript
             typescript(
                 `myFunc(props)`,
-                `myFunc({ ...props })`
+                `myFunc({...props})`
             )
         );
     });

@@ -66,3 +66,8 @@ export {
     TemplateBuilder,
     template
 } from './template';
+
+// Export engine utilities (for testing)
+export {
+    clearTemplateCache
+} from './engine';

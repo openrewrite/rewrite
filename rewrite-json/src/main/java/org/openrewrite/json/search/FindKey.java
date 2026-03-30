@@ -38,15 +38,9 @@ public class FindKey extends Recipe {
             example = "$.subjects.kind")
     String key;
 
-    @Override
-    public String getDisplayName() {
-        return "Find JSON object members";
-    }
+    String displayName = "Find JSON object members";
 
-    @Override
-    public String getDescription() {
-        return "Find JSON object members by JsonPath expression.";
-    }
+    String description = "Find JSON object members by JsonPath expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

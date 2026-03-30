@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonMap;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.ObjectMappers.propertyBasedMapper;
 
@@ -125,10 +126,14 @@ public class RawGradleModule {
                 .filter(Objects::nonNull)
                 .flatMap(Collection::stream)
                 .filter(d -> categories.length == 0 || (d.getAttributes() != null && d.getAttributes().getCategory() != null && Arrays.stream(categories).anyMatch(cat -> d.getAttributes().getCategory().equalsIgnoreCase(cat))))
-                .map(Dependency::asGav)
-                .map(gav -> org.openrewrite.maven.tree.Dependency.builder()
-                        .gav(gav)
-                        .build())
+                .map(dep -> {
+                    org.openrewrite.maven.tree.Dependency.DependencyBuilder builder = org.openrewrite.maven.tree.Dependency.builder().gav(dep.asGav());
+                    if (dep.getAttributes() != null && dep.getAttributes().getCategory() != null) {
+                        //noinspection NullableProblems,ResultOfMethodCallIgnored
+                        builder.attributes(singletonMap("org.gradle.category", dep.getAttributes().getCategory()));
+                    }
+                    return builder.build();
+                })
                 .collect(toList());
     }
 }

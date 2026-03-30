@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.FormatFirstClassPrefix;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -139,7 +140,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
                                 methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                             methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
-                            return unfoldStarImport(import_, methodsAndFieldsUsed);
+                            return unfoldStarImport(import_, methodsAndFieldsUsed, cu);
                         }
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
@@ -157,7 +158,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         spaceForNextImport.set(import_.getPrefix());
                         return null;
                     } else {
-                        return unfoldStarImport(import_, otherTypesInPackageUsed);
+                        return unfoldStarImport(import_, otherTypesInPackageUsed, cu);
                     }
                 }
                 return import_;
@@ -178,14 +179,53 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         return space.getLastWhitespace().chars().filter(s -> s == '\n').count();
     }
 
-    private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed) {
+    private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed, JavaSourceFile cu) {
         List<J.Import> unfoldedImports = new ArrayList<>(otherImportsUsed.size());
         int i = 0;
         for (String other : otherImportsUsed) {
-            J.Import unfolded = starImport.withQualid(starImport.getQualid().withName(starImport
-                    .getQualid().getName().withSimpleName(other))).withId(randomId());
+            J.FieldAccess newQualid = starImport.getQualid().withName(starImport
+                    .getQualid().getName().withSimpleName(other));
+
+            // Set type attribution on the unfolded import so downstream recipes
+            // can properly match and transform it
+            if (!starImport.isStatic()) {
+                String fqn = starImport.getPackageName() + "." + other;
+                JavaType.FullyQualified typeForImport = findType(fqn, cu);
+                newQualid = newQualid.withType(typeForImport);
+            }
+
+            J.Import unfolded = starImport.withQualid(newQualid).withId(randomId());
             unfoldedImports.add(i++ == 0 ? unfolded : unfolded.withPrefix(Space.format("\n")));
         }
         return unfoldedImports;
+    }
+
+    /**
+     * Find a fully qualified type by name. First checks TypesInUse for a fully hydrated type,
+     * then checks the JavaSourceSet classpath, and falls back to creating a ShallowClass.
+     */
+    private JavaType.FullyQualified findType(String fqn, JavaSourceFile cu) {
+        // First, check if the type is already used in the source file (fully hydrated)
+        for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
+            if (javaType instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
+                    return fq;
+                }
+            }
+        }
+
+        // Check the JavaSourceSet classpath
+        Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+        if (sourceSet.isPresent()) {
+            for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                if (TypeUtils.fullyQualifiedNamesAreEqual(fq.getFullyQualifiedName(), fqn)) {
+                    return fq;
+                }
+            }
+        }
+
+        // Fall back to creating a ShallowClass
+        return JavaType.ShallowClass.build(fqn);
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.xml.XPathMatcher;
@@ -23,17 +24,13 @@ import org.openrewrite.xml.tree.Xml;
 
 public class ModernizeObsoletePoms extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Modernize obsolete Maven poms";
-    }
+    @Getter
+    final String displayName = "Modernize obsolete Maven poms";
 
-    @Override
-    public String getDescription() {
-        return "Very old Maven poms are no longer supported by current versions of Maven. " +
-               "This recipe updates poms with `<pomVersion>3</pomVersion>` to `<modelVersion>4.0.0</modelVersion>` of the Maven pom schema. " +
-               "This does not attempt to upgrade old dependencies or plugins and is best regarded as the starting point of a migration rather than an end-point.";
-    }
+    @Getter
+    final String description = "Very old Maven poms are no longer supported by current versions of Maven. " +
+        "This recipe updates poms with `<pomVersion>3</pomVersion>` to `<modelVersion>4.0.0</modelVersion>` of the Maven pom schema. " +
+        "This does not attempt to upgrade old dependencies or plugins and is best regarded as the starting point of a migration rather than an end-point.";
 
     private static final XPathMatcher POM_VERSION = new XPathMatcher("/project/pomVersion");
     private static final XPathMatcher CURRENT_VERSION = new XPathMatcher("/project/currentVersion");

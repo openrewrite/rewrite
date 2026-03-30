@@ -36,6 +36,7 @@ public class LatestMinorTest {
         assertThat(latestMinor.isValid("1.0", "1.0.1")).isTrue();
         assertThat(latestMinor.isValid("1.0.0", "1.1.0")).isTrue();
         assertThat(latestMinor.isValid("1.0.0", "2.0.0")).isFalse();
+        assertThat(latestMinor.isValid("1.0.x", "1.0.1")).isTrue();
     }
 
     @Test
@@ -47,6 +48,7 @@ public class LatestMinorTest {
     void compare() {
         assertThat(latestMinor.compare(null, "1.0", "latest.minor")).isNegative();
         assertThat(latestMinor.compare(null, "latest.minor", "1.0")).isPositive();
+        assertThat(latestMinor.compare("1.x", "1.0", "1.1")).isNegative();
     }
 
     @Test
@@ -66,5 +68,8 @@ public class LatestMinorTest {
         assertThat(latestMinor.upgrade("2.10.0", List.of("3.0.0-SNAPSHOT"))).isNotPresent();
 
         assertThat(latestMinor.upgrade("2.10.0", List.of("3.0.0"))).isNotPresent();
+
+        assertThat(latestMinor.upgrade("2.x", List.of("2.9"))).isPresent();
+        assertThat(latestMinor.upgrade("2.x", List.of("3.0"))).isNotPresent();
     }
 }

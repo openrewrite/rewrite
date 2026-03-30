@@ -17,15 +17,20 @@
 import {Option, ScanningRecipe} from "../../recipe";
 import {ExecutionContext} from "../../execution";
 import {TreeVisitor} from "../../visitor";
-import {getMemberKeyName, isLiteral, Json, JsonVisitor} from "../../json";
+import {Tree} from "../../tree";
+import {getMemberKeyName, isJson, isLiteral, Json, JsonVisitor} from "../../json";
+import {isDocuments, isYaml, Yaml} from "../../yaml";
+import {isPlainText, PlainText} from "../../text";
 import {
     allDependencyScopes,
     DependencyScope,
     findNodeResolutionResult,
-    PackageManager
+    PackageManager,
+    serializeNpmrcConfigs
 } from "../node-resolution-result";
 import * as path from "path";
 import * as semver from "semver";
+import * as picomatch from "picomatch";
 import {markupWarn, replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
 import {
@@ -33,6 +38,7 @@ import {
     createLockFileEditor,
     DependencyRecipeAccumulator,
     getAllLockFileNames,
+    getLockFileName,
     parseLockFileContent,
     runInstallIfNeeded,
     runInstallInTempDir,
@@ -40,32 +46,26 @@ import {
     updateNodeResolutionMarker
 } from "../package-manager";
 
-/**
- * Information about a project that needs updating
- */
-interface ProjectUpdateInfo {
-    /** Absolute path to the project directory */
-    projectDir: string;
-    /** Relative path to package.json (from source root) */
-    packageJsonPath: string;
-    /** Original package.json content */
-    originalPackageJson: string;
-    /** The scope where the dependency was found */
+interface MatchedDependency {
+    packageName: string;
     dependencyScope: DependencyScope;
-    /** Current version constraint */
     currentVersion: string;
-    /** New version constraint to apply */
-    newVersion: string;
-    /** The package manager used by this project */
-    packageManager: PackageManager;
-    /**
-     * If true, skip running the package manager because the resolved version
-     * already satisfies the new constraint. Only package.json needs updating.
-     */
-    skipInstall: boolean;
 }
 
-type Accumulator = DependencyRecipeAccumulator<ProjectUpdateInfo>;
+interface ProjectUpdateInfo {
+    packageJsonPath: string;
+    originalPackageJson: string;
+    matchedDependencies: MatchedDependency[];
+    newVersion: string;
+    packageManager: PackageManager;
+    skipInstall: boolean;
+    configFiles?: Record<string, string>;
+}
+
+interface Accumulator extends DependencyRecipeAccumulator<ProjectUpdateInfo> {
+    /** Original lock file content, keyed by lock file path */
+    originalLockFiles: Map<string, string>;
+}
 
 /**
  * Upgrades the version of a direct dependency in package.json and updates the lock file.
@@ -84,14 +84,23 @@ type Accumulator = DependencyRecipeAccumulator<ProjectUpdateInfo>;
 export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     readonly name = "org.openrewrite.javascript.dependencies.upgrade-dependency-version";
     readonly displayName = "Upgrade npm dependency version";
-    readonly description = "Upgrades the version of a direct dependency in `package.json` and updates the lock file by running the package manager.";
+    readonly description = "Upgrades the version of a direct dependency in `package.json` and updates the lock file by running the package manager. Either `packageName` or `packagePattern` must be specified.";
 
     @Option({
         displayName: "Package name",
-        description: "The name of the npm package to upgrade (e.g., `lodash`, `@types/node`)",
+        description: "The exact name of the npm package to upgrade (e.g., `lodash`, `@types/node`). Either this or `packagePattern` must be specified.",
+        required: false,
         example: "lodash"
     })
-    packageName!: string;
+    packageName?: string;
+
+    @Option({
+        displayName: "Package pattern",
+        description: "A glob expression to match package names (e.g., `@angular/*`, `@types/*`). Either this or `packageName` must be specified.",
+        required: false,
+        example: "@angular/*"
+    })
+    packagePattern?: string;
 
     @Option({
         displayName: "Version",
@@ -100,8 +109,35 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     })
     newVersion!: string;
 
+    private _matcher?: picomatch.Matcher;
+
+    private get matcher(): picomatch.Matcher | undefined {
+        if (this.packagePattern && !this._matcher) {
+            this._matcher = picomatch.default
+                ? picomatch.default(this.packagePattern)
+                : (picomatch as any)(this.packagePattern);
+        }
+        return this._matcher;
+    }
+
+    matchesPackage(name: string): boolean {
+        if (this.packageName && name === this.packageName) {
+            return true;
+        }
+        if (this.matcher) {
+            return this.matcher(name);
+        }
+        return false;
+    }
+
     initialValue(_ctx: ExecutionContext): Accumulator {
-        return createDependencyRecipeAccumulator();
+        if (!this.packageName && !this.packagePattern) {
+            throw new Error("Either packageName or packagePattern must be specified");
+        }
+        return {
+            ...createDependencyRecipeAccumulator<ProjectUpdateInfo>(),
+            originalLockFiles: new Map()
+        };
     }
 
     /**
@@ -139,10 +175,38 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
 
     async scanner(acc: Accumulator): Promise<TreeVisitor<any, ExecutionContext>> {
         const recipe = this;
+        const LOCK_FILE_NAMES = getAllLockFileNames();
 
-        return new class extends JsonVisitor<ExecutionContext> {
-            protected async visitDocument(doc: Json.Document, _ctx: ExecutionContext): Promise<Json | undefined> {
-                // Only process package.json files
+        return new class extends TreeVisitor<Tree, ExecutionContext> {
+            protected async accept(tree: Tree, ctx: ExecutionContext): Promise<Tree | undefined> {
+                // Handle JSON documents (package.json and JSON lock files)
+                if (isJson(tree) && tree.kind === Json.Kind.Document) {
+                    return this.handleJsonDocument(tree as Json.Document, ctx);
+                }
+
+                // Handle YAML documents (pnpm-lock.yaml)
+                if (isYaml(tree) && isDocuments(tree)) {
+                    return this.handleYamlDocument(tree, ctx);
+                }
+
+                // Handle PlainText files (yarn.lock for Yarn Classic)
+                if (isPlainText(tree)) {
+                    return this.handlePlainTextDocument(tree as PlainText, ctx);
+                }
+
+                return tree;
+            }
+
+            private async handleJsonDocument(doc: Json.Document, _ctx: ExecutionContext): Promise<Json | undefined> {
+                const basename = path.basename(doc.sourcePath);
+
+                // Capture JSON lock file content (package-lock.json, bun.lock)
+                if (LOCK_FILE_NAMES.includes(basename)) {
+                    acc.originalLockFiles.set(doc.sourcePath, await TreePrinters.print(doc));
+                    return doc;
+                }
+
+                // Only process package.json files for dependency analysis
                 if (!doc.sourcePath.endsWith('package.json')) {
                     return doc;
                 }
@@ -152,59 +216,65 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                     return doc;
                 }
 
-                // Get the project directory and package manager
-                const projectDir = path.dirname(path.resolve(doc.sourcePath));
                 const pm = marker.packageManager ?? PackageManager.Npm;
 
-                // Check each dependency scope for the target package
-                const scopes = allDependencyScopes;
-                let foundScope: DependencyScope | undefined;
-                let currentVersion: string | undefined;
-
-                for (const scope of scopes) {
+                const matchedDeps: MatchedDependency[] = [];
+                for (const scope of allDependencyScopes) {
                     const deps = marker[scope];
-                    const dep = deps?.find(d => d.name === recipe.packageName);
-
-                    if (dep) {
-                        foundScope = scope;
-                        currentVersion = dep.versionConstraint;
-                        break;
+                    if (!deps) continue;
+                    for (const dep of deps) {
+                        if (recipe.matchesPackage(dep.name) && recipe.shouldUpgrade(dep.versionConstraint, recipe.newVersion)) {
+                            matchedDeps.push({
+                                packageName: dep.name,
+                                dependencyScope: scope,
+                                currentVersion: dep.versionConstraint
+                            });
+                        }
                     }
                 }
 
-                if (!foundScope || !currentVersion) {
-                    return doc; // Dependency not found in any scope
+                if (matchedDeps.length === 0) {
+                    return doc;
                 }
 
-                // Check if upgrade is needed
-                if (!recipe.shouldUpgrade(currentVersion, recipe.newVersion)) {
-                    return doc; // Already at target version or newer
-                }
+                const skipInstall = matchedDeps.every(md => {
+                    const resolvedDep = marker.resolvedDependencies?.find(rd => rd.name === md.packageName);
+                    return resolvedDep !== undefined && semver.satisfies(resolvedDep.version, recipe.newVersion);
+                });
 
-                // Check if we can skip running the package manager
-                // (resolved version already satisfies the new constraint)
-                const resolvedDep = marker.resolvedDependencies?.find(
-                    rd => rd.name === recipe.packageName
-                );
-                const skipInstall = resolvedDep !== undefined &&
-                    semver.satisfies(resolvedDep.version, recipe.newVersion);
+                const configFiles: Record<string, string> = {};
+                const npmrcContent = serializeNpmrcConfigs(marker.npmrcConfigs);
+                if (npmrcContent) {
+                    configFiles['.npmrc'] = npmrcContent;
+                }
 
                 acc.projectsToUpdate.set(doc.sourcePath, {
-                    projectDir,
                     packageJsonPath: doc.sourcePath,
-                    originalPackageJson: await this.printDocument(doc),
-                    dependencyScope: foundScope,
-                    currentVersion,
+                    originalPackageJson: await TreePrinters.print(doc),
+                    matchedDependencies: matchedDeps,
                     newVersion: recipe.newVersion,
                     packageManager: pm,
-                    skipInstall
+                    skipInstall,
+                    configFiles: Object.keys(configFiles).length > 0 ? configFiles : undefined
                 });
 
                 return doc;
             }
 
-            private async printDocument(doc: Json.Document): Promise<string> {
-                return TreePrinters.print(doc);
+            private async handleYamlDocument(docs: Yaml.Documents, _ctx: ExecutionContext): Promise<Yaml.Documents | undefined> {
+                const basename = path.basename(docs.sourcePath);
+                if (LOCK_FILE_NAMES.includes(basename)) {
+                    acc.originalLockFiles.set(docs.sourcePath, await TreePrinters.print(docs));
+                }
+                return docs;
+            }
+
+            private async handlePlainTextDocument(text: PlainText, _ctx: ExecutionContext): Promise<PlainText | undefined> {
+                const basename = path.basename(text.sourcePath);
+                if (LOCK_FILE_NAMES.includes(basename)) {
+                    acc.originalLockFiles.set(text.sourcePath, await TreePrinters.print(text));
+                }
+                return text;
             }
         };
     }
@@ -224,32 +294,31 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                         return doc; // This package.json doesn't need updating
                     }
 
-                    // Run package manager install if needed, check for failure
-                    // Skip if the resolved version already satisfies the new constraint
                     const failureMessage = updateInfo.skipInstall
                         ? undefined
                         : await runInstallIfNeeded(sourcePath, acc, () =>
                             recipe.runPackageManagerInstall(acc, updateInfo, ctx)
                         );
                     if (failureMessage) {
+                        const names = updateInfo.matchedDependencies.map(d => d.packageName).join(', ');
                         return markupWarn(
                             doc,
-                            `Failed to upgrade ${recipe.packageName} to ${recipe.newVersion}`,
+                            `Failed to upgrade ${names} to ${recipe.newVersion}`,
                             failureMessage
                         );
                     }
 
-                    // Update the dependency version in the JSON AST (preserves formatting)
-                    const visitor = new UpdateVersionVisitor(
-                        recipe.packageName,
-                        updateInfo.newVersion,
-                        updateInfo.dependencyScope
-                    );
-                    const modifiedDoc = await visitor.visit(doc, undefined) as Json.Document;
+                    let modifiedDoc = doc;
+                    for (const md of updateInfo.matchedDependencies) {
+                        const visitor = new UpdateVersionVisitor(
+                            md.packageName,
+                            updateInfo.newVersion,
+                            md.dependencyScope
+                        );
+                        modifiedDoc = await visitor.visit(modifiedDoc, undefined) as Json.Document;
+                    }
 
-                    // Update the NodeResolutionResult marker
                     if (updateInfo.skipInstall) {
-                        // Just update the versionConstraint in the marker - resolved version is unchanged
                         return recipe.updateMarkerVersionConstraint(modifiedDoc, updateInfo);
                     }
                     return updateNodeResolutionMarker(modifiedDoc, updateInfo, acc);
@@ -260,7 +329,13 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                 if (getAllLockFileNames().includes(lockFileName)) {
                     const updatedLockContent = acc.updatedLockFiles.get(sourcePath);
                     if (updatedLockContent) {
-                        return await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                        const parsed = await parseLockFileContent(updatedLockContent, sourcePath, lockFileName) as Json.Document;
+                        // Preserve original ID for RPC compatibility
+                        return {
+                            ...doc,
+                            value: parsed.value,
+                            eof: parsed.eof
+                        } as Json.Document;
                     }
                 }
 
@@ -275,50 +350,57 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
     /**
      * Runs the package manager in a temporary directory to update the lock file.
      * Writes a modified package.json with the new version, then runs install to update the lock file.
+     * All file contents are provided from in-memory sources (SourceFiles), not read from disk.
      */
     private async runPackageManagerInstall(
         acc: Accumulator,
         updateInfo: ProjectUpdateInfo,
         _ctx: ExecutionContext
     ): Promise<void> {
-        // Create modified package.json with the new version constraint
         const modifiedPackageJson = this.createModifiedPackageJson(
             updateInfo.originalPackageJson,
-            updateInfo.dependencyScope,
+            updateInfo.matchedDependencies,
             updateInfo.newVersion
         );
 
+        // Get the lock file path based on package manager
+        const lockFileName = getLockFileName(updateInfo.packageManager);
+        const packageJsonDir = path.dirname(updateInfo.packageJsonPath);
+        const lockFilePath = packageJsonDir === '.'
+            ? lockFileName
+            : path.join(packageJsonDir, lockFileName);
+
+        // Look up the original lock file content from captured SourceFiles
+        const originalLockFileContent = acc.originalLockFiles.get(lockFilePath);
+
         const result = await runInstallInTempDir(
-            updateInfo.projectDir,
             updateInfo.packageManager,
-            modifiedPackageJson
+            modifiedPackageJson,
+            {
+                originalLockFileContent,
+                configFiles: updateInfo.configFiles
+            }
         );
 
         storeInstallResult(result, acc, updateInfo, modifiedPackageJson);
     }
 
-    /**
-     * Creates a modified package.json with the updated dependency version.
-     * Used for the temp directory to validate the version exists.
-     */
     private createModifiedPackageJson(
         originalContent: string,
-        scope: DependencyScope,
+        matchedDependencies: MatchedDependency[],
         newVersion: string
     ): string {
         const packageJson = JSON.parse(originalContent);
 
-        if (packageJson[scope] && packageJson[scope][this.packageName]) {
-            packageJson[scope][this.packageName] = newVersion;
+        for (const md of matchedDependencies) {
+            if (packageJson[md.dependencyScope]?.[md.packageName]) {
+                packageJson[md.dependencyScope][md.packageName] = newVersion;
+            }
         }
 
         return JSON.stringify(packageJson, null, 2);
     }
 
-    /**
-     * Updates just the versionConstraint in the marker for the target dependency.
-     * Used when skipInstall is true - the resolved version is unchanged.
-     */
     private updateMarkerVersionConstraint(
         doc: Json.Document,
         updateInfo: ProjectUpdateInfo
@@ -328,18 +410,19 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
             return doc;
         }
 
-        // Update the versionConstraint for the target dependency
-        const deps = existingMarker[updateInfo.dependencyScope];
-        const updatedDeps = deps?.map(dep =>
-            dep.name === this.packageName
-                ? {...dep, versionConstraint: updateInfo.newVersion}
-                : dep
-        );
-
-        const newMarker = {
-            ...existingMarker,
-            [updateInfo.dependencyScope]: updatedDeps
-        };
+        const matchedNames = new Set(updateInfo.matchedDependencies.map(md => md.packageName));
+        let newMarker = {...existingMarker};
+        for (const md of updateInfo.matchedDependencies) {
+            const deps = newMarker[md.dependencyScope];
+            newMarker = {
+                ...newMarker,
+                [md.dependencyScope]: deps?.map(dep =>
+                    matchedNames.has(dep.name)
+                        ? {...dep, versionConstraint: updateInfo.newVersion}
+                        : dep
+                )
+            };
+        }
 
         return {
             ...doc,

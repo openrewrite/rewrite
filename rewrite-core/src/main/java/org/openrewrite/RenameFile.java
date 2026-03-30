@@ -35,15 +35,9 @@ public class RenameFile extends Recipe {
             example = "application.yml")
     String fileName;
 
-    @Override
-    public String getDisplayName() {
-        return "Rename a file";
-    }
+    String displayName = "Rename a file";
 
-    @Override
-    public String getDescription() {
-        return "Rename a file while keeping it in the same directory.";
-    }
+    String description = "Rename a file while keeping it in the same directory.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

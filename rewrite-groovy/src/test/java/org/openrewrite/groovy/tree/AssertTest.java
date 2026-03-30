@@ -48,4 +48,19 @@ class AssertTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6374")
+    @Test
+    void withMessageAndSpaceBeforeColon() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.Collection
+
+              assert args : "Expecting directory"
+              def homePath = args[0]
+              """
+          )
+        );
+    }
 }

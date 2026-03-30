@@ -54,7 +54,9 @@ class ScalarTest implements RewriteTest {
                     @Override
                     public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Object o) {
                         if ("baz".equals(entry.getKey().getValue())) {
-                            assertThat(entry.getPrefix()).isEqualTo("\n  ");
+                            // After a literal/folded scalar, the trailing newline is kept in the
+                            // scalar value, so the next entry's prefix is just indentation
+                            assertThat(entry.getPrefix()).isEqualTo("  ");
                         }
                         return super.visitMappingEntry(entry, o);
                     }

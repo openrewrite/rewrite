@@ -25,6 +25,7 @@ import org.openrewrite.rpc.RpcSendQueue;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -83,6 +84,10 @@ public class Checksum implements RpcCodec<Checksum> {
                 .withMethod(HttpSender.Method.GET)
                 .build();
         try (HttpSender.Response response = httpSender.send(request)) {
+            if (!response.isSuccessful()) {
+                throw new UncheckedIOException(new IOException(
+                        "Failed to download checksum from " + uri + ": HTTP " + response.getCode()));
+            }
             String hexString = new String(response.getBodyAsBytes(), StandardCharsets.UTF_8);
             return Checksum.fromHex(algorithm, hexString);
         }

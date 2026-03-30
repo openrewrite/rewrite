@@ -48,16 +48,10 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Add entries to `.gitignore`";
-    }
+    String displayName = "Add entries to `.gitignore`";
 
-    @Override
-    public String getDescription() {
-        return "Adds entries to the project's `.gitignore` file. If no `.gitignore` file exists, one will be created. " +
+    String description = "Adds entries to the project's `.gitignore` file. If no `.gitignore` file exists, one will be created. " +
                 "Existing entries that match will not be duplicated.";
-    }
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -132,6 +126,7 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
 
             private String mergeGitignoreEntries(String existing, String newEntries) {
                 String separator = existing.contains("\r\n") ? "\r\n" : "\n";
+                boolean endsWithNewline = existing.isEmpty() || existing.endsWith("\n");
 
                 Set<String> existingRules = new LinkedHashSet<>();
                 Set<String> existingWildcardPatterns = new LinkedHashSet<>();
@@ -187,7 +182,8 @@ public class AddToGitignore extends ScanningRecipe<AtomicBoolean> {
 
                 result.addAll(linesToAdd);
 
-                return String.join(separator, result);
+                String joined = String.join(separator, result);
+                return endsWithNewline ? joined + separator : joined;
             }
 
             private String normalizeRule(String rule) {

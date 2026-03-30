@@ -40,15 +40,9 @@ public class FindJVMTestSuites extends Recipe {
     @Nullable
     Boolean insertRows;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle JVMTestSuite plugin configuration";
-    }
+    String displayName = "Find Gradle JVMTestSuite plugin configuration";
 
-    @Override
-    public String getDescription() {
-        return "Find Gradle JVMTestSuite plugin configurations and produce a data table.";
-    }
+    String description = "Find Gradle JVMTestSuite plugin configurations and produce a data table.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

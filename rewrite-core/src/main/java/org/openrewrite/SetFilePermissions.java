@@ -42,15 +42,9 @@ public class SetFilePermissions extends Recipe {
             description = "Files executable permission.")
     Boolean isExecutable;
 
-    @Override
-    public String getDisplayName() {
-        return "Set file permission attributes";
-    }
+    String displayName = "Set file permission attributes";
 
-    @Override
-    public String getDescription() {
-        return "Set a file's read, write and executable permission attributes.";
-    }
+    String description = "Set a file's read, write and executable permission attributes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.rpc;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
@@ -37,6 +39,7 @@ import java.io.PipedOutputStream;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaRewriteRpcTest implements RewriteTest {
@@ -49,13 +52,16 @@ class JavaRewriteRpcTest implements RewriteTest {
 
     @BeforeEach
     void before() throws IOException {
-        PipedOutputStream serverOut = new PipedOutputStream();
-        PipedOutputStream clientOut = new PipedOutputStream();
-        PipedInputStream serverIn = new PipedInputStream(clientOut);
-        PipedInputStream clientIn = new PipedInputStream(serverOut);
+        var serverOut = new PipedOutputStream();
+        var clientOut = new PipedOutputStream();
+        var serverIn = new PipedInputStream(clientOut);
+        var clientIn = new PipedInputStream(serverOut);
 
-        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientIn, clientOut)), env);
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverIn, serverOut)), env)
+        var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), env.toMarketplace(runtimeClasspath()));
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), env.toMarketplace(runtimeClasspath()))
           .log(System.out);
 //        client.traceGetObject(true, true);
     }

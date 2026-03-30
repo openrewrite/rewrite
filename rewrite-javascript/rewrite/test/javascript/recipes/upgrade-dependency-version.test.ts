@@ -444,13 +444,13 @@ describe("UpgradeDependencyVersion", () => {
     });
 
     test("skips npm install when resolved version already satisfies new constraint", async () => {
-        // Scenario: package.json has ^4.17.20, npm resolves to 4.17.21 (latest)
-        // If we upgrade to ^4.17.21, the resolved version 4.17.21 already satisfies it,
+        // Scenario: package.json has ^4.17.20, npm resolves to 4.17.23 (latest)
+        // If we upgrade to ^4.17.23, the resolved version 4.17.23 already satisfies it,
         // so we should only update package.json, not run npm install
         const spec = new RecipeSpec();
         spec.recipe = new UpgradeDependencyVersion({
             packageName: "lodash",
-            newVersion: "^4.17.21"
+            newVersion: "^4.17.23"
         });
 
         await withDir(async (repo) => {
@@ -458,7 +458,7 @@ describe("UpgradeDependencyVersion", () => {
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    // package.json should be updated from ^4.17.20 to ^4.17.21
+                    // package.json should be updated from ^4.17.20 to ^4.17.23
                     {
                         ...packageJson(`
                             {
@@ -473,7 +473,7 @@ describe("UpgradeDependencyVersion", () => {
                                 "name": "test-project",
                                 "version": "1.0.0",
                                 "dependencies": {
-                                    "lodash": "^4.17.21"
+                                    "lodash": "^4.17.23"
                                 }
                             }
                         `),
@@ -481,10 +481,10 @@ describe("UpgradeDependencyVersion", () => {
                             // Verify marker was updated with new versionConstraint
                             const marker = findNodeResolutionResult(doc);
                             expect(marker).toBeDefined();
-                            expect(marker!.dependencies[0].versionConstraint).toBe("^4.17.21");
-                            // The resolved version should still be 4.17.21 (unchanged)
+                            expect(marker!.dependencies[0].versionConstraint).toBe("^4.17.23");
+                            // The resolved version should still be 4.17.23 (unchanged)
                             // This proves we didn't run npm install - just updated the constraint
-                            expect(marker!.resolvedDependencies?.[0]?.version).toBe("4.17.21");
+                            expect(marker!.resolvedDependencies?.[0]?.version).toBe("4.17.23");
                         }
                     }
                 )
@@ -519,6 +519,114 @@ describe("UpgradeDependencyVersion", () => {
                 )
             );
         }, {unsafeCleanup: true});
+    });
+
+    test("upgrades multiple scoped packages matching a pattern", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new UpgradeDependencyVersion({
+            packagePattern: "@angular/*",
+            newVersion: "^19.0.0"
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "@angular/core": "^18.0.0",
+                                "@angular/common": "^18.0.0",
+                                "rxjs": "^7.0.0"
+                            }
+                        }
+                    `, `
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "@angular/core": "^19.0.0",
+                                "@angular/common": "^19.0.0",
+                                "rxjs": "^7.0.0"
+                            }
+                        }
+                    `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test("does not modify when pattern matches no packages", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new UpgradeDependencyVersion({
+            packagePattern: "@vue/*",
+            newVersion: "^4.0.0"
+        });
+
+        await withDir(async (repo) => {
+            await spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "dependencies": {
+                                "lodash": "^4.17.20"
+                            }
+                        }
+                    `)
+                )
+            );
+        }, {unsafeCleanup: true});
+    });
+
+    test("throws when neither packageName nor packagePattern is specified", () => {
+        const recipe = new UpgradeDependencyVersion({
+            newVersion: "^2.0.0"
+        });
+        expect(() => recipe.initialValue({} as any)).toThrow(
+            "Either packageName or packagePattern must be specified"
+        );
+    });
+
+    describe("matchesPackage", () => {
+
+        test("matches exact package name", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "lodash",
+                newVersion: "^5.0.0"
+            });
+            expect(recipe.matchesPackage("lodash")).toBe(true);
+            expect(recipe.matchesPackage("underscore")).toBe(false);
+        });
+
+        test("matches glob pattern", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packagePattern: "@angular/*",
+                newVersion: "^19.0.0"
+            });
+            expect(recipe.matchesPackage("@angular/core")).toBe(true);
+            expect(recipe.matchesPackage("@angular/common")).toBe(true);
+            expect(recipe.matchesPackage("@types/node")).toBe(false);
+            expect(recipe.matchesPackage("angular")).toBe(false);
+        });
+
+        test("matches when both packageName and packagePattern are set", () => {
+            const recipe = new UpgradeDependencyVersion({
+                packageName: "rxjs",
+                packagePattern: "@angular/*",
+                newVersion: "^19.0.0"
+            });
+            expect(recipe.matchesPackage("rxjs")).toBe(true);
+            expect(recipe.matchesPackage("@angular/core")).toBe(true);
+            expect(recipe.matchesPackage("lodash")).toBe(false);
+        });
+
     });
 
     describe("shouldUpgrade semver comparison", () => {

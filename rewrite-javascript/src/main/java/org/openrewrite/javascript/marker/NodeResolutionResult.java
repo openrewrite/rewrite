@@ -17,6 +17,7 @@ package org.openrewrite.javascript.marker;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.ToString;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
@@ -52,9 +53,15 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
     UUID id;
 
     // Project metadata from package.json
+    @ToString.Include
     @Nullable String name;
+
+    @ToString.Include
     @Nullable String version;
+
     @Nullable String description;
+
+    @ToString.Include
     String path;
 
     // Paths to workspace package.json files (only populated on workspace root)
@@ -171,6 +178,7 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
         String versionConstraint; // Version constraint (e.g., "^18.2.0")
 
         // The resolved version of this dependency (from package-lock.json)
+        @ToString.Exclude
         @Nullable ResolvedDependency resolved;
 
         @Override
@@ -200,7 +208,10 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
     public static class ResolvedDependency implements RpcCodec<ResolvedDependency> {
+        @ToString.Include
         String name;    // Package name (e.g., "react")
+
+        @ToString.Include
         String version; // Actual resolved version (e.g., "18.3.1")
 
         // This package's own dependency requests
@@ -237,19 +248,27 @@ public class NodeResolutionResult implements Marker, RpcCodec<NodeResolutionResu
 
         @Override
         public ResolvedDependency rpcReceive(ResolvedDependency before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withVersion(q.receive(before.version))
+            before = before
+                    .withName(q.receive(before.name));
+            before = before
+                    .withVersion(q.receive(before.version));
+            before = before
                     .withDependencies(q.receiveList(before.dependencies,
-                            dep -> dep.rpcReceive(dep, q)))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
                     .withDevDependencies(q.receiveList(before.devDependencies,
-                            dep -> dep.rpcReceive(dep, q)))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
                     .withPeerDependencies(q.receiveList(before.peerDependencies,
-                            dep -> dep.rpcReceive(dep, q)))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
                     .withOptionalDependencies(q.receiveList(before.optionalDependencies,
-                            dep -> dep.rpcReceive(dep, q)))
-                    .withEngines(q.receive(before.engines))
+                            dep -> dep.rpcReceive(dep, q)));
+            before = before
+                    .withEngines(q.receive(before.engines));
+            before = before
                     .withLicense(q.receive(before.license));
+            return before;
         }
     }
 

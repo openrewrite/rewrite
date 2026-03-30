@@ -21,8 +21,12 @@ import org.openrewrite.xml.XPathCompiler.*;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
+import static java.util.Collections.emptySet;
 import static org.openrewrite.xml.XPathCompiler.FLAG_ABSOLUTE_PATH;
 
 /**
@@ -1417,7 +1421,7 @@ public class XPathMatcher {
 
         String[] steps = pathExpr.split("/");
         if (steps.length == 0) {
-            return Collections.emptySet();
+            return emptySet();
         }
 
         Set<Xml.Tag> currentMatches = new LinkedHashSet<>();

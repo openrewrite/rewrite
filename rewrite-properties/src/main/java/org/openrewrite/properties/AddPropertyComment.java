@@ -48,15 +48,9 @@ public class AddPropertyComment extends Recipe {
     @Nullable
     Boolean commentOutProperty;
 
-    @Override
-    public String getDisplayName() {
-        return "Add comment before property key";
-    }
+    String displayName = "Add comment before property key";
 
-    @Override
-    public String getDescription() {
-        return "Add a new comment before a property key if not already present, optionally commenting out the property.";
-    }
+    String description = "Add a new comment before a property key if not already present, optionally commenting out the property.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

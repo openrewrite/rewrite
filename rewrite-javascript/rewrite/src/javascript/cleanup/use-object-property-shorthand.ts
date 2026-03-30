@@ -20,7 +20,7 @@ import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor} from "../visitor";
 import {J} from "../../java";
 import {JS} from "../tree";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 import {findMarker} from "../../markers";
 
 /**

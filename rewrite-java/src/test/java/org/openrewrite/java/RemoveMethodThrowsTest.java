@@ -112,8 +112,8 @@ class RemoveMethodThrowsTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration bar = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getLast();
-                J.MethodInvocation fooCall = (J.MethodInvocation) bar.getBody().getStatements().getFirst();
+                var bar = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getLast();
+                var fooCall = (J.MethodInvocation) bar.getBody().getStatements().getFirst();
                 assertThat(fooCall.getMethodType().getThrownExceptions()).isEmpty();
             })
           )

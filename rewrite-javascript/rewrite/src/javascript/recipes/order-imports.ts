@@ -19,7 +19,7 @@ import {produceAsync, TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor, JS} from "../index";
 import {J} from "../../java";
-import {Draft, produce} from "immer";
+import {create as produce, Draft} from "mutative";
 import {SpacesStyle, styleFromSourceFile, StyleKind} from "../style";
 
 /**
@@ -87,6 +87,12 @@ export class OrderImports extends Recipe {
                     // Tiebreaker: keep original order for stability
                     return originalImportPosition[aPadded.element.id] - originalImportPosition[bPadded.element.id];
                 });
+
+                // Check if anything actually changed
+                const alreadySorted = sortedSpecifiers.every((s, i) => s === imports[i]);
+                if (alreadySorted) {
+                    return cu;
+                }
 
                 const cuWithImportsSorted = await produceAsync(cu, async draft => {
                     draft.statements = [...sortedSpecifiers, ...restStatements];

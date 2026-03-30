@@ -19,8 +19,10 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -43,11 +45,11 @@ class ChangeTypeTest implements RewriteTest {
 
     @Language("java")
     String a1 = """
-          package a;
-          public class A1 extends Exception {
-              public static void stat() {}
-              public void foo() {}
-          }
+      package a;
+      public class A1 extends Exception {
+          public static void stat() {}
+          public void foo() {}
+      }
       """;
 
     @Language("java")
@@ -142,11 +144,41 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import java.lang.management.PlatformLoggingMXBean;
-              import java.util.logging.*;
 
               class Test {
                   static void method() {
                       PlatformLoggingMXBean loggingBean = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"deprecation", "KotlinRedundantDiagnosticSuppress"})
+    @Test
+    void starImportUnfoldedWhenOtherTypesUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+          java(
+            """
+              import java.util.logging.*;
+
+              class Test {
+                  static void method() {
+                      LoggingMXBean loggingBean = null;
+                      Logger logger = null;
+                  }
+              }
+              """,
+            """
+              import java.lang.management.PlatformLoggingMXBean;
+              import java.util.logging.Logger;
+
+              class Test {
+                  static void method() {
+                      PlatformLoggingMXBean loggingBean = null;
+                      Logger logger = null;
                   }
               }
               """
@@ -406,6 +438,26 @@ class ChangeTypeTest implements RewriteTest {
 
               @A2 public class B {}
               """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedAnnotationOnPackageDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+          java("package a.b.c;\npublic @interface A1 {}"),
+          java("package a.b.d;\npublic @interface A2 {}"),
+          java(
+            """
+              @a.b.c.A1 package foo;
+              """,
+            """
+              @A2 package foo;
+
+              import a.b.d.A2;
+              """,
+            spec -> spec.path("foo/package-info.java")
           )
         );
     }
@@ -2254,10 +2306,10 @@ class ChangeTypeTest implements RewriteTest {
             spec -> spec.beforeRecipe((source) -> {
                 TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
-                J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
+                var cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cu.getClasses().getFirst().getSimpleName());
 
-                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
+                var cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
         );
@@ -2463,6 +2515,49 @@ class ChangeTypeTest implements RewriteTest {
                 }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void inheritedTypesUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("com.demo.Before", "com.demo.After", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.demo;
+                  
+                  public class Before { }
+                  """,
+                """
+                  package com.demo;
+                  
+                  public class After { }
+                  """
+              )
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.demo.Before;
+              
+              class X extends Before { }
+              """,
+            """
+              package app;
+              
+              import com.demo.After;
+              
+              class X extends After { }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type -> TypeUtils.isAssignableTo("com.demo.After", type), "Assignable to updated type")
+            )
           )
         );
     }

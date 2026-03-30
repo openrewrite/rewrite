@@ -473,7 +473,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                    var mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                     if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
                         return mi;
                     }

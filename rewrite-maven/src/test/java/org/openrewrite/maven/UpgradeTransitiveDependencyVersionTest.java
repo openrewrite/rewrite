@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
@@ -307,6 +308,76 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void doesNotAddManagedDependencyToChildModuleWhenInheritedFromParent() {
+        rewriteRun(
+          mavenProject("parent",
+            pomXml(
+              """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-java</artifactId>
+                          <version>7.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+              """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.fasterxml.jackson.core</groupId>
+                              <artifactId>jackson-core</artifactId>
+                              <version>2.12.5</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-java</artifactId>
+                          <version>7.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """
+              )
+            )
           )
         );
     }

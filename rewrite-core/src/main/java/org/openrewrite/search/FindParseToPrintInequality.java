@@ -15,6 +15,7 @@
  */
 package org.openrewrite.search;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -30,19 +31,15 @@ import static java.util.Collections.emptySet;
 public class FindParseToPrintInequality extends Recipe {
     transient ParseToPrintInequalities inequalities = new ParseToPrintInequalities(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find parse to print inequality";
-    }
+    @Getter
+    final String displayName = "Find parse to print inequality";
 
-    @Override
-    public String getDescription() {
-        return "OpenRewrite `Parser` implementations should produce `SourceFile` objects whose `printAll()` " +
-               "method should be byte-for-byte equivalent with the original source file. When this isn't true, " +
-               "recipes can still run on the `SourceFile` and even produce diffs, but the diffs would fail to " +
-               "apply as a patch to the original source file. Most `Parser` use `Parser#requirePrintEqualsInput` " +
-               "to produce a `ParseError` when they fail to produce a `SourceFile` that is print idempotent.";
-    }
+    @Getter
+    final String description = "OpenRewrite `Parser` implementations should produce `SourceFile` objects whose `printAll()` " +
+        "method should be byte-for-byte equivalent with the original source file. When this isn't true, " +
+        "recipes can still run on the `SourceFile` and even produce diffs, but the diffs would fail to " +
+        "apply as a patch to the original source file. Most `Parser` use `Parser#requirePrintEqualsInput` " +
+        "to produce a `ParseError` when they fail to produce a `SourceFile` that is print idempotent.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

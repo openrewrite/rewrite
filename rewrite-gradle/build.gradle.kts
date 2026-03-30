@@ -55,7 +55,7 @@ dependencies {
     implementation(project(":rewrite-properties"))
     implementation(project(":rewrite-toml"))
 
-    compileOnly("org.codehaus.groovy:groovy:latest.release")
+    compileOnly("org.apache.groovy:groovy:4.+")
     compileOnly(gradleApi())
     // No particular reason to hold back upgrading this beyond 3.x, but it takes some effort: https://github.com/openrewrite/rewrite/issues/5270
     compileOnly("com.gradle:develocity-gradle-plugin:3.+")
@@ -89,6 +89,7 @@ java {
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
     systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!.path)
+    maxHeapSize = "2g"
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode

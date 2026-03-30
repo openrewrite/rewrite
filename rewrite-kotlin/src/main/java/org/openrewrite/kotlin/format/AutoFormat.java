@@ -15,20 +15,17 @@
  */
 package org.openrewrite.kotlin.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
 public class AutoFormat extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Format Kotlin code";
-    }
+    @Getter
+    final String displayName = "Format Kotlin code";
 
-    @Override
-    public String getDescription() {
-        return "Format Kotlin code using a standard comprehensive set of Kotlin formatting recipes.";
-    }
+    @Getter
+    final String description = "Format Kotlin code using a standard comprehensive set of Kotlin formatting recipes.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

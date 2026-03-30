@@ -249,7 +249,7 @@ class JavaTemplateTest implements RewriteTest {
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                   var a = assignment;
                   if (a.getAssignment() instanceof J.MethodInvocation) {
-                      J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
+                      var mi = (J.MethodInvocation) a.getAssignment();
                       a = JavaTemplate.apply("1", getCursor(), mi.getCoordinates().replace());
                   }
                   return a;
@@ -504,7 +504,7 @@ class JavaTemplateTest implements RewriteTest {
           })).afterRecipe(run -> new JavaIsoVisitor<Integer>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                  JavaType.Parameterized type = (JavaType.Parameterized) method.getType();
+                  var type = (JavaType.Parameterized) method.getType();
                   assertThat(type.getTypeParameters()).hasSize(1);
                   assertThat(type.getTypeParameters().getFirst()).isInstanceOf(JavaType.GenericTypeVariable.class);
                   return method;
@@ -553,7 +553,7 @@ class JavaTemplateTest implements RewriteTest {
           })).afterRecipe(run -> new JavaIsoVisitor<Integer>() {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                  JavaType.Parameterized type = (JavaType.Parameterized) method.getType();
+                  var type = (JavaType.Parameterized) method.getType();
                   assertThat(type.getTypeParameters()).hasSize(1);
                   assertThat(type.getTypeParameters().getFirst()).isInstanceOf(JavaType.Parameterized.class);
                   assertThat(((JavaType.Parameterized) type.getTypeParameters().getFirst()).getTypeParameters()
@@ -594,7 +594,7 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
-                      J.MethodInvocation mi = (J.MethodInvocation) binary.getLeft();
+                      var mi = (J.MethodInvocation) binary.getLeft();
                       return JavaTemplate.builder("!#{any(java.util.List)}.isEmpty()")
                         .build()
                         .apply(getCursor(), mi.getCoordinates().replace(), mi.getSelect());
@@ -636,7 +636,7 @@ class JavaTemplateTest implements RewriteTest {
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                  var mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                   if (bigDecimalSetScale.matches(mi)) {
                       mi = twoArgScale.apply(updateCursor(mi), mi.getCoordinates().replaceArguments(),
                         mi.getArguments().getFirst(), "RoundingMode.HALF_UP");
@@ -956,7 +956,7 @@ class JavaTemplateTest implements RewriteTest {
 
               @Override
               public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                  J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, ctx);
+                  var nc = (J.NewClass) super.visitNewClass(newClass, ctx);
                   return JavaTemplate.apply("Integer.valueOf(#{any(java.lang.Integer)}",
                     getCursor(), nc.getCoordinates().replace(), nc.getArguments().getFirst());
               }
@@ -1298,7 +1298,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  J.VariableDeclarations vd = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, ctx);
+                  var vd = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, ctx);
                   if (vd.getVariables().size() == 1 || "a".equals(vd.getVariables().getFirst().getSimpleName())) {
                       return JavaTemplate.apply("String a();", getCursor(), vd.getCoordinates().replace());
                   }
@@ -1486,7 +1486,7 @@ class JavaTemplateTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
-                    J.VariableDeclarations param = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
+                    var param = (J.VariableDeclarations) lambda.getParameters().getParameters().getFirst();
                     J.VariableDeclarations.NamedVariable variable = param.getVariables().getFirst();
 
                     return JavaTemplate.builder("reference -> System.out.println(#{any()})")

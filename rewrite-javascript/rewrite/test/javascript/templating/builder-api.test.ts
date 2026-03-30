@@ -90,8 +90,7 @@ describe('Builder API', () => {
                       const a = function validate(x) {
                           if (typeof x !== "number") throw new Error("Invalid");
                           return 1;
-                      }
-                      `
+                      }`
                 ),
             );
         });

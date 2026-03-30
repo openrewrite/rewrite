@@ -54,10 +54,7 @@ public class ChangeType extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
-    @Override
-    public String getDisplayName() {
-        return "Change type";
-    }
+    String displayName = "Change type";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -81,10 +78,7 @@ public class ChangeType extends Recipe {
         }
     }
 
-    @Override
-    public String getDescription() {
-        return "Change a given type to another.";
-    }
+    String description = "Change a given type to another.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -237,13 +231,19 @@ public class ChangeType extends Recipe {
                             continue;
                         }
 
-                        JavaType maybeType = anImport.getQualid().getType();
-                        if (maybeType instanceof JavaType.FullyQualified) {
-                            JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
-                            if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
-                            } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                        if ("*".equals(anImport.getClassName()) &&
+                                anImport.getPackageName().equals(originalType.getPackageName()) &&
+                                !originalType.getPackageName().equals(((JavaType.FullyQualified) targetType).getPackageName())) {
+                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                        } else {
+                            JavaType maybeType = anImport.getQualid().getType();
+                            if (maybeType instanceof JavaType.FullyQualified) {
+                                JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
+                                if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                    sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                    sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visitNonNull(sf, ctx, getCursor().getParentOrThrow());
+                                }
                             }
                         }
                     }
@@ -511,6 +511,13 @@ public class ChangeType extends Recipe {
                     JavaType.FullyQualified updatedNestedType = updateNestedType(original);
                     oldNameToChangedType.put(oldType, updatedNestedType);
                     return updatedNestedType;
+                } else if (oldType instanceof JavaType.Class) {
+                    JavaType.Class clazz = ((JavaType.Class) oldType)
+                            .withInterfaces(ListUtils.map(original.getInterfaces(), t -> (JavaType.FullyQualified) updateType(t)))
+                            .withSupertype((JavaType.FullyQualified) updateType(original.getSupertype()));
+                    oldNameToChangedType.put(oldType, clazz);
+                    oldNameToChangedType.put(clazz, clazz);
+                    return clazz;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable gtv = (JavaType.GenericTypeVariable) oldType;
@@ -692,7 +699,7 @@ public class ChangeType extends Recipe {
                 }
             }
             //noinspection ConstantConditions
-            return pkg;
+            return super.visitPackage(pkg, ctx);
         }
 
         @Override

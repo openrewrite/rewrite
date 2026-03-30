@@ -57,20 +57,14 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Gradle property";
-    }
+    String displayName = "Add Gradle property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s=%s`", key, value);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a property to the `gradle.properties` file.";
-    }
+    String description = "Add a property to the `gradle.properties` file.";
 
     public static class NeedsProperty {
         boolean isGradleProject;

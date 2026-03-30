@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -30,16 +31,12 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
     private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("/project/build/pluginManagement/plugins");
 
-    @Override
-    public String getDisplayName() {
-        return "Remove duplicate plugin declarations";
-    }
+    @Getter
+    final String displayName = "Remove duplicate plugin declarations";
 
-    @Override
-    public String getDescription() {
-        return "Maven 4 rejects duplicate plugin declarations (same groupId and artifactId) with an error. " +
-                "This recipe removes duplicate plugin declarations, keeping only the first occurrence.";
-    }
+    @Getter
+    final String description = "Maven 4 rejects duplicate plugin declarations (same groupId and artifactId) with an error. " +
+        "This recipe removes duplicate plugin declarations, keeping only the first occurrence.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

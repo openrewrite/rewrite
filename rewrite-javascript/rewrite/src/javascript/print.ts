@@ -21,7 +21,7 @@ import {PrintOutputCapture, TreePrinters} from "../print";
 import {Cursor, isTree, Tree} from "../tree";
 import {Comment, emptySpace, J, Statement, TextComment, TrailingComma, TypedTree} from "../java";
 import {findMarker, Marker, Markers} from "../markers";
-import {DelegatedYield, FunctionDeclaration, Generator, NonNullAssertion, Optional, Spread} from "./markers";
+import {DelegatedYield, FunctionDeclaration, Generator, NonNullAssertion, Optional} from "./markers";
 
 export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
 
@@ -86,6 +86,14 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
         await this.visit(statementExpression.statement, p);
         await this.afterSyntax(statementExpression, p);
         return statementExpression;
+    }
+
+    override async visitSpread(spread: JS.Spread, p: PrintOutputCapture): Promise<J | undefined> {
+        await this.beforeSyntax(spread, p);
+        p.append("...");
+        await this.visit(spread.expression, p);
+        await this.afterSyntax(spread, p);
+        return spread;
     }
 
     override async visitInferType(inferType: JS.InferType, p: PrintOutputCapture): Promise<J | undefined> {
@@ -1901,12 +1909,7 @@ export class JavaScriptPrinter extends JavaScriptVisitor<PrintOutputCapture> {
     }
 
     protected async preVisit(tree: J, p: PrintOutputCapture): Promise<J | undefined> {
-        for (const marker of tree.markers.markers) {
-            if (marker.kind === JS.Markers.Spread) {
-                await this.visitSpace((marker as Spread).prefix, p);
-                p.append("...");
-            }
-        }
+        // Note: Spread is now handled as JS.Spread AST element via visitSpread
         return tree;
     }
 

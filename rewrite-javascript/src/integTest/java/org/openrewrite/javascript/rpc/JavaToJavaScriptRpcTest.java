@@ -47,7 +47,7 @@ public class JavaToJavaScriptRpcTest {
           .recipe(toRecipe(() -> {
               JavaScriptRewriteRpc client = JavaScriptRewriteRpc.getOrStart();
 
-              assertThat(client.installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")))
+              assertThat(client.installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")).getRecipesInstalled())
                 .isEqualTo(1);
               Recipe modifyAll = client.prepareRecipe("org.openrewrite.java.test.modify-all-trees");
 

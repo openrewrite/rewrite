@@ -175,6 +175,48 @@ class JsonPathMatcherTest implements RewriteTest {
         );
     }
 
+    @Test
+    void negateUnaryExpression() {
+        rewriteRun(
+          hcl(
+            """
+              provider "azurerm" {
+                features {
+                  key_vault {
+                    purge_soft_delete_on_destroy = true
+                  }
+                }
+              }
+              """,
+            spec -> spec.beforeRecipe(configFile -> {
+                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!@.no_match)]"))).isTrue();
+                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!@.purge_soft_delete_on_destroy)]"))).isFalse();
+            })
+          )
+        );
+    }
+
+    @Test
+    void negateBinaryExpression() {
+        rewriteRun(
+          hcl(
+            """
+              provider "azurerm" {
+                features {
+                  key_vault {
+                    purge_soft_delete_on_destroy = true
+                  }
+                }
+              }
+              """,
+            spec -> spec.beforeRecipe(configFile -> {
+                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!(@.purge_soft_delete_on_destroy == false))]"))).isTrue();
+                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(!(@.purge_soft_delete_on_destroy == true))]"))).isFalse();
+            })
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2198")
     @Test
     void matchParentBlockWithWildCard() {

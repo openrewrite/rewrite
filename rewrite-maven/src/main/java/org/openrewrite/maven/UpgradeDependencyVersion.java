@@ -24,6 +24,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.RetainVersions;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -110,21 +111,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Upgrade Maven dependency version";
-    }
+    String displayName = "Upgrade Maven dependency version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
+    String description = "Upgrade the version of a dependency by specifying a group and (optionally) an artifact using Node Semver " +
                "advanced range selectors, allowing more precise control over version updates to patch or minor releases.";
-    }
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
@@ -255,7 +250,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
                                 doAfterVisit(upgradeManagedDependency);
-                                maybeUpdateModel();
                             }
                         }
                     } else if (isPluginDependencyTag(groupId, artifactId) || isAnnotationProcessorPathTag(groupId, artifactId)) {
@@ -511,9 +505,11 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         getResolutionResult().getPom().getRepositories()
                 );
 
+                VersionComparator bomVersionComparator = new LatestRelease(null);
                 return metadata.getVersioning().getVersions().stream()
-                        .filter(version -> versionComparator.compare(null, currentVersion, version) < 0)
-                        .sorted(versionComparator)
+                        .filter(version -> bomVersionComparator.isValid(currentVersion, version))
+                        .filter(version -> bomVersionComparator.compare(null, currentVersion, version) < 0)
+                        .sorted(bomVersionComparator)
                         .collect(toList());
             }
 

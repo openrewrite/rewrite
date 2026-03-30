@@ -25,7 +25,7 @@ import {
 } from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {ExecutionContext, Recipe, TreeVisitor} from "../../../src";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 describe('fromRecipe', () => {
     const spec = new RecipeSpec();

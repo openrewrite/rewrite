@@ -17,7 +17,6 @@ import * as rpc from "vscode-jsonrpc/node";
 import {ExecutionContext} from "../../execution";
 import {ParserInput, parserInputFile, Parsers, ParserType} from "../../parser";
 import {randomId, UUID} from "../../uuid";
-import {produce} from "immer";
 import {SourceFile} from "../../tree";
 import {withMetrics} from "./metrics";
 import * as path from "path";
@@ -70,9 +69,7 @@ export class Parse {
                         const id = randomId();
                         localObjects.set(id, async (id: string) => {
                             const sourceFile: SourceFile = (await generator.next()).value;
-                            return produce(sourceFile, (draft) => {
-                                draft.id = id;
-                            });
+                            return { ...sourceFile, id };
                         });
                         resultIds.push(id);
                     }

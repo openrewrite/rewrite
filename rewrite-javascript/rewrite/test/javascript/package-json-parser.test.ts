@@ -188,6 +188,7 @@ describe("PackageJsonParser", () => {
 
         expect(parser.accept("package.json")).toBe(true);
         expect(parser.accept("/some/path/package.json")).toBe(true);
+        expect(parser.accept(path.normalize("/some/path/package.json"))).toBe(true);
         expect(parser.accept("package-lock.json")).toBe(false);
         expect(parser.accept("tsconfig.json")).toBe(false);
         expect(parser.accept("index.ts")).toBe(false);
@@ -381,6 +382,86 @@ empty-value=
         }, {unsafeCleanup: true});
     });
 
+    test("should correctly parse pnpm .pnpm directory with peer dependency context", async () => {
+        // Tests that pnpm directory names with peer dependency context (e.g., name@version_peer@version)
+        // are correctly parsed by stripping the peer dependency suffix
+        await withDir(async (dir) => {
+            // Write package.json
+            const packageJsonContent = {
+                name: "pnpm-project",
+                version: "1.0.0",
+                dependencies: {
+                    "@babel/helper-module-transforms": "^7.28.3"
+                }
+            };
+            fs.writeFileSync(
+                path.join(dir.path, 'package.json'),
+                JSON.stringify(packageJsonContent, null, 2)
+            );
+
+            // Create pnpm-style node_modules structure
+            // pnpm stores packages in node_modules/.pnpm/<name>@<version>_<peer-context>/node_modules/<name>/
+            const pnpmDir = path.join(dir.path, 'node_modules', '.pnpm');
+            fs.mkdirSync(pnpmDir, {recursive: true});
+
+            // Create directory with peer dependency context
+            const pkgWithPeerDeps = '@babel+helper-module-transforms@7.28.3_@babel+core@7.28.5';
+            const pkgInternalDir = path.join(pnpmDir, pkgWithPeerDeps, 'node_modules', '@babel', 'helper-module-transforms');
+            fs.mkdirSync(pkgInternalDir, {recursive: true});
+            fs.writeFileSync(
+                path.join(pkgInternalDir, 'package.json'),
+                JSON.stringify({
+                    name: "@babel/helper-module-transforms",
+                    version: "7.28.3",
+                    license: "MIT"
+                }, null, 2)
+            );
+
+            // Also create a simple package without peer context
+            const simplePkg = 'lodash@4.17.21';
+            const simplePkgDir = path.join(pnpmDir, simplePkg, 'node_modules', 'lodash');
+            fs.mkdirSync(simplePkgDir, {recursive: true});
+            fs.writeFileSync(
+                path.join(simplePkgDir, 'package.json'),
+                JSON.stringify({
+                    name: "lodash",
+                    version: "4.17.21",
+                    license: "MIT"
+                }, null, 2)
+            );
+
+            // Write pnpm-lock.yaml (empty but valid)
+            fs.writeFileSync(
+                path.join(dir.path, 'pnpm-lock.yaml'),
+                'lockfileVersion: 9.0\n'
+            );
+
+            // Parse
+            const parser = new PackageJsonParser({relativeTo: dir.path});
+            const results: Json.Document[] = [];
+            for await (const result of parser.parse(path.join(dir.path, 'package.json'))) {
+                results.push(result as Json.Document);
+            }
+
+            expect(results).toHaveLength(1);
+            const marker = findNodeResolutionResult(results[0]);
+            expect(marker).toBeDefined();
+            expect(marker!.resolvedDependencies.length).toBeGreaterThanOrEqual(2);
+
+            // Check that the package with peer deps was parsed correctly
+            const babelTransforms = marker!.resolvedDependencies.find(
+                r => r.name === "@babel/helper-module-transforms"
+            );
+            expect(babelTransforms).toBeDefined();
+            expect(babelTransforms!.version).toBe("7.28.3");  // Should be 7.28.3, not 7.28.5
+
+            // Check simple package too
+            const lodash = marker!.resolvedDependencies.find(r => r.name === "lodash");
+            expect(lodash).toBeDefined();
+            expect(lodash!.version).toBe("4.17.21");
+        }, {unsafeCleanup: true});
+    });
+
     test("should find lock file in subdirectory when relativeTo is parent directory", async () => {
         // This tests the scenario where relativeTo is the Git root but package.json
         // and its lock file are in a subdirectory (e.g., a workspace member)
@@ -388,6 +469,7 @@ empty-value=
             // Create a subdirectory structure: rootDir/subproject/
             const subprojectDir = path.join(rootDir.path, 'subproject');
             fs.mkdirSync(subprojectDir);
+            const subprojectPackageJson = path.join(subprojectDir, 'package.json');
 
             // Write package.json in subdirectory
             const packageJsonContent = {
@@ -398,7 +480,7 @@ empty-value=
                 }
             };
             fs.writeFileSync(
-                path.join(subprojectDir, 'package.json'),
+                subprojectPackageJson,
                 JSON.stringify(packageJsonContent, null, 2)
             );
 
@@ -429,7 +511,7 @@ empty-value=
             // Parse with relativeTo set to root directory (simulating Git root)
             const parser = new PackageJsonParser({relativeTo: rootDir.path});
             const results: Json.Document[] = [];
-            for await (const result of parser.parse(path.join(subprojectDir, 'package.json'))) {
+            for await (const result of parser.parse(subprojectPackageJson)) {
                 results.push(result as Json.Document);
             }
 
@@ -438,7 +520,7 @@ empty-value=
             expect(marker).toBeDefined();
             expect(marker!.name).toBe("subproject");
             // Path should be relative to relativeTo
-            expect(marker!.path).toBe("subproject/package.json");
+            expect(marker!.path).toBe(path.normalize("subproject/package.json"));
             // Should have found the lock file in the subdirectory
             expect(marker!.resolvedDependencies.length).toBeGreaterThan(0);
             // Check that dependency is resolved

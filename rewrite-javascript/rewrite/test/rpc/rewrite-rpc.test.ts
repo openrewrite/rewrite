@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, RecipeRegistry, rootCursor} from "../../src";
-import {RewriteRpc} from "../../src/rpc";
+import {Cursor, RecipeMarketplace, rootCursor} from "../../src";
+import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
 import {PlainText, text} from "../../src/text";
 import {json, Json} from "../../src/json";
 import {RecipeSpec} from "../../src/test";
@@ -59,10 +58,10 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageReader(clientToServer),
             new rpc.StreamMessageWriter(serverToClient)
         );
-        const registry = new RecipeRegistry();
-        activate(registry as any);
+        const marketplace = new RecipeMarketplace();
+        await activate(marketplace);
         server = new RewriteRpc(serverConnection, {
-            registry: registry
+            marketplace: marketplace
         });
     });
 
@@ -130,8 +129,8 @@ describe("Rewrite RPC", () => {
         expect(marker!.dependencies[0].name).toEqual("lodash");
     });
 
-    test("getRecipes", async () =>
-        expect((await client.recipes()).length).toBeGreaterThan(0)
+    test("getMarketplace", async () =>
+        expect((await client.marketplace()).allRecipes().length).toBeGreaterThan(0)
     );
 
     test("prepareRecipe", async () => {
@@ -140,7 +139,8 @@ describe("Rewrite RPC", () => {
         expect(recipe.instanceName()).toEqual("Change text to 'hello'");
     });
 
-    test("installRecipes", async () => {
+    // TODO: Re-enable once @openrewrite/recipes-npm is updated to use RecipeMarketplace API
+    test.skip("installRecipes", async () => {
         const installed = await client.installRecipes(
             {packageName: "@openrewrite/recipes-npm"}
         );
@@ -248,6 +248,16 @@ describe("Rewrite RPC", () => {
             text(
                 "hi",
                 "hello"
+            )
+        );
+    });
+
+    test("runRecipeWithCrossModuleRecipeList", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.cross-module-recipe-list");
+        await spec.rewriteRun(
+            text(
+                "hi",
+                "cross-module"
             )
         );
     });

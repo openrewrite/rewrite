@@ -40,7 +40,6 @@ import static java.util.stream.Collectors.toSet;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class FindMethods extends Recipe {
-    transient MethodCalls methodCalls = new MethodCalls(this);
 
     /**
      * A method pattern that is used to find matching method invocations.
@@ -57,15 +56,15 @@ public class FindMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Find method usages";
+    transient MethodCalls methodCalls = new MethodCalls(this);
+
+    private String dataTableInstanceName() {
+        return "Method calls matching `" + methodPattern + "`";
     }
 
-    @Override
-    public String getDescription() {
-        return "Find method calls by pattern.";
-    }
+    String displayName = "Find method usages";
+
+    String description = "Find method calls by pattern.";
 
     @Override
     public String getInstanceName() {

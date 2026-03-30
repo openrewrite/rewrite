@@ -28,6 +28,7 @@ import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,9 +53,9 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private final RecipeClassLoaderFactory classLoaderFactory;
 
     private transient @Nullable Environment environment;
-    private transient @Nullable Path recipeJar;
-    private transient @Nullable List<Path> classpath;
-    private transient @Nullable ClassLoader classLoader;
+    transient @Nullable Path recipeJar;
+    transient @Nullable List<Path> classpath;
+    private transient @Nullable RecipeClassLoader classLoader;
 
     @Override
     public RecipeMarketplace read() {
@@ -71,13 +72,16 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
                     if (entry != null) {
                         try (InputStream recipesCsv = jarFile.getInputStream(entry)) {
                             RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv(recipesCsv);
-                            for (RecipeListing recipe : marketplace.getAllRecipes()) {
-                                // The recipes.csv inside a JAR may be generated without a version,
-                                // since the version of a published Maven artifact is determined at
-                                // publish time if the artifact is a snapshot. Having resolved the
-                                // JAR containing the recipes.csv, we now know the version.
-                                recipe.getBundle().setVersion(bundle.getVersion());
-                            }
+                            // The recipes.csv inside a JAR may be generated without a version,
+                            // since the version of a published Maven artifact is determined at
+                            // publish time if the artifact is a snapshot. Having resolved the
+                            // JAR containing the recipes.csv, we now know the version.
+                            //
+                            // We must walk the full tree structure rather than using getAllRecipes()
+                            // because getAllRecipes() returns a deduplicated set (by recipe name).
+                            // When a recipe appears in multiple categories, each category has its
+                            // own RecipeListing with its own RecipeBundle that needs updating.
+                            setVersionRecursive(marketplace.getRoot());
                             return marketplace;
                         }
                     }
@@ -94,31 +98,39 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
      * @return Build a marketplace that consists of just the recipes found via classpath scanning
      * in the resolved recipe JAR (not including its dependencies)
      */
-    private RecipeMarketplace marketplaceFromClasspathScan() {
+    RecipeMarketplace marketplaceFromClasspathScan() {
         String[] ga = bundle.getPackageName().split(":");
         RecipeMarketplace marketplace = new RecipeMarketplace();
-
-        // Scan only the target jar for recipes (using scanJar with jar name filter)
         List<Path> classpath = classpath();
-        Environment env = Environment.builder().scanJar(
-                requireNonNull(recipeJar).toAbsolutePath(),
-                classpath.stream().map(Path::toAbsolutePath).collect(toList()),
-                RecipeClassLoader.forScanning(recipeJar, classpath)
-        ).build();
+        try (RecipeClassLoader classLoader = new RecipeClassLoader(requireNonNull(recipeJar), classpath)) {
+            // First pass: Scan only the recipe jar for recipes and don't list recipes from dependencies
+            Environment env = Environment.builder().scanJar(
+                    requireNonNull(recipeJar).toAbsolutePath(),
+                    classpath.stream().map(Path::toAbsolutePath).collect(toList()),
+                    classLoader
+            ).build();
 
-        // Bundle version may be set in the environment() call above (as the JARs making up
-        // the classpath are resolved)
-        GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
+            // Second pass: Scan all jars in classpath for recipes and categories
+            // This gives us proper root categories from category YAMLs.
+            Environment envWithCategories = environment();
 
-        for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
-            marketplace.install(
-                    RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
-                            "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
-                            requireNonNull(gav.getVersion()), null)),
-                    descriptor.inferCategoriesFromName(env)
-            );
+            // Bundle version may be set in the environment() call above (as the JARs making up
+            // the classpath are resolved)
+            GroupArtifactVersion gav = new GroupArtifactVersion(ga[0], ga[1], bundle.getVersion());
+
+            for (RecipeDescriptor descriptor : env.listRecipeDescriptors()) {
+                marketplace.install(
+                        RecipeListing.fromDescriptor(descriptor, new RecipeBundle(
+                                "maven", gav.getGroupId() + ":" + gav.getArtifactId(),
+                                bundle.getRequestedVersion() == null ? gav.getVersion() : bundle.getRequestedVersion(),
+                                gav.getVersion(), null)),
+                        descriptor.inferCategoriesFromName(envWithCategories)
+                );
+            }
+            return marketplace;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return marketplace;
     }
 
     @Override
@@ -132,6 +144,13 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         return r.withOptions(options);
     }
 
+    @Override
+    public void close() throws IOException {
+        if (classLoader != null) {
+            classLoader.close();
+        }
+    }
+
     private Environment environment() {
         if (environment == null) {
             environment = Environment.builder()
@@ -141,7 +160,7 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
         return environment;
     }
 
-    public ClassLoader classLoader() {
+    private ClassLoader classLoader() {
         if (classLoader == null) {
             // Create an isolated classloader with controlled parent delegation
             // This ensures maximum isolation while still allowing necessary shared types
@@ -184,5 +203,19 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private boolean isResolvedBundle(ResolvedDependency resolvedDependency) {
         return resolvedDependency.isDirect() && bundle.getPackageName()
                 .equals(resolvedDependency.getGroupId() + ":" + resolvedDependency.getArtifactId());
+    }
+
+    private void setVersionRecursive(RecipeMarketplace.Category category) {
+        for (RecipeListing recipe : category.getRecipes()) {
+            RecipeBundle recipeBundle = recipe.getBundle();
+            // Only update bundles from the same package as the bundle we're reading
+            if (bundle.getPackageName().equals(recipeBundle.getPackageName())) {
+                recipeBundle.setVersion(bundle.getVersion());
+                recipeBundle.setRequestedVersion(bundle.getRequestedVersion());
+            }
+        }
+        for (RecipeMarketplace.Category child : category.getCategories()) {
+            setVersionRecursive(child);
+        }
     }
 }

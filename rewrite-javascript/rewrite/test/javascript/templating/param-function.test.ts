@@ -16,7 +16,7 @@
 import {fromVisitor, RecipeSpec} from "../../../src/test";
 import {JavaScriptVisitor, param, template, typescript} from "../../../src/javascript";
 import {J} from "../../../src/java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 describe('param() function', () => {
     const spec = new RecipeSpec();

@@ -281,6 +281,13 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitSpread(JS.Spread spread, RpcSendQueue q) {
+        q.getAndSend(spread, JS.Spread::getExpression, el -> visit(el, q));
+        q.getAndSend(spread, el -> asRef(el.getType()), el -> visitType(getValueNonNull(el), q));
+        return spread;
+    }
+
+    @Override
     public J visitStatementExpression(JS.StatementExpression statementExpression, RpcSendQueue q) {
         q.getAndSend(statementExpression, JS.StatementExpression::getStatement, el -> visit(el, q));
         return statementExpression;

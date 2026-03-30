@@ -30,7 +30,7 @@ public class Dir implements Iterable<SourceSpec<?>>, SourceSpecs {
 
     public Dir(String dir, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sourceSpecs) {
         // Prevent invalid paths such as `<project>` passed into `mavenProject(...)` where `pomXml` should be used
-        if (!dir.matches("[- \\w/\\\\]+")) {
+        if (!dir.matches("[- \\w/\\\\]*")) {
             throw new IllegalArgumentException("Invalid directory: " + dir);
         }
         this.dir = dir;

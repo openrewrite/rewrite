@@ -252,6 +252,12 @@ class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
         return shebang;
     }
 
+    override async visitSpread(spread: JS.Spread, q: RpcSendQueue): Promise<J | undefined> {
+        await q.getAndSend(spread, el => el.expression, el => this.visit(el, q));
+        await q.getAndSend(spread, el => asRef(el.type), el => this.visitType(el, q));
+        return spread;
+    }
+
     override async visitStatementExpression(statementExpression: JS.StatementExpression, q: RpcSendQueue): Promise<J | undefined> {
         await q.getAndSend(statementExpression, el => el.statement, el => this.visit(el, q));
         return statementExpression;
@@ -838,6 +844,14 @@ class JavaScriptReceiver extends JavaScriptVisitor<RpcReceiveQueue> {
             text: await q.receive(shebang.text)
         };
         return updateIfChanged(shebang, updates);
+    }
+
+    override async visitSpread(spread: JS.Spread, q: RpcReceiveQueue): Promise<J | undefined> {
+        const updates = {
+            expression: await q.receive(spread.expression, el => this.visitDefined<Expression>(el, q)),
+            type: await q.receive(spread.type, el => this.visitType(el, q))
+        };
+        return updateIfChanged(spread, updates);
     }
 
     override async visitStatementExpression(statementExpression: JS.StatementExpression, q: RpcReceiveQueue): Promise<J | undefined> {

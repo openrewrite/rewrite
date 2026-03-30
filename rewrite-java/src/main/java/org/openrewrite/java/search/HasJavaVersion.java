@@ -43,16 +43,10 @@ public class HasJavaVersion extends Recipe {
     @Nullable
     Boolean checkTargetCompatibility;
 
-    @Override
-    public String getDisplayName() {
-        return "Find files compiled at a specific Java version";
-    }
+    String displayName = "Find files compiled at a specific Java version";
 
-    @Override
-    public String getDescription() {
-        return "Finds Java source files matching a particular language level. " +
+    String description = "Finds Java source files matching a particular language level. " +
                "This is useful especially as a precondition for other recipes.";
-    }
 
     @SuppressWarnings("ConstantConditions")
     @Override

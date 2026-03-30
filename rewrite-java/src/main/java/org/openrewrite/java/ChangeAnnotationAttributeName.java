@@ -48,10 +48,7 @@ public class ChangeAnnotationAttributeName extends Recipe {
             example = "waitFor")
     String newAttributeName;
 
-    @Override
-    public String getDisplayName() {
-        return "Change annotation attribute name";
-    }
+    String displayName = "Change annotation attribute name";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -61,10 +58,7 @@ public class ChangeAnnotationAttributeName extends Recipe {
                 shortType, newAttributeName);
     }
 
-    @Override
-    public String getDescription() {
-        return "Some annotations accept arguments. This recipe renames an existing attribute.";
-    }
+    String description = "Some annotations accept arguments. This recipe renames an existing attribute.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

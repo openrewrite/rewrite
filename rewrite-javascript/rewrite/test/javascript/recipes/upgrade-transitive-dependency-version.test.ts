@@ -16,9 +16,11 @@
 import {
     applyOverrideToPackageJson,
     npm,
+    NpmrcScope,
     packageJson,
     PackageManager,
     parseDependencyPath,
+    serializeNpmrcConfigs,
     typescript,
     UpgradeTransitiveDependencyVersion
 } from "../../../src/javascript";
@@ -318,6 +320,84 @@ describe("UpgradeTransitiveDependencyVersion", () => {
                 "^4.17.21"
             );
             expect(result.overrides).toEqual({lodash: "^4.17.21"});
+        });
+
+    });
+
+    describe("serializeNpmrcConfigs", () => {
+        const NpmrcKind = "org.openrewrite.javascript.marker.NodeResolutionResult$Npmrc" as const;
+
+        test("returns undefined for empty array", () => {
+            expect(serializeNpmrcConfigs([])).toBeUndefined();
+        });
+
+        test("returns undefined for undefined", () => {
+            expect(serializeNpmrcConfigs(undefined)).toBeUndefined();
+        });
+
+        test("returns undefined when no matching scopes", () => {
+            const configs = [
+                {kind: NpmrcKind, scope: NpmrcScope.User, properties: {registry: "https://user.example.com"}}
+            ];
+            expect(serializeNpmrcConfigs(configs, [NpmrcScope.Project])).toBeUndefined();
+        });
+
+        test("serializes single scope", () => {
+            const configs = [
+                {kind: NpmrcKind, scope: NpmrcScope.Project, properties: {registry: "https://project.example.com"}}
+            ];
+            const result = serializeNpmrcConfigs(configs, [NpmrcScope.Project]);
+            expect(result).toBe("registry=https://project.example.com\n");
+        });
+
+        test("serializes multiple properties", () => {
+            const configs = [
+                {kind: NpmrcKind, scope: NpmrcScope.Project, properties: {
+                    registry: "https://project.example.com",
+                    "always-auth": "true"
+                }}
+            ];
+            const result = serializeNpmrcConfigs(configs, [NpmrcScope.Project]);
+            expect(result).toContain("registry=https://project.example.com");
+            expect(result).toContain("always-auth=true");
+        });
+
+        test("merges multiple scopes in priority order (lower priority first)", () => {
+            const configs = [
+                {kind: NpmrcKind, scope: NpmrcScope.Global, properties: {registry: "https://global.example.com", foo: "global"} as Record<string, string>},
+                {kind: NpmrcKind, scope: NpmrcScope.User, properties: {registry: "https://user.example.com", bar: "user"} as Record<string, string>},
+                {kind: NpmrcKind, scope: NpmrcScope.Project, properties: {registry: "https://project.example.com"} as Record<string, string>}
+            ];
+            const result = serializeNpmrcConfigs(configs, [NpmrcScope.Global, NpmrcScope.User, NpmrcScope.Project]);
+            // Project scope (highest priority) should override registry
+            expect(result).toContain("registry=https://project.example.com");
+            // Global property should be retained
+            expect(result).toContain("foo=global");
+            // User property should be retained
+            expect(result).toContain("bar=user");
+        });
+
+        test("default scope is Project only", () => {
+            const configs = [
+                {kind: NpmrcKind, scope: NpmrcScope.Global, properties: {registry: "https://global.example.com"}},
+                {kind: NpmrcKind, scope: NpmrcScope.Project, properties: {registry: "https://project.example.com"}}
+            ];
+            // Default scope (no second argument) should only include Project
+            const result = serializeNpmrcConfigs(configs);
+            expect(result).toBe("registry=https://project.example.com\n");
+            expect(result).not.toContain("global");
+        });
+
+        test("handles scoped registry auth tokens", () => {
+            const configs = [
+                {kind: NpmrcKind, scope: NpmrcScope.User, properties: {
+                    "//registry.npmjs.org/:_authToken": "npm_secret_token",
+                    "@mycompany:registry": "https://npm.mycompany.com"
+                }}
+            ];
+            const result = serializeNpmrcConfigs(configs, [NpmrcScope.User]);
+            expect(result).toContain("//registry.npmjs.org/:_authToken=npm_secret_token");
+            expect(result).toContain("@mycompany:registry=https://npm.mycompany.com");
         });
 
     });

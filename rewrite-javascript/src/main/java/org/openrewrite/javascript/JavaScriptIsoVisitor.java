@@ -254,6 +254,11 @@ public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
     }
 
     @Override
+    public JS.Spread visitSpread(JS.Spread spread, P p) {
+        return (JS.Spread) super.visitSpread(spread, p);
+    }
+
+    @Override
     public JS.StatementExpression visitStatementExpression(JS.StatementExpression expression, P p) {
         return (JS.StatementExpression) super.visitStatementExpression(expression, p);
     }

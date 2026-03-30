@@ -16,12 +16,11 @@
  * limitations under the License.
  */
 import {mapAsync, updateIfChanged} from "../util";
-import {Cursor, SourceFile} from "../tree";
-import {ValidImmerRecipeReturnType} from "../visitor";
-import {Expression, J, Type, JavaVisitor, NameTree, Statement, TypedTree} from "../java";
-import {createDraft, Draft, finishDraft} from "immer";
+import {SourceFile} from "../tree";
+import {ValidRecipeReturnType} from "../visitor";
+import {Expression, J, JavaVisitor, NameTree, Statement, Type, TypedTree} from "../java";
+import {create, Draft} from "mutative";
 import {isJavaScript, JS, JSX} from "./tree";
-import ComputedPropertyName = JS.ComputedPropertyName;
 
 export class JavaScriptVisitor<P> extends JavaVisitor<P> {
 
@@ -58,16 +57,16 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         before: J2,
         p: P,
         recipe?: (draft: Draft<J2>) =>
-            ValidImmerRecipeReturnType<Draft<J2>> |
-            PromiseLike<ValidImmerRecipeReturnType<Draft<J2>>>
+            ValidRecipeReturnType<Draft<J2>> |
+            PromiseLike<ValidRecipeReturnType<Draft<J2>>>
     ): Promise<J2> {
-        const draft: Draft<J2> = createDraft(before!);
+        const [draft, finishDraft] = create(before!);
         (draft as Draft<J>).prefix = await this.visitSpace(before!.prefix, p);
         (draft as Draft<J>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
         }
-        return finishDraft(draft) as J2;
+        return finishDraft() as J2;
     }
 
     protected async visitAlias(alias: JS.Alias, p: P): Promise<J | undefined> {
@@ -599,6 +598,28 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
         return updateIfChanged(shebang, updates);
     }
 
+    protected async visitSpread(spread: JS.Spread, p: P): Promise<J | undefined> {
+        const expression = await this.visitExpression(spread, p);
+        if (!expression?.kind || expression.kind !== JS.Kind.Spread) {
+            return expression;
+        }
+        spread = expression as JS.Spread;
+
+        const statement = await this.visitStatement(spread, p);
+        if (!statement?.kind || statement.kind !== JS.Kind.Spread) {
+            return statement;
+        }
+        spread = statement as JS.Spread;
+
+        const updates: any = {
+            prefix: await this.visitSpace(spread.prefix, p),
+            markers: await this.visitMarkers(spread.markers, p),
+            expression: await this.visitDefined<Expression>(spread.expression, p),
+            type: await this.visitType(spread.type, p)
+        };
+        return updateIfChanged(spread, updates);
+    }
+
     protected async visitStatementExpression(statementExpression: JS.StatementExpression, p: P): Promise<J | undefined> {
         const expression = await this.visitExpression(statementExpression, p);
         if (!expression?.kind || expression.kind !== JS.Kind.StatementExpression) {
@@ -957,7 +978,7 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
             modifiers: await mapAsync(computedPropMethod.modifiers, item => this.visitDefined<J.Modifier>(item, p)),
             typeParameters: computedPropMethod.typeParameters && await this.visitDefined<J.TypeParameters>(computedPropMethod.typeParameters, p),
             returnTypeExpression: computedPropMethod.returnTypeExpression && await this.visitDefined<TypedTree>(computedPropMethod.returnTypeExpression, p),
-            name: await this.visitDefined<ComputedPropertyName>(computedPropMethod.name, p),
+            name: await this.visitDefined<JS.ComputedPropertyName>(computedPropMethod.name, p),
             parameters: await this.visitContainer(computedPropMethod.parameters, p),
             body: computedPropMethod.body && await this.visitDefined<J.Block>(computedPropMethod.body, p),
             methodType: computedPropMethod.methodType && (await this.visitType(computedPropMethod.methodType, p) as Type.Method)
@@ -1171,6 +1192,8 @@ export class JavaScriptVisitor<P> extends JavaVisitor<P> {
                     return this.visitScopedVariableDeclarations(tree as unknown as JS.ScopedVariableDeclarations, p);
                 case JS.Kind.Shebang:
                     return this.visitShebang(tree as unknown as JS.Shebang, p);
+                case JS.Kind.Spread:
+                    return this.visitSpread(tree as unknown as JS.Spread, p);
                 case JS.Kind.StatementExpression:
                     return this.visitStatementExpression(tree as unknown as JS.StatementExpression, p);
                 case JS.Kind.TaggedTemplateExpression:

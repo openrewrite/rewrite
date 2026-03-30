@@ -3225,7 +3225,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class DeconstructionPattern implements J, TypedTree {
+    final class DeconstructionPattern implements J, Expression, TypedTree {
 
         @Nullable
         @NonFinal
@@ -3265,6 +3265,12 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitDeconstructionPattern(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @Override

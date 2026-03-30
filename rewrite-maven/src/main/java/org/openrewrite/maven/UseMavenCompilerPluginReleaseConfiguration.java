@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
 
@@ -40,16 +41,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
     )
     Integer releaseVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Use Maven compiler plugin release configuration";
-    }
+    String displayName = "Use Maven compiler plugin release configuration";
 
-    @Override
-    public String getDescription() {
-        return "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
+    String description = "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
                 "`release`, and updates the `release` value if needed. Will not downgrade the Java version if the current version is higher.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -79,8 +74,15 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
 
                 Xml.Tag updated = filterTagChildren(t, compilerPluginConfig,
                         child -> !("source".equals(child.getName()) || "target".equals(child.getName())));
-                String releaseVersionValue = hasJavaVersionProperty(getCursor().firstEnclosingOrThrow(Xml.Document.class)) ?
-                        "${java.version}" : releaseVersion.toString();
+                String existingPropertyRef = getExistingPropertyReference(release, source, target);
+                String releaseVersionValue;
+                if (existingPropertyRef != null) {
+                    releaseVersionValue = existingPropertyRef;
+                } else if (hasJavaVersionProperty(getCursor().firstEnclosingOrThrow(Xml.Document.class))) {
+                    releaseVersionValue = "${java.version}";
+                } else {
+                    releaseVersionValue = releaseVersion.toString();
+                }
                 return addOrUpdateChild(updated, compilerPluginConfig,
                         Xml.Tag.build("<release>" + releaseVersionValue + "</release>"), getCursor().getParentOrThrow());
             }
@@ -98,6 +100,25 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+
+    private static @Nullable String getExistingPropertyReference(
+            @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String>... configs) {
+        for (Optional<String> config : configs) {
+            if (config.isPresent()) {
+                String value = config.get();
+                if (value.startsWith("${") && value.endsWith("}") && !isDefaultMavenCompilerProperty(value)) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isDefaultMavenCompilerProperty(String value) {
+        return "${maven.compiler.source}".equals(value) ||
+               "${maven.compiler.target}".equals(value) ||
+               "${maven.compiler.release}".equals(value);
     }
 
     private boolean hasJavaVersionProperty(Xml.Document xml) {

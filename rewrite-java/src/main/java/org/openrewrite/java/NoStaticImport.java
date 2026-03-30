@@ -42,15 +42,11 @@ public class NoStaticImport extends Recipe {
             example = "java.util.Collections emptyList()")
     String methodPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove static import";
-    }
+    @Getter
+    final String displayName = "Remove static import";
 
-    @Override
-    public String getDescription() {
-        return "Removes static imports and replaces them with qualified references. For example, `emptyList()` becomes `Collections.emptyList()`.";
-    }
+    @Getter
+    final String description = "Removes static imports and replaces them with qualified references. For example, `emptyList()` becomes `Collections.emptyList()`.";
 
     @Override
     public Validated<Object> validate() {

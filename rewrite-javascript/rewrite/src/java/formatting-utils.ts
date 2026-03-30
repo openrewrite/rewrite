@@ -15,7 +15,7 @@
  */
 
 import {J} from "../java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 /**
  * Gets the effective last whitespace from a Space.
@@ -34,7 +34,7 @@ export function lastWhitespace(space: J.Space): string {
  * When there are comments, updates the suffix of the last comment.
  * When there are no comments, updates the whitespace property.
  *
- * @param space The Space to modify (Immer draft)
+ * @param space The Space to modify (Mutative draft)
  * @param transform Function that receives the current last whitespace and returns the new value
  */
 export function replaceLastWhitespace(space: J.Space, transform: (ws: string) => string): J.Space {

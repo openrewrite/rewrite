@@ -31,6 +31,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -46,6 +47,9 @@ import static org.openrewrite.internal.StringUtils.readFully;
  * A client for spawning and communicating with a subprocess that implements Rewrite RPC.
  */
 public class RewriteRpcProcess extends Thread {
+    private static final File DEV_NULL = new File(
+            System.getProperty("os.name").startsWith("Windows") ? "NUL" : "/dev/null");
+
     private final String[] command;
 
     @Setter
@@ -62,6 +66,9 @@ public class RewriteRpcProcess extends Thread {
     private JsonRpc rpcClient;
 
     private final Map<String, String> environment = new LinkedHashMap<>();
+
+    @Setter
+    private @Nullable Path stderrRedirect;
 
     public RewriteRpcProcess(String... command) {
         this.command = command;
@@ -86,6 +93,11 @@ public class RewriteRpcProcess extends Thread {
             if (workingDirectory != null) {
                 pb.directory(workingDirectory.toFile());
             }
+            if (stderrRedirect != null) {
+                pb.redirectError(ProcessBuilder.Redirect.appendTo(stderrRedirect.toFile()));
+            } else {
+                pb.redirectError(ProcessBuilder.Redirect.to(DEV_NULL));
+            }
             process = pb.start();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -93,25 +105,28 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
-        if (process != null && !process.isAlive()) {
-            int exitCode = process.exitValue();
-            String errorOutput = "", stdOutput = "";
+        if (process == null) {
+            return null;
+        }
 
-            // Read any remaining output from the process
-            try (InputStream errorStream = process.getErrorStream();
-                 InputStream inputStream = process.getInputStream()) {
-                errorOutput = readFully(errorStream);
+        if (!process.isAlive()) {
+            int exitCode = process.exitValue();
+
+            // Read any remaining stdout
+            String stdOutput = "";
+            try {
+                InputStream inputStream = process.getInputStream();
                 stdOutput = readFully(inputStream);
-            } catch (IOException | UnsupportedOperationException e) {
-                // Ignore errors reading final output
+            } catch (UnsupportedOperationException e) {
+                // Ignore errors reading final stdout
             }
 
-            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
+            String message = "RPC process shut down early with exit code " + exitCode;
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
             }
-            if (!errorOutput.isEmpty()) {
-                message += "\nError output:\n  " + errorOutput.replace("\n", "\n  ");
+            if (stderrRedirect != null) {
+                message += "\nSee stderr log: " + stderrRedirect;
             }
             return new IllegalStateException(message.trim());
         }
@@ -152,7 +167,7 @@ public class RewriteRpcProcess extends Thread {
                     process.waitFor(2, TimeUnit.SECONDS);
                 }
                 int exitCode = process.exitValue();
-                if (exitCode != 0 && exitCode != 143) { // 143 = SIGTERM
+                if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
                     throw new RuntimeException("JavaScript Rewrite RPC process crashed with exit code: " + exitCode);
                 }
             } catch (InterruptedException e) {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {emptyMarkers, markers, MarkersKind, ParseExceptionResult} from "../markers";
-import {Parser, ParserInput, parserInputRead} from "../parser";
+import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
 import {emptySpace, Json, space} from "./tree";
@@ -534,3 +534,5 @@ class JsoncParserReader {
         } satisfies Json.Literal as Json.Literal;
     }
 }
+
+Parsers.registerParser("json", JsonParser);

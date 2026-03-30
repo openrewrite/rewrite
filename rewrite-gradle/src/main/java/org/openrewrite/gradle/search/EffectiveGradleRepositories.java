@@ -35,16 +35,10 @@ import static org.openrewrite.PathUtils.separatorsToUnix;
 @EqualsAndHashCode(callSuper = false)
 public class EffectiveGradleRepositories extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "List effective Gradle project repositories";
-    }
+    String displayName = "List effective Gradle project repositories";
 
-    @Override
-    public String getDescription() {
-        return "Lists the Gradle project repositories that would be used for dependency resolution, in order of precedence. " +
+    String description = "Lists the Gradle project repositories that would be used for dependency resolution, in order of precedence. " +
                "This includes Maven repositories defined in the Gradle build files and settings as determined when the LST was produced.";
-    }
 
     @Option(displayName = "Use markers",
             description = "Whether to add markers for each effective Gradle repository to the build file. Default `false`.",

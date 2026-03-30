@@ -33,9 +33,10 @@ dependencies {
     implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
     implementation("io.micrometer:micrometer-core:1.9.+")
-    implementation("org.apache.commons:commons-text:1.11.+")
+    implementation("org.apache.commons:commons-text:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("io.moderne:jsonrpc:latest.integration")
 }
 
 //Javadoc compiler will complain about the use of the internal types.

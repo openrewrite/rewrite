@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {describe} from "@jest/globals";
-import {RecipeSpec} from "../../../src/test";
-import {ChangeImport} from "../../../src/javascript/recipes/change-import";
-import {npm, packageJson, tsx, typescript} from "../../../src/javascript";
-import {withDir} from "tmp-promise";
+import { RecipeSpec } from "../../../src/test";
+import { ChangeImport, npm, packageJson, tsx, typescript } from "../../../src/javascript";
+import { withDir } from "tmp-promise";
 
 describe("change-import", () => {
     describe("named imports", () => {
@@ -54,7 +52,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
 
         test("changes named import with double quotes", async () => {
@@ -90,7 +88,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
 
         test("preserves other imports from the same module", async () => {
@@ -129,7 +127,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
 
         test("does not change import from different module", async () => {
@@ -159,7 +157,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
 
         test("does not change unrelated imports from the same module", async () => {
@@ -190,7 +188,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
 
         test("adds import from target module", async () => {
@@ -230,7 +228,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
 
         test("preserves aliased import", async () => {
@@ -266,7 +264,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
     });
 
@@ -301,7 +299,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
     });
 
@@ -336,7 +334,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
     });
 
@@ -372,7 +370,68 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
+        });
+
+        test("renames aliased member when changing import", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                            import { extend as myExtend } from 'lodash';
+                            `,
+                            `
+                            import { assign as myExtend } from 'lodash';
+                            `
+                        ),
+                        packageJson(`{
+                            "name": "test",
+                            "dependencies": {
+                                "lodash": "^4.17.21"
+                            }
+                        }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
+        });
+
+        test("does not rename if member is local alias only", async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = new ChangeImport({
+                oldModule: "lodash",
+                oldMember: "extend",
+                newModule: "lodash",
+                newMember: "assign"
+            });
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        typescript(
+                            `
+                             import { flatten as extend } from 'lodash';
+                             `
+                        ),
+                        packageJson(`{
+                             "name": "test",
+                             "dependencies": {
+                                 "lodash": "^4.17.21"
+                             }
+                         }`)
+                    )
+                );
+            }, { unsafeCleanup: true });
         });
     });
 
@@ -416,7 +475,7 @@ describe("change-import", () => {
                         }`)
                     )
                 );
-            }, {unsafeCleanup: true});
+            }, { unsafeCleanup: true });
         });
     });
 });

@@ -23,8 +23,11 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.*;
 
@@ -32,7 +35,7 @@ class OrderImportsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new OrderImports(false));
+        spec.recipe(new OrderImports(false, null));
     }
 
     @DocumentExample
@@ -126,7 +129,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void unfoldStar() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               import java.util.*;
@@ -151,7 +154,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void unfoldStarMultiple() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               import java.util.*;
@@ -177,7 +180,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void removeUnused() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               import java.util.*;
@@ -189,7 +192,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void unfoldStaticStar() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               import java.util.List;
@@ -328,7 +331,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void preservesStaticStarImportWhenRemovingUnused() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               import static java.util.Collections.*;
@@ -344,7 +347,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void preservesStaticInheritanceImport() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               package my;
@@ -366,7 +369,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void preservesStaticMethodArguments() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               import static java.util.Collections.*;
@@ -613,7 +616,7 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void importReferencedByRecordComponentOnly() {
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           version(java(
             """
               import java.util.List;
@@ -671,7 +674,7 @@ class OrderImportsTest implements RewriteTest {
     void nestedInnerClass() {
         // language=java
         rewriteRun(
-          spec -> spec.recipe(new OrderImports(true)),
+          spec -> spec.recipe(new OrderImports(true, null)),
           java(
             """
               import org.openrewrite.java.tree.JContainer;
@@ -703,6 +706,64 @@ class OrderImportsTest implements RewriteTest {
                   JavaType.Variable myVariable = null;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void styleParameter() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(false, """
+            type: specs.openrewrite.org/v1beta/style
+            name: com.yourorg.CustomImportOrder
+            styleConfigs:
+              - org.openrewrite.java.style.ImportLayoutStyle:
+                  classCountToUseStarImport: 9999
+                  nameCountToUseStarImport: 9999
+                  layout:
+                    - "import static all other imports"
+                    - "<blank line>"
+                    - "import all other imports"
+            """)),
+          java(
+            """
+              import java.util.List;
+              import static java.util.Collections.singletonList;
+
+              class Test {
+              }
+              """,
+            """
+              import static java.util.Collections.singletonList;
+
+              import java.util.List;
+
+              class Test {
+              }
+              """,
+            spec -> spec
+              .markers(new NamedStyles(
+                randomId(),
+                "PreExisting",
+                "Pre-existing style",
+                null,
+                emptySet(),
+                singletonList(ImportLayoutStyle.builder()
+                  .classCountToUseStarImport(1)
+                  .nameCountToUseStarImport(1)
+                  .importAllOthers()
+                  .blankLine()
+                  .importStaticAllOthers()
+                  .build())
+              ))
+              .afterRecipe(cu -> {
+                  // Recipe parameter style should take precedence
+                  List<NamedStyles> allStyles = cu.getMarkers().findAll(NamedStyles.class);
+                  ImportLayoutStyle importLayoutStyle = NamedStyles.merge(ImportLayoutStyle.class, allStyles);
+                  assertThat(importLayoutStyle).isNotNull();
+                  assertThat(importLayoutStyle.getClassCountToUseStarImport()).isEqualTo(9999);
+                  assertThat(importLayoutStyle.getNameCountToUseStarImport()).isEqualTo(9999);
+              })
           )
         );
     }

@@ -43,6 +43,7 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.sort;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
@@ -100,22 +101,27 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
         try {
-            ClassLoader classLoader = findCaller().getClassLoader();
-            Vector<URL> combinedResources = new Vector<>();
-            for (Enumeration<URL> e = classLoader.getResources(DEFAULT_RESOURCE_PATH); e.hasMoreElements(); ) {
-                combinedResources.add(e.nextElement());
-            }
-            // TO-BE-REMOVED(2025-10-31) In the future we only want to support the `.gz` extension
-            for (Enumeration<URL> e = classLoader.getResources(DEFAULT_RESOURCE_PATH.replace(".gz", ".zip")); e.hasMoreElements(); ) {
-                combinedResources.add(e.nextElement());
+            ClassLoader callerClassLoader = findCaller().getClassLoader();
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+
+            Set<URL> seen = new LinkedHashSet<>();
+            collectResources(callerClassLoader, DEFAULT_RESOURCE_PATH, seen);
+            if (contextClassLoader != null && contextClassLoader != callerClassLoader) {
+                collectResources(contextClassLoader, DEFAULT_RESOURCE_PATH, seen);
             }
 
-            if (!combinedResources.isEmpty()) {
-                return new TypeTable(ctx, combinedResources.elements(), artifactNames);
+            if (!seen.isEmpty()) {
+                return new TypeTable(ctx, new Vector<>(seen).elements(), artifactNames);
             }
             return null;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void collectResources(ClassLoader classLoader, String resourcePath, Set<URL> target) throws IOException {
+        for (Enumeration<URL> e = classLoader.getResources(resourcePath); e.hasMoreElements(); ) {
+            target.add(e.nextElement());
         }
     }
 
@@ -604,6 +610,16 @@ public class TypeTable implements JavaParserClasspathLoader {
             }
         }
         return null;
+    }
+
+    @Override
+    public Collection<String> availableArtifacts() {
+        List<String> available = new ArrayList<>(classesDirByArtifact.size());
+        for (GroupArtifactVersion gav : classesDirByArtifact.keySet()) {
+            available.add(gav.getArtifactId() + "-" + gav.getVersion());
+        }
+        sort(available);
+        return available;
     }
 
     public static class Writer implements AutoCloseable {

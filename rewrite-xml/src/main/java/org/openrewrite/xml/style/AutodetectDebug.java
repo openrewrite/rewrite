@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.style;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.ScanningRecipe;
@@ -35,16 +36,12 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
 
     private final transient XmlStyleReport report = new XmlStyleReport(this);
 
-    @Override
-    public String getDisplayName() {
-        return "XML style Auto-detection debug";
-    }
+    @Getter
+    final String displayName = "XML style Auto-detection debug";
 
-    @Override
-    public String getDescription() {
-        return "Runs XML Autodetect and records the results in data tables and search markers. " +
-               "A debugging tool for figuring out why XML documents get styled the way they do.";
-    }
+    @Getter
+    final String description = "Runs XML Autodetect and records the results in data tables and search markers. " +
+        "A debugging tool for figuring out why XML documents get styled the way they do.";
 
     public static class Accumulator {
         Autodetect.Detector overallDetector = new Autodetect.Detector();

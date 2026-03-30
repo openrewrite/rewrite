@@ -61,15 +61,9 @@ public class ChangeMethodTargetToVariable extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Change method target to variable";
-    }
+    String displayName = "Change method target to variable";
 
-    @Override
-    public String getDescription() {
-        return "Change method invocations to method calls on a variable.";
-    }
+    String description = "Change method invocations to method calls on a variable.";
 
     @Override
     public Validated<Object> validate() {

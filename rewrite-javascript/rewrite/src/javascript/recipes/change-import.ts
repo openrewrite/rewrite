@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-import {Option, Recipe} from "../../recipe";
-import {TreeVisitor} from "../../visitor";
-import {ExecutionContext} from "../../execution";
-import {JavaScriptVisitor, JS} from "../index";
-import {maybeAddImport} from "../add-import";
-import {J, isIdentifier, Type} from "../../java";
-import {produce, WritableDraft} from "immer";
+import { Option, Recipe } from "../../recipe";
+import { TreeVisitor } from "../../visitor";
+import { ExecutionContext } from "../../execution";
+import { JavaScriptVisitor, JS } from "../index";
+import { maybeAddImport } from "../add-import";
+import { J, isIdentifier, Type } from "../../java";
+import { create as produce, Draft } from "mutative";
 
 /**
  * Changes an import from one module to another, updating all type attributions.
@@ -206,7 +206,7 @@ export class ChangeImport extends Recipe {
                     this.transformedImport = true;
                     return produce(imp, draft => {
                         if (draft.moduleSpecifier) {
-                            const literal = draft.moduleSpecifier.element as WritableDraft<J.Literal>;
+                            const literal = draft.moduleSpecifier.element as Draft<J.Literal>;
                             literal.value = newModule;
                             // Update valueSource to preserve quote style
                             const originalSource = literal.valueSource || `"${oldModule}"`;
@@ -217,12 +217,19 @@ export class ChangeImport extends Recipe {
                         if (newMember !== oldMember && oldMember !== 'default' && oldMember !== '*') {
                             const importClause = draft.importClause;
                             if (importClause?.namedBindings?.kind === JS.Kind.NamedImports) {
-                                const namedImports = importClause.namedBindings as WritableDraft<JS.NamedImports>;
+                                const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
                                 for (const elem of namedImports.elements.elements) {
                                     const specifier = elem.element;
                                     if (specifier.specifier.kind === J.Kind.Identifier &&
                                         specifier.specifier.simpleName === oldMember) {
                                         specifier.specifier.simpleName = newMember;
+                                    } else if (specifier.specifier.kind === JS.Kind.Alias) {
+                                        const aliasNode = specifier.specifier as Draft<JS.Alias>;
+                                        const propertyName = aliasNode.propertyName.element;
+                                        if (propertyName.kind === J.Kind.Identifier &&
+                                            propertyName.simpleName === oldMember) {
+                                            propertyName.simpleName = newMember;
+                                        }
                                     }
                                 }
                             }
@@ -241,7 +248,7 @@ export class ChangeImport extends Recipe {
                     if (!importClause?.namedBindings) return;
                     if (importClause.namedBindings.kind !== JS.Kind.NamedImports) return;
 
-                    const namedImports = importClause.namedBindings as WritableDraft<JS.NamedImports>;
+                    const namedImports = importClause.namedBindings as Draft<JS.NamedImports>;
                     const elements = namedImports.elements.elements;
                     const filteredElements = elements.filter(elem => {
                         const specifier = elem.element;
@@ -520,7 +527,7 @@ export class ChangeImport extends Recipe {
 
                         // Also update the method name if we're renaming the member
                         const updatedName = (oldMember !== 'default' && oldMember !== '*' &&
-                                            methodType.name === oldMember && newMember !== oldMember)
+                            methodType.name === oldMember && newMember !== oldMember)
                             ? newMember
                             : methodType.name;
 

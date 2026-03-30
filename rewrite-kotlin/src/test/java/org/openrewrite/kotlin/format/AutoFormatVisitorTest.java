@@ -347,7 +347,7 @@ class AutoFormatVisitorTest implements RewriteTest {
           .findFirst()
           .get();
 
-        K.CompilationUnit autoFormatted = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+        var autoFormatted = (K.CompilationUnit) new KotlinIsoVisitor<>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object p) {
                 return autoFormat(method, p);

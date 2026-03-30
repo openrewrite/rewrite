@@ -132,6 +132,54 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void retainImportIfUsedInJavaDoc() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Date;
+              import java.util.List;
+
+              /**
+               * referencing {@link Date} only in doc
+               */
+              class Test {
+                  List list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportIfFullyQualifiedInJavaDoc() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Date;
+              import java.util.List;
+
+              /**
+               * referencing {@link java.util.Date} only in doc
+               */
+              class Test2 {
+                  List list;
+              }
+              """,
+            """
+              import java.util.List;
+
+              /**
+               * referencing {@link java.util.Date} only in doc
+               */
+              class Test2 {
+                  List list;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1052")
     @Test
     void usedInJavadocWithThrows() {
@@ -508,6 +556,23 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import foo.Bar;
               import foo.Foo;
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6519")
+    @Test
+    void retainPackageInfoAnnotationWithMissingTypeInformation() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              @NullMarked
+              package org.openrewrite.java;
+
+              import org.jspecify.annotations.NullMarked;
+              """,
+            spec -> spec.path("src/main/java/org/openrewrite/java/package-info.java")
           )
         );
     }
@@ -1457,7 +1522,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeWildcardImportWithDirectImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.util.*;
@@ -2174,7 +2238,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void wildcardImportsWithConflictingNames() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.sql.*;
@@ -2283,6 +2346,69 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 Class<?> cls = TimeUnit.class;
             }
             """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6544")
+    @Test
+    void starImportWithExplicitImportsFromSamePackage() {
+        rewriteRun(
+          java(
+            """
+              package com.example.common.utils;
+
+              public class ListUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.common.utils;
+
+              public class ClassUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.common.utils;
+
+              public class StringUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.service;
+
+              import com.example.common.utils.*;
+              import com.example.common.utils.ClassUtil;
+              import com.example.common.utils.StringUtil;
+
+              public class MyService {
+                  public void init() {
+                      StringUtil.execute();
+                  }
+              }
+              """,
+            """
+              package com.example.service;
+
+              import com.example.common.utils.StringUtil;
+
+              public class MyService {
+                  public void init() {
+                      StringUtil.execute();
+                  }
+              }
+              """
           )
         );
     }

@@ -16,21 +16,26 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
 import {Cursor, isSourceFile, isTree, rootCursor, SourceFile, Tree} from "../tree";
-import {Recipe, RecipeDescriptor, RecipeRegistry} from "../recipe";
+import {Recipe} from "../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
     Generate,
     GenerateResponse,
     GetObject,
-    GetRecipes,
+    GetMarketplace,
+    GetMarketplaceResponseRow,
+    toMarketplace,
     Parse,
+    ParseProject,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
     TraceGetObject,
     Visit,
-    VisitResponse
+    VisitResponse,
+    BatchVisit
 } from "./request";
+import {RecipeMarketplace} from "../marketplace";
 import {initializeMetricsCsv} from "./request/metrics";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcRecipe} from "./recipe";
@@ -61,9 +66,9 @@ export class RewriteRpc {
                     new rpc.StreamMessageReader(process.stdin),
                     new rpc.StreamMessageWriter(process.stdout),
                 ),
-                private readonly options: {
+                options: {
                     batchSize?: number,
-                    registry?: RecipeRegistry,
+                    marketplace?: RecipeMarketplace,
                     logger?: rpc.Logger,
                     metricsCsv?: string,
                     recipeInstallDir?: string
@@ -80,23 +85,38 @@ export class RewriteRpc {
         const getCursor = (cursorIds: string[] | undefined, sourceFileType?: string) => this.getCursor(cursorIds, sourceFileType);
         const traceGetObject = () => this.traceGetObject.send;
 
-        const registry = options.registry || new RecipeRegistry();
+        const marketplace = options.marketplace || new RecipeMarketplace();
 
         Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
+        BatchVisit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor, options.metricsCsv);
         Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, options.metricsCsv);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects,
             this.localRefs, options?.batchSize || 1000, traceGetObject, options.metricsCsv);
-        GetRecipes.handle(this.connection, registry, options.metricsCsv);
+        GetMarketplace.handle(this.connection, marketplace, options.metricsCsv);
         GetLanguages.handle(this.connection, options.metricsCsv);
-        PrepareRecipe.handle(this.connection, registry, preparedRecipes, options.metricsCsv);
+        PrepareRecipe.handle(this.connection, marketplace, preparedRecipes, options.metricsCsv);
         Parse.handle(this.connection, this.localObjects, options.metricsCsv);
+        ParseProject.handle(this.connection, this.localObjects, options.metricsCsv);
         Print.handle(this.connection, getObject, options.logger, options.metricsCsv);
-        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", registry, options.logger, options.metricsCsv);
+        InstallRecipes.handle(this.connection, options.recipeInstallDir ?? ".rewrite", marketplace, options.logger, options.metricsCsv);
 
         this.connection.onRequest(
             new rpc.RequestType<TraceGetObject, boolean, Error>("TraceGetObject"),
             async (request) => {
                 this.traceGetObject = request;
+                return true;
+            }
+        )
+
+        this.connection.onRequest(
+            new rpc.RequestType0<boolean, Error>("Reset"),
+            async () => {
+                this.localObjects.clear();
+                this.localObjectIds.clear();
+                this.remoteObjects.clear();
+                this.remoteRefs.clear();
+                this.localRefs.clear();
+                preparedRecipes.clear();
                 return true;
             }
         )
@@ -119,7 +139,11 @@ export class RewriteRpc {
     }
 
     async getObject<P>(id: string, sourceFileType?: string): Promise<P> {
-        const localObject = this.localObjects.get(id);
+        // Use the last synced state as the baseline for receiving diffs.
+        // This must match what the remote used as its baseline when computing the diff.
+        // Using localObjects here would be wrong if the local side modified the tree
+        // (e.g., via a local recipe) since the remote doesn't know about those changes.
+        const before = this.remoteObjects.get(id);
 
         const q = new RpcReceiveQueue(this.remoteRefs, sourceFileType, () => {
             return this.connection.sendRequest(
@@ -128,7 +152,15 @@ export class RewriteRpc {
             );
         }, this.logger, this.traceGetObject.receive);
 
-        const remoteObject = await q.receive<P>(localObject);
+        let remoteObject: P;
+        try {
+            remoteObject = await q.receive<P>(before as P);
+        } catch (e) {
+            // Reset our tracking of the remote state so the next interaction
+            // forces a full object sync (ADD) instead of a delta (CHANGE).
+            this.remoteObjects.delete(id);
+            throw e;
+        }
 
         const eof = (await q.take());
         if (eof.state !== RpcObjectState.END_OF_OBJECT) {
@@ -188,10 +220,11 @@ export class RewriteRpc {
         return this.remoteLanguages;
     }
 
-    async recipes(): Promise<({ name: string } & RecipeDescriptor)[]> {
-        return await this.connection.sendRequest(
-            new rpc.RequestType0<({ name: string } & RecipeDescriptor)[], Error>("GetRecipes")
+    async marketplace(): Promise<RecipeMarketplace> {
+        const rows = await this.connection.sendRequest(
+            new rpc.RequestType0<GetMarketplaceResponseRow[], Error>("GetMarketplace")
         );
+        return await toMarketplace(rows);
     }
 
     async prepareRecipe(id: string, options?: any): Promise<RpcRecipe> {
@@ -293,5 +326,10 @@ class IdentityMap {
         } else {
             return this.primitiveMap.has(key);
         }
+    }
+
+    clear(): void {
+        this.objectMap = new WeakMap<any, string>();
+        this.primitiveMap.clear();
     }
 }
