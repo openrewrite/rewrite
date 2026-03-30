@@ -26,6 +26,7 @@ import org.openrewrite.groovy.format.AutoFormat;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
@@ -190,6 +191,15 @@ public class AddSettingsPluginRepository extends Recipe {
                     return statement;
                 }
                 J.MethodInvocation repoToAdd = extractRepository(pluginManagement);
+
+                // Defensive check: skip if a repository with the same name already exists.
+                // FindRepository relies on MethodMatcher which needs type info; on the Moderne
+                // platform, Kotlin-parsed settings.gradle.kts may have incomplete type attribution,
+                // causing FindRepository to miss existing entries like gradlePluginPortal().
+                if (repoAlreadyExists(repos, repoToAdd.getSimpleName())) {
+                    return statement;
+                }
+
                 J.MethodInvocation m2 = repos.withArguments(ListUtils.mapFirst(repos.getArguments(), arg2 -> {
                     if (!(arg2 instanceof J.Lambda) || !(((J.Lambda) arg2).getBody() instanceof J.Block)) {
                         return arg2;
@@ -206,6 +216,75 @@ public class AddSettingsPluginRepository extends Recipe {
                                     .withComments(emptyList()))));
                 }));
                 return rewrap(statement, m2);
+            }
+
+            private boolean repoAlreadyExists(J.MethodInvocation repos, String repoName) {
+                if (repos.getArguments().isEmpty() || !(repos.getArguments().get(0) instanceof J.Lambda)) {
+                    return false;
+                }
+                J.Lambda lambda = (J.Lambda) repos.getArguments().get(0);
+                if (!(lambda.getBody() instanceof J.Block)) {
+                    return false;
+                }
+                for (Statement s : ((J.Block) lambda.getBody()).getStatements()) {
+                    J.MethodInvocation mi = unwrapMethodCall(s, repoName);
+                    if (mi == null) {
+                        continue;
+                    }
+                    if (url == null) {
+                        return true;
+                    }
+                    if (urlExistsInRepo(mi)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private boolean urlExistsInRepo(J.MethodInvocation repo) {
+                if (repo.getArguments().isEmpty() || !(repo.getArguments().get(0) instanceof J.Lambda)) {
+                    return false;
+                }
+                J.Lambda lambda = (J.Lambda) repo.getArguments().get(0);
+                if (!(lambda.getBody() instanceof J.Block)) {
+                    return false;
+                }
+                for (Statement s : ((J.Block) lambda.getBody()).getStatements()) {
+                    Statement actual = s instanceof J.Return ? (Statement) requireNonNull(((J.Return) s).getExpression()) : s;
+                    if (actual instanceof J.Assignment) {
+                        J.Assignment a = (J.Assignment) actual;
+                        if (a.getVariable() instanceof J.Identifier &&
+                                "url".equals(((J.Identifier) a.getVariable()).getSimpleName())) {
+                            if (urlValueMatches(a.getAssignment())) {
+                                return true;
+                            }
+                        }
+                    }
+                    if (actual instanceof J.MethodInvocation) {
+                        J.MethodInvocation m = (J.MethodInvocation) actual;
+                        if ("url".equals(m.getSimpleName()) || "setUrl".equals(m.getSimpleName())) {
+                            if (!m.getArguments().isEmpty() && urlValueMatches(m.getArguments().get(0))) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            private boolean urlValueMatches(Expression expr) {
+                if (expr instanceof J.Literal) {
+                    return url != null && url.equals(((J.Literal) expr).getValue());
+                }
+                if (expr instanceof J.MethodInvocation && "uri".equals(((J.MethodInvocation) expr).getSimpleName())) {
+                    J.MethodInvocation uri = (J.MethodInvocation) expr;
+                    if (!uri.getArguments().isEmpty()) {
+                        return urlValueMatches(uri.getArguments().get(0));
+                    }
+                }
+                // GString/StringTemplate matching is handled by FindRepository's primary check;
+                // this fallback covers the most common literal and uri() patterns.
+                return false;
             }
 
             private <T extends JavaSourceFile> J generatePluginManagementBlock(Class<T> compilationUnitClass, Function<T, J> methodExtractor, ExecutionContext ctx) {
