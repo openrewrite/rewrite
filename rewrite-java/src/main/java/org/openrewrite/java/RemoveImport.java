@@ -60,7 +60,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            boolean isKotlin = !(cu instanceof J.CompilationUnit) && (cu.getSourcePath().toString().endsWith("kt") || cu.getSourcePath().toString().endsWith("kts")); // poor man's `cu instanceof K.CompilationUnit`
+            String sourcePath = cu.getSourcePath().toString();
+            boolean isKotlin = !(cu instanceof J.CompilationUnit) && (sourcePath.endsWith(".kt") || sourcePath.endsWith(".kts"));
             ImportLayoutStyle importLayoutStyle = Style.from(ImportLayoutStyle.class, cu, IntelliJ::importLayout);
 
             boolean typeUsed = false;
@@ -75,28 +76,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                 if (fq != null) {
                     String fqnType = TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName());
                     originalImports.add(fqnType);
-                    if (isKotlin && type.equals(fqnType)) {
-                        // For Kotlin, the owning class interfaces with methods can be used without actually importing those interfaces directly...
-                        JavaType.Class owningClass = TypeUtils.asClass(fq.getOwningClass());
-                        if (owningClass != null) {
-                            Queue<JavaType.FullyQualified> toVisit = new LinkedList<>(owningClass.getInterfaces());
-                            Set<JavaType.FullyQualified> visited = new HashSet<>();
-                            while (!toVisit.isEmpty()) {
-                                JavaType.FullyQualified current = toVisit.poll();
-                                if (!visited.add(current)) {
-                                    continue;
-                                }
-                                toVisit.addAll(current.getInterfaces());
-                            }
-                            for (JavaType.FullyQualified current : visited) {
-                                types.add(TypeUtils.toFullyQualifiedName(current.getFullyQualifiedName()));
-                            }
-                        }
-                        // ... and there is the option to star imports references of Java sourced superclasses types
-                        while (fq.getSupertype() != null) {
-                            fq = fq.getSupertype();
-                            types.add(TypeUtils.toFullyQualifiedName(fq.getFullyQualifiedName()));
-                        }
+                    if (isKotlin && TypeUtils.fullyQualifiedNamesAreEqual(type, fqnType)) {
+                        collectSupertypeNames(fq, types);
                     }
                 }
             }
@@ -120,11 +101,11 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                         } else {
                             otherMethodsAndFieldsInTypeUsed.add(method.getName());
                         }
-                    } else if (declaringType.endsWith("Kt") || declaringType.endsWith("Kts")) { // Kotlin top level function
+                    } else if (isKotlin && (declaringType.endsWith("Kt") || declaringType.endsWith("Kts"))) {
                         for (JavaType.Method m : method.getDeclaringType().getMethods()) {
                             if (m.getDeclaringType().getOwningClass() != null) {
-                                String declaringDeclaringType = m.getDeclaringType().getOwningClass().getFullyQualifiedName() + "." + m.getName();
-                                if (fullyQualifiedNamesAreEqual(declaringDeclaringType, types)) {
+                                String ownerMethodFqn = m.getDeclaringType().getOwningClass().getFullyQualifiedName() + "." + m.getName();
+                                if (fullyQualifiedNamesAreEqual(ownerMethodFqn, types)) {
                                     methodsAndFieldsUsed.add(method.getName());
                                     break;
                                 }
@@ -211,6 +192,30 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
 
         return j;
+    }
+
+    private static void collectSupertypeNames(JavaType.FullyQualified fq, Set<String> types) {
+        JavaType.Class owningClass = TypeUtils.asClass(fq.getOwningClass());
+        if (owningClass != null) {
+            Queue<JavaType.FullyQualified> toVisit = new LinkedList<>(owningClass.getInterfaces());
+            Set<JavaType.FullyQualified> visited = new HashSet<>();
+            while (!toVisit.isEmpty()) {
+                JavaType.FullyQualified current = toVisit.poll();
+                if (!visited.add(current)) {
+                    continue;
+                }
+                toVisit.addAll(current.getInterfaces());
+            }
+            for (JavaType.FullyQualified current : visited) {
+                types.add(TypeUtils.toFullyQualifiedName(current.getFullyQualifiedName()));
+            }
+        }
+        Set<JavaType.FullyQualified> visitedSupertypes = new HashSet<>();
+        JavaType.FullyQualified current = fq;
+        while (current.getSupertype() != null && visitedSupertypes.add(current.getSupertype())) {
+            current = current.getSupertype();
+            types.add(TypeUtils.toFullyQualifiedName(current.getFullyQualifiedName()));
+        }
     }
 
     private boolean fullyQualifiedNamesAreEqual(String declaringType, Collection<String> types) {
