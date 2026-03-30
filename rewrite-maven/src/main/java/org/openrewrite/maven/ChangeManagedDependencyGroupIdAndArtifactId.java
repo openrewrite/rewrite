@@ -24,6 +24,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -175,6 +176,15 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 } else {
                                     t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                 }
+                            } else {
+                                // Managed dependency has no version tag (e.g. version inherited from BOM parent);
+                                // add an explicit version tag
+                                String resolvedGroupId = t.getChildValue("groupId").orElse(newGroupId != null ? newGroupId : oldGroupId);
+                                String resolvedArtifactId = t.getChildValue("artifactId").orElse(newArtifactId != null ? newArtifactId : oldArtifactId);
+                                String resolvedNewVersion = resolveSemverVersion(ctx, resolvedGroupId, resolvedArtifactId, null);
+                                Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
+                                //noinspection ConstantConditions
+                                t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(t);

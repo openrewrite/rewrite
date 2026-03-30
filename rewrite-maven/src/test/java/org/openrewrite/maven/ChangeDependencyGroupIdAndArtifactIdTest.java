@@ -2741,11 +2741,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>project</artifactId>
                   <version>1.0.0</version>
-                  <parent>
-                      <groupId>com.fasterxml.jackson</groupId>
-                      <artifactId>jackson-bom</artifactId>
-                      <version>2.15.0</version>
-                  </parent>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child-project</module>
                   </modules>
@@ -2754,6 +2750,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           <dependency>
                               <groupId>com.fasterxml.jackson.core</groupId>
                               <artifactId>jackson-core</artifactId>
+                              <version>2.15.0</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
@@ -2764,11 +2761,7 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <groupId>com.example</groupId>
                   <artifactId>project</artifactId>
                   <version>1.0.0</version>
-                  <parent>
-                      <groupId>com.fasterxml.jackson</groupId>
-                      <artifactId>jackson-bom</artifactId>
-                      <version>2.15.0</version>
-                  </parent>
+                  <packaging>pom</packaging>
                   <modules>
                       <module>child-project</module>
                   </modules>

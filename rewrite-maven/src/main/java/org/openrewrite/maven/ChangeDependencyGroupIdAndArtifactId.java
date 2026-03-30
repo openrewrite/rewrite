@@ -160,9 +160,17 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         }
         return new MavenIsoVisitor<ExecutionContext>() {
             final boolean configuredToChangeManagedDependency = changeManagedDependency == null || changeManagedDependency;
+            final boolean configuredToOverrideManagedVersion = overrideManagedVersion != null && overrideManagedVersion;
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                // Check if this dependency's managed version is in a parent POM;
+                // if so, mark the parent POM for managed dep update when overrideManagedVersion is true
+                if (configuredToOverrideManagedVersion && isDependencyTag(oldGroupId, oldArtifactId)) {
+                    if (!isManagedInCurrentPom()) {
+                        findAndStoreParentWithManagedDep(getResolutionResult(), acc);
+                    }
+                }
                 if (!isDependencyTag(oldGroupId, oldArtifactId) &&
                         !isPluginDependencyTag(oldGroupId, oldArtifactId) &&
                         !isAnnotationProcessorPathTag(oldGroupId, oldArtifactId)) {
@@ -244,6 +252,34 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 }
                 storeParentPomProperty(parent.getParent(), propertyName, newValue, acc);
             }
+
+            private boolean isManagedInCurrentPom() {
+                Pom requestedPom = getResolutionResult().getPom().getRequested();
+                for (ManagedDependency managedDep : requestedPom.getDependencyManagement()) {
+                    if (matchesGlob(managedDep.getGroupId(), oldGroupId) && matchesGlob(managedDep.getArtifactId(), oldArtifactId)) {
+                        return managedDep instanceof ManagedDependency.Defined;
+                    }
+                }
+                return false;
+            }
+
+            private void findAndStoreParentWithManagedDep(MavenResolutionResult result, Accumulator acc) {
+                if (!result.parentPomIsProjectPom() || result.getParent() == null) {
+                    return;
+                }
+                MavenResolutionResult parent = result.getParent();
+                Pom parentPom = parent.getPom().getRequested();
+                for (ManagedDependency managedDep : parentPom.getDependencyManagement()) {
+                    if (matchesGlob(managedDep.getGroupId(), oldGroupId) && matchesGlob(managedDep.getArtifactId(), oldArtifactId)
+                            && managedDep instanceof ManagedDependency.Defined) {
+                        if (parentPom.getSourcePath() != null) {
+                            acc.getParentPomPathsNeedingManagedDepUpdate().add(parentPom.getSourcePath());
+                        }
+                        return;
+                    }
+                }
+                findAndStoreParentWithManagedDep(parent, acc);
+            }
         };
     }
 
@@ -263,7 +299,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 isNewDependencyPresent = checkIfNewDependencyPresent(newGroupId, newArtifactId, newVersion);
                 safeVersionPlaceholdersToChange = getSafeVersionPlaceholdersToChange(oldGroupId, oldArtifactId, ctx);
-                if (configuredToChangeManagedDependency) {
+                Path currentSourcePath = getResolutionResult().getPom().getRequested().getSourcePath();
+                if (configuredToChangeManagedDependency || acc.getParentPomPathsNeedingManagedDepUpdate().contains(currentSourcePath)) {
                     doAfterVisit(new ChangeManagedDependencyGroupIdAndArtifactId(
                             oldGroupId, oldArtifactId,
                             newGroupId,
@@ -381,6 +418,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                         t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
                                     }
                                 }
+                            } else if (configuredToOverrideManagedVersion && oldDependencyDefinedManaged && !isManagedInCurrentPom(oldGroupId, oldArtifactId)) {
+                                // Managed dep is in a parent POM, not the current POM; the version update
+                                // is handled by ChangeManagedDependencyGroupIdAndArtifactId on the parent
+                                deferUpdate = true;
                             } else if (configuredToOverrideManagedVersion || (!newDependencyManaged && !(oldDependencyDefinedManaged && configuredToChangeManagedDependency))) {
                                 // If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
                                 Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
@@ -420,6 +461,16 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
+                    }
+                }
+                return false;
+            }
+
+            private boolean isManagedInCurrentPom(String groupId, String artifactId) {
+                Pom requestedPom = getResolutionResult().getPom().getRequested();
+                for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
+                    if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
+                        return requestedManagedDependency instanceof ManagedDependency.Defined;
                     }
                 }
                 return false;
@@ -489,6 +540,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     @Value
     public static class Accumulator {
         Set<PomProperty> pomProperties = new HashSet<>();
+        Set<Path> parentPomPathsNeedingManagedDepUpdate = new HashSet<>();
     }
 
     @Value
