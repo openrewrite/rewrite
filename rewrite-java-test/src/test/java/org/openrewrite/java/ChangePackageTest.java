@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
@@ -28,11 +29,16 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.openrewrite.java.Assertions.addTypesToSourceSet;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.srcMainJava;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
@@ -662,6 +668,92 @@ class ChangePackageTest implements RewriteTest {
                 assertThat(cu.findType("org.openrewrite.Test")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void changePackageExpandsStarImportWhenItWouldCreateAmbiguity() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api", "hibernate-validator");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api", "hibernate-validator"))
+                  .beforeRecipe(addTypesToSourceSet("main",
+                    emptyList(), classpath)),
+          srcMainJava(
+            java(
+              """
+                package xyz;
+
+                import javax.validation.constraints.*;
+                import org.hibernate.validator.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @NotEmpty
+                    private String otherField;
+                }
+                """,
+              """
+                package xyz;
+
+                import jakarta.validation.constraints.NotNull;
+                import org.hibernate.validator.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @NotEmpty
+                    private String otherField;
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void changePackagePreservesStarImportWhenNoAmbiguity() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api"))
+                  .beforeRecipe(addTypesToSourceSet("main",
+                    emptyList(), classpath)),
+          srcMainJava(
+            java(
+              """
+                package xyz;
+
+                import javax.validation.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @Size(max = 100)
+                    private String otherField;
+                }
+                """,
+              """
+                package xyz;
+
+                import jakarta.validation.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @Size(max = 100)
+                    private String otherField;
+                }
+                """
+            )
           )
         );
     }
@@ -2058,5 +2150,41 @@ class ChangePackageTest implements RewriteTest {
             spec -> spec.path("META-INF/services/org.other.SomeInterface")
           )
         );
+    }
+
+    /**
+     * Enrich each source file's JavaSourceSet marker with types declared in other source files,
+     * so that classpath-based ambiguity detection works in tests where types come from source
+     * files rather than JARs.
+     */
+    private static UncheckedConsumer<List<SourceFile>> withSourceTypesOnClasspath() {
+        return sourceFiles -> {
+            List<JavaType.FullyQualified> sourceTypes = new ArrayList<>();
+            for (SourceFile sf : sourceFiles) {
+                if (sf instanceof JavaSourceFile) {
+                    for (J.ClassDeclaration classDecl : ((JavaSourceFile) sf).getClasses()) {
+                        JavaType.FullyQualified type = classDecl.getType();
+                        if (type != null) {
+                            sourceTypes.add(type);
+                        }
+                    }
+                }
+            }
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sf = sourceFiles.get(i);
+                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                JavaSourceSet ss;
+                if (maybeSourceSet.isPresent()) {
+                    ss = maybeSourceSet.get();
+                    List<JavaType.FullyQualified> enriched = new ArrayList<>(ss.getClasspath());
+                    enriched.addAll(sourceTypes);
+                    ss = ss.withClasspath(enriched);
+                } else {
+                    ss = new JavaSourceSet(java.util.UUID.randomUUID(), "main", sourceTypes, java.util.Collections.emptyMap());
+                }
+                sourceFiles.set(i, sf.withMarkers(
+                  sf.getMarkers().computeByType(ss, (orig, upd) -> upd)));
+            }
+        };
     }
 }
