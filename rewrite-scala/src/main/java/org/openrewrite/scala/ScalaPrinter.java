@@ -32,6 +32,7 @@ import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.IndentedBlock;
 import org.openrewrite.scala.marker.SObject;
+import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.tree.S;
@@ -84,16 +85,51 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(typeParam.getAnnotations(), p);
         visit(typeParam.getName(), p);
         
-        // Print bounds if present using Scala syntax
+        // Print bounds if present using Scala syntax.
+        // Each bound element may be a J.TypeBound (with explicit Kind) or a plain
+        // TypeTree (context bound, printed with `:`).
         if (typeParam.getPadding().getBounds() != null) {
-            visitSpace(typeParam.getPadding().getBounds().getBefore(), Space.Location.TYPE_BOUNDS, p);
-            p.append(":");  // Scala uses : instead of extends for bounds
-            visitRightPadded(typeParam.getPadding().getBounds().getPadding().getElements(), 
-                JRightPadded.Location.TYPE_BOUND, " with", p);  // Scala uses "with" instead of "&"
+            List<JRightPadded<TypeTree>> boundElems = typeParam.getPadding().getBounds().getPadding().getElements();
+            for (int i = 0; i < boundElems.size(); i++) {
+                JRightPadded<TypeTree> elem = boundElems.get(i);
+                TypeTree boundTree = elem.getElement();
+                if (boundTree instanceof J.TypeBound) {
+                    J.TypeBound tb = (J.TypeBound) boundTree;
+                    visitSpace(tb.getPrefix(), Space.Location.TYPE_BOUNDS, p);
+                    p.append(tb.getKind() == J.TypeBound.Kind.Lower ? ">:" : "<:");
+                    visit((J) tb.getBoundedType(), p);
+                } else {
+                    // Context bound or plain type — use `:`
+                    visitSpace(typeParam.getPadding().getBounds().getBefore(), Space.Location.TYPE_BOUNDS, p);
+                    p.append(":");
+                    visit(boundTree, p);
+                }
+            }
         }
         
         afterSyntax(typeParam, p);
         return typeParam;
+    }
+
+    @Override
+    public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
+        // Type projection: Foo#Bar uses # instead of .
+        if (fieldAccess.getMarkers().findFirst(TypeProjection.class).isPresent()) {
+            beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
+            visit(fieldAccess.getTarget(), p);
+            p.append('#');
+            visit(fieldAccess.getName(), p);
+            afterSyntax(fieldAccess, p);
+            return fieldAccess;
+        }
+        // Empty target (import qualids): skip the dot
+        if (fieldAccess.getTarget() instanceof J.Empty) {
+            beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
+            visit(fieldAccess.getName(), p);
+            afterSyntax(fieldAccess, p);
+            return fieldAccess;
+        }
+        return super.visitFieldAccess(fieldAccess, p);
     }
 
     @Override
@@ -330,8 +366,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             
             // Print the appropriate keyword
             String kind = "";
-            if (isObject) {
-                // For objects, we print "object" - the "case" modifier is printed separately
+            if (isObject && classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
+                // Enum case: `case Red extends Color`
+                kind = "case";
+            } else if (isObject) {
                 kind = "object";
             } else {
                 switch (classDecl.getKind()) {
@@ -570,10 +608,16 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         boolean isVal = false;
         boolean hasVisibleModifier = false;
 
+        String valVarKeyword = "var";
         for (J.Modifier m : multiVariable.getModifiers()) {
             if (m.getType() == J.Modifier.Type.Final) {
-                // Any Final modifier means this is a val
+                // Any Final modifier means this is a val (or given)
                 isVal = true;
+                if ("given".equals(m.getKeyword())) {
+                    valVarKeyword = "given";
+                } else {
+                    valVarKeyword = "val";
+                }
                 // Only print the modifier if it has an explicit "final" keyword
                 if ("final".equals(m.getKeyword())) {
                     visit(m, p);
@@ -585,14 +629,12 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             }
         }
 
-        // Print val or var (unless it's a lambda parameter)
+        // Print val/var/given (unless it's a lambda parameter)
         if (!isLambdaParam) {
-            // Add space between modifiers and val/var if modifiers were printed
-            // but only if the val/var keyword wouldn't already have its own prefix space
             if (hasVisibleModifier) {
                 p.append(" ");
             }
-            p.append(isVal ? "val" : "var");
+            p.append(valVarKeyword);
         }
         
         // In Scala, variable declarations don't have a type at the declaration level
@@ -611,7 +653,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         
         // Print the variable name
         visit(variable.getName(), p);
-        
+
         // In Scala, type annotation comes after the name
         J.VariableDeclarations parent = getCursor().getParentOrThrow().getValue();
         if (parent.getTypeExpression() != null) {
@@ -696,18 +738,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return instanceOf;
     }
     
-    @Override
-    public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
-        // When the target is Empty (used in import qualids for single-segment packages
-        // or source-text-based imports), don't print the dot separator.
-        if (fieldAccess.getTarget() instanceof J.Empty) {
-            beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
-            visit(fieldAccess.getName(), p);
-            afterSyntax(fieldAccess, p);
-            return fieldAccess;
-        }
-        return super.visitFieldAccess(fieldAccess, p);
-    }
+    // visitFieldAccess is defined above with TypeProjection and Empty target handling
 
     @Override
     public J visitModifier(J.Modifier mod, PrintOutputCapture<P> p) {
