@@ -15,8 +15,6 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -26,6 +24,11 @@ import org.openrewrite.style.Style;
 import org.openrewrite.table.StylesInUse;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.introspector.BeanAccess;
+import org.yaml.snakeyaml.introspector.Property;
+import org.yaml.snakeyaml.nodes.MappingNode;
+import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Representer;
 
 import java.util.*;
 
@@ -45,10 +48,6 @@ public class FindStyles extends Recipe {
 
     String description = "Find and report the styles attached to each source file. " +
                          "Styles are output as valid OpenRewrite style YAML that can be used directly in rewrite.yml configuration.";
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT)
-            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -91,7 +90,16 @@ public class FindStyles extends Recipe {
         options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         options.setIndent(2);
         options.setPrettyFlow(true);
-        SNAKE_YAML = new Yaml(options);
+        // Suppress class tags (e.g. !!com.example.SomeStyle) so beans dump as plain maps
+        Representer representer = new Representer(options) {
+            @Override
+            protected MappingNode representJavaBean(Set<Property> properties, Object javaBean) {
+                addClassTag(javaBean.getClass(), Tag.MAP);
+                return super.representJavaBean(properties, javaBean);
+            }
+        };
+        SNAKE_YAML = new Yaml(representer, options);
+        SNAKE_YAML.setBeanAccess(BeanAccess.FIELD);
     }
 
     private static String stylesToYaml(List<NamedStyles> namedStylesList) {
@@ -111,14 +119,8 @@ public class FindStyles extends Recipe {
         if (styles != null && !styles.isEmpty()) {
             List<Map<String, Object>> styleConfigs = new ArrayList<>();
             for (Style style : styles) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> props = OBJECT_MAPPER.convertValue(style, Map.class);
-                // Remove Jackson metadata properties (@c, @ref, etc.)
-                props.entrySet().removeIf(e -> e.getKey().startsWith("@"));
-                props.values().removeIf(Objects::isNull);
-
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put(style.getClass().getName(), props);
+                entry.put(style.getClass().getName(), style);
                 styleConfigs.add(entry);
             }
             doc.put("styleConfigs", styleConfigs);
