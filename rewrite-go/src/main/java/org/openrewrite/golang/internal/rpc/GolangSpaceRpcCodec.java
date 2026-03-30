@@ -16,7 +16,7 @@
 package org.openrewrite.golang.internal.rpc;
 
 import lombok.Getter;
-import org.openrewrite.golang.tree.G;
+import org.openrewrite.golang.tree.Go;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
@@ -27,7 +27,7 @@ public class GolangSpaceRpcCodec extends DynamicDispatchRpcCodec<Space> {
 
     @Override
     public String getSourceFileType() {
-        return G.CompilationUnit.class.getName();
+        return Go.CompilationUnit.class.getName();
     }
 
     @Override

@@ -17,13 +17,12 @@
 package rpc
 
 import (
-	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/pkg/tree"
 )
 
 // sendRightPadded serializes a RightPadded element.
 // Matches JavaSender.visitRightPadded: element, after, markers
-func sendRightPadded(s *GoSender, rp any, q *SendQueue) {
+func sendRightPadded(s Sender, rp any, q *SendQueue) {
 	// Element: dispatch based on whether it's a J node, Space, or primitive
 	elem := rightPaddedElement(rp)
 	if _, ok := elem.(tree.J); ok {
@@ -56,7 +55,7 @@ func sendRightPaddedBool(elem bool, after tree.Space, markers tree.Markers, q *S
 
 // sendLeftPadded serializes a LeftPadded element.
 // Matches JavaSender.visitLeftPadded: before, element, markers
-func sendLeftPadded(s *GoSender, lp any, q *SendQueue) {
+func sendLeftPadded(s Sender, lp any, q *SendQueue) {
 	// Before space
 	q.GetAndSend(lp, func(v any) any { return leftPaddedBefore(v) },
 		func(v any) { sendSpace(v.(tree.Space), q) })
@@ -80,7 +79,7 @@ func sendLeftPadded(s *GoSender, lp any, q *SendQueue) {
 
 // sendContainer serializes a Container.
 // Matches JavaSender.visitContainer: before, elements (list of right-padded), markers
-func sendContainer(s *GoSender, c any, q *SendQueue) {
+func sendContainer(s Sender, c any, q *SendQueue) {
 	// Before space
 	q.GetAndSend(c, func(v any) any { return containerBefore(v) },
 		func(v any) { sendSpace(v.(tree.Space), q) })
@@ -95,7 +94,7 @@ func sendContainer(s *GoSender, c any, q *SendQueue) {
 }
 
 // receiveRightPadded deserializes a RightPadded element.
-func receiveRightPadded(r *GoReceiver, q *ReceiveQueue, before any) any {
+func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
 	// Element
 	elem := q.Receive(rightPaddedElement(before), func(v any) any {
 		if _, ok := v.(tree.J); ok {
@@ -112,11 +111,25 @@ func receiveRightPadded(r *GoReceiver, q *ReceiveQueue, before any) any {
 		return receiveMarkersCodec(q, v.(tree.Markers))
 	})
 
-	return updateRightPadded(before, elem, afterSpace.(tree.Space), markers.(tree.Markers))
+	var after tree.Space
+	if afterSpace != nil {
+		after = afterSpace.(tree.Space)
+	}
+	var m tree.Markers
+	if markers != nil {
+		m = markers.(tree.Markers)
+	}
+
+	// For factory-created fallback (RightPadded[tree.J]), create the result
+	// based on the element's type since we don't know the parent's expectation.
+	if _, ok := before.(tree.RightPadded[tree.J]); ok {
+		return rightPaddedFromElement(elem, after, m)
+	}
+	return updateRightPadded(before, elem, after, m)
 }
 
 // receiveLeftPadded deserializes a LeftPadded element.
-func receiveLeftPadded(r *GoReceiver, q *ReceiveQueue, before any) any {
+func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 	// Before space
 	beforeSpace := q.Receive(leftPaddedBefore(before), func(v any) any {
 		return receiveSpace(v.(tree.Space), q)
@@ -140,7 +153,7 @@ func receiveLeftPadded(r *GoReceiver, q *ReceiveQueue, before any) any {
 }
 
 // receiveContainer deserializes a Container.
-func receiveContainer(r *GoReceiver, q *ReceiveQueue, before any) any {
+func receiveContainer(r Receiver, q *ReceiveQueue, before any) any {
 	// Before space
 	beforeSpace := q.Receive(containerBefore(before), func(v any) any {
 		return receiveSpace(v.(tree.Space), q)
@@ -224,7 +237,11 @@ func updateRightPadded(rp any, elem any, after tree.Space, markers tree.Markers)
 	case tree.RightPadded[tree.Expression]:
 		return tree.RightPadded[tree.Expression]{Element: elem.(tree.Expression), After: after, Markers: markers}
 	case tree.RightPadded[tree.J]:
-		return tree.RightPadded[tree.J]{Element: elem.(tree.J), After: after, Markers: markers}
+		// Factory-created fallback: determine the correct RightPadded variant.
+		// This is called when Java sends ADD for a new RightPadded in the
+		// bidirectional direction. We need to create the exact generic variant
+		// that the parent container expects.
+		return rightPaddedFromElement(elem, after, markers)
 	case tree.RightPadded[*tree.Identifier]:
 		return tree.RightPadded[*tree.Identifier]{Element: elem.(*tree.Identifier), After: after, Markers: markers}
 	case tree.RightPadded[*tree.VariableDeclarator]:
@@ -236,8 +253,91 @@ func updateRightPadded(rp any, elem any, after tree.Space, markers tree.Markers)
 	}
 }
 
+// rightPaddedFromElement creates the most specific RightPadded variant based on
+// the element's concrete type. This is needed for factory-created fallback instances
+// (RightPadded[tree.J]) where we don't know the desired variant until we see the element.
+func rightPaddedFromElement(elem any, after tree.Space, markers tree.Markers) any {
+	// Try concrete pointer types first (most specific)
+	switch e := elem.(type) {
+	case *tree.Identifier:
+		return tree.RightPadded[*tree.Identifier]{Element: e, After: after, Markers: markers}
+	case *tree.VariableDeclarator:
+		return tree.RightPadded[*tree.VariableDeclarator]{Element: e, After: after, Markers: markers}
+	case *tree.Import:
+		return tree.RightPadded[*tree.Import]{Element: e, After: after, Markers: markers}
+	}
+	// For types that implement both Statement and Expression (like MethodInvocation),
+	// we create BOTH variants and let the caller decide. In practice, the parent container
+	// determines which variant is needed. Since we can't know the parent's expectation here,
+	// we prefer Expression for most call-like expressions and Statement for block-level items.
+	//
+	// The key insight: Statement includes Block, Return, If, ForLoop, Switch, etc.
+	// Expression includes Identifier, Literal, Binary, MethodInvocation, FieldAccess, etc.
+	// Types implementing both: MethodInvocation, Assignment, Unary, MethodDeclaration, etc.
+	//
+	// For the bidirectional RPC, the container type determines which variant is needed.
+	// Since most containers in the RPC protocol use Expression (arguments, conditions),
+	// and Statement-only containers are mostly for block bodies, we check Statement FIRST
+	// and fall back to Expression. The caller (container update) will handle the type assertion.
+	if stmt, ok := elem.(tree.Statement); ok {
+		return tree.RightPadded[tree.Statement]{Element: stmt, After: after, Markers: markers}
+	}
+	if expr, ok := elem.(tree.Expression); ok {
+		return tree.RightPadded[tree.Expression]{Element: expr, After: after, Markers: markers}
+	}
+	if j, ok := elem.(tree.J); ok {
+		return tree.RightPadded[tree.J]{Element: j, After: after, Markers: markers}
+	}
+	return tree.RightPadded[tree.J]{After: after, Markers: markers}
+}
+
+// coerceToExpressionRP converts a RightPadded of any variant to RightPadded[Expression]
+// by extracting the element and verifying it implements Expression.
+func coerceToExpressionRP(rp any) tree.RightPadded[tree.Expression] {
+	if rp, ok := rp.(tree.RightPadded[tree.Expression]); ok {
+		return rp
+	}
+	elem := rightPaddedElement(rp)
+	after := rightPaddedAfter(rp).(tree.Space)
+	m := rightPaddedMarkers(rp).(tree.Markers)
+	if expr, ok := elem.(tree.Expression); ok {
+		return tree.RightPadded[tree.Expression]{Element: expr, After: after, Markers: m}
+	}
+	return tree.RightPadded[tree.Expression]{After: after, Markers: m}
+}
+
+// coerceToStatementRP converts a RightPadded of any variant to RightPadded[Statement].
+func coerceToStatementRP(rp any) tree.RightPadded[tree.Statement] {
+	if rp, ok := rp.(tree.RightPadded[tree.Statement]); ok {
+		return rp
+	}
+	elem := rightPaddedElement(rp)
+	after := rightPaddedAfter(rp).(tree.Space)
+	m := rightPaddedMarkers(rp).(tree.Markers)
+	if stmt, ok := elem.(tree.Statement); ok {
+		return tree.RightPadded[tree.Statement]{Element: stmt, After: after, Markers: m}
+	}
+	return tree.RightPadded[tree.Statement]{After: after, Markers: m}
+}
+
+// coerceRightPaddedIdent converts a RightPadded of any variant to RightPadded[*Identifier].
+func coerceRightPaddedIdent(rp any) tree.RightPadded[*tree.Identifier] {
+	if rp, ok := rp.(tree.RightPadded[*tree.Identifier]); ok {
+		return rp
+	}
+	elem := rightPaddedElement(rp)
+	after := rightPaddedAfter(rp).(tree.Space)
+	m := rightPaddedMarkers(rp).(tree.Markers)
+	if id, ok := elem.(*tree.Identifier); ok {
+		return tree.RightPadded[*tree.Identifier]{Element: id, After: after, Markers: m}
+	}
+	return tree.RightPadded[*tree.Identifier]{After: after, Markers: m}
+}
+
 func leftPaddedBefore(lp any) any {
 	switch v := lp.(type) {
+	case tree.LeftPadded[tree.J]:
+		return v.Before
 	case tree.LeftPadded[tree.Expression]:
 		return v.Before
 	case tree.LeftPadded[*tree.Identifier]:
@@ -263,6 +363,8 @@ func leftPaddedBefore(lp any) any {
 
 func leftPaddedElement(lp any) any {
 	switch v := lp.(type) {
+	case tree.LeftPadded[tree.J]:
+		return v.Element
 	case tree.LeftPadded[tree.Expression]:
 		return v.Element
 	case tree.LeftPadded[*tree.Identifier]:
@@ -288,6 +390,8 @@ func leftPaddedElement(lp any) any {
 
 func leftPaddedMarkers(lp any) any {
 	switch v := lp.(type) {
+	case tree.LeftPadded[tree.J]:
+		return v.Markers
 	case tree.LeftPadded[tree.Expression]:
 		return v.Markers
 	case tree.LeftPadded[*tree.Identifier]:
@@ -313,6 +417,15 @@ func leftPaddedMarkers(lp any) any {
 
 func updateLeftPadded(lp any, before tree.Space, elem any, markers tree.Markers) any {
 	switch lp.(type) {
+	case tree.LeftPadded[tree.J]:
+		// Factory-created fallback: determine the most specific type from the element
+		if expr, ok := elem.(tree.Expression); ok {
+			return tree.LeftPadded[tree.Expression]{Before: before, Element: expr, Markers: markers}
+		}
+		if j, ok := elem.(tree.J); ok {
+			return tree.LeftPadded[tree.J]{Before: before, Element: j, Markers: markers}
+		}
+		return tree.LeftPadded[tree.J]{Before: before, Markers: markers}
 	case tree.LeftPadded[tree.Expression]:
 		return tree.LeftPadded[tree.Expression]{Before: before, Element: elem.(tree.Expression), Markers: markers}
 	case tree.LeftPadded[*tree.Identifier]:
@@ -351,6 +464,8 @@ func updateLeftPadded(lp any, before tree.Space, elem any, markers tree.Markers)
 
 func containerBefore(c any) any {
 	switch v := c.(type) {
+	case tree.Container[tree.J]:
+		return v.Before
 	case tree.Container[tree.Statement]:
 		return v.Before
 	case tree.Container[tree.Expression]:
@@ -364,6 +479,12 @@ func containerBefore(c any) any {
 
 func containerElements(c any) []any {
 	switch v := c.(type) {
+	case tree.Container[tree.J]:
+		result := make([]any, len(v.Elements))
+		for i, e := range v.Elements {
+			result[i] = e
+		}
+		return result
 	case tree.Container[tree.Statement]:
 		result := make([]any, len(v.Elements))
 		for i, e := range v.Elements {
@@ -406,102 +527,10 @@ func containerElementID(rp any) any {
 	}
 }
 
-func extractID(v any) any {
-	// Try common tree types
-	switch t := v.(type) {
-	case *tree.Identifier:
-		return t.ID
-	case *tree.Literal:
-		return t.ID
-	case *tree.Binary:
-		return t.ID
-	case *tree.Block:
-		return t.ID
-	case *tree.MethodDeclaration:
-		return t.ID
-	case *tree.MethodInvocation:
-		return t.ID
-	case *tree.VariableDeclarations:
-		return t.ID
-	case *tree.VariableDeclarator:
-		return t.ID
-	case *tree.Assignment:
-		return t.ID
-	case *tree.Return:
-		return t.ID
-	case *tree.If:
-		return t.ID
-	case *tree.Else:
-		return t.ID
-	case *tree.ForLoop:
-		return t.ID
-	case *tree.ForEachLoop:
-		return t.ID
-	case *tree.Switch:
-		return t.ID
-	case *tree.Case:
-		return t.ID
-	case *tree.Import:
-		return t.ID
-	case *tree.Empty:
-		return t.ID
-	case *tree.Unary:
-		return t.ID
-	case *tree.FieldAccess:
-		return t.ID
-	case *tree.ArrayAccess:
-		return t.ID
-	case *tree.ArrayType:
-		return t.ID
-	case *tree.Parentheses:
-		return t.ID
-	case *tree.TypeCast:
-		return t.ID
-	case *tree.CompilationUnit:
-		return t.ID
-	case *tree.GoStmt:
-		return t.ID
-	case *tree.Defer:
-		return t.ID
-	case *tree.Send:
-		return t.ID
-	case *tree.Goto:
-		return t.ID
-	case *tree.Fallthrough:
-		return t.ID
-	case *tree.Composite:
-		return t.ID
-	case *tree.KeyValue:
-		return t.ID
-	case *tree.Slice:
-		return t.ID
-	case *tree.MapType:
-		return t.ID
-	case *tree.Channel:
-		return t.ID
-	case *tree.FuncType:
-		return t.ID
-	case *tree.StructType:
-		return t.ID
-	case *tree.InterfaceType:
-		return t.ID
-	case *tree.TypeList:
-		return t.ID
-	case *tree.TypeDecl:
-		return t.ID
-	case *tree.MultiAssignment:
-		return t.ID
-	case *tree.CommClause:
-		return t.ID
-	case *tree.IndexList:
-		return t.ID
-	default:
-		return uuid.Nil
-	}
-}
-
 func containerMarkers(c any) any {
 	switch v := c.(type) {
+	case tree.Container[tree.J]:
+		return v.Markers
 	case tree.Container[tree.Statement]:
 		return v.Markers
 	case tree.Container[tree.Expression]:
@@ -515,16 +544,51 @@ func containerMarkers(c any) any {
 
 func updateContainer(c any, before tree.Space, elements []any, markers tree.Markers) any {
 	switch c.(type) {
+	case tree.Container[tree.J]:
+		// Factory-created fallback: detect element type from first element
+		if len(elements) > 0 {
+			switch elements[0].(type) {
+			case tree.RightPadded[tree.Statement]:
+				elems := make([]tree.RightPadded[tree.Statement], len(elements))
+				for i, e := range elements {
+					elems[i] = e.(tree.RightPadded[tree.Statement])
+				}
+				return tree.Container[tree.Statement]{Before: before, Elements: elems, Markers: markers}
+			case tree.RightPadded[tree.Expression]:
+				elems := make([]tree.RightPadded[tree.Expression], len(elements))
+				for i, e := range elements {
+					elems[i] = e.(tree.RightPadded[tree.Expression])
+				}
+				return tree.Container[tree.Expression]{Before: before, Elements: elems, Markers: markers}
+			case tree.RightPadded[*tree.Import]:
+				elems := make([]tree.RightPadded[*tree.Import], len(elements))
+				for i, e := range elements {
+					elems[i] = e.(tree.RightPadded[*tree.Import])
+				}
+				return tree.Container[*tree.Import]{Before: before, Elements: elems, Markers: markers}
+			}
+		}
+		// Empty or unrecognized element type
+		return tree.Container[tree.J]{Before: before, Markers: markers}
 	case tree.Container[tree.Statement]:
 		elems := make([]tree.RightPadded[tree.Statement], len(elements))
 		for i, e := range elements {
-			elems[i] = e.(tree.RightPadded[tree.Statement])
+			if rp, ok := e.(tree.RightPadded[tree.Statement]); ok {
+				elems[i] = rp
+			} else {
+				elems[i] = coerceToStatementRP(e)
+			}
 		}
 		return tree.Container[tree.Statement]{Before: before, Elements: elems, Markers: markers}
 	case tree.Container[tree.Expression]:
 		elems := make([]tree.RightPadded[tree.Expression], len(elements))
 		for i, e := range elements {
-			elems[i] = e.(tree.RightPadded[tree.Expression])
+			if rp, ok := e.(tree.RightPadded[tree.Expression]); ok {
+				elems[i] = rp
+			} else {
+				// Coerce from RightPadded[Statement] or RightPadded[J] when element implements Expression
+				elems[i] = coerceToExpressionRP(e)
+			}
 		}
 		return tree.Container[tree.Expression]{Before: before, Elements: elems, Markers: markers}
 	case tree.Container[*tree.Import]:

@@ -19,12 +19,28 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class GroupedImport implements Marker {
+public class GroupedImport implements Marker, RpcCodec<GroupedImport> {
     UUID id;
     Space before;
+
+    @Override
+    public void rpcSend(GroupedImport after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, g -> g.getBefore().getWhitespace());
+    }
+
+    @Override
+    public GroupedImport rpcReceive(GroupedImport before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withBefore(Space.format(q.receive(before.getBefore() == null ? "" : before.getBefore().getWhitespace())));
+    }
 }

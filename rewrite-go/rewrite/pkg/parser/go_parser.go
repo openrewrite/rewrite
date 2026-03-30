@@ -19,8 +19,10 @@ package parser
 import (
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"strings"
 
 	"github.com/google/uuid"
@@ -28,10 +30,16 @@ import (
 )
 
 // GoParser parses Go source code into OpenRewrite LST nodes.
-type GoParser struct{}
+type GoParser struct {
+	// Importer resolves imported packages for type checking.
+	// Defaults to importer.Default() which resolves stdlib packages.
+	Importer types.Importer
+}
 
 func NewGoParser() *GoParser {
-	return &GoParser{}
+	return &GoParser{
+		Importer: importer.Default(),
+	}
 }
 
 // Parse parses the given Go source code and returns a CompilationUnit.
@@ -42,12 +50,38 @@ func (gp *GoParser) Parse(sourcePath string, source string) (*tree.CompilationUn
 		return nil, fmt.Errorf("parse error: %w", err)
 	}
 
+	// Run type checking to populate type information
+	typeInfo := &types.Info{
+		Types:      make(map[ast.Expr]types.TypeAndValue),
+		Defs:       make(map[*ast.Ident]types.Object),
+		Uses:       make(map[*ast.Ident]types.Object),
+		Selections: make(map[*ast.SelectorExpr]*types.Selection),
+	}
+
+	conf := types.Config{
+		Importer: gp.Importer,
+		// Don't fail on type errors — we want partial type info even when
+		// imports can't be resolved (single-file mode).
+		Error: func(err error) {},
+	}
+
+	// Determine package name from the parsed file
+	pkgName := "main"
+	if file.Name != nil {
+		pkgName = file.Name.Name
+	}
+
+	// Type-check; errors are non-fatal (unresolvable imports are expected)
+	_, _ = conf.Check(pkgName, fset, []*ast.File{file}, typeInfo)
+
 	ctx := &parseContext{
-		src:     []byte(source),
-		fset:    fset,
-		file:    fset.File(file.Pos()),
-		astFile: file,
-		cursor:  0,
+		src:      []byte(source),
+		fset:     fset,
+		file:     fset.File(file.Pos()),
+		astFile:  file,
+		cursor:   0,
+		typeInfo: typeInfo,
+		mapper:   newTypeMapper(),
 	}
 
 	return ctx.mapFile(file, sourcePath), nil
@@ -55,11 +89,13 @@ func (gp *GoParser) Parse(sourcePath string, source string) (*tree.CompilationUn
 
 // parseContext holds the state needed during AST-to-LST mapping.
 type parseContext struct {
-	src     []byte
-	fset    *token.FileSet
-	file    *token.File
-	astFile *ast.File
-	cursor  int // current byte offset into src, tracks consumed positions
+	src      []byte
+	fset     *token.FileSet
+	file     *token.File
+	astFile  *ast.File
+	cursor   int // current byte offset into src, tracks consumed positions
+	typeInfo *types.Info
+	mapper   *typeMapper
 }
 
 // prefix extracts the whitespace and comments between the current cursor
@@ -428,7 +464,7 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *tree.MethodDeclaration
 		body = ctx.mapBlockStmt(decl.Body)
 	}
 
-	return &tree.MethodDeclaration{
+	md := &tree.MethodDeclaration{
 		ID:         uuid.New(),
 		Prefix:     prefix,
 		Receiver:   receiver,
@@ -437,6 +473,15 @@ func (ctx *parseContext) mapFuncDecl(decl *ast.FuncDecl) *tree.MethodDeclaration
 		ReturnType: returnType,
 		Body:       body,
 	}
+
+	// Type attribution for method declaration
+	if obj, ok := ctx.typeInfo.Defs[decl.Name]; ok && obj != nil {
+		if fn, ok := obj.(*types.Func); ok {
+			md.MethodType = ctx.mapper.mapMethodObject(fn)
+		}
+	}
+
+	return md
 }
 
 // mapReturnType maps function return types.
@@ -1382,7 +1427,18 @@ func (ctx *parseContext) mapExpr(expr ast.Expr) tree.Expression {
 func (ctx *parseContext) mapIdent(ident *ast.Ident) *tree.Identifier {
 	prefix := ctx.prefix(ident.Pos())
 	ctx.skip(len(ident.Name))
-	return &tree.Identifier{ID: uuid.New(), Prefix: prefix, Name: ident.Name}
+	id := &tree.Identifier{ID: uuid.New(), Prefix: prefix, Name: ident.Name}
+
+	// Type attribution: look up in Defs first, then Uses
+	if obj, ok := ctx.typeInfo.Defs[ident]; ok && obj != nil {
+		id.Type = ctx.mapper.mapObject(obj)
+		id.FieldType = ctx.mapper.mapObjectToVariable(obj)
+	} else if obj, ok := ctx.typeInfo.Uses[ident]; ok && obj != nil {
+		id.Type = ctx.mapper.mapObject(obj)
+		id.FieldType = ctx.mapper.mapObjectToVariable(obj)
+	}
+
+	return id
 }
 
 // mapBasicLit maps a basic literal (string, int, float, etc.)
@@ -1404,7 +1460,14 @@ func (ctx *parseContext) mapBasicLit(lit *ast.BasicLit) *tree.Literal {
 		kind = tree.StringLiteral
 	}
 
-	return &tree.Literal{ID: uuid.New(), Prefix: prefix, Kind: kind, Value: lit.Value, Source: lit.Value}
+	l := &tree.Literal{ID: uuid.New(), Prefix: prefix, Kind: kind, Value: lit.Value, Source: lit.Value}
+
+	// Type attribution for literal
+	if tv, ok := ctx.typeInfo.Types[lit]; ok {
+		l.Type = ctx.mapper.mapType(tv.Type)
+	}
+
+	return l
 }
 
 // mapBinaryExpr maps a binary expression.
@@ -1415,12 +1478,19 @@ func (ctx *parseContext) mapBinaryExpr(expr *ast.BinaryExpr) *tree.Binary {
 	ctx.skip(len(expr.Op.String()))
 	right := ctx.mapExpr(expr.Y)
 
-	return &tree.Binary{
+	b := &tree.Binary{
 		ID:       uuid.New(),
 		Left:     left,
 		Operator: tree.LeftPadded[tree.BinaryOperator]{Before: opPrefix, Element: op},
 		Right:    right,
 	}
+
+	// Type attribution for binary expression
+	if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		b.Type = ctx.mapper.mapType(tv.Type)
+	}
+
+	return b
 }
 
 // mapCallExpr maps a function/method call.
@@ -1500,7 +1570,7 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 		ctx.skip(1)             // ")"
 	}
 
-	return &tree.MethodInvocation{
+	mi := &tree.MethodInvocation{
 		ID:        uuid.New(),
 		Prefix:    tree.EmptySpace,
 		Markers:   markers,
@@ -1508,6 +1578,26 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 		Name:      name,
 		Arguments: tree.Container[tree.Expression]{Before: argsBefore, Elements: argElements},
 	}
+
+	// Type attribution for method invocation
+	if selExpr, ok := expr.Fun.(*ast.SelectorExpr); ok {
+		if selection, ok := ctx.typeInfo.Selections[selExpr]; ok {
+			mi.MethodType = ctx.mapper.mapSelectionToMethod(selection)
+		} else if obj, ok := ctx.typeInfo.Uses[selExpr.Sel]; ok {
+			// Qualified identifier (pkg.Func) — not a selection, but Sel is in Uses
+			if fn, ok := obj.(*types.Func); ok {
+				mi.MethodType = ctx.mapper.mapMethodObject(fn)
+			}
+		}
+	} else if ident, ok := expr.Fun.(*ast.Ident); ok {
+		if obj, ok := ctx.typeInfo.Uses[ident]; ok {
+			if fn, ok := obj.(*types.Func); ok {
+				mi.MethodType = ctx.mapper.mapMethodObject(fn)
+			}
+		}
+	}
+
+	return mi
 }
 
 // mapSelectorExpr maps a selector expression (e.g., pkg.Name).
@@ -1523,11 +1613,21 @@ func (ctx *parseContext) mapSelectorExpr(expr *ast.SelectorExpr) *tree.FieldAcce
 
 	sel := ctx.mapIdent(expr.Sel)
 
-	return &tree.FieldAccess{
+	fa := &tree.FieldAccess{
 		ID:     uuid.New(),
 		Target: target,
 		Name:   tree.LeftPadded[*tree.Identifier]{Before: dotPrefix, Element: sel},
 	}
+
+	// Type attribution for selector (field access or method access)
+	if selection, ok := ctx.typeInfo.Selections[expr]; ok {
+		fa.Type = ctx.mapper.mapSelection(selection)
+	} else if tv, ok := ctx.typeInfo.Types[expr]; ok {
+		// Qualified identifier (e.g., pkg.ExportedName) — not a selection
+		fa.Type = ctx.mapper.mapType(tv.Type)
+	}
+
+	return fa
 }
 
 // mapUnaryExpr maps a unary expression.

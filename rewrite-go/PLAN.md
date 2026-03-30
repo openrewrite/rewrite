@@ -2,7 +2,7 @@
 
 ## Current State
 
-The Go module supports **parse + print + GetObject + InstallRecipes + Reset** over RPC. All 15 integration tests pass (helloWorld, structs, slices, interfaces, for/range loops, switch, channels, maps, etc.). The recipe bundle resolver infrastructure (`GitRecipeBundleResolver`/`GitRecipeBundleReader`) is wired up on the Java side with stub handling on the Go side.
+The Go module supports **parse + print + GetObject + InstallRecipes + Reset** over RPC. All 15 integration tests pass (helloWorld, structs, slices, interfaces, for/range loops, switch, channels, maps, etc.). The recipe bundle resolver infrastructure (`GolangRecipeBundleResolver`/`GolangRecipeBundleReader`) is wired up on the Java side with stub handling on the Go side.
 
 ## What's Left
 

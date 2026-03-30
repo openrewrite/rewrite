@@ -69,6 +69,21 @@ func (Base) Editor() TreeVisitor                         { return nil }
 func (Base) RecipeList() []Recipe                        { return nil }
 func (Base) Options() []OptionDescriptor                 { return nil }
 
+// DelegatesTo marks a recipe that delegates entirely to a Java-side recipe.
+// When the Java host calls PrepareRecipe, the Go server includes the
+// delegation info in the response, and Java loads the recipe locally
+// instead of wrapping it in an RpcRecipe.
+type DelegatesTo interface {
+	Recipe
+
+	// JavaRecipeName returns the fully qualified Java recipe name
+	// (e.g., "org.openrewrite.java.ChangeType").
+	JavaRecipeName() string
+
+	// JavaOptions returns options to configure the Java recipe, keyed by option name.
+	JavaOptions() map[string]any
+}
+
 // OptionDescriptor describes a configurable option on a recipe.
 type OptionDescriptor struct {
 	// Name is the programmatic name (e.g., "oldPackageName").

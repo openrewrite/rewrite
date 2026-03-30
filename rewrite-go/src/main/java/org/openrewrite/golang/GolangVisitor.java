@@ -20,13 +20,13 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.golang.tree.G;
+import org.openrewrite.golang.tree.Go;
 
 public class GolangVisitor<P> extends JavaVisitor<P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
-        return sourceFile instanceof G.CompilationUnit;
+        return sourceFile instanceof Go.CompilationUnit;
     }
 
     @Override
@@ -38,12 +38,13 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
     // Go-specific visit methods
     // ---------------------------------------------------------------
 
-    public J visitGoCompilationUnit(G.CompilationUnit cu, P p) {
-        G.CompilationUnit c = cu;
+    public J visitGoCompilationUnit(Go.CompilationUnit cu, P p) {
+        Go.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         if (c.getPadding().getPackageDecl() != null) {
-            c = c.getPadding().withPackageDecl(visitRightPadded(c.getPadding().getPackageDecl(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+            c = c.getPadding().withPackageDecl(
+                    visitRightPadded(c.getPadding().getPackageDecl(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
         }
         c = c.getPadding().withImports(ListUtils.map(c.getPadding().getImports(),
                 el -> visitRightPadded(el, JRightPadded.Location.IMPORT, p)));
@@ -69,24 +70,24 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
-    public J visitGoStatement(G.GoStatement goStmt, P p) {
-        G.GoStatement g = goStmt;
+    public J visitGoStatement(Go.GoStatement goStmt, P p) {
+        Go.GoStatement g = goStmt;
         g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         g = g.withMarkers(visitMarkers(g.getMarkers(), p));
         g = g.withExpression((Expression) visitAndCast(g.getExpression(), p));
         return g;
     }
 
-    public J visitDefer(G.Defer defer, P p) {
-        G.Defer d = defer;
+    public J visitDefer(Go.Defer defer, P p) {
+        Go.Defer d = defer;
         d = d.withPrefix(visitSpace(d.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withExpression((Expression) visitAndCast(d.getExpression(), p));
         return d;
     }
 
-    public J visitSend(G.Send send, P p) {
-        G.Send s = send;
+    public J visitSend(Go.Send send, P p) {
+        Go.Send s = send;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withChannelExpr((Expression) visitAndCast(s.getChannelExpr(), p));
@@ -94,23 +95,23 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
-    public J visitGoto(G.Goto gotoStmt, P p) {
-        G.Goto g = gotoStmt;
+    public J visitGoto(Go.Goto gotoStmt, P p) {
+        Go.Goto g = gotoStmt;
         g = g.withPrefix(visitSpace(g.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         g = g.withMarkers(visitMarkers(g.getMarkers(), p));
         g = g.withLabelIdent((J.Identifier) visitAndCast(g.getLabelIdent(), p));
         return g;
     }
 
-    public J visitFallthrough(G.Fallthrough fallthrough, P p) {
-        G.Fallthrough f = fallthrough;
+    public J visitFallthrough(Go.Fallthrough fallthrough, P p) {
+        Go.Fallthrough f = fallthrough;
         f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         return f;
     }
 
-    public J visitComposite(G.Composite composite, P p) {
-        G.Composite c = composite;
+    public J visitComposite(Go.Composite composite, P p) {
+        Go.Composite c = composite;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         if (c.getTypeExpr() != null) {
@@ -120,8 +121,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
-    public J visitKeyValue(G.KeyValue keyValue, P p) {
-        G.KeyValue kv = keyValue;
+    public J visitKeyValue(Go.KeyValue keyValue, P p) {
+        Go.KeyValue kv = keyValue;
         kv = kv.withPrefix(visitSpace(kv.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         kv = kv.withMarkers(visitMarkers(kv.getMarkers(), p));
         kv = kv.withKeyExpr((Expression) visitAndCast(kv.getKeyExpr(), p));
@@ -129,8 +130,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return kv;
     }
 
-    public J visitSliceExpr(G.SliceExpr slice, P p) {
-        G.SliceExpr s = slice;
+    public J visitSliceExpr(Go.SliceExpr slice, P p) {
+        Go.SliceExpr s = slice;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withIndexed((Expression) visitAndCast(s.getIndexed(), p));
@@ -144,8 +145,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return s;
     }
 
-    public J visitMapType(G.MapType mapType, P p) {
-        G.MapType m = mapType;
+    public J visitMapType(Go.MapType mapType, P p) {
+        Go.MapType m = mapType;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         m = m.withOpenBracket(visitSpace(m.getOpenBracket(), Space.Location.LANGUAGE_EXTENSION, p));
@@ -154,16 +155,16 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
-    public J visitChannel(G.Channel channel, P p) {
-        G.Channel c = channel;
+    public J visitChannel(Go.Channel channel, P p) {
+        Go.Channel c = channel;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withValue((Expression) visitAndCast(c.getValue(), p));
         return c;
     }
 
-    public J visitFuncType(G.FuncType funcType, P p) {
-        G.FuncType f = funcType;
+    public J visitFuncType(Go.FuncType funcType, P p) {
+        Go.FuncType f = funcType;
         f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), JContainer.Location.LANGUAGE_EXTENSION, p));
@@ -173,32 +174,32 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
-    public J visitStructType(G.StructType structType, P p) {
-        G.StructType s = structType;
+    public J visitStructType(Go.StructType structType, P p) {
+        Go.StructType s = structType;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withBody((J.Block) visitAndCast(s.getBody(), p));
         return s;
     }
 
-    public J visitInterfaceType(G.InterfaceType interfaceType, P p) {
-        G.InterfaceType i = interfaceType;
+    public J visitInterfaceType(Go.InterfaceType interfaceType, P p) {
+        Go.InterfaceType i = interfaceType;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.withBody((J.Block) visitAndCast(i.getBody(), p));
         return i;
     }
 
-    public J visitTypeList(G.TypeList typeList, P p) {
-        G.TypeList t = typeList;
+    public J visitTypeList(Go.TypeList typeList, P p) {
+        Go.TypeList t = typeList;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         t = t.getPadding().withTypes(visitContainer(t.getPadding().getTypes(), JContainer.Location.LANGUAGE_EXTENSION, p));
         return t;
     }
 
-    public J visitTypeDecl(G.TypeDecl typeDecl, P p) {
-        G.TypeDecl t = typeDecl;
+    public J visitTypeDecl(Go.TypeDecl typeDecl, P p) {
+        Go.TypeDecl t = typeDecl;
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         t = t.withName((J.Identifier) visitAndCast(t.getName(), p));
@@ -211,15 +212,15 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return t;
     }
 
-    public J visitMultiAssignment(G.MultiAssignment multiAssignment, P p) {
-        G.MultiAssignment m = multiAssignment;
+    public J visitMultiAssignment(Go.MultiAssignment multiAssignment, P p) {
+        Go.MultiAssignment m = multiAssignment;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         return m;
     }
 
-    public J visitCommClause(G.CommClause commClause, P p) {
-        G.CommClause c = commClause;
+    public J visitCommClause(Go.CommClause commClause, P p) {
+        Go.CommClause c = commClause;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         if (c.getComm() != null) {
@@ -230,8 +231,8 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
-    public J visitIndexList(G.IndexList indexList, P p) {
-        G.IndexList i = indexList;
+    public J visitIndexList(Go.IndexList indexList, P p) {
+        Go.IndexList i = indexList;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.withTarget((Expression) visitAndCast(i.getTarget(), p));

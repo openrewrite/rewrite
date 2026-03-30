@@ -18,11 +18,24 @@ package org.openrewrite.golang.marker;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class SelectStmt implements Marker {
+public class SelectStmt implements Marker, RpcCodec<SelectStmt> {
     UUID id;
+
+    @Override
+    public void rpcSend(SelectStmt after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+    }
+
+    @Override
+    public SelectStmt rpcReceive(SelectStmt before, RpcReceiveQueue q) {
+        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    }
 }

@@ -20,7 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.golang.rpc.GoRewriteRpc;
-import org.openrewrite.golang.tree.G;
+import org.openrewrite.golang.tree.Go;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
@@ -37,7 +37,7 @@ public class GolangParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return GoRewriteRpc.getOrStart().parse(sources, relativeTo, this,
-                G.CompilationUnit.class.getName(), ctx);
+                Go.CompilationUnit.class.getName(), ctx);
     }
 
     @Override
@@ -57,7 +57,7 @@ public class GolangParser implements Parser {
     public static class Builder extends Parser.Builder {
 
         public Builder() {
-            super(G.CompilationUnit.class);
+            super(Go.CompilationUnit.class);
         }
 
         @Override

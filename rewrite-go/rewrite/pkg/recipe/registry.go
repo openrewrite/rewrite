@@ -116,6 +116,19 @@ func (r *Registry) Register(prototype Recipe, categories ...CategoryDescriptor) 
 	cat.Recipes = append(cat.Recipes, *reg)
 }
 
+// RegisterDescriptor registers a recipe from its descriptor (used for dynamically loaded recipes).
+// The constructor returns nil since the recipe implementation lives in the external module.
+func (r *Registry) RegisterDescriptor(desc RecipeDescriptor) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	reg := &Registration{
+		Descriptor:  desc,
+		Constructor: func(options map[string]any) Recipe { return nil },
+	}
+	r.byName[desc.Name] = reg
+}
+
 // FindRecipe looks up a registration by fully qualified recipe name.
 func (r *Registry) FindRecipe(name string) (*Registration, bool) {
 	r.mu.RLock()

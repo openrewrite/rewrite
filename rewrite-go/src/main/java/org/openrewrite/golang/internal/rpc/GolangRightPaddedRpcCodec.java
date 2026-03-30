@@ -17,7 +17,7 @@ package org.openrewrite.golang.internal.rpc;
 
 import lombok.Getter;
 import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.golang.tree.G;
+import org.openrewrite.golang.tree.Go;
 import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
@@ -28,7 +28,7 @@ public class GolangRightPaddedRpcCodec extends DynamicDispatchRpcCodec<JRightPad
 
     @Override
     public String getSourceFileType() {
-        return G.CompilationUnit.class.getName();
+        return Go.CompilationUnit.class.getName();
     }
 
     @Override

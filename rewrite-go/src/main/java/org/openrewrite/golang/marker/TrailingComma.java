@@ -19,13 +19,31 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class TrailingComma implements Marker {
+public class TrailingComma implements Marker, RpcCodec<TrailingComma> {
     UUID id;
     Space before;
     Space after;
+
+    @Override
+    public void rpcSend(TrailingComma after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, t -> t.getBefore().getWhitespace());
+        q.getAndSend(after, t -> t.getAfter().getWhitespace());
+    }
+
+    @Override
+    public TrailingComma rpcReceive(TrailingComma before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withBefore(Space.format(q.receive(before.getBefore() == null ? "" : before.getBefore().getWhitespace())))
+                .withAfter(Space.format(q.receive(before.getAfter() == null ? "" : before.getAfter().getWhitespace())));
+    }
 }

@@ -16,7 +16,7 @@
 package org.openrewrite.golang;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.golang.tree.G;
+import org.openrewrite.golang.tree.Go;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -26,25 +26,25 @@ public final class Assertions {
     private Assertions() {
     }
 
-    public static SourceSpecs goSource(@Nullable String before) {
-        return goSource(before, s -> {
+    public static SourceSpecs go(@Nullable String before) {
+        return go(before, s -> {
         });
     }
 
-    public static SourceSpecs goSource(@Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> go = new SourceSpec<>(G.CompilationUnit.class, null, GolangParser.builder(), before, null);
+    public static SourceSpecs go(@Nullable String before, Consumer<SourceSpec<Go.CompilationUnit>> spec) {
+        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, null);
         spec.accept(go);
         return go;
     }
 
-    public static SourceSpecs goSource(@Nullable String before, String after) {
-        return goSource(before, after, s -> {
+    public static SourceSpecs go(@Nullable String before, String after) {
+        return go(before, after, s -> {
         });
     }
 
-    public static SourceSpecs goSource(@Nullable String before, String after,
-                                       Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> go = new SourceSpec<>(G.CompilationUnit.class, null, GolangParser.builder(), before, s -> after);
+    public static SourceSpecs go(@Nullable String before, String after,
+                                       Consumer<SourceSpec<Go.CompilationUnit>> spec) {
+        SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, s -> after);
         spec.accept(go);
         return go;
     }

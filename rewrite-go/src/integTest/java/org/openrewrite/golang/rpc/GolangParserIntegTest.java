@@ -20,14 +20,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.golang.tree.Go;
 import org.openrewrite.test.RewriteTest;
+import static org.assertj.core.api.Assertions.assertThat;
 import org.openrewrite.test.TypeValidation;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
-import static org.openrewrite.golang.Assertions.goSource;
+import static org.openrewrite.golang.Assertions.go;
 
 /**
  * Integration tests that parse Go source via the RPC subprocess and verify
@@ -62,9 +64,62 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void verifyPackageDeclSurvivesRecipe() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func hello() {
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            Go.CompilationUnit goCu = (Go.CompilationUnit) cu;
+
+                            // Verify the tree is valid before visiting
+                            assertThat(goCu.getPadding().getPackageDecl())
+                                    .as("packageDecl should exist before recipe")
+                                    .isNotNull();
+
+                            // Run a no-op visitor — should preserve the tree unchanged
+                            var noopVisitor = new org.openrewrite.java.JavaIsoVisitor<org.openrewrite.ExecutionContext>() {};
+                            var noopResult = (Go.CompilationUnit) noopVisitor.visit(goCu, new org.openrewrite.InMemoryExecutionContext());
+                            assertThat(noopResult).as("no-op visitor should not return null").isNotNull();
+                            assertThat(noopResult.getPadding().getPackageDecl())
+                                    .as("packageDecl should survive no-op visitor")
+                                    .isNotNull();
+                        })
+                )
+        );
+    }
+
+    @Test
+    void verifyMethodTypeAttribution() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import "fmt"
+
+                                func main() {
+                                \tfmt.Println("Hello")
+                                }
+                                """,
+                        spec -> spec.afterRecipe(cu -> {
+                            var methods = org.openrewrite.java.search.FindMethods.find(cu, "fmt Println(..)");
+                            org.assertj.core.api.Assertions.assertThat(methods)
+                                    .as("FindMethods should find fmt.Println invocation via type attribution")
+                                    .isNotEmpty();
+                        })
+                )
+        );
+    }
+
+    @Test
     void helloWorld() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -81,7 +136,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void multipleImports() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -101,7 +156,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void structDeclaration() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -117,7 +172,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void ifElseStatement() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -136,7 +191,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void forLoop() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -155,7 +210,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void rangeLoop() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -174,7 +229,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void switchStatement() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -196,7 +251,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void interfaceDeclaration() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -211,7 +266,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void mapType() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -230,7 +285,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void goroutineAndDefer() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -250,7 +305,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void channelSendReceive() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -265,7 +320,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void sliceExpression() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -280,7 +335,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void multipleAssignment() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -295,7 +350,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void typeDeclaration() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 
@@ -310,7 +365,7 @@ class GolangParserIntegTest implements RewriteTest {
     @Test
     void compositeAndKeyValue() {
         rewriteRun(
-                goSource(
+                go(
                         """
                                 package main
 

@@ -16,7 +16,9 @@
 
 package rpc
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // ReceiveQueue deserializes RpcObjectData messages from the RPC channel.
 type ReceiveQueue struct {
@@ -31,6 +33,12 @@ func NewReceiveQueue(refs map[int]any, pull func() []RpcObjectData) *ReceiveQueu
 		refs: refs,
 		pull: pull,
 	}
+}
+
+// PeekBatch returns the current batch without consuming. Useful for checking
+// if END_OF_OBJECT is waiting without triggering a new fetch.
+func (q *ReceiveQueue) PeekBatch() []RpcObjectData {
+	return q.batch
 }
 
 // Take returns the next message from the queue, pulling a new batch if needed.
@@ -88,6 +96,10 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 			q.refs[*ref] = after
 		}
 		return after
+	case EndOfObject:
+		// Sentinel from multi-batch GetObject; push back and return before unchanged
+		q.batch = append([]RpcObjectData{msg}, q.batch...)
+		return before
 	default:
 		panic(fmt.Sprintf("unsupported state: %v", msg.State))
 	}
@@ -134,6 +146,10 @@ func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
 			after[i] = q.Receive(beforeItem, onChange)
 		}
 		return after
+	case EndOfObject:
+		// Sentinel from multi-batch GetObject; push back and return before unchanged
+		q.batch = append([]RpcObjectData{msg}, q.batch...)
+		return before
 	default:
 		panic(fmt.Sprintf("unsupported state for list: %v", msg.State))
 	}

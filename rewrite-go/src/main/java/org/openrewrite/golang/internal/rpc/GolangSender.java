@@ -20,7 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.golang.GolangVisitor;
-import org.openrewrite.golang.tree.G;
+import org.openrewrite.golang.tree.Go;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.getValueNonNull;
@@ -30,7 +30,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
 
     @Override
     public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p) {
-        if (tree instanceof G) {
+        if (tree instanceof Go) {
             return super.visit(tree, p);
         }
         return delegate.visit(tree, p);
@@ -45,125 +45,125 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitGoCompilationUnit(G.CompilationUnit cu, RpcSendQueue q) {
+    public J visitGoCompilationUnit(Go.CompilationUnit cu, RpcSendQueue q) {
         q.getAndSend(cu, c -> c.getSourcePath().toString());
         q.getAndSend(cu, c -> c.getCharset().name());
-        q.getAndSend(cu, G.CompilationUnit::isCharsetBomMarked);
-        q.getAndSend(cu, G.CompilationUnit::getChecksum);
-        q.getAndSend(cu, G.CompilationUnit::getFileAttributes);
+        q.getAndSend(cu, Go.CompilationUnit::isCharsetBomMarked);
+        q.getAndSend(cu, Go.CompilationUnit::getChecksum);
+        q.getAndSend(cu, Go.CompilationUnit::getFileAttributes);
         q.getAndSend(cu, c -> c.getPadding().getPackageDecl(), el -> visitRightPadded(el, q));
-        q.getAndSendList(cu, c -> c.getPadding().getImports(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
+        q.getAndSend(cu, Go.CompilationUnit::getImportsContainer, c -> visitContainer(c, q));
         q.getAndSendList(cu, c -> c.getPadding().getStatements(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
-        q.getAndSend(cu, G.CompilationUnit::getEof, space -> visitSpace(space, q));
+        q.getAndSend(cu, Go.CompilationUnit::getEof, space -> visitSpace(space, q));
         return cu;
     }
 
     @Override
-    public J visitGoStatement(G.GoStatement goStmt, RpcSendQueue q) {
-        q.getAndSend(goStmt, G.GoStatement::getExpression, el -> visit(el, q));
+    public J visitGoStatement(Go.GoStatement goStmt, RpcSendQueue q) {
+        q.getAndSend(goStmt, Go.GoStatement::getExpression, el -> visit(el, q));
         return goStmt;
     }
 
     @Override
-    public J visitDefer(G.Defer defer, RpcSendQueue q) {
-        q.getAndSend(defer, G.Defer::getExpression, el -> visit(el, q));
+    public J visitDefer(Go.Defer defer, RpcSendQueue q) {
+        q.getAndSend(defer, Go.Defer::getExpression, el -> visit(el, q));
         return defer;
     }
 
     @Override
-    public J visitSend(G.Send send, RpcSendQueue q) {
-        q.getAndSend(send, G.Send::getChannelExpr, el -> visit(el, q));
+    public J visitSend(Go.Send send, RpcSendQueue q) {
+        q.getAndSend(send, Go.Send::getChannelExpr, el -> visit(el, q));
         q.getAndSend(send, s -> s.getPadding().getArrow(), el -> visitLeftPadded(el, q));
         return send;
     }
 
     @Override
-    public J visitGoto(G.Goto gotoStmt, RpcSendQueue q) {
-        q.getAndSend(gotoStmt, G.Goto::getLabelIdent, el -> visit(el, q));
+    public J visitGoto(Go.Goto gotoStmt, RpcSendQueue q) {
+        q.getAndSend(gotoStmt, Go.Goto::getLabelIdent, el -> visit(el, q));
         return gotoStmt;
     }
 
     @Override
-    public J visitFallthrough(G.Fallthrough fallthrough, RpcSendQueue q) {
+    public J visitFallthrough(Go.Fallthrough fallthrough, RpcSendQueue q) {
         return fallthrough;
     }
 
     @Override
-    public J visitComposite(G.Composite composite, RpcSendQueue q) {
-        q.getAndSend(composite, G.Composite::getTypeExpr, el -> visit(el, q));
+    public J visitComposite(Go.Composite composite, RpcSendQueue q) {
+        q.getAndSend(composite, Go.Composite::getTypeExpr, el -> visit(el, q));
         q.getAndSend(composite, c -> c.getPadding().getElements(), el -> visitContainer(el, q));
         return composite;
     }
 
     @Override
-    public J visitKeyValue(G.KeyValue keyValue, RpcSendQueue q) {
-        q.getAndSend(keyValue, G.KeyValue::getKeyExpr, el -> visit(el, q));
+    public J visitKeyValue(Go.KeyValue keyValue, RpcSendQueue q) {
+        q.getAndSend(keyValue, Go.KeyValue::getKeyExpr, el -> visit(el, q));
         q.getAndSend(keyValue, kv -> kv.getPadding().getValue(), el -> visitLeftPadded(el, q));
         return keyValue;
     }
 
     @Override
-    public J visitSliceExpr(G.SliceExpr slice, RpcSendQueue q) {
-        q.getAndSend(slice, G.SliceExpr::getIndexed, el -> visit(el, q));
-        q.getAndSend(slice, G.SliceExpr::getOpenBracket, space -> visitSpace(space, q));
+    public J visitSliceExpr(Go.SliceExpr slice, RpcSendQueue q) {
+        q.getAndSend(slice, Go.SliceExpr::getIndexed, el -> visit(el, q));
+        q.getAndSend(slice, Go.SliceExpr::getOpenBracket, space -> visitSpace(space, q));
         q.getAndSend(slice, s -> s.getPadding().getLow(), el -> visitRightPadded(el, q));
         q.getAndSend(slice, s -> s.getPadding().getHigh(), el -> visitRightPadded(el, q));
-        q.getAndSend(slice, G.SliceExpr::getMax, el -> visit(el, q));
-        q.getAndSend(slice, G.SliceExpr::getCloseBracket, space -> visitSpace(space, q));
+        q.getAndSend(slice, Go.SliceExpr::getMax, el -> visit(el, q));
+        q.getAndSend(slice, Go.SliceExpr::getCloseBracket, space -> visitSpace(space, q));
         return slice;
     }
 
     @Override
-    public J visitMapType(G.MapType mapType, RpcSendQueue q) {
-        q.getAndSend(mapType, G.MapType::getOpenBracket, space -> visitSpace(space, q));
+    public J visitMapType(Go.MapType mapType, RpcSendQueue q) {
+        q.getAndSend(mapType, Go.MapType::getOpenBracket, space -> visitSpace(space, q));
         q.getAndSend(mapType, m -> m.getPadding().getKey(), el -> visitRightPadded(el, q));
-        q.getAndSend(mapType, G.MapType::getValue, el -> visit(el, q));
+        q.getAndSend(mapType, Go.MapType::getValue, el -> visit(el, q));
         return mapType;
     }
 
     @Override
-    public J visitChannel(G.Channel channel, RpcSendQueue q) {
+    public J visitChannel(Go.Channel channel, RpcSendQueue q) {
         q.getAndSend(channel, c -> c.getDir().name());
-        q.getAndSend(channel, G.Channel::getValue, el -> visit(el, q));
+        q.getAndSend(channel, Go.Channel::getValue, el -> visit(el, q));
         return channel;
     }
 
     @Override
-    public J visitFuncType(G.FuncType funcType, RpcSendQueue q) {
+    public J visitFuncType(Go.FuncType funcType, RpcSendQueue q) {
         q.getAndSend(funcType, f -> f.getPadding().getParameters(), el -> visitContainer(el, q));
-        q.getAndSend(funcType, G.FuncType::getReturnType, el -> visit(el, q));
+        q.getAndSend(funcType, Go.FuncType::getReturnType, el -> visit(el, q));
         return funcType;
     }
 
     @Override
-    public J visitStructType(G.StructType structType, RpcSendQueue q) {
-        q.getAndSend(structType, G.StructType::getBody, el -> visit(el, q));
+    public J visitStructType(Go.StructType structType, RpcSendQueue q) {
+        q.getAndSend(structType, Go.StructType::getBody, el -> visit(el, q));
         return structType;
     }
 
     @Override
-    public J visitInterfaceType(G.InterfaceType interfaceType, RpcSendQueue q) {
-        q.getAndSend(interfaceType, G.InterfaceType::getBody, el -> visit(el, q));
+    public J visitInterfaceType(Go.InterfaceType interfaceType, RpcSendQueue q) {
+        q.getAndSend(interfaceType, Go.InterfaceType::getBody, el -> visit(el, q));
         return interfaceType;
     }
 
     @Override
-    public J visitTypeList(G.TypeList typeList, RpcSendQueue q) {
+    public J visitTypeList(Go.TypeList typeList, RpcSendQueue q) {
         q.getAndSend(typeList, t -> t.getPadding().getTypes(), el -> visitContainer(el, q));
         return typeList;
     }
 
     @Override
-    public J visitTypeDecl(G.TypeDecl typeDecl, RpcSendQueue q) {
-        q.getAndSend(typeDecl, G.TypeDecl::getName, el -> visit(el, q));
+    public J visitTypeDecl(Go.TypeDecl typeDecl, RpcSendQueue q) {
+        q.getAndSend(typeDecl, Go.TypeDecl::getName, el -> visit(el, q));
         q.getAndSend(typeDecl, t -> t.getPadding().getAssign(), el -> visitLeftPadded(el, q));
-        q.getAndSend(typeDecl, G.TypeDecl::getDefinition, el -> visit(el, q));
+        q.getAndSend(typeDecl, Go.TypeDecl::getDefinition, el -> visit(el, q));
         q.getAndSend(typeDecl, t -> t.getPadding().getSpecs(), el -> visitContainer(el, q));
         return typeDecl;
     }
 
     @Override
-    public J visitMultiAssignment(G.MultiAssignment multiAssignment, RpcSendQueue q) {
+    public J visitMultiAssignment(Go.MultiAssignment multiAssignment, RpcSendQueue q) {
         q.getAndSendList(multiAssignment, m -> m.getPadding().getVariables(), v -> v.getElement().getId(), v -> visitRightPadded(v, q));
         q.getAndSend(multiAssignment, m -> m.getPadding().getOperator(), el -> visitLeftPadded(el, q));
         q.getAndSendList(multiAssignment, m -> m.getPadding().getValues(), v -> v.getElement().getId(), v -> visitRightPadded(v, q));
@@ -171,16 +171,16 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
-    public J visitCommClause(G.CommClause commClause, RpcSendQueue q) {
-        q.getAndSend(commClause, G.CommClause::getComm, el -> visit(el, q));
-        q.getAndSend(commClause, G.CommClause::getColon, space -> visitSpace(space, q));
+    public J visitCommClause(Go.CommClause commClause, RpcSendQueue q) {
+        q.getAndSend(commClause, Go.CommClause::getComm, el -> visit(el, q));
+        q.getAndSend(commClause, Go.CommClause::getColon, space -> visitSpace(space, q));
         q.getAndSendList(commClause, c -> c.getPadding().getBody(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         return commClause;
     }
 
     @Override
-    public J visitIndexList(G.IndexList indexList, RpcSendQueue q) {
-        q.getAndSend(indexList, G.IndexList::getTarget, el -> visit(el, q));
+    public J visitIndexList(Go.IndexList indexList, RpcSendQueue q) {
+        q.getAndSend(indexList, Go.IndexList::getTarget, el -> visit(el, q));
         q.getAndSend(indexList, i -> i.getPadding().getIndices(), el -> visitContainer(el, q));
         return indexList;
     }
@@ -216,7 +216,7 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
 
         @Override
         public @Nullable J visit(@Nullable Tree tree, RpcSendQueue p) {
-            if (tree instanceof G) {
+            if (tree instanceof Go) {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);

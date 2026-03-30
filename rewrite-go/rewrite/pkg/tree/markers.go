@@ -29,6 +29,25 @@ type Markers struct {
 	Entries []Marker
 }
 
+// GenericMarker is a marker type for Java-side markers that the Go side
+// doesn't have a native type for (e.g., RecipesThatMadeChanges, SearchResult).
+// It preserves the marker data as opaque fields during RPC round-trips.
+type GenericMarker struct {
+	Ident uuid.UUID
+	Data  map[string]any
+}
+
+func (m GenericMarker) ID() uuid.UUID { return m.Ident }
+
+// SearchResultMarker represents a SearchResult marker from Java.
+// It implements RpcCodec on the Java side, sending 2 sub-fields (id, description).
+type SearchResultMarker struct {
+	Ident       uuid.UUID
+	Description string
+}
+
+func (m SearchResultMarker) ID() uuid.UUID { return m.Ident }
+
 // FindMarker returns a pointer to the first marker of type T, or nil if not found.
 func FindMarker[T any](markers Markers) *T {
 	for _, m := range markers.Entries {

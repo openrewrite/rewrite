@@ -59,3 +59,40 @@ testing {
         }
     }
 }
+
+// ============================================
+// Go Test Support Tasks
+// ============================================
+
+// Configuration to collect classpath for the Java RPC server
+val javaRpcClasspath by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    extendsFrom(configurations.getByName("runtimeClasspath"))
+}
+
+dependencies {
+    javaRpcClasspath(project(":rewrite-maven"))
+}
+
+// Task to generate classpath file for Java RPC server testing from Go
+val generateTestClasspath by tasks.registering {
+    group = "golang"
+    description = "Generate classpath file for Java RPC server (used by Go tests)"
+
+    val outputFile = file("rewrite/test-classpath.txt")
+    outputs.file(outputFile)
+
+    dependsOn(tasks.named("compileJava"))
+
+    doLast {
+        val classpath = (
+            javaRpcClasspath.files +
+            tasks.named("compileJava").get().outputs.files +
+            tasks.named("processResources").get().outputs.files
+        ).distinctBy { it.absolutePath }
+         .joinToString(File.pathSeparator) { it.absolutePath }
+        outputFile.writeText(classpath)
+        logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
+    }
+}

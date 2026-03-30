@@ -15,38 +15,35 @@
  */
 package org.openrewrite.golang.marketplace;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Recipe;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.golang.rpc.GoRewriteRpc;
-import org.openrewrite.golang.rpc.InstallRecipesResponse;
 import org.openrewrite.marketplace.RecipeBundle;
 import org.openrewrite.marketplace.RecipeBundleReader;
-import org.openrewrite.marketplace.RecipeBundleResolver;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Map;
 
 @RequiredArgsConstructor
-public class GitRecipeBundleResolver implements RecipeBundleResolver {
+public class GolangRecipeBundleReader implements RecipeBundleReader {
+    private final @Getter RecipeBundle bundle;
     private final GoRewriteRpc rpc;
 
     @Override
-    public String getEcosystem() {
-        return "git";
+    public RecipeMarketplace read() {
+        return rpc.getMarketplace(bundle);
     }
 
     @Override
-    public RecipeBundleReader resolve(RecipeBundle bundle) {
-        Path pkgPath = Paths.get(bundle.getPackageName());
-        InstallRecipesResponse response;
-        if (Files.exists(pkgPath)) {
-            response = rpc.installRecipes(pkgPath.toFile());
-        } else {
-            response = rpc.installRecipes(bundle.getPackageName(), bundle.getVersion());
-        }
-        if (response.getVersion() != null) {
-            bundle.setVersion(response.getVersion());
-        }
-        return new GitRecipeBundleReader(bundle, rpc);
+    public RecipeDescriptor describe(RecipeListing listing) {
+        return rpc.prepareRecipe(listing.getName()).getDescriptor();
+    }
+
+    @Override
+    public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+        return rpc.prepareRecipe(listing.getName(), options);
     }
 }

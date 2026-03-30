@@ -207,6 +207,7 @@ type VisitorI interface {
 	VisitMultiAssignment(ma *tree.MultiAssignment, p any) tree.J
 	VisitCommClause(cc *tree.CommClause, p any) tree.J
 	VisitSpace(space tree.Space, p any) tree.Space
+	VisitType(javaType tree.JavaType, p any) tree.JavaType
 }
 
 // Ensure GoVisitor satisfies VisitorI.
@@ -537,6 +538,10 @@ func (v *GoVisitor) VisitCommClause(cc *tree.CommClause, p any) tree.J {
 
 func (v *GoVisitor) VisitSpace(space tree.Space, p any) tree.Space {
 	return space
+}
+
+func (v *GoVisitor) VisitType(javaType tree.JavaType, p any) tree.JavaType {
+	return javaType
 }
 
 func (v *GoVisitor) visitMarkers(markers tree.Markers, p any) tree.Markers {

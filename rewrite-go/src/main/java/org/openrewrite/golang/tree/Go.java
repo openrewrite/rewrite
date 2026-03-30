@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 
 @SuppressWarnings("unused")
-public interface G extends J {
+public interface Go extends J {
 
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
@@ -70,7 +70,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CompilationUnit implements G, JavaSourceFile, SourceFile {
+    final class CompilationUnit implements Go, JavaSourceFile, SourceFile {
         @Nullable
         @NonFinal
         transient SoftReference<TypesInUse> typesInUse;
@@ -132,7 +132,7 @@ public interface G extends J {
             return packageDecl == null ? null : packageDecl.getElement();
         }
 
-        public G.CompilationUnit withPackageDecl(J.@Nullable Identifier packageDecl) {
+        public Go.CompilationUnit withPackageDecl(J.@Nullable Identifier packageDecl) {
             return getPadding().withPackageDecl(
                     packageDecl == null ? null :
                             this.packageDecl == null ?
@@ -140,16 +140,37 @@ public interface G extends J {
                                     this.packageDecl.withElement(packageDecl));
         }
 
-        List<JRightPadded<J.Import>> imports;
+        @Nullable
+        JContainer<J.Import> imports;
 
-        @Override
-        public List<J.Import> getImports() {
-            return JRightPadded.getElements(imports);
+        public @Nullable JContainer<J.Import> getImportsContainer() {
+            return imports;
+        }
+
+        public Go.CompilationUnit withImportsContainer(@Nullable JContainer<J.Import> imports) {
+            return this.imports == imports ? this : new Go.CompilationUnit(
+                    typesInUse, padding, id, prefix, markers, sourcePath,
+                    fileAttributes, charsetName, charsetBomMarked, checksum,
+                    packageDecl, imports, statements, eof);
         }
 
         @Override
-        public G.CompilationUnit withImports(List<J.Import> imports) {
-            return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
+        public List<J.Import> getImports() {
+            return imports == null ? java.util.Collections.emptyList() : imports.getElements();
+        }
+
+        @Override
+        public Go.CompilationUnit withImports(List<J.Import> imports) {
+            if (imports.isEmpty() && this.imports == null) {
+                return this;
+            }
+            if (this.imports == null) {
+                return withImportsContainer(JContainer.build(Space.EMPTY,
+                        JRightPadded.withElements(java.util.Collections.emptyList(), imports), Markers.EMPTY));
+            }
+            return withImportsContainer(JContainer.build(this.imports.getBefore(),
+                    JRightPadded.withElements(this.imports.getPadding().getElements(), imports),
+                    this.imports.getMarkers()));
         }
 
         List<JRightPadded<Statement>> statements;
@@ -158,7 +179,7 @@ public interface G extends J {
             return JRightPadded.getElements(statements);
         }
 
-        public G.CompilationUnit withStatements(List<Statement> statements) {
+        public Go.CompilationUnit withStatements(List<Statement> statements) {
             return getPadding().withStatements(JRightPadded.withElements(this.statements, statements));
         }
 
@@ -189,6 +210,21 @@ public interface G extends J {
         public JavaSourceFile withClasses(List<J.ClassDeclaration> classes) {
             // Go doesn't have class declarations in the Java sense
             return this;
+        }
+
+        @Override
+        public <S, T extends S> T service(Class<S> service) {
+            if (org.openrewrite.java.service.AutoFormatService.class.getName().equals(service.getName())) {
+                @SuppressWarnings("unchecked")
+                T t = (T) new org.openrewrite.golang.service.GolangAutoFormatService();
+                return t;
+            }
+            if (org.openrewrite.java.service.ImportService.class.getName().equals(service.getName())) {
+                @SuppressWarnings("unchecked")
+                T t = (T) new org.openrewrite.golang.service.GolangImportService();
+                return t;
+            }
+            return JavaSourceFile.super.service(service);
         }
 
         @Override
@@ -243,14 +279,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding implements JavaSourceFile.Padding {
-            private final G.CompilationUnit t;
+            private final Go.CompilationUnit t;
 
             public @Nullable JRightPadded<J.Identifier> getPackageDecl() {
                 return t.packageDecl;
             }
 
-            public G.CompilationUnit withPackageDecl(@Nullable JRightPadded<J.Identifier> packageDecl) {
-                return t.packageDecl == packageDecl ? t : new G.CompilationUnit(
+            public Go.CompilationUnit withPackageDecl(@Nullable JRightPadded<J.Identifier> packageDecl) {
+                return t.packageDecl == packageDecl ? t : new Go.CompilationUnit(
                         t.typesInUse, t.padding, t.id, t.prefix, t.markers, t.sourcePath,
                         t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum,
                         packageDecl, t.imports, t.statements, t.eof);
@@ -258,23 +294,31 @@ public interface G extends J {
 
             @Override
             public List<JRightPadded<J.Import>> getImports() {
-                return t.imports;
+                return t.imports == null ? null : t.imports.getPadding().getElements();
             }
 
             @Override
-            public G.CompilationUnit withImports(List<JRightPadded<J.Import>> imports) {
-                return t.imports == imports ? t : new G.CompilationUnit(
+            public Go.CompilationUnit withImports(List<JRightPadded<J.Import>> imports) {
+                JContainer<J.Import> container = t.imports;
+                if (imports == null || imports.isEmpty()) {
+                    container = null;
+                } else if (container == null) {
+                    container = JContainer.build(Space.EMPTY, imports, Markers.EMPTY);
+                } else {
+                    container = container.getPadding().withElements(imports);
+                }
+                return container == t.imports ? t : new Go.CompilationUnit(
                         t.typesInUse, t.padding, t.id, t.prefix, t.markers, t.sourcePath,
                         t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum,
-                        t.packageDecl, imports, t.statements, t.eof);
+                        t.packageDecl, container, t.statements, t.eof);
             }
 
             public List<JRightPadded<Statement>> getStatements() {
                 return t.statements;
             }
 
-            public G.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
-                return t.statements == statements ? t : new G.CompilationUnit(
+            public Go.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
+                return t.statements == statements ? t : new Go.CompilationUnit(
                         t.typesInUse, t.padding, t.id, t.prefix, t.markers, t.sourcePath,
                         t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum,
                         t.packageDecl, t.imports, statements, t.eof);
@@ -290,7 +334,7 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class GoStatement implements G, Statement {
+    final class GoStatement implements Go, Statement {
         @EqualsAndHashCode.Include
         @With
         @Getter
@@ -327,7 +371,7 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class Defer implements G, Statement {
+    final class Defer implements Go, Statement {
         @EqualsAndHashCode.Include
         @With
         @Getter
@@ -365,7 +409,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Send implements G, Statement {
+    final class Send implements Go, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -393,7 +437,7 @@ public interface G extends J {
             return arrow.getElement();
         }
 
-        public G.Send withArrow(Expression arrow) {
+        public Go.Send withArrow(Expression arrow) {
             return getPadding().withArrow(this.arrow.withElement(arrow));
         }
 
@@ -424,14 +468,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.Send t;
+            private final Go.Send t;
 
             public JLeftPadded<Expression> getArrow() {
                 return t.arrow;
             }
 
-            public G.Send withArrow(JLeftPadded<Expression> arrow) {
-                return t.arrow == arrow ? t : new G.Send(t.padding, t.id, t.prefix, t.markers, t.channelExpr, arrow);
+            public Go.Send withArrow(JLeftPadded<Expression> arrow) {
+                return t.arrow == arrow ? t : new Go.Send(t.padding, t.id, t.prefix, t.markers, t.channelExpr, arrow);
             }
         }
     }
@@ -444,7 +488,7 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class Goto implements G, Statement {
+    final class Goto implements Go, Statement {
         @EqualsAndHashCode.Include
         @With
         @Getter
@@ -481,7 +525,7 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class Fallthrough implements G, Statement {
+    final class Fallthrough implements Go, Statement {
         @EqualsAndHashCode.Include
         @With
         @Getter
@@ -515,7 +559,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class Composite implements G, Expression {
+    final class Composite implements Go, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -544,7 +588,7 @@ public interface G extends J {
             return elements.getElements();
         }
 
-        public G.Composite withElements(List<Expression> elements) {
+        public Go.Composite withElements(List<Expression> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
 
@@ -586,14 +630,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.Composite t;
+            private final Go.Composite t;
 
             public JContainer<Expression> getElements() {
                 return t.elements;
             }
 
-            public G.Composite withElements(JContainer<Expression> elements) {
-                return t.elements == elements ? t : new G.Composite(t.padding, t.id, t.prefix, t.markers, t.typeExpr, elements);
+            public Go.Composite withElements(JContainer<Expression> elements) {
+                return t.elements == elements ? t : new Go.Composite(t.padding, t.id, t.prefix, t.markers, t.typeExpr, elements);
             }
         }
     }
@@ -607,7 +651,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class KeyValue implements G, Expression {
+    final class KeyValue implements Go, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -635,7 +679,7 @@ public interface G extends J {
             return value.getElement();
         }
 
-        public G.KeyValue withValue(Expression value) {
+        public Go.KeyValue withValue(Expression value) {
             return getPadding().withValue(this.value.withElement(value));
         }
 
@@ -677,14 +721,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.KeyValue t;
+            private final Go.KeyValue t;
 
             public JLeftPadded<Expression> getValue() {
                 return t.value;
             }
 
-            public G.KeyValue withValue(JLeftPadded<Expression> value) {
-                return t.value == value ? t : new G.KeyValue(t.padding, t.id, t.prefix, t.markers, t.keyExpr, value);
+            public Go.KeyValue withValue(JLeftPadded<Expression> value) {
+                return t.value == value ? t : new Go.KeyValue(t.padding, t.id, t.prefix, t.markers, t.keyExpr, value);
             }
         }
     }
@@ -698,7 +742,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class SliceExpr implements G, Expression {
+    final class SliceExpr implements Go, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -730,7 +774,7 @@ public interface G extends J {
             return low.getElement();
         }
 
-        public G.SliceExpr withLow(Expression low) {
+        public Go.SliceExpr withLow(Expression low) {
             return getPadding().withLow(this.low.withElement(low));
         }
 
@@ -740,7 +784,7 @@ public interface G extends J {
             return high.getElement();
         }
 
-        public G.SliceExpr withHigh(Expression high) {
+        public Go.SliceExpr withHigh(Expression high) {
             return getPadding().withHigh(this.high.withElement(high));
         }
 
@@ -791,22 +835,22 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.SliceExpr t;
+            private final Go.SliceExpr t;
 
             public JRightPadded<Expression> getLow() {
                 return t.low;
             }
 
-            public G.SliceExpr withLow(JRightPadded<Expression> low) {
-                return t.low == low ? t : new G.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, low, t.high, t.max, t.closeBracket);
+            public Go.SliceExpr withLow(JRightPadded<Expression> low) {
+                return t.low == low ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, low, t.high, t.max, t.closeBracket);
             }
 
             public JRightPadded<Expression> getHigh() {
                 return t.high;
             }
 
-            public G.SliceExpr withHigh(JRightPadded<Expression> high) {
-                return t.high == high ? t : new G.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, t.low, high, t.max, t.closeBracket);
+            public Go.SliceExpr withHigh(JRightPadded<Expression> high) {
+                return t.high == high ? t : new Go.SliceExpr(t.padding, t.id, t.prefix, t.markers, t.indexed, t.openBracket, t.low, high, t.max, t.closeBracket);
             }
         }
     }
@@ -820,7 +864,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MapType implements G, Expression, TypeTree {
+    final class MapType implements Go, Expression, TypeTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -848,7 +892,7 @@ public interface G extends J {
             return key.getElement();
         }
 
-        public G.MapType withKey(Expression key) {
+        public Go.MapType withKey(Expression key) {
             return getPadding().withKey(this.key.withElement(key));
         }
 
@@ -894,14 +938,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.MapType t;
+            private final Go.MapType t;
 
             public JRightPadded<Expression> getKey() {
                 return t.key;
             }
 
-            public G.MapType withKey(JRightPadded<Expression> key) {
-                return t.key == key ? t : new G.MapType(t.padding, t.id, t.prefix, t.markers, t.openBracket, key, t.value);
+            public Go.MapType withKey(JRightPadded<Expression> key) {
+                return t.key == key ? t : new Go.MapType(t.padding, t.id, t.prefix, t.markers, t.openBracket, key, t.value);
             }
         }
     }
@@ -920,7 +964,7 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class Channel implements G, Expression, TypeTree {
+    final class Channel implements Go, Expression, TypeTree {
         @EqualsAndHashCode.Include
         @With
         @Getter
@@ -973,7 +1017,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class FuncType implements G, Expression, TypeTree {
+    final class FuncType implements Go, Expression, TypeTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -997,7 +1041,7 @@ public interface G extends J {
             return parameters.getElements();
         }
 
-        public G.FuncType withParameters(List<Statement> parameters) {
+        public Go.FuncType withParameters(List<Statement> parameters) {
             return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
         }
 
@@ -1044,14 +1088,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.FuncType t;
+            private final Go.FuncType t;
 
             public JContainer<Statement> getParameters() {
                 return t.parameters;
             }
 
-            public G.FuncType withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new G.FuncType(t.padding, t.id, t.prefix, t.markers, parameters, t.returnType);
+            public Go.FuncType withParameters(JContainer<Statement> parameters) {
+                return t.parameters == parameters ? t : new Go.FuncType(t.padding, t.id, t.prefix, t.markers, parameters, t.returnType);
             }
         }
     }
@@ -1064,7 +1108,7 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class StructType implements G, Expression, TypeTree {
+    final class StructType implements Go, Expression, TypeTree {
         @EqualsAndHashCode.Include
         @With
         @Getter
@@ -1112,7 +1156,7 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class InterfaceType implements G, Expression, TypeTree {
+    final class InterfaceType implements Go, Expression, TypeTree {
         @EqualsAndHashCode.Include
         @With
         @Getter
@@ -1161,7 +1205,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TypeList implements G, Expression, TypeTree {
+    final class TypeList implements Go, Expression, TypeTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1185,7 +1229,7 @@ public interface G extends J {
             return types.getElements();
         }
 
-        public G.TypeList withTypes(List<Statement> types) {
+        public Go.TypeList withTypes(List<Statement> types) {
             return getPadding().withTypes(JContainer.withElements(this.types, types));
         }
 
@@ -1227,14 +1271,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.TypeList t;
+            private final Go.TypeList t;
 
             public JContainer<Statement> getTypes() {
                 return t.types;
             }
 
-            public G.TypeList withTypes(JContainer<Statement> types) {
-                return t.types == types ? t : new G.TypeList(t.padding, t.id, t.prefix, t.markers, types);
+            public Go.TypeList withTypes(JContainer<Statement> types) {
+                return t.types == types ? t : new Go.TypeList(t.padding, t.id, t.prefix, t.markers, types);
             }
         }
     }
@@ -1248,7 +1292,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TypeDecl implements G, Statement {
+    final class TypeDecl implements Go, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1316,22 +1360,22 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.TypeDecl t;
+            private final Go.TypeDecl t;
 
             public @Nullable JLeftPadded<Space> getAssign() {
                 return t.assign;
             }
 
-            public G.TypeDecl withAssign(@Nullable JLeftPadded<Space> assign) {
-                return t.assign == assign ? t : new G.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, assign, t.definition, t.specs);
+            public Go.TypeDecl withAssign(@Nullable JLeftPadded<Space> assign) {
+                return t.assign == assign ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, assign, t.definition, t.specs);
             }
 
             public @Nullable JContainer<Statement> getSpecs() {
                 return t.specs;
             }
 
-            public G.TypeDecl withSpecs(@Nullable JContainer<Statement> specs) {
-                return t.specs == specs ? t : new G.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, t.assign, t.definition, specs);
+            public Go.TypeDecl withSpecs(@Nullable JContainer<Statement> specs) {
+                return t.specs == specs ? t : new Go.TypeDecl(t.padding, t.id, t.prefix, t.markers, t.name, t.assign, t.definition, specs);
             }
         }
     }
@@ -1345,7 +1389,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MultiAssignment implements G, Statement {
+    final class MultiAssignment implements Go, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1369,7 +1413,7 @@ public interface G extends J {
             return JRightPadded.getElements(variables);
         }
 
-        public G.MultiAssignment withVariables(List<Expression> variables) {
+        public Go.MultiAssignment withVariables(List<Expression> variables) {
             return getPadding().withVariables(JRightPadded.withElements(this.variables, variables));
         }
 
@@ -1385,7 +1429,7 @@ public interface G extends J {
             return JRightPadded.getElements(values);
         }
 
-        public G.MultiAssignment withValues(List<Expression> values) {
+        public Go.MultiAssignment withValues(List<Expression> values) {
             return getPadding().withValues(JRightPadded.withElements(this.values, values));
         }
 
@@ -1416,30 +1460,30 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.MultiAssignment t;
+            private final Go.MultiAssignment t;
 
             public List<JRightPadded<Expression>> getVariables() {
                 return t.variables;
             }
 
-            public G.MultiAssignment withVariables(List<JRightPadded<Expression>> variables) {
-                return t.variables == variables ? t : new G.MultiAssignment(t.padding, t.id, t.prefix, t.markers, variables, t.operator, t.values);
+            public Go.MultiAssignment withVariables(List<JRightPadded<Expression>> variables) {
+                return t.variables == variables ? t : new Go.MultiAssignment(t.padding, t.id, t.prefix, t.markers, variables, t.operator, t.values);
             }
 
             public JLeftPadded<Space> getOperator() {
                 return t.operator;
             }
 
-            public G.MultiAssignment withOperator(JLeftPadded<Space> operator) {
-                return t.operator == operator ? t : new G.MultiAssignment(t.padding, t.id, t.prefix, t.markers, t.variables, operator, t.values);
+            public Go.MultiAssignment withOperator(JLeftPadded<Space> operator) {
+                return t.operator == operator ? t : new Go.MultiAssignment(t.padding, t.id, t.prefix, t.markers, t.variables, operator, t.values);
             }
 
             public List<JRightPadded<Expression>> getValues() {
                 return t.values;
             }
 
-            public G.MultiAssignment withValues(List<JRightPadded<Expression>> values) {
-                return t.values == values ? t : new G.MultiAssignment(t.padding, t.id, t.prefix, t.markers, t.variables, t.operator, values);
+            public Go.MultiAssignment withValues(List<JRightPadded<Expression>> values) {
+                return t.values == values ? t : new Go.MultiAssignment(t.padding, t.id, t.prefix, t.markers, t.variables, t.operator, values);
             }
         }
     }
@@ -1453,7 +1497,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CommClause implements G, Statement {
+    final class CommClause implements Go, Statement {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1486,7 +1530,7 @@ public interface G extends J {
             return JRightPadded.getElements(body);
         }
 
-        public G.CommClause withBody(List<Statement> body) {
+        public Go.CommClause withBody(List<Statement> body) {
             return getPadding().withBody(JRightPadded.withElements(this.body, body));
         }
 
@@ -1517,14 +1561,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.CommClause t;
+            private final Go.CommClause t;
 
             public List<JRightPadded<Statement>> getBody() {
                 return t.body;
             }
 
-            public G.CommClause withBody(List<JRightPadded<Statement>> body) {
-                return t.body == body ? t : new G.CommClause(t.padding, t.id, t.prefix, t.markers, t.comm, t.colon, body);
+            public Go.CommClause withBody(List<JRightPadded<Statement>> body) {
+                return t.body == body ? t : new Go.CommClause(t.padding, t.id, t.prefix, t.markers, t.comm, t.colon, body);
             }
         }
     }
@@ -1538,7 +1582,7 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class IndexList implements G, Expression {
+    final class IndexList implements Go, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -1566,7 +1610,7 @@ public interface G extends J {
             return indices.getElements();
         }
 
-        public G.IndexList withIndices(List<Expression> indices) {
+        public Go.IndexList withIndices(List<Expression> indices) {
             return getPadding().withIndices(JContainer.withElements(this.indices, indices));
         }
 
@@ -1608,14 +1652,14 @@ public interface G extends J {
 
         @RequiredArgsConstructor
         public static class Padding {
-            private final G.IndexList t;
+            private final Go.IndexList t;
 
             public JContainer<Expression> getIndices() {
                 return t.indices;
             }
 
-            public G.IndexList withIndices(JContainer<Expression> indices) {
-                return t.indices == indices ? t : new G.IndexList(t.padding, t.id, t.prefix, t.markers, t.target, indices);
+            public Go.IndexList withIndices(JContainer<Expression> indices) {
+                return t.indices == indices ? t : new Go.IndexList(t.padding, t.id, t.prefix, t.markers, t.target, indices);
             }
         }
     }

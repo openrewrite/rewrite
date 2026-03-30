@@ -19,12 +19,28 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class StructTag implements Marker {
+public class StructTag implements Marker, RpcCodec<StructTag> {
     UUID id;
     J.Literal tag;
+
+    @Override
+    public void rpcSend(StructTag after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, StructTag::getTag);
+    }
+
+    @Override
+    public StructTag rpcReceive(StructTag before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withTag(q.receive(before.getTag()));
+    }
 }

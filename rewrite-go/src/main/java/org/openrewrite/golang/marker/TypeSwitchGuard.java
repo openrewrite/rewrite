@@ -18,11 +18,24 @@ package org.openrewrite.golang.marker;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
 @Value
 @With
-public class TypeSwitchGuard implements Marker {
+public class TypeSwitchGuard implements Marker, RpcCodec<TypeSwitchGuard> {
     UUID id;
+
+    @Override
+    public void rpcSend(TypeSwitchGuard after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+    }
+
+    @Override
+    public TypeSwitchGuard rpcReceive(TypeSwitchGuard before, RpcReceiveQueue q) {
+        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    }
 }

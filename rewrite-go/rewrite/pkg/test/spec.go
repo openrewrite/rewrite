@@ -159,10 +159,18 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
+// JavaRecipeConfig holds config for a Java-delegated recipe test.
+type JavaRecipeConfig struct {
+	RecipeName string
+	Options    map[string]any
+}
+
 // RecipeSpec configures a test run.
 type RecipeSpec struct {
 	CheckParsePrintIdempotence bool
 	Recipe                     recipe.Recipe
+	JavaRecipe                 *JavaRecipeConfig // when set, delegates to Java RPC
+	JavaRpcClient              *JavaRpcClient    // injected Java RPC client
 }
 
 // NewRecipeSpec creates a new RecipeSpec with default settings.
@@ -175,6 +183,22 @@ func NewRecipeSpec() *RecipeSpec {
 // WithRecipe sets the recipe to apply during the test run.
 func (spec *RecipeSpec) WithRecipe(r recipe.Recipe) *RecipeSpec {
 	spec.Recipe = r
+	return spec
+}
+
+// WithJavaRecipe configures the test to delegate to a Java-defined recipe via RPC.
+// Requires a JavaRpcClient to be set on the spec.
+func (spec *RecipeSpec) WithJavaRecipe(recipeName string, options map[string]any) *RecipeSpec {
+	spec.JavaRecipe = &JavaRecipeConfig{
+		RecipeName: recipeName,
+		Options:    options,
+	}
+	return spec
+}
+
+// WithJavaRpcClient sets the Java RPC client for recipe delegation.
+func (spec *RecipeSpec) WithJavaRpcClient(client *JavaRpcClient) *RecipeSpec {
+	spec.JavaRpcClient = client
 	return spec
 }
 
