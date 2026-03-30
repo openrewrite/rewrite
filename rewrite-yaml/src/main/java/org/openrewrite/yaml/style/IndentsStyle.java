@@ -21,7 +21,6 @@ import lombok.Data;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.internal.ToBeRemoved;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
@@ -38,7 +37,6 @@ public class IndentsStyle implements YamlStyle {
     }
 
     @Deprecated
-    @ToBeRemoved(after = "2026-06-01", reason = "All parent runtimes have had few weeks to update")
     public IndentsStyle(int indentSize) {
         this(indentSize, null);
     }
