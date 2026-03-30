@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-json/src/main/antlr/JsonPathParser.g4 by ANTLR 4.13.2
+// Generated from rewrite-json/src/main/antlr/JsonPathParser.g4 by ANTLR 4.13.2
 package org.openrewrite.json.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -111,6 +111,18 @@ public class JsonPathParserBaseListener implements JsonPathParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitFilterExpression(JsonPathParser.FilterExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterNegationExpression(JsonPathParser.NegationExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitNegationExpression(JsonPathParser.NegationExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

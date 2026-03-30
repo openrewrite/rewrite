@@ -21,6 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PythonDependencyParser;
 import org.openrewrite.python.internal.UvLockParser;
+import org.openrewrite.python.internal.UvLockRegeneration;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -78,10 +79,35 @@ public class PyProjectTomlParser implements Parser {
         }
 
         List<ResolvedDependency> resolvedDeps = UvLockParser.findAndParse(pyprojectDir, relativeTo);
+        if (!resolvedDeps.isEmpty()) {
+            return applyResolution(marker, resolvedDeps);
+        }
+
+        // No uv.lock found — check if another package manager owns this project
+        if (UvLockParser.hasAlternativeLockFile(pyprojectDir, relativeTo)) {
+            return marker;
+        }
+        PackageManager pm = marker.getPackageManager();
+        if (pm == PackageManager.Poetry || pm == PackageManager.Pdm) {
+            return marker;
+        }
+
+        // Fall back to running uv lock
+        UvLockRegeneration.Result result = UvLockRegeneration.regenerate(doc.printAll());
+        if (!result.isSuccess() || result.getLockFileContent() == null) {
+            return marker;
+        }
+
+        resolvedDeps = UvLockParser.parse(result.getLockFileContent());
         if (resolvedDeps.isEmpty()) {
             return marker;
         }
 
+        return applyResolution(marker, resolvedDeps);
+    }
+
+    private PythonResolutionResult applyResolution(PythonResolutionResult marker,
+                                                    List<ResolvedDependency> resolvedDeps) {
         marker = marker.withResolvedDependencies(resolvedDeps);
         marker = marker.withPackageManager(PackageManager.Uv);
 

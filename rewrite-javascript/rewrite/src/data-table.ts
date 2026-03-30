@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import {ExecutionContext} from "./execution";
@@ -23,7 +24,6 @@ const COLUMNS_KEY = Symbol.for("org.openrewrite.dataTables.columns");
 
 export function Column(descriptor: ColumnDescriptor) {
     return function (target: any, propertyKey: string) {
-        // Ensure the constructor has columns storage.
         if (!target.constructor.hasOwnProperty(COLUMNS_KEY)) {
             Object.defineProperty(target.constructor, COLUMNS_KEY, {
                 value: {},
@@ -31,8 +31,6 @@ export function Column(descriptor: ColumnDescriptor) {
                 configurable: true,
             });
         }
-
-        // Register the option metadata under the property key.
         target.constructor[COLUMNS_KEY][propertyKey] = descriptor;
     }
 }
@@ -40,31 +38,74 @@ export function Column(descriptor: ColumnDescriptor) {
 export interface DataTableStore {
     insertRow<Row>(dataTable: DataTable<Row>, ctx: ExecutionContext, row: Row): void
 
-    acceptRows(accept: boolean): void
+    getRows(dataTableName: string, scope: string): Iterable<any>
+
+    getDataTables(): DataTable<any>[]
 }
 
 export class InMemoryDataTableStore implements DataTableStore {
-    private _acceptRows = false
-    private readonly _dataTables: { [dataTable: string]: DataTable<any> } = {}
-    private readonly _rows: { [dataTable: string]: any[] } = {}
+    private readonly _buckets = new Map<string, { dataTable: DataTable<any>, rows: any[] }>()
 
     insertRow<Row>(dataTable: DataTable<Row>, _ctx: ExecutionContext, row: Row): void {
-        if (this._acceptRows) {
-            this._dataTables[dataTable.descriptor.name] = dataTable;
-            if (!this._rows[dataTable.descriptor.name]) {
-                this._rows[dataTable.descriptor.name] = [];
-            }
-            this._rows[dataTable.descriptor.name].push(row);
+        const suffix = dataTable.group ?? dataTable.instanceName;
+        const key = `${dataTable.descriptor.name}\0${suffix}`;
+        let bucket = this._buckets.get(key);
+        if (!bucket) {
+            bucket = {dataTable, rows: []};
+            this._buckets.set(key, bucket);
         }
+        bucket.rows.push(row);
     }
 
-    acceptRows(accept: boolean): void {
-        this._acceptRows = accept
+    getRows(dataTableName: string, group?: string): any[] {
+        if (group !== undefined) {
+            const key = `${dataTableName}\0${group}`;
+            const bucket = this._buckets.get(key);
+            return bucket ? [...bucket.rows] : [];
+        }
+        // For ungrouped, find by name with no group
+        for (const bucket of this._buckets.values()) {
+            if (bucket.dataTable.descriptor.name === dataTableName && bucket.dataTable.group === undefined) {
+                return [...bucket.rows];
+            }
+        }
+        return [];
     }
+
+    getDataTables(): DataTable<any>[] {
+        return Array.from(this._buckets.values()).map(b => b.dataTable);
+    }
+}
+
+function sha256Prefix(input: string, hexChars: number): string {
+    const hash = crypto.createHash('sha256').update(input, 'utf8').digest('hex');
+    return hash.substring(0, hexChars);
+}
+
+export function sanitizeScope(scope: string): string {
+    // 1. lowercase
+    let s = scope.toLowerCase();
+    // 2. replace non-alphanumeric with '-'
+    s = s.replace(/[^a-z0-9]/g, '-');
+    // 3. collapse consecutive '-', trim leading/trailing
+    s = s.replace(/-+/g, '-').replace(/^-|-$/g, '');
+    // 4. truncate to ~30 chars at word boundary
+    if (s.length > 30) {
+        s = s.substring(0, 30);
+        const lastDash = s.lastIndexOf('-');
+        if (lastDash > 0) {
+            s = s.substring(0, lastDash);
+        }
+    }
+    // 5. append 4-char hash
+    const hash = sha256Prefix(scope, 4);
+    return `${s}-${hash}`;
 }
 
 export class DataTable<Row> {
     private readonly _descriptor: DataTableDescriptor
+    private _group?: string
+    private _instanceName?: string
 
     public constructor(name: string, displayName: string, description: string,
                        private rowConstructor: { [key: string | symbol]: any }) {
@@ -83,6 +124,22 @@ export class DataTable<Row> {
             columns: Object.entries(columnsRecord).map(([name, descriptor]) =>
                 ({name, ...descriptor})),
         }
+    }
+
+    get group(): string | undefined {
+        return this._group;
+    }
+
+    set group(value: string) {
+        this._group = value;
+    }
+
+    get instanceName(): string {
+        return this._instanceName ?? this._descriptor.displayName;
+    }
+
+    set instanceName(value: string) {
+        this._instanceName = value;
     }
 
     insertRow(ctx: ExecutionContext, row: Row): void {
@@ -108,14 +165,12 @@ export interface ColumnDescriptor {
 
 /**
  * Escape a value for CSV output following RFC 4180.
- * Quotes the value if it contains commas, quotes, or newlines.
  */
 function escapeCsv(value: unknown): string {
     if (value === null || value === undefined) {
         return '""';
     }
     const str = String(value);
-    // If the value contains comma, quote, or newline, wrap in quotes and escape internal quotes
     if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
         return '"' + str.replace(/"/g, '""') + '"';
     }
@@ -124,62 +179,68 @@ function escapeCsv(value: unknown): string {
 
 /**
  * A DataTableStore that writes rows directly to CSV files as they are inserted.
+ * Uses the data table's file-safe key for filenames.
  */
 export class CsvDataTableStore implements DataTableStore {
-    private _acceptRows = false;
     private readonly _initializedTables = new Set<string>();
-    private readonly _rowCounts: { [dataTable: string]: number } = {};
+    private readonly _rowCounts: { [key: string]: number } = {};
+    private readonly _dataTables = new Map<string, DataTable<any>>();
 
     constructor(private readonly outputDir: string) {
-        // Ensure output directory exists
         fs.mkdirSync(outputDir, {recursive: true});
     }
 
     insertRow<Row>(dataTable: DataTable<Row>, _ctx: ExecutionContext, row: Row): void {
-        if (!this._acceptRows) {
-            return;
-        }
+        const fileKey = CsvDataTableStore.fileKey(dataTable);
+        const csvPath = path.join(this.outputDir, fileKey + '.csv');
 
-        const descriptor = dataTable.descriptor;
-        const tableName = descriptor.name;
-        const csvPath = path.join(this.outputDir, tableName + '.csv');
+        if (!this._initializedTables.has(fileKey)) {
+            this._initializedTables.add(fileKey);
+            this._rowCounts[fileKey] = 0;
+            this._dataTables.set(fileKey, dataTable);
 
-        // Write header row on first insert for this table
-        if (!this._initializedTables.has(tableName)) {
-            this._initializedTables.add(tableName);
-            this._rowCounts[tableName] = 0;
-
-            const columns = descriptor.columns;
+            const columns = dataTable.descriptor.columns;
             const headerRow = columns.map(col => escapeCsv(col.displayName)).join(',');
-
-            fs.writeFileSync(csvPath, headerRow + '\n');
+            // Write metadata comments + header
+            const comments = [
+                `# @name ${dataTable.descriptor.name}`,
+                `# @instanceName ${dataTable.instanceName}`,
+                `# @group ${dataTable.group ?? ''}`,
+            ].join('\n');
+            fs.writeFileSync(csvPath, comments + '\n' + headerRow + '\n');
         }
 
-        // Write the data row
-        const columns = descriptor.columns;
+        const columns = dataTable.descriptor.columns;
         const rowValues = columns.map(col => {
             const value = (row as any)[col.name];
             return escapeCsv(value);
         });
         fs.appendFileSync(csvPath, rowValues.join(',') + '\n');
-        this._rowCounts[tableName]++;
+        this._rowCounts[fileKey]++;
     }
 
-    acceptRows(accept: boolean): void {
-        this._acceptRows = accept;
+    getRows(_dataTableName: string, _group?: string): any[] {
+        // CSV store writes to disk; reading back is not supported
+        return [];
     }
 
-    /**
-     * Get the number of rows written for each data table.
-     */
-    get rowCounts(): { [dataTable: string]: number } {
+    getDataTables(): DataTable<any>[] {
+        return Array.from(this._dataTables.values());
+    }
+
+    get rowCounts(): { [key: string]: number } {
         return {...this._rowCounts};
     }
 
-    /**
-     * Get the names of all data tables that have been written to.
-     */
-    get tableNames(): string[] {
+    get tableKeys(): string[] {
         return [...this._initializedTables];
+    }
+
+    static fileKey(dataTable: DataTable<any>): string {
+        const suffix = dataTable.group ?? dataTable.instanceName;
+        if (suffix === dataTable.descriptor.name) {
+            return dataTable.descriptor.name;
+        }
+        return `${dataTable.descriptor.name}--${sanitizeScope(suffix)}`;
     }
 }

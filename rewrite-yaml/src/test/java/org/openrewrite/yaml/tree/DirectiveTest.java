@@ -139,7 +139,7 @@ class DirectiveTest implements RewriteTest {
     @Test
     void directiveCopyPaste() {
         // given
-        Yaml.Directive original = new Yaml.Directive(
+        var original = new Yaml.Directive(
                 UUID.randomUUID(),
                 "",
                 Markers.EMPTY,
@@ -169,16 +169,16 @@ class DirectiveTest implements RewriteTest {
             }
         };
 
-        Yaml.Directive directive = new Yaml.Directive(
+        var directive = new Yaml.Directive(
                 UUID.randomUUID(),
                 "",
                 Markers.EMPTY,
                 "YAML 1.2",
                 "\n"
         );
-        Yaml.Document.End end = new Yaml.Document.End(UUID.randomUUID(), "", Markers.EMPTY, false);
-        Yaml.Mapping block = new Yaml.Mapping(UUID.randomUUID(), Markers.EMPTY, null, emptyList(), null, null, null);
-        Yaml.Document document = new Yaml.Document(
+        var end = new Yaml.Document.End(UUID.randomUUID(), "", Markers.EMPTY, false);
+        var block = new Yaml.Mapping(UUID.randomUUID(), Markers.EMPTY, null, emptyList(), null, null, null);
+        var document = new Yaml.Document(
                 UUID.randomUUID(),
                 "",
                 Markers.EMPTY,

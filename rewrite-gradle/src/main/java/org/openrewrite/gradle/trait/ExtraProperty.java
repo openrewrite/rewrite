@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.trait.Trait;
@@ -36,6 +37,8 @@ import org.openrewrite.trait.Trait;
  *   <li>ext block assignments: {@code ext { propertyName = 'value' }}</li>
  *   <li>ext field access: {@code ext.propertyName = 'value'}</li>
  *   <li>ext.set() method: {@code ext.set("propertyName", "value")}</li>
+ *   <li>ext subscript access: {@code ext['propertyName'] = 'value'}</li>
+ *   <li>set() in ext block: {@code ext { set('propertyName', 'value') }}</li>
  * </ul>
  */
 @Value
@@ -64,7 +67,15 @@ public class ExtraProperty implements Trait<J> {
         /**
          * Method invocation: {@code ext.set("foo", "bar")}
          */
-        EXT_SET_METHOD
+        EXT_SET_METHOD,
+        /**
+         * Subscript access: {@code ext['foo'] = "bar"}
+         */
+        EXT_SUBSCRIPT_ACCESS,
+        /**
+         * set() method inside ext block: {@code ext { set('foo', 'bar') }}
+         */
+        EXT_BLOCK_SET_METHOD
     }
 
     public String getName() {
@@ -113,6 +124,7 @@ public class ExtraProperty implements Trait<J> {
 
             case EXT_BLOCK_ASSIGNMENT:
             case EXT_FIELD_ACCESS:
+            case EXT_SUBSCRIPT_ACCESS:
                 J.Assignment assignment = (J.Assignment) tree;
                 if (assignment.getAssignment() instanceof J.Literal) {
                     J.Literal literal = (J.Literal) assignment.getAssignment();
@@ -121,6 +133,7 @@ public class ExtraProperty implements Trait<J> {
                 break;
 
             case EXT_SET_METHOD:
+            case EXT_BLOCK_SET_METHOD:
                 J.MethodInvocation method = (J.MethodInvocation) tree;
                 if (method.getArguments().size() == 2 && method.getArguments().get(1) instanceof J.Literal) {
                     J.Literal valueLiteral = (J.Literal) method.getArguments().get(1);
@@ -191,7 +204,7 @@ public class ExtraProperty implements Trait<J> {
                 }
             }
 
-            // Check for assignment: ext { foo = "bar" } or ext.foo = "bar"
+            // Check for assignment: ext { foo = "bar" } or ext.foo = "bar" or ext['foo'] = "bar"
             if (node instanceof J.Assignment) {
                 J.Assignment assignment = (J.Assignment) node;
                 if (!(assignment.getAssignment() instanceof J.Literal)) {
@@ -224,44 +237,65 @@ public class ExtraProperty implements Trait<J> {
                         syntax = PropertySyntax.EXT_FIELD_ACCESS;
                     }
                 }
+                // Check for ext['foo'] = "bar" (subscript/indexed access)
+                else if (assignment.getVariable() instanceof G.Binary) {
+                    G.Binary binary = (G.Binary) assignment.getVariable();
+                    if (binary.getOperator() == G.Binary.Type.Access &&
+                            binary.getLeft() instanceof J.Identifier &&
+                            "ext".equals(((J.Identifier) binary.getLeft()).getSimpleName()) &&
+                            binary.getRight() instanceof J.Literal) {
+                        J.Literal keyLiteral = (J.Literal) binary.getRight();
+                        if (keyLiteral.getValue() instanceof String) {
+                            name = (String) keyLiteral.getValue();
+                            syntax = PropertySyntax.EXT_SUBSCRIPT_ACCESS;
+                        }
+                    }
+                }
 
                 if (name != null && syntax != null && (propertyName == null || propertyName.equals(name))) {
                     return new ExtraProperty(cursor, name, (String) literal.getValue(), syntax);
                 }
             }
 
-            // Check for ext.set("foo", "bar")
+            // Check for ext.set("foo", "bar") or ext { set("foo", "bar") }
             if (node instanceof J.MethodInvocation) {
                 J.MethodInvocation method = (J.MethodInvocation) node;
-                if ("set".equals(method.getSimpleName()) &&
-                        method.getSelect() instanceof J.Identifier &&
-                        "ext".equals(((J.Identifier) method.getSelect()).getSimpleName()) &&
-                        method.getArguments().size() == 2) {
-
-                    if (!(method.getArguments().get(0) instanceof J.Literal)) {
-                        return null;
-                    }
-                    J.Literal keyLiteral = (J.Literal) method.getArguments().get(0);
-                    if (!(keyLiteral.getValue() instanceof String)) {
-                        return null;
-                    }
-                    String name = (String) keyLiteral.getValue();
-
-                    if (!(method.getArguments().get(1) instanceof J.Literal)) {
-                        return null;
-                    }
-                    J.Literal valueLiteral = (J.Literal) method.getArguments().get(1);
-                    if (!(valueLiteral.getValue() instanceof String)) {
-                        return null;
+                if ("set".equals(method.getSimpleName()) && method.getArguments().size() == 2) {
+                    // Determine if this is ext.set() or set() inside ext block
+                    PropertySyntax setSyntax = null;
+                    if (method.getSelect() instanceof J.Identifier &&
+                            "ext".equals(((J.Identifier) method.getSelect()).getSimpleName())) {
+                        setSyntax = PropertySyntax.EXT_SET_METHOD;
+                    } else if (withinBlock(cursor, "ext")) {
+                        setSyntax = PropertySyntax.EXT_BLOCK_SET_METHOD;
                     }
 
-                    if (propertyName == null || propertyName.equals(name)) {
-                        return new ExtraProperty(
-                                cursor,
-                                name,
-                                (String) valueLiteral.getValue(),
-                                PropertySyntax.EXT_SET_METHOD
-                        );
+                    if (setSyntax != null) {
+                        if (!(method.getArguments().get(0) instanceof J.Literal)) {
+                            return null;
+                        }
+                        J.Literal keyLiteral = (J.Literal) method.getArguments().get(0);
+                        if (!(keyLiteral.getValue() instanceof String)) {
+                            return null;
+                        }
+                        String name = (String) keyLiteral.getValue();
+
+                        if (!(method.getArguments().get(1) instanceof J.Literal)) {
+                            return null;
+                        }
+                        J.Literal valueLiteral = (J.Literal) method.getArguments().get(1);
+                        if (!(valueLiteral.getValue() instanceof String)) {
+                            return null;
+                        }
+
+                        if (propertyName == null || propertyName.equals(name)) {
+                            return new ExtraProperty(
+                                    cursor,
+                                    name,
+                                    (String) valueLiteral.getValue(),
+                                    setSyntax
+                            );
+                        }
                     }
                 }
             }

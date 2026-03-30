@@ -19,10 +19,11 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -764,33 +765,17 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactId() {
-        assertThatExceptionOfType(AssertionError.class)
-          .isThrownBy(() -> rewriteRun(
-            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-              "javax.activation",
-              "javax.activation-api",
-              null,
-              null,
-              null,
-              null
-            ))
-          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+       var recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", null, null, null, null);;
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("newGroupId OR newArtifactId must be different from before");
     }
 
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/issues/55")
     @Test
     void requireNewGroupIdOrNewArtifactIdToBeDifferentFromBefore() {
-        assertThatExceptionOfType(AssertionError.class)
-          .isThrownBy(() -> rewriteRun(
-            spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-              "javax.activation",
-              "javax.activation-api",
-              "javax.activation",
-              null,
-              null,
-              null
-            ))
-          )).withMessageContaining("newGroupId OR newArtifactId must be different from before");
+        var recipe = new ChangeDependencyGroupIdAndArtifactId("javax.activation", "javax.activation-api", "javax.activation", null, null, null);
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("newGroupId OR newArtifactId must be different from before");
     }
 
     @Test
@@ -2351,20 +2336,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>parent-project</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <version.swagger>2.2.43</version.swagger>
-                  </properties>
-                  <modules>
-                    <module>sub-project</module>
-                  </modules>
-                </project>
-                """,
-              spec -> spec.path("pom.xml")
+              spec -> spec.path("pom.xml").after(actual -> assertThat(actual)
+                .containsPattern("<version\\.swagger>2\\.2\\.\\d+</version\\.swagger>")
+                .doesNotContain("<version.swagger>1.5.16</version.swagger>")
+                .actual())
             ),
             mavenProject("sub-project",
               //language=xml
@@ -2389,27 +2364,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>sub-project</artifactId>
-                    <version>1</version>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>parent-project</artifactId>
-                      <version>1</version>
-                      <relativePath>../pom.xml</relativePath>
-                    </parent>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>${version.swagger}</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                spec -> spec.path("sub-project/pom.xml")
+                spec -> spec.path("sub-project/pom.xml").after(actual -> assertThat(actual)
+                  .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>\\$\\{version\\.swagger}</version>")
+                  .doesNotContain("<groupId>io.swagger</groupId>")
+                  .actual())
               )
             )
           )
@@ -2479,32 +2437,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>sub-project</artifactId>
-                    <version>1</version>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>parent-project</artifactId>
-                      <version>1</version>
-                      <relativePath>../pom.xml</relativePath>
-                    </parent>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>2.2.43</version>
-                      </dependency>
-                      <dependency>
-                        <groupId>io.swagger</groupId>
-                        <artifactId>swagger-models</artifactId>
-                        <version>${version.swagger}</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                spec -> spec.path("sub-project/pom.xml")
+                spec -> spec.path("sub-project/pom.xml").after(actual -> assertThat(actual)
+                  .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>2\\.2\\.\\d+</version>")
+                  .containsPattern("<groupId>io\\.swagger</groupId>\\s*<artifactId>swagger-models</artifactId>\\s*<version>\\$\\{version\\.swagger}</version>")
+                  .actual())
               )
             )
           )
@@ -2569,27 +2505,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>child-a</artifactId>
-                    <version>1</version>
-                    <parent>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>parent-project</artifactId>
-                      <version>1</version>
-                      <relativePath>../pom.xml</relativePath>
-                    </parent>
-                    <dependencies>
-                      <dependency>
-                        <groupId>io.swagger.core.v3</groupId>
-                        <artifactId>swagger-annotations</artifactId>
-                        <version>2.2.43</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """,
-                spec -> spec.path("child-a/pom.xml")
+                spec -> spec.path("child-a/pom.xml").after(actual -> assertThat(actual)
+                  .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>2\\.2\\.\\d+</version>")
+                  .doesNotContain("<version>${version.swagger}</version>")
+                  .actual())
               )
             ),
             mavenProject("child-b",
@@ -2663,28 +2582,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
                 </project>
                 """,
-              //language=xml
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>parent-project</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <version.swagger>1.5.16</version.swagger>
-                  </properties>
-                  <modules>
-                    <module>sub-project</module>
-                  </modules>
-                  <dependencies>
-                    <dependency>
-                      <groupId>io.swagger.core.v3</groupId>
-                      <artifactId>swagger-annotations</artifactId>
-                      <version>2.2.43</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """,
-              spec -> spec.path("pom.xml")
+              spec -> spec.path("pom.xml").after(actual -> assertThat(actual)
+                .containsPattern("<groupId>io\\.swagger\\.core\\.v3</groupId>\\s*<artifactId>swagger-annotations</artifactId>\\s*<version>2\\.2\\.\\d+</version>")
+                .contains("<version.swagger>1.5.16</version.swagger>")
+                .actual())
             ),
             mavenProject("sub-project",
               pomXml(
@@ -3150,6 +3051,85 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void handlesGlobCorrectlyWithManagedDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "io.swagger",
+            "swagger-*",
+            "io.swagger.core.v3",
+            null,
+            "2.2.0",
+            null
+          )),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger</groupId>
+                      <artifactId>swagger-annotations</artifactId>
+                      <version>1.5.16</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>io.swagger</groupId>
+                      <artifactId>swagger-models</artifactId>
+                      <version>1.5.16</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger</groupId>
+                    <artifactId>swagger-models</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo-child</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.swagger.core.v3</groupId>
+                      <artifactId>swagger-annotations</artifactId>
+                      <version>2.2.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>io.swagger.core.v3</groupId>
+                      <artifactId>swagger-models</artifactId>
+                      <version>2.2.0</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-annotations</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>io.swagger.core.v3</groupId>
+                    <artifactId>swagger-models</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void handlesCollisionInDeepRemoteParent() {
         rewriteRun(
             spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
@@ -3250,33 +3230,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-                                  <artifactId>*</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
           )
         );
     }
@@ -3326,33 +3283,10 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>com.fasterxml.jackson.jaxrs</groupId>
-                                  <artifactId>*</artifactId>
-                              </exclusion>
-                          </exclusions>
-                      </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
+            spec -> spec.after(actual -> assertThat(actual)
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
           )
         );
     }
@@ -3455,16 +3389,17 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Issue("https://github.com/moderneinc/customer-requests/issues/1330")
     @Test
-    void exclusionUpdatedWhenDependencyGroupIdChanges() {
-        // When changing a dependency's groupId/artifactId, any exclusions that match
-        // the old coordinates should be updated to match the new coordinates.
+    void exclusionPreservedAndSiblingAddedWhenDependencyGroupIdChanges() {
+        // When changing a dependency's groupId/artifactId, exclusions that match
+        // the old coordinates should be preserved, and a sibling exclusion for the
+        // new coordinates should be added alongside them.
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
             "com.fasterxml.jackson.jaxrs",
             "jackson-jaxrs-json-provider",
             "com.fasterxml.jackson.jakarta.rs",
             "jackson-jakarta-rs-json-provider",
-            "2.x",
+            "2.18.x",
             null
           )),
           pomXml(
@@ -3495,6 +3430,35 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
+            spec -> spec.after(actual -> assertThat(actual)
+              // Old exclusion preserved
+              .containsPattern("<exclusion>\\s*<groupId>com\\.fasterxml\\.jackson\\.jaxrs</groupId>\\s*<artifactId>jackson-jaxrs-json-provider</artifactId>\\s*</exclusion>")
+              // Sibling exclusion added for new coordinates
+              .containsPattern("<exclusion>\\s*<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*</exclusion>")
+              // Version updated
+              .containsPattern("<groupId>com\\.fasterxml\\.jackson\\.jakarta\\.rs</groupId>\\s*<artifactId>jackson-jakarta-rs-json-provider</artifactId>\\s*<version>2\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.9.7</version>")
+              .actual())
+          )
+        );
+    }
+
+    @Test
+    void exclusionPreservedAndSiblingAddedForNewCoordinates() {
+        // When changing commons-lang:commons-lang to org.apache.commons:commons-lang3,
+        // the old exclusion for commons-lang:commons-lang should be preserved (to block
+        // the vulnerable transitive dependency), and a sibling exclusion for the new
+        // coordinates should be added alongside it.
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "commons-lang",
+            "commons-lang",
+            "org.apache.commons",
+            "commons-lang3",
+            "3.x",
+            null
+          )),
+          pomXml(
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -3503,25 +3467,33 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   <version>1</version>
                   <dependencies>
                       <dependency>
-                          <groupId>io.swagger.core.v3</groupId>
-                          <artifactId>swagger-jaxrs2-jakarta</artifactId>
-                          <version>2.2.20</version>
-                          <scope>provided</scope>
+                          <groupId>commons-lang</groupId>
+                          <artifactId>commons-lang</artifactId>
+                          <version>2.6</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.apache.struts</groupId>
+                          <artifactId>struts2-core</artifactId>
+                          <version>2.5.30</version>
                           <exclusions>
                               <exclusion>
-                                  <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                                  <artifactId>jackson-jakarta-rs-json-provider</artifactId>
+                                  <groupId>commons-lang</groupId>
+                                  <artifactId>commons-lang</artifactId>
                               </exclusion>
                           </exclusions>
                       </dependency>
-                      <dependency>
-                          <groupId>com.fasterxml.jackson.jakarta.rs</groupId>
-                          <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-                          <version>2.21.0</version>
-                      </dependency>
                   </dependencies>
               </project>
-              """
+              """,
+            spec -> spec.after(actual -> assertThat(actual)
+              // Direct dependency changed to commons-lang3
+              .containsPattern("<groupId>org\\.apache\\.commons</groupId>\\s*<artifactId>commons-lang3</artifactId>\\s*<version>3\\.\\d+\\.\\d+</version>")
+              .doesNotContain("<version>2.6</version>")
+              // Old exclusion preserved
+              .containsPattern("<exclusion>\\s*<groupId>commons-lang</groupId>\\s*<artifactId>commons-lang</artifactId>\\s*</exclusion>")
+              // Sibling exclusion added for new coordinates
+              .containsPattern("<exclusion>\\s*<groupId>org\\.apache\\.commons</groupId>\\s*<artifactId>commons-lang3</artifactId>\\s*</exclusion>")
+              .actual())
           )
         );
     }
@@ -3566,4 +3538,5 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
 }

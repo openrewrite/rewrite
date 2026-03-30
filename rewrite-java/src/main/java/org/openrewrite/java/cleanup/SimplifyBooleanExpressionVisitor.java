@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -192,7 +193,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (isLiteralFalse(expr)) {
             j = ((J.Literal) expr).withValue(true).withValueSource("true");
         } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
-            j = ((J.Unary) expr).getExpression();
+            if (canSimplifyDoubleNegation(((J.Unary) expr).getExpression())) {
+                j = ((J.Unary) expr).getExpression();
+            }
         } else if (expr instanceof J.Parentheses) {
             J parenthesized = ((J.Parentheses<?>) expr).getTree();
             if (parenthesized instanceof J.Binary) {
@@ -204,7 +207,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             } else if (parenthesized instanceof J.Unary) {
                 J.Unary unary1 = (J.Unary) parenthesized;
                 J.Unary.Type operator = unary1.getOperator();
-                if (operator == J.Unary.Type.Not) {
+                if (operator == J.Unary.Type.Not && canSimplifyDoubleNegation(unary1.getExpression())) {
                     j = unary1.getExpression().withPrefix(j.getPrefix());
                 }
             } else if (parenthesized instanceof J.Ternary) {
@@ -428,19 +431,38 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     /**
-     * Override this method to disable simplification of equals expressions,
-     * specifically for Kotlin while that is not yet part of the OpenRewrite/rewrite.
+     * In Java, {@code !} only applies to boolean expressions, so {@code !!x} is always
+     * equivalent to {@code x}. In other languages like JavaScript/TypeScript and Groovy,
+     * {@code !!x} is an idiomatic boolean coercion that converts any truthy/falsy value
+     * to a strict boolean. In those cases, simplifying {@code !!x} to {@code x} changes
+     * semantics when {@code x} is not boolean-typed.
+     */
+    private boolean canSimplifyDoubleNegation(Expression innerExpression) {
+        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+            return true;
+        }
+        return innerExpression.getType() == JavaType.Primitive.Boolean;
+    }
+
+    /**
+     * Determines whether an equals comparison with a boolean literal can be simplified.
      * <p>
-     * Comparing Kotlin nullable type `?` with tree/false can not be simplified,
-     * e.g. `X?.fun() == true` is not equivalent to `X?.fun()`
+     * In Java, {@code x == true} can always be simplified to {@code x}.
+     * In Kotlin and other languages, nullable types like {@code Boolean?} compared
+     * with {@code == true} have different semantics than using the value directly,
+     * e.g. {@code nullableBoolean == true} evaluates to {@code false} when null,
+     * whereas using {@code nullableBoolean} directly would be a type error.
      * <p>
-     * Subclasses will want to check if the `org.openrewrite.kotlin.marker.IsNullSafe`
-     * marker is present.
+     * For non-Java languages, simplification is only allowed when the expression
+     * type is primitive boolean (non-nullable).
      *
      * @param j the expression to simplify
-     * @return true by default, unless overridden
+     * @return true if the equals comparison can be safely simplified
      */
     protected boolean shouldSimplifyEqualsOn(J j) {
-        return true;
+        if (getCursor().firstEnclosing(SourceFile.class) instanceof J.CompilationUnit) {
+            return true;
+        }
+        return j instanceof Expression && ((Expression) j).getType() == JavaType.Primitive.Boolean;
     }
 }

@@ -47,6 +47,7 @@ public final class Assertions {
      */
     public static SourceSpecs uv(Path relativeTo, SourceSpecs... sources) {
         String pyprojectContent = null;
+        SourceSpec<Toml.Document> pyprojectSpec = null;
 
         // First pass: find pyproject.toml content and write it
         for (SourceSpecs multiSpec : sources) {
@@ -55,6 +56,8 @@ public final class Assertions {
                 Path sourcePath = spec.getSourcePath();
                 if (sourcePath != null && "pyproject.toml".equals(sourcePath.toFile().getName())) {
                     pyprojectContent = spec.getBefore();
+                    //noinspection unchecked
+                    pyprojectSpec = (SourceSpec<Toml.Document>) multiSpec;
                     try {
                         Path pyproject = relativeTo.resolve(sourcePath);
                         Files.write(pyproject, requireNonNull(pyprojectContent).getBytes(StandardCharsets.UTF_8));
@@ -84,6 +87,16 @@ public final class Assertions {
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for .venv", e);
             }
+
+            // Delete symlinks after recipe run so JUnit's @TempDir cleanup
+            // doesn't warn about symlinks pointing outside the temp directory
+            pyprojectSpec.afterRecipe(doc -> {
+                try {
+                    Files.deleteIfExists(venvTarget);
+                    Files.deleteIfExists(lockFileTarget);
+                } catch (IOException ignored) {
+                }
+            });
         }
 
         return SourceSpecs.dir(relativeTo.toString(), sources);

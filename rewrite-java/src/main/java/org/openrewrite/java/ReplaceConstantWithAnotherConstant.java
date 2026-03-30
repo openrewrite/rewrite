@@ -108,14 +108,17 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 String realName = hasNoConflictingImport ? newOwningType.getClassName() : newOwningType.getFullyQualifiedName();
                 if (target instanceof J.Identifier) {
                     target = ((J.Identifier) target).withType(newOwningType).withSimpleName(realName);
-                    name = name
-                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
-                            .withSimpleName(newConstantName);
                 } else {
                     target = (((J.FieldAccess) target).getName()).withType(newOwningType).withSimpleName(realName);
-                    name = name
-                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
-                            .withSimpleName(newConstantName);
+                }
+                JavaType nameType = name.getType();
+                name = name
+                        .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
+                        .withSimpleName(newConstantName)
+                        .withType(TypeUtils.isOfClassType(nameType, existingOwningType) ? newOwningType : nameType);
+                // manipulate the fieldAccess type to also handle enums
+                if (TypeUtils.isOfClassType(fieldAccess.getType(), existingOwningType)) {
+                    fieldAccess = fieldAccess.withType(newOwningType);
                 }
                 return fieldAccess
                         .withTarget(target)

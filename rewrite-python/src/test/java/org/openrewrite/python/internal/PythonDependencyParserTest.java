@@ -246,6 +246,42 @@ class PythonDependencyParserTest {
         assertThat(testGroup.get(0).getName()).isEqualTo("coverage");
     }
 
+    @Test
+    void detectsPoetryPackageManager() {
+        String toml = """
+          [project]
+          name = "poetry-project"
+          version = "1.0.0"
+
+          [tool.poetry]
+          name = "poetry-project"
+          """;
+
+        Toml.Document doc = parseToml(toml);
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Poetry);
+    }
+
+    @Test
+    void detectsPoetryFromSubTable() {
+        String toml = """
+          [project]
+          name = "poetry-project"
+          version = "1.0.0"
+
+          [tool.poetry.dependencies]
+          python = "^3.10"
+          """;
+
+        Toml.Document doc = parseToml(toml);
+        PythonResolutionResult marker = PythonDependencyParser.createMarker(doc, null);
+
+        assertThat(marker).isNotNull();
+        assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Poetry);
+    }
+
     private static Toml.Document parseToml(String content) {
         TomlParser parser = new TomlParser();
         Parser.Input input = Parser.Input.fromString(

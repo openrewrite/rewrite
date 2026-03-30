@@ -18,9 +18,10 @@ package org.openrewrite.yaml;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
@@ -3059,22 +3060,21 @@ class MergeYamlTest implements RewriteTest {
 
     @Test
     void invalidYaml() {
-        assertThrows(AssertionError.class, () -> rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.some.object",
-              //language=text
-              """
-                script: |-ParseError
-                """,
-              false,
-              "name",
-              null,
-              null,
-              null,
-              null
-            ))
-        ));
+        var recipe = new MergeYaml(
+          "$.some.object",
+          //language=text
+          """
+            script: |-ParseError
+            """,
+          false,
+          "name",
+          null,
+          null,
+          null,
+          null
+        );
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("Must be valid YAML");
     }
 
     @Test
@@ -3144,20 +3144,18 @@ class MergeYamlTest implements RewriteTest {
     @SuppressWarnings("DataFlowIssue")
     @Test
     void sourceNull() {
-        assertThrows(AssertionError.class, () ->
-            rewriteRun(
-              spec -> spec
-                .recipe(new MergeYaml(
-                  "$.some.object",
-                  null,
-                  false,
-                  "name",
-                  null,
-                  null,
-                  null,
-                  null
-                ))
-            ));
+        var recipe = new MergeYaml(
+          "$.some.object",
+          null,
+          false,
+          "name",
+          null,
+          null,
+          null,
+          null
+        );
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("Must be valid YAML");
     }
 
     @Test

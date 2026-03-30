@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import ts from "typescript";
+import * as path from "path";
 import {Type} from "../java";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 
@@ -30,7 +31,8 @@ export class JavaScriptTypeMapping {
 
 
     constructor(
-        private readonly checker: ts.TypeChecker
+        private readonly checker: ts.TypeChecker,
+        private readonly sourceRoot?: string
     ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
@@ -69,11 +71,14 @@ export class JavaScriptTypeMapping {
             // Fall through to regular type checking if not a variable
         }
 
+        // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
+        // Everything else — expressions, declarations, specifiers, bindings, etc. —
+        // uses getTypeAtLocation which works for virtually all node kinds.
         let type: ts.Type | undefined;
-        if (ts.isExpression(node)) {
-            type = this.checker.getTypeAtLocation(node);
-        } else if (ts.isTypeNode(node)) {
+        if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);
+        } else {
+            type = this.checker.getTypeAtLocation(node);
         }
         return type && this.getType(type);
     }
@@ -166,26 +171,30 @@ export class JavaScriptTypeMapping {
                                 this.populateClassType(classType, declaredType);
                             }
 
-                            // Resolve type arguments
+                            // Shell-cache: Create parameterized type wrapper with empty typeParameters
+                            // BEFORE resolving type arguments, to prevent infinite recursion
+                            // when type argument resolution cycles back to this parameterized type
+                            const parameterized = {
+                                kind: Type.Kind.Parameterized,
+                                type: classType,
+                                typeParameters: [],
+                                fullyQualifiedName: classType.fullyQualifiedName,
+                                toJSON: function () {
+                                    return Type.signature(this);
+                                }
+                            } as Type.Parameterized;
+                            this.typeCache.set(signature, parameterized);
+
+                            // Resolve type arguments (may recursively reference this parameterized type)
                             const typeParameters: Type[] = [];
                             for (const typeArg of typeRef.typeArguments!) {
                                 const resolvedArg = this.getType(typeArg as ts.Type);
                                 typeParameters.push(resolvedArg);
                             }
 
-                            // Create the parameterized type wrapper
-                            const parameterized = {
-                                kind: Type.Kind.Parameterized,
-                                type: classType,
-                                typeParameters: typeParameters,
-                                fullyQualifiedName: classType.fullyQualifiedName,
-                                toJSON: function () {
-                                    return Type.signature(this);
-                                }
-                            } as Type.Parameterized;
+                            // Update the shell with resolved type parameters
+                            (parameterized as any).typeParameters = typeParameters;
 
-                            // Cache the parameterized type
-                            this.typeCache.set(signature, parameterized);
                             return parameterized;
                         }
                     }
@@ -287,7 +296,9 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        // For non-object types, we can create them directly without recursion concerns
+        // Pre-cache as unknownType before resolving type aliases to prevent infinite
+        // recursion when alias resolution cycles back through getType with different type.ids
+        this.typeCache.set(signature, Type.unknownType);
         const result = this.createPrimitiveOrUnknownType(type);
         this.typeCache.set(signature, result);
         return result;
@@ -559,7 +570,7 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
         declaringType: Type.FullyQualified,
         name: string,
         declaredFormalTypeNames: string[] = []
@@ -909,6 +920,22 @@ export class JavaScriptTypeMapping {
                     declaredFormalTypeNames.push(tp.name.getText());
                 }
             }
+        } else if (ts.isConstructorDeclaration(node)) {
+            // For constructor declarations
+            signature = this.checker.getSignatureFromDeclaration(node);
+            if (!signature) {
+                return undefined;
+            }
+
+            methodName = "<constructor>";
+
+            const parent = node.parent;
+            if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) {
+                const parentType = this.checker.getTypeAtLocation(parent);
+                declaringType = this.getType(parentType) as Type.FullyQualified;
+            } else {
+                declaringType = Type.unknownType as Type.FullyQualified;
+            }
         } else if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)) {
             // For function declarations/expressions
             signature = this.checker.getSignatureFromDeclaration(node);
@@ -1025,6 +1052,14 @@ export class JavaScriptTypeMapping {
                 } else {
                     cleanedName = packageName;
                 }
+            }
+        } else if (path.isAbsolute(cleanedName)) {
+            // TypeScript returns absolute file paths as module names for project source files
+            // that are ES modules (have imports/exports). Relativize using sourceRoot.
+            // Example: /var/moderne/.../BookStack/resources/js/foo.MyClass
+            // Should become: resources/js/foo.MyClass
+            if (this.sourceRoot) {
+                cleanedName = path.relative(this.sourceRoot, cleanedName);
             }
         }
 

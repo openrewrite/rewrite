@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/HCLLexer.g4 by ANTLR 4.13.2
+// Generated from rewrite-hcl/src/main/antlr/HCLLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import java.util.Stack;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -31,14 +33,14 @@ public class HCLLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, BooleanLiteral=5, NULL=6, LBRACE=7, 
-		RBRACE=8, ASSIGN=9, Identifier=10, WS=11, COMMENT=12, LINE_COMMENT=13, 
-		NEWLINE=14, NumericLiteral=15, QUOTE=16, HEREDOC_START=17, PLUS=18, AND=19, 
-		EQ=20, LT=21, DOUBLE_COLON=22, COLON=23, LBRACK=24, LPAREN=25, MINUS=26, 
-		OR=27, NEQ=28, GT=29, QUESTION=30, RBRACK=31, RPAREN=32, MUL=33, NOT=34, 
-		LEQ=35, DOT=36, DIV=37, GEQ=38, ARROW=39, COMMA=40, MOD=41, ELLIPSIS=42, 
-		TILDE=43, TEMPLATE_INTERPOLATION_START=44, TemplateStringLiteral=45, TemplateStringLiteralChar=46, 
-		HP_WS=47, HP_COMMENT=48, HP_LINE_COMMENT=49, HTemplateLiteral=50, HTemplateLiteralChar=51, 
+		FOR_BRACE=1, FOR_BRACK=2, IF=3, IN=4, BooleanLiteral=5, NULL=6, LBRACE=7,
+		RBRACE=8, ASSIGN=9, Identifier=10, WS=11, COMMENT=12, LINE_COMMENT=13,
+		NEWLINE=14, NumericLiteral=15, QUOTE=16, HEREDOC_START=17, PLUS=18, AND=19,
+		EQ=20, LT=21, DOUBLE_COLON=22, COLON=23, LBRACK=24, LPAREN=25, MINUS=26,
+		OR=27, NEQ=28, GT=29, QUESTION=30, RBRACK=31, RPAREN=32, MUL=33, NOT=34,
+		LEQ=35, DOT=36, DIV=37, GEQ=38, ARROW=39, COMMA=40, MOD=41, ELLIPSIS=42,
+		TILDE=43, TEMPLATE_INTERPOLATION_START=44, TemplateStringLiteral=45, TemplateStringLiteralChar=46,
+		HP_WS=47, HP_COMMENT=48, HP_LINE_COMMENT=49, HTemplateLiteral=50, HTemplateLiteralChar=51,
 		H_NEWLINE=52;
 	public static final int
 		TEMPLATE=1, HEREDOC_PREAMBLE=2, HEREDOC=3;
@@ -52,16 +54,16 @@ public class HCLLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"FOR_BRACE", "FOR_BRACK", "IF", "IN", "BooleanLiteral", "NULL", "LBRACE", 
-			"RBRACE", "ASSIGN", "StringLiteralChar", "Identifier", "WS", "COMMENT", 
-			"LINE_COMMENT", "NEWLINE", "LetterOrDigit", "Letter", "EscapeSequence", 
-			"HexDigit", "NumericLiteral", "ExponentPart", "QUOTE", "HEREDOC_START", 
-			"PLUS", "AND", "EQ", "LT", "DOUBLE_COLON", "COLON", "LBRACK", "LPAREN", 
-			"MINUS", "OR", "NEQ", "GT", "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT", 
-			"LEQ", "DOT", "DIV", "GEQ", "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE", 
-			"TEMPLATE_INTERPOLATION_START", "TemplateStringLiteral", "TemplateStringLiteralChar", 
-			"END_QUOTE", "HP_NEWLINE", "HP_WS", "HP_COMMENT", "HP_LINE_COMMENT", 
-			"HPIdentifier", "H_NEWLINE", "H_TEMPLATE_INTERPOLATION_START", "HTemplateLiteral", 
+			"FOR_BRACE", "FOR_BRACK", "IF", "IN", "BooleanLiteral", "NULL", "LBRACE",
+			"RBRACE", "ASSIGN", "StringLiteralChar", "Identifier", "WS", "COMMENT",
+			"LINE_COMMENT", "NEWLINE", "LetterOrDigit", "Letter", "EscapeSequence",
+			"HexDigit", "NumericLiteral", "ExponentPart", "QUOTE", "HEREDOC_START",
+			"PLUS", "AND", "EQ", "LT", "DOUBLE_COLON", "COLON", "LBRACK", "LPAREN",
+			"MINUS", "OR", "NEQ", "GT", "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT",
+			"LEQ", "DOT", "DIV", "GEQ", "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE",
+			"TEMPLATE_INTERPOLATION_START", "TemplateStringLiteral", "TemplateStringLiteralChar",
+			"END_QUOTE", "HP_NEWLINE", "HP_WS", "HP_COMMENT", "HP_LINE_COMMENT",
+			"HPIdentifier", "H_NEWLINE", "H_TEMPLATE_INTERPOLATION_START", "HTemplateLiteral",
 			"HTemplateLiteralChar"
 		};
 	}
@@ -69,24 +71,24 @@ public class HCLLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, "'if'", "'in'", null, "'null'", "'{'", "'}'", "'='", 
-			null, null, null, null, null, null, null, null, "'+'", "'&&'", "'=='", 
-			"'<'", "'::'", "':'", "'['", "'('", "'-'", "'||'", "'!='", "'>'", "'?'", 
-			"']'", "')'", "'*'", "'!'", "'<='", "'.'", "'/'", "'>='", "'=>'", "','", 
-			"'%'", "'...'", "'~'", null, null, null, null, null, null, null, null, 
+			null, null, null, "'if'", "'in'", null, "'null'", "'{'", "'}'", "'='",
+			null, null, null, null, null, null, null, null, "'+'", "'&&'", "'=='",
+			"'<'", "'::'", "':'", "'['", "'('", "'-'", "'||'", "'!='", "'>'", "'?'",
+			"']'", "')'", "'*'", "'!'", "'<='", "'.'", "'/'", "'>='", "'=>'", "','",
+			"'%'", "'...'", "'~'", null, null, null, null, null, null, null, null,
 			"'\\n'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "FOR_BRACE", "FOR_BRACK", "IF", "IN", "BooleanLiteral", "NULL", 
-			"LBRACE", "RBRACE", "ASSIGN", "Identifier", "WS", "COMMENT", "LINE_COMMENT", 
-			"NEWLINE", "NumericLiteral", "QUOTE", "HEREDOC_START", "PLUS", "AND", 
-			"EQ", "LT", "DOUBLE_COLON", "COLON", "LBRACK", "LPAREN", "MINUS", "OR", 
-			"NEQ", "GT", "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT", 
-			"DIV", "GEQ", "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START", 
-			"TemplateStringLiteral", "TemplateStringLiteralChar", "HP_WS", "HP_COMMENT", 
+			null, "FOR_BRACE", "FOR_BRACK", "IF", "IN", "BooleanLiteral", "NULL",
+			"LBRACE", "RBRACE", "ASSIGN", "Identifier", "WS", "COMMENT", "LINE_COMMENT",
+			"NEWLINE", "NumericLiteral", "QUOTE", "HEREDOC_START", "PLUS", "AND",
+			"EQ", "LT", "DOUBLE_COLON", "COLON", "LBRACK", "LPAREN", "MINUS", "OR",
+			"NEQ", "GT", "QUESTION", "RBRACK", "RPAREN", "MUL", "NOT", "LEQ", "DOT",
+			"DIV", "GEQ", "ARROW", "COMMA", "MOD", "ELLIPSIS", "TILDE", "TEMPLATE_INTERPOLATION_START",
+			"TemplateStringLiteral", "TemplateStringLiteralChar", "HP_WS", "HP_COMMENT",
 			"HP_LINE_COMMENT", "HTemplateLiteral", "HTemplateLiteralChar", "H_NEWLINE"
 		};
 	}

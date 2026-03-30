@@ -125,6 +125,20 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.EnumValue visitEnumValue(J.EnumValue enum_, P p) {
+        if (enum_.getPrefix().isEmpty() && !enum_.getAnnotations().isEmpty()) {
+            Cursor enumValueSetCursor = getCursor().getParentTreeCursor();
+            if (enumValueSetCursor.getValue() instanceof J.EnumValueSet) {
+                J.EnumValueSet evs = enumValueSetCursor.getValue();
+                if (evs.getEnums().get(0) == enum_ && evs.getPrefix().getWhitespace().contains("\n")) {
+                    getCursor().putMessage("lastIndent", findIndent(evs.getPrefix()));
+                }
+            }
+        }
+        return super.visitEnumValue(enum_, p);
+    }
+
+    @Override
     public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
         // FIXME fix formatting of control sections
         return control;

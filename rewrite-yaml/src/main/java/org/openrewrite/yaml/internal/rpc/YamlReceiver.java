@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml.internal.rpc;
 
+import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
@@ -31,7 +32,8 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
     public Yaml preVisit(Yaml y, RpcReceiveQueue q) {
         y = y.withId(q.receiveAndGet(y.getId(), UUID::fromString));
         y = y.withPrefix(q.receive(y.getPrefix()));
-        return y.withMarkers(q.receive(y.getMarkers()));
+        Markers markers = q.receive(y.getMarkers());
+        return y.withMarkers(markers != null ? markers : Markers.EMPTY);
     }
 
     @Override
@@ -79,8 +81,12 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
 
     @Override
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, RpcReceiveQueue q) {
+        YamlKey originalKey = entry.getKey();
         return entry
-                .withKey(q.receive(entry.getKey(), k -> (YamlKey) visitNonNull(k, q)))
+                .withKey(q.receive(entry.getKey(), k -> {
+                    Yaml visited = (Yaml) visitNonNull(k, q);
+                    return visited instanceof YamlKey ? (YamlKey) visited : originalKey;
+                }))
                 .withBeforeMappingValueIndicator(q.receive(entry.getBeforeMappingValueIndicator()))
                 .withValue(q.receive(entry.getValue(), v -> (Yaml.Block) visitNonNull(v, q)));
     }

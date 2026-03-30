@@ -32,31 +32,22 @@ import org.openrewrite.kotlin.tree.K;
 public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
     String pluginId;
 
-    MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("RewriteGradleProject plugins(..)");
-    MethodMatcher applyPluginMatcher = new MethodMatcher("RewriteGradleProject apply(..)");
-    MethodMatcher settingsPluginsContainerMatcher = new MethodMatcher("RewriteSettings plugins(..)");
+    // Wildcard type because KTS extension functions have a file-level declaring type, not Project/Settings
+    MethodMatcher pluginsMatcher = new MethodMatcher("* plugins(..)", false);
+    MethodMatcher applyPluginMatcher = new MethodMatcher("org.gradle.api.Project apply(..)", true);
+    MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("org.gradle.api.Project plugins(..)", true);
+    MethodMatcher settingsPluginsContainerMatcher = new MethodMatcher("org.gradle.api.initialization.Settings plugins(..)", true);
 
-    MethodMatcher buildPluginMatcher = new MethodMatcher("PluginSpec id(..)");
-    MethodMatcher buildPluginWithVersionMatcher = new MethodMatcher("Plugin version(..)");
-    MethodMatcher buildPluginWithApplyMatcher = new MethodMatcher("Plugin apply(..)");
-    MethodMatcher settingsPluginMatcher = new MethodMatcher("PluginSpec id(..)");
-    MethodMatcher settingsPluginWithVersionMatcher = new MethodMatcher("Plugin version(..)");
-    MethodMatcher settingsPluginWithApplyMatcher = new MethodMatcher("Plugin apply(..)");
+    MethodMatcher pluginIdMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependenciesSpec id(..)", true);
+    MethodMatcher pluginVersionMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
+    MethodMatcher pluginApplyMatcher = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec apply(..)", true);
 
     @Override
     public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
         J.Block b = super.visitBlock(block, executionContext);
 
         J.MethodInvocation enclosingMethod = getCursor().firstEnclosing(J.MethodInvocation.class);
-        if (enclosingMethod == null) {
-            return b;
-        }
-
-        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
-        boolean isPluginsBlock = isKotlin ?
-                "plugins".equals(enclosingMethod.getSimpleName()) :
-                buildPluginsContainerMatcher.matches(enclosingMethod) || settingsPluginsContainerMatcher.matches(enclosingMethod);
-        if (!isPluginsBlock) {
+        if (enclosingMethod == null || !isPluginsMethod(enclosingMethod)) {
             return b;
         }
 
@@ -71,28 +62,28 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
 
             // Check for id("pluginId")
-            if (isIdMethodInvocation(m, isKotlin)) {
+            if (isIdMethodInvocation(m)) {
                 if (isPluginLiteral(m.getArguments().get(0))) {
                     return null;
                 }
             }
             // Check for id("pluginId").version("...")
-            else if (isVersionMethodInvocation(m, isKotlin)) {
+            else if (isVersionMethodInvocation(m)) {
                 if (m.getSelect() instanceof J.MethodInvocation &&
                         isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                     return null;
                 }
             }
             // Check for id("pluginId").apply(...) or id("pluginId").version("...").apply(...)
-            else if (isApplyMethodInvocation(m, isKotlin)) {
-                if (isIdMethodInvocation(m.getSelect(), isKotlin)) {
+            else if (isApplyMethodInvocation(m)) {
+                if (isIdMethodInvocation(m.getSelect())) {
                     if (m.getSelect() instanceof J.MethodInvocation &&
                             isPluginLiteral(((J.MethodInvocation) m.getSelect()).getArguments().get(0))) {
                         return null;
                     }
-                } else if (isVersionMethodInvocation(m.getSelect(), isKotlin)) {
+                } else if (isVersionMethodInvocation(m.getSelect())) {
                     if (m.getSelect() instanceof J.MethodInvocation &&
-                            isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect(), isKotlin)) {
+                            isIdMethodInvocation(((J.MethodInvocation) m.getSelect()).getSelect())) {
                         if (((J.MethodInvocation) m.getSelect()).getSelect() instanceof J.MethodInvocation &&
                                 isPluginLiteral(((J.MethodInvocation) ((J.MethodInvocation) m.getSelect()).getSelect()).getArguments().get(0))) {
                             return null;
@@ -105,53 +96,45 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
         }));
     }
 
+    private boolean isPluginsMethod(J.MethodInvocation m) {
+        // Specifically for Kotlin type information is still missing; match strongly where possible for Groovy
+        return getCursor().firstEnclosing(K.CompilationUnit.class) != null ?
+                pluginsMatcher.matches(m) :
+                buildPluginsContainerMatcher.matches(m, true) || settingsPluginsContainerMatcher.matches(m);
+    }
+
     private boolean isPluginLiteral(Expression expression) {
         return expression instanceof J.Literal &&
                 pluginId.equals(((J.Literal) expression).getValue());
     }
 
-    private boolean isIdMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+    private boolean isIdMethodInvocation(@Nullable Expression expr) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
-        J.MethodInvocation m = (J.MethodInvocation) expr;
-        return isKotlin ?
-                "id".equals(m.getSimpleName()) :
-                (buildPluginMatcher.matches(m) || settingsPluginMatcher.matches(m));
+        return pluginIdMatcher.matches((J.MethodInvocation) expr, true);
     }
 
-    private boolean isVersionMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+    private boolean isVersionMethodInvocation(@Nullable Expression expr) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
-        J.MethodInvocation m = (J.MethodInvocation) expr;
-        return isKotlin ?
-                "version".equals(m.getSimpleName()) :
-                (buildPluginWithVersionMatcher.matches(m) || settingsPluginWithVersionMatcher.matches(m));
+        return pluginVersionMatcher.matches((J.MethodInvocation) expr, true);
     }
 
-    private boolean isApplyMethodInvocation(@Nullable Expression expr, boolean isKotlin) {
+    private boolean isApplyMethodInvocation(@Nullable Expression expr) {
         if (!(expr instanceof J.MethodInvocation)) {
             return false;
         }
-        J.MethodInvocation m = (J.MethodInvocation) expr;
-        return isKotlin ?
-                "apply".equals(m.getSimpleName()) :
-                (buildPluginWithApplyMatcher.matches(m) || settingsPluginWithApplyMatcher.matches(m));
+        return pluginApplyMatcher.matches((J.MethodInvocation) expr, true);
     }
 
     @Override
     public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
-        boolean isKotlin = getCursor().firstEnclosing(K.CompilationUnit.class) != null;
-
         // Check for empty plugins{} block
-        boolean isPluginsMethod = isKotlin ?
-                "plugins".equals(m.getSimpleName()) :
-                (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m));
-
-        if (isPluginsMethod) {
+        if (isPluginsMethod(m)) {
             if (m.getArguments().get(0) instanceof J.Lambda &&
                     ((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block &&
                     ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
@@ -159,7 +142,7 @@ public class RemovePluginVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
         }
         // Check for TOP-LEVEL apply plugin: "..." or apply(plugin = "...")
-        else if ((isKotlin && "apply".equals(m.getSimpleName())) || (!isKotlin && applyPluginMatcher.matches(m))) {
+        else if (applyPluginMatcher.matches(m, true)) {
             for (Expression arg : m.getArguments()) {
                 if (arg instanceof G.MapEntry) {
                     G.MapEntry me = (G.MapEntry) arg;

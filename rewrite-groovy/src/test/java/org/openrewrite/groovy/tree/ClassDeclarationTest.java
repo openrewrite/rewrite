@@ -481,6 +481,34 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void recordDeclaration() {
+        rewriteRun(
+          groovy(
+            """
+              record Point(int x, int y) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sealedClass() {
+        rewriteRun(
+          groovy(
+            """
+              sealed class Shape permits Circle, Square {
+              }
+              final class Circle extends Shape {
+              }
+              non-sealed class Square extends Shape {
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4063")
     @Test
     void nestedStaticClass() {

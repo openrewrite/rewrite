@@ -18,7 +18,7 @@ import {omitColon} from "./markers";
 import {Parser, ParserInput, parserInputRead, Parsers} from "../parser";
 import {randomId} from "../uuid";
 import {SourceFile} from "../tree";
-import {Yaml} from "./tree";
+import {Yaml, isYamlKey} from "./tree";
 import {ParseError, ParseErrorKind} from "../parse-error";
 import {Parser as YamlCstParser, CST} from "yaml";
 
@@ -301,7 +301,23 @@ class YamlCstReader {
         let key: Yaml.YamlKey;
         if (item.key) {
             const keyResult = this.convertTokenWithTrailing(item.key);
-            key = keyResult.node as Yaml.YamlKey;
+            if (isYamlKey(keyResult.node)) {
+                key = keyResult.node;
+            } else {
+                // Complex keys (mappings or sequences used as keys) are valid YAML
+                // but our tree model only supports Scalar | Alias as keys.
+                // Degrade to a Scalar containing the source text.
+                key = {
+                    kind: Yaml.Kind.Scalar,
+                    id: randomId(),
+                    prefix: keyResult.node.prefix,
+                    markers: emptyMarkers,
+                    style: Yaml.ScalarStyle.PLAIN,
+                    anchor: undefined,
+                    tag: undefined,
+                    value: CST.stringify(item.key).trim()
+                };
+            }
             keyTrailing = keyResult.trailing;
         } else {
             key = this.createEmptyScalar();
@@ -604,7 +620,20 @@ class YamlCstReader {
         let key: Yaml.YamlKey;
         if (item.key) {
             const keyResult = this.convertTokenWithTrailing(item.key);
-            key = keyResult.node as Yaml.YamlKey;
+            if (isYamlKey(keyResult.node)) {
+                key = keyResult.node;
+            } else {
+                key = {
+                    kind: Yaml.Kind.Scalar,
+                    id: randomId(),
+                    prefix: keyResult.node.prefix,
+                    markers: emptyMarkers,
+                    style: Yaml.ScalarStyle.PLAIN,
+                    anchor: undefined,
+                    tag: undefined,
+                    value: CST.stringify(item.key).trim()
+                };
+            }
             keyTrailing = keyResult.trailing;
         } else {
             key = this.createEmptyScalar();
@@ -635,7 +664,9 @@ class YamlCstReader {
             const valueResult = this.convertTokenWithTrailing(item.value);
             value = valueResult.node as Yaml.Block;
             valueTrailing = valueResult.trailing;
-            value = {...value, prefix: afterColonSpace + value.prefix} as Yaml.Block;
+            if (afterColonSpace) {
+                value = this.prependWhitespaceToValue(value, afterColonSpace);
+            }
         } else {
             value = this.createEmptyScalar(afterColonSpace);
         }

@@ -19,6 +19,7 @@ import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.*;
@@ -226,11 +227,18 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
         }
-        List<Validated<Object>> validations = new ArrayList<>();
-        recipe.validateAll(ctx, validations);
-        assertThat(validations.stream().filter(Validated::isInvalid))
-                .as("Recipe validation must have no failures")
-                .isEmpty();
+
+        // Imperative recipes are loaded with no user-provided arguments, so all optional parameters are null.
+        // Skip recipe validation for these since custom validate() methods (e.g. requiring at least one of several
+        // optional parameters) would fail on an unconfigured instance.
+        if (recipe instanceof DeclarativeRecipe
+                || recipe.getDescriptor().getOptions().stream().allMatch(OptionDescriptor::isRequired)) {
+            List<Validated<Object>> validations = new ArrayList<>();
+            recipe.validateAll(ctx, validations);
+            assertThat(validations.stream().filter(Validated::isInvalid))
+                    .as("Recipe validation must have no failures")
+                    .isEmpty();
+        }
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -305,7 +313,7 @@ public interface RewriteTest extends SourceSpecs {
 
                 SourceSpec<?> nextSpec = sourceSpecIter.next();
                 for (Marker marker : nextSpec.getMarkers()) {
-                    markers = markers.setByType(marker);
+                    markers = markers.add(marker);
                 }
                 sourceFile = sourceFile.withMarkers(markers);
 
@@ -462,6 +470,7 @@ public interface RewriteTest extends SourceSpecs {
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         continue nextSourceSpec;
                     }
                 }
@@ -488,6 +497,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         //noinspection unchecked
                         ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         if (sourceSpec.sourcePath != null) {
                             assertThat(result.getAfter().getSourcePath())
                                     .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));

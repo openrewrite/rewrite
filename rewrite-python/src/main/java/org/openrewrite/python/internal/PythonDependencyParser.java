@@ -312,6 +312,9 @@ public class PythonDependencyParser {
      */
     private static PythonResolutionResult.@Nullable PackageManager detectPackageManager(Map<String, Toml.Table> tables) {
         for (String tableName : tables.keySet()) {
+            if ("tool.poetry".equals(tableName) || tableName.startsWith("tool.poetry.")) {
+                return PythonResolutionResult.PackageManager.Poetry;
+            }
             if ("tool.pdm".equals(tableName) || tableName.startsWith("tool.pdm.")) {
                 return PythonResolutionResult.PackageManager.Pdm;
             }

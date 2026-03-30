@@ -352,7 +352,7 @@ class ChangeParentPomTest implements RewriteTest {
 
     @RepeatedTest(10)
     void multiModuleRelativePath() {
-        ChangeParentPom recipe = new ChangeParentPom(
+        var recipe = new ChangeParentPom(
           "org.springframework.boot",
           null,
           "spring-boot-starter-parent",
@@ -478,7 +478,7 @@ class ChangeParentPomTest implements RewriteTest {
 
     @RepeatedTest(10)
     void multiModuleRelativePathChangeChildren() {
-        ChangeParentPom recipe = new ChangeParentPom(
+        var recipe = new ChangeParentPom(
           "org.sample",
           "org.springframework.boot",
           "sample",
@@ -587,7 +587,7 @@ class ChangeParentPomTest implements RewriteTest {
     })
     @ParameterizedTest
     void multiModuleChangeChildrenBasedOnRelativePath(String oldRelativePath, String newRelativePath, String oldRelativePathTag, String expectedNewRelativePathTag) {
-        ChangeParentPom recipe = new ChangeParentPom(
+        var recipe = new ChangeParentPom(
           "org.sample", "org.springframework.boot",
           "sample", "spring-boot-starter-parent",
           "2.5.0",
@@ -672,7 +672,7 @@ class ChangeParentPomTest implements RewriteTest {
     })
     @ParameterizedTest
     void multiModuleRelativePathNotMatching(String oldRelativePath, String oldRelativePathTag) {
-        ChangeParentPom recipe = new ChangeParentPom(
+        var recipe = new ChangeParentPom(
           "org.sample", "org.springframework.boot",
           "sample", "spring-boot-starter-parent",
           "2.5.0",
@@ -1569,7 +1569,7 @@ class ChangeParentPomTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
     @RepeatedTest(10)
     void multiModule() {
-        ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot",
+        var recipe = new ChangeParentPom("org.springframework.boot",
           null,
           "spring-boot-starter-parent",
           null,
@@ -2111,7 +2111,7 @@ class ChangeParentPomTest implements RewriteTest {
         // This test verifies that when the root pom's parent is upgraded,
         // the child modules' MavenResolutionResult markers are also updated
         // to reflect the new parent information
-        ChangeParentPom recipe = new ChangeParentPom(
+        var recipe = new ChangeParentPom(
           "org.springframework.boot",
           null,
           "spring-boot-starter-parent",
@@ -2224,7 +2224,7 @@ class ChangeParentPomTest implements RewriteTest {
         // - intermediate module has root pom as its parent
         // - leaf module has intermediate module as its parent
         // All modules should have their MavenResolutionResult markers updated
-        ChangeParentPom recipe = new ChangeParentPom(
+        var recipe = new ChangeParentPom(
           "org.springframework.boot",
           null,
           "spring-boot-starter-parent",

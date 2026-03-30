@@ -201,6 +201,27 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         }
 
         @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, J j) {
+            if (isEqual.get() && j instanceof J.MemberReference) {
+                J.MemberReference compareTo = (J.MemberReference) j;
+                // When the template's containing expression is a template parameter placeholder,
+                // always visit it to match against the actual containing expression.
+                // The base class only visits containing when it's a J.Identifier or J.FieldAccess
+                // with a fieldType, which misses literals and other expression types.
+                if (memberRef.getContaining() instanceof J.Empty &&
+                    isTemplateParameterPlaceholder((J.Empty) memberRef.getContaining())) {
+                    if (!memberRef.getReference().getSimpleName().equals(compareTo.getReference().getSimpleName())) {
+                        isEqual.set(false);
+                        return memberRef;
+                    }
+                    visit(memberRef.getContaining(), compareTo.getContaining());
+                    return memberRef;
+                }
+            }
+            return super.visitMemberReference(memberRef, j);
+        }
+
+        @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation template, J j) {
             if (!isEqual.get()) {
                 return template;

@@ -91,9 +91,6 @@ public class StyleHelper {
      */
     public static <T> T merge(T left, T right) {
         Class<?> styleClass = left.getClass();
-        if (right.getClass() != styleClass) {
-            throw new RuntimeException(left.getClass().getName() + " and " + right.getClass().getName() + " should match exactly.");
-        }
         for (FieldAccessor accessor : FIELD_ACCESSORS.get(styleClass)) {
             try {
                 Object rightValue = accessor.getGetter().invoke(right);
@@ -118,6 +115,7 @@ public class StyleHelper {
         return left;
     }
 
+    @SuppressWarnings("unused")
     public static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
         if (!styles.isEmpty()) {
             Set<NamedStyles> newNamedStyles = new HashSet<>(styles);
@@ -170,6 +168,7 @@ public class StyleHelper {
     public static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {
+            //noinspection unchecked
             return (S) style.applyDefaults();
         }
         return null;

@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.groovy.Assertions.groovy;
 
@@ -624,6 +625,36 @@ class DependencyInsightTest implements RewriteTest {
                   /*~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2,com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-web'
                   /*~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2,com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.2)~~>*/implementation 'org.springframework.boot:spring-boot-starter-actuator:2.6.4'
                   /*~~(com.fasterxml.jackson.core:jackson-annotations:2.13.2,com.fasterxml.jackson.core:jackson-core:2.13.2,com.fasterxml.jackson.core:jackson-databind:2.13.2.2)~~>*/implementation 'io.pivotal.cfenv:java-cfenv-boot:2.5.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findTransitiveDependencyKts() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("com.google.guava:guava:31.1-jre")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  /*~~(com.google.guava:failureaccess:1.0.1)~~>*/implementation("com.google.guava:guava:31.1-jre")
               }
               """
           )

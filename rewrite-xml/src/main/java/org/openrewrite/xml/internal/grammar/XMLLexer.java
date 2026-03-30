@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/knut/git/openrewrite/rewrite/rewrite-xml/src/main/antlr/XMLLexer.g4 by ANTLR 4.13.2
+// Generated from rewrite-xml/src/main/antlr/XMLLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
@@ -32,38 +32,38 @@ public class XMLLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, COMMENT=2, CDATA=3, ParamEntityRef=4, EntityRef=5, CharRef=6, SEA_WS=7, 
-		UTF_ENCODING_BOM=8, QUESTION_MARK=9, SPECIAL_OPEN_XML=10, OPEN=11, SPECIAL_OPEN=12, 
-		DTD_OPEN=13, JSP_COMMENT=14, JSP_DECLARATION=15, JSP_EXPRESSION=16, JSP_SCRIPTLET=17, 
-		TEXT=18, DTD_CLOSE=19, DTD_SUBSET_OPEN=20, DTD_S=21, DOCTYPE=22, DTD_SUBSET_CLOSE=23, 
-		MARKUP_OPEN=24, DTS_SUBSET_S=25, MARK_UP_CLOSE=26, MARKUP_S=27, MARKUP_TEXT=28, 
-		MARKUP_SUBSET=29, PI_S=30, PI_TEXT=31, CLOSE=32, SPECIAL_CLOSE=33, SLASH_CLOSE=34, 
-		S=35, DIRECTIVE_OPEN=36, DIRECTIVE_CLOSE=37, SLASH=38, EQUALS=39, STRING=40, 
+		WS=1, COMMENT=2, CDATA=3, ParamEntityRef=4, EntityRef=5, CharRef=6, SEA_WS=7,
+		UTF_ENCODING_BOM=8, QUESTION_MARK=9, SPECIAL_OPEN_XML=10, OPEN=11, SPECIAL_OPEN=12,
+		DTD_OPEN=13, JSP_COMMENT=14, JSP_DECLARATION=15, JSP_EXPRESSION=16, JSP_SCRIPTLET=17,
+		TEXT=18, DTD_CLOSE=19, DTD_SUBSET_OPEN=20, DTD_S=21, DOCTYPE=22, DTD_SUBSET_CLOSE=23,
+		MARKUP_OPEN=24, DTS_SUBSET_S=25, MARK_UP_CLOSE=26, MARKUP_S=27, MARKUP_TEXT=28,
+		MARKUP_SUBSET=29, PI_S=30, PI_TEXT=31, CLOSE=32, SPECIAL_CLOSE=33, SLASH_CLOSE=34,
+		S=35, DIRECTIVE_OPEN=36, DIRECTIVE_CLOSE=37, SLASH=38, EQUALS=39, STRING=40,
 		Name=41;
 	public static final int
-		INSIDE_DTD=1, INSIDE_DTD_SUBSET=2, INSIDE_MARKUP=3, INSIDE_MARKUP_SUBSET=4, 
+		INSIDE_DTD=1, INSIDE_DTD_SUBSET=2, INSIDE_MARKUP=3, INSIDE_MARKUP_SUBSET=4,
 		INSIDE_PROCESS_INSTRUCTION=5, INSIDE_PI_TEXT=6, INSIDE=7;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
 	};
 
 	public static String[] modeNames = {
-		"DEFAULT_MODE", "INSIDE_DTD", "INSIDE_DTD_SUBSET", "INSIDE_MARKUP", "INSIDE_MARKUP_SUBSET", 
+		"DEFAULT_MODE", "INSIDE_DTD", "INSIDE_DTD_SUBSET", "INSIDE_MARKUP", "INSIDE_MARKUP_SUBSET",
 		"INSIDE_PROCESS_INSTRUCTION", "INSIDE_PI_TEXT", "INSIDE"
 	};
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"WS", "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS", 
-			"UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", 
-			"DTD_OPEN", "JSP_COMMENT", "JSP_DECLARATION", "JSP_EXPRESSION", "JSP_SCRIPTLET", 
-			"TEXT", "UTF_8_BOM_CHARS", "UTF_8_BOM", "DTD_CLOSE", "DTD_SUBSET_OPEN", 
-			"DTD_S", "DOCTYPE", "DTD_NAME", "DTD_STRING", "DTD_SUBSET_CLOSE", "MARKUP_OPEN", 
-			"DTS_SUBSET_S", "DTD_PERef", "DTD_SUBSET_COMMENT", "MARK_UP_CLOSE", "MARKUP_SUBSET_OPEN", 
-			"MARKUP_S", "MARKUP_TEXT", "MARKUP_SUBSET", "TXT", "PI_SPECIAL_CLOSE", 
-			"PI_S", "PI_QUESTION_MARK", "PI_TEXT", "PI_TEXT_SPECIAL_CASE", "CLOSE", 
-			"SPECIAL_CLOSE", "SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE", 
-			"SLASH", "EQUALS", "STRING", "Name", "HEXDIGIT", "DIGIT", "NameChar", 
+			"WS", "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS",
+			"UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN",
+			"DTD_OPEN", "JSP_COMMENT", "JSP_DECLARATION", "JSP_EXPRESSION", "JSP_SCRIPTLET",
+			"TEXT", "UTF_8_BOM_CHARS", "UTF_8_BOM", "DTD_CLOSE", "DTD_SUBSET_OPEN",
+			"DTD_S", "DOCTYPE", "DTD_NAME", "DTD_STRING", "DTD_SUBSET_CLOSE", "MARKUP_OPEN",
+			"DTS_SUBSET_S", "DTD_PERef", "DTD_SUBSET_COMMENT", "MARK_UP_CLOSE", "MARKUP_SUBSET_OPEN",
+			"MARKUP_S", "MARKUP_TEXT", "MARKUP_SUBSET", "TXT", "PI_SPECIAL_CLOSE",
+			"PI_S", "PI_QUESTION_MARK", "PI_TEXT", "PI_TEXT_SPECIAL_CASE", "CLOSE",
+			"SPECIAL_CLOSE", "SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE",
+			"SLASH", "EQUALS", "STRING", "Name", "HEXDIGIT", "DIGIT", "NameChar",
 			"NameStartChar"
 		};
 	}
@@ -71,22 +71,22 @@ public class XMLLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, null, null, null, "'?'", null, "'<'", 
-			null, null, null, null, null, null, null, null, null, null, null, null, 
-			null, null, null, null, null, null, null, null, null, null, "'/>'", null, 
+			null, null, null, null, null, null, null, null, null, "'?'", null, "'<'",
+			null, null, null, null, null, null, null, null, null, null, null, null,
+			null, null, null, null, null, null, null, null, null, null, "'/>'", null,
 			"'%@'", "'%'", "'/'", "'='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", 
-			"SEA_WS", "UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN", 
-			"SPECIAL_OPEN", "DTD_OPEN", "JSP_COMMENT", "JSP_DECLARATION", "JSP_EXPRESSION", 
-			"JSP_SCRIPTLET", "TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE", 
-			"DTD_SUBSET_CLOSE", "MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S", 
-			"MARKUP_TEXT", "MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE", 
-			"SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE", "SLASH", "EQUALS", 
+			null, "WS", "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef",
+			"SEA_WS", "UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN",
+			"SPECIAL_OPEN", "DTD_OPEN", "JSP_COMMENT", "JSP_DECLARATION", "JSP_EXPRESSION",
+			"JSP_SCRIPTLET", "TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE",
+			"DTD_SUBSET_CLOSE", "MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S",
+			"MARKUP_TEXT", "MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE",
+			"SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE", "SLASH", "EQUALS",
 			"STRING", "Name"
 		};
 	}

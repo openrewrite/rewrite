@@ -28,6 +28,7 @@ import {MarkClassTypes} from "./mark-class-types";
 import {ScanningEditor} from "./scanning-editor";
 import {ReplaceAssignment} from "./replace-assignment";
 import {JavaChangeMethodName} from "./java-change-method-name";
+import {CrossModuleRecipeList} from "./cross-module-recipe-list";
 
 export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ChangeText, JavaScript);
@@ -44,4 +45,5 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(ScanningEditor, JavaScript);
     await marketplace.install(ReplaceAssignment, JavaScript);
     await marketplace.install(JavaChangeMethodName, JavaScript);
+    await marketplace.install(CrossModuleRecipeList, JavaScript);
 }
