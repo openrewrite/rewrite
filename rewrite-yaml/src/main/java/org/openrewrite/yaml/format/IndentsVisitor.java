@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.yaml.MultilineScalarChanged;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
@@ -27,6 +28,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -78,7 +80,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             if (y instanceof Yaml.Sequence.Entry) {
                 indent = getCursor().getParentOrThrow().getMessage("sequenceEntryIndent", indent);
 
-                int seqIndentOffset = style.isIndentedSequences() ? style.getIndentSize() : 0;
+                int seqIndentOffset = evaluate(() -> style.isIndentedSequences(), true) ? style.getIndentSize() : 0;
                 int dashColumn = indent + seqIndentOffset;
                 y = y.withPrefix(indentTo(y.getPrefix(), dashColumn));
 
@@ -227,6 +229,16 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             }
         }
         return size;
+    }
+
+    @ToBeRemoved(after = "2026-06-01", reason = "All parent runtimes have had few weeks to update")
+    private <T> T evaluate(Supplier<T> supplier, T defaultValue) {
+        try {
+            return supplier.get();
+        } catch (NoSuchMethodError | NoSuchFieldError e) {
+            // Handle newly introduced method calls on style that are not part of lst yet
+            return defaultValue;
+        }
     }
 
     private String firstIndent(Yaml yaml) {
