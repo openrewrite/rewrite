@@ -64,7 +64,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param properties     Yaml placeholder properties
      * @param acceptPackages Limit scan to specified packages
      */
-    public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
+    public ClasspathScanningLoader(@Nullable Properties properties, String[] acceptPackages) {
         this.classLoader = ClasspathScanningLoader.class.getClassLoader();
         this.recipeLoader = new RecipeLoader(classLoader);
         this.performScan = () -> {
@@ -82,7 +82,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param properties  YAML placeholder properties
      * @param classLoader Limit scan to classes loadable by this classloader
      */
-    public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
+    public ClasspathScanningLoader(@Nullable Properties properties, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
         this.performScan = () -> {
@@ -105,7 +105,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * `MavenRecipeBundleReader.marketplaceFromClasspathScan`.
      * Supports both jar files and directories containing class files.
      */
-    public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
+    public ClasspathScanningLoader(Path jar, @Nullable Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
 
@@ -174,7 +174,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * Construct a ClasspathScanningLoader to load Yaml categories and recipes from the runtime classpath, as part of
      * running tests or inferring local recipe categories.
      */
-    public static ClasspathScanningLoader onlyYaml(Properties properties) {
+    public static ClasspathScanningLoader onlyYaml(@Nullable Properties properties) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
         classpathScanningLoader.scanYaml(
                 new ClassGraph().acceptPaths("META-INF/rewrite"),
@@ -188,7 +188,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * Construct a ClasspathScanningLoader to load categories from the provided dependencies only, as part of migration
      * in the CLI.
      */
-    public static ClasspathScanningLoader onlyYaml(Properties properties, Collection<Path> dependencies) {
+    public static ClasspathScanningLoader onlyYaml(@Nullable Properties properties, Collection<Path> dependencies) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
         classpathScanningLoader.scanYaml(
                 new ClassGraph().acceptPaths("META-INF/rewrite").overrideClasspath(dependencies),
@@ -207,7 +207,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * This must be called _after_ scanClasses or the descriptors of declarative recipes will be missing any
      * non-declarative recipes they depend on that would be discovered by scanClasses
      */
-    private void scanYaml(ClassGraph classGraph, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, @Nullable ClassLoader classLoader) {
+    private void scanYaml(ClassGraph classGraph, @Nullable Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, @Nullable ClassLoader classLoader) {
         try (ScanResult scanResult = classGraph.scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
