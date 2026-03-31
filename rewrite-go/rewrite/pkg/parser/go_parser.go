@@ -101,8 +101,11 @@ type parseContext struct {
 // prefix extracts the whitespace and comments between the current cursor
 // position and the given token position.
 func (ctx *parseContext) prefix(pos token.Pos) tree.Space {
+	if !pos.IsValid() {
+		return tree.EmptySpace
+	}
 	targetOffset := ctx.file.Offset(pos)
-	if targetOffset <= ctx.cursor {
+	if targetOffset <= ctx.cursor || targetOffset > len(ctx.src) {
 		return tree.EmptySpace
 	}
 	raw := string(ctx.src[ctx.cursor:targetOffset])
@@ -117,7 +120,12 @@ func (ctx *parseContext) skip(n int) {
 
 // skipTo advances the cursor to the given position.
 func (ctx *parseContext) skipTo(pos token.Pos) {
-	ctx.cursor = ctx.file.Offset(pos)
+	if pos.IsValid() {
+		off := ctx.file.Offset(pos)
+		if off <= len(ctx.src) {
+			ctx.cursor = off
+		}
+	}
 }
 
 // prefixAndSkip extracts the prefix before pos and advances past length bytes.
@@ -2303,8 +2311,11 @@ func (ctx *parseContext) findNextString(s string) int {
 
 // prefixString returns the raw source between cursor and pos, for debugging.
 func (ctx *parseContext) prefixString(pos token.Pos) string {
+	if !pos.IsValid() {
+		return ""
+	}
 	targetOffset := ctx.file.Offset(pos)
-	if targetOffset <= ctx.cursor {
+	if targetOffset <= ctx.cursor || targetOffset > len(ctx.src) {
 		return ""
 	}
 	return strings.TrimRight(string(ctx.src[ctx.cursor:targetOffset]), " \t\n")
