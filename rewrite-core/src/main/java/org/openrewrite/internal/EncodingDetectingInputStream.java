@@ -37,14 +37,10 @@ public class EncodingDetectingInputStream extends InputStream {
     private boolean charsetBomMarked;
 
     /**
-     * Last byte read
+     * Number of UTF-8 continuation bytes (0x80-0xBF) still expected
+     * to complete the current multi-byte sequence. Zero when idle.
      */
-    private int prev;
-    private int prev2;
-
-    boolean maybeTwoByteSequence = false;
-    boolean maybeThreeByteSequence = false;
-    boolean maybeFourByteSequence = false;
+    int remainingContinuationBytes = 0;
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this(inputStream, null);
@@ -84,7 +80,7 @@ public class EncodingDetectingInputStream extends InputStream {
         // if we haven't yet determined a charset...
         if (read == -1) {
             if (charset == null) {
-                if (maybeTwoByteSequence || maybeThreeByteSequence || maybeFourByteSequence) {
+                if (remainingContinuationBytes > 0) {
                     charset = WINDOWS_1252;
                 } else {
                     charset = StandardCharsets.UTF_8;
@@ -116,50 +112,25 @@ public class EncodingDetectingInputStream extends InputStream {
     }
 
     private void guessCharset(int aByte) {
-        if (aByte >= 0xF8 || aByte == 0xC0 || aByte == 0xC1) {
-            // 0xF8-0xFF are never valid in any position of a UTF-8 sequence.
-            // 0xC0 and 0xC1 would start overlong encodings of code points below U+0080,
-            // which are forbidden by RFC 3629.
-            charset = WINDOWS_1252;
-            return;
-        }
-        if (utf8TwoByteSequence(aByte)) {
-            maybeTwoByteSequence = true;
-        } else if (utf8ThreeByteSequence(aByte)) {
-            maybeThreeByteSequence = true;
-        } else if (utf8FourByteSequence(aByte)) {
-            maybeFourByteSequence = true;
-        } else if (maybeTwoByteSequence) {
-            if (!utf8SequenceEnd(aByte)) {
-                charset = WINDOWS_1252;
+        if (remainingContinuationBytes > 0) {
+            if (aByte >= 0x80 && aByte <= 0xBF) {
+                remainingContinuationBytes--;
             } else {
-                maybeTwoByteSequence = false;
-                prev = -1;
-            }
-        } else if (maybeThreeByteSequence) {
-            if (!utf8SequenceEnd(aByte)) {
                 charset = WINDOWS_1252;
             }
-
-            if (utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
-                maybeThreeByteSequence = false;
-                prev = -1;
-            }
-        } else if (maybeFourByteSequence) {
-            if (utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) || utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) || !utf8SequenceEnd(aByte)) {
-                charset = WINDOWS_1252;
-            }
-
-            if (utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
-                maybeFourByteSequence = false;
-                prev = -1;
-            }
-        } else if (utf8SequenceEnd(aByte)) {
+        } else if (aByte <= 0x7F) {
+            // ASCII — valid, nothing to track
+        } else if (aByte >= 0xC2 && aByte <= 0xDF) {
+            remainingContinuationBytes = 1;
+        } else if (aByte >= 0xE0 && aByte <= 0xEF) {
+            remainingContinuationBytes = 2;
+        } else if (aByte >= 0xF0 && aByte <= 0xF4) {
+            remainingContinuationBytes = 3;
+        } else {
+            // 0x80-0xBF (bare continuation), 0xC0-0xC1 (overlong),
+            // 0xF5-0xFF (above max Unicode) — all invalid UTF-8
             charset = WINDOWS_1252;
         }
-
-        prev2 = prev;
-        prev = aByte;
     }
 
     public String readFully() {
@@ -204,27 +175,7 @@ public class EncodingDetectingInputStream extends InputStream {
         return -2;
     }
 
-    // The first byte of a UTF-8 two byte sequence is between 0xC2 - 0xDF.
-    // 0xC0 and 0xC1 are excluded because they would encode code points below U+0080
-    // (overlong encodings), which are forbidden by RFC 3629.
-    private boolean utf8TwoByteSequence(int b) {
-        return 0xC2 <= b && b <= 0xDF;
-    }
 
-    // The first byte of a UTF-8 three byte sequence is between 0xE0 - 0xEF.
-    private boolean utf8ThreeByteSequence(int b) {
-        return 0xE0 <= b && b <= 0xEF;
-    }
-
-    // The first byte of a UTF-8 four byte sequence is between 0xF0 - 0xF7.
-    private boolean utf8FourByteSequence(int b) {
-        return 0xF0 <= b && b <= 0xF7;
-    }
-
-    // A UTF-8 byte sequence must end between 0x80 - 0xBF.
-    private boolean utf8SequenceEnd(int b) {
-        return 0x80 <= b && b <= 0xBF;
-    }
 
     @Override
     public void close() throws IOException {
