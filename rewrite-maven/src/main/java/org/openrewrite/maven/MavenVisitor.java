@@ -43,6 +43,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
+    static final XPathMatcher PROFILE_PROPERTY_MATCHER = new XPathMatcher("/project/profiles/profile/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher ANNOTATION_PROCESSORS_PATH_MATCHER = new XPathMatcher("//annotationProcessorPaths/path");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
@@ -99,6 +100,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public boolean isPropertyTag() {
         return PROPERTY_MATCHER.matches(getCursor());
+    }
+
+    public boolean isProfilePropertyTag() {
+        return PROFILE_PROPERTY_MATCHER.matches(getCursor());
     }
 
     public boolean isDependencyTag() {
