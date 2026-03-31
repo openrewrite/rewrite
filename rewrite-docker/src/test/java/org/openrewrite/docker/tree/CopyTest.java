@@ -229,6 +229,43 @@ class CopyTest implements RewriteTest {
     }
 
     @Test
+    void copyWithLineContinuationAndFromFlag() {
+        rewriteRun(
+          docker(
+            """
+              FROM registry.example.com/base-images/debian:bookworm-slim
+              COPY \\
+                --from=registry.example.com/base-images/openjdk:17-slim \\
+                /opt/java/17 \\
+                /usr/local/java/
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                var copy = (Docker.Copy) doc.getStages().getFirst().getInstructions().getLast();
+
+                // Flag prefix captures the line continuation after COPY
+                assertThat(copy.getFlags()).hasSize(1);
+                assertThat(copy.getFlags().getFirst().getName()).isEqualTo("from");
+                assertThat(copy.getFlags().getFirst().getPrefix().getWhitespace()).isEqualTo(" \\\n  ");
+
+                // Shell form prefix captures the line continuation after the flag
+                assertThat(copy.getShellForm()).isNotNull();
+                assertThat(copy.getShellForm().getPrefix().getWhitespace()).isEqualTo(" \\\n  ");
+
+                // Source path
+                assertThat(copy.getShellForm().getSources()).hasSize(1);
+                assertThat(((Docker.Literal) copy.getShellForm().getSources().get(0).getContents().getFirst()).getText())
+                    .isEqualTo("/opt/java/17");
+
+                // Destination prefix captures its line continuation
+                assertThat(copy.getShellForm().getDestination().getPrefix().getWhitespace()).isEqualTo(" \\\n  ");
+                assertThat(((Docker.Literal) copy.getShellForm().getDestination().getContents().getFirst()).getText())
+                    .isEqualTo("/usr/local/java/");
+            })
+          )
+        );
+    }
+
+    @Test
     void copyExecFormWithMultipleSources() {
         // COPY with exec form (JSON array) containing multiple sources and one destination
         rewriteRun(
