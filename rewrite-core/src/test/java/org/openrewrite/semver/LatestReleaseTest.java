@@ -93,6 +93,13 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare("1.0", "1.1.1", "1.1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1.1", "1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1", "1.1")).isLessThan(0);
+
+        // Different counts crossing the 5-group boundary
+        assertThat(latestRelease.compare(null, "1.2.3.4.5", "1.2.3.4.5.1")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.1", "1.2.3.4.5")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3", "1.2.3.4.5.6")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.6.0.0")).isZero();
     }
 
     @Test
