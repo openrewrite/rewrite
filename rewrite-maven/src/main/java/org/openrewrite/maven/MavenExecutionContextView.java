@@ -188,10 +188,27 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      */
     public List<MavenRepository> getRepositories(@Nullable MavenSettings mavenSettings,
                                                  @Nullable List<String> activeProfiles) {
+        List<MavenRepository> contextRepos = getMessage(MAVEN_REPOSITORIES, emptyList());
         if (mavenSettings != null) {
-            return mapRepositories(mavenSettings, activeProfiles == null ? emptyList() : activeProfiles);
+            List<MavenRepository> settingsRepos = mapRepositories(mavenSettings, activeProfiles == null ? emptyList() : activeProfiles);
+            if (contextRepos.isEmpty()) {
+                return settingsRepos;
+            }
+            // Include both settings-derived repos and context repos, settings repos take precedence by ID
+            Map<String, MavenRepository> result = new LinkedHashMap<>();
+            for (MavenRepository repo : settingsRepos) {
+                if (repo.getId() != null) {
+                    result.put(repo.getId(), repo);
+                }
+            }
+            for (MavenRepository repo : contextRepos) {
+                if (repo.getId() != null) {
+                    result.putIfAbsent(repo.getId(), repo);
+                }
+            }
+            return new ArrayList<>(result.values());
         }
-        return getMessage(MAVEN_REPOSITORIES, emptyList());
+        return contextRepos;
     }
 
     /**

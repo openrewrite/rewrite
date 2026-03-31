@@ -149,6 +149,172 @@ class MavenPomDownloaderTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2122")
+    @Test
+    void settingsReposUsedWhenPomRepoFails(@TempDir Path tempDir) throws Exception {
+        // Create a working settings repo with the artifact
+        Path settingsRepoDir = tempDir.resolve("settings-repo");
+        Path artifactDir = settingsRepoDir.resolve("com/example/my-lib/1.0.0");
+        Files.createDirectories(artifactDir);
+        Files.writeString(artifactDir.resolve("my-lib-1.0.0.pom"),
+          //language=xml
+          """
+            <project>
+                <groupId>com.example</groupId>
+                <artifactId>my-lib</artifactId>
+                <version>1.0.0</version>
+            </project>
+            """);
+        Files.writeString(artifactDir.resolve("my-lib-1.0.0.jar"), "I'm a jar");
+
+        // Create a broken POM repo (empty, has no artifacts)
+        Path brokenRepoDir = tempDir.resolve("broken-repo");
+        Files.createDirectories(brokenRepoDir);
+
+        // Set up Maven settings with the working repo in a profile
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+          //language=xml
+          """
+            <settings>
+              <profiles>
+                <profile>
+                  <id>my-repos</id>
+                  <repositories>
+                    <repository>
+                      <id>settings-repo</id>
+                      <url>%s</url>
+                    </repository>
+                  </repositories>
+                </profile>
+              </profiles>
+              <activeProfiles>
+                <activeProfile>my-repos</activeProfile>
+              </activeProfiles>
+            </settings>
+            """.formatted(settingsRepoDir.toUri())
+        ), ctx));
+
+        var gav = new GroupArtifactVersion("com.example", "my-lib", "1.0.0");
+
+        // The POM repo doesn't have the artifact, but settings repo does.
+        // The download should succeed by falling through to the settings repo.
+        var brokenRepo = MavenRepository.builder()
+          .id("broken-repo")
+          .uri(brokenRepoDir.toUri().toString())
+          .knownToExist(true)
+          .build();
+
+        Pom pom = assertDoesNotThrow(() ->
+          new MavenPomDownloader(emptyMap(), ctx)
+            .download(gav, null, null, List.of(brokenRepo)));
+        assertThat(pom.getGroupId()).isEqualTo("com.example");
+        assertThat(pom.getArtifactId()).isEqualTo("my-lib");
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2122")
+    @Test
+    void contextReposUsedWhenPomRepoFails(@TempDir Path tempDir) throws Exception {
+        // Create a working repo with the artifact
+        Path workingRepoDir = tempDir.resolve("working-repo");
+        Path artifactDir = workingRepoDir.resolve("com/example/my-lib/1.0.0");
+        Files.createDirectories(artifactDir);
+        Files.writeString(artifactDir.resolve("my-lib-1.0.0.pom"),
+          //language=xml
+          """
+            <project>
+                <groupId>com.example</groupId>
+                <artifactId>my-lib</artifactId>
+                <version>1.0.0</version>
+            </project>
+            """);
+        Files.writeString(artifactDir.resolve("my-lib-1.0.0.jar"), "I'm a jar");
+
+        // Create a broken POM repo (empty, has no artifacts)
+        Path brokenRepoDir = tempDir.resolve("broken-repo");
+        Files.createDirectories(brokenRepoDir);
+
+        // Set repos directly on context (without MavenSettings)
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var workingRepo = MavenRepository.builder()
+          .id("working-repo")
+          .uri(workingRepoDir.toUri().toString())
+          .knownToExist(true)
+          .build();
+        ctx.setRepositories(List.of(workingRepo));
+
+        var gav = new GroupArtifactVersion("com.example", "my-lib", "1.0.0");
+
+        var brokenRepo = MavenRepository.builder()
+          .id("broken-repo")
+          .uri(brokenRepoDir.toUri().toString())
+          .knownToExist(true)
+          .build();
+
+        // Download should succeed using context repo when POM repo fails
+        Pom pom = assertDoesNotThrow(() ->
+          new MavenPomDownloader(emptyMap(), ctx)
+            .download(gav, null, null, List.of(brokenRepo)));
+        assertThat(pom.getGroupId()).isEqualTo("com.example");
+        assertThat(pom.getArtifactId()).isEqualTo("my-lib");
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2122")
+    @Test
+    void contextReposNotLostWhenMavenSettingsPresent(@TempDir Path tempDir) throws Exception {
+        // Create a working repo with the artifact
+        Path workingRepoDir = tempDir.resolve("working-repo");
+        Path artifactDir = workingRepoDir.resolve("com/example/my-lib/1.0.0");
+        Files.createDirectories(artifactDir);
+        Files.writeString(artifactDir.resolve("my-lib-1.0.0.pom"),
+          //language=xml
+          """
+            <project>
+                <groupId>com.example</groupId>
+                <artifactId>my-lib</artifactId>
+                <version>1.0.0</version>
+            </project>
+            """);
+        Files.writeString(artifactDir.resolve("my-lib-1.0.0.jar"), "I'm a jar");
+
+        // Create a broken POM repo (empty, has no artifacts)
+        Path brokenRepoDir = tempDir.resolve("broken-repo");
+        Files.createDirectories(brokenRepoDir);
+
+        // Set up Maven settings with NO profiles/repos
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+          //language=xml
+          """
+            <settings>
+            </settings>
+            """
+        ), ctx));
+
+        // Add repos directly on the context AFTER setting maven settings
+        var workingRepo = MavenRepository.builder()
+          .id("working-repo")
+          .uri(workingRepoDir.toUri().toString())
+          .knownToExist(true)
+          .build();
+        ctx.setRepositories(List.of(workingRepo));
+
+        var gav = new GroupArtifactVersion("com.example", "my-lib", "1.0.0");
+
+        var brokenRepo = MavenRepository.builder()
+          .id("broken-repo")
+          .uri(brokenRepoDir.toUri().toString())
+          .knownToExist(true)
+          .build();
+
+        // Download should succeed using the context repo even though MavenSettings is set
+        Pom pom = assertDoesNotThrow(() ->
+          new MavenPomDownloader(emptyMap(), ctx)
+            .download(gav, null, null, List.of(brokenRepo)));
+        assertThat(pom.getGroupId()).isEqualTo("com.example");
+        assertThat(pom.getArtifactId()).isEqualTo("my-lib");
+    }
+
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
