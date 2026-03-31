@@ -119,6 +119,13 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 		q.GetAndSend(m, func(x any) any { return x.(tree.GroupedImport).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(tree.GroupedImport).Before.Whitespace }, nil)
+	case tree.ImportBlock:
+		// ImportBlock.rpcSend sends: id, closePrevious, before, grouped, groupedBefore
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).ClosePrevious }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Grouped }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).GroupedBefore.Whitespace }, nil)
 	case tree.ShortVarDecl:
 		q.GetAndSend(m, func(x any) any { return x.(tree.ShortVarDecl).Ident.String() }, nil)
 	case tree.VarKeyword:
@@ -192,6 +199,21 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 			}
 			ws := receiveScalar[string](q, m.Before.Whitespace)
 			m.Before = tree.Space{Whitespace: ws}
+			return m
+		case tree.ImportBlock:
+			// ImportBlock.rpcReceive: id, closePrevious, before, grouped, groupedBefore
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.ClosePrevious = receiveScalar[bool](q, m.ClosePrevious)
+			ws := receiveScalar[string](q, m.Before.Whitespace)
+			m.Before = tree.Space{Whitespace: ws}
+			m.Grouped = receiveScalar[bool](q, m.Grouped)
+			gbWs := receiveScalar[string](q, m.GroupedBefore.Whitespace)
+			m.GroupedBefore = tree.Space{Whitespace: gbWs}
 			return m
 		case tree.ShortVarDecl:
 			idStr := receiveScalar[string](q, m.Ident.String())
