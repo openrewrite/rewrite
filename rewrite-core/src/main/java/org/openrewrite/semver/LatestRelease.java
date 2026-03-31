@@ -139,7 +139,8 @@ public class LatestRelease implements VersionComparator {
         v2Gav.find();
 
         try {
-            for (int i = 1; i <= Math.max(vp1, vp2); i++) {
+            // Cap at 5 because RELEASE_PATTERN only has 5 numeric capturing groups
+            for (int i = 1; i <= Math.min(Math.max(vp1, vp2), 5); i++) {
                 String v1Part = v1Gav.group(i);
                 String v2Part = v2Gav.group(i);
                 if (v1Part == null) {
