@@ -162,8 +162,8 @@ public class LatestRelease implements VersionComparator {
         // When all numeric parts are equal, we need to handle pre-release versions properly
         // A pre-release version should be considered less than a release version
         // e.g., "3.5.0-RC1" < "3.5.0"
-        int v1Prio = qualifierPriority(v1Gav.group(6));
-        int v2Prio = qualifierPriority(v2Gav.group(6));
+        int v1Prio = qualifierPriority(v1Gav.group("qualifier"));
+        int v2Prio = qualifierPriority(v2Gav.group("qualifier"));
 
         if (v1Prio != v2Prio) {
             return Integer.compare(v1Prio, v2Prio);

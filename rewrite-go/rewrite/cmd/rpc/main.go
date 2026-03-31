@@ -194,12 +194,17 @@ func (s *server) writeMessage(resp *jsonRPCResponse) error {
 }
 
 // safeHandleRequest wraps handleRequest with panic recovery.
-func (s *server) safeHandleRequest(req *jsonRPCRequest) *jsonRPCResponse {
+func (s *server) safeHandleRequest(req *jsonRPCRequest) (resp *jsonRPCResponse) {
 	defer func() {
 		if r := recover(); r != nil {
 			buf := make([]byte, 4096)
 			n := runtime.Stack(buf, false)
 			s.logger.Printf("PANIC in %s: %v\n%s", req.Method, r, buf[:n])
+			resp = &jsonRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &rpcError{Code: -32603, Message: fmt.Sprintf("Internal error: %v", r)},
+			}
 		}
 	}()
 	return s.handleRequest(req)

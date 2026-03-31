@@ -218,6 +218,19 @@ var _ VisitorI = (*GoVisitor)(nil)
 func (v *GoVisitor) VisitCompilationUnit(cu *tree.CompilationUnit, p any) tree.J {
 	cu = cu.WithPrefix(v.self().VisitSpace(cu.Prefix, p))
 	cu = cu.WithMarkers(v.visitMarkers(cu.Markers, p))
+	if cu.PackageDecl != nil {
+		pkg := *cu.PackageDecl
+		pkg.Element = visitAndCast[*tree.Identifier](v, pkg.Element, p)
+		pkg.After = v.self().VisitSpace(pkg.After, p)
+		cu = cu.WithPackageDecl(&pkg)
+	}
+	if cu.Imports != nil {
+		imports := *cu.Imports
+		imports.Before = v.self().VisitSpace(imports.Before, p)
+		imports.Markers = v.visitMarkers(imports.Markers, p)
+		imports.Elements = visitRightPaddedList(v, imports.Elements, p)
+		cu = cu.WithImports(&imports)
+	}
 	cu = cu.WithStatements(visitRightPaddedList(v, cu.Statements, p))
 	cu = cu.WithEOF(v.self().VisitSpace(cu.EOF, p))
 	return cu
@@ -552,11 +565,18 @@ func (v *GoVisitor) visitMarkers(markers tree.Markers, p any) tree.Markers {
 
 func visitAndCast[T tree.Tree](v *GoVisitor, t tree.Tree, p any) T {
 	result := v.self().Visit(t, p)
+	if result == nil {
+		var zero T
+		return zero
+	}
 	return result.(T)
 }
 
 func visitExpression(v *GoVisitor, expr tree.Expression, p any) tree.Expression {
 	result := v.self().Visit(expr, p)
+	if result == nil {
+		return nil
+	}
 	return result.(tree.Expression)
 }
 

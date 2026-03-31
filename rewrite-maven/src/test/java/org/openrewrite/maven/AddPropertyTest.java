@@ -386,6 +386,56 @@ class AddPropertyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2123")
+    @Test
+    void preserveSelfClosingProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("argLine", "", true, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <argLine/>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2123")
+    @Test
+    void updateSelfClosingProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("argLine", "some-value", null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <argLine/>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <argLine>some-value</argLine>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void twiceInARow() {
         rewriteRun(
