@@ -40,7 +40,9 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.marketplace.MavenRecipeBundleResolver;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
+import org.openrewrite.Parser;
 import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -198,6 +200,27 @@ public class JavaRewriteRpc {
 
         // Create the RPC server with the marketplace and resolvers
         RewriteRpc server = new RewriteRpc(jsonRpc, marketplace, resolvers);
+
+        // FIXME replace reflective parser discovery with ServiceLoader-based
+        //  discovery (e.g. make Parser.Builder a service interface) so that any
+        //  parser on the classpath is automatically available for RPC Parse requests.
+        //
+        // Register parsers for handling Parse requests. More specific parsers
+        // (like CsprojParser) must come before generic ones (XmlParser) so they
+        // win the accept() dispatch for file types they both handle.
+        List<Parser> parsers = new ArrayList<>();
+        try {
+            Object builder = Class.forName("org.openrewrite.csharp.CsprojParser")
+                    .getMethod("builder").invoke(null);
+            parsers.add((Parser) builder.getClass().getMethod("build").invoke(builder));
+        } catch (ClassNotFoundException ignored) {
+            // CsprojParser not on classpath — fall through to XmlParser
+        } catch (ReflectiveOperationException e) {
+            PrintStream err = logStream != null ? logStream : System.err;
+            err.println("Failed to load CsprojParser: " + e.getMessage());
+        }
+        parsers.add(new XmlParser());
+        server.setParsers(parsers);
 
         if (logStream != null) {
             server.log(logStream);
