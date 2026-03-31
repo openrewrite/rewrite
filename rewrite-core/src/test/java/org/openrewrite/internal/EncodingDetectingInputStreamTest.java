@@ -96,11 +96,10 @@ class EncodingDetectingInputStreamTest {
 
     @Test
     void oddPairInWindows1252() throws Exception {
-        // Range 1: 0xC0 - 0xDF == "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"
-        // Range 2: 0x80 - 0xBF == "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”·–—˜™š›œžŸ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿"
-        // A character in range 1 followed by a character in range 2 encoded in Windows-1252 will be detected as UTF-8.
-        try (EncodingDetectingInputStream is = read("À€", WINDOWS_1252)) {
-            assertThat(is.getCharset()).isEqualTo(UTF_8);
+        // 0xC0 and 0xC1 are invalid UTF-8 lead bytes (overlong encodings forbidden by RFC 3629),
+        // so Windows-1252 text starting with À (0xC0) is now correctly detected.
+        try (EncodingDetectingInputStream is = read(new String(new byte[]{(byte) 0xC0, (byte) 0x80}, WINDOWS_1252), WINDOWS_1252)) {
+            assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
         }
     }
 
@@ -136,6 +135,167 @@ class EncodingDetectingInputStreamTest {
                 assertThat(iso[0]).isEqualTo(win[0]);
             }
         }
+    }
+
+    @Test
+    void detectsWindows1252WhenFileContainsByteAboveF7() {
+        // 0xFC is 'ü' in ISO-8859-1/Windows-1252, and is never valid in UTF-8
+        byte[] bytes = new byte[]{'H', 'e', 'l', 'l', 'o', (byte) 0xFC};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void detectsWindows1252WithMultipleHighBytes() {
+        // 0xFC='ü', 0xE4 starts a valid UTF-8 3-byte sequence but 0xFC does not
+        byte[] bytes = new byte[]{'t', 'e', 's', 't', (byte) 0xFC, ' ', (byte) 0xE4, ' ', (byte) 0xF6};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void validUtf8MultiBytesDetectedAsUtf8() {
+        // 'ü' encoded as UTF-8: 0xC3 0xBC
+        byte[] bytes = new byte[]{'H', 'e', 'l', 'l', 'o', (byte) 0xC3, (byte) 0xBC};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(UTF_8);
+    }
+
+    @Test
+    void readFullyDecodesIso8859Correctly() {
+        // "Hütte" in ISO-8859-1: H=0x48, ü=0xFC, t=0x74, t=0x74, e=0x65
+        byte[] bytes = new byte[]{0x48, (byte) 0xFC, 0x74, 0x74, 0x65};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        String result = is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+        assertThat(result).isEqualTo("Hütte");
+    }
+
+    @Test
+    void detectsWindows1252ForOverlongC0() {
+        // 0xC0 is 'À' in ISO-8859-1, and is an invalid UTF-8 lead byte (overlong)
+        byte[] bytes = new byte[]{'C', 'a', 'f', (byte) 0xC0};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void detectsWindows1252ForOverlongC1() {
+        // 0xC1 is 'Á' in ISO-8859-1, and is an invalid UTF-8 lead byte (overlong)
+        byte[] bytes = new byte[]{'S', 'a', 'o', ' ', 'P', 'a', 'u', 'l', 'o', (byte) 0xC1};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void detectsWindows1252ForC0FollowedByContinuationByte() {
+        // 0xC0 0xA3 looks like a UTF-8 two-byte sequence but is actually overlong
+        // In ISO-8859-1 this would be 'À£'
+        byte[] bytes = new byte[]{'t', 'e', 's', 't', (byte) 0xC0, (byte) 0xA3};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void utf8ThreeByteSequences() throws Exception {
+        // U+0800 (first 3-byte), U+4E16 (世), U+AC00 (가)
+        for (String s : List.of("\u0800", "世", "가", "Hello 世界")) {
+            try (EncodingDetectingInputStream is = read(s, UTF_8)) {
+                assertThat(is.getCharset())
+                        .as("Expected UTF-8 for: %s", s)
+                        .isEqualTo(UTF_8);
+            }
+        }
+    }
+
+    @Test
+    void utf8FourByteSequences() throws Exception {
+        // U+1F600 (😀), U+10000 (first 4-byte), U+1F4A9 (💩)
+        for (String s : List.of("\uD83D\uDE00", "\uD800\uDC00", "\uD83D\uDCA9", "Hello \uD83D\uDE00 world")) {
+            try (EncodingDetectingInputStream is = read(s, UTF_8)) {
+                assertThat(is.getCharset())
+                        .as("Expected UTF-8 for: %s", s)
+                        .isEqualTo(UTF_8);
+            }
+        }
+    }
+
+    @Test
+    void truncatedThreeByteSequence() {
+        // 0xE4 starts a 3-byte sequence, but only one continuation byte follows
+        byte[] bytes = new byte[]{'a', 'b', (byte) 0xE4, (byte) 0xB8};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void truncatedFourByteSequence() {
+        // 0xF0 starts a 4-byte sequence, but only two continuation bytes follow
+        byte[] bytes = new byte[]{'a', (byte) 0xF0, (byte) 0x9F, (byte) 0x98};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void bareContinuationByte() {
+        // 0x80-0xBF without a preceding lead byte is invalid UTF-8
+        byte[] bytes = new byte[]{'H', 'e', 'l', 'l', 'o', (byte) 0x80};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void validUtf8FollowedByInvalidByte() {
+        // Valid 2-byte UTF-8 (0xC3 0xBC = ü), then ASCII, then invalid byte 0xFC
+        byte[] bytes = new byte[]{(byte) 0xC3, (byte) 0xBC, ' ', 'a', 'n', 'd', ' ', (byte) 0xFC};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void mixedMultiByteUtf8() throws Exception {
+        // 2-byte (é), 3-byte (世), 4-byte (😀), all valid UTF-8
+        String s = "caf\u00E9 \u4E16\u754C \uD83D\uDE00";
+        try (EncodingDetectingInputStream is = read(s, UTF_8)) {
+            assertThat(is.getCharset()).isEqualTo(UTF_8);
+        }
+    }
+
+    @Test
+    void invalidByteAfterValidThreeByteSequence() {
+        // Valid 3-byte (世 = 0xE4 0xB8 0x96), then invalid 0xFE
+        byte[] bytes = new byte[]{(byte) 0xE4, (byte) 0xB8, (byte) 0x96, ' ', (byte) 0xFE};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void brokenContinuationInThreeByteSequence() {
+        // 0xE4 expects two continuation bytes, but second byte is ASCII
+        byte[] bytes = new byte[]{'x', (byte) 0xE4, (byte) 0xB8, 'z'};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+    }
+
+    @Test
+    void brokenContinuationInFourByteSequence() {
+        // 0xF0 expects three continuation bytes, but third byte is ASCII
+        byte[] bytes = new byte[]{(byte) 0xF0, (byte) 0x9F, (byte) 0x98, 'x'};
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bytes));
+        is.readFully();
+        assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
     }
 
     private EncodingDetectingInputStream read(String s, Charset charset) {

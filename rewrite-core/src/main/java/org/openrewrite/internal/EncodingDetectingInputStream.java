@@ -116,6 +116,13 @@ public class EncodingDetectingInputStream extends InputStream {
     }
 
     private void guessCharset(int aByte) {
+        if (aByte >= 0xF8 || aByte == 0xC0 || aByte == 0xC1) {
+            // 0xF8-0xFF are never valid in any position of a UTF-8 sequence.
+            // 0xC0 and 0xC1 would start overlong encodings of code points below U+0080,
+            // which are forbidden by RFC 3629.
+            charset = WINDOWS_1252;
+            return;
+        }
         if (utf8TwoByteSequence(aByte)) {
             maybeTwoByteSequence = true;
         } else if (utf8ThreeByteSequence(aByte)) {
@@ -197,9 +204,11 @@ public class EncodingDetectingInputStream extends InputStream {
         return -2;
     }
 
-    // The first byte of a UTF-8 two byte sequence is between 0xC0 - 0xDF.
+    // The first byte of a UTF-8 two byte sequence is between 0xC2 - 0xDF.
+    // 0xC0 and 0xC1 are excluded because they would encode code points below U+0080
+    // (overlong encodings), which are forbidden by RFC 3629.
     private boolean utf8TwoByteSequence(int b) {
-        return 0xC0 <= b && b <= 0xDF;
+        return 0xC2 <= b && b <= 0xDF;
     }
 
     // The first byte of a UTF-8 three byte sequence is between 0xE0 - 0xEF.
