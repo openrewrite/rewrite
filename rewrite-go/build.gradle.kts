@@ -27,7 +27,8 @@ tasks.withType<Javadoc>().configureEach {
 
 val goBuild = tasks.register<Exec>("goBuild") {
     workingDir = file("rewrite")
-    commandLine("go", "build", "-o", "${layout.buildDirectory.get().asFile}/rewrite-go-rpc", "./cmd/rpc")
+    // Use relative path to avoid absolute paths in cache key (Exec args are cache inputs)
+    commandLine("go", "build", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(file("rewrite")).path, "./cmd/rpc")
 
     inputs.files(fileTree("rewrite") {
         include("**/*.go")
