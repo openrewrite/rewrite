@@ -171,57 +171,100 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *tree.Compil
 	}
 }
 
-// mapImports maps the import declarations in the file.
+// mapImports maps all import declarations in the file into a single Container.
+// Go allows multiple import blocks; subsequent blocks are tracked via ImportBlock markers.
 func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import] {
-	var importDecl *ast.GenDecl
+	// Collect all import GenDecls in order.
+	var importDecls []*ast.GenDecl
 	for _, decl := range file.Decls {
 		if gd, ok := decl.(*ast.GenDecl); ok && gd.Tok == token.IMPORT {
-			importDecl = gd
-			break
+			importDecls = append(importDecls, gd)
 		}
 	}
-	if importDecl == nil {
+	if len(importDecls) == 0 {
 		return nil
 	}
 
-	before := ctx.prefixAndSkip(importDecl.Pos(), len("import"))
-
 	var elements []tree.RightPadded[*tree.Import]
-
 	var containerMarkers tree.Markers
-	if importDecl.Lparen.IsValid() {
-		openParenPrefix := ctx.prefix(importDecl.Lparen)
-		ctx.skip(1) // skip "("
+	prevGrouped := false
 
+	// First import block: captured into Container.Before and Container.Markers
+	first := importDecls[0]
+	before := ctx.prefixAndSkip(first.Pos(), len("import"))
+
+	if first.Lparen.IsValid() {
+		prevGrouped = true
+		openParenPrefix := ctx.prefix(first.Lparen)
+		ctx.skip(1) // skip "("
 		containerMarkers = tree.Markers{
 			ID: uuid.New(),
 			Entries: []tree.Marker{
 				tree.GroupedImport{Ident: uuid.New(), Before: openParenPrefix},
 			},
 		}
+	}
 
-		for _, spec := range importDecl.Specs {
-			is := spec.(*ast.ImportSpec)
-			imp := ctx.mapImportSpec(is)
-			elements = append(elements, tree.RightPadded[*tree.Import]{Element: imp})
-		}
+	for _, spec := range first.Specs {
+		is := spec.(*ast.ImportSpec)
+		imp := ctx.mapImportSpec(is)
+		elements = append(elements, tree.RightPadded[*tree.Import]{Element: imp})
+	}
 
-		closeParen := ctx.prefix(importDecl.Rparen)
+	if first.Lparen.IsValid() {
+		closeParen := ctx.prefix(first.Rparen)
 		ctx.skip(1) // skip ")"
-
 		if len(elements) > 0 {
 			elements[len(elements)-1].After = closeParen
 		}
-	} else {
-		for _, spec := range importDecl.Specs {
-			is := spec.(*ast.ImportSpec)
-			imp := ctx.mapImportSpec(is)
-			elements = append(elements, tree.RightPadded[*tree.Import]{Element: imp})
+	}
+
+	// Subsequent import blocks: attach ImportBlock marker to first import of each
+	for _, importDecl := range importDecls[1:] {
+		blockBefore := ctx.prefixAndSkip(importDecl.Pos(), len("import"))
+		grouped := importDecl.Lparen.IsValid()
+		var groupedBefore tree.Space
+		if grouped {
+			groupedBefore = ctx.prefix(importDecl.Lparen)
+			ctx.skip(1) // skip "("
 		}
+
+		ctx.mapImportBlockSpecs(importDecl, &elements, tree.ImportBlock{
+			Ident:         uuid.New(),
+			ClosePrevious: prevGrouped,
+			Before:        blockBefore,
+			Grouped:       grouped,
+			GroupedBefore: groupedBefore,
+		})
+
+		if grouped {
+			closeParen := ctx.prefix(importDecl.Rparen)
+			ctx.skip(1) // skip ")"
+			if len(elements) > 0 {
+				elements[len(elements)-1].After = closeParen
+			}
+		}
+		prevGrouped = grouped
 	}
 
 	container := tree.Container[*tree.Import]{Before: before, Elements: elements, Markers: containerMarkers}
 	return &container
+}
+
+// mapImportBlockSpecs maps the specs of a subsequent import block, attaching
+// the ImportBlock marker to the first spec's Import node.
+func (ctx *parseContext) mapImportBlockSpecs(decl *ast.GenDecl, elements *[]tree.RightPadded[*tree.Import], marker tree.ImportBlock) {
+	for j, spec := range decl.Specs {
+		is := spec.(*ast.ImportSpec)
+		imp := ctx.mapImportSpec(is)
+		if j == 0 {
+			imp.Markers = tree.Markers{
+				ID:      uuid.New(),
+				Entries: []tree.Marker{marker},
+			}
+		}
+		*elements = append(*elements, tree.RightPadded[*tree.Import]{Element: imp})
+	}
 }
 
 // mapImportSpec maps a single import spec.
@@ -1761,8 +1804,8 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) tree.Expression {
 		length = ctx.mapExpr(expr.Len)
 	}
 
-	closePrefix := ctx.prefix(expr.Lbrack + token.Pos(ctx.findNextFrom('[', ctx.file.Offset(expr.Lbrack)) - ctx.file.Offset(expr.Lbrack)))
 	// Find the `]`
+	var closePrefix tree.Space
 	rbrackOff := ctx.findNext(']')
 	if rbrackOff >= 0 {
 		closePrefix = ctx.prefix(ctx.file.Pos(rbrackOff))
