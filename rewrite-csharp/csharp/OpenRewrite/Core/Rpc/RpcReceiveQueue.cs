@@ -441,6 +441,7 @@ public class RpcReceiveQueue
         {
             "org.openrewrite.java.tree.Space" => typeof(Space),
             "org.openrewrite.java.tree.TextComment" => typeof(TextComment),
+            "org.openrewrite.csharp.tree.CsDocCommentRawComment" => typeof(XmlDocComment),
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
