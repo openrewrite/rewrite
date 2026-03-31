@@ -18,6 +18,9 @@ package rpc
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/openrewrite/rewrite/pkg/tree"
 )
 
 // ReceiveQueue deserializes RpcObjectData messages from the RPC channel.
@@ -178,9 +181,14 @@ func RegisterFactory(javaClassName string, factory func() any) {
 }
 
 // newObj creates a new empty instance by Java class name.
+// Unknown marker types are treated as GenericMarker to avoid panics
+// from markers added in newer versions of rewrite-core.
 func newObj(javaClassName string) any {
 	if factory, ok := factories[javaClassName]; ok {
 		return factory()
+	}
+	if strings.HasPrefix(javaClassName, "org.openrewrite.marker.") {
+		return tree.GenericMarker{}
 	}
 	panic(fmt.Sprintf("no factory registered for type: %s", javaClassName))
 }

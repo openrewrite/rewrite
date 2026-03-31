@@ -42,6 +42,12 @@ func (s *GoSender) Visit(node any, q *SendQueue) {
 		return
 	}
 
+	// ParseError has its own codec — handle before preVisit (no prefix field)
+	if pe, ok := node.(*tree.ParseError); ok {
+		s.sendParseError(pe, q)
+		return
+	}
+
 	// preVisit: send ID, prefix, markers
 	s.preVisit(node, q)
 
@@ -304,6 +310,20 @@ func (s *GoSender) sendCommClause(cc *tree.CommClause, q *SendQueue) {
 		},
 		func(v any) any { return containerElementID(v) },
 		func(v any) { sendRightPadded(s, v, q) })
+}
+
+// sendParseError serializes a ParseError matching Java's ParseError.rpcSend field order:
+// id, markers, sourcePath, charsetName, charsetBomMarked, checksum, fileAttributes, text
+func (s *GoSender) sendParseError(pe *tree.ParseError, q *SendQueue) {
+	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).Ident.String() }, nil)
+	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).Markers },
+		func(v any) { SendMarkersCodec(v.(tree.Markers), q) })
+	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).SourcePath }, nil)
+	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).CharsetName }, nil)
+	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).CharsetBomMarked }, nil)
+	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // checksum
+	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // fileAttributes
+	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).Text }, nil)
 }
 
 func (s *GoSender) sendIndexList(il *tree.IndexList, q *SendQueue) {
