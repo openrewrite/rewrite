@@ -1547,12 +1547,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Print body or semicolon (for interface methods without body)
-        if (method.Markers.FindFirst<ExpressionBodied>() != null && method.Body != null)
+        if (method.Markers.FindFirst<ExpressionBodied>() != null && method.Body != null
+            && method.Body.Statements.Count > 0 && method.Body.Statements[0].Element is Return returnStmt)
         {
             // Expression-bodied: print => expr;
             VisitSpace(method.Body.Prefix, p);
             p.Append("=>");
-            var returnStmt = (Return)method.Body.Statements[0].Element;
             Visit(returnStmt.Expression, p);
             p.Append(';');
         }
@@ -3751,12 +3751,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         PrintParameterList("(", operatorDeclaration.Parameters, ")", p);
 
         // Body — expression-bodied (=> expr;) or block body ({...})
-        if (operatorDeclaration.Markers.FindFirst<ExpressionBodied>() != null)
+        if (operatorDeclaration.Markers.FindFirst<ExpressionBodied>() != null
+            && operatorDeclaration.Body.Statements.Count > 0
+            && operatorDeclaration.Body.Statements[0].Element is Return opReturnStmt)
         {
             VisitSpace(operatorDeclaration.Body.Prefix, p);
             p.Append("=>");
-            var returnStmt = (Return)operatorDeclaration.Body.Statements[0].Element;
-            Visit(returnStmt.Expression, p);
+            Visit(opReturnStmt.Expression, p);
             p.Append(';');
         }
         else
