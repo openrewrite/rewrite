@@ -3657,6 +3657,7 @@ class ScalaTreeVisitor(
     var classIndex = -1
     var isTrait = false
     var isEnum = false
+    var isEnumCaseClass = false
     var sourceSnippet = ""
     
     // Use cursor position (after annotations) instead of adjustedStart
@@ -3680,6 +3681,15 @@ class ScalaTreeVisitor(
         classIndex = idx
         isTrait = isTr
         isEnum = isEn
+      } else {
+        // No class/trait/enum keyword found — check for enum case class: `case Cons(h: A, ...)`
+        // In Scala 3, enum members with params are TypeDefs with only `case` keyword.
+        val caseIdx = findKeyword(sourceSnippet, "case")
+        if (caseIdx >= 0) {
+          classIndex = caseIdx
+          isEnum = true
+          isEnumCaseClass = true
+        }
       }
       if (classIndex > 0) {
         modifierText = sourceSnippet.substring(0, classIndex)
@@ -4161,10 +4171,14 @@ class ScalaTreeVisitor(
       }
     }
     
+    val classDeclMarkers = if (isEnumCaseClass) {
+      Markers.build(Collections.singletonList(SObject.create()))
+    } else Markers.EMPTY
+
     new J.ClassDeclaration(
       Tree.randomId(),
       prefix,
-      Markers.EMPTY,
+      classDeclMarkers,
       leadingAnnotations, // annotations
       modifiers,
       kind,

@@ -1014,6 +1014,21 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void applyWithBracesAndSpace() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val x = Seq {
+                    "hello"
+                  }
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void fieldAccessNewline() {
         rewriteRun(
             scala(
