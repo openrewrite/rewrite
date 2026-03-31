@@ -18,6 +18,8 @@ package org.openrewrite.semver;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 
+import java.util.regex.Matcher;
+
 public class LatestRelease implements VersionComparator {
 
     @Nullable
@@ -130,23 +132,38 @@ public class LatestRelease implements VersionComparator {
         String normalized1 = metadataPattern == null ? nv1 : nv1.replaceAll(metadataPattern, "");
         String normalized2 = metadataPattern == null ? nv2 : nv2.replaceAll(metadataPattern, "");
 
-        int maxParts = Math.max(vp1, vp2);
-        long[] parts1 = extractVersionParts(normalized1, maxParts);
-        long[] parts2 = extractVersionParts(normalized2, maxParts);
+        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized1);
+        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(normalized2);
 
-        for (int i = 0; i < maxParts; i++) {
-            long diff = parts1[i] - parts2[i];
-            if (diff != 0) {
-                // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
-                return (int) (diff / Math.abs(diff));
+        v1Gav.find();
+        v2Gav.find();
+
+        try {
+            for (int i = 1; i <= Math.max(vp1, vp2); i++) {
+                String v1Part = v1Gav.group(i);
+                String v2Part = v2Gav.group(i);
+                if (v1Part == null) {
+                    return v2Part == null ? normalized1.compareTo(normalized2) : -1;
+                } else if (v2Part == null) {
+                    return 1;
+                }
+
+                long diff = Long.parseLong(v1Part) - Long.parseLong(v2Part);
+                if (diff != 0) {
+                    // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
+                    return (int) (diff / Math.abs(diff));
+                }
             }
+        } catch (IllegalStateException exception) {
+            // Provide a better error message if an error is thrown while getting groups from the regular expression.
+            throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]", exception);
         }
 
         // When all numeric parts are equal, we need to handle pre-release versions properly
         // A pre-release version should be considered less than a release version
         // e.g., "3.5.0-RC1" < "3.5.0"
-        int v1Prio = qualifierPriority(extractQualifierSuffix(normalized1));
-        int v2Prio = qualifierPriority(extractQualifierSuffix(normalized2));
+        int v1Prio = qualifierPriority(v1Gav.group("qualifier"));
+        int v2Prio = qualifierPriority(v2Gav.group("qualifier"));
 
         if (v1Prio != v2Prio) {
             return Integer.compare(v1Prio, v2Prio);
@@ -154,56 +171,6 @@ public class LatestRelease implements VersionComparator {
 
         // Both are either pre-release or release versions, do string comparison
         return normalized1.compareTo(normalized2);
-    }
-
-    /**
-     * Extract numeric version parts from a version string. Parses consecutive digit groups
-     * separated by dots from the start of the string. Missing parts are filled with 0.
-     */
-    static long[] extractVersionParts(String version, int count) {
-        long[] parts = new long[count];
-        int partIndex = 0;
-        int i = 0;
-        int len = version.length();
-        while (i < len && partIndex < count) {
-            if (!Character.isDigit(version.charAt(i))) {
-                break;
-            }
-            int start = i;
-            while (i < len && Character.isDigit(version.charAt(i))) {
-                i++;
-            }
-            parts[partIndex++] = Long.parseLong(version.substring(start, i));
-            if (i < len && version.charAt(i) == '.' && i + 1 < len && Character.isDigit(version.charAt(i + 1))) {
-                i++;
-            } else {
-                break;
-            }
-        }
-        return parts;
-    }
-
-    /**
-     * Extract the qualifier suffix from a version string (everything after the numeric parts).
-     * Returns the suffix including its leading separator, e.g. "-RC1" or ".Final", or null if none.
-     */
-    static @Nullable String extractQualifierSuffix(String version) {
-        int i = 0;
-        int len = version.length();
-        while (i < len) {
-            if (!Character.isDigit(version.charAt(i))) {
-                break;
-            }
-            while (i < len && Character.isDigit(version.charAt(i))) {
-                i++;
-            }
-            if (i < len && version.charAt(i) == '.' && i + 1 < len && Character.isDigit(version.charAt(i + 1))) {
-                i++;
-            } else {
-                break;
-            }
-        }
-        return i < len ? version.substring(i) : null;
     }
 
     private static int qualifierPriority(@Nullable String suffix) {
