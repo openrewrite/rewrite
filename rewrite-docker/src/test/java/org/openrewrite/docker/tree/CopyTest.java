@@ -229,6 +229,21 @@ class CopyTest implements RewriteTest {
     }
 
     @Test
+    void copyWithLineContinuationAndFromFlag() {
+        rewriteRun(
+          docker(
+            """
+              FROM registry.example.com/base-images/debian:bookworm-slim
+              COPY \\
+                --from=registry.example.com/base-images/openjdk:17-slim \\
+                /opt/java/17 \\
+                /usr/local/java/
+              """
+          )
+        );
+    }
+
+    @Test
     void copyExecFormWithMultipleSources() {
         // COPY with exec form (JSON array) containing multiple sources and one destination
         rewriteRun(
