@@ -1846,3 +1846,34 @@ TypeVar
             assert 'typing' in result._fully_qualified_name
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestDeclarationDeclaringType:
+    """Tests for declaring type on function declarations."""
+
+    def test_declaration_declaring_type_no_ty_types(self):
+        """Without ty-types, declaring type remains None."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+        func_node = tree.body[0]
+        result = mapping.method_declaration_type(func_node)
+        assert result is not None
+        assert result._declaring_type is None
+
+    @requires_ty_types_cli
+    def test_declaration_declaring_type_with_ty_types(self):
+        """With ty-types, a function declaration should get a declaring type from the descriptor."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            func_node = tree.body[0]
+            result = mapping.method_declaration_type(func_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Method)
+            assert result._declaring_type is not None, \
+                "Declaration should have a declaring type, not None"
+            assert isinstance(result._declaring_type, JavaType.Class)
+            assert result._declaring_type._fully_qualified_name != "<unknown>"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
