@@ -124,9 +124,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                   if ("test".equals(method.getSimpleName())) {
-                      return JavaTemplate.builder("#{} void test2() {}")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getLeadingAnnotations().getFirst());
+                      return JavaTemplate.apply("#{} void test2() {}", getCursor(), method.getCoordinates().replace(), method.getLeadingAnnotations().getFirst());
                   }
                   return method;
               }
@@ -194,9 +192,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                   var s = method.getBody().getStatements().getFirst();
-                  return JavaTemplate.builder("if(true) #{}")
-                    .build()
-                    .apply(getCursor(), s.getCoordinates().replace(), method.getBody());
+                  return JavaTemplate.apply("if(true) #{}", getCursor(), s.getCoordinates().replace(), method.getBody());
               }
           }).withMaxCycles(1)),
           java(
@@ -425,9 +421,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return JavaTemplate.builder("System.out.println(#{any()})")
-                    .build()
-                    .apply(getCursor(), method.getCoordinates().replace(), method);
+                  return JavaTemplate.apply("System.out.println(#{any()})", getCursor(), method.getCoordinates().replace(), method);
               }
           }).withMaxCycles(1)),
           java(
@@ -457,9 +451,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodInvocation(J.MethodInvocation methodInvocation, ExecutionContext executionContext) {
-                  return JavaTemplate.builder("throw new RuntimeException()")
-                    .build()
-                    .apply(getCursor(), methodInvocation.getCoordinates().replace());
+                  return JavaTemplate.apply("throw new RuntimeException()", getCursor(), methodInvocation.getCoordinates().replace());
               }
           })),
           java(

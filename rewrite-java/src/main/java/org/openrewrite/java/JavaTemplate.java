@@ -175,7 +175,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
-        return builder(template).build().apply(scope, coordinates, parameters);
+        return JavaTemplate.apply(template, scope, coordinates, parameters);
     }
 
     public static Builder builder(String code) {

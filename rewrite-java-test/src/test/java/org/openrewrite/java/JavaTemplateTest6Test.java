@@ -243,9 +243,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getThrows() == null) {
-                      return JavaTemplate.builder("Exception")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replaceThrows());
+                      return JavaTemplate.apply("Exception", getCursor(), method.getCoordinates().replaceThrows());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
