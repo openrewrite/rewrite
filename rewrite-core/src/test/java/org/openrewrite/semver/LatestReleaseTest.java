@@ -202,6 +202,13 @@ class LatestReleaseTest {
     }
 
     @Test
+    void versionsWithMoreThanFiveParts() {
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.7")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.7", "1.2.3.4.5.6")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.3", "1.2.3.4.5.3")).isZero();
+    }
+
+    @Test
     void datedSnapshotVersions() {
         assertThat(latestRelease.compare(null, "7.17.0-20211102.000501-28",
           "7.17.0-20211102.012229-29")).isLessThan(0);
