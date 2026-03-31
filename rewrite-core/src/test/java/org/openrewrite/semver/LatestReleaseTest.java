@@ -38,8 +38,11 @@ class LatestReleaseTest {
         assertThat(latestRelease.isValid("1.0", "1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1.1")).isTrue();
 
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1-SNAPSHOT")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.0-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.a")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isFalse();
