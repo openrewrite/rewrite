@@ -1014,6 +1014,20 @@ class Scala2CompatTest implements RewriteTest {
     }
 
     @Test
+    void fieldAccessNewline() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val x = Map(1 -> 2)
+                    .toList
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void dotMethodCallNewlineAfterParen() {
         rewriteRun(
             scala(

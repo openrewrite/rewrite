@@ -1140,10 +1140,11 @@ class ScalaTreeVisitor(
           return visitUnknown(sel)
       }
       
-      // Extract the space before the dot (or # for type projection)
+      // Extract space before the dot/hash and after it (for the name prefix)
       val qualifierEnd = sel.qualifier.span.end
       val nameStart = sel.nameSpan.start
       var isTypeProjection = false
+      var beforeDotSpace: Space = Space.EMPTY
       val dotSpace = if (qualifierEnd < nameStart) {
         val dotStart = Math.max(0, qualifierEnd - offsetAdjustment)
         val nameStartAdjusted = Math.max(0, nameStart - offsetAdjustment)
@@ -1154,9 +1155,11 @@ class ScalaTreeVisitor(
           val dotIndex = between.indexOf('.')
           if (hashIndex >= 0 && (dotIndex < 0 || hashIndex < dotIndex)) {
             isTypeProjection = true
+            beforeDotSpace = if (hashIndex > 0) Space.format(between.substring(0, hashIndex)) else Space.EMPTY
             if (hashIndex + 1 < between.length) Space.format(between.substring(hashIndex + 1)) else Space.EMPTY
-          } else if (dotIndex >= 0 && dotIndex + 1 < between.length) {
-            Space.format(between.substring(dotIndex + 1))
+          } else if (dotIndex >= 0) {
+            beforeDotSpace = if (dotIndex > 0) Space.format(between.substring(0, dotIndex)) else Space.EMPTY
+            if (dotIndex + 1 < between.length) Space.format(between.substring(dotIndex + 1)) else Space.EMPTY
           } else {
             Space.EMPTY
           }
@@ -1195,7 +1198,7 @@ class ScalaTreeVisitor(
         prefix,
         faMarkers,
         target,
-        JLeftPadded.build(name),
+        new JLeftPadded(beforeDotSpace, name, Markers.EMPTY),
         null
       )
     }
