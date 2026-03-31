@@ -31,6 +31,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-xml"))
+    testImplementation(project(":rewrite-maven"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
@@ -80,12 +81,30 @@ val csharpBuild by tasks.registering(Exec::class) {
     }
 }
 
+// Writes the test runtime classpath to a file so the C# RpcFixture can
+// launch JavaRewriteRpc via `java -cp <classpath> ...` without a fat JAR.
+val rpcTestClasspath by tasks.registering {
+    group = "csharp"
+    description = "Write the Java RPC test server classpath for C# integration tests"
+    dependsOn(tasks.named("testClasses"))
+
+    val classpathFile = layout.buildDirectory.file("rpc-test-server-classpath.txt")
+    outputs.file(classpathFile)
+
+    doLast {
+        val cp = configurations["testRuntimeClasspath"].resolve().joinToString(File.pathSeparator) +
+                File.pathSeparator + tasks.named<JavaCompile>("compileJava").get().destinationDirectory.get().asFile +
+                File.pathSeparator + tasks.named<JavaCompile>("compileTestJava").get().destinationDirectory.get().asFile
+        classpathFile.get().asFile.writeText(cp)
+    }
+}
+
 val junitXmlFile = csharpDir.resolve("build/test-results/xunit/junit.xml")
 
 val csharpTest by tasks.registering(Exec::class) {
     group = "csharp"
     description = "Run C# xunit tests"
-    dependsOn(csharpBuild)
+    dependsOn(csharpBuild, rpcTestClasspath)
 
     workingDir = csharpDir
     // Use relative path for JUnit XML to avoid absolute paths in cache key
@@ -94,6 +113,9 @@ val csharpTest by tasks.registering(Exec::class) {
         findDotnet(), "test", "--no-build", "--verbosity", "normal",
         "--logger", "junit;LogFilePath=${relativeJunitPath}"
     )
+
+    environment("RPC_TEST_SERVER_CLASSPATH",
+        rpcTestClasspath.get().outputs.files.singleFile.absolutePath)
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)

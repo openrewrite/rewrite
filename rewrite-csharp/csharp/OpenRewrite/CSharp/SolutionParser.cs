@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 using System.Diagnostics;
+using System.Xml.Linq;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -270,6 +271,8 @@ public class SolutionParser
         // the same CSharpFormatStyle marker instance.
         var editorConfigResolver = new EditorConfigResolver(rootDir);
 
+        var dotNetProject = CreateDotNetProjectMarker(projectPath, projectName);
+
         var results = new List<SourceFile>();
         var fileIndex = 0;
         var projectSw = Stopwatch.StartNew();
@@ -328,6 +331,7 @@ public class SolutionParser
                     }
                 }
 
+                cu = cu.WithMarkers(cu.Markers.Add(dotNetProject));
                 results.Add(cu);
                 fileSw.Stop();
 
@@ -427,6 +431,43 @@ public class SolutionParser
             return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// Creates a DotNetProject marker by reading TFM and SDK from the .csproj XML.
+    /// </summary>
+    private static DotNetProject CreateDotNetProjectMarker(string projectPath, string projectName)
+    {
+        string? sdk = null;
+        var tfms = new List<string>();
+
+        try
+        {
+            var doc = XDocument.Load(projectPath);
+            var root = doc.Root;
+            if (root != null)
+            {
+                sdk = root.Attribute("Sdk")?.Value;
+
+                var tfm = root.Elements("PropertyGroup").Elements("TargetFramework").FirstOrDefault()?.Value;
+                if (tfm != null)
+                    tfms.Add(tfm);
+
+                var tfmList = root.Elements("PropertyGroup").Elements("TargetFrameworks").FirstOrDefault()?.Value;
+                if (tfmList != null)
+                {
+                    foreach (var t in tfmList.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        if (!tfms.Contains(t))
+                            tfms.Add(t);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("Failed to read project metadata from {ProjectPath}: {Error}", projectPath, ex.Message);
+        }
+
+        return new DotNetProject(Guid.NewGuid(), projectName, tfms, sdk);
     }
 
     private static void EnsureMSBuildRegistered()

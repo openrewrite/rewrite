@@ -13,26 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-namespace OpenRewrite.Core;
+using OpenRewrite.Test;
+
+namespace OpenRewrite.Tests.Rpc;
 
 /// <summary>
-/// The base interface for all LST (Lossless Semantic Tree) elements.
+/// xUnit collection definition for RPC tests. Must be defined in each test
+/// assembly — xUnit does not discover collection definitions from referenced assemblies.
 /// </summary>
-public interface Tree
-{
-    Guid Id { get; }
-
-    Markers Markers { get; }
-
-    Tree WithId(Guid id);
-}
-
-/// <summary>
-/// Represents a source file in the LST.
-/// </summary>
-public interface SourceFile : Tree
-{
-    string SourcePath { get; }
-
-    SourceFile WithSourcePath(string sourcePath);
-}
+[CollectionDefinition("RPC")]
+public class RpcCollection : ICollectionFixture<RpcFixture>;
