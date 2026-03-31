@@ -601,55 +601,81 @@ class ScalaTreeVisitor(
   
   private def visitFunctionApplication(app: Trees.Apply[?], id: Trees.Ident[?]): J.MethodInvocation = {
     val prefix = extractPrefix(app.span)
-    
+
     // In Scala, arr(0) is syntactic sugar for arr.apply(0)
     // We'll represent it as a method invocation with "apply" as the method name
-    
+
     // The select is the identifier (e.g., "arr")
     val select = visitIdent(id).asInstanceOf[Expression]
-    
-    // Skip past the opening parenthesis to position cursor correctly for arguments
-    val parenPos = positionOfNext("(")
-    if (parenPos >= 0) {
-      cursor = parenPos + 1
-    }
-    
-    // Visit the arguments
+
+    // Detect block argument syntax: `Seq { 1 }` vs parenthesized `Seq(1)`
+    val isBlockArg = if (app.args.nonEmpty) {
+      val searchEnd = Math.min(cursor + 50, source.length)
+      if (cursor < searchEnd) {
+        val ahead = source.substring(cursor, searchEnd)
+        val firstNonWs = ahead.indexWhere(!_.isWhitespace)
+        firstNonWs >= 0 && ahead.charAt(firstNonWs) == '{'
+      } else false
+    } else false
+
     val args = new util.ArrayList[JRightPadded[Expression]]()
-    for ((arg, i) <- app.args.zipWithIndex) {
-      visitTree(arg) match {
-        case expr: Expression =>
-          val isLast = i == app.args.length - 1
-          if (!isLast) {
-            // Non-last arg: find trailing space after comma
-            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-            val commaPos = source.indexOf(',', Math.max(cursor, argEnd))
-            val afterComma = if (commaPos >= 0 && commaPos + 1 < source.length) {
-              cursor = commaPos + 1
-              Space.EMPTY // The next arg's prefix captures the post-comma space
-            } else Space.EMPTY
-            args.add(JRightPadded.build(expr).withAfter(afterComma))
-          } else {
-            // Last arg: capture space before closing `)`
-            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
-            val closePos = source.indexOf(')', Math.max(cursor, argEnd))
-            val beforeClose = if (closePos > argEnd) {
-              Space.format(source.substring(argEnd, closePos))
-            } else Space.EMPTY
-            args.add(new JRightPadded(expr, beforeClose, Markers.EMPTY))
-          }
-        case _ => // Skip non-expressions
+    val markers = new util.ArrayList[org.openrewrite.marker.Marker]()
+    import org.openrewrite.scala.marker.FunctionApplication
+    markers.add(FunctionApplication.create())
+
+    if (isBlockArg) {
+      // Block argument: Seq { 1 } — mark as block arg and visit args directly
+      markers.add(new BlockArgument(UUID.randomUUID()))
+      for (arg <- app.args) {
+        val argSpace = extractPrefix(arg.span)
+        visitTree(arg) match {
+          case expr: Expression =>
+            args.add(JRightPadded.build(expr))
+          case block: J.Block =>
+            val blockExpr = new S.BlockExpression(Tree.randomId(), argSpace, Markers.EMPTY,
+              block.withPrefix(Space.EMPTY), null)
+            args.add(JRightPadded.build(blockExpr.asInstanceOf[Expression]))
+          case _ =>
+        }
+      }
+    } else {
+      // Normal parenthesized arguments: Seq(1, 2)
+      val parenPos = positionOfNext("(")
+      if (parenPos >= 0) {
+        cursor = parenPos + 1
+      }
+
+      for ((arg, i) <- app.args.zipWithIndex) {
+        visitTree(arg) match {
+          case expr: Expression =>
+            val isLast = i == app.args.length - 1
+            if (!isLast) {
+              val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+              val commaPos = source.indexOf(',', Math.max(cursor, argEnd))
+              val afterComma = if (commaPos >= 0 && commaPos + 1 < source.length) {
+                cursor = commaPos + 1
+                Space.EMPTY
+              } else Space.EMPTY
+              args.add(JRightPadded.build(expr).withAfter(afterComma))
+            } else {
+              val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+              val closePos = source.indexOf(')', Math.max(cursor, argEnd))
+              val beforeClose = if (closePos > argEnd) {
+                Space.format(source.substring(argEnd, closePos))
+              } else Space.EMPTY
+              args.add(new JRightPadded(expr, beforeClose, Markers.EMPTY))
+            }
+          case _ =>
+        }
+      }
+
+      // Skip past the closing parenthesis
+      val closeParenPos = positionOfNext(")")
+      if (closeParenPos >= 0) {
+        cursor = closeParenPos + 1
       }
     }
 
-    // Skip past the closing parenthesis
-    val closeParenPos = positionOfNext(")")
-    if (closeParenPos >= 0) {
-      cursor = closeParenPos + 1
-    }
-    
-    // Create the method invocation
-    // We use "apply" as the method name since that's what Scala desugars to
     val methodName = new J.Identifier(
       Tree.randomId(),
       Space.EMPTY,
@@ -659,14 +685,11 @@ class ScalaTreeVisitor(
       null,
       null
     )
-    
-    // Add a marker to indicate this is function application syntax
-    import org.openrewrite.scala.marker.FunctionApplication
-    
+
     new J.MethodInvocation(
       Tree.randomId(),
       prefix,
-      Markers.build(Collections.singletonList(FunctionApplication.create())),
+      Markers.build(markers),
       JRightPadded.build(select),
       null, // typeParameters
       methodName,
@@ -708,37 +731,34 @@ class ScalaTreeVisitor(
     }
     
     // Handle the method call target
-    val (select: Expression, methodName: String, typeParams: java.util.List[Expression]) = app.fun match {
+    val (select: Expression, selectAfterSpace: Space, methodName: String, typeParams: java.util.List[Expression]) = app.fun match {
       case sel: Trees.Select[?] =>
-        // Method call like obj.method(...) or package.Class.method(...)
-        // The Select node represents the full method access (e.g., System.out.println)
-        // We need to use sel.qualifier as the receiver and sel.name as the method name
-        
-        // Debug: check what we're dealing with
-        // println(s"DEBUG visitMethodInvocation: sel=$sel, qualifier=${sel.qualifier}, name=${sel.name}")
-        
         val target = visitTree(sel.qualifier) match {
           case expr: Expression => expr
           case _ => cursor = savedCursor; return visitUnknown(app)
         }
-        
-        // Update cursor position to after the method name to avoid re-reading it
+
+        // Capture space between qualifier and the `.` (for multi-line chains)
+        val dotPos = source.indexOf('.', cursor)
+        val selectAfter = if (dotPos > cursor) {
+          Space.format(source.substring(cursor, dotPos))
+        } else Space.EMPTY
+        if (dotPos >= 0) cursor = dotPos + 1
+
+        // Update cursor position to after the method name
         if (sel.nameSpan.exists) {
           val nameEnd = Math.max(0, sel.nameSpan.end - offsetAdjustment)
           if (nameEnd > cursor) {
             cursor = nameEnd
           }
         }
-        
-        (target, sel.name.toString, Collections.emptyList[Expression]())
-        
+
+        (target, selectAfter, sel.name.toString, Collections.emptyList[Expression]())
+
       case id: Trees.Ident[?] =>
-        // Simple function call like println(...)
-        (null, id.name.toString, Collections.emptyList[Expression]())
-        
+        (null, Space.EMPTY, id.name.toString, Collections.emptyList[Expression]())
+
       case typeApp: Trees.TypeApply[?] =>
-        // Method with type parameters like List.empty[Int]
-        // For now, fall back to Unknown for type applications
         cursor = savedCursor; return visitUnknown(app)
 
       case _ =>
@@ -786,15 +806,14 @@ class ScalaTreeVisitor(
       for (i <- app.args.indices) {
         val arg = app.args(i)
 
-        var argPrefix = Space.EMPTY
         if (i > 0) {
+          // For non-first args, advance cursor past the comma separator
           val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
           val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
           if (prevEnd < thisStart && prevEnd >= cursor && thisStart <= source.length) {
             val between = source.substring(prevEnd, thisStart)
             val commaIndex = between.indexOf(',')
             if (commaIndex >= 0) {
-              argPrefix = Space.format(between.substring(commaIndex + 1))
               cursor = prevEnd + commaIndex + 1
             }
           }
@@ -802,21 +821,6 @@ class ScalaTreeVisitor(
 
         visitTree(arg) match {
           case expr: Expression =>
-            val exprWithPrefix = expr match {
-              case lit: J.Literal => lit.withPrefix(argPrefix)
-              case id: J.Identifier => id.withPrefix(argPrefix)
-              case mi: J.MethodInvocation => mi.withPrefix(argPrefix)
-              case na: J.NewArray => na.withPrefix(argPrefix)
-              case bin: J.Binary => bin.withPrefix(argPrefix)
-              case aa: J.ArrayAccess => aa.withPrefix(argPrefix)
-              case fa: J.FieldAccess => fa.withPrefix(argPrefix)
-              case paren: J.Parentheses[_] => paren.withPrefix(argPrefix)
-              case unknown: J.Unknown => unknown.withPrefix(argPrefix)
-              case nc: J.NewClass => nc.withPrefix(argPrefix)
-              case asg: J.Assignment => asg.withPrefix(argPrefix)
-              case lambda: J.Lambda => lambda.withPrefix(argPrefix)
-              case _ => expr
-            }
             // For the last arg, capture trailing space before `)`
             val isLastArg = i == app.args.size - 1
             val afterSpace = if (isLastArg) {
@@ -824,7 +828,7 @@ class ScalaTreeVisitor(
               val closePos = source.indexOf(')', Math.max(cursor, argEnd))
               if (closePos > argEnd) Space.format(source.substring(argEnd, closePos)) else Space.EMPTY
             } else Space.EMPTY
-            args.add(new JRightPadded(exprWithPrefix, afterSpace, Markers.EMPTY))
+            args.add(new JRightPadded(expr, afterSpace, Markers.EMPTY))
           case _ => cursor = savedCursor; return visitUnknown(app)
         }
       }
@@ -874,7 +878,7 @@ class ScalaTreeVisitor(
       Tree.randomId(),
       prefix,
       markers,
-      if (select != null) JRightPadded.build(select) else null,
+      if (select != null) new JRightPadded(select, selectAfterSpace, Markers.EMPTY) else null,
       null, // typeParameters - handled separately in TypeApply
       name,
       argContainer,
@@ -1359,9 +1363,14 @@ class ScalaTreeVisitor(
     }
     
     // Visit the argument (right side)
+    val savedCursorArg = cursor
     val arg = visitTree(infixOp.right) match {
       case expr: Expression => expr
-      case _ => return visitUnknown(infixOp)
+      case block: J.Block =>
+        // Block arguments in infix calls: `"test" should { ... }`
+        new S.BlockExpression(Tree.randomId(), argSpace, Markers.EMPTY,
+          block.withPrefix(Space.EMPTY), null)
+      case _ => cursor = savedCursorArg; return visitUnknown(infixOp)
     }
     
     // Create the method name identifier

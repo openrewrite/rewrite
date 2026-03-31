@@ -84,7 +84,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         beforeSyntax(typeParam, Space.Location.TYPE_PARAMETERS_PREFIX, p);
         visit(typeParam.getAnnotations(), p);
         visit(typeParam.getName(), p);
-        
+
         // Print bounds if present using Scala syntax.
         // Each bound element may be a J.TypeBound (with explicit Kind) or a plain
         // TypeTree (context bound, printed with `:`).
@@ -510,27 +510,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append('[');
             List<JRightPadded<J.TypeParameter>> elements = typeParams.getPadding().getElements();
             for (int i = 0; i < elements.size(); i++) {
-                JRightPadded<J.TypeParameter> elem = elements.get(i);
-                J.TypeParameter typeParam = elem.getElement();
-                
-                // Check if the type parameter name starts with variance
-                if (typeParam.getName() instanceof J.Identifier) {
-                    J.Identifier nameId = (J.Identifier) typeParam.getName();
-                    String name = nameId.getSimpleName();
-                    if (name.startsWith("-") || name.startsWith("+")) {
-                        // For variance annotations, print them directly without visiting
-                        // to avoid any special handling
-                        visitSpace(typeParam.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p);
-                        p.append(name);
-                    } else {
-                        visit(elem.getElement(), p);
-                    }
-                } else {
-                    visit(elem.getElement(), p);
-                }
-                
+                visit(elements.get(i).getElement(), p);
                 if (i < elements.size() - 1) {
-                    visitSpace(elem.getAfter(), Space.Location.TYPE_PARAMETER_SUFFIX, p);
+                    visitSpace(elements.get(i).getAfter(), Space.Location.TYPE_PARAMETER_SUFFIX, p);
                     p.append(',');
                 }
             }
@@ -784,31 +766,22 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
-        // Check if this is function application syntax (arr(0) instead of arr.apply(0))
-        if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
-            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
-            
-            // Print the select (e.g., "arr" or "println")
-            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
-            
-            // Print arguments directly with parentheses (no ".apply")
-            visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
-            
-            afterSyntax(method, p);
-            return method;
-        }
-        
-        // Check if this is a block argument call: list.foreach { x => println(x) }
+        // Check block argument BEFORE function application — when both are present
+        // (e.g. `Seq { 1 }`), the block-arg path should win.
         if (method.getMarkers().findFirst(BlockArgument.class).isPresent()) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
-            // Print the select with dot: "list."
-            if (method.getPadding().getSelect() != null) {
-                visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+            if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
+                // Function application with block arg: `Seq { 1 }`
+                // Print select (function name), skip ".apply", print args directly
+                visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+            } else {
+                // Dot-notation with block arg: `list.foreach { x => ... }`
+                if (method.getPadding().getSelect() != null) {
+                    visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+                }
+                visit(method.getName(), p);
             }
-
-            // Print the method name: "foreach"
-            visit(method.getName(), p);
 
             // Print the block argument directly (no parentheses)
             if (method.getArguments() != null) {
@@ -816,6 +789,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visit(arg, p);
                 }
             }
+
+            afterSyntax(method, p);
+            return method;
+        }
+
+        // Check if this is function application syntax (arr(0) instead of arr.apply(0))
+        if (method.getMarkers().findFirst(org.openrewrite.scala.marker.FunctionApplication.class).isPresent()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+
+            // Print the select (e.g., "arr" or "println")
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+
+            // Print arguments directly with parentheses (no ".apply")
+            visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
 
             afterSyntax(method, p);
             return method;
