@@ -3074,7 +3074,7 @@ class MergeYamlTest implements RewriteTest {
           null
         );
         assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
-            .contains("Must be valid YAML");
+            .anyMatch(msg -> msg.startsWith("Could not parse as YAML"));
     }
 
     @Test
