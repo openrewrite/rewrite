@@ -197,10 +197,6 @@ public class AddSettingsPluginRepository extends Recipe {
                 }
                 J.MethodInvocation repoToAdd = extractRepository(pluginManagement);
 
-                // Name-based fallback: FindRepository uses MethodMatcher which requires correct
-                // declaring types. When the Kotlin parser produces wrong types (e.g. kotlin.Unit
-                // instead of RepositoryHandler), MethodMatcher's strict path fails to match.
-                // Safe to keep even after parser is fixed — redundant but not conflicting.
                 if (repoAlreadyExists(repos, repoToAdd.getSimpleName())) {
                     return statement;
                 }
@@ -223,6 +219,7 @@ public class AddSettingsPluginRepository extends Recipe {
                 return rewrap(statement, m2);
             }
 
+            // Name-based fallback for when MethodMatcher fails due to incorrect type attribution (e.g. rewrite-kotlin)
             private boolean repoAlreadyExists(J.MethodInvocation repos, String repoName) {
                 if (repos.getArguments().isEmpty() || !(repos.getArguments().get(0) instanceof J.Lambda)) {
                     return false;
