@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/openrewrite/rewrite/pkg/parser"
-	"github.com/openrewrite/rewrite/pkg/printer"
-	"github.com/openrewrite/rewrite/pkg/recipe"
-	"github.com/openrewrite/rewrite/pkg/test"
-	"github.com/openrewrite/rewrite/pkg/tree"
-	"github.com/openrewrite/rewrite/pkg/visitor"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/test"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // --- Sample search recipe that marks identifiers named "foo" ---

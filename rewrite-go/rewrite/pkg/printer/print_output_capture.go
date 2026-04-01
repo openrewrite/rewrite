@@ -19,7 +19,7 @@ package printer
 import (
 	"strings"
 
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // PrintOutputCapture accumulates printed source code text.

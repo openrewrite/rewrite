@@ -19,7 +19,7 @@ package test
 import (
 	"testing"
 
-	. "github.com/openrewrite/rewrite/pkg/test"
+	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
 // === FOR RANGE INTEGER (Go 1.22+) ===

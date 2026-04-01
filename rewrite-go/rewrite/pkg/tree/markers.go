@@ -122,3 +122,23 @@ func NewMarkup(level MarkupLevel, message, detail string) Markup {
 func FoundSearchResult(markers Markers, description string) Markers {
 	return AddMarker(markers, NewSearchResult(description))
 }
+
+// MarkupWarn attaches a warning-level Markup marker to the given Markers.
+func MarkupWarn(markers Markers, message string) Markers {
+	return AddMarker(markers, NewMarkup(MarkupWarnLevel, message, ""))
+}
+
+// MarkupWarnDetail attaches a warning-level Markup marker with detail to the given Markers.
+func MarkupWarnDetail(markers Markers, message, detail string) Markers {
+	return AddMarker(markers, NewMarkup(MarkupWarnLevel, message, detail))
+}
+
+// MarkupInfo attaches an info-level Markup marker to the given Markers.
+func MarkupInfo(markers Markers, message string) Markers {
+	return AddMarker(markers, NewMarkup(MarkupInfoLevel, message, ""))
+}
+
+// MarkupError attaches an error-level Markup marker to the given Markers.
+func MarkupError(markers Markers, message string) Markers {
+	return AddMarker(markers, NewMarkup(MarkupErrorLevel, message, ""))
+}

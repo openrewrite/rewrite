@@ -16,7 +16,7 @@
 
 package visitor
 
-import "github.com/openrewrite/rewrite/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 
 // Cursor tracks the path from root to the currently visited node,
 // providing context during tree traversal.

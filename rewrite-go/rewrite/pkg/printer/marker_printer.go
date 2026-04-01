@@ -19,7 +19,7 @@ package printer
 import (
 	"fmt"
 
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // CommentWrapper wraps marker output in a language-appropriate comment syntax.

@@ -16,7 +16,7 @@
 
 package recipe
 
-import "github.com/openrewrite/rewrite/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 
 // ScanningRecipe extends Recipe with a two-phase scan-then-edit pattern.
 // The first phase collects data across all source files into an accumulator,

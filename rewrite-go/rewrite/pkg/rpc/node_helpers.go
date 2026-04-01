@@ -18,7 +18,7 @@ package rpc
 
 import (
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // nodeID extracts and formats the ID from any AST node for serialization.

@@ -19,9 +19,9 @@ package test
 import (
 	"testing"
 
-	"github.com/openrewrite/rewrite/pkg/parser"
-	"github.com/openrewrite/rewrite/pkg/tree"
-	"github.com/openrewrite/rewrite/pkg/visitor"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // typeCollector visits a tree and collects identifiers with their types.

@@ -16,7 +16,7 @@
 
 package golang
 
-import "github.com/openrewrite/rewrite/pkg/recipe"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 
 // ChangeMethodName renames method invocations matching a pattern.
 // Delegates to the Java ChangeMethodName recipe via RPC.

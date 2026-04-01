@@ -1,4 +1,4 @@
-module github.com/openrewrite/rewrite
+module github.com/openrewrite/rewrite/rewrite-go
 
 go 1.23
 

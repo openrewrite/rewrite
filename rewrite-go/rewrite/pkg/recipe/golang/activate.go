@@ -16,7 +16,7 @@
 
 package golang
 
-import "github.com/openrewrite/rewrite/pkg/recipe"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 
 // Activate registers all Go recipes with the given registry.
 func Activate(r *recipe.Registry) {
