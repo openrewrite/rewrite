@@ -434,6 +434,11 @@ public class ImportLayoutStyle implements JavaStyle {
             return this;
         }
 
+        public Builder importAllOthersInflow() {
+            blocks.add(new Block.AllOthers(false, true));
+            return this;
+        }
+
         public Builder blankLine() {
             if (!blocks.isEmpty() &&
                     blocks.get(blocks.size() - 1) instanceof Block.BlankLines) {
@@ -491,9 +496,10 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         public ImportLayoutStyle build() {
-            assert (blocks.stream().anyMatch(it -> it instanceof Block.AllOthers && ((Block.AllOthers) it).isStatic()))
+            boolean hasInflowBlock = blocks.stream().anyMatch(it -> it instanceof Block.AllOthers && ((Block.AllOthers) it).isInflow());
+            assert (hasInflowBlock || blocks.stream().anyMatch(it -> it instanceof Block.AllOthers && ((Block.AllOthers) it).isStatic()))
                     : "There must be at least one block that accepts all static imports, but no such block was found in the specified layout";
-            assert (blocks.stream().anyMatch(it -> it instanceof Block.AllOthers && !((Block.AllOthers) it).isStatic()))
+            assert (hasInflowBlock || blocks.stream().anyMatch(it -> it instanceof Block.AllOthers && !((Block.AllOthers) it).isStatic()))
                     : "There must be at least one block that accepts all non-static imports, but no such block was found in the specified layout";
 
             for (Block block : blocks) {
@@ -769,13 +775,19 @@ public class ImportLayoutStyle implements JavaStyle {
 
         class AllOthers extends Block.ImportPackage {
             private final boolean statik;
+            @Getter
+            private final boolean inflow;
             @Setter
             private Collection<ImportPackage> packageImports = emptyList();
 
             public AllOthers(boolean statik) {
-                super(statik, "*", true
-                );
+                this(statik, false);
+            }
+
+            public AllOthers(boolean statik, boolean inflow) {
+                super(statik, "*", true);
                 this.statik = statik;
+                this.inflow = inflow;
             }
 
             @Override
@@ -790,12 +802,13 @@ public class ImportLayoutStyle implements JavaStyle {
                         return false;
                     }
                 }
-                return anImport.getElement().isStatic() == statik;
+                return inflow || anImport.getElement().isStatic() == statik;
             }
 
             @Override
             public String toString() {
-                return "import " + (statik ? "static " : "") + "all other imports";
+                return inflow ? "import all other imports (inflow)" :
+                        "import " + (statik ? "static " : "") + "all other imports";
             }
         }
     }
@@ -848,7 +861,9 @@ class Deserializer extends JsonDeserializer<ImportLayoutStyle> {
                                 statik = true;
                                 block = block.substring("static ".length());
                             }
-                            if ("all other imports".equals(block)) {
+                            if ("all other imports (inflow)".equals(block)) {
+                                builder.importAllOthersInflow();
+                            } else if ("all other imports".equals(block)) {
                                 if (statik) {
                                     builder.importStaticAllOthers();
                                 } else {
@@ -927,7 +942,11 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                     if (block instanceof ImportLayoutStyle.Block.BlankLines) {
                         return "<blank line>";
                     } else if (block instanceof ImportLayoutStyle.Block.AllOthers) {
-                        return "import " + (((ImportLayoutStyle.Block.AllOthers) block).isStatic() ? "static " : "") +
+                        ImportLayoutStyle.Block.AllOthers allOthers = (ImportLayoutStyle.Block.AllOthers) block;
+                        if (allOthers.isInflow()) {
+                            return "import all other imports (inflow)";
+                        }
+                        return "import " + (allOthers.isStatic() ? "static " : "") +
                                 "all other imports";
                     } else if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
                         ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;

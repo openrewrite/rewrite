@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 using OpenRewrite.Core;
 
-namespace OpenRewrite.Tests.DataTable;
+namespace OpenRewrite.Tests.Core;
 
 public record TextMatch
 {
@@ -37,29 +38,28 @@ public class InMemoryDataTableStoreTests
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
         var row = new TextMatch { SourcePath = "Foo.cs", LineNumber = 42, Match = "hello" };
 
-        store.AcceptRows(true);
         store.InsertRow(table, ctx, row);
 
-        Assert.Single(store.Rows);
-        Assert.True(store.Rows.ContainsKey("org.openrewrite.table.TextMatches"));
-        Assert.Single(store.Rows["org.openrewrite.table.TextMatches"]);
-        Assert.Equal(row, store.Rows["org.openrewrite.table.TextMatches"][0]);
+        Assert.Single(store.GetDataTables());
+        var rows = store.GetRows("org.openrewrite.table.TextMatches", "Text Matches").ToList();
+        Assert.Single(rows);
+        Assert.Equal(row, rows[0]);
     }
 
     [Fact]
-    public void SuppressesRowsWhenNotAccepting()
+    public void AlwaysAcceptsRows()
     {
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
-        Assert.Empty(store.Rows);
+        Assert.Single(store.GetDataTables());
     }
 
     [Fact]
@@ -68,13 +68,12 @@ public class InMemoryDataTableStoreTests
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
-        store.AcceptRows(true);
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "A.cs", LineNumber = 1, Match = "a" });
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "B.cs", LineNumber = 2, Match = "b" });
 
-        Assert.Equal(2, store.Rows["org.openrewrite.table.TextMatches"].Count);
+        Assert.Equal(2, store.GetRows("org.openrewrite.table.TextMatches", "Text Matches").Count());
     }
 
     [Fact]
@@ -83,14 +82,15 @@ public class InMemoryDataTableStoreTests
         var store = new InMemoryDataTableStore();
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
-        store.AcceptRows(true);
         store.InsertRow(table, ctx, new TextMatch { SourcePath = "A.cs", LineNumber = 1, Match = "a" });
 
-        Assert.Single(store.DataTables);
-        Assert.True(store.DataTables.ContainsKey("org.openrewrite.table.TextMatches"));
-        Assert.Equal("Text Matches", store.DataTables["org.openrewrite.table.TextMatches"].DisplayName);
+        var dataTables = store.GetDataTables();
+        Assert.Single(dataTables);
+        var dt = dataTables[0] as DataTable<TextMatch>;
+        Assert.NotNull(dt);
+        Assert.Equal("Text Matches", dt!.Descriptor.DisplayName);
     }
 }
 
@@ -105,20 +105,23 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
-            store.AcceptRows(true);
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 42, Match = "hello" });
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "Bar.cs", LineNumber = 7, Match = "world" });
 
-            var csvPath = Path.Combine(outputDir, "org.openrewrite.table.TextMatches.csv");
+            var fileKey = CsvDataTableStore.FileKey(table);
+            var csvPath = Path.Combine(outputDir, fileKey + ".csv");
             Assert.True(File.Exists(csvPath));
 
             var lines = File.ReadAllLines(csvPath);
-            Assert.Equal(3, lines.Length);
-            Assert.Equal("Source Path,Line Number,Match", lines[0]);
-            Assert.Equal("Foo.cs,42,hello", lines[1]);
-            Assert.Equal("Bar.cs,7,world", lines[2]);
+            Assert.Equal(6, lines.Length);
+            Assert.StartsWith("# @name", lines[0]);
+            Assert.StartsWith("# @instanceName", lines[1]);
+            Assert.StartsWith("# @group", lines[2]);
+            Assert.Equal("Source Path,Line Number,Match", lines[3]);
+            Assert.Equal("Foo.cs,42,hello", lines[4]);
+            Assert.Equal("Bar.cs,7,world", lines[5]);
         }
         finally
         {
@@ -135,15 +138,15 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
-            store.AcceptRows(true);
             store.InsertRow(table, ctx,
                 new TextMatch { SourcePath = "path,with,commas.cs", LineNumber = 1, Match = "has \"quotes\"" });
             store.InsertRow(table, ctx,
                 new TextMatch { SourcePath = "normal.cs", LineNumber = 2, Match = "line1\nline2" });
 
-            var csvPath = Path.Combine(outputDir, "org.openrewrite.table.TextMatches.csv");
+            var fileKey = CsvDataTableStore.FileKey(table);
+            var csvPath = Path.Combine(outputDir, fileKey + ".csv");
             var content = File.ReadAllText(csvPath);
             // Row with commas and quotes
             Assert.Contains("\"path,with,commas.cs\",1,\"has \"\"quotes\"\"\"", content);
@@ -157,7 +160,7 @@ public class CsvDataTableStoreTests
     }
 
     [Fact]
-    public void SuppressesRowsWhenNotAccepting()
+    public void AlwaysAcceptsRows()
     {
         var outputDir = Path.Combine(Path.GetTempPath(), "datatable-test-" + Guid.NewGuid());
         try
@@ -165,13 +168,14 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
-            var csvPath = Path.Combine(outputDir, "org.openrewrite.table.TextMatches.csv");
-            Assert.False(File.Exists(csvPath));
-            Assert.Empty(store.RowCounts);
+            var fileKey = CsvDataTableStore.FileKey(table);
+            var csvPath = Path.Combine(outputDir, fileKey + ".csv");
+            Assert.True(File.Exists(csvPath));
+            Assert.Equal(1, store.RowCounts[fileKey]);
         }
         finally
         {
@@ -188,15 +192,15 @@ public class CsvDataTableStoreTests
             var store = new CsvDataTableStore(outputDir);
             var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
                 "Matches found by a text search.");
-            var ctx = new Core.ExecutionContext();
+            var ctx = new OpenRewrite.Core.ExecutionContext();
 
-            store.AcceptRows(true);
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "A.cs", LineNumber = 1, Match = "a" });
             store.InsertRow(table, ctx, new TextMatch { SourcePath = "B.cs", LineNumber = 2, Match = "b" });
 
-            Assert.Single(store.TableNames);
-            Assert.Contains("org.openrewrite.table.TextMatches", store.TableNames);
-            Assert.Equal(2, store.RowCounts["org.openrewrite.table.TextMatches"]);
+            var fileKey = CsvDataTableStore.FileKey(table);
+            Assert.Single(store.TableKeys);
+            Assert.Contains(fileKey, store.TableKeys);
+            Assert.Equal(2, store.RowCounts[fileKey]);
         }
         finally
         {
@@ -212,31 +216,30 @@ public class DataTableTests
     {
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         table.InsertRow(ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
         var store = ctx.GetMessage<InMemoryDataTableStore>(DataTable<TextMatch>.DataTableStoreKey);
         Assert.NotNull(store);
-        // Default store does not accept rows until AcceptRows(true) is called
-        Assert.Empty(store.Rows);
+        Assert.Single(store!.GetDataTables());
     }
 
     [Fact]
-    public void InsertRowDelegatesToAcceptingStore()
+    public void InsertRowDelegatesToStore()
     {
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
 
         var store = new InMemoryDataTableStore();
-        store.AcceptRows(true);
         ctx.PutMessage(DataTable<TextMatch>.DataTableStoreKey, store);
 
         table.InsertRow(ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
-        Assert.Single(store.Rows);
-        Assert.Equal("Foo.cs", ((TextMatch)store.Rows["org.openrewrite.table.TextMatches"][0]).SourcePath);
+        var rows = store.GetRows("org.openrewrite.table.TextMatches", "Text Matches").ToList();
+        Assert.Single(rows);
+        Assert.Equal("Foo.cs", ((TextMatch)rows[0]).SourcePath);
     }
 
     [Fact]
@@ -244,14 +247,13 @@ public class DataTableTests
     {
         var table = new DataTable<TextMatch>("org.openrewrite.table.TextMatches", "Text Matches",
             "Matches found by a text search.");
-        var ctx = new Core.ExecutionContext();
+        var ctx = new OpenRewrite.Core.ExecutionContext();
         var store = new InMemoryDataTableStore();
-        store.AcceptRows(true);
         ctx.PutMessage(DataTable<TextMatch>.DataTableStoreKey, store);
 
         table.InsertRow(ctx, new TextMatch { SourcePath = "Foo.cs", LineNumber = 1, Match = "x" });
 
-        Assert.Single(store.Rows);
+        Assert.Single(store.GetDataTables());
     }
 
     [Fact]

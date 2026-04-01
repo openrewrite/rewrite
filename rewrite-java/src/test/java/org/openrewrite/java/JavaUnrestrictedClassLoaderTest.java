@@ -45,10 +45,8 @@ class JavaUnrestrictedClassLoaderTest {
     void addExportIfNeededExportsPackageFromNamedModule() throws Throwable {
         assumeTrue(hasModuleSystem(), "Requires JDK 9+ module system");
 
-        JavaUnrestrictedClassLoader loader = new JavaUnrestrictedClassLoader(
-                getClass().getClassLoader());
-
-        try {
+        try (JavaUnrestrictedClassLoader loader = new JavaUnrestrictedClassLoader(
+                getClass().getClassLoader())) {
             Class<?> moduleClass = Class.forName("java.lang.Module");
             Method getModule = Class.class.getMethod("getModule");
             Method getUnnamedModule = ClassLoader.class.getMethod("getUnnamedModule");
@@ -78,8 +76,6 @@ class JavaUnrestrictedClassLoaderTest {
             assertThat(exported)
                     .as("jdk.compiler should export com.sun.tools.javac.parser to the classloader's unnamed module")
                     .isTrue();
-        } finally {
-            loader.close();
         }
     }
 
@@ -91,10 +87,8 @@ class JavaUnrestrictedClassLoaderTest {
     void addExportIfNeededSkipsUnnamedModuleClasses() throws Throwable {
         assumeTrue(hasModuleSystem(), "Requires JDK 9+ module system");
 
-        JavaUnrestrictedClassLoader loader = new JavaUnrestrictedClassLoader(
-                getClass().getClassLoader());
-
-        try {
+        try (JavaUnrestrictedClassLoader loader = new JavaUnrestrictedClassLoader(
+                getClass().getClassLoader())) {
             // Load a class through our classloader's defineClass path (unnamed module)
             Class<?> contextClass = loader.loadClass("com.sun.tools.javac.util.Context");
 
@@ -115,8 +109,6 @@ class JavaUnrestrictedClassLoaderTest {
             addExportIfNeeded.setAccessible(true);
             addExportIfNeeded.invoke(loader, contextClass);
             // No exception = success
-        } finally {
-            loader.close();
         }
     }
 
@@ -128,10 +120,8 @@ class JavaUnrestrictedClassLoaderTest {
     void addExportIfNeededIsIdempotent() throws Throwable {
         assumeTrue(hasModuleSystem(), "Requires JDK 9+ module system");
 
-        JavaUnrestrictedClassLoader loader = new JavaUnrestrictedClassLoader(
-                getClass().getClassLoader());
-
-        try {
+        try (JavaUnrestrictedClassLoader loader = new JavaUnrestrictedClassLoader(
+                getClass().getClassLoader())) {
             Class<?> tokensClass = Class.forName(
                     "com.sun.tools.javac.parser.Tokens",
                     false,
@@ -149,8 +139,6 @@ class JavaUnrestrictedClassLoaderTest {
             addExportIfNeeded.invoke(loader, tokensClass);
             addExportIfNeeded.invoke(loader, tokenKindClass);
             addExportIfNeeded.invoke(loader, tokensClass);
-        } finally {
-            loader.close();
         }
     }
 }

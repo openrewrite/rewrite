@@ -182,6 +182,14 @@ public class Environment {
             }
         }
         if (recipe == null) {
+            for (ResourceLoader loader : dependencyResourceLoaders) {
+                recipe = loader.loadRecipe(recipeName, details);
+                if (recipe != null) {
+                    break;
+                }
+            }
+        }
+        if (recipe == null) {
             return null;
         }
 
@@ -288,7 +296,7 @@ public class Environment {
         this.dependencyResourceLoaders = dependencyResourceLoaders;
     }
 
-    public static Builder builder(Properties properties) {
+    public static Builder builder(@Nullable Properties properties) {
         return new Builder(properties);
     }
 
@@ -297,11 +305,11 @@ public class Environment {
     }
 
     public static class Builder {
-        private final Properties properties;
+        private final @Nullable Properties properties;
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
         private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
 
-        public Builder(Properties properties) {
+        public Builder(@Nullable Properties properties) {
             this.properties = properties;
         }
 

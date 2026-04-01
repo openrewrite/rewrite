@@ -35,7 +35,7 @@ public class RpcSendQueue
     private readonly int _batchSize;
     private readonly List<RpcObjectData> _batch;
     private readonly Action<List<RpcObjectData>> _drain;
-    private readonly Dictionary<object, int> _refs;
+    private readonly IDictionary<object, int> _refs;
     private readonly string? _sourceFileType;
     private readonly bool _trace;
     private readonly IRpcCodec? _treeCodec;
@@ -43,7 +43,7 @@ public class RpcSendQueue
     private object? _before;
 
     public RpcSendQueue(int batchSize, Action<List<RpcObjectData>> drain,
-                        Dictionary<object, int> refs, string? sourceFileType, bool trace,
+                        IDictionary<object, int> refs, string? sourceFileType, bool trace,
                         IRpcCodec? treeCodec = null)
     {
         _batchSize = batchSize;
@@ -350,6 +350,7 @@ public class RpcSendQueue
                 "Markup" => "org.openrewrite.marker.Markup",
                 "Space" => "org.openrewrite.java.tree.Space",
                 "TextComment" => "org.openrewrite.java.tree.TextComment",
+                "XmlDocComment" => "org.openrewrite.csharp.tree.CsDocCommentRawComment",
                 "Checksum" => "org.openrewrite.Checksum",
                 "FileAttributes" => "org.openrewrite.FileAttributes",
                 _ => null,

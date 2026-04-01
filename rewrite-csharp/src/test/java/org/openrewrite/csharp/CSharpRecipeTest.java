@@ -87,7 +87,7 @@ class CSharpRecipeTest implements RewriteTest {
         assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
 
         // Find the method invocation
-        Cs.CompilationUnit cu = (Cs.CompilationUnit) sf;
+        var cu = (Cs.CompilationUnit) sf;
         J.MethodInvocation invocation = findFirstMethodInvocation(cu);
         assertThat(invocation).as("Should find SerializeObject invocation").isNotNull();
         assertThat(invocation.getSimpleName()).isEqualTo("SerializeObject");
@@ -132,32 +132,42 @@ class CSharpRecipeTest implements RewriteTest {
         if (tree instanceof Cs.CompilationUnit cu) {
             for (Statement member : cu.getMembers()) {
                 J.MethodInvocation result = findFirstMethodInvocation(member);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof Cs.NamespaceDeclaration ns) {
             for (var member : ns.getMembers()) {
                 J.MethodInvocation result = findFirstMethodInvocation(member);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.ClassDeclaration cd) {
             for (Statement stmt : cd.getBody().getStatements()) {
                 J.MethodInvocation result = findFirstMethodInvocation(stmt);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.MethodDeclaration md && md.getBody() != null) {
             for (Statement stmt : md.getBody().getStatements()) {
                 J.MethodInvocation result = findFirstMethodInvocation(stmt);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.VariableDeclarations vd) {
             for (var v : vd.getVariables()) {
                 if (v.getInitializer() != null) {
                     J.MethodInvocation result = findFirstMethodInvocation(v.getInitializer());
-                    if (result != null) return result;
+                    if (result != null) {
+                        return result;
+                    }
                 }
             }
         }
@@ -484,4 +494,5 @@ class CSharpRecipeTest implements RewriteTest {
           )
         );
     }
+
 }

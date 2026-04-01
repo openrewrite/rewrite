@@ -766,6 +766,45 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4802")
+    @Test
+    void changePropertyKeyWithSequenceContainingDashOnOwnLine() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("app.rhino", "rhino", null, null, null)),
+          yaml(
+            """
+              app:
+                rhino:
+                  config:
+                    props:
+                      - prop: 'name1'
+                        config[0]:
+                          prop1: 1
+                          prop2: 2
+                      -
+                        prop: 'name2'
+                        config[0]:
+                          prop1: 3
+                          prop2: 4
+              """,
+            """
+              rhino:
+                config:
+                  props:
+                    - prop: 'name1'
+                      config[0]:
+                        prop1: 1
+                        prop2: 2
+                    -
+                      prop: 'name2'
+                      config[0]:
+                        prop1: 3
+                        prop2: 4
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2881")
     @Test
     void embedIndentedPropertyIntoExisting() {

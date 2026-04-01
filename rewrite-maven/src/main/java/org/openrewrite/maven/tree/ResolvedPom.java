@@ -1182,7 +1182,13 @@ public class ResolvedPom {
                         }
                     }
                 } catch (MavenDownloadingException e) {
-                    exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    String type = dd.getDependency().getType();
+                    if (type != null && !"jar".equals(type) && !"ejb".equals(type)) {
+                        // Non-classpath artifacts may lack a POM; skip like Maven does
+                        ctx.getOnError().accept(e);
+                    } else {
+                        exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    }
                 }
             }
 

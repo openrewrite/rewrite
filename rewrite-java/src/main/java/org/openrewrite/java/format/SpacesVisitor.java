@@ -246,7 +246,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
                     }
                 }.visit((J) classCursor.getValue(), (J.EnumValue) right.getElement());
                 if (classCursor.getMessage("singleLineEnum") == Boolean.TRUE) {
-                    if (atomicIndex.get() == 0) {
+                    if (atomicIndex.get() == 0 && !((J) right.getElement()).getPrefix().isEmpty()) {
                         before = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
                     } else if (atomicIndex.get() > 0) {
                         before = evaluate(() -> spacesStyle.getOther().getAfterComma(), true) ? " " : "";
@@ -753,6 +753,19 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessage("singleLineEnum", singleLineEnum);
         }
         return super.visitClassDeclaration(classDecl, p);
+    }
+
+    @Override
+    public J.EnumValueSet visitEnumValueSet(J.EnumValueSet enums, P p) {
+        J.EnumValueSet e = (J.EnumValueSet) super.visitEnumValueSet(enums, p);
+        if (!e.getEnums().isEmpty() && e.getEnums().get(0).getPrefix().isEmpty()) {
+            Cursor classCursor = getCursor().getParentTreeCursor().getParentTreeCursor();
+            if (classCursor.getMessage("singleLineEnum") == Boolean.TRUE) {
+                String space = evaluate(() -> spacesStyle.getOther().getInsideOneLineEnumBraces(), false) ? " " : "";
+                e = e.withPrefix(e.getPrefix().withWhitespace(space));
+            }
+        }
+        return e;
     }
 
     @Override

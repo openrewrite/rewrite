@@ -190,11 +190,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.MethodDeclaration visitMethodDeclaration(Cs.MethodDeclaration methodDeclaration, P p) {
-        return (Cs.MethodDeclaration) super.visitMethodDeclaration(methodDeclaration, p);
-    }
-
-    @Override
     public Cs.UsingStatement visitUsingStatement(Cs.UsingStatement usingStatement, P p) {
         return (Cs.UsingStatement) super.visitUsingStatement(usingStatement, p);
     }
@@ -255,11 +250,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     }
 
     @Override
-    public Cs.DestructorDeclaration visitDestructorDeclaration(Cs.DestructorDeclaration destructorDeclaration, P p) {
-        return (Cs.DestructorDeclaration) super.visitDestructorDeclaration(destructorDeclaration, p);
-    }
-
-    @Override
     public Cs.Unary visitUnary(Cs.Unary unary, P p) {
         return (Cs.Unary) super.visitUnary(unary, p);
     }
@@ -272,11 +262,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.TupleElement visitTupleElement(Cs.TupleElement tupleElement, P p) {
         return (Cs.TupleElement) super.visitTupleElement(tupleElement, p);
-    }
-
-    @Override
-    public Cs.NewClass visitNewClass(Cs.NewClass newClass, P p) {
-        return (Cs.NewClass) super.visitNewClass(newClass, p);
     }
 
     @Override
@@ -459,11 +444,6 @@ public class CSharpIsoVisitor<P> extends CSharpVisitor<P>
     @Override
     public Cs.AliasQualifiedName visitAliasQualifiedName(Cs.AliasQualifiedName aliasQualifiedName, P p) {
         return (Cs.AliasQualifiedName) super.visitAliasQualifiedName(aliasQualifiedName, p);
-    }
-
-    @Override
-    public Cs.ArrayType visitArrayType(Cs.ArrayType arrayType, P p) {
-        return (Cs.ArrayType) super.visitArrayType(arrayType, p);
     }
 
     @Override

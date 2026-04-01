@@ -17,16 +17,23 @@ namespace OpenRewrite.Core;
 
 /// <summary>
 /// Interface for storing data table rows emitted during recipe execution.
+/// Each bucket is identified by (DataTable name, scope).
 /// </summary>
 public interface IDataTableStore
 {
     /// <summary>
     /// Insert a row into the specified data table.
+    /// The store uses the data table's scope to determine the bucket.
     /// </summary>
     void InsertRow<TRow>(DataTable<TRow> dataTable, ExecutionContext ctx, TRow row) where TRow : notnull;
 
     /// <summary>
-    /// Enable or disable row acceptance.
+    /// Stream rows for a specific table by name and scope.
     /// </summary>
-    void AcceptRows(bool accept);
+    IEnumerable<object> GetRows(string dataTableName, string? group);
+
+    /// <summary>
+    /// Get all data tables that have received rows.
+    /// </summary>
+    IReadOnlyList<object> GetDataTables();
 }

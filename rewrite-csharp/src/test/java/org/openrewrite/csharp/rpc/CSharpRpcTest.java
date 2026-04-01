@@ -15,6 +15,7 @@
  */
 package org.openrewrite.csharp.rpc;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.openrewrite.csharp.tree.Cs;
@@ -35,6 +36,7 @@ import static org.openrewrite.csharp.Assertions.csharp;
  * Integration tests for C# RPC communication.
  * Uses rewriteRun with csharp() assertions for round-trip verification.
  */
+@Tag("slow")
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 class CSharpRpcTest implements RewriteTest {
 
@@ -432,7 +434,7 @@ class CSharpRpcTest implements RewriteTest {
 
     @Test
     void getMarketplace() {
-        RecipeBundle bundle = new RecipeBundle("nuget", "test-recipes",
+        var bundle = new RecipeBundle("nuget", "test-recipes",
                 null, null, null);
         RecipeMarketplace marketplace = CSharpRewriteRpc.getOrStart().getMarketplace(bundle);
         assertThat(marketplace).isNotNull();
@@ -1623,22 +1625,66 @@ class CSharpRpcTest implements RewriteTest {
         if (tree instanceof Cs.CompilationUnit cu) {
             for (Statement member : cu.getMembers()) {
                 T result = findFirst(member, type);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.ClassDeclaration cd) {
             for (Statement stmt : cd.getBody().getStatements()) {
                 T result = findFirst(stmt, type);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof Cs.NamespaceDeclaration ns) {
             for (var member : ns.getMembers()) {
                 T result = findFirst(member, type);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         return null;
+    }
+
+    /**
+     * Verifies that a tree containing catch-when (ControlParentheses in WhenClause)
+     * survives a Parse → Reset → Print cycle. The Reset clears both sides' caches,
+     * forcing the Java side to re-send the tree to C# via the receiver, which must
+     * correctly handle ControlParentheses deserialized as ControlParentheses&lt;J&gt;.
+     */
+    @Test
+    void catchWithWhenFilterSurvivesResetCycle() {
+        rewriteRun(csharp(
+          """
+            using System;
+
+            namespace Test
+            {
+                public class Foo
+                {
+                    public void Bar()
+                    {
+                        try
+                        {
+                            throw new InvalidOperationException();
+                        }
+                        catch (Exception ex) when (ex.Message != null)
+                        {
+                        }
+                    }
+                }
+            }
+            """,
+          spec -> spec.beforeRecipe(cu -> {
+              // Reset clears both sides' caches, forcing the next print to
+              // re-send the tree from Java to C# via the full receiver path.
+              // This exercises ControlParentheses<J> deserialization.
+              CSharpRewriteRpc.resetCurrent();
+          })
+        ));
     }
 
     private static J.MethodDeclaration findMethodByName(J.ClassDeclaration classDecl, String name) {

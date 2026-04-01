@@ -38,7 +38,7 @@ public class CaptureTests
     [Fact]
     public void VariadicCaptureIsMarked()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         Assert.True(args.IsVariadic);
         Assert.Equal("__plh_args__", args.ToString());
     }
@@ -46,7 +46,7 @@ public class CaptureTests
     [Fact]
     public void VariadicCaptureWithBounds()
     {
-        var args = Capture.Variadic<Expression>("args", min: 1, max: 3);
+        var args = Capture.Expression("args", variadic: new(Min: 1, Max: 3));
         Assert.True(args.IsVariadic);
         Assert.Equal(1, args.MinCount);
         Assert.Equal(3, args.MaxCount);

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -49,31 +50,31 @@ public class RewriteRpcServer
     public static void SetCurrent(RewriteRpcServer? server) => _current = server;
 
     private readonly RecipeMarketplace _marketplace;
-    private readonly Dictionary<string, Recipe> _preparedRecipes = new();
-    private readonly Dictionary<string, object?> _recipeAccumulators = new();
-    private readonly Dictionary<string, ExecutionContext> _executionContexts = new();
+    private readonly ConcurrentDictionary<string, Recipe> _preparedRecipes = new();
+    private readonly ConcurrentDictionary<string, object?> _recipeAccumulators = new();
+    private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
 
     /// <summary>
     /// Objects that have been parsed locally and are available for remote access.
     /// </summary>
-    private readonly Dictionary<string, object?> _localObjects = new();
+    private readonly ConcurrentDictionary<string, object?> _localObjects = new();
 
     /// <summary>
     /// Our understanding of the remote's state of objects.
     /// </summary>
-    private readonly Dictionary<string, object?> _remoteObjects = new();
+    private readonly ConcurrentDictionary<string, object?> _remoteObjects = new();
 
     /// <summary>
     /// Referentially deduplicated objects and their ref IDs.
     /// </summary>
-    private readonly Dictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
+    private readonly ConcurrentDictionary<object, int> _localRefs = new(ReferenceEqualityComparer.Instance);
 
     /// <summary>
     /// Refs received from the remote process (Java) for deduplication.
     /// </summary>
-    private readonly Dictionary<int, object> _remoteRefs = new();
+    private readonly ConcurrentDictionary<int, object> _remoteRefs = new();
 
     /// <summary>
     /// Connects this server to a remote JSON-RPC peer. Used by test infrastructure
@@ -82,6 +83,7 @@ public class RewriteRpcServer
     public void Connect(JsonRpc jsonRpc)
     {
         _jsonRpc = jsonRpc;
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(this);
         jsonRpc.StartListening();
     }
@@ -98,16 +100,10 @@ public class RewriteRpcServer
             "org.openrewrite.csharp.tree.Cs$Binary");
         RpcSendQueue.RegisterJavaTypeName(typeof(CsUnary),
             "org.openrewrite.csharp.tree.Cs$Unary");
-        RpcSendQueue.RegisterJavaTypeName(typeof(ConstrainedTypeParameter),
-            "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter");
 
         // Types in nagoya's Rewrite.Java namespace that don't follow nesting conventions
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.NamedVariable),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable");
-
-        // Types in nagoya's Rewrite.Java namespace that are Cs types in Java
-        RpcSendQueue.RegisterJavaTypeName(typeof(Java.ExpressionStatement),
-            "org.openrewrite.csharp.tree.Cs$ExpressionStatement");
 
         // Marker type name overrides — markers live in marker packages, not tree packages
         RpcSendQueue.RegisterJavaTypeName(typeof(Java.Semicolon),
@@ -128,6 +124,8 @@ public class RewriteRpcServer
             "org.openrewrite.java.marker.OmitParentheses");
         RpcSendQueue.RegisterJavaTypeName(typeof(AnonymousMethod),
             "org.openrewrite.csharp.marker.AnonymousMethod");
+        RpcSendQueue.RegisterJavaTypeName(typeof(CSharpFormatStyle),
+            "org.openrewrite.csharp.style.CSharpFormatStyle");
         RpcSendQueue.RegisterJavaTypeName(typeof(ConditionalBranchMarker),
             "org.openrewrite.csharp.marker.ConditionalBranchMarker");
         RpcSendQueue.RegisterJavaTypeName(typeof(DirectiveBoundaryMarker),
@@ -152,6 +150,26 @@ public class RewriteRpcServer
         // Marker type overrides for markers that live in Cs.java but map to marker package
         RpcSendQueue.RegisterJavaTypeName(typeof(ImplicitTypeParameters),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters");
+
+        // DotNetProject marker
+        RpcSendQueue.RegisterJavaTypeName(typeof(DotNetProject),
+            "org.openrewrite.csharp.marker.DotNetProject");
+
+        // MSBuildProject marker and nested types
+        RpcSendQueue.RegisterJavaTypeName(typeof(MSBuildProject),
+            "org.openrewrite.csharp.marker.MSBuildProject");
+        RpcSendQueue.RegisterJavaTypeName(typeof(TargetFramework),
+            "org.openrewrite.csharp.marker.MSBuildProject$TargetFramework");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PackageReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageReference");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ResolvedPackage),
+            "org.openrewrite.csharp.marker.MSBuildProject$ResolvedPackage");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ProjectReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$ProjectReference");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PropertyValue),
+            "org.openrewrite.csharp.marker.MSBuildProject$PropertyValue");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PackageSource),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageSource");
 
         // LINQ types live in Linq$ not Cs$ on the Java side
         RpcSendQueue.RegisterJavaTypeName(typeof(QueryExpression),
@@ -1034,7 +1052,10 @@ public class RewriteRpcServer
         }
     }
 
-    private static readonly string[] Languages = ["org.openrewrite.csharp.tree.Cs$CompilationUnit"];
+    private static readonly string[] Languages = [
+        "org.openrewrite.csharp.tree.Cs$CompilationUnit",
+        "org.openrewrite.xml.tree.Xml$Document",
+    ];
 
     [JsonRpcMethod("GetLanguages")]
     public Task<string[]> GetLanguages()
@@ -1107,13 +1128,61 @@ public class RewriteRpcServer
         var id = Guid.NewGuid().ToString();
         _preparedRecipes[id] = recipe;
 
-        return Task.FromResult(new PrepareRecipeResponse
+        var response = new PrepareRecipeResponse
         {
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
             ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
-        });
+        };
+
+        if (recipe is IDelegatesTo del)
+        {
+            response.DelegatesTo = new DelegatesTo
+            {
+                RecipeName = del.JavaRecipeName,
+                Options = del.Options
+            };
+        }
+        else
+        {
+            OptimizePreconditions(recipe, response);
+        }
+
+        return Task.FromResult(response);
+    }
+
+    /// <summary>
+    /// Inspects a recipe's visitor to extract preconditions that Java can evaluate
+    /// before sending files via RPC. Also adds a FindTreesOfType precondition based
+    /// on the visitor type so Java only sends compatible files.
+    /// </summary>
+    private void OptimizePreconditions(Recipe recipe, PrepareRecipeResponse response)
+    {
+        try
+        {
+            var visitor = recipe.GetVisitor();
+
+            var innerVisitor = visitor;
+            if (visitor is Check check)
+            {
+                innerVisitor = check.Visitor;
+            }
+
+            // Add tree type precondition so Java only sends files this visitor can handle
+            if (innerVisitor is CSharpVisitor<ExecutionContext>)
+            {
+                response.EditPreconditions.Add(new Precondition
+                {
+                    VisitorName = "org.openrewrite.rpc.internal.FindTreesOfType",
+                    VisitorOptions = new() { ["type"] = "org.openrewrite.csharp.tree.Cs" }
+                });
+            }
+        }
+        catch
+        {
+            // Some recipes may fail during GetVisitor() — skip precondition detection
+        }
     }
 
     private static Recipe InstantiateWithOptions(Type recipeType, Dictionary<string, object?> options)
@@ -1198,7 +1267,7 @@ public class RewriteRpcServer
         var modified = !ReferenceEquals(tree, result);
         if (result == null)
         {
-            _localObjects.Remove(request.TreeId);
+            _localObjects.TryRemove(request.TreeId, out _);
         }
         else if (modified)
         {
@@ -1313,7 +1382,7 @@ public class RewriteRpcServer
 
             if (deleted)
             {
-                _localObjects.Remove(request.TreeId);
+                _localObjects.TryRemove(request.TreeId, out _);
                 break;
             }
 
@@ -1398,6 +1467,10 @@ public class RewriteRpcServer
         var server = new RewriteRpcServer(marketplace);
         server._jsonRpc = jsonRpc;
         _current = server;
+        // Allow concurrent request dispatch so reentrant callbacks don't deadlock.
+        // Without this, the default NonConcurrentSynchronizationContext serializes
+        // dispatch, blocking incoming GetObject requests while BatchVisit is in progress.
+        jsonRpc.SynchronizationContext = null;
         jsonRpc.AddLocalRpcTarget(server);
         jsonRpc.StartListening();
 
@@ -1409,6 +1482,27 @@ public class RewriteRpcServer
         {
             _current = null;
         }
+    }
+
+    /// <summary>
+    /// Asks the Java peer to parse source content and returns the parsed tree.
+    /// The Java side selects the appropriate parser based on the file extension.
+    /// </summary>
+    public SourceFile ParseOnRemote(string sourcePath, string content, string? sourceFileType = null)
+    {
+        var response = _jsonRpc!.InvokeWithParameterObjectAsync<List<string>>(
+            "Parse",
+            new ParseRequest
+            {
+                Inputs = [new ParseInput { Text = content, SourcePath = sourcePath }]
+            }
+        ).GetAwaiter().GetResult();
+
+        if (response.Count == 0)
+            throw new InvalidOperationException($"Parse returned no results for {sourcePath}");
+
+        var id = response[0];
+        return (SourceFile)GetObjectFromRemoteAsync(id, sourceFileType).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -1516,7 +1610,10 @@ public class RewriteRpcServer
 
         var ctx = new ExecutionContext();
         if (pId != null)
+        {
             _executionContexts[pId] = ctx;
+            _localObjects[pId] = ctx;
+        }
         return ctx;
     }
 
@@ -1660,6 +1757,18 @@ public class GetObjectRequest
     public string? SourceFileType { get; set; }
 }
 
+public class ParseRequest
+{
+    public List<ParseInput> Inputs { get; set; } = new();
+    public string? RelativeTo { get; set; }
+}
+
+public class ParseInput
+{
+    public string Text { get; set; } = "";
+    public string SourcePath { get; set; } = "";
+}
+
 public class PrintRequest
 {
     public string TreeId { get; set; } = "";
@@ -1766,6 +1875,13 @@ public class PrepareRecipeResponse
     public List<Precondition> EditPreconditions { get; set; } = [];
     public string? ScanVisitor { get; set; }
     public List<Precondition> ScanPreconditions { get; set; } = [];
+    public DelegatesTo? DelegatesTo { get; set; }
+}
+
+public class DelegatesTo
+{
+    public string RecipeName { get; set; } = "";
+    public Dictionary<string, object?> Options { get; set; } = new();
 }
 
 public class Precondition

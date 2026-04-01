@@ -272,4 +272,67 @@ public class AttributeListTests : RewriteTest
             )
         );
     }
+
+    [Fact]
+    public void AttributeArgumentWithTrailingComment()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [assembly: Foo("bar" /*comment*/)]
+                class Test { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeMultipleArgumentsWithTrailingComment()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                [assembly: Foo("bar", "baz" /*comment*/)]
+                class Test { }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void AttributeOnExplicitInterfaceMethod()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                interface IFoo {
+                    void DoWork();
+                }
+                class Test : IFoo {
+                    [System.Obsolete]
+                    void IFoo.DoWork() { }
+                }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void MultipleAttributesOnExplicitInterfaceMethod()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                interface IFoo {
+                    void GetResult();
+                }
+                class Test : IFoo {
+                    [System.Obsolete]
+                    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+                    void IFoo.GetResult() { }
+                }
+                """
+            )
+        );
+    }
 }

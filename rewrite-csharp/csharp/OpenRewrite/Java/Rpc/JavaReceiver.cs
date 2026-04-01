@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp;
 using Space = OpenRewrite.Core.Space;
 
 namespace OpenRewrite.Java.Rpc;
@@ -86,6 +87,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             ControlParentheses<Expression> cp => VisitControlParentheses(cp, q),
             ControlParentheses<TypeTree> cptt => VisitControlParentheses(cptt, q),
             ControlParentheses<VariableDeclarations> cpvd => VisitControlParentheses(cpvd, q),
+            ControlParentheses<J> cpj => VisitControlParenthesesUntyped(cpj, q),
             ExpressionStatement es => VisitExpressionStatement(es, q),
             VariableDeclarations vd => VisitVariableDeclarations(vd, q),
             NamedVariable nv => VisitVariable(nv, q),
@@ -521,6 +523,13 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
         var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
         return new Parentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
+    }
+
+    private J VisitControlParenthesesUntyped(ControlParentheses<J> shell, RpcReceiveQueue q)
+    {
+        var tree = q.Receive(shell.Tree, rp => VisitRightPadded(rp, q));
+        var rp = new JRightPadded<Expression>((Expression)tree!.Element, tree.After, tree.Markers);
+        return new ControlParentheses<Expression>(_pvId, _pvPrefix, _pvMarkers, rp);
     }
 
     public override J VisitPrimitive(Primitive primitive, RpcReceiveQueue q)

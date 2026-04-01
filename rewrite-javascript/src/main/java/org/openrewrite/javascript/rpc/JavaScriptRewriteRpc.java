@@ -357,6 +357,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
                         serverJs.toAbsolutePath().normalize().toString(),
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         traceRpcMessages ? "--trace-rpc-messages" : null,
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
@@ -382,6 +383,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
             // caller-provided options, if any, are taking precedence over the options baked above

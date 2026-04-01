@@ -185,7 +185,7 @@ export class RpcSendQueue {
             for (const anAfter of after) {
                 const beforePos = beforeIdx.get(id(anAfter));
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
-                if (!beforePos) {
+                if (beforePos === undefined) {
                     await this.add(anAfter, onChangeRun);
                 } else {
                     const aBefore = before?.[beforePos];

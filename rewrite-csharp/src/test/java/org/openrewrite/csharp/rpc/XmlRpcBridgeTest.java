@@ -86,7 +86,7 @@ class XmlRpcBridgeTest {
      * Applies a C#-side recipe to an XML document and returns the modified result.
      */
     private Xml.Document visitOnCSharp(Xml.Document doc, String recipeName, Map<String, Object> options) {
-        RpcRecipe recipe = rpc.prepareRecipe(recipeName, options);
+        RpcRecipe recipe = (RpcRecipe) rpc.prepareRecipe(recipeName, options);
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         Tree result = rpc.visit(doc, recipe.getEditVisitor(), ctx);
         assertThat(result).isNotNull().isInstanceOf(Xml.Document.class);

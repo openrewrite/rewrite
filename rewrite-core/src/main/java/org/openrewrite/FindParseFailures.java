@@ -60,6 +60,10 @@ public class FindParseFailures extends Recipe {
 
     transient ParseFailures failures = new ParseFailures(this);
 
+    private String dataTableInstanceName() {
+        return parserType != null ? "Parse failures for " + parserType : "Parse failures";
+    }
+
     String displayName = "Find source files with `ParseExceptionResult` markers";
 
     String description = "This recipe explores parse failures after an LST is produced for classifying the types of " +

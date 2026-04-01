@@ -108,15 +108,49 @@ public class RewriteRpc {
     }
 
     /**
+     * Mutable resolver list so it can be updated after construction
+     * (e.g. when the RPC process is started eagerly before all resolvers are built).
+     */
+    private final List<RecipeBundleResolver> resolvers = new ArrayList<>();
+
+    /**
+     * Parsers available for handling Parse requests from remote peers.
+     */
+    private final List<Parser> parsers = new ArrayList<>();
+
+    private final RecipeMarketplace marketplace;
+
+    /**
+     * Replace the resolver list. Useful when the RPC process is started before all
+     * resolvers are built (e.g. the NuGet resolver starts the C# RPC during
+     * buildResolvers, but Maven resolvers are added to the list afterward).
+     */
+    public void setResolvers(List<RecipeBundleResolver> resolvers) {
+        this.resolvers.clear();
+        this.resolvers.addAll(resolvers);
+    }
+
+    /**
+     * Set the parsers available for handling Parse requests from remote peers.
+     */
+    public void setParsers(List<Parser> parsers) {
+        this.parsers.clear();
+        this.parsers.addAll(parsers);
+    }
+
+    /**
      * Creates a new RPC interface that can be used to communicate with a remote.
      *
      * @param marketplace The marketplace of recipes that this peer makes available.
      *                    Even if this peer is the host process, configuring this
      *                    marketplace allows the remote peer to discover what recipes
      *                    the host process has available for its use in composite recipes.
+     * @param resolvers   The initial set of recipe bundle resolvers.
      */
     public RewriteRpc(JsonRpc jsonRpc, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers) {
         this.jsonRpc = jsonRpc;
+        this.marketplace = marketplace;
+        this.resolvers.addAll(resolvers);
 
         jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
                 this::getObject, this::getCursor));
@@ -129,7 +163,7 @@ public class RewriteRpc {
         jsonRpc.rpc("GetMarketplace", new JsonRpcMethod<Void>() {
             @Override
             protected Object handle(Void noParams) {
-                return GetMarketplaceResponse.fromMarketplace(marketplace, resolvers);
+                return GetMarketplaceResponse.fromMarketplace(marketplace, RewriteRpc.this.resolvers);
             }
         });
         jsonRpc.rpc("TraceGetObject", new JsonRpcMethod<TraceGetObject>() {
@@ -162,11 +196,12 @@ public class RewriteRpc {
         jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes, (id, opts) -> {
             RecipeListing listing = marketplace.findRecipe(id);
             if (listing != null) {
-                return listing.prepare(resolvers, opts);
+                return listing.prepare(RewriteRpc.this.resolvers, opts);
             }
             // Fall back to loading by class name if not found in marketplace
             return new RecipeLoader(null).load(id, opts);
         }));
+        jsonRpc.rpc("Parse", new Parse.Handler(localObjects, () -> parsers));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
         jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
             @Override
@@ -313,12 +348,23 @@ public class RewriteRpc {
         return remoteLanguages;
     }
 
-    public RpcRecipe prepareRecipe(String id) {
+    public Recipe prepareRecipe(String id) {
         return prepareRecipe(id, emptyMap());
     }
 
-    public RpcRecipe prepareRecipe(String id, Map<String, Object> options) {
+    public Recipe prepareRecipe(String id, Map<String, Object> options) {
         PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+
+        if (r.getDelegatesTo() != null) {
+            PrepareRecipeResponse.DelegatesTo d = r.getDelegatesTo();
+            RecipeListing listing = marketplace.findRecipe(d.getRecipeName());
+            if (listing == null) {
+                throw new IllegalStateException(
+                        "Remote declared delegatesTo " + d.getRecipeName() +
+                        " but no recipe found in marketplace.");
+            }
+            return listing.prepare(resolvers, d.getOptions());
+        }
 
         // FIXME do this validation on the server side instead
         for (OptionDescriptor option : r.getDescriptor().getOptions()) {
@@ -367,9 +413,9 @@ public class RewriteRpc {
         for (Parser.Input input : inputs) {
             inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.Input(input.getSource(ctx).readFully(), input.getPath()));
             } else {
-                mappedInputs.add(new Parse.PathInput(input.getPath()));
+                mappedInputs.add(new Parse.Input(null, input.getPath()));
             }
         }
 

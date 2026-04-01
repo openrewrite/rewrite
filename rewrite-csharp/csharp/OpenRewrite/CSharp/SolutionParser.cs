@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 using System.Diagnostics;
+using System.Xml.Linq;
 using Microsoft.Build.Locator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using OpenRewrite.Core;
+using OpenRewrite.CSharp.Format;
 using Serilog;
 
 namespace OpenRewrite.CSharp;
@@ -261,8 +263,24 @@ public class SolutionParser
         var userDocs = project.Documents
             .Where(d => d.FilePath != null && IsUserSource(d, project))
             .ToList();
+
+        // Filter out git-ignored files when inside a git repository
+        var ignoredPaths = GetGitIgnoredPaths(rootDir, userDocs.Select(d => d.FilePath!));
+        if (ignoredPaths.Count > 0)
+        {
+            var before = userDocs.Count;
+            userDocs = userDocs.Where(d => !ignoredPaths.Contains(d.FilePath!)).ToList();
+            Log.Debug("ParseProject: excluded {ExcludedCount} git-ignored files", before - userDocs.Count);
+        }
         Log.Debug("ParseProject: {ProjectName} has {UserDocCount} user source files (of {TotalDocCount} total)",
             projectName, userDocs.Count, project.Documents.Count());
+
+        // Create an EditorConfigResolver to detect formatting style from .editorconfig files.
+        // The resolver caches results per directory, so files in the same directory share
+        // the same CSharpFormatStyle marker instance.
+        var editorConfigResolver = new EditorConfigResolver(rootDir);
+
+        var dotNetProject = CreateDotNetProjectMarker(projectPath, projectName);
 
         var results = new List<SourceFile>();
         var fileIndex = 0;
@@ -276,6 +294,10 @@ public class SolutionParser
             var relativePath = Path.GetRelativePath(rootDir, doc.FilePath!);
             // Normalize path separators to forward slashes for cross-platform consistency
             relativePath = relativePath.Replace('\\', '/');
+
+            // Detect UTF-8 BOM — Roslyn's SourceText.ToString() strips the BOM character,
+            // so we check the raw file bytes to preserve the flag for patch fidelity.
+            var charsetBomMarked = HasUtf8Bom(doc.FilePath!);
 
             var fileSw = Stopwatch.StartNew();
             try
@@ -291,12 +313,17 @@ public class SolutionParser
                 CompilationUnit cu;
                 if (configSymbolSets.Count > 1)
                 {
-                    cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets);
+                    cu = _parser.ParseWithConfigurations(source, relativePath, semanticModel, configSymbolSets,
+                        charsetBomMarked);
                 }
                 else
                 {
-                    cu = _parser.Parse(source, relativePath, semanticModel);
+                    cu = _parser.Parse(source, relativePath, semanticModel, charsetBomMarked);
                 }
+
+                // Attach formatting style marker from .editorconfig
+                var formatStyle = editorConfigResolver.Resolve(doc.FilePath!);
+                cu = cu.WithMarkers(cu.Markers.Add(formatStyle));
 
                 if (requirePrintEqualsInput)
                 {
@@ -305,13 +332,15 @@ public class SolutionParser
                     {
                         Log.Debug("  IDEMPOTENCY [{FileIndex}/{TotalFiles}] {RelativePath}",
                             fileIndex, userDocs.Count, relativePath);
+                        var diff = DiffUtils.UnifiedDiff(source, printed, relativePath);
                         results.Add(ParseError.Build(relativePath, source,
-                            new InvalidOperationException(relativePath + " is not print idempotent.")));
+                            new InvalidOperationException(relativePath + " is not print idempotent. \n" + diff)));
                         fileSw.Stop();
                         continue;
                     }
                 }
 
+                cu = cu.WithMarkers(cu.Markers.Add(dotNetProject));
                 results.Add(cu);
                 fileSw.Stop();
 
@@ -334,6 +363,24 @@ public class SolutionParser
         Log.Debug("ParseProject: {ProjectName} completed {ResultCount} files in {ElapsedSec}s",
             projectName, results.Count, projectSw.Elapsed.TotalSeconds.ToString("F1"));
         return results;
+    }
+
+    /// <summary>
+    /// Checks whether a file starts with a UTF-8 BOM (byte order mark: EF BB BF).
+    /// </summary>
+    private static bool HasUtf8Bom(string filePath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            Span<byte> buf = stackalloc byte[3];
+            return stream.Read(buf) == 3
+                   && buf[0] == 0xEF && buf[1] == 0xBB && buf[2] == 0xBF;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -370,6 +417,77 @@ public class SolutionParser
     }
 
     /// <summary>
+    /// Returns the set of file paths (from <paramref name="candidatePaths"/>) that are
+    /// git-ignored according to the repository rooted at or above <paramref name="rootDir"/>.
+    /// Returns an empty set when git is not available or <paramref name="rootDir"/> is not
+    /// inside a git repository.
+    /// </summary>
+    private static HashSet<string> GetGitIgnoredPaths(string rootDir, IEnumerable<string> candidatePaths)
+    {
+        var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var paths = candidatePaths.ToList();
+        if (paths.Count == 0) return ignored;
+
+        try
+        {
+            // Check if rootDir is inside a git repo
+            var checkPsi = new ProcessStartInfo("git", "rev-parse --git-dir")
+            {
+                WorkingDirectory = rootDir,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var checkProcess = Process.Start(checkPsi);
+            if (checkProcess == null) return ignored;
+            checkProcess.WaitForExit(5_000);
+            if (checkProcess.ExitCode != 0) return ignored;
+
+            // Use git check-ignore --stdin to batch-check all candidate paths
+            var psi = new ProcessStartInfo("git", "check-ignore --stdin")
+            {
+                WorkingDirectory = rootDir,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var process = Process.Start(psi);
+            if (process == null) return ignored;
+
+            // Write all paths to stdin, one per line
+            foreach (var path in paths)
+                process.StandardInput.WriteLine(path);
+            process.StandardInput.Close();
+
+            // Read ignored paths from stdout
+            var output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(10_000);
+
+            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.TrimEnd('\r');
+                if (!string.IsNullOrEmpty(trimmed))
+                {
+                    // git check-ignore outputs paths relative to the working directory;
+                    // resolve them to full paths for comparison
+                    var fullPath = Path.GetFullPath(trimmed, rootDir);
+                    ignored.Add(fullPath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("GetGitIgnoredPaths: failed ({ExType}: {ExMessage}), skipping filter",
+                ex.GetType().Name, ex.Message);
+        }
+
+        return ignored;
+    }
+
+    /// <summary>
     /// Determines if a document is a user source file.
     /// Excludes bin/ and obj/ directories entirely.
     /// </summary>
@@ -393,6 +511,43 @@ public class SolutionParser
             return false;
 
         return true;
+    }
+
+    /// <summary>
+    /// Creates a DotNetProject marker by reading TFM and SDK from the .csproj XML.
+    /// </summary>
+    private static DotNetProject CreateDotNetProjectMarker(string projectPath, string projectName)
+    {
+        string? sdk = null;
+        var tfms = new List<string>();
+
+        try
+        {
+            var doc = XDocument.Load(projectPath);
+            var root = doc.Root;
+            if (root != null)
+            {
+                sdk = root.Attribute("Sdk")?.Value;
+
+                var tfm = root.Elements("PropertyGroup").Elements("TargetFramework").FirstOrDefault()?.Value;
+                if (tfm != null)
+                    tfms.Add(tfm);
+
+                var tfmList = root.Elements("PropertyGroup").Elements("TargetFrameworks").FirstOrDefault()?.Value;
+                if (tfmList != null)
+                {
+                    foreach (var t in tfmList.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        if (!tfms.Contains(t))
+                            tfms.Add(t);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("Failed to read project metadata from {ProjectPath}: {Error}", projectPath, ex.Message);
+        }
+
+        return new DotNetProject(Guid.NewGuid(), projectName, tfms, sdk);
     }
 
     private static void EnsureMSBuildRegistered()

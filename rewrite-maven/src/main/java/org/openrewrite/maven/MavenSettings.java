@@ -73,15 +73,25 @@ public class MavenSettings {
     @With
     Servers servers;
 
-    @JsonCreator
+    @Nullable
+    Proxies proxies;
+
     public MavenSettings(@Nullable String localRepository, @Nullable Profiles profiles,
                          @Nullable ActiveProfiles activeProfiles, @Nullable Mirrors mirrors,
                          @Nullable Servers servers) {
+        this(localRepository, profiles, activeProfiles, mirrors, servers, null);
+    }
+
+    @JsonCreator
+    public MavenSettings(@Nullable String localRepository, @Nullable Profiles profiles,
+                         @Nullable ActiveProfiles activeProfiles, @Nullable Mirrors mirrors,
+                         @Nullable Servers servers, @Nullable Proxies proxies) {
         this.localRepository = localRepository;
         this.profiles = profiles;
         this.activeProfiles = activeProfiles;
         this.mirrors = mirrors;
         this.servers = servers;
+        this.proxies = proxies;
     }
 
     public static @Nullable MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
@@ -148,6 +158,12 @@ public class MavenSettings {
                     return password == null ? server : server.withPassword(password);
                 });
             }
+            if (proxies != null) {
+                proxies.proxies = ListUtils.map(proxies.proxies, proxy -> {
+                    String password = security.decrypt(proxy.getPassword(), decryptedMasterPassword);
+                    return password == null ? proxy : proxy.withPassword(password);
+                });
+            }
         }
     }
 
@@ -192,7 +208,8 @@ public class MavenSettings {
                 profiles == null ? installSettings.profiles : profiles.merge(installSettings.profiles),
                 activeProfiles == null ? installSettings.activeProfiles : activeProfiles.merge(installSettings.activeProfiles),
                 mirrors == null ? installSettings.mirrors : mirrors.merge(installSettings.mirrors),
-                servers == null ? installSettings.servers : servers.merge(installSettings.servers)
+                servers == null ? installSettings.servers : servers.merge(installSettings.servers),
+                proxies == null ? installSettings.proxies : proxies.merge(installSettings.proxies)
         );
     }
 
@@ -254,7 +271,8 @@ public class MavenSettings {
                     mavenSettings.profiles,
                     interpolate(mavenSettings.activeProfiles),
                     interpolate(mavenSettings.mirrors),
-                    interpolate(mavenSettings.servers));
+                    interpolate(mavenSettings.servers),
+                    interpolate(mavenSettings.proxies));
         }
 
         private @Nullable ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
@@ -293,6 +311,17 @@ public class MavenSettings {
         private Server interpolate(Server server) {
             return new Server(interpolate(server.id), interpolate(server.username), interpolate(server.password),
                     interpolate(server.configuration));
+        }
+
+        private @Nullable Proxies interpolate(@Nullable Proxies proxies) {
+            if (proxies == null) return null;
+            return new Proxies(ListUtils.map(proxies.getProxies(), this::interpolate));
+        }
+
+        private Proxy interpolate(Proxy proxy) {
+            return new Proxy(interpolate(proxy.id), proxy.active, interpolate(proxy.protocol),
+                    interpolate(proxy.host), proxy.port, interpolate(proxy.username),
+                    interpolate(proxy.password), interpolate(proxy.nonProxyHosts));
         }
 
         private @Nullable String interpolate(@Nullable String s) {
@@ -444,6 +473,64 @@ public class MavenSettings {
 
         @Nullable
         ServerConfiguration configuration;
+    }
+
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class Proxies {
+        @JacksonXmlProperty(localName = "proxy")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        List<Proxy> proxies = emptyList();
+
+        public Proxies merge(@Nullable Proxies proxies) {
+            final Map<String, Proxy> merged = new LinkedHashMap<>();
+            int nullIndex = 0;
+            for (Proxy proxy : this.proxies) {
+                String key = proxy.id != null ? proxy.id : "__null_" + nullIndex++;
+                merged.put(key, proxy);
+            }
+            if (proxies != null) {
+                for (Proxy proxy : proxies.getProxies()) {
+                    if (proxy.getId() != null) {
+                        merged.putIfAbsent(proxy.getId(), proxy);
+                    } else {
+                        merged.put("__null_" + nullIndex++, proxy);
+                    }
+                }
+            }
+            return new Proxies(new ArrayList<>(merged.values()));
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
+    public static class Proxy {
+        @Nullable
+        String id;
+
+        @Nullable
+        Boolean active;
+
+        @Nullable
+        String protocol;
+
+        String host;
+
+        @Nullable
+        Integer port;
+
+        @Nullable
+        String username;
+
+        @Nullable
+        String password;
+
+        @Nullable
+        String nonProxyHosts;
     }
 
     @EqualsAndHashCode
