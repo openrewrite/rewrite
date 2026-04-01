@@ -12,16 +12,18 @@ testing {
         }
 
         register<JvmTestSuite>("groovy2Test") {
-            configurations.getByName("groovy2TestRuntimeClasspath") {
-                resolutionStrategy {
-                    force("org.codehaus.groovy:groovy:2.5.22")
-                }
-            }
-
             dependencies {
                 implementation(project())
                 implementation(project(":rewrite-test"))
                 implementation("org.assertj:assertj-core:latest.release")
+            }
+
+            // Replace Groovy 4.x (org.apache.groovy) with Groovy 2.x (org.codehaus.groovy)
+            configurations.named("groovy2TestRuntimeClasspath") {
+                exclude(group = "org.apache.groovy")
+            }
+            configurations.named("groovy2TestRuntimeOnly") {
+                dependencies.add(project.dependencies.create("org.codehaus.groovy:groovy:2.5.22"))
             }
 
             targets {

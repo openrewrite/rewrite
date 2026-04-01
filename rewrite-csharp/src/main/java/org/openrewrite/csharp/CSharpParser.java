@@ -96,7 +96,7 @@ public class CSharpParser implements Parser {
                 }
             }
 
-            return CSharpRewriteRpc.getOrStart().parseSolution(csproj, tempDir, ctx);
+            return CSharpRewriteRpc.getOrStart().parseSolution(csproj, tempDir, ctx).sourceFiles();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -123,7 +123,7 @@ public class CSharpParser implements Parser {
      * @return Stream of parsed source files
      */
     public static Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
-        return CSharpRewriteRpc.getOrStart().parseSolution(path, rootDir, ctx);
+        return CSharpRewriteRpc.getOrStart().parseSolution(path, rootDir, ctx).sourceFiles();
     }
 
     private static void writeString(Path path, String content) throws IOException {

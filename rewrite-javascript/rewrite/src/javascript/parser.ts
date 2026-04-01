@@ -336,7 +336,7 @@ export class JavaScriptParser extends Parser {
         // This ensures that TypeScript types with the same type.id map to the same Type instance,
         // preventing duplicate Type.Class, Type.Parameterized, etc. instances.
         const typeChecker = program.getTypeChecker();
-        const typeMapping = new JavaScriptTypeMapping(typeChecker);
+        const typeMapping = new JavaScriptTypeMapping(typeChecker, this.relativeTo);
 
         for (const input of inputFiles.values()) {
             const filePath = parserInputFile(input);
@@ -1172,6 +1172,7 @@ export class JavaScriptParserVisitor {
 
     visitMethodSignature(node: ts.MethodSignature): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
         const prefix = this.prefix(node);
+        const methodType = this.mapMethodType(node);
 
         if (ts.isComputedPropertyName(node.name)) {
             return {
@@ -1187,11 +1188,10 @@ export class JavaScriptParserVisitor {
                     draft.markers = this.maybeAddOptionalMarker(draft, node);
                 }),
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-                methodType: this.mapMethodType(node)
+                methodType: methodType
             };
         }
-
-        let name = this.mapMethodName(node) as J.Identifier;
+        let name = this.mapMethodName(node, methodType) as J.Identifier;
         name = produce(name, draft => {
             draft.markers = this.maybeAddOptionalMarker(draft, node);
         });
@@ -1208,12 +1208,13 @@ export class JavaScriptParserVisitor {
             nameAnnotations: [],
             name: name,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
     visitMethodDeclaration(node: ts.MethodDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
         const prefix = this.prefix(node);
+        const methodType = this.mapMethodType(node);
         const markers = produce(emptyMarkers, draft => {
             if (node.asteriskToken) {
                 draft.markers.push({
@@ -1224,7 +1225,7 @@ export class JavaScriptParserVisitor {
             }
         });
 
-        let name = this.mapMethodName(node);
+        let name = this.mapMethodName(node, methodType);
         name = produce(name, draft => {
             draft.markers = this.maybeAddOptionalMarker(draft, node);
         });
@@ -1242,7 +1243,7 @@ export class JavaScriptParserVisitor {
                 name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
-                methodType: this.mapMethodType(node)
+                methodType: methodType
             };
         }
 
@@ -1259,16 +1260,29 @@ export class JavaScriptParserVisitor {
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
-    private mapMethodName(node: ts.NamedDeclaration): J.Identifier | JS.ComputedPropertyName {
-        return !node.name
-            ? this.mapIdentifier(node, "")
-            : ts.isStringLiteral(node.name) || ts.isNumericLiteral(node.name)
-                ? this.mapIdentifier(node.name, node.name.getText())
-                : this.visit(node.name);
+    private mapMethodName(node: ts.NamedDeclaration, methodType?: Type.Method): J.Identifier | JS.ComputedPropertyName {
+        // Build the name identifier without an independent type — the containing
+        // MethodDeclaration's methodType is the authoritative source. We set the
+        // identifier's type to the same methodType object to maintain the
+        // referential equality invariant (name.type === methodType).
+        let ident: J.Identifier | JS.ComputedPropertyName;
+        if (!node.name) {
+            ident = this.mapIdentifier(node, "", false);
+        } else if (ts.isStringLiteral(node.name) || ts.isNumericLiteral(node.name)) {
+            ident = this.mapIdentifier(node.name, node.name.getText(), false);
+        } else if (ts.isComputedPropertyName(node.name)) {
+            return this.visit(node.name);
+        } else {
+            ident = this.mapIdentifier(node.name, node.name.getText(), false);
+        }
+        if (methodType && ident.kind === J.Kind.Identifier) {
+            return {...ident, type: methodType};
+        }
+        return ident;
     }
 
     private mapTypeInfo(node: ts.MethodDeclaration | ts.PropertyDeclaration | ts.VariableDeclaration | ts.ParameterDeclaration
@@ -1306,6 +1320,7 @@ export class JavaScriptParserVisitor {
         // using string literal for the following case: class A { "constructor"() {} }
         const constructorKeyword = node.getChildren()
             .find(n => (n.kind === ts.SyntaxKind.ConstructorKeyword) || ((n.kind === ts.SyntaxKind.StringLiteral) && (n.getText().includes("constructor"))))!;
+        const methodType = this.mapMethodType(node);
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),
@@ -1314,15 +1329,16 @@ export class JavaScriptParserVisitor {
             leadingAnnotations: this.mapDecorators(node),
             modifiers: this.mapModifiers(node),
             nameAnnotations: [],
-            name: this.mapIdentifier(constructorKeyword, constructorKeyword.getText()),
+            name: {...this.mapIdentifier(constructorKeyword, constructorKeyword.getText(), false), type: methodType},
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
     visitGetAccessor(node: ts.GetAccessorDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
-        const name = this.mapMethodName(node);
+        const methodType = this.mapMethodType(node);
+        const name = this.mapMethodName(node, methodType);
         if (ts.isComputedPropertyName(node.name)) {
             return {
                 kind: JS.Kind.ComputedPropertyMethodDeclaration,
@@ -1335,7 +1351,7 @@ export class JavaScriptParserVisitor {
                 name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
-                methodType: this.mapMethodType(node)
+                methodType: methodType
             };
         }
 
@@ -1351,12 +1367,13 @@ export class JavaScriptParserVisitor {
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
     visitSetAccessor(node: ts.SetAccessorDeclaration): J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration {
-        const name = this.mapMethodName(node);
+        const methodType = this.mapMethodType(node);
+        const name = this.mapMethodName(node, methodType);
         if (ts.isComputedPropertyName(node.name)) {
             return {
                 kind: JS.Kind.ComputedPropertyMethodDeclaration,
@@ -1368,7 +1385,7 @@ export class JavaScriptParserVisitor {
                 name: name as ComputedPropertyName,
                 parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
                 body: node.body && this.convert<J.Block>(node.body),
-                methodType: this.mapMethodType(node)
+                methodType: methodType
             };
         }
 
@@ -1383,11 +1400,12 @@ export class JavaScriptParserVisitor {
             name: name as J.Identifier,
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             body: node.body && this.convert<J.Block>(node.body),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
     visitCallSignature(node: ts.CallSignatureDeclaration): J.MethodDeclaration {
+        const methodType = this.mapMethodType(node);
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),
@@ -1401,17 +1419,19 @@ export class JavaScriptParserVisitor {
             name: {
                 kind: J.Kind.Identifier,
                 id: randomId(),
-                prefix: emptySpace/* this.prefix(node.getChildren().find(n => n.kind === ts.SyntaxKind.OpenBraceToken)!) */,
+                prefix: emptySpace,
                 markers: emptyMarkers,
-                annotations: [], // FIXME decorators
+                annotations: [],
                 simpleName: "",
+                type: methodType
             },
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
     visitConstructSignature(node: ts.ConstructSignatureDeclaration): J.MethodDeclaration {
+        const methodType = this.mapMethodType(node);
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),
@@ -1428,10 +1448,11 @@ export class JavaScriptParserVisitor {
                 prefix: emptySpace,
                 markers: emptyMarkers,
                 annotations: [],
-                simpleName: 'new'
+                simpleName: 'new',
+                type: methodType
             },
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
@@ -3318,6 +3339,7 @@ export class JavaScriptParserVisitor {
     }
 
     private mapFunctionDeclaration(node: ts.FunctionDeclaration | ts.FunctionExpression): J.MethodDeclaration {
+        const methodType = this.mapMethodType(node);
         return {
             kind: J.Kind.MethodDeclaration,
             id: randomId(),
@@ -3340,12 +3362,12 @@ export class JavaScriptParserVisitor {
             leadingAnnotations: [],
             nameAnnotations: [],
             modifiers: this.mapModifiers(node),
-            name: this.mapMethodName(node) as J.Identifier,
+            name: this.mapMethodName(node, methodType) as J.Identifier,
             typeParameters: this.mapTypeParametersAsObject(node),
             parameters: this.mapCommaSeparatedList(this.getParameterListNodes(node)),
             returnTypeExpression: this.mapTypeInfo(node),
             body: node.body && this.convert<J.Block>(node.body),
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         };
     }
 
@@ -3830,19 +3852,20 @@ export class JavaScriptParserVisitor {
     }
 
     visitExternalModuleReference(node: ts.ExternalModuleReference): J.MethodInvocation {
+        const methodType = this.mapMethodType(node);
         return {
             kind: J.Kind.MethodInvocation,
             id: randomId(),
             prefix: this.prefix(node),
             markers: emptyMarkers,
-            name: this.mapIdentifier(node, "require"),
+            name: {...this.mapIdentifier(node, "require", false), type: methodType},
             arguments: {
                 kind: J.Kind.Container,
                 before: this.prefix(this.findChildNode(node, ts.SyntaxKind.OpenParenToken)!),
                 elements: [this.rightPadded(this.visit(node.expression), this.suffix(node.expression))],
                 markers: emptyMarkers
             },
-            methodType: this.mapMethodType(node)
+            methodType: methodType
         }
     }
 

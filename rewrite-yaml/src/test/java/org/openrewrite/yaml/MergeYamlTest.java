@@ -3060,7 +3060,7 @@ class MergeYamlTest implements RewriteTest {
 
     @Test
     void invalidYaml() {
-        MergeYaml recipe = new MergeYaml(
+        var recipe = new MergeYaml(
           "$.some.object",
           //language=text
           """
@@ -3074,7 +3074,7 @@ class MergeYamlTest implements RewriteTest {
           null
         );
         assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
-            .contains("Must be valid YAML");
+            .anyMatch(msg -> msg.startsWith("Could not parse as YAML"));
     }
 
     @Test
@@ -3144,7 +3144,7 @@ class MergeYamlTest implements RewriteTest {
     @SuppressWarnings("DataFlowIssue")
     @Test
     void sourceNull() {
-        MergeYaml recipe = new MergeYaml(
+        var recipe = new MergeYaml(
           "$.some.object",
           null,
           false,

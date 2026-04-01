@@ -23,6 +23,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
@@ -1071,15 +1072,36 @@ class ChangeDependencyTest implements RewriteTest {
 
     @Test
     void isAcceptable() {
-        ChangeDependency recipe = new ChangeDependency(
+        var recipe = new ChangeDependency(
                 "org.old", "artifact", "org.new", "artifact", null, null, null
         );
         @SuppressWarnings("unchecked")
-        TreeVisitor<?, ExecutionContext> visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
 
         SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
                 .findFirst().orElseThrow()
                 .withSourcePath(Path.of("not-a-gradle-file.txt"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+    }
+
+    @Test
+    void isNotAcceptableForPlainTextWithGradleProjectMarker() {
+        var recipe = new ChangeDependency(
+                "org.old", "artifact", "org.new", "artifact", null, null, null
+        );
+        @SuppressWarnings("unchecked")
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
+                .findFirst().orElseThrow()
+                .withSourcePath(Path.of("build.gradle"))
+                .withMarkers(new org.openrewrite.marker.Markers(org.openrewrite.Tree.randomId(),
+                        java.util.Collections.singletonList(GradleProject.builder()
+                                .group("com.example")
+                                .name("test")
+                                .version("1.0")
+                                .path(":")
+                                .build())));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
     }
 }

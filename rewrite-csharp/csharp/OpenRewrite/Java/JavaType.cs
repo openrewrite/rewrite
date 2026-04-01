@@ -28,6 +28,15 @@ public abstract class JavaType
     /// </summary>
     public sealed class Primitive : JavaType
     {
+        // Shared instances for referential deduplication across the tree.
+        // The RPC layer uses AsRef + identity tracking, so reusing instances
+        // avoids sending duplicate type data for every node that shares a type.
+        private static readonly Primitive[] Instances = Enum.GetValues<PrimitiveKind>()
+            .Select(k => new Primitive(k))
+            .ToArray();
+
+        public static Primitive Of(PrimitiveKind kind) => Instances[(int)kind];
+
         public PrimitiveKind Kind { get; }
 
         public Primitive(PrimitiveKind kind)
@@ -122,6 +131,52 @@ public abstract class JavaType
             Members = members;
             Methods = methods;
             return this;
+        }
+    }
+
+    /// <summary>
+    /// A lightweight class type that only carries the fully qualified name, kind, flags,
+    /// and owning class. All other fields (type parameters, supertype, annotations,
+    /// interfaces, members, methods) are discarded.
+    /// Matches Java's JavaType.ShallowClass.
+    /// </summary>
+    public class ShallowClass : Class
+    {
+        public ShallowClass() { }
+
+        public ShallowClass(long flagsBitMap, FullyQualifiedKind classKind, string fullyQualifiedName,
+            FullyQualified? owningClass)
+            : base(flagsBitMap, classKind, fullyQualifiedName, null, null, owningClass, null, null, null, null)
+        {
+        }
+
+        public static ShallowClass Build(string fullyQualifiedName)
+        {
+            ShallowClass? owningClass = null;
+
+            int firstClassNameIndex = 0;
+            int lastDelimiter = 0;
+            char prev = ' ';
+            for (int i = 0; i < fullyQualifiedName.Length; i++)
+            {
+                char c = fullyQualifiedName[i];
+                if (firstClassNameIndex == 0 && (prev == '.' || prev == '$') && char.IsUpper(c))
+                {
+                    firstClassNameIndex = i;
+                }
+                else if (c == '.' || c == '$')
+                {
+                    lastDelimiter = i;
+                }
+                prev = c;
+            }
+
+            if (lastDelimiter > firstClassNameIndex)
+            {
+                owningClass = Build(fullyQualifiedName[..lastDelimiter]);
+            }
+
+            return new ShallowClass(1, FullyQualifiedKind.Class, fullyQualifiedName, owningClass);
         }
     }
 

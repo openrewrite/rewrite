@@ -987,7 +987,7 @@ class MavenParserTest implements RewriteTest {
         // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
         var username = "admin";
         var password = "password";
-        try (MockWebServer mockRepo = new MockWebServer()) {
+        try (var mockRepo = new MockWebServer()) {
             // TLS server setup based on https://github.com/square/okhttp/blob/master/okhttp-tls/README.md
             String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
             HeldCertificate localhostCertificate = new HeldCertificate.Builder()
@@ -1001,7 +1001,7 @@ class MavenParserTest implements RewriteTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
-                    MockResponse resp = new MockResponse();
+                    var resp = new MockResponse();
                     if (!Objects.equals(
                       request.getHeader("Authorization"),
                       "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))) {
@@ -5074,6 +5074,110 @@ class MavenParserTest implements RewriteTest {
                     .extracting(ResolvedDependency::getVersion)
                     .isEqualTo("1.79");
               })
+            )
+          )
+        );
+    }
+
+    @Test
+    void directoryStyleRelativePathWithCiFriendlyVersion() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example.boot</groupId>
+                    <artifactId>boot</artifactId>
+                    <version>${revision}</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <revision>1.0.0-SNAPSHOT</revision>
+                    </properties>
+                    <modules>
+                        <module>boot-dependencies</module>
+                        <module>boot-parent</module>
+                        <module>boot-core</module>
+                        <module>boot-starter</module>
+                    </modules>
+                </project>
+                """
+            ),
+            mavenProject("boot-dependencies",
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.example.boot</groupId>
+                      <artifactId>boot-dependencies</artifactId>
+                      <version>${revision}</version>
+                      <packaging>pom</packaging>
+                      <properties>
+                          <revision>1.0.0-SNAPSHOT</revision>
+                      </properties>
+                  </project>
+                  """
+              )
+            ),
+            mavenProject("boot-parent",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example.boot</groupId>
+                          <artifactId>boot-dependencies</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../boot-dependencies</relativePath>
+                      </parent>
+                      <artifactId>boot-parent</artifactId>
+                      <packaging>pom</packaging>
+                  </project>
+                  """
+              )
+            ),
+            mavenProject("boot-core",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example.boot</groupId>
+                          <artifactId>boot-parent</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../boot-parent</relativePath>
+                      </parent>
+                      <artifactId>boot-core</artifactId>
+                  </project>
+                  """
+              )
+            ),
+            mavenProject("boot-starter",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example.boot</groupId>
+                          <artifactId>boot-parent</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../boot-parent</relativePath>
+                      </parent>
+                      <artifactId>boot-starter</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example.boot</groupId>
+                              <artifactId>boot-core</artifactId>
+                              <version>${revision}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    MavenResolutionResult mrr = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(mrr.getPom().getVersion()).isEqualTo("1.0.0-SNAPSHOT");
+                    assertThat(mrr.getDependencies().get(Scope.Compile))
+                      .filteredOn(dep -> "boot-core".equals(dep.getArtifactId()))
+                      .singleElement()
+                      .extracting(ResolvedDependency::getVersion)
+                      .isEqualTo("1.0.0-SNAPSHOT");
+                })
+              )
             )
           )
         );

@@ -5,7 +5,8 @@ import com.github.gradle.node.npm.task.NpmTask
 import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
 import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
 import nl.javadude.gradle.plugins.license.LicenseExtension
-import java.time.LocalDateTime
+import java.time.Instant
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 plugins {
@@ -56,10 +57,23 @@ extensions.configure<NodeExtension> {
 }
 
 // Generate a timestamped version for CI builds, or use the regular version for local development
+// Uses git commit timestamp for determinism (same commit always produces same version)
+fun gitCommitTimestamp(): String {
+    val process = ProcessBuilder("git", "log", "-1", "--format=%ct")
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+    val timestamp = process.inputStream.bufferedReader().readText().trim()
+    process.waitFor()
+    return Instant.ofEpochSecond(timestamp.toLong())
+        .atZone(ZoneOffset.UTC)
+        .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+}
+
 val datedSnapshotVersion = if (System.getenv("CI") != null) {
     project.version.toString().replace(
         "SNAPSHOT",
-        LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+        gitCommitTimestamp()
     )
 } else {
     project.version.toString()
@@ -98,17 +112,18 @@ val npmVersion = tasks.register<NpmTask>("npmVersion") {
 val npmInstall = tasks.named("npmInstall")
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
-    inputs.files(npmInstall)
+    dependsOn(npmInstall)
+    inputs.files(fileTree("rewrite/node_modules") { exclude(".vite-temp/**", ".vite/**", ".cache/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite") {
         include("*.json")
-        include("jest.config.js")
+        include("vitest.config.mts")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/src"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
     inputs.files(fileTree("rewrite/test"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    outputs.files("rewrite/build/test-results/jest/junit.xml")
+    outputs.files("rewrite/build/test-results/vitest/junit.xml")
     outputs.cacheIf { true }
 
     args = listOf("run", "ci:test")

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Newtonsoft.Json.Linq;
@@ -29,12 +30,12 @@ namespace OpenRewrite.Core.Rpc;
 public class RpcReceiveQueue
 {
     private readonly Queue<RpcObjectData> _batch = new();
-    private readonly Dictionary<int, object> _refs;
+    private readonly IDictionary<int, object> _refs;
     private readonly Func<List<RpcObjectData>>? _pull;
     private readonly string? _sourceFileType;
     private readonly IRpcCodec? _treeCodec;
 
-    public RpcReceiveQueue(List<RpcObjectData> data, Dictionary<int, object> refs,
+    public RpcReceiveQueue(List<RpcObjectData> data, IDictionary<int, object> refs,
                            string? sourceFileType, IRpcCodec? treeCodec = null)
     {
         foreach (var item in data) _batch.Enqueue(item);
@@ -43,7 +44,7 @@ public class RpcReceiveQueue
         _treeCodec = treeCodec;
     }
 
-    public RpcReceiveQueue(Dictionary<int, object> refs, Func<List<RpcObjectData>> pull,
+    public RpcReceiveQueue(IDictionary<int, object> refs, Func<List<RpcObjectData>> pull,
                            string? sourceFileType, IRpcCodec? treeCodec = null)
     {
         _refs = refs;
@@ -145,9 +146,15 @@ public class RpcReceiveQueue
                 {
                     after = (T)selfCodec.RpcReceive(before, this);
                 }
-                else if (message.ValueType == null)
+                else if (message.Value != null)
                 {
+                    // Simple value types (enums, primitives) sent with both valueType and value
                     after = ExtractValue<T>(message.Value);
+                }
+                else if (message.ValueType != null)
+                {
+                    // ValueType set but no value and no codec - keep before
+                    after = before;
                 }
                 else
                 {
@@ -226,6 +233,10 @@ public class RpcReceiveQueue
         if (typeof(T) == typeof(bool) && value is IConvertible bc)
             return (T)(object)bc.ToBoolean(null);
 
+        // Enum values arrive as strings from Java (via StringEnumConverter)
+        if (typeof(T).IsEnum && value is string enumStr)
+            return (T)Enum.Parse(typeof(T), enumStr, ignoreCase: true);
+
         return (T)value;
     }
 
@@ -248,6 +259,9 @@ public class RpcReceiveQueue
             return (T)(object)je.GetInt64();
         if (underlyingType == typeof(double))
             return (T)(object)je.GetDouble();
+
+        if (underlyingType.IsEnum && je.ValueKind == JsonValueKind.String)
+            return (T)Enum.Parse(underlyingType, je.GetString()!, ignoreCase: true);
 
         if (je.ValueKind == JsonValueKind.String)
             return (T)(object)je.GetString()!;
@@ -287,10 +301,10 @@ public class RpcReceiveQueue
         var type = FromJavaTypeName(javaTypeName);
         if (type == null)
         {
-            // Generic container types: use T directly since the caller knows the exact closed type
-            if (javaTypeName is "org.openrewrite.java.tree.JRightPadded"
-                             or "org.openrewrite.java.tree.JLeftPadded"
-                             or "org.openrewrite.java.tree.JContainer")
+            // Generic types: use T directly since the caller knows the exact closed type.
+            // Java sends non-generic names (e.g. J$ControlParentheses) but C# needs
+            // the closed generic type which only the caller knows.
+            if (typeof(T).IsGenericType || typeof(T).IsConstructedGenericType)
             {
                 type = typeof(T);
             }
@@ -305,6 +319,27 @@ public class RpcReceiveQueue
                     $"Cannot map Java type name to C# type: {javaTypeName}");
             }
         }
+        // Open generic types (e.g. ControlParentheses`1): close with appropriate type args
+        if (type.IsGenericTypeDefinition)
+        {
+            var typeParams = type.GetGenericArguments();
+            var closedArgs = new Type[typeParams.Length];
+            // If T is a closed generic of this definition, use its type args
+            if (typeof(T).IsConstructedGenericType && typeof(T).GetGenericTypeDefinition() == type)
+            {
+                closedArgs = typeof(T).GetGenericArguments();
+            }
+            else
+            {
+                for (int i = 0; i < typeParams.Length; i++)
+                {
+                    // Use the first constraint type, or object if unconstrained
+                    var constraints = typeParams[i].GetGenericParameterConstraints();
+                    closedArgs[i] = constraints.Length > 0 ? constraints[0] : typeof(object);
+                }
+            }
+            type = type.MakeGenericType(closedArgs);
+        }
         if (type.IsInterface || type.IsAbstract)
         {
             if (typeof(Marker).IsAssignableFrom(type))
@@ -312,7 +347,45 @@ public class RpcReceiveQueue
             throw new InvalidOperationException(
                 $"Cannot instantiate interface/abstract type: {type.FullName} (from {javaTypeName})");
         }
-        return (T)RuntimeHelpers.GetUninitializedObject(type);
+        var obj = RuntimeHelpers.GetUninitializedObject(type);
+        InitializeFields(obj, type);
+        return (T)obj;
+    }
+
+    /// <summary>
+    /// Initialize fields of an uninitialized object to sensible defaults so that
+    /// receiver code can safely access sub-properties without NullReferenceException.
+    /// Only initializes Space, Markers, and collection fields - padded types are left
+    /// null as they are handled by q.Receive() which accepts null "before" values.
+    /// </summary>
+    private static void InitializeFields(object obj, Type type)
+    {
+        for (var t = type; t != null && t != typeof(object); t = t.BaseType)
+        {
+            foreach (var field in t.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            {
+                if (field.GetValue(obj) != null) continue;
+                var ft = field.FieldType;
+                if (ft == typeof(Space))
+                    field.SetValue(obj, Space.Empty);
+                else if (ft == typeof(Markers))
+                    field.SetValue(obj, Markers.Empty);
+                // Note: do NOT initialize string fields to "" here.
+                // Nullable strings (like SearchResult.Description) must stay null
+                // so that NO_CHANGE messages preserve the null value correctly.
+                else if (ft.IsGenericType)
+                {
+                    var gtd = ft.GetGenericTypeDefinition();
+                    if (gtd == typeof(IList<>) || gtd == typeof(List<>)
+                        || gtd == typeof(IEnumerable<>) || gtd == typeof(ICollection<>)
+                        || gtd == typeof(IReadOnlyList<>))
+                    {
+                        var elemType = ft.GetGenericArguments()[0];
+                        field.SetValue(obj, Activator.CreateInstance(typeof(List<>).MakeGenericType(elemType)));
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -322,6 +395,13 @@ public class RpcReceiveQueue
     private static T DeserializeInline<T>(string javaTypeName, object value)
     {
         var type = FromJavaTypeName(javaTypeName) ?? typeof(T);
+
+        // Enum types: parse the string value directly
+        if (type.IsEnum)
+        {
+            var str = value is JsonElement ej ? ej.GetString()! : value.ToString()!;
+            return (T)Enum.Parse(type, str, ignoreCase: true);
+        }
 
         // If the resolved type is an interface or abstract class, use UnknownMarker
         // as fallback for marker types that have no C# equivalent (e.g., GitProvenance,
@@ -348,9 +428,7 @@ public class RpcReceiveQueue
 
     private static bool IsTreeType(object obj)
     {
-        var type = obj.GetType();
-        var ns = type.Namespace;
-        return ns != null && (ns.StartsWith("OpenRewrite.Java") || ns.StartsWith("OpenRewrite.CSharp"));
+        return obj is Tree;
     }
 
     /// <summary>
@@ -363,19 +441,22 @@ public class RpcReceiveQueue
         {
             "org.openrewrite.java.tree.Space" => typeof(Space),
             "org.openrewrite.java.tree.TextComment" => typeof(TextComment),
+            "org.openrewrite.csharp.tree.CsDocCommentRawComment" => typeof(XmlDocComment),
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
+            "org.openrewrite.Checksum" => typeof(Checksum),
+            "org.openrewrite.FileAttributes" => typeof(FileAttributes),
 
             // Special C# type name overrides (reverse of RpcSendQueue.RegisterJavaTypeName)
-            "org.openrewrite.csharp.tree.Cs$BlockScopeNamespaceDeclaration" =>
-                typeof(NamespaceDeclaration),
             "org.openrewrite.csharp.tree.Cs$Lambda" =>
                 typeof(CsLambda),
-            "org.openrewrite.csharp.tree.Cs$ConstrainedTypeParameter" =>
-                typeof(ConstrainedTypeParameter),
-            "org.openrewrite.csharp.tree.Cs$ExpressionStatement" =>
-                typeof(ExpressionStatement),
+            "org.openrewrite.csharp.tree.Cs$Binary" =>
+                typeof(CsBinary),
+            "org.openrewrite.csharp.tree.Cs$Unary" =>
+                typeof(CsUnary),
+            "org.openrewrite.csharp.tree.Cs$ForEachVariableLoop$Control" =>
+                typeof(ForEachVariableLoopControl),
             "org.openrewrite.java.tree.J$VariableDeclarations$NamedVariable" =>
                 typeof(NamedVariable),
 
@@ -402,6 +483,33 @@ public class RpcReceiveQueue
                 typeof(NullSafe),
             "org.openrewrite.csharp.marker.PointerMemberAccess" =>
                 typeof(PointerMemberAccess),
+            "org.openrewrite.csharp.marker.ImplicitTypeParameters" =>
+                typeof(ImplicitTypeParameters),
+
+            // DotNetProject marker
+            "org.openrewrite.csharp.marker.DotNetProject" =>
+                typeof(DotNetProject),
+
+            // MSBuildProject marker and nested types
+            "org.openrewrite.csharp.marker.MSBuildProject" =>
+                typeof(MSBuildProject),
+            "org.openrewrite.csharp.marker.MSBuildProject$TargetFramework" =>
+                typeof(TargetFramework),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageReference" =>
+                typeof(PackageReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$ResolvedPackage" =>
+                typeof(ResolvedPackage),
+            "org.openrewrite.csharp.marker.MSBuildProject$ProjectReference" =>
+                typeof(ProjectReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$PropertyValue" =>
+                typeof(PropertyValue),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageSource" =>
+                typeof(PackageSource),
+
+            "org.openrewrite.ParseExceptionResult" =>
+                typeof(ParseExceptionResult),
+            "org.openrewrite.tree.ParseError" =>
+                typeof(ParseError),
 
             _ => FromJavaTypeNameByConvention(javaTypeName)
         };
@@ -444,11 +552,26 @@ public class RpcReceiveQueue
             return FindType("OpenRewrite.CSharp", name);
         }
 
+        // Pattern: org.openrewrite.xml.tree.Xml$ClassName → OpenRewrite.Xml.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.xml.tree.Xml$"))
+        {
+            var name = javaTypeName["org.openrewrite.xml.tree.Xml$".Length..];
+            return FindType("OpenRewrite.Xml", name);
+        }
+
         // Marker type conventions — markers live in marker packages, not tree packages
         // Pattern: org.openrewrite.csharp.marker.ClassName → OpenRewrite.CSharp.ClassName
         if (javaTypeName.StartsWith("org.openrewrite.csharp.marker."))
         {
             var name = javaTypeName["org.openrewrite.csharp.marker.".Length..];
+            return FindType("OpenRewrite.CSharp", name);
+        }
+
+        // Style type conventions — styles live in style packages
+        // Pattern: org.openrewrite.csharp.style.ClassName → OpenRewrite.CSharp.ClassName
+        if (javaTypeName.StartsWith("org.openrewrite.csharp.style."))
+        {
+            var name = javaTypeName["org.openrewrite.csharp.style.".Length..];
             return FindType("OpenRewrite.CSharp", name);
         }
 
@@ -478,13 +601,38 @@ public class RpcReceiveQueue
 
     private static Type? FindType(string ns, string name)
     {
-        var fullName = $"{ns}.{name}";
+        // Java uses '$' for nested types, .NET uses '+'
+        var fullName = $"{ns}.{name.Replace('$', '+')}";
+
+        Type? nonGenericMatch = null;
+
         // Search in all loaded assemblies
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             var type = assembly.GetType(fullName);
-            if (type != null) return type;
+            if (type != null)
+            {
+                // If the match is an interface or abstract type, remember it but keep
+                // looking for a generic concrete type with the same base name (e.g.,
+                // Parentheses<T> vs the Parentheses interface).
+                if (type.IsInterface || type.IsAbstract)
+                {
+                    nonGenericMatch = type;
+                    break;
+                }
+                return type;
+            }
         }
-        return null;
+        // Try generic type names: Java sends ControlParentheses but .NET needs ControlParentheses`1
+        for (int arity = 1; arity <= 3; arity++)
+        {
+            var genericName = $"{fullName}`{arity}";
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(genericName);
+                if (type != null) return type;
+            }
+        }
+        return nonGenericMatch;
     }
 }

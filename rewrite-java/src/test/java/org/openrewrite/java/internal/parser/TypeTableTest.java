@@ -154,10 +154,10 @@ class TypeTableTest implements RewriteTest {
      */
     Path createJarFromClasses(String jarName, Path... classFiles) throws Exception {
         Path jarFile = tempDir.resolve(jarName);
-        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(jarFile))) {
+        try (var jos = new JarOutputStream(Files.newOutputStream(jarFile))) {
             for (Path classFile : classFiles) {
                 String relativePath = tempDir.relativize(classFile).toString();
-                JarEntry entry = new JarEntry(relativePath);
+                var entry = new JarEntry(relativePath);
                 jos.putNextEntry(entry);
                 jos.write(Files.readAllBytes(classFile));
                 jos.closeEntry();
@@ -170,7 +170,7 @@ class TypeTableTest implements RewriteTest {
      * Helper method to process a JAR through TypeTable and return the TSV content
      */
     String processJarThroughTypeTable(Path jarFile, String groupId, String artifactId, String version) throws Exception {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        var baos = new ByteArrayOutputStream();
         try (TypeTable.Writer writer = TypeTable.newWriter(baos)) {
             writer.jar(groupId, artifactId, version).write(jarFile);
         }
@@ -178,7 +178,7 @@ class TypeTableTest implements RewriteTest {
         // Decompress and return TSV content
         try (InputStream is = new ByteArrayInputStream(baos.toByteArray());
              InputStream gzis = new GZIPInputStream(is);
-             java.util.Scanner scanner = new java.util.Scanner(gzis)) {
+             var scanner = new java.util.Scanner(gzis)) {
             return scanner.useDelimiter("\\A").next();
         }
     }
@@ -302,7 +302,7 @@ class TypeTableTest implements RewriteTest {
         @Test
         void canCompileAgainstTypeTableGeneratedEnum() throws Exception {
             // Create a simple enum that can be compiled against
-            ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+            var cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
             cw.visit(Opcodes.V1_8, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_ENUM,
               "TestEnum", "Ljava/lang/Enum<LTestEnum;>;", "java/lang/Enum", null);
 
@@ -418,8 +418,8 @@ class TypeTableTest implements RewriteTest {
         void writeAllMavenLocal() throws Exception {
             Path m2Repo = Path.of(System.getProperty("user.home"), ".m2", "repository");
             try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
-                AtomicLong jarsSize = new AtomicLong();
-                AtomicLong jarCount = new AtomicLong();
+                var jarsSize = new AtomicLong();
+                var jarCount = new AtomicLong();
                 Files.walkFileTree(m2Repo, new SimpleFileVisitor<>() {
                     @Override
                     @SneakyThrows
@@ -448,7 +448,7 @@ class TypeTableTest implements RewriteTest {
                 }
             }
 
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("junit-jupiter-api"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("junit-jupiter-api"));
             Path classesDir = table.load("junit-jupiter-api");
             assertThat(Files.walk(requireNonNull(classesDir))).noneMatch(p -> p.getFileName().toString().endsWith("$1.class"));
 
@@ -511,7 +511,7 @@ class TypeTableTest implements RewriteTest {
                 writer.jar("test.group", "test-validation", "1.0").write(testJar);
             }
 
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("test-validation"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("test-validation"));
             Path classesDir = table.load("test-validation");
 
             // Verify that TypeTable can successfully load classes from our JAR
@@ -551,7 +551,7 @@ class TypeTableTest implements RewriteTest {
             }
 
             // Load back via TypeTable
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("validation-rules"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("validation-rules"));
             Path classesDir = table.load("validation-rules");
             assertThat(classesDir).isNotNull();
 
@@ -751,7 +751,7 @@ class TypeTableTest implements RewriteTest {
             }
 
             // Load back via TypeTable
-            TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("annotated-library"));
+            var table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("annotated-library"));
             Path classesDir = table.load("annotated-library");
             assertThat(classesDir).isNotNull();
 
@@ -871,14 +871,14 @@ class TypeTableTest implements RewriteTest {
 
             // Create a URLClassLoader that can see the recipe JAR's resources
             // Use a parent that does NOT have access to any classpath.tsv.gz (the bootstrap classloader)
-            URLClassLoader isolatedLoader = new URLClassLoader(
+            var isolatedLoader = new URLClassLoader(
                     new URL[]{recipeJarDir.toUri().toURL()},
                     ClassLoader.getPlatformClassLoader()
             );
 
             // Set the isolated classloader as the TCCL
             ClassLoader originalTccl = Thread.currentThread().getContextClassLoader();
-            try {
+            try (isolatedLoader) {
                 Thread.currentThread().setContextClassLoader(isolatedLoader);
 
                 // TypeTable.fromClasspath should find the resource via TCCL
@@ -889,7 +889,6 @@ class TypeTableTest implements RewriteTest {
                 assertThat(loaded).isNotNull();
             } finally {
                 Thread.currentThread().setContextClassLoader(originalTccl);
-                isolatedLoader.close();
             }
         }
     }

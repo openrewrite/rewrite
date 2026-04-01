@@ -94,7 +94,8 @@ class LatestPatchTest {
     @Test
     void overflowingVersionSegment() {
         // Version numbers that exceed Integer.MAX_VALUE should not throw NumberFormatException
-        assertThat(latestPatch.isValid("202302104298", "202302104299")).isFalse();
+        assertThat(latestPatch.isValid("1.202302104298", "1.202302104298")).isTrue();
+        assertThat(latestPatch.isValid("1.202302104298", "1.202302104298.1")).isTrue();
         assertThat(latestPatch.isValid("1.202302104298", "1.202302104299")).isFalse();
     }
 

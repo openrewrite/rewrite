@@ -107,6 +107,9 @@ public class GroovyParserVisitor {
     @Nullable
     private static Boolean olderThanGroovy3;
 
+    @Nullable
+    private static Boolean groovy4OrLater;
+
     @SuppressWarnings("unused")
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
@@ -124,13 +127,23 @@ public class GroovyParserVisitor {
         this.typeMapping = new GroovyTypeMapping(typeCache);
     }
 
+    private static int groovyMajorVersion() {
+        String groovyVersionText = GroovySystem.getVersion();
+        return Integer.parseInt(groovyVersionText.substring(0, groovyVersionText.indexOf('.')));
+    }
+
     private static boolean isOlderThanGroovy3() {
         if (olderThanGroovy3 == null) {
-            String groovyVersionText = GroovySystem.getVersion();
-            int majorVersion = Integer.parseInt(groovyVersionText.substring(0, groovyVersionText.indexOf('.')));
-            olderThanGroovy3 = majorVersion < 3;
+            olderThanGroovy3 = groovyMajorVersion() < 3;
         }
         return olderThanGroovy3;
+    }
+
+    private static boolean isGroovy4OrLater() {
+        if (groovy4OrLater == null) {
+            groovy4OrLater = groovyMajorVersion() >= 4;
+        }
+        return groovy4OrLater;
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
@@ -254,7 +267,7 @@ public class GroovyParserVisitor {
             } else if (clazz.isEnum()) {
                 kindType = J.ClassDeclaration.Kind.Type.Enum;
                 skip("enum");
-            } else if (clazz.isRecord()) {
+            } else if (isGroovy4OrLater() && clazz.isRecord()) {
                 kindType = J.ClassDeclaration.Kind.Type.Record;
                 skip("record");
             } else {
@@ -328,7 +341,7 @@ public class GroovyParserVisitor {
             }
 
             JContainer<TypeTree> permitting = null;
-            if (clazz.isSealed() && clazz.getPermittedSubclasses() != null && !clazz.getPermittedSubclasses().isEmpty()) {
+            if (isGroovy4OrLater() && clazz.isSealed() && clazz.getPermittedSubclasses() != null && !clazz.getPermittedSubclasses().isEmpty()) {
                 Space permitsPrefix = sourceBefore("permits");
                 List<ClassNode> permitted = clazz.getPermittedSubclasses();
                 List<JRightPadded<TypeTree>> permitTypes = new ArrayList<>(permitted.size());
@@ -393,7 +406,7 @@ public class GroovyParserVisitor {
              */
             Set<InnerClassNode> fieldInitializers = new HashSet<>();
             Set<String> recordComponentNames = new HashSet<>();
-            if (clazz.getRecordComponents() != null) {
+            if (isGroovy4OrLater() && clazz.getRecordComponents() != null) {
                 for (RecordComponentNode rc : clazz.getRecordComponents()) {
                     recordComponentNames.add(rc.getName());
                 }
@@ -1715,6 +1728,61 @@ public class GroovyParserVisitor {
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
             List<J.Modifier> modifiers = getModifiers();
+
+            if (expression.isMultipleAssignmentDeclaration()) {
+                // def (a, b, c) = expr
+                TupleExpression tuple = expression.getTupleExpression();
+                List<org.codehaus.groovy.ast.expr.Expression> tupleExpressions = tuple.getExpressions();
+
+                VariableExpression firstVar = (VariableExpression) tupleExpressions.get(0);
+                TypeTree typeExpr = visitVariableExpressionType(firstVar);
+
+                Space beforeOpenParen = sourceBefore("(");
+
+                List<JRightPadded<J.VariableDeclarations>> tupleVars = new ArrayList<>(tupleExpressions.size());
+                for (int i = 0; i < tupleExpressions.size(); i++) {
+                    VariableExpression varExpr = (VariableExpression) tupleExpressions.get(i);
+                    TypeTree innerType = visitVariableExpressionType(varExpr);
+                    J.Identifier name = doVisit(varExpr);
+                    J.VariableDeclarations.NamedVariable nv = new J.VariableDeclarations.NamedVariable(
+                            randomId(),
+                            name.getPrefix(),
+                            Markers.EMPTY,
+                            name.withPrefix(EMPTY),
+                            emptyList(),
+                            null,
+                            typeMapping.variableType(name.getSimpleName(), innerType.getType()));
+                    J.VariableDeclarations innerDecl = new J.VariableDeclarations(
+                            randomId(), EMPTY, Markers.EMPTY,
+                            emptyList(), emptyList(),
+                            innerType, null,
+                            singletonList(JRightPadded.build(nv)));
+                    Space after = i < tupleExpressions.size() - 1 ? sourceBefore(",") : sourceBefore(")");
+                    tupleVars.add(JRightPadded.<J.VariableDeclarations>build(innerDecl).withAfter(after));
+                }
+
+                G.TupleExpression tupleDeclarator = new G.TupleExpression(
+                        randomId(), EMPTY, Markers.EMPTY,
+                        JContainer.build(beforeOpenParen, tupleVars, Markers.EMPTY),
+                        null);
+
+                J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
+                        randomId(), EMPTY, Markers.EMPTY,
+                        tupleDeclarator, emptyList(), null, null);
+
+                if (!(expression.getRightExpression() instanceof EmptyExpression)) {
+                    Space beforeAssign = sourceBefore("=");
+                    Expression initializer = doVisit(expression.getRightExpression());
+                    namedVariable = namedVariable.getPadding().withInitializer(padLeft(beforeAssign, initializer));
+                }
+
+                J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
+                        randomId(), prefix, Markers.EMPTY, leadingAnnotations, modifiers,
+                        typeExpr, null, singletonList(JRightPadded.build(namedVariable)));
+                queue.add(variableDeclarations);
+                return;
+            }
+
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;

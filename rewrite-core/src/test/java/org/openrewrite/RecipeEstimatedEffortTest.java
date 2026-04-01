@@ -69,7 +69,7 @@ class RecipeEstimatedEffortTest implements RewriteTest {
     void zeroEstimatedEffortForRecipeThatDoesNotGenerateSourcesFileResults() {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(Recipe.noop())
-            .afterRecipe(recipeRun -> assertThat(recipeRun.getDataTables()).isEmpty())
+            .afterRecipe(recipeRun -> assertThat(recipeRun.getDataTableStore().getDataTables()).isEmpty())
         );
     }
 
@@ -78,10 +78,14 @@ class RecipeEstimatedEffortTest implements RewriteTest {
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new FindGitProvenance())
             .afterRecipe(recipeRun -> {
-                  assertThat(recipeRun.getDataTables()).hasSize(2);
-                  assertThat(recipeRun.getDataTable(DistinctGitProvenance.class.getName())).isNotNull();
-                  assertThat(recipeRun.getDataTable(RecipeRunStats.class.getName())).isNotNull();
-                  assertThat(recipeRun.getDataTable(SourcesFileResults.class.getName())).isNull();
+                  DataTableStore store = recipeRun.getDataTableStore();
+                  assertThat(store.getDataTables()).hasSize(2);
+                  assertThat(store.getDataTables().stream()
+                          .anyMatch(dt -> dt.getName().equals(DistinctGitProvenance.class.getName()))).isTrue();
+                  assertThat(store.getDataTables().stream()
+                          .anyMatch(dt -> dt.getName().equals(RecipeRunStats.class.getName()))).isTrue();
+                  assertThat(store.getDataTables().stream()
+                          .noneMatch(dt -> dt.getName().equals(SourcesFileResults.class.getName()))).isTrue();
               }
             ),
           text(

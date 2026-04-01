@@ -26,7 +26,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
@@ -66,13 +65,13 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
 
     @Setter
-    private List<Recipe> recipeList = new ArrayList<>();
+    private volatile List<Recipe> recipeList = Collections.emptyList();
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
     @Getter
     @Setter
-    private List<Recipe> preconditions = new ArrayList<>();
+    private volatile List<Recipe> preconditions = Collections.emptyList();
 
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
@@ -94,8 +93,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         Map<String, Recipe> recipeMap = new HashMap<>();
         availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
         Set<String> initializingRecipes = new HashSet<>();
-        initialize(uninitializedRecipes, recipeList, recipeMap::get, initializingRecipes);
-        initialize(uninitializedPreconditions, preconditions, recipeMap::get, initializingRecipes);
+        recipeList = initialize(uninitializedRecipes, recipeMap::get, initializingRecipes);
+        preconditions = initialize(uninitializedPreconditions, recipeMap::get, initializingRecipes);
     }
 
     @Deprecated
@@ -106,8 +105,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
     public void initialize(Function<String, @Nullable Recipe> availableRecipes) {
         Set<String> initializingRecipes = new HashSet<>();
-        initialize(uninitializedRecipes, recipeList, availableRecipes, initializingRecipes);
-        initialize(uninitializedPreconditions, preconditions, availableRecipes, initializingRecipes);
+        recipeList = initialize(uninitializedRecipes, availableRecipes, initializingRecipes);
+        preconditions = initialize(uninitializedPreconditions, availableRecipes, initializingRecipes);
     }
 
     @Deprecated
@@ -116,8 +115,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         this.initialize(availableRecipes);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
-        initialized.clear();
+    private List<Recipe> initialize(List<Recipe> uninitialized, Function<String, @Nullable Recipe> availableRecipes, Set<String> initializingRecipes) {
+        List<Recipe> result = new ArrayList<>();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
@@ -127,7 +126,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     if (subRecipe instanceof DeclarativeRecipe) {
                         initializeDeclarativeRecipe((DeclarativeRecipe) subRecipe, recipeFqn, availableRecipes, initializingRecipes);
                     }
-                    initialized.add(subRecipe);
+                    result.add(subRecipe);
                 } else {
                     initValidation = initValidation.and(
                             invalid(name + ".recipeList" +
@@ -140,9 +139,10 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                 if (recipe instanceof DeclarativeRecipe) {
                     initializeDeclarativeRecipe((DeclarativeRecipe) recipe, recipe.getName(), availableRecipes, initializingRecipes);
                 }
-                initialized.add(recipe);
+                result.add(recipe);
             }
         }
+        return Collections.unmodifiableList(result);
     }
 
     private void initializeDeclarativeRecipe(DeclarativeRecipe declarativeRecipe, String recipeIdentifier,
@@ -155,14 +155,11 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
                     "Recipe '" + recipeIdentifier + "' creates a cycle: " + cycle);
         } else {
             initializingRecipes.add(recipeName);
-            declarativeRecipe.initialize(declarativeRecipe.uninitializedRecipes, declarativeRecipe.recipeList, availableRecipes, initializingRecipes);
-            declarativeRecipe.initialize(declarativeRecipe.uninitializedPreconditions, declarativeRecipe.preconditions, availableRecipes, initializingRecipes);
+            declarativeRecipe.recipeList = initialize(declarativeRecipe.uninitializedRecipes, availableRecipes, initializingRecipes);
+            declarativeRecipe.preconditions = initialize(declarativeRecipe.uninitializedPreconditions, availableRecipes, initializingRecipes);
             initializingRecipes.remove(recipeName);
         }
     }
-
-    @JsonIgnore
-    private transient ThreadLocal<Accumulator> accumulator = new ThreadLocal<>();
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
@@ -170,7 +167,6 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         for (Recipe precondition : preconditions) {
             registerNestedScanningRecipes(precondition, acc, ctx);
         }
-        accumulator.set(acc);
         return acc;
     }
 
@@ -222,7 +218,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         String description = "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends.";
 
-        Supplier<TreeVisitor<?, ExecutionContext>> precondition;
+        DeclarativeRecipe declarativeRecipe;
 
         @NonFinal
         transient boolean preconditionApplicable;
@@ -230,18 +226,34 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
-                final TreeVisitor<?, ExecutionContext> p = precondition.get();
+                @Nullable
+                TreeVisitor<?, ExecutionContext> p;
 
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                    return p.isAcceptable(sourceFile, ctx);
+                    // p is lazily resolved in visit() where the cursor is available.
+                    // Before that, conservatively accept all source files.
+                    return p == null || p.isAcceptable(sourceFile, ctx);
                 }
 
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    Tree t = p.visit(tree, ctx);
+                    Tree t = resolve(ctx).visit(tree, ctx);
                     preconditionApplicable = t != tree;
                     return tree;
+                }
+
+                private TreeVisitor<?, ExecutionContext> resolve(ExecutionContext ctx) {
+                    if (p == null) {
+                        Cursor rootCursor = getCursor().getRoot();
+                        List<TreeVisitor<?, ExecutionContext>> andVisitors = new ArrayList<>();
+                        for (Recipe precondition : declarativeRecipe.preconditions) {
+                            andVisitors.add(declarativeRecipe.orVisitors(precondition, rootCursor, ctx));
+                        }
+                        //noinspection unchecked
+                        p = Preconditions.and(andVisitors.toArray(new TreeVisitor[0]));
+                    }
+                    return p;
                 }
             };
         }
@@ -495,36 +507,30 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             return recipeList;
         }
 
-        List<Supplier<TreeVisitor<?, ExecutionContext>>> andPreconditions = new ArrayList<>();
-        for (Recipe precondition : preconditions) {
-            andPreconditions.add(() -> orVisitors(precondition));
-        }
-        //noinspection unchecked
-        PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
+        PreconditionBellwether bellwether = new PreconditionBellwether(this);
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
         recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
         return recipeListWithBellwether;
     }
 
-    private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe, Cursor rootCursor, ExecutionContext ctx) {
         List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
         if (recipe instanceof ScanningRecipe) {
-            //noinspection rawtypes
             ScanningRecipe scanning = (ScanningRecipe) recipe;
-            //noinspection unchecked
-            Accumulator acc = accumulator.get();
-            conditions.add(scanning.getVisitor(acc != null ? acc.recipeToAccumulator.get(scanning) : null));
+            Accumulator acc = getAccumulator(rootCursor, ctx);
+            Object recipeAcc = acc.recipeToAccumulator.get(scanning);
+            conditions.add(scanning.getVisitor(recipeAcc));
         } else {
             conditions.add(recipe.getVisitor());
         }
         for (Recipe r : recipe.getRecipeList()) {
-            conditions.add(orVisitors(r));
+            conditions.add(orVisitors(r, rootCursor, ctx));
         }
         if (conditions.size() == 1) {
             return conditions.get(0);
         }
-        //noinspection unchecked
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
     }
 
@@ -608,15 +614,8 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
     }
 
     @Override
-    public void onComplete(ExecutionContext ctx) {
-        accumulator.remove();
-    }
-
-    @Override
     public DeclarativeRecipe clone() {
-        DeclarativeRecipe cloned = (DeclarativeRecipe) super.clone();
-        cloned.accumulator = new ThreadLocal<>();
-        return cloned;
+        return (DeclarativeRecipe) super.clone();
     }
 
     @Override
