@@ -406,7 +406,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             response = rpc.batchVisit(originalBefore, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
             if (!batch.recipeStacks.isEmpty()) {
-                handleError(batch.recipeStacks.get(0).peek(), originalBefore, originalBefore, t);
+                SourceFile beforeError = source;
+                if (!(t instanceof RecipeRunException)) {
+                    source = Markup.error(source, t);
+                }
+                source = handleError(batch.recipeStacks.get(0).peek(), originalBefore, source, t);
+                if (source != null && source != beforeError) {
+                    source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
+                }
             }
             batch.clear();
             return source;
