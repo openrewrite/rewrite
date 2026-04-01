@@ -30,9 +30,9 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -67,15 +67,9 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create YAML file";
-    }
+    String displayName = "Create YAML file";
 
-    @Override
-    public String getDescription() {
-        return "Create a new YAML file.";
-    }
+    String description = "Create a new YAML file.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -92,7 +86,7 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
         if (shouldCreate.get()) {
             return YamlParser.builder().build().parse(getYamlContents(ctx))
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }

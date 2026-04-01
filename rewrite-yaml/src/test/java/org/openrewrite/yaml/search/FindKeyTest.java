@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class FindKeyTest implements RewriteTest {
@@ -29,7 +30,8 @@ class FindKeyTest implements RewriteTest {
     void findKey() {
         rewriteRun(
           spec -> spec.recipe(new FindKey("$.metadata.name")),
-          yaml("""
+          yaml(
+                """
                   apiVersion: v1
                   metadata:
                     name: monitoring-tools
@@ -50,7 +52,8 @@ class FindKeyTest implements RewriteTest {
     void findKeyWithSpecificName() {
         rewriteRun(
           spec -> spec.recipe(new FindKey("$.metadata[?(@.name == 'container')].name")),
-          yaml("""
+          yaml(
+                """
                   metadata:
                     name: container
                     namespace: container
@@ -69,7 +72,8 @@ class FindKeyTest implements RewriteTest {
     void findKeyWithMultipleBinaryExpressions() {
         rewriteRun(
           spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
-          yaml("""
+          yaml(
+                """
               foo:
                 bar:
                   -
@@ -103,5 +107,13 @@ class FindKeyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void invalidJsonPathFailsValidation() {
+        assertThat(new FindKey("$[invalid syntax").validate().isInvalid()).isTrue();
+        assertThat(new FindKey("$[invalid syntax").validate().failures().iterator().next().getMessage())
+                .contains("Invalid JsonPath expression")
+                .contains("Syntax error");
     }
 }

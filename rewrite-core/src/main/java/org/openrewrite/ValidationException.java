@@ -18,7 +18,8 @@ package org.openrewrite;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 /**
  * Turns a set of {@link Validated.Invalid} into a throwable exception, which is used to throw an unchecked exception
@@ -44,7 +45,7 @@ public class ValidationException extends RuntimeException {
                 .map(invalid -> invalid.getProperty() + " was '" +
                         (invalid.getInvalidValue() == null ? "null" : invalid.getInvalidValue()) +
                         "' but it " + invalid.getMessage())
-                .collect(Collectors.joining(
+                .collect(joining(
                         "\n",
                         validation.failures().size() > 1 ? "Multiple validation failures:\n" : "",
                         ""

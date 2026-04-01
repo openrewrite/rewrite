@@ -48,10 +48,6 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
         spec.recipe(new PadEmptyForLoopComponents());
     }
 
-    private static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
-        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
-    }
-
     @DocumentExample
     @Test
     void addSpaceToEmptyInitializer() {
@@ -79,6 +75,10 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
             autoFormatIsIdempotent()
           )
         );
+    }
+
+    private static Iterable<NamedStyles> namedStyles(Collection<Style> styles) {
+        return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
     }
 
     @Test
@@ -147,7 +147,11 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
-          org.assertj.core.api.Assertions.assertThat(new SpacesVisitor<>(IntelliJ.spaces(), null,
-            new EmptyForIteratorPadStyle(false)).visit(cu, 0)).isEqualTo(cu));
+          org.assertj.core.api.Assertions.assertThat(
+            new SpacesVisitor<>(
+              IntelliJ.spaces(),
+              null, new EmptyForIteratorPadStyle(false),
+              IntelliJ.wrappingAndBraces(),
+              null).visit(cu, 0)).isEqualTo(cu));
     }
 }

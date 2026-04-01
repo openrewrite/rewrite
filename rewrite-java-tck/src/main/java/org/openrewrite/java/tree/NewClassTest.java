@@ -113,8 +113,8 @@ class NewClassTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 J.VariableDeclarations.NamedVariable l =
                   ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
-                J.NewClass arrayList = (J.NewClass) l.getInitializer();
-                JavaType.Parameterized javaType = (JavaType.Parameterized) arrayList.getType();
+                var arrayList = (J.NewClass) l.getInitializer();
+                var javaType = (JavaType.Parameterized) arrayList.getType();
                 assertThat(javaType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
                 assertThat(javaType.getTypeParameters()).satisfiesExactly(
                   p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
@@ -124,8 +124,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @MinimumJava11
+    @Test
     void anonymousTypeAttribution() {
         rewriteRun(
           java(
@@ -138,9 +138,9 @@ class NewClassTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 J.VariableDeclarations.NamedVariable l =
                   ((J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0);
-                J.NewClass arrayList = (J.NewClass) l.getInitializer();
-                JavaType.Class javaType = (JavaType.Class) arrayList.getType();
-                JavaType.Parameterized arrayListType = (JavaType.Parameterized) javaType.getSupertype();
+                var arrayList = (J.NewClass) l.getInitializer();
+                var javaType = (JavaType.Class) arrayList.getType();
+                var arrayListType = (JavaType.Parameterized) javaType.getSupertype();
                 assertThat(arrayListType.getType().getFullyQualifiedName()).isEqualTo("java.util.ArrayList");
                 assertThat(arrayListType.getTypeParameters()).satisfiesExactly(
                   p -> assertThat(((JavaType.Class) p).getFullyQualifiedName()).isEqualTo("java.lang.String")
@@ -157,10 +157,10 @@ class NewClassTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-              
+
               class Test {
                   List<Integer> l = new ArrayList<Integer>() {
-                      /** Javadoc */
+                      /* Javadoc */
                       @Override
                       public boolean isEmpty() {
                           return false;
@@ -182,12 +182,12 @@ class NewClassTest implements RewriteTest {
               import java.util.ArrayList;
               import java.util.Arrays;
               import java.util.Comparator;
-              
+
               class Test {
                   void method() {
                       Arrays.sort(new ArrayList[]{new ArrayList<File>()}, new Comparator<Object>() {
                           long time1, time2;
-              
+
                           @Override
                           public int compare(Object o1, Object o2) {
                               time1 = ((File) o1).lastModified();
@@ -202,8 +202,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody1() {
         rewriteRun(
           java(
@@ -221,8 +221,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody1WithComment() {
         rewriteRun(
           java(
@@ -240,8 +240,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody2() {
         rewriteRun(
           java(
@@ -259,8 +259,8 @@ class NewClassTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("UnnecessarySemicolon")
+    @Test
     void unnecessarySemicolonInBody2WithComment() {
         rewriteRun(
           java(

@@ -24,12 +24,14 @@ import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -45,20 +47,6 @@ import static org.openrewrite.java.Assertions.java;
   "LoopConditionNotUpdatedInsideLoop"
 })
 class SpacesTest implements RewriteTest {
-
-    private static Consumer<RecipeSpec> spaces() {
-        return spaces(style -> style);
-    }
-
-    private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with) {
-        return spec -> spec.recipe(new Spaces())
-          .parser(JavaParser.fromJavaVersion().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.spaces()))
-            )
-          )));
-    }
 
     @DocumentExample
     @Test
@@ -88,6 +76,34 @@ class SpacesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static Consumer<RecipeSpec> spaces() {
+        return spaces(style -> style);
+    }
+
+    private static Consumer<RecipeSpec> spaces(boolean removeCustomLineBreaks) {
+        return spaces(style -> style, removeCustomLineBreaks);
+    }
+
+    private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with) {
+        return spaces(with, false);
+    }
+
+    private static Consumer<RecipeSpec> spaces(UnaryOperator<SpacesStyle> with, boolean removeCustomLineBreaks) {
+        return spec -> spec.recipes(new AutoFormat(null))
+          .parser(JavaParser.fromJavaVersion().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              List.of(
+                with.apply(IntelliJ.spaces()),
+                IntelliJ.wrappingAndBraces()
+                  .withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(!removeCustomLineBreaks).withSimpleMethodsInOneLine(true).withSimpleClassesInOneLine(true).withSimpleLambdasInOneLine(true))
+                  .withMethodAnnotations(IntelliJ.wrappingAndBraces().getMethodAnnotations().withWrap(LineWrapSetting.DoNotWrap)),
+                IntelliJ.blankLines().withMinimum(IntelliJ.blankLines().getMinimum().withAroundMethod(0).withAroundClass(0))
+              )
+            )
+          )));
     }
 
     @Test
@@ -137,8 +153,10 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void method1 () {
                   }
+
                   void method2    () {
                   }
+
                   void method3  	() {
                   }
               }
@@ -147,8 +165,10 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void method1() {
                   }
+
                   void method2() {
                   }
+
                   void method3() {
                   }
               }
@@ -185,8 +205,8 @@ class SpacesTest implements RewriteTest {
           java(
             """
               class Test {
-                  void method1 
-                  () {
+                  void method1
+                          () {
                   }
               }
               """
@@ -1126,8 +1146,8 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       int x = 0;
-                      x ++;
-                      x --;
+                      x++;
+                      x--;
                       -- x;
                       ++ x;
                       x = - x;
@@ -1989,6 +2009,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               package abc;
+              
               @interface MyAnno {
                   String[] names;
                   Integer[] counts;
@@ -1998,12 +2019,14 @@ class SpacesTest implements RewriteTest {
           java(
             """
               package abc;
+              
               @MyAnno(names={"a","b"},counts={1,2})
               class Test {
               }
               """,
             """
               package abc;
+              
               @MyAnno(names = {"a", "b"}, counts = {1, 2})
               class Test {
               }
@@ -2494,7 +2517,7 @@ class SpacesTest implements RewriteTest {
     void compositeMethodDeclarationParentheses() {
         rewriteRun(
           spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))
-              .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
+            .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
           ),
           java(
             """
@@ -2526,6 +2549,8 @@ class SpacesTest implements RewriteTest {
                   }
                   void baz(    /*c3*/    int z    /*c4*/    ) {
                   }
+                  void bat(    int   /*c4*/    z    ) {
+                  }
               }
               """,
             """
@@ -2535,6 +2560,8 @@ class SpacesTest implements RewriteTest {
                   void bar( int y    /*c2*/ ) {
                   }
                   void baz(    /*c3*/    int z    /*c4*/ ) {
+                  }
+                  void bat( int   /*c4*/    z ) {
                   }
               }
               """
@@ -2550,7 +2577,7 @@ class SpacesTest implements RewriteTest {
             """
               class Test {
                   void foo(
-                      int x
+                          int x
                   ) {
                   }
               }
@@ -3194,9 +3221,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test<T, U> {
-                            
+
                   <T2 extends T> T2 foo() {
                       List<T2> myList = new ArrayList<>();
                       return null;
@@ -3206,9 +3233,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test< T, U > {
-                            
+
                   < T2 extends T > T2 foo() {
                       List< T2 > myList = new ArrayList<>();
                       return null;
@@ -3227,9 +3254,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test< T, U > {
-                            
+
                   < T2 extends T > T2 foo() {
                       List< T2 > myList = new ArrayList<>();
                       return null;
@@ -3239,9 +3266,9 @@ class SpacesTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class Test<T, U> {
-                            
+
                   <T2 extends T> T2 foo() {
                       List<T2> myList = new ArrayList<>();
                       return null;
@@ -3501,6 +3528,7 @@ class SpacesTest implements RewriteTest {
                       Map<String,String> m = new HashMap<String,String>();
                       Test.<String,Integer>bar(1,2);
                   }
+
                   static <A,B> void bar(int x,int y) {
                   }
               }
@@ -3514,6 +3542,7 @@ class SpacesTest implements RewriteTest {
                       Map<String, String> m = new HashMap<String, String>();
                       Test.<String, Integer>bar(1, 2);
                   }
+
                   static <A, B> void bar(int x, int y) {
                   }
               }
@@ -4059,7 +4088,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4068,7 +4097,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1 , str2) -> "Hello";
@@ -4086,7 +4115,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1 , str2) -> "Hello";
@@ -4095,7 +4124,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4113,7 +4142,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4122,7 +4151,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1,str2) -> "Hello";
@@ -4140,7 +4169,7 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1,str2) -> "Hello";
@@ -4149,7 +4178,7 @@ class SpacesTest implements RewriteTest {
               """,
             """
               import java.util.function.BiFunction;
-                            
+
               class Test {
                   void foo() {
                       BiFunction<String, String, String> f = (str1, str2) -> "Hello";
@@ -4269,7 +4298,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }
@@ -4278,7 +4307,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1" , 1),
                   TEST2("str2" , 2);
-                  
+
                   Test(String str , int num) {
                   }
               }
@@ -4296,7 +4325,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1" , 1),
                   TEST2("str2" , 2);
-                  
+
                   Test(String str , int num) {
                   }
               }
@@ -4305,7 +4334,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }
@@ -4323,7 +4352,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }
@@ -4332,7 +4361,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1",1),
                   TEST2("str2",2);
-                  
+
                   Test(String str,int num) {
                   }
               }
@@ -4350,7 +4379,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1",1),
                   TEST2("str2",2);
-                  
+
                   Test(String str,int num) {
                   }
               }
@@ -4359,7 +4388,7 @@ class SpacesTest implements RewriteTest {
               enum Test {
                   TEST1("str1", 1),
                   TEST2("str2", 2);
-                  
+
                   Test(String str, int num) {
                   }
               }
@@ -4565,6 +4594,64 @@ class SpacesTest implements RewriteTest {
     }
 
     @Test
+    void otherBeforeAndAfterTryResourcesSemicolon() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withBeforeForSemicolon(true).withAfterForSemicolon(true))),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");BufferedReader br = new BufferedReader(fr);FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt") ; BufferedReader br = new BufferedReader(fr) ; FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void otherNotBeforeAndAfterTryResourcesSemicolon() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withBeforeForSemicolon(false).withAfterForSemicolon(false))),
+          java(
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt") ; BufferedReader br = new BufferedReader(fr) ; FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """,
+            """
+              import java.io.*;
+              
+              class Test {
+                  void test() {
+                      try (FileReader fr = new FileReader("input.txt");BufferedReader br = new BufferedReader(fr);FileWriter fw = new FileWriter("output.txt")) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void otherInsideOneLineEnumBracesTrue() {
         rewriteRun(
           spaces(style -> style.withOther(style.getOther().withInsideOneLineEnumBraces(true))),
@@ -4574,6 +4661,26 @@ class SpacesTest implements RewriteTest {
               """,
             """
               enum Test { }
+              """
+          ),
+          java(
+            """
+              enum Tester {ONE, TWO}
+              """,
+            """
+              enum Tester { ONE, TWO }
+              """
+          ),
+          java(
+            """
+              class TestEnum {
+                  enum Tester {ONE, TWO}
+              }
+              """,
+            """
+              class TestEnum {
+                  enum Tester { ONE, TWO }
+              }
               """
           )
         );
@@ -4589,6 +4696,26 @@ class SpacesTest implements RewriteTest {
               """,
             """
               enum Test {}
+              """
+          ),
+          java(
+            """
+              enum Tester { ONE, TWO }
+              """,
+            """
+              enum Tester {ONE, TWO}
+              """
+          ),
+          java(
+            """
+              class TestEnum {
+                  enum Tester { ONE, TWO }
+              }
+              """,
+            """
+              class TestEnum {
+                  enum Tester {ONE, TWO}
+              }
               """
           )
         );
@@ -4854,6 +4981,263 @@ class SpacesTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void keepMinimalViableSpaces() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withBeforeComma(true))), //This style has no impact on throws, interfaces commas
+          java(
+            """
+              class Test {
+                  void guardedCases(Object o) {
+                      switch (o) {
+                          case Integer i when i > 0 -> System.out.println("Perfect");
+                          case String s when "YES".equalsIgnoreCase(s) -> System.out.println("Great"); //The labels here should not suddenly receive no space
+                          default -> System.out.println("OK");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleThrowsExtendsImplements() {
+        rewriteRun(
+          spaces(style -> style.withOther(style.getOther().withAfterComma(true).withBeforeComma(true))), //This style has no impact on throws, interfaces commas
+          java(
+            """
+              class Test {
+                  void guardedCases(Object o) throws IllegalStateException , IllegalArgumentException {
+                  }
+
+                  public static class ExtendedTest extends Test {
+                  }
+
+                  public static class ImplementsTestBeforeComma implements AutoCloseable
+                          , Comparable<ImplementsTestBeforeComma> {
+                  }
+
+                  public static class ImplementsTestAfterComma implements AutoCloseable,
+                          Comparable<ImplementsTestAfterComma> {
+                  }
+
+                  public static class ExtendsAndImplements extends Test implements AutoCloseable , Comparable<ExtendsAndImplements> {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void guardedCases(Object o) throws IllegalStateException, IllegalArgumentException {
+                  }
+
+                  public static class ExtendedTest extends Test {
+                  }
+
+                  public static class ImplementsTestBeforeComma implements AutoCloseable
+                          , Comparable<ImplementsTestBeforeComma> {
+                  }
+
+                  public static class ImplementsTestAfterComma implements AutoCloseable,
+                          Comparable<ImplementsTestAfterComma> {
+                  }
+
+                  public static class ExtendsAndImplements extends Test implements AutoCloseable, Comparable<ExtendsAndImplements> {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleInstanceOf() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                void isString(Object o) {
+                    return o   instanceof   String;
+                }
+            }
+            """,
+            """
+            class Test {
+                void isString(Object o) {
+                    return o instanceof String;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void handleIfBeforeParentheses() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if      (o instanceof String) {
+                        return true;
+                    }
+                    if(o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    }
+                    if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void handleIfWithoutBlock() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() ->
+            new SpacesVisitor<>(IntelliJ.spaces(), null, null, IntelliJ.wrappingAndBraces().withKeepWhenFormatting(IntelliJ.wrappingAndBraces().getKeepWhenFormatting().withLineBreaks(false)), null))),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String)
+                        return true;
+                    else if (o instanceof Character)
+                        return true;
+                    else
+                        return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) return true;
+                    else if (o instanceof Character) return true;
+                    else return false;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void elseIfSplitBySpace() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    } else     if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) {
+                        return true;
+                    } else if (o instanceof Character) {
+                        return true;
+                    }
+                    return false;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void elseIfWithoutBraces() {
+        rewriteRun(
+          spaces(true),
+          java(
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) return true;
+                    else
+                    if (o instanceof Character) return true;
+                    return false;
+                }
+            }
+            """,
+            """
+            class Test {
+                boolean isString(Object o) {
+                    if (o instanceof String) return true;
+                    else if (o instanceof Character) return true;
+                    return false;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void annotationPositions() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+            class TestClass {
+                protected void doSomething(Object o) {
+                }
+            }
+            """
+          ),
+          java(
+            """
+            class TesterOne extends TestClass {
+                @Override
+                protected void doSomething(Object o) {
+                }
+            }
+            """
+          ),
+          java(
+            """
+            class TesterTwo extends TestClass {
+                @Override   protected void doSomething(Object o) {
+                }
+            }
+            """,
+            """
+            class TesterTwo extends TestClass {
+                @Override protected void doSomething(Object o) {
+                }
+            }
+            """
           )
         );
     }

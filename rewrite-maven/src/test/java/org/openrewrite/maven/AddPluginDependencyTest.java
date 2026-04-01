@@ -40,7 +40,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -57,7 +57,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -89,7 +89,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -118,7 +118,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -155,7 +155,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -179,7 +179,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -213,7 +213,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -237,7 +237,7 @@ class AddPluginDependencyTest implements RewriteTest {
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
-                  
+
                   <build>
                       <plugins>
                           <plugin>
@@ -248,6 +248,54 @@ class AddPluginDependencyTest implements RewriteTest {
                                   <dependency>
                                       <groupId>org.openrewrite.recipe</groupId>
                                       <artifactId>rewrite-spring</artifactId>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void impliedGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPluginDependency(
+            "org.apache.maven.plugins", "maven-surefire-plugin",
+            "org.openrewrite.recipe", "rewrite-spring", "1.0.0")),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>2.20.1</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>2.20.1</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                      <version>1.0.0</version>
                                   </dependency>
                               </dependencies>
                           </plugin>

@@ -86,6 +86,9 @@ public interface Yaml extends Tree {
         @Nullable
         Checksum checksum;
 
+        @Nullable
+        String suffix;
+
         @Override
         public Charset getCharset() {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
@@ -106,7 +109,7 @@ public interface Yaml extends Tree {
         @Override
         public Documents copyPaste() {
             return new Documents(randomId(), Markers.EMPTY,
-                    sourcePath, fileAttributes, charsetName, charsetBomMarked, checksum, documents.stream().map(Document::copyPaste).collect(toList()));
+                    sourcePath, fileAttributes, charsetName, charsetBomMarked, checksum, suffix, documents.stream().map(Document::copyPaste).collect(toList()));
         }
 
         /**
@@ -152,6 +155,14 @@ public interface Yaml extends Tree {
 
         String prefix;
         Markers markers;
+
+        /**
+         * Optional list of directives that precede this document.
+         * Directives include %YAML and %TAG.
+         */
+        @Nullable
+        List<Directive> directives;
+
         boolean explicit;
         Block block;
         End end;
@@ -167,6 +178,7 @@ public interface Yaml extends Tree {
                     randomId(),
                     prefix,
                     Markers.EMPTY,
+                    directives == null ? null : directives.stream().map(Directive::copyPaste).collect(toList()),
                     explicit,
                     block.copyPaste(),
                     end.copyPaste()
@@ -203,6 +215,54 @@ public interface Yaml extends Tree {
             public End copyPaste() {
                 return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }
+        }
+    }
+
+    /**
+     * Represents a YAML directive, such as %YAML or %TAG.
+     * <p>
+     * Examples:
+     * <pre>
+     * %YAML 1.2
+     * %TAG !yaml! tag:yaml.org,2002:
+     * </pre>
+     *
+     * @see <a href="https://yaml.org/spec/1.2/spec.html#id2781553">YAML Directives</a>
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Directive implements Yaml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        String prefix;
+        Markers markers;
+
+        /**
+         * The content of the directive after the '%' character.
+         * For example, "YAML 1.2" or "TAG !yaml! tag:yaml.org,2002:".
+         */
+        String value;
+
+        /**
+         * Whitespace/content after the directive value, typically a newline.
+         */
+        String suffix;
+
+        @Override
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+            return v.visitDirective(this, p);
+        }
+
+        @Override
+        public Directive copyPaste() {
+            return new Directive(randomId(), prefix, Markers.EMPTY, value, suffix);
+        }
+
+        @Override
+        public String toString() {
+            return "Yaml.Directive(%" + value + ")";
         }
     }
 
@@ -244,22 +304,6 @@ public interface Yaml extends Tree {
             PLAIN
         }
 
-        @Deprecated
-        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, String value) {
-            this(id, prefix, markers, style, anchor, null, value);
-        }
-
-        @JsonCreator
-        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, @Nullable Tag tag, String value) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.style = style;
-            this.anchor = anchor;
-            this.tag = tag;
-            this.value = value;
-        }
-
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitScalar(this, p);
@@ -299,11 +343,6 @@ public interface Yaml extends Tree {
 
         @Nullable
         Tag tag;
-
-        @Deprecated
-        public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor) {
-            this(id, markers, openingBracePrefix, entries, closingBracePrefix, anchor, null);
-        }
 
         @JsonCreator
         public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
@@ -403,11 +442,6 @@ public interface Yaml extends Tree {
 
         @Nullable
         Tag tag;
-
-        @Deprecated
-        public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor) {
-            this(id, markers, openingBracketPrefix, entries, closingBracketPrefix, anchor, null);
-        }
 
         @JsonCreator
         public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag) {

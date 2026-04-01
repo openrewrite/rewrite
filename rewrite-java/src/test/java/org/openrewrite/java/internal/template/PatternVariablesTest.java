@@ -24,7 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.java.internal.template.PatternVariables.neverCompletesNormally;
+import static org.openrewrite.java.internal.template.PatternVariables.alwaysCompletesAbnormally;
 import static org.openrewrite.java.internal.template.PatternVariables.simplifiedPatternVariableCondition;
 
 @SuppressWarnings({"SizeReplaceableByIsEmpty", "PointlessBooleanExpression", "ConstantValue", "DuplicateCondition"})
@@ -85,55 +85,97 @@ class PatternVariablesTest {
                     .findFirst()
                     .map(J.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
-            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-            @SuppressWarnings("DataFlowIssue") J.If ifStatement = (J.If) method.getBody().getStatements().get(0);
+            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+            @SuppressWarnings("DataFlowIssue") J.If ifStatement = (J.If) method.getBody().getStatements().getFirst();
             return simplifiedPatternVariableCondition(ifStatement.getIfCondition().getTree(), null);
         }
     }
 
-    @SuppressWarnings({"UnnecessarySemicolon", "UnnecessaryReturnStatement"})
+    @SuppressWarnings({"UnnecessarySemicolon", "UnnecessaryReturnStatement", "InfiniteLoopStatement", "StatementWithEmptyBody", "LoopStatementThatDoesntLoop", "UnnecessaryContinue"})
     @Nested
     class CompletesNormally {
         @Test
         void emptyBlock() {
             Statement stmt = statement("{}");
-            assertThat(neverCompletesNormally(stmt)).isFalse();
+            assertThat(alwaysCompletesAbnormally(stmt)).isFalse();
         }
 
         @Test
         void nullStatement() {
             Statement stmt = statement(";");
-            assertThat(neverCompletesNormally(stmt)).isFalse();
+            assertThat(alwaysCompletesAbnormally(stmt)).isFalse();
         }
 
         @Test
         void return_() {
             Statement stmt = statement("return;");
-            assertThat(neverCompletesNormally(stmt)).isTrue();
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
         }
 
         @Test
         void continue_() {
             Statement stmt = statement("continue;");
-            assertThat(neverCompletesNormally(stmt)).isTrue();
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
         }
 
         @Test
         void labelledContinue() {
             Statement stmt = statement("continue x;");
-            assertThat(neverCompletesNormally(stmt)).isTrue();
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
         }
 
         @Test
         void break_() {
             Statement stmt = statement("break;");
-            assertThat(neverCompletesNormally(stmt)).isTrue();
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
         }
 
         @Test
         void labelledBreak() {
             Statement stmt = statement("break x;");
-            assertThat(neverCompletesNormally(stmt)).isTrue();
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
+        }
+
+        @Test
+        void systemExit() {
+            Statement stmt = statement("System.exit(0);");
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
+        }
+
+        @Test
+        void qualifiedSystemExit() {
+            Statement stmt = statement("java.lang.System.exit(0);");
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
+        }
+
+        @Test
+        void endlessWhileLoop() {
+            Statement stmt = statement("while (true) {}");
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
+        }
+
+        @Test
+        void trueWhileLoopWithBreak() {
+            Statement stmt = statement("while (true) {break;}");
+            assertThat(alwaysCompletesAbnormally(stmt)).isFalse();
+        }
+
+        @Test
+        void endlessDoWhileLoop() {
+            Statement stmt = statement("do {continue;} while (true);");
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
+        }
+
+        @Test
+        void trueDoWhileLoopWithBreak() {
+            Statement stmt = statement("do {if(false) break;} while (true);");
+            assertThat(alwaysCompletesAbnormally(stmt)).isFalse();
+        }
+
+        @Test
+        void endlessForLoop() {
+            Statement stmt = statement("for (;;) {}");
+            assertThat(alwaysCompletesAbnormally(stmt)).isTrue();
         }
 
         private Statement statement(@Language(value = "java", prefix = "class $ { void test() { ", suffix = "} }") String statement) {
@@ -149,9 +191,9 @@ class PatternVariablesTest {
                     .findFirst()
                     .map(J.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
-            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+            J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
             //noinspection DataFlowIssue
-            return method.getBody().getStatements().get(0);
+            return method.getBody().getStatements().getFirst();
         }
     }
 }

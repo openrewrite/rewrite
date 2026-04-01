@@ -20,7 +20,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Paths;
@@ -38,15 +37,9 @@ public class FindGradleProject extends Recipe {
     @Nullable
     SearchCriteria searchCriteria;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle projects";
-    }
+    String displayName = "Find Gradle projects";
 
-    @Override
-    public String getDescription() {
-        return "Gradle projects are those with `build.gradle` or `build.gradle.kts` files.";
-    }
+    String description = "Gradle projects are those with `build.gradle` or `build.gradle.kts` files.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -55,10 +48,10 @@ public class FindGradleProject extends Recipe {
                 @Override
                 public Tree preVisit(Tree tree, ExecutionContext ctx) {
                     stopAfterPreVisit();
-                    if (tree instanceof JavaSourceFile) {
-                        JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                        if (cu.getMarkers().findFirst(GradleProject.class).isPresent()) {
-                            return SearchResult.found(cu);
+                    if (tree instanceof SourceFile) {
+                        SourceFile file = (SourceFile) requireNonNull(tree);
+                        if (file.getMarkers().findFirst(GradleProject.class).isPresent()) {
+                            return SearchResult.found(file);
                         }
                     }
                     return tree;

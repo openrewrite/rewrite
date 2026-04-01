@@ -64,11 +64,9 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         t = new TabsAndIndentsVisitor<>(tabsStyle, stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, doc))
+        return new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, doc))
                 .orElse(autodetectGeneralFormatStyle(doc)), stopAfter)
                 .visit(t, p, cursor.fork());
-
-        return t;
     }
 
     @Override

@@ -30,41 +30,17 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeParentVersionTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1317")
-    @Test
-    void doesNotDowngradeVersion() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.5",
-            null,
-            null
-          )),
-          pomXml(
-            """
-              <project>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.4.12</version>
-                  <relativePath/>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void nonMavenCentralRepository() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null))
+            .recipe(new UpgradeParentVersion(
+              "org.jenkins-ci",
+              "jenkins",
+              "1.125",
+              null,
+              null))
             .executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -99,6 +75,34 @@ class UpgradeParentVersionTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1317")
+    @Test
+    void doesNotDowngradeVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "~1.5",
+            null,
+            null)),
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.4.12</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
     @Test
     void upgradeVersion() {
         rewriteRun(
@@ -107,8 +111,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            null
-          )),
+            null)),
           pomXml(
             """
               <project>
@@ -149,8 +152,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            true
-          )),
+            true)),
           pomXml(
             """
               <project>
@@ -191,8 +193,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "~1.5",
             null,
-            true
-          )),
+            true)),
           pomXml(
             """
               <project>
@@ -219,8 +220,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "spring-boot-starter-parent",
             "1.5.22.RELEASE",
             null,
-            null
-          )),
+            null)),
           pomXml(
             """
               <project>
@@ -246,6 +246,57 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5707")
+    @Test
+    void upgradeParentWithCIFriendlyVersionsAndNullProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeParentVersion(
+            "org.openrewrite",
+            "rewrite-bom",
+            "8.56.0",
+            null,
+            null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-bom</artifactId>
+                  <version>8.55.0</version>
+                </parent>
+                <groupId>foo</groupId>
+                <artifactId>bar</artifactId>
+                <version>${revision}${sha1}${changelist}</version>
+                <properties>
+                  <revision>1.2.3</revision>
+                  <changelist>-SNAPSHOT</changelist>
+                  <sha1 />
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-bom</artifactId>
+                  <version>8.56.0</version>
+                </parent>
+                <groupId>foo</groupId>
+                <artifactId>bar</artifactId>
+                <version>${revision}${sha1}${changelist}</version>
+                <properties>
+                  <revision>1.2.3</revision>
+                  <changelist>-SNAPSHOT</changelist>
+                  <sha1 />
+                </properties>
               </project>
               """
           )

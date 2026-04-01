@@ -24,6 +24,8 @@ import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.jspecify.annotations.Nullable;
 
+import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
+
 public class ObjectMappers {
     private ObjectMappers() {
     }
@@ -40,6 +42,7 @@ public class ObjectMappers {
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(cl);
         m.setTypeFactory(tf);
+        maybeAddKotlinModule(m);
         return m;
     }
 }

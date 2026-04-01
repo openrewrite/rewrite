@@ -32,6 +32,35 @@ class FindDeprecatedMethodsTest implements RewriteTest {
         spec.recipe(new FindDeprecatedMethods(null, null));
     }
 
+    @DocumentExample
+    @Test
+    void findDeprecations() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated
+                  void test(int n) {
+                      if(n == 1) {
+                          test(n + 1);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  @Deprecated
+                  void test(int n) {
+                      if(n == 1) {
+                          /*~~>*/test(n + 1);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
@@ -63,40 +92,11 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   @Deprecated
                   void test(int n) {
                   }
-              
+
                   Test() {
                       int n = 1;
                       if(n == 1) {
                           test(n + 1);
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findDeprecations() {
-        rewriteRun(
-          java(
-            """
-              class Test {
-                  @Deprecated
-                  void test(int n) {
-                      if(n == 1) {
-                          test(n + 1);
-                      }
-                  }
-              }
-              """,
-            """
-              class Test {
-                  @Deprecated
-                  void test(int n) {
-                      if(n == 1) {
-                          /*~~>*/test(n + 1);
                       }
                   }
               }
@@ -154,8 +154,8 @@ class FindDeprecatedMethodsTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2196")
-    @ParameterizedTest
     @NullAndEmptySource
+    @ParameterizedTest
     void noNPEWhenUsedFromDeprecatedUses(String typePattern) {
         rewriteRun(
           spec -> spec.recipe(new FindDeprecatedUses(typePattern, null, null)),
@@ -197,7 +197,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                           test(n + 1);
                       }
                   }
-                  
+
                   @Deprecated
                   void foo(int n) {
                       if(n == 1) {
@@ -214,7 +214,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                           test(n + 1);
                       }
                   }
-                  
+
                   @Deprecated
                   void foo(int n) {
                       if(n == 1) {
@@ -244,7 +244,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
           java(
             """
               import com.yourorg.Foo;
-              
+
               class A {
                   void a() {
                       new Foo().foo();
@@ -253,7 +253,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
               """,
             """
               import com.yourorg.Foo;
-              
+
               class A {
                   void a() {
                       /*~~>*/new Foo().foo();

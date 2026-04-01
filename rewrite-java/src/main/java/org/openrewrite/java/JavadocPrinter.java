@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.java.marker.LeadingBrace;
+import org.openrewrite.java.marker.LineComment;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -67,9 +68,15 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     @Override
     public Javadoc visitDocComment(Javadoc.DocComment javadoc, PrintOutputCapture<P> p) {
         beforeSyntax(javadoc, p, JAVA_MARKER_WRAPPER);
-        p.append("/**");
+        if (javadoc.getMarkers().findFirst(LineComment.class).isPresent()) {
+            p.append("///");
+        } else {
+            p.append("/**");
+        }
         visit(javadoc.getBody(), p);
-        p.append("*/");
+        if (!javadoc.getMarkers().findFirst(LineComment.class).isPresent()) {
+            p.append("*/");
+        }
         afterSyntax(javadoc, p);
         return javadoc;
     }
@@ -279,6 +286,17 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Javadoc visitSnippet(Javadoc.Snippet snippet, PrintOutputCapture<P> p) {
+        beforeSyntax(snippet, p);
+        p.append("{@snippet");
+        visit(snippet.getAttributes(), p);
+        visit(snippet.getContent(), p);
+        visit(snippet.getEndBrace(), p);
+        afterSyntax(snippet, p);
+        return snippet;
+    }
+
+    @Override
     public Javadoc visitSummary(Javadoc.Summary summary, PrintOutputCapture<P> p) {
         beforeSyntax(summary, p);
         p.append("{@summary");
@@ -356,6 +374,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitReference(Javadoc.Reference reference, PrintOutputCapture<P> p) {
+        beforeSyntax(reference, p);
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAKS", reference.getLineBreaks());
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", 0);
         javaVisitorVisit(reference.getTree(), p);
@@ -397,8 +416,15 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
             beforeSyntax(memberRef, Space.Location.MEMBER_REFERENCE_PREFIX, p);
-            visit(memberRef.getContaining(), p);
-            visitLeftPadded("#", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
+            JRightPadded<Expression> containing = memberRef.getPadding().getContaining();
+            // TO-BE-REMOVED(2025-09-01) For LSTs ingested before commit 117414b7 the entire `JRightPadded<Expression>` is `null`
+            //noinspection ConstantValue
+            if (containing != null && containing.getElement() != null) { // Invalid references will have a null containing
+                visit(containing.getElement(), p);
+                visitLeftPadded("#", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
+            } else {
+                visitLeftPadded(null, memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
+            }
             afterSyntax(memberRef, p);
             return memberRef;
         }
@@ -435,6 +461,28 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             p.append(">");
             afterSyntax(typeParam, p);
             return typeParam;
+        }
+
+        @Override
+        public J visitWildcard(J.Wildcard wildcard, PrintOutputCapture<P> p) {
+            beforeSyntax(wildcard, Space.Location.WILDCARD_PREFIX, p);
+            p.append('?');
+            if (wildcard.getPadding().getBound() != null) {
+                //noinspection ConstantConditions
+                switch (wildcard.getBound()) {
+                    case Extends:
+                        visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                        p.append("extends");
+                        break;
+                    case Super:
+                        visitSpace(wildcard.getPadding().getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
+                        p.append("super");
+                        break;
+                }
+            }
+            visit(wildcard.getBoundedType(), p);
+            afterSyntax(wildcard, p);
+            return wildcard;
         }
 
         @Override

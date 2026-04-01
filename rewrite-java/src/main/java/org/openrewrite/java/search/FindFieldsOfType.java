@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
+import org.openrewrite.java.table.FieldsOfTypeUses;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
@@ -47,20 +48,16 @@ public class FindFieldsOfType extends Recipe {
     @Nullable
     Boolean matchInherited;
 
-    @Override
-    public String getDisplayName() {
-        return "Find fields of type";
-    }
+    private final transient FieldsOfTypeUses fieldsOfTypeUses = new FieldsOfTypeUses(this);
+
+    String displayName = "Find fields of type";
 
     @Override
     public String getInstanceNameSuffix() {
         return "on types `" + fullyQualifiedTypeName + "`";
     }
 
-    @Override
-    public String getDescription() {
-        return "Finds declared fields matching a particular class name.";
-    }
+    String description = "Finds declared fields matching a particular class name.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -74,6 +71,22 @@ public class FindFieldsOfType extends Recipe {
                     hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName,
                                 Boolean.TRUE.equals(matchInherited)) &&
                     isField(getCursor())) {
+
+                    // Populate the FieldsOfTypeUses DataTable
+                    for (J.VariableDeclarations.NamedVariable variable : multiVariable.getVariables()) {
+                        String varType = variable.getType().toString();
+                        if (variable.getInitializer() != null && variable.getInitializer().getType() != null) {
+                            varType = variable.getInitializer().getType().toString();
+                        }
+                        fieldsOfTypeUses.insertRow(ctx, new FieldsOfTypeUses.Row(
+                            getCursor().firstEnclosingOrThrow(J.CompilationUnit.class).getSourcePath().toString(),
+                            variable.getSimpleName(),
+                            multiVariable.getTypeExpression().getType().toString(),
+                            varType,
+                            multiVariable.getModifiers().stream().map(J.Modifier::toString).reduce((m1, m2) -> m1 + " " + m2).orElse(""),
+                            multiVariable.printTrimmed(getCursor())
+                        ));
+                    }
                     return SearchResult.found(multiVariable);
                 }
                 return multiVariable;
@@ -120,7 +133,7 @@ public class FindFieldsOfType extends Recipe {
                                           boolean matchOverrides) {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName, matchOverrides);
-        } else if (type instanceof JavaType.FullyQualified) {
+        } else if (type instanceof JavaType.FullyQualified || type instanceof JavaType.Primitive) {
             return new TypeMatcher(fullyQualifiedName, matchOverrides).matches(type);
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;

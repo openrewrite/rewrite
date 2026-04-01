@@ -61,8 +61,8 @@ class JavaParserCaller {
                             if (c1.getName().equals(JavaParser.class.getName()) ||
                                 c1.getName().equals(JavaParser.Builder.class.getName()) ||
                                 // FIXME this is a hack
-                                c1.getName().equals("org.openrewrite.gradle.GradleParser") ||
-                                c1.getName().equals("org.openrewrite.gradle.GradleParser$Builder")) {
+                                "org.openrewrite.gradle.GradleParser".equals(c1.getName()) ||
+                                "org.openrewrite.gradle.GradleParser$Builder".equals(c1.getName())) {
                                 parserOrBuilderFound = true;
                                 return false;
                             }

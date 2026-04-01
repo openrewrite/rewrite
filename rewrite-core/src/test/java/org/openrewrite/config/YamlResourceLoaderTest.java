@@ -40,152 +40,8 @@ class YamlResourceLoaderTest implements RewriteTest {
         }
     }
 
-    @Test
-    void dataTables() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).hasSize(1);
-        assertThat(recipeDescriptors.iterator().next().getDataTables()).isNotEmpty();
-    }
-
-    @Test
-    void maintainers() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              maintainers:
-                  - maintainer: Sam
-                    logo: https://sam.com/logo.svg
-                  - maintainer: Jon
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).hasSize(1);
-        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
-        assertThat(descriptor.getDataTables()).isNotEmpty();
-        assertThat(descriptor.getMaintainers()).hasSize(2);
-        Maintainer sam = descriptor.getMaintainers().get(0);
-        assertThat(sam.getMaintainer()).isEqualTo("Sam");
-        assertThat(sam.getLogo()).isNotNull();
-        assertThat(sam.getLogo().toString()).isEqualTo("https://sam.com/logo.svg");
-        Maintainer jon = descriptor.getMaintainers().get(1);
-        assertThat(jon.getMaintainer()).isEqualTo("Jon");
-        assertThat(jon.getLogo()).isNull();
-    }
-
-    @Test
-    void recipeContributorAttribution() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/attribution
-              recipeName: test.ChangeTextToHello
-              contributors:
-                - name: "Jonathan Schneider"
-                  email: "jon@moderne.io"
-                  lineCount: 5
-                - name: "Sam Snyder"
-                  email: "sam@moderne.io"
-                  lineCount: 3
-              """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
-          .build();
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSize(1);
-        Recipe recipe = recipes.iterator().next();
-        List<Contributor> contributors = recipe.getContributors();
-        assertThat(contributors).hasSize(2);
-        Contributor jon = contributors.get(0);
-        assertThat(jon.getName()).isEqualTo("Jonathan Schneider");
-        assertThat(jon.getEmail()).isEqualTo("jon@moderne.io");
-        assertThat(jon.getLineCount()).isEqualTo(5);
-        Contributor sam = contributors.get(1);
-        assertThat(sam.getName()).isEqualTo("Sam Snyder");
-        assertThat(sam.getEmail()).isEqualTo("sam@moderne.io");
-        assertThat(sam.getLineCount()).isEqualTo(3);
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).hasSize(1);
-        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
-        List<Contributor> descriptorContributors = descriptor.getContributors();
-        assertThat(descriptorContributors).containsExactlyElementsOf(contributors);
-
-        RecipeDescriptor recipeDescriptor = recipe.getDescriptor();
-        assertThat(recipeDescriptor.getContributors()).containsExactlyElementsOf(contributors);
-    }
-
-    @Test
-    void declarativeAttributionIncludesRecipeListContributors() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/attribution
-              recipeName: org.openrewrite.text.ChangeText
-              contributors:
-                - name: "Jonathan Schneider"
-                  email: "jon@moderne.io"
-                  lineCount: 5
-              """.getBytes()
-          ), URI.create("attribution/org.openrewrite.text.ChangeText.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSize(1);
-        Recipe recipe = recipes.iterator().next();
-        Optional<Contributor> maybeJon = recipe.getContributors()
-          .stream()
-          .filter(c -> c.getName().equals("Jonathan Schneider"))
-          .findFirst();
-        assertThat(maybeJon).isPresent();
-    }
-
-    @Test
     @DocumentExample
+    @Test
     void recipeExamples() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
@@ -263,7 +119,7 @@ class YamlResourceLoaderTest implements RewriteTest {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
 
                 assertThat(e.getParameters()).hasSize(2);
-                assertThat(e.getParameters().get(0)).isEqualTo("arg0");
+                assertThat(e.getParameters().getFirst()).isEqualTo("arg0");
                 assertThat(e.getParameters().get(1)).isEqualTo("1");
 
                 assertThat(e.getSources()).hasSize(1);
@@ -295,6 +151,61 @@ class YamlResourceLoaderTest implements RewriteTest {
             List<RecipeExample> descriptorExamples = descriptor.getExamples();
             assertThat(descriptorExamples).containsExactlyElementsOf(recipes.iterator().next().getExamples());
         });
+    }
+
+    @Test
+    void dataTables() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
+        assertThat(recipeDescriptors).hasSize(1);
+        assertThat(recipeDescriptors.iterator().next().getDataTables()).isNotEmpty();
+    }
+
+    @Test
+    void maintainers() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              maintainers:
+                  - maintainer: Sam
+                    logo: https://sam.com/logo.svg
+                  - maintainer: Jon
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
+        assertThat(recipeDescriptors).hasSize(1);
+        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
+        assertThat(descriptor.getDataTables()).isNotEmpty();
+        assertThat(descriptor.getMaintainers()).hasSize(2);
+        Maintainer sam = descriptor.getMaintainers().getFirst();
+        assertThat(sam.getMaintainer()).isEqualTo("Sam");
+        assertThat(sam.getLogo()).isNotNull();
+        assertThat(sam.getLogo().toString()).isEqualTo("https://sam.com/logo.svg");
+        Maintainer jon = descriptor.getMaintainers().get(1);
+        assertThat(jon.getMaintainer()).isEqualTo("Jon");
+        assertThat(jon.getLogo()).isNull();
     }
 
     @Test
@@ -356,6 +267,38 @@ class YamlResourceLoaderTest implements RewriteTest {
           new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe".getBytes()),
           URI.create("rewrite.yml"),
           new Properties());
+    }
+
+    @Test
+    void nullPropertiesSkipsPlaceholderResolution() {
+        String yaml = //language=yml
+          """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.ChangeTextWithPlaceholder
+            displayName: Change text with placeholder
+            description: Test that placeholder resolution respects null properties.
+            recipeList:
+                - org.openrewrite.text.ChangeText:
+                    toText: "${java_home.jdk21:/bin/java}"
+            """;
+
+        // With null properties, placeholder with default value should be preserved as-is
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder(null)
+            .load(new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+              URI.create("rewrite.yml"), null))
+            .build().listRecipes().iterator().next()),
+          text("hello", "${java_home.jdk21:/bin/java}")
+        );
+
+        // With empty properties, the default value gets resolved
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder(new Properties())
+            .load(new YamlResourceLoader(new ByteArrayInputStream(yaml.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .build().listRecipes().iterator().next()),
+          text("hello", "/bin/java")
+        );
     }
 
     private static class RecipeWithBadStaticInitializer extends Recipe {

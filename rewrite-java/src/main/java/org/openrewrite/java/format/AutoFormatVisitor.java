@@ -19,29 +19,31 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.Style;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
 
-import java.util.Optional;
-import java.util.function.Supplier;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
+import static java.util.stream.Collectors.toList;
 
 public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
+    private final List<NamedStyles> styles;
+
     public AutoFormatVisitor() {
         this(null);
     }
 
-    public AutoFormatVisitor(@Nullable Tree stopAfter) {
+    public AutoFormatVisitor(@Nullable Tree stopAfter, NamedStyles ... style) {
         this.stopAfter = stopAfter;
+        this.styles = Arrays.stream(style).collect(toList());
     }
 
     @Override
@@ -51,40 +53,34 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
-        JavaSourceFile cu = (tree instanceof JavaSourceFile) ?
-                (JavaSourceFile) tree :
-                cursor.firstEnclosingOrThrow(JavaSourceFile.class);
+        JavaSourceFile cu = (tree instanceof JavaSourceFile) ? (JavaSourceFile) tree : cursor.firstEnclosingOrThrow(JavaSourceFile.class);
+        if (tree == null) {
+            tree = cursor.getValue();
+        }
+        List<NamedStyles> activeStyles = new ArrayList<>(cu.getMarkers().findAll(NamedStyles.class));
+        activeStyles.addAll(styles);
 
-        J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
+        // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
+        J t = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
+        t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new SpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
 
-        t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
+        // With the updated tree, overwrite the original space with the newly computed space
+        tree = new MergeSpacesVisitor(activeStyles).visitNonNull(tree, t, cursor.fork());
 
-        t = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
-                .visit(t, p, cursor.fork());
+        // Then apply formatting that applies on line-endings / #lines / ...
+        tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
-                .visit(t, p, cursor.fork());
+        if (tree instanceof JavaSourceFile) {
+            return addStyleMarker((JavaSourceFile) tree, styles);
+        }
 
-        t = new SpacesVisitor<>(
-                Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
-                Style.from(EmptyForInitializerPadStyle.class, cu),
-                Style.from(EmptyForIteratorPadStyle.class, cu),
-                stopAfter
-        ).visit(t, p, cursor.fork());
-
-        t = new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, cu))
-                .orElse(autodetectGeneralFormatStyle(cu)), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
-
-        return t;
+        return (J) tree;
     }
 
     @Override
@@ -97,30 +93,51 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
             if (!(cu instanceof J.CompilationUnit)) {
                 return cu;
             }
-            JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
+            List<NamedStyles> activeStyles = new ArrayList<>(cu.getMarkers().findAll(NamedStyles.class));
+            activeStyles.addAll(styles);
 
-            t = (JavaSourceFile) new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
-                    .visit(t, p);
+            // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
+            JavaSourceFile t = (JavaSourceFile) new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p);
+            t = (JavaSourceFile) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p);
+            t = (JavaSourceFile) new SpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
+            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
+            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p);
 
-            t = (JavaSourceFile) new SpacesVisitor<P>(Optional.ofNullable(
-                    Style.from(SpacesStyle.class, cu)).orElse(IntelliJ.spaces()),
-                    Style.from(EmptyForInitializerPadStyle.class, cu),
-                    Style.from(EmptyForIteratorPadStyle.class, cu),
-                    stopAfter)
-                    .visit(t, p);
+            // With the updated tree, overwrite the original space with the newly computed space
+            tree = new MergeSpacesVisitor(activeStyles).visitNonNull(tree, t);
 
-            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
-                    .visit(t, p);
+            // Then apply formatting that applies on line-endings / #lines / ...
+            tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p);
+            tree = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(tree, p);
+            tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p);
 
-            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
-                    .visit(t, p);
-
-            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
-                    .visit(t, p);
-
-            assert t != null;
-            return t;
+            if (tree instanceof J.CompilationUnit) {
+                return addStyleMarker((JavaSourceFile) tree, styles);
+            }
         }
+        //noinspection DataFlowIssue
         return (J) tree;
+    }
+
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.addStyleMarker now available in parent runtime")
+    private static <T extends SourceFile> T addStyleMarker(T t, List<NamedStyles> styles) {
+        if (!styles.isEmpty()) {
+            Set<NamedStyles> newNamedStyles = new HashSet<>(styles);
+            boolean styleAlreadyPresent = false;
+            for (NamedStyles namedStyle : t.getMarkers().findAll(NamedStyles.class)) {
+                styleAlreadyPresent = !newNamedStyles.add(namedStyle) || styleAlreadyPresent;
+            }
+            // As the order or NamedStyles matters, we cannot simply use addIfAbsent.
+            if (!styleAlreadyPresent) {
+                Markers markers = t.getMarkers().removeByType(NamedStyles.class);
+                for (NamedStyles namedStyle : newNamedStyles) {
+                    markers = markers.add(namedStyle);
+                }
+
+                return t.withMarkers(markers);
+            }
+        }
+        return t;
     }
 }

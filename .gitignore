@@ -4,12 +4,36 @@ build/
 out/
 */src/main/gen/
 */src/main/antlr/gen
-.idea/
+.idea/*
+# Exception: Include Python/C# modules for IntelliJ (needs parent dirs unignored first)
+!.idea/modules/
+.idea/modules/*
+!.idea/modules/rewrite-python-src/
+!.idea/modules/rewrite-csharp-src/
 .project
 .classpath
 .settings/
+.vscode/
 .DS_Store
 **/node_modules/
 IDE.properties
 # ASDF https://asdf-vm.com/
 .tool-versions
+.aider*
+/worktrees
+rewrite-gradle-tooling-model/model/src/main/resources/test-manifest.txt
+.nvmrc
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+.context/
+CLAUDE.local.md
+
+/.claude/settings.local.json

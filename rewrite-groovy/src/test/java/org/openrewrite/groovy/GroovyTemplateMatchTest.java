@@ -43,7 +43,7 @@ class GroovyTemplateMatchTest implements RewriteTest {
               class Test {
                   boolean b1 = 1 == 2
                   def b2 = 1 == 3
-              
+
                   boolean b3 = 2 == 1
                   def b4 = 2 == 2 + 3
               }
@@ -52,7 +52,7 @@ class GroovyTemplateMatchTest implements RewriteTest {
               class Test {
                   boolean b1 = /*~~>*/1 == 2
                   def b2 = /*~~>*/1 == 3
-              
+
                   boolean b3 = 2 == 1
                   def b4 = 2 == 2 + 3
               }

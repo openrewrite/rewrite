@@ -26,8 +26,8 @@ import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Markers;
 
 import java.util.Calendar;
-import java.util.Collections;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -42,15 +42,9 @@ public class AddLicenseHeader extends Recipe {
             example = "Copyright ${CURRENT_YEAR} the original author or authors...")
     String licenseText;
 
-    @Override
-    public String getDisplayName() {
-        return "Add license header";
-    }
+    String displayName = "Add license header";
 
-    @Override
-    public String getDescription() {
-        return "Adds license headers to Java source files when missing. Does not override existing license headers.";
-    }
+    String description = "Adds license headers to Java source files when missing. Does not override existing license headers.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -69,7 +63,7 @@ public class AddLicenseHeader extends Recipe {
                                     return System.getProperty(k);
                                 }).replace("\n", "\n * ") + "\n ";
 
-                        cu = cu.withComments(Collections.singletonList(
+                        cu = cu.withComments(singletonList(
                                 new TextComment(true, formattedLicenseText, "\n", Markers.EMPTY)
                         ));
                     }

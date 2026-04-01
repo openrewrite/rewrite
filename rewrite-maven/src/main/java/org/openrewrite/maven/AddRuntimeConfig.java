@@ -26,9 +26,11 @@ import org.openrewrite.text.PlainTextVisitor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -83,15 +85,9 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
         }
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add a configuration option for the Maven runtime";
-    }
+    String displayName = "Add a configuration option for the Maven runtime";
 
-    @Override
-    public String getDescription() {
-        return "Add a new configuration option for the Maven runtime if not already present.";
-    }
+    String description = "Add a new configuration option for the Maven runtime if not already present.";
 
     @Data
     @RequiredArgsConstructor
@@ -137,12 +133,12 @@ public class AddRuntimeConfig extends ScanningRecipe<AddRuntimeConfig.Accumulato
     @Override
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
         if (acc.isMavenProject() && acc.getMatchingRuntimeConfigFile() == null) {
-            return Collections.singletonList(PlainText.builder()
+            return singletonList(PlainText.builder()
                     .text(acc.getTargetRepresentation())
                     .sourcePath(Paths.get(MVN_CONFIG_DIR, relativeConfigFileName))
                     .build());
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     @Override

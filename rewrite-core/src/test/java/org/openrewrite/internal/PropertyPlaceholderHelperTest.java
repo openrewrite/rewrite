@@ -22,7 +22,40 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PropertyPlaceholderHelperTest {
 
     @Test
-    void dashed() {
+    void nested() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("%%{%%{k1}}", k -> switch (k) {
+            case "k1" -> "k2";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("jon");
+    }
+
+    @Test
+    void notOnlyPlaceholders() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("Oh, %%{k1} there %%{k2}!", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("Oh, hi there jon!");
+    }
+
+    @Test
+    void dashedSeparation() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("%%{k1}-%%{k2}", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("hi-jon");
+    }
+
+    @Test
+    void spaceSeparation() {
         var helper = new PropertyPlaceholderHelper("%%{", "}", null);
         var s = helper.replacePlaceholders("%%{k1} %%{k2}", k -> switch (k) {
             case "k1" -> "hi";
@@ -30,5 +63,86 @@ class PropertyPlaceholderHelperTest {
             default -> throw new UnsupportedOperationException();
         });
         assertThat(s).isEqualTo("hi jon");
+    }
+
+    @Test
+    void noSeparation() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("%%{k1}%%{k2}", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            default -> throw new UnsupportedOperationException();
+        });
+        assertThat(s).isEqualTo("hijon");
+    }
+
+    @Test
+    void withValueSeparatorAndValueReplacement() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
+        var s = helper.replacePlaceholders("%%{k1,oh} %%{k2}", k -> switch (k) {
+            case "k1" -> "hi";
+            case "k2" -> "jon";
+            // Note: this needs to not throw an exception because there won't be a match for "k1,oh" as a placeholder
+            default -> null;
+        });
+        assertThat(s).isEqualTo("hi jon");
+    }
+
+    @Test
+    void escapedPlaceholder() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("\\${java.version}", k -> "should-not-resolve");
+        assertThat(s).isEqualTo("${java.version}");
+    }
+
+    @Test
+    void escapedPlaceholderWithOtherPrefix() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", null);
+        var s = helper.replacePlaceholders("\\%%{k1}", k -> "should-not-resolve");
+        assertThat(s).isEqualTo("%%{k1}");
+    }
+
+    @Test
+    void mixedEscapedAndResolvedPlaceholders() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${greeting} \\${java.version}", k -> "greeting".equals(k) ? "hello" : null);
+        assertThat(s).isEqualTo("hello ${java.version}");
+    }
+
+    @Test
+    void unresolvedPlaceholderLeftAsIs() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${unresolved}", k -> null);
+        assertThat(s).isEqualTo("${unresolved}");
+    }
+
+    @Test
+    void normalResolutionStillWorks() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("${greeting} ${name}", k -> switch (k) {
+            case "greeting" -> "hello";
+            case "name" -> "world";
+            default -> null;
+        });
+        assertThat(s).isEqualTo("hello world");
+    }
+
+    @Test
+    void backslashNotBeforePrefixIsPreserved() {
+        var helper = new PropertyPlaceholderHelper("${", "}", null);
+        var s = helper.replacePlaceholders("path\\to\\file", k -> null);
+        assertThat(s).isEqualTo("path\\to\\file");
+    }
+
+    @Test
+    void withValueSeparatorAndNullReplacement() {
+        var helper = new PropertyPlaceholderHelper("%%{", "}", ",");
+        var s = helper.replacePlaceholders("%%{k1,oh}%%{k2}", k -> switch (k) {
+            case "k1" -> null;
+            case "k2" -> "jon";
+            // Note: this needs to not throw an exception because there won't be a match for "k1,oh" as a placeholder
+            default -> null;
+        });
+        assertThat(s).isEqualTo("ohjon");
     }
 }

@@ -259,8 +259,8 @@ class DeleteStatementTest implements RewriteTest {
               @Override
               public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
                   J.ForLoop f = super.visitForLoop(forLoop, ctx);
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getInit().get(0)));
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getUpdate().get(0)));
+                  doAfterVisit(new DeleteStatement<>(f.getControl().getInit().getFirst()));
+                  doAfterVisit(new DeleteStatement<>(f.getControl().getUpdate().getFirst()));
                   return f;
               }
           })),
@@ -412,7 +412,7 @@ class DeleteStatementTest implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-                  if (m.getSimpleName().equals("b")) {
+                  if ("b".equals(m.getSimpleName())) {
                       doAfterVisit(new DeleteStatement<>(m));
                   }
                   return m;
@@ -424,7 +424,7 @@ class DeleteStatementTest implements RewriteTest {
                   public void a() {
                       boolean a = !b();
                   }
-                  
+
                   abstract boolean b();
               }
               """

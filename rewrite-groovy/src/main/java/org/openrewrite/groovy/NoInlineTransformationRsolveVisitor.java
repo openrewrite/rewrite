@@ -122,7 +122,7 @@ class NoInlineAnnotationTransformationResolveVisitor extends ResolveVisitor {
     private boolean isRepeatable(final Class<?> annTypeClass) {
         Annotation[] annTypeAnnotations = annTypeClass.getAnnotations();
         for (Annotation annTypeAnnotation : annTypeAnnotations) {
-            if (annTypeAnnotation.annotationType().getName().equals("java.lang.annotation.Repeatable")) {
+            if ("java.lang.annotation.Repeatable".equals(annTypeAnnotation.annotationType().getName())) {
                 return true;
             }
         }

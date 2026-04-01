@@ -39,9 +39,9 @@ class PrefixlessExpressionsTest implements RewriteTest {
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
-                <version>1.0</version>
+                <version>1.0.0</version>
                 <properties>
-                  <other.version>1.0.0</other.version>
+                  <other.version>1.0</other.version>
                 </properties>
                 <dependencies>
                   <dependency>
@@ -72,9 +72,9 @@ class PrefixlessExpressionsTest implements RewriteTest {
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
-                <version>1.0</version>
+                <version>1.0.0</version>
                 <properties>
-                  <other.version>1.0.0</other.version>
+                  <other.version>1.0</other.version>
                 </properties>
                 <dependencies>
                   <dependency>

@@ -26,6 +26,9 @@ import org.openrewrite.RecipeScheduler;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -87,7 +90,7 @@ public interface Markup extends Marker {
     @Value
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
-    class Error implements Markup {
+    class Error implements Markup, RpcCodec<Error> {
         UUID id;
 
         @EqualsAndHashCode.Include
@@ -109,12 +112,27 @@ public interface Markup extends Marker {
             this.message = message;
             this.detail = detail;
         }
+
+        @Override
+        public void rpcSend(Error after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+            q.getAndSend(after, Error::getMessage);
+            q.getAndSend(after, Error::getDetail);
+        }
+
+        @Override
+        public Error rpcReceive(Error before, RpcReceiveQueue q) {
+            return before
+                    .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                    .withMessage(q.receive(before.getMessage()))
+                    .withDetail(q.receive(before.getDetail()));
+        }
     }
 
     @Value
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
-    class Warn implements Markup {
+    class Warn implements Markup, RpcCodec<Warn> {
         UUID id;
 
         @EqualsAndHashCode.Include
@@ -136,12 +154,27 @@ public interface Markup extends Marker {
             this.message = message;
             this.detail = detail;
         }
+
+        @Override
+        public void rpcSend(Warn after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+            q.getAndSend(after, Warn::getMessage);
+            q.getAndSend(after, Warn::getDetail);
+        }
+
+        @Override
+        public Warn rpcReceive(Warn before, RpcReceiveQueue q) {
+            return before
+                    .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                    .withMessage(q.receive(before.getMessage()))
+                    .withDetail(q.receive(before.getDetail()));
+        }
     }
 
     @Value
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
-    class Info implements Markup {
+    class Info implements Markup, RpcCodec<Info> {
         UUID id;
 
         @EqualsAndHashCode.Include
@@ -160,12 +193,27 @@ public interface Markup extends Marker {
         public @Nullable String getDetail() {
             return detail;
         }
+
+        @Override
+        public void rpcSend(Info after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+            q.getAndSend(after, Info::getMessage);
+            q.getAndSend(after, Info::getDetail);
+        }
+
+        @Override
+        public Info rpcReceive(Info before, RpcReceiveQueue q) {
+            return before
+                    .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                    .withMessage(q.receive(before.getMessage()))
+                    .withDetail(q.receive(before.getDetail()));
+        }
     }
 
     @Value
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
-    class Debug implements Markup {
+    class Debug implements Markup, RpcCodec<Debug> {
         UUID id;
 
         @EqualsAndHashCode.Include
@@ -183,6 +231,21 @@ public interface Markup extends Marker {
         @Override
         public @Nullable String getDetail() {
             return detail;
+        }
+
+        @Override
+        public void rpcSend(Debug after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+            q.getAndSend(after, Debug::getMessage);
+            q.getAndSend(after, Debug::getDetail);
+        }
+
+        @Override
+        public Debug rpcReceive(Debug before, RpcReceiveQueue q) {
+            return before
+                    .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                    .withMessage(q.receive(before.getMessage()))
+                    .withDetail(q.receive(before.getDetail()));
         }
     }
 }

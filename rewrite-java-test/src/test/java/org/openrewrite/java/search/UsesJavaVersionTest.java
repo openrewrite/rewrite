@@ -30,26 +30,26 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class UsesJavaVersionTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2035")
-    @ParameterizedTest
     @CsvSource(textBlock = """
       8,      8
       1.8,    8
       11,     11
       17,     17
       """)
+    @Issue("https://github.com/openrewrite/rewrite/issues/2035")
+    @ParameterizedTest
     void mavenCompilerSources(String version, int major) {
         assertThat(new JavaVersion(randomId(), "", "", version, version).getMajorVersion())
           .isEqualTo(major);
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2035")
-    @ParameterizedTest
     @CsvSource(textBlock = """
       1.8.0.332,  8
       11.0.15,    11
       17.0.3,     17
       """)
+    @Issue("https://github.com/openrewrite/rewrite/issues/2035")
+    @ParameterizedTest
     void javaRuntimeVersions(String version, int major) {
         assertThat(new JavaVersion(randomId(), "", "", version, version).getMajorVersion())
           .isEqualTo(major);

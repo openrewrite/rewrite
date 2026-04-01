@@ -22,8 +22,8 @@ import org.openrewrite.marker.Markers;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.format;
 
@@ -40,7 +40,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
 
     public ImplementInterface(J.ClassDeclaration scope, String interface_, @Nullable List<Expression> typeParameters) {
         this(scope, ListUtils.nullIfEmpty(typeParameters) != null ?
-                new JavaType.Parameterized(null, JavaType.ShallowClass.build(interface_), typeParameters.stream().map(Expression::getType).collect(Collectors.toList())) :
+                new JavaType.Parameterized(null, JavaType.ShallowClass.build(interface_), typeParameters.stream().map(Expression::getType).collect(toList())) :
                 JavaType.ShallowClass.build(interface_),
                 typeParameters
         );
@@ -78,7 +78,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
 
                 List<JRightPadded<Expression>> elements = typeParameters.stream()
                         .map(t -> new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY))
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 J.ParameterizedType typedImpl = new J.ParameterizedType(
                         randomId(),

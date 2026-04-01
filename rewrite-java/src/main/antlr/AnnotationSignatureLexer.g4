@@ -270,7 +270,10 @@ AT              : '@';
 ELLIPSIS        : '...';
 
 DOTDOT          : '..';
-SPACE           : ' ';
+COLONCOLON      : '::';
+
+// Whitespace handling
+WS              : [ \t\r\n]+ -> skip ;
 
 Identifier
     : '*'

@@ -89,7 +89,7 @@ class IfTest implements RewriteTest {
                   void test() {
                       if (true) {
                       }
-                      else{ 
+                      else{
                           System.out.println("test");
                       }
                   }

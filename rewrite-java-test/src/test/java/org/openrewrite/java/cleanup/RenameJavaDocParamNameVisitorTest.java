@@ -35,9 +35,9 @@ class RenameJavaDocParamNameVisitorTest implements RewriteTest {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 J.MethodDeclaration md = method;
-                if (md.getSimpleName().equals("method") && md.getParameters().stream()
+                if ("method".equals(md.getSimpleName()) && md.getParameters().stream()
                   .anyMatch(p -> p instanceof J.VariableDeclarations && ((J.VariableDeclarations) p).getVariables().stream()
-                    .anyMatch(v -> v.getSimpleName().equals("oldName")))) {
+                    .anyMatch(v -> "oldName".equals(v.getSimpleName())))) {
                     md = new RenameJavaDocParamNameVisitor<>(md, "oldName", "newName")
                       .visitMethodDeclaration(md, executionContext);
                 }
@@ -47,7 +47,7 @@ class RenameJavaDocParamNameVisitorTest implements RewriteTest {
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
                 J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, executionContext);
-                if (variable.getSimpleName().equals("oldName")) {
+                if ("oldName".equals(variable.getSimpleName())) {
                     v = v.withName(v.getName().withSimpleName("newName"));
                     v = v.withName(v.getName().withFieldType(v.getName().getFieldType().withName("newName")));
                     v = v.withVariableType(v.getVariableType().withName("newName"));

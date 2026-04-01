@@ -52,7 +52,6 @@ class CommentOutPropertyTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("comment out entire sequence")
     @Test
     void commentSequence() {
         rewriteRun(
@@ -75,6 +74,91 @@ class CommentOutPropertyTest implements RewriteTest {
                   #   - name: name
                   #   - propertyA: fieldA
                   #   - propertyB: fieldB
+                  scalar: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void sequenceKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.propertyA",
+            "Some comments", false)),
+          yaml(
+            """
+                foo:
+                  bar:
+                    sequence:
+                      - name: name
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """,
+            """
+                foo:
+                  bar:
+                    sequence:
+                      - name: name
+                      # Some comments
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void sequenceFirstKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.name", "Some comments", false)),
+          yaml(
+            """
+                foo:
+                  bar:
+                    sequence:
+                      - name: name
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """,
+            """
+                foo:
+                  bar:
+                    sequence:
+                      # Some comments
+                      - name: name
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentSequenceKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence", "Some comments", false)),
+          yaml(
+            """
+              foo:
+                bar:
+                  sequence:
+                    - name: name
+                    - propertyA: fieldA
+                    - propertyB: fieldB
+                  scalar: value
+              """,
+            """
+              foo:
+                bar:
+                  # Some comments
+                  sequence:
+                    - name: name
+                    - propertyA: fieldA
+                    - propertyB: fieldB
                   scalar: value
               """
           )
@@ -156,94 +240,6 @@ class CommentOutPropertyTest implements RewriteTest {
             """
               # Some comments
               # test: foo
-              """
-          )
-        );
-    }
-
-    @DocumentExample("comment out a map entry")
-    @Test
-    void sequenceKeepProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.propertyA",
-            "Some comments", false)),
-          yaml(
-            """
-                foo:
-                  bar:
-                    sequence:
-                      - name: name
-                      - propertyA: fieldA
-                      - propertyB: fieldB
-                    scalar: value
-              """,
-            """
-                foo:
-                  bar:
-                    sequence:
-                      - name: name
-                      # Some comments
-                      - propertyA: fieldA
-                      - propertyB: fieldB
-                    scalar: value
-              """
-          )
-        );
-    }
-
-    @DocumentExample("comment out a map entry")
-    @Test
-    void sequenceFirstKeepProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.name", "Some comments", false)),
-          yaml(
-            """
-                foo:
-                  bar:
-                    sequence:
-                      - name: name
-                      - propertyA: fieldA
-                      - propertyB: fieldB
-                    scalar: value
-              """,
-            """
-                foo:
-                  bar:
-                    sequence:
-                      # Some comments
-                      - name: name
-                      - propertyA: fieldA
-                      - propertyB: fieldB
-                    scalar: value
-              """
-          )
-        );
-    }
-
-    @DocumentExample("comment out entire sequence")
-    @Test
-    void commentSequenceKeepProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence", "Some comments", false)),
-          yaml(
-            """
-              foo:
-                bar:
-                  sequence:
-                    - name: name
-                    - propertyA: fieldA
-                    - propertyB: fieldB
-                  scalar: value
-              """,
-            """
-              foo:
-                bar:
-                  # Some comments
-                  sequence:
-                    - name: name
-                    - propertyA: fieldA
-                    - propertyB: fieldB
-                  scalar: value
               """
           )
         );

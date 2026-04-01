@@ -27,12 +27,36 @@ import static org.openrewrite.properties.Assertions.properties;
 @SuppressWarnings("UnusedProperty")
 class AddPropertyTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void newProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            null,
+            null,
+            null
+          )),
+          properties(
+            """
+              management=true
+              """,
+            """
+              management=true
+              management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
     @Test
     void emptyProperty() {
         rewriteRun(
           spec -> spec.recipe(new AddProperty(
             "",
             "true",
+            null,
             null,
             null
           )),
@@ -51,6 +75,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "",
             null,
+            null,
             null
           )),
           properties(
@@ -68,32 +93,11 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
-            null
-          )),
-          properties(
-            """
-              management.metrics.enable.process.files=true
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void newProperty() {
-        rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
             null,
             null
           )),
           properties(
             """
-              management=true
-              """,
-            """
-              management=true
               management.metrics.enable.process.files=true
               """
           )
@@ -108,7 +112,8 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
-            ":"
+            ":",
+            null
           )),
           properties(
             """
@@ -130,7 +135,8 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
-            "    "
+            "    ",
+            null
           )),
           properties(
             """
@@ -151,6 +157,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
+            null,
             null
           )),
           properties(
@@ -169,6 +176,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             "Management metrics",
+            null,
             null
           )),
           properties(
@@ -188,6 +196,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             "Management metrics",
+            null,
             null
           )),
           properties(
@@ -208,6 +217,7 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             null,
+            null,
             null
           )),
           properties(
@@ -221,7 +231,7 @@ class AddPropertyTest implements RewriteTest {
               management.metrics.enable.process.files=true
               """,
             spec -> spec.afterRecipe(after -> {
-                Properties.Entry entry = (Properties.Entry) after.getContent().get(0);
+                var entry = (Properties.Entry) after.getContent().getFirst();
                 assertThat(entry.getValue().getText()).isEqualTo("true");
                 assertThat(entry.getValue().getSource()).isEqualTo("tr\\\n  ue");
             })
@@ -236,6 +246,7 @@ class AddPropertyTest implements RewriteTest {
             "com.sam",
             "true",
             "sam",
+            null,
             null
           )),
           properties(
@@ -246,7 +257,8 @@ class AddPropertyTest implements RewriteTest {
               # sam
               com.sam=true
               com.zoe=true
-              """)
+              """
+          )
         );
     }
 
@@ -257,6 +269,7 @@ class AddPropertyTest implements RewriteTest {
             "com.sam",
             "true",
             "sam",
+            null,
             null
           )),
           properties(
@@ -281,7 +294,8 @@ class AddPropertyTest implements RewriteTest {
               com.seb=true
               # zoe
               com.zoe=true
-              """)
+              """
+          )
         );
     }
 
@@ -292,6 +306,7 @@ class AddPropertyTest implements RewriteTest {
             "com.sam",
             "true",
             "sam",
+            null,
             null
           )),
           properties(
@@ -302,7 +317,46 @@ class AddPropertyTest implements RewriteTest {
               com.amy=true
               # sam
               com.sam=true
-              """)
+              """
+          )
         );
     }
+
+    @Test
+    void unorderedInsertion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            "sam",
+            null,
+            false
+          )),
+          properties(
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              """,
+            """
+              # amy
+              com.amy=true
+              # bea
+              com.bea=true
+              # seb
+              com.seb=true
+              # zoe
+              com.zoe=true
+              # sam
+              com.sam=true
+              """
+          )
+        );
+    }
+
 }

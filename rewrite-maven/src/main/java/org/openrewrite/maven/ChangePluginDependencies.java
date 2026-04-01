@@ -27,8 +27,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterChildren;
 
@@ -56,20 +56,14 @@ public class ChangePluginDependencies extends Recipe {
     @Nullable
     String dependencies;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven plugin dependencies";
-    }
+    String displayName = "Change Maven plugin dependencies";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("for `%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Applies the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
-    }
+    String description = "Applies the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -85,7 +79,7 @@ public class ChangePluginDependencies extends Recipe {
                                 String[] gavs = gav.split(":");
                                 return "<dependency>\n<groupId>" + gavs[0] + "</groupId>\n<artifactId>" + gavs[1] +
                                        "</artifactId>\n<version>" + gavs[2] + "</version>\n</dependency>";
-                            }).collect(Collectors.joining("\n")) +
+                            }).collect(joining("\n")) +
                     "\n</dependencies>\n");
         }
         return new MavenVisitor<ExecutionContext>() {

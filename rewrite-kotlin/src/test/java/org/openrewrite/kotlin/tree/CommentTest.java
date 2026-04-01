@@ -77,17 +77,17 @@ class CommentTest implements RewriteTest {
           kotlin(
             """
               // C1
-              
+
               // C2
               open class Test {
-                  // C3  
-                  
+                  // C3
+
                   // C4
                   internal val n = 0
 
                   // C5
-                  
-                  // C6 
+
+                  // C6
                   internal fun method() {
                   }
               }
@@ -158,7 +158,7 @@ class CommentTest implements RewriteTest {
           kotlin(
             """
               class T () {
-              }/**/ 
+              }/**/
               """
           )
         );

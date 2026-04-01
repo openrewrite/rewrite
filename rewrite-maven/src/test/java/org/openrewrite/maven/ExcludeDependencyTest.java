@@ -42,7 +42,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.3.6.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
@@ -67,7 +67,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.3.6.RELEASE</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <version>0.0.1-SNAPSHOT</version>
@@ -105,7 +105,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>2.4.0</version>
                 </parent>
-              
+
                 <groupId>com.example</groupId>
                 <artifactId>demo</artifactId>
                 <dependencies>
@@ -137,49 +137,6 @@ class ExcludeDependencyTest implements RewriteTest {
                           <groupId>junit</groupId>
                           <artifactId>junit</artifactId>
                           <version>4.13.2</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void excludeJUnitInCompileScope() {
-        rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
-          pomXml(
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            """
-              <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.neo4j</groupId>
-                          <artifactId>neo4j-ogm-core</artifactId>
-                          <version>3.2.21</version>
-                          <exclusions>
-                              <exclusion>
-                                  <groupId>junit</groupId>
-                                  <artifactId>junit</artifactId>
-                              </exclusion>
-                          </exclusions>
                       </dependency>
                   </dependencies>
               </project>
@@ -239,8 +196,7 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeAlsoWhereConflictOmitted() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
+          spec -> spec.recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
           pomXml(
             """
               <project>
@@ -290,6 +246,120 @@ class ExcludeDependencyTest implements RewriteTest {
                       <exclusion>
                         <groupId>org.apache.logging.log4j</groupId>
                         <artifactId>log4j-api</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void excludeFromEjbTypeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("org.projectlombok", "lombok", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <version>1.0.1.0</version>
+                    <type>ejb</type>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <version>1.0.1.0</version>
+                    <type>ejb</type>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5965")
+    @Test
+    void excludeFromManagedEjbTypeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("org.projectlombok", "lombok", null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>ru.send-to.ejb</groupId>
+                      <artifactId>EjbContext</artifactId>
+                      <version>1.0.1.0</version>
+                      <type>ejb</type>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <type>ejb</type>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>ru.send-to.ejb</groupId>
+                      <artifactId>EjbContext</artifactId>
+                      <version>1.0.1.0</version>
+                      <type>ejb</type>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>ru.send-to.ejb</groupId>
+                    <artifactId>EjbContext</artifactId>
+                    <type>ejb</type>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.projectlombok</groupId>
+                        <artifactId>lombok</artifactId>
                       </exclusion>
                     </exclusions>
                   </dependency>

@@ -44,7 +44,7 @@ public class ChangeTypeBenchmark {
 
     @Benchmark
     public void changeType(JavaCompilationUnitState state) {
-        new ChangeType("java.util.List", "java.util.Collection", null, null)
+        new ChangeType("java.util.List", "java.util.Collection", null)
                 .run(state.getSourceSet(), new InMemoryExecutionContext());
     }
 }

@@ -20,11 +20,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
-import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
@@ -92,6 +92,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.Import ||
                 tree instanceof J.ClassDeclaration ||
                 tree instanceof J.Label ||
+                tree instanceof J.Lambda.Parameters ||
                 tree instanceof J.DoWhileLoop ||
                 tree instanceof J.ArrayDimension) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
@@ -107,6 +108,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ForEachLoop.Control ||
                 tree instanceof J.WhileLoop ||
                 tree instanceof J.Case ||
+                tree instanceof J.Lambda ||
                 tree instanceof J.EnumValueSet ||
                 (tree instanceof J.Ternary && !wrappingStyle.getElvisExpressions().getUseContinuationIndent()) ||
                 (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation) &&
@@ -154,13 +156,17 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         if (parent != null && parent.getValue() instanceof J.Annotation) {
             parent.getParentOrThrow().putMessage("afterAnnotation", true);
         } else if (loc == Space.Location.BLOCK_PREFIX &&
-                ((J.Block) value).getMarkers().findFirst(OmitBraces.class).isPresent() &&
+                   (((J.Block) value).getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                   ((J.Block) value).getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent()) &&
                 ((J.Block) value).getStatements().isEmpty()) {
             return space;
         } else if (parent != null && !getCursor().getParentOrThrow().getPath(J.Annotation.class::isInstance).hasNext()) {
             // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
             alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
-                    !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
+                    !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation) &&
+                    //Unlike Java LST element, where the parent has a list of annotations, AnnotatedExpression has sibling annotation and Expression in this one.
+                    //As the getCursor().pollNearestMessage("afterAnnotation") will not have been null, still the message will be gone if it was an AnnotatedExpression so no further action needed.
+                    !(getCursor().getParentOrThrow().getValue() instanceof K.AnnotatedExpression);
 
             if ((loc == Space.Location.CLASS_KIND ||
                     loc == Space.Location.METHOD_DECLARATION_PREFIX) &&

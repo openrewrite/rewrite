@@ -27,8 +27,10 @@ import org.openrewrite.marker.Marker;
 
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -43,7 +45,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
     }
 
     public RemoveMethodInvocationsVisitor(List<String> methodSignatures) {
-        this(methodSignatures.stream().collect(Collectors.toMap(
+        this(methodSignatures.stream().collect(toMap(
             MethodMatcher::new,
             signature -> args -> true
         )));
@@ -235,11 +237,11 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         block = (J.Block) super.visitBlock(block, ctx);
         List<Statement> statements = block.getStatements();
         if (!statements.isEmpty() && statements.stream().allMatch(ToBeRemoved::hasMarker)) {
-            return ToBeRemoved.withMarker(block.withStatements(Collections.emptyList()));
+            return ToBeRemoved.withMarker(block.withStatements(emptyList()));
         }
 
         if (statementsCount > 0 && statements.isEmpty()) {
-            return ToBeRemoved.withMarker(block.withStatements(Collections.emptyList()));
+            return ToBeRemoved.withMarker(block.withStatements(emptyList()));
         }
 
         if (statements.stream().anyMatch(ToBeRemoved::hasMarker)) {
@@ -247,7 +249,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
             return block.withStatements(statements.stream()
                 .filter(s -> !ToBeRemoved.hasMarker(s) || s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSelect() instanceof J.MethodInvocation)
                 .map(s -> s instanceof J.MethodInvocation && ToBeRemoved.hasMarker(s) ? ((J.MethodInvocation) s).getSelect().withPrefix(s.getPrefix()) : s)
-                .collect(Collectors.toList()));
+                .collect(toList()));
         }
         return block;
     }

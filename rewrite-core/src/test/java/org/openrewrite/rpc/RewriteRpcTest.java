@@ -15,30 +15,41 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
-import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.*;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.time.Duration;
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -47,39 +58,136 @@ class RewriteRpcTest implements RewriteTest {
       .scanRuntimeClasspath("org.openrewrite.text")
       .build();
 
-    RewriteRpc server;
+    RecipeMarketplace marketplace;
     RewriteRpc client;
+    RewriteRpc server;
 
     @BeforeEach
     void before() throws IOException {
-        PipedOutputStream serverOut = new PipedOutputStream();
-        PipedOutputStream clientOut = new PipedOutputStream();
-        PipedInputStream serverIn = new PipedInputStream(clientOut);
-        PipedInputStream clientIn = new PipedInputStream(serverOut);
+        var serverOut = new PipedOutputStream();
+        var clientOut = new PipedOutputStream();
+        var serverIn = new PipedInputStream(clientOut);
+        var clientIn = new PipedInputStream(serverOut);
 
-        JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        marketplace = env.toMarketplace(runtimeClasspath());
 
-        JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+
+        client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
+          .batchSize(1);
+
+        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace, List.of(new TestRecipeBundleResolver()))
+          .batchSize(1);
     }
 
     @AfterEach
     void after() {
-        server.shutdown();
         client.shutdown();
+        server.shutdown();
     }
 
+    /**
+     * Verifies that getObject() uses remoteObjects (last synced state) as the
+     * diff baseline, not localObjects. When the local side modifies a tree
+     * (e.g., via a local recipe) before calling getObject(), the localObjects
+     * entry diverges from what the remote used as its baseline. Using
+     * localObjects would cause NO_CHANGE fields to retain the local
+     * modification rather than the synced value.
+     * <p>
+     * The bug only manifests for object fields (identity-compared via ==)
+     * where the sender emits NO_CHANGE. Here, the server changes only text
+     * (a value field), so Markers — an object field preserved by reference
+     * in withText() — is sent as NO_CHANGE. If the client locally created
+     * a different Markers object, the wrong baseline would retain it.
+     */
     @Test
-    void sendReceiveExecutionContext() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage("key", "value");
+    void getObjectUsesRemoteObjectsAsBaseline() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
 
-        client.localObjects.put("123", ctx);
-        InMemoryExecutionContext received = server.getObject("123");
-        assertThat(received.<String>getMessage("key")).isEqualTo("value");
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // Server has the tree; client fetches it → both synced
+        server.localObjects.put(id, original);
+        PlainText synced = client.getObject(id, sourceFileType);
+        UUID syncedMarkersId = synced.getMarkers().getId();
+
+        // Server modifies text only — Markers reference stays the same
+        // (original.withText() preserves the Markers by reference via @With),
+        // so the handler sends NO_CHANGE for the Markers field.
+        // Using original (not synced) ensures server's before == original.getMarkers()
+        // and after == original.withText(...).getMarkers() are the same reference.
+        server.localObjects.put(id, original.withText("Hello World"));
+
+        // Client locally modifies Markers (simulating a local recipe step),
+        // creating a new Markers object with a different ID
+        Markers localMarkers = synced.getMarkers().withId(Tree.randomId());
+        client.localObjects.put(id, synced.withMarkers(localMarkers));
+
+        // Fetch: server sends Markers=NO_CHANGE, text=CHANGE("Hello World").
+        // The receiver should apply NO_CHANGE against remoteObjects (synced
+        // markers), not localObjects (local markers).
+        PlainText result = client.getObject(id, sourceFileType);
+        assertThat(result.getText()).isEqualTo("Hello World");
+        assertThat(result.getMarkers().getId())
+          .describedAs("Markers should come from remoteObjects baseline, not localObjects")
+          .isEqualTo(syncedMarkersId);
+    }
+
+    /**
+     * Verifies that when getObject() fails mid-serialization on the sender side,
+     * the sender removes the stale entry from remoteObjects. This ensures that
+     * a subsequent getObject() for the same ID sends a full ADD (not a CHANGE
+     * delta against a partially-sent, stale baseline).
+     * <p>
+     * Without the fix, the sender would keep the stale remoteObjects entry and
+     * attempt a CHANGE diff on retry, causing cascading desync errors.
+     */
+    @Test
+    void sendFailureCleansUpRemoteObjects() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // Step 1: successful sync — both sides establish remoteObjects baseline
+        server.localObjects.put(id, original);
+        PlainText synced = client.getObject(id, sourceFileType);
+        assertThat(synced.getText()).isEqualTo("Hello");
+        assertThat(server.remoteObjects).containsKey(id);
+
+        // Step 2: replace with a PlainText that has null sourcePath, causing
+        // NPE in PlainTextRpcCodec.rpcSend() at d.getSourcePath().toString()
+        PlainText badTree = PlainText.builder()
+          .id(original.getId())
+          .text("Bad")
+          .build(); // no sourcePath → null → NPE during send
+        server.localObjects.put(id, badTree);
+
+        // Step 3: client.getObject() should fail because the sender NPEs mid-serialization
+        try {
+            client.getObject(id, sourceFileType);
+        } catch (Exception expected) {
+            // Expected — sender failed and emitted premature END_OF_OBJECT
+        }
+
+        // Step 4: verify the sender cleaned up its stale remoteObjects entry
+        assertThat(server.remoteObjects)
+          .describedAs("Sender should remove stale remoteObjects entry after send failure")
+          .doesNotContainKey(id);
+
+        // Step 5: put back a valid tree and retry — should succeed via full ADD
+        PlainText fixed = original.withText("Fixed");
+        server.localObjects.put(id, fixed);
+        PlainText result = client.getObject(id, sourceFileType);
+        assertThat(result.getText()).isEqualTo("Fixed");
     }
 
     @DocumentExample
@@ -87,10 +195,10 @@ class RewriteRpcTest implements RewriteTest {
     void sendReceiveIdempotence() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-              @SneakyThrows
               @Override
-              public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
-                  Tree t = server.visit((SourceFile) tree, ChangeText.class.getName(), 0);
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = client.visit((SourceFile) tree, ChangeText.class.getName(), 0);
                   stopAfterPreVisit();
                   return requireNonNull(t);
               }
@@ -102,35 +210,39 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Disabled("Print requires bidirectional RPC (GetObject callback) which deadlocks in the in-process test setup. " +
+              "Works correctly when calling to a real subprocess (e.g., Java to Python/JS).")
     @Test
     void print() {
         rewriteRun(
           text(
             "Hello Jon!",
             spec -> spec.beforeRecipe(text ->
-              assertThat(server.print(text)).isEqualTo("Hello Jon!"))
+              assertThat(client.print(text)).isEqualTo("Hello Jon!"))
           )
         );
     }
 
     @Test
-    void getRecipes() {
-        assertThat(server.getRecipes()).isNotEmpty();
+    void getMarketplace() {
+        assertThat(client.getMarketplace(new RecipeBundle("runtime",
+          "", null, null, null)).getAllRecipes()).isNotEmpty();
     }
 
     @Test
     void prepareRecipe() {
-        Recipe recipe = server.prepareRecipe("org.openrewrite.text.Find",
+        Recipe recipe = client.prepareRecipe("org.openrewrite.text.Find",
           Map.of("find", "hello"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
     }
 
+    @Disabled("Disabled until https://github.com/openrewrite/rewrite/pull/5260 is complete")
     @Test
     void runRecipe() {
-        CountDownLatch latch = new CountDownLatch(1);
+        var latch = new CountDownLatch(1);
         rewriteRun(
           spec -> spec
-            .recipe(server.prepareRecipe("org.openrewrite.text.Find",
+            .recipe(client.prepareRecipe("org.openrewrite.text.Find",
               Map.of("find", "hello")))
             .validateRecipeSerialization(false)
             .dataTable(TextMatches.Row.class, rows -> {
@@ -152,7 +264,7 @@ class RewriteRpcTest implements RewriteTest {
     void runScanningRecipeThatGenerates() {
         rewriteRun(
           spec -> spec
-            .recipe(server.prepareRecipe("org.openrewrite.text.CreateTextFile",
+            .recipe(client.prepareRecipe("org.openrewrite.text.CreateTextFile",
               Map.of("fileContents", "hello", "relativeFileName", "hello.txt")))
             .validateRecipeSerialization(false),
           text(
@@ -167,7 +279,7 @@ class RewriteRpcTest implements RewriteTest {
     void runRecipeWithRecipeList() {
         rewriteRun(
           spec -> spec
-            .recipe(server.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$RecipeWithRecipeList", Map.of()))
+            .recipe(client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$RecipeWithRecipeList", Map.of()))
             .validateRecipeSerialization(false),
           text(
             "hi",
@@ -176,13 +288,138 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    /**
+     * When a composite recipe has consecutive sub-recipes that are all RpcRecipes
+     * bound to the same RewriteRpc instance, the scheduler batches them into a
+     * single BatchVisit RPC call. The remote runs all visitors in sequence and
+     * the host fetches the final result at the end. This test verifies that
+     * two consecutive same-RPC ChangeText recipes produce the correct final output.
+     */
+    @Test
+    void consecutiveSameRpcRecipesAreBatchedAndProduceCorrectResult() {
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step1"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "step2"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r1, r2)))
+            .validateRecipeSerialization(false)
+            // Consecutive ChangeText recipes aren't idempotent (r1 re-applies in cycle 2).
+            // We only need 1 cycle to verify deferral correctness.
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "step2"
+          )
+        );
+    }
+
+    /**
+     * Verifies three consecutive same-RPC recipes. The scheduler should batch
+     * all three into one BatchVisit and fetch only once at the end.
+     */
+    @Test
+    void threeConsecutiveSameRpcRecipes() {
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "C"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
+            .validateRecipeSerialization(false)
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "C"
+          )
+        );
+    }
+
+    /**
+     * When a batch contains recipes where only some modify the tree,
+     * only those recipes should appear in the RecipesThatMadeChanges marker.
+     * Previously, all recipes in the batch were attributed regardless of
+     * whether they actually modified the tree.
+     */
+    @Test
+    void batchOnlyAttributesRecipesThatActuallyMadeChanges() {
+        Recipe r1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "A"));
+        Recipe r2 = client.prepareRecipe("org.openrewrite.text.Find", Map.of("find", "NOMATCH_PATTERN"));
+        Recipe r3 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "B"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r1, r2, r3)))
+            .validateRecipeSerialization(false)
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "B",
+            spec -> spec.afterRecipe(result -> {
+                RecipesThatMadeChanges marker = result.getMarkers()
+                  .findFirst(RecipesThatMadeChanges.class)
+                  .orElseThrow(() -> new AssertionError("Expected RecipesThatMadeChanges marker"));
+                List<String> recipeNames = marker.getRecipes().stream()
+                  .map(stack -> stack.get(stack.size() - 1).getName())
+                  .toList();
+                assertThat(recipeNames)
+                  .describedAs("Only recipes that modified the tree should be attributed")
+                  .contains("org.openrewrite.text.ChangeText")
+                  .doesNotContain("org.openrewrite.text.Find");
+            })
+          )
+        );
+    }
+
+    /**
+     * When a batch of same-RPC recipes is followed by a non-RPC recipe,
+     * the scheduler should flush the batch at the boundary and
+     * then run the non-RPC recipe on the fetched result.
+     */
+    @Test
+    void sameRpcBatchFollowedByNonRpcRecipe() {
+        Recipe rpc1 = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "from-rpc"));
+        Recipe local = new org.openrewrite.text.ChangeText("from-local");
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(rpc1, local)))
+            .validateRecipeSerialization(false)
+            .expectedCyclesThatMakeChanges(2),
+          text(
+            "hello",
+            "from-local"
+          )
+        );
+    }
+
+    /**
+     * A single RPC recipe (no consecutive same-RPC peer) should behave
+     * identically to the non-batched path — no batching, immediate getObject.
+     */
+    @Test
+    void singleRpcRecipeNoBatch() {
+        Recipe r = client.prepareRecipe("org.openrewrite.text.ChangeText", Map.of("toText", "only"));
+
+        rewriteRun(
+          spec -> spec
+            .recipe(new CompositeRecipe(List.of(r)))
+            .validateRecipeSerialization(false),
+          text(
+            "hello",
+            "only"
+          )
+        );
+    }
+
     @Test
     void getCursor() {
-        Cursor parent = new Cursor(null, Cursor.ROOT_VALUE);
-        Cursor c1 = new Cursor(parent, 0);
-        Cursor c2 = new Cursor(c1, 1);
+        var parent = new Cursor(null, Cursor.ROOT_VALUE);
+        var c1 = new Cursor(parent, 0);
+        var c2 = new Cursor(c1, 1);
 
-        Cursor clientC2 = client.getCursor(server.getCursorIds(c2));
+        Cursor clientC2 = server.getCursor(client.getCursorIds(c2), null);
         assertThat(clientC2.<Integer>getValue()).isEqualTo(1);
         assertThat(clientC2.getParentOrThrow().<Integer>getValue()).isEqualTo(0);
         assertThat(clientC2.getParentOrThrow(2).<String>getValue()).isEqualTo(Cursor.ROOT_VALUE);
@@ -210,6 +447,43 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public void buildRecipeList(RecipeList recipes) {
             recipes.recipe(new org.openrewrite.text.ChangeText("hello"));
+        }
+    }
+
+    /**
+     * A trivial resolver for testing that returns the existing marketplace without
+     * requiring any actual dependency resolution.
+     */
+    class TestRecipeBundleResolver implements RecipeBundleResolver {
+        @Override
+        public String getEcosystem() {
+            return "runtime";
+        }
+
+        @Override
+        public RecipeBundleReader resolve(RecipeBundle bundle) {
+            return new RecipeBundleReader() {
+                @Override
+                public RecipeBundle getBundle() {
+                    return bundle;
+                }
+
+                @Override
+                public RecipeMarketplace read() {
+                    return marketplace;
+                }
+
+                @Override
+                public RecipeDescriptor describe(RecipeListing listing) {
+                    return env.activateRecipes(listing.getName()).getDescriptor();
+                }
+
+                @Override
+                public Recipe prepare(RecipeListing listing, Map<String, Object> options) {
+                    // Use RecipeLoader to instantiate directly, avoiding recursive marketplace lookup
+                    return new RecipeLoader(null).load(listing.getName(), options);
+                }
+            };
         }
     }
 }

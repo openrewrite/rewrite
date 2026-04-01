@@ -39,7 +39,7 @@ class EndOfLineAtEndOfFileTest implements RewriteTest {
               """,
             """
               This is text.
-              
+
               """,
             spec -> spec.path("test.yml")
           )
@@ -55,7 +55,7 @@ class EndOfLineAtEndOfFileTest implements RewriteTest {
               """,
             """
               This is text.
-              
+
               """
           )
         );

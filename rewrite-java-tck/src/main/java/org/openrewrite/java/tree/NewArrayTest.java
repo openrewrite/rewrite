@@ -97,7 +97,7 @@ class NewArrayTest implements RewriteTest {
               public @interface Produces {
                   String[] value() default "*/*";
               }
-              
+
               @Produces({"something"}) class A {}
               """
           )

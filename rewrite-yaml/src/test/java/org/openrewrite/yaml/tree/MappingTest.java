@@ -19,8 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml.Scalar;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -60,7 +65,7 @@ class MappingTest implements RewriteTest {
               name : org.openrewrite.text.ChangeTextToJon
               """,
             spec -> spec.afterRecipe(y -> {
-                assertThat(((Yaml.Mapping) (y.getDocuments().get(0).getBlock())).getEntries().stream()
+                assertThat(((Yaml.Mapping) (y.getDocuments().getFirst().getBlock())).getEntries().stream()
                   .map(e -> (Scalar) e.getKey())
                   .map(Scalar::getValue)).containsExactly("type", "name");
             })
@@ -77,11 +82,11 @@ class MappingTest implements RewriteTest {
                       name: org.openrewrite.text.ChangeTextToJon
               """,
             spec -> spec.afterRecipe(y -> {
-                Yaml.Mapping mapping = (Yaml.Mapping) y.getDocuments().get(0).getBlock();
+                var mapping = (Yaml.Mapping) y.getDocuments().getFirst().getBlock();
                 assertThat(mapping.getEntries().stream()
                   .map(e -> (Scalar) e.getKey())
                   .map(Scalar::getValue)).containsExactly("type");
-                assertThat(mapping.getEntries().get(0).getValue()).isInstanceOf(Yaml.Mapping.class);
+                assertThat(mapping.getEntries().getFirst().getValue()).isInstanceOf(Yaml.Mapping.class);
             })
           )
         );
@@ -141,8 +146,8 @@ class MappingTest implements RewriteTest {
               baz: foo
               """,
             spec -> spec.afterRecipe(documents -> {
-                var doc = documents.getDocuments().get(0);
-                Yaml.Mapping mapping = (Yaml.Mapping) doc.getBlock();
+                var doc = documents.getDocuments().getFirst();
+                var mapping = (Yaml.Mapping) doc.getBlock();
                 assertThat(mapping.getEntries().size()).isEqualTo(2);
 
                 var bazFooEntry = mapping.getEntries().get(1);
@@ -177,7 +182,7 @@ class MappingTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(docs -> {
                 assertThat(docs.getDocuments().size()).isEqualTo(2);
-                var doc = docs.getDocuments().get(0);
+                var doc = docs.getDocuments().getFirst();
                 assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre\n");
                 assertThat(doc.getEnd().getPrefix()).isEqualTo("\n# doc-1-end\n");
                 var doc2 = docs.getDocuments().get(1);
@@ -196,7 +201,7 @@ class MappingTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(docs -> {
                 assertThat(docs.getDocuments().size()).isEqualTo(1);
-                var doc = docs.getDocuments().get(0);
+                var doc = docs.getDocuments().getFirst();
                 assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre");
             })
           )
@@ -225,6 +230,46 @@ class MappingTest implements RewriteTest {
                     data :
                       test : 0
               """
+          )
+        );
+    }
+
+    @Test
+    void keysWithDashes() {
+        rewriteRun(
+          yaml(
+            """
+            foo-bar: 1
+            foo-bar-baz: 2
+            foo-: 3
+            -foo: 4
+            """
+          )
+        );
+    }
+
+    @Test
+    void keysWithDashesAnchored() {
+        rewriteRun(
+          yaml(
+            """
+            -data: &first
+              test: 0
+            """
+          )
+        );
+    }
+
+    @Test
+    void keysWithDashesInsideSequence() {
+        rewriteRun(
+          yaml(
+            """
+            - foo-bar: 1
+            - bar-baz-qux: 2
+            - nested:
+                deep-key-name: 3
+            """
           )
         );
     }
@@ -408,6 +453,27 @@ class MappingTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mappingSequenceWithAnchor() {
+        rewriteRun(
+          yaml(
+              """
+              defaults:
+                - &first
+                  A: 1
+                  B: 2
+              mapping:
+                - &first
+                  A: 1
+                  B: 2
+                - <<: *first
+                  A: 23
+                  C: 99
+              """
+          )
+        );
+    }
+
     // https://github.com/yaml/yaml-grammar/blob/master/yaml-spec-1.2.txt#L1914
     @ParameterizedTest
     @ValueSource(strings = {
@@ -439,5 +505,28 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml("escaped-value: " + str)
         );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2045")
+    @Test
+    void complexMappingKeyDoesNotCrash() {
+        // Complex YAML keys (mappings/sequences as keys) are not fully supported
+        // by the YamlKey model, but should not cause NPE or ClassCastException.
+        // They gracefully degrade to ParseError.
+        List<SourceFile> sources = YamlParser.builder().build()
+                .parse("? key1: val1\n: value\n")
+                .toList();
+        assertThat(sources).hasSize(1);
+        assertThat(sources.get(0)).isInstanceOf(ParseError.class);
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2045")
+    @Test
+    void complexSequenceKeyDoesNotCrash() {
+        List<SourceFile> sources = YamlParser.builder().build()
+                .parse("? - item1\n  - item2\n: value\n")
+                .toList();
+        assertThat(sources).hasSize(1);
+        assertThat(sources.get(0)).isInstanceOf(ParseError.class);
     }
 }

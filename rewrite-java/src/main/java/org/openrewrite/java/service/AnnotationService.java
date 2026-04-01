@@ -15,13 +15,18 @@
  */
 package org.openrewrite.java.service;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
@@ -114,5 +119,145 @@ public class AnnotationService {
 
     private List<J.Annotation> getAllAnnotations(J.Identifier identifier) {
         return identifier.getAnnotations();
+    }
+
+    /**
+     * Checks if the given element has the specified annotation,
+     * searching through type information including:
+     * - Direct annotations on the element
+     * - Inherited annotations from parent classes (for class declarations)
+     * - Inherited annotations from overridden methods (for method declarations)
+     * - Meta-annotations (annotations on annotations)
+     *
+     * @param j The element to check (J.ClassDeclaration, J.MethodDeclaration, or J.VariableDeclarations)
+     * @param annotationFqn The fully qualified name of the annotation to search for
+     * @return true if the annotation is found anywhere in the hierarchy, false otherwise
+     */
+    public boolean isAnnotatedWith(J j, String annotationFqn) {
+        return isAnnotatedWith(j, annotationFqn, true);
+    }
+
+    /**
+     * Checks if the given element has the specified annotation,
+     * searching through type information including:
+     * - Direct annotations on the element
+     * - Inherited annotations from parent classes (for class declarations)
+     * - Inherited annotations from overridden methods (for method declarations)
+     * - Optionally, meta-annotations (annotations on annotations)
+     *
+     * @param j The element to check (J.ClassDeclaration, J.MethodDeclaration, or J.VariableDeclarations)
+     * @param annotationFqn The fully qualified name of the annotation to search for
+     * @param includeMetaAnnotations Whether to search for meta-annotations (annotations on annotations)
+     * @return true if the annotation is found anywhere in the hierarchy, false otherwise
+     */
+    public boolean isAnnotatedWith(J j, String annotationFqn, boolean includeMetaAnnotations) {
+        return !annotatedWith(j, annotationFqn, includeMetaAnnotations).isEmpty();
+    }
+
+    /**
+     * Finds all instances of the specified annotation in the type hierarchy,
+     * including direct annotations, inherited annotations, and meta-annotations.
+     *
+     * @param j The element to check (J.ClassDeclaration, J.MethodDeclaration, or J.VariableDeclarations)
+     * @param annotationFqn The fully qualified name of the annotation to search for
+     * @return A list of all matching annotations found in the hierarchy
+     */
+    public List<JavaType.FullyQualified> annotatedWith(J j, String annotationFqn) {
+        return annotatedWith(j, annotationFqn, true);
+    }
+
+    /**
+     * Finds all instances of the specified annotation in the type hierarchy,
+     * including direct annotations, inherited annotations, and optionally meta-annotations.
+     *
+     * @param j The element to check (J.ClassDeclaration, J.MethodDeclaration, or J.VariableDeclarations)
+     * @param annotationFqn The fully qualified name of the annotation to search for
+     * @param includeMetaAnnotations Whether to search for meta-annotations (annotations on annotations)
+     * @return A list of all matching annotations found in the hierarchy
+     */
+    public List<JavaType.FullyQualified> annotatedWith(J j, String annotationFqn, boolean includeMetaAnnotations) {
+        List<JavaType.FullyQualified> result = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+
+        if (j instanceof J.ClassDeclaration) {
+            J.ClassDeclaration classDecl = (J.ClassDeclaration) j;
+            JavaType.FullyQualified type = TypeUtils.asFullyQualified(classDecl.getType());
+            if (type != null) {
+                collectClassAnnotations(type, annotationFqn, result, visited, includeMetaAnnotations);
+            }
+        } else if (j instanceof J.MethodDeclaration) {
+            J.MethodDeclaration methodDecl = (J.MethodDeclaration) j;
+            if (methodDecl.getMethodType() != null) {
+                collectMethodAnnotations(methodDecl.getMethodType(), annotationFqn, result, visited, includeMetaAnnotations);
+            }
+        } else if (j instanceof J.VariableDeclarations) {
+            J.VariableDeclarations varDecls = (J.VariableDeclarations) j;
+            for (J.Annotation ann : getAllAnnotations(varDecls)) {
+                JavaType.FullyQualified annType = TypeUtils.asFullyQualified(ann.getType());
+                if (annType != null) {
+                    collectAnnotationAndMeta(annType, annotationFqn, result, visited, includeMetaAnnotations);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private void collectClassAnnotations(JavaType.FullyQualified type, String annotationFqn,
+                                        List<JavaType.FullyQualified> result, Set<String> visited,
+                                        boolean includeMetaAnnotations) {
+        if (!visited.add(type.getFullyQualifiedName())) {
+            return;
+        }
+
+        for (JavaType.FullyQualified annotation : type.getAnnotations()) {
+            collectAnnotationAndMeta(annotation, annotationFqn, result, visited, includeMetaAnnotations);
+        }
+
+        JavaType.@Nullable FullyQualified supertype = type.getSupertype();
+        if (supertype != null && !(supertype instanceof JavaType.Unknown)) {
+            collectClassAnnotations(supertype, annotationFqn, result, visited, includeMetaAnnotations);
+        }
+
+        for (JavaType.FullyQualified _interface : type.getInterfaces()) {
+            if (!(_interface instanceof JavaType.Unknown)) {
+                collectClassAnnotations(_interface, annotationFqn, result, visited, includeMetaAnnotations);
+            }
+        }
+    }
+
+    private void collectMethodAnnotations(JavaType.Method method, String annotationFqn,
+                                         List<JavaType.FullyQualified> result, Set<String> visited,
+                                         boolean includeMetaAnnotations) {
+        for (JavaType.FullyQualified annotation : method.getAnnotations()) {
+            collectAnnotationAndMeta(annotation, annotationFqn, result, visited, includeMetaAnnotations);
+        }
+
+        JavaType.Method override = method.getOverride();
+        if (override != null) {
+            collectMethodAnnotations(override, annotationFqn, result, visited, includeMetaAnnotations);
+        }
+    }
+
+    private void collectAnnotationAndMeta(JavaType.FullyQualified annotation, String annotationFqn,
+                                         List<JavaType.FullyQualified> result, Set<String> visited,
+                                         boolean includeMetaAnnotations) {
+        String annFqn = annotation.getFullyQualifiedName();
+        if (visited.contains(annFqn)) {
+            return;
+        }
+
+        if (TypeUtils.isAssignableTo(annotationFqn, annotation)) {
+            result.add(annotation);
+        }
+
+        visited.add(annFqn);
+
+        // Check meta-annotations (annotations on this annotation) if enabled
+        if (includeMetaAnnotations && !annFqn.startsWith("java.lang.annotation.") && !annFqn.startsWith("jdk.internal.")) {
+            for (JavaType.FullyQualified metaAnnotation : annotation.getAnnotations()) {
+                collectAnnotationAndMeta(metaAnnotation, annotationFqn, result, visited, includeMetaAnnotations);
+            }
+        }
     }
 }

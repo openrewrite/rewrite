@@ -17,12 +17,12 @@ package org.openrewrite.yaml;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
+import org.openrewrite.yaml.MergeYaml.InsertMode;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -36,8 +36,8 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
-import static org.openrewrite.yaml.MergeYaml.*;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
+import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 /**
  * Visitor class to merge two yaml files.
@@ -86,14 +86,6 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     public MergeYamlVisitor(Yaml.Block block, Yaml incoming, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, boolean shouldAutoFormat, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
         this(block, incoming, acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
         this.shouldAutoFormat = shouldAutoFormat;
-    }
-
-    /**
-     * @deprecated Use {@link #MergeYamlVisitor(Yaml.Block, Yaml, boolean, String, boolean, InsertMode, String)} instead.
-     */
-    @Deprecated
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
-        this(scope, MergeYaml.parse(yamlString), acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
     }
 
     @Override
@@ -207,27 +199,37 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     String partOne = substringOfBeforeFirstLineBreak(afterInsertEntry.getPrefix());
                     String partTwo = substringOfAfterFirstLineBreak(afterInsertEntry.getPrefix());
 
-                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(partOne + firstNewlyAddedEntry.getPrefix()));
+                    String newFirstPrefix = partOne + firstNewlyAddedEntry.getPrefix();
+                    if (afterInsertEntry.getPrefix().isEmpty() && partOne.isEmpty() && newFirstPrefix.startsWith("\n")) {
+                        // Remove leading newline since the previous element already provides line separation
+                        newFirstPrefix = newFirstPrefix.substring(1);
+                    }
+
+                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(newFirstPrefix));
                     mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + partTwo));
                 }
             } else {
-               Cursor c = getCursor().dropParentUntil(it -> {
-                   if (ROOT_VALUE.equals(it) || it instanceof Yaml.Document) {
-                       return true;
-                   }
+                Cursor c = getCursor().dropParentUntil(it -> {
+                    if (ROOT_VALUE.equals(it) || it instanceof Yaml.Document) {
+                        return true;
+                    }
 
-                   if (it instanceof Yaml.Mapping) {
-                       List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
-                       // At least two entries and when current elem is the last entry should not be current entry
-                       return entries.size() > 1 && !entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue());
-                   }
+                    if (it instanceof Yaml.Mapping) {
+                        List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
+                        // At least two entries and when current elem is the last entry should not be current entry
+                        return entries.size() > 1 && !entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue());
+                    }
 
-                   return false;
-               });
+                    return false;
+                });
 
                 String comment = null;
                 if (c.getValue() instanceof Yaml.Document) {
-                    comment = c.<Yaml.Document>getValue().getEnd().getPrefix();
+                    Yaml.Document doc = c.getValue();
+                    // Don't treat document end prefix as comment if it contains a document separator
+                    if (!preserveDocumentSeparator(doc)) {
+                        comment = doc.getEnd().getPrefix();
+                    }
                 } else if (c.getValue() instanceof Yaml.Mapping) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
@@ -263,7 +265,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private void removePrefixForDirectChildren(List<Yaml.Mapping.Entry> m1Entries, List<Yaml.Mapping.Entry> mutatedEntries) {
         for (int i = 0; i < m1Entries.size() - 1; i++) {
             if (m1Entries.get(i).getValue() instanceof Yaml.Mapping && mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
-                ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
+                    ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
                 mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix(
                         linebreak() + substringOfAfterFirstLineBreak(mutatedEntries.get(i + 1).getPrefix())));
             }
@@ -294,7 +296,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
             String currentIndent = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
             List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(currentIndent));
-            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> ((Yaml.Scalar) it.getBlock()).getValue()).ls;
+            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> {
+                if (it.getBlock() instanceof Yaml.Scalar) {
+                    return ((Yaml.Scalar) it.getBlock()).getValue();
+                } else if (it.getBlock() instanceof Yaml.Mapping) {
+                    Yaml.Mapping.Entry entry = ((Yaml.Mapping) it.getBlock()).getEntries().get(0);
+                    return entry.getKey().getValue();
+                }
+                return "";
+            }).ls;
 
             return s1.withEntries(mutatedEntries);
         }
@@ -342,7 +352,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
      */
     private <T> ListConcat<T> concatAll(List<T> ls, List<T> t, Function<T, String> getValue) {
         if (insertMode == null || insertMode == Last || insertProperty == null || t.isEmpty()) {
-            return new ListConcat<>(ListUtils.concatAll(ls, t), -1,-1);
+            return new ListConcat<>(ListUtils.concatAll(ls, t), -1, -1);
         }
 
         List<T> mutatedEntries = new ArrayList<>();
@@ -389,8 +399,23 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {
         String[] lines = LINE_BREAK.split(entry.getPrefix(), -1);
-        int keyIndent  = (lines.length > 1 ? lines[lines.length - 1] : "").length();
+        int keyIndent = (lines.length > 1 ? lines[lines.length - 1] : "").length();
         int indent = minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
         return Math.max(indent - keyIndent, 0);
+    }
+
+    private boolean preserveDocumentSeparator(Yaml.Document document) {
+        // Check if this document is part of a multi-document YAML with a following explicit document
+        Yaml.Documents documents = getCursor().firstEnclosing(Yaml.Documents.class);
+        if (documents != null) {
+            int currentIndex = documents.getDocuments().indexOf(document);
+            // Preserve a newline before the next document separator
+            if (0 <= currentIndex && currentIndex < documents.getDocuments().size() - 1) {
+                return documents.getDocuments().get(currentIndex + 1).isExplicit();
+            }
+            // Or if this is the last document and it has an explicit end
+            return currentIndex == documents.getDocuments().size() - 1 && document.getEnd().isExplicit();
+        }
+        return false;
     }
 }

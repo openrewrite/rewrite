@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.ScanningRecipe;
@@ -36,15 +37,11 @@ import static java.util.Collections.emptyList;
 public class ClasspathTypeCounts extends ScanningRecipe<Set<ClasspathTypeCounts.ProjectSourceSet>> {
     private final transient ClasspathTypeCount counts = new ClasspathTypeCount(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Study the size of the classpath by source set";
-    }
+    @Getter
+    final String displayName = "Study the size of the classpath by source set";
 
-    @Override
-    public String getDescription() {
-        return "Emit one data table row per source set in a project, with the number of types in the source set.";
-    }
+    @Getter
+    final String description = "Emit one data table row per source set in a project, with the number of types in the source set.";
 
     @Override
     public Set<ProjectSourceSet> getInitialValue(ExecutionContext ctx) {

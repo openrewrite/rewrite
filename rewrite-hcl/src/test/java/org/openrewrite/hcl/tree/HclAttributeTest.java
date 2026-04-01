@@ -26,6 +26,35 @@ import static org.openrewrite.hcl.Assertions.hcl;
 
 class HclAttributeTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void attributeValue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
+                  @Override
+                  public Hcl visitBlock(Hcl.Block block, ExecutionContext executionContext) {
+                      assertThat(block.<String>getAttributeValue("key"))
+                        .isEqualTo("hello");
+                      return block.withAttributeValue("key", "goodbye");
+                  }
+              }
+            ).withMaxCycles(1)),
+          hcl(
+            """
+              provider {
+                  key = "hello"
+              }
+              """,
+            """
+              provider {
+                  key = "goodbye"
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void attribute() {
         rewriteRun(
@@ -52,29 +81,18 @@ class HclAttributeTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
-    void attributeValue() {
+    void objectKey() {
         rewriteRun(
-          spec -> spec
-            .recipe(RewriteTest.toRecipe(() -> new HclVisitor<ExecutionContext>() {
-                  @Override
-                  public Hcl visitBlock(Hcl.Block block, ExecutionContext executionContext) {
-                      assertThat(block.<String>getAttributeValue("key"))
-                        .isEqualTo("hello");
-                      return block.withAttributeValue("key", "goodbye");
-                  }
-              }
-            ).withMaxCycles(1)),
           hcl(
             """
-              provider {
-                  key = "hello"
-              }
-              """,
-            """
-              provider {
-                  key = "goodbye"
+              terraform {
+                required_providers {
+                  null = {
+                    source = "hashicorp/null"
+                    version = "=3.2.3"
+                  }
+                }
               }
               """
           )

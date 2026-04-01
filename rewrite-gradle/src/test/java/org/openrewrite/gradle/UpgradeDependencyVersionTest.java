@@ -16,19 +16,25 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
 
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.list;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
@@ -127,10 +133,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
     void mockitoTestImplementation() {
-        rewriteRun(recipeSpec -> {
+        rewriteRun(recipeSpec ->
               recipeSpec.beforeRecipe(withToolingApi())
-                .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null));
-          },
+                .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null)),
           buildGradle(
             """
               plugins {
@@ -221,6 +226,35 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void updateVersionInVariableToRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot", "3.5.x", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              def springBootVersion = '3.1.5'
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation ("org.springframework.boot:spring-boot:$springBootVersion")
+              }
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .containsPattern("def springBootVersion = '3.5.\\d+'")
+                .actual()
+            )
+          )
+        );
+    }
+
+    @Test
     void deeplyNestedProjectDependency() {
         rewriteRun(
           buildGradle(
@@ -285,7 +319,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   'com.google.guava:guava-gwt:29.0-jre',
                   'com.google.guava:guava:30.1.1-jre')
               }
-              """)
+              """
+          )
         );
     }
 
@@ -359,6 +394,237 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiComponentLiteralNotation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava", "guava", "29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("com.google.guava", "guava", "30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceNotation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceWithExtraProperties() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+              extra["guavaVersion"] = guavaVersion
+
+              dependencies {
+                  implementation("com.google.guava", "guava", guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiComponentVariableReferenceSharedAcrossMultipleDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.awspring.cloud", "*", "3.4.2", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val awsVersion = "3.3.1"
+
+              dependencies {
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter", awsVersion)
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter-sqs", awsVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val awsVersion = "3.4.2"
+
+              dependencies {
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter", awsVersion)
+                  implementation("io.awspring.cloud", "spring-cloud-aws-starter-sqs", awsVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
+    void mapNotationGStringInterpolation(String stringInterpolationReference) {
+        rewriteRun(
+          buildGradle(
+                  """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              def guavaVersion = '29.0-jre'
+
+              dependencies {
+                implementation(group: "com.google.guava", name: "guava", version: "%s")
+              }
+              """.formatted(stringInterpolationReference),
+                  """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              def guavaVersion = '30.1.1-jre'
+
+              dependencies {
+                implementation(group: "com.google.guava", name: "guava", version: "%s")
+              }
+              """.formatted(stringInterpolationReference)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"$guavaVersion", "${guavaVersion}"})
+    void mapNotationKStringTemplateInterpolation(String stringInterpolationReference) {
+        rewriteRun(
+          buildGradleKts(
+                  """
+              plugins {
+                `java-library`
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              val guavaVersion = "29.0-jre"
+
+              dependencies {
+                implementation(group = "com.google.guava", name = "guava", version = "%s")
+              }
+              """.formatted(stringInterpolationReference),
+                  """
+              plugins {
+                `java-library`
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              val guavaVersion = "30.1.1-jre"
+
+              dependencies {
+                implementation(group = "com.google.guava", name = "guava", version = "%s")
+              }
+              """.formatted(stringInterpolationReference)
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3227")
     @Test
     void worksWithPlatform() {
@@ -388,6 +654,45 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                 implementation platform("com.google.guava:guava:30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void platformsAreManagedVersionAware() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "spring-boot-dependencies", "3.2.4", null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation platform("org.springframework.boot:spring-boot-dependencies:2.4.0")
+                implementation("javax.servlet:javax.servlet-api")
+                implementation("org.apache.activemq:activemq-client-jakarta:5.18.2")
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation platform("org.springframework.boot:spring-boot-dependencies:3.2.4")
+                implementation("javax.servlet:javax.servlet-api:4.0.1")
+                implementation("org.apache.activemq:activemq-client-jakarta")
               }
               """
           )
@@ -437,6 +742,86 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesVersionInExtSubscriptNotation() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext['guava.version'] = "29.0-jre"
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext['guava.version'] = "30.1.1-jre"
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionInExtBlockSetMethod() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  set('guava.version', "29.0-jre")
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  set('guava.version', "30.1.1-jre")
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:${findProperty('guava.version')}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradesVariablesDefinedInExtraPropertiesInBuildscript() {
         rewriteRun(
           buildGradle(
@@ -465,7 +850,88 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       classpath("com.google.guava:guava:${guavaVersion}")
                   }
               }
+              """,
+            spec -> spec.afterRecipe(cu ->
+                //noinspection DataFlowIssue
+                assertThat(cu.getMarkers().findFirst(GradleProject.class))
+                  .get()
+                  .asInstanceOf(type(GradleProject.class))
+                  .extracting(gp -> gp.getBuildscript().getConfigurations())
+                  .asInstanceOf(list(GradleDependencyConfiguration.class))
+                  .singleElement()
+                  .extracting(conf -> conf.findResolvedDependency("com.google.guava", "guava"))
+                  .isNotNull()
+                  .extracting(ResolvedDependency::getVersion)
+                  .as("GradleProject model should reflect the updated guava version")
+                  .isEqualTo("30.1.1-jre"))
+          )
+        );
+    }
+
+    @Test
+    void upgradesMultiModuleVariablesDefinedInExtraPropertiesInBuildscript() {
+        rewriteRun(
+          settingsGradle(
+            """
+              rootProject.name = 'test'
+              include 'module1'
+              include 'module2'
               """
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              subprojects {
+                  apply plugin: 'java'
+
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              subprojects {
+                  apply plugin: 'java'
+
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+              """
+          ),
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("module1/build.gradle")
+          ), buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("module2/build.gradle")
           )
         );
     }
@@ -615,11 +1081,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   plugins {
                     id 'java-library'
                   }
-                  
+
                   repositories {
                     mavenCentral()
                   }
-                  
+
                   dependencies {
                     implementation 'com.google.guava:guava:%s'
                   }
@@ -629,8 +1095,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void versionInPropertiesFile() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$guavaVersion",
+      "${guavaVersion}",
+      "${property('guavaVersion')}",
+      "${project.property('guavaVersion')}",
+      "${findProperty('guavaVersion')}",
+      "${project.findProperty('guavaVersion')}",
+      "${project.properties['guavaVersion']}"
+    })
+    void versionInPropertiesFile(String propertyNotation) {
         rewriteRun(
           properties(
             """
@@ -652,9 +1127,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                implementation ("com.google.guava:guava:$guavaVersion")
+                implementation ("com.google.guava:guava:%s")
               }
-              """
+              """.formatted(propertyNotation)
           )
         );
     }
@@ -799,6 +1274,111 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void versionInParentPropertiesFiles() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("moduleA")
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
+
+    @Test
+    void versionInParentUsedInChildModules() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              ext {
+                guavaVersion = "29.0-jre"
+              }
+
+              repositories {
+                mavenCentral()
+              }
+              """,
+              """
+              plugins {
+                id 'java-library'
+              }
+
+              ext {
+                guavaVersion = "30.1.1-jre"
+              }
+
+              repositories {
+                mavenCentral()
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("moduleA")
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:${guavaVersion}"
+              }
+              """,
+            spec -> spec.path("moduleA/build.gradle")
+          )
+        );
+    }
 
     @Test
     void versionOnlyInMultiModuleChildPropertiesFiles() {
@@ -831,8 +1411,21 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
-    void mapNotationVariableInPropertiesFile() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "guavaVersion",
+      "\"$guavaVersion\"",
+      "\"${guavaVersion}\"",
+      "property('guavaVersion')",
+      "\"${property('guavaVersion')}\"",
+      "\"${project.property('guavaVersion')}\"",
+      "findProperty('guavaVersion')",
+      "\"${findProperty('guavaVersion')}\"",
+      "\"${project.findProperty('guavaVersion')}\"",
+      "project.properties['guavaVersion']",
+      "\"${project.properties['guavaVersion']}\""
+    })
+    void mapNotationVariableInPropertiesFile(String propertyNotation) {
         rewriteRun(
           properties(
             """
@@ -854,9 +1447,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                implementation group: "com.google.guava", name: "guava", version: guavaVersion
+                implementation group: "com.google.guava", name: "guava", version: %s
               }
-              """
+              """.formatted(propertyNotation)
           )
         );
     }
@@ -926,16 +1519,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void disallowDowngrade() {
+    void retainLatestReleaseOrLatestIntegrationIfUsed() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.security", "*", "5.3.x", null)),
-          properties(
-            """
-              springBootVersion=3.0.0
-              springSecurityVersion=5.4.0
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.*", null)),
           buildGradle(
             """
               plugins {
@@ -947,8 +1533,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation("org.springframework.boot:spring-boot-starter-actuator:${springBootVersion}")
-                  implementation("org.springframework.security:spring-security-oauth2-core:${springSecurityVersion}")
+                  implementation("org.projectlombok:lombok:latest.release")
+                  testImplementation("org.projectlombok:lombok:latest.integration")
               }
               """
           )
@@ -1039,8 +1625,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4275")
+    @Test
     void noActionForNonStringLiterals() {
         rewriteRun(
           buildGradle(
@@ -1064,22 +1650,22 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-java-dependencies/pull/106")
+    @Test
     void isAcceptable() {
         // Mimic org.openrewrite.java.dependencies.UpgradeTransitiveDependencyVersion#getVisitor
-        UpgradeDependencyVersion guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
+        var guava = new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre");
         TreeVisitor<?, ExecutionContext> visitor = guava.getVisitor();
 
-        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow();
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file").findFirst().orElseThrow().withSourcePath(Path.of("not-a-gradle-file.txt"));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
 
         sourceFile = PropertiesParser.builder().build().parse("guavaVersion=29.0-jre").findFirst().orElseThrow();
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
+    @Test
     void exactVersionWithExactPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", "-jre")),
@@ -1114,8 +1700,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
+    @Test
     void exactVersionWithRegexPattern() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", "-.*?droid")),
@@ -1199,6 +1785,62 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void removesTransitiveDependenciesFromGradleProjectMarker() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("io.vertx", "vertx-core", "5.0.1", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'io.vertx:vertx-core:3.9.8'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'io.vertx:vertx-core:5.0.1'
+              }
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Optional<GradleProject> maybeGp = after.getMarkers().findFirst(GradleProject.class);
+                assertThat(maybeGp).isPresent();
+                GradleDependencyConfiguration compileClasspath = maybeGp.get().getConfiguration("compileClasspath");
+                assertThat(compileClasspath).isNotNull();
+
+                // Check that vertx-core is updated to 5.0.1
+                assertThat(compileClasspath.getResolved())
+                  .as("GradleProject resolved dependencies should have vertx-core 5.0.1")
+                  .anySatisfy(dep -> {
+                      assertThat(dep.getGroupId()).isEqualTo("io.vertx");
+                      assertThat(dep.getArtifactId()).isEqualTo("vertx-core");
+                      assertThat(dep.getVersion()).isEqualTo("5.0.1");
+                  });
+
+                // Check that netty-codec is NOT listed amongst the dependencies as it is not a dependency of vertx-core 5.0.1
+                assertThat(compileClasspath.getResolved())
+                  .as("GradleProject resolved dependencies should NOT contain netty-codec after upgrade to vertx-core 5.0.1")
+                  .noneMatch(dep -> "io.netty".equals(dep.getGroupId()) && "netty-codec".equals(dep.getArtifactId()));
+            })
+          )
+        );
+    }
+
+    @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.17.0-2.17.2", null)),
@@ -1208,7 +1850,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -1220,7 +1862,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -1240,8 +1882,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4655")
+    @Test
     void issue4655() {
         rewriteRun(
           buildGradle(
@@ -1297,11 +1939,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("com.google.guava:guava:29.0-jre")
               }
@@ -1310,11 +1952,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation("com.google.guava:guava:30.1.1-jre")
               }
@@ -1331,11 +1973,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(group = "com.google.guava", name = "guava", version = "29.0-jre")
               }
@@ -1344,11 +1986,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation(group = "com.google.guava", name = "guava", version = "30.1.1-jre")
               }
@@ -1365,11 +2007,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   val guavaVersion = "29.0-jre"
                   implementation(group = "com.google.guava", name = "guava", version = guavaVersion)
@@ -1379,11 +2021,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   val guavaVersion = "30.1.1-jre"
                   implementation(group = "com.google.guava", name = "guava", version = guavaVersion)
@@ -1401,11 +2043,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   val guavaVersion = "29.0-jre"
                   implementation("com.google.guava:guava:${guavaVersion}")
@@ -1415,16 +2057,525 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   val guavaVersion = "30.1.1-jre"
                   implementation("com.google.guava:guava:${guavaVersion}")
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void shellCommandsWithEscapes() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                compileOnly 'com.google.guava:guava:29.0-jre'
+                runtimeOnly ('com.google.guava:guava:29.0-jre')
+              }
+
+              task executeShellCommands {
+                  doLast {
+                      exec {
+                          commandLine 'bash', '-c', \"""
+                              RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                              echo "TEST" > "$someVar"
+                          \"""
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                compileOnly 'com.google.guava:guava:30.1.1-jre'
+                runtimeOnly ('com.google.guava:guava:30.1.1-jre')
+              }
+
+              task executeShellCommands {
+                  doLast {
+                      exec {
+                          commandLine 'bash', '-c', \"""
+                              RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                              echo "TEST" > "$someVar"
+                          \"""
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateVersionDefinedInExtraPropertiesWithInlineReferenceInDependenciesGradle() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation "com.google.guava:guava:${guavaVersion}"
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+              }
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateVersionDefinedInExtraPropertiesWithConcatenatedReferenceInDependenciesGradle() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              apply from: 'dependencies.gradle'
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+              }
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    void ignoreVersionDefinedInExtraPropertiesWithConcatenatedReferenceInDependenciesGradleWhenConcatenationLeftIsNotADependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation 'com.google.guava:' + 'guava:' + guavaVersion
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+              }
+
+              plugins {
+                  id("java")
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "\"com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}\"",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: gradle.jackson",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: \"$gradle.jackson\"",
+      "group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: \"${gradle.jackson}\""
+    })
+    void upgradeVersionInSettingsGradleExt(String dependencyNotation) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.0", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """,
+            """
+              gradle.ext {
+                  jackson = '2.15.0'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation %s
+              }
+              """.formatted(dependencyNotation)
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeRegularDependencyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "tomcat-embed-core", "10.1.33", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.1.43'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeBuildscriptDependencyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null)),
+          //language=groovy
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath("com.google.guava:guava:30.1.1-jre")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeRegularDependencyVersionInSettingsGradleExt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.2", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+    
+              repositories {
+                  mavenCentral()
+              }
+    
+              dependencies {
+                  implementation "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotDowngradeBuildscriptDependencyVersionInSettingsGradleExt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.13.2", null)),
+          settingsGradle(
+            """
+              gradle.ext {
+                  jackson = '2.13.3'
+              }
+              """
+          ),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath "com.fasterxml.jackson.core:jackson-databind:${gradle.jackson}"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeAnnotationProcessors() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              dependencies {
+                  implementation 'org.mapstruct:mapstruct:1.4.1.Final'
+                  annotationProcessor 'org.mapstruct:mapstruct-processor:1.4.1.Final'
+              }
+              """,
+            spec -> spec.after(actual ->
+              assertThat(actual)
+                .doesNotContain("1.4.1.Final")
+                .containsPattern("1.6.\\d+(.\\d+)?")
+                .actual())
+          )
+        );
+    }
+
+    /**
+     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration.
+     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+     */
+    @Test
+    void groovyDslUpgradesPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """,
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  api "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0"
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Plugin-provided direct dependencies are upgraded by adding a direct dependency declaration (Kotlin DSL).
+     * Uses 'api' configuration because the Kotlin plugin exposes kotlin-stdlib-jdk8 as an API dependency.
+     */
+    @Test
+    void kotlinDslUpgradesPluginProvidedDirectDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib-jdk8", "1.9.0", null)),
+          buildGradleKts(
+            //language=kotlin
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+              """,
+            //language=kotlin
+            """
+              plugins {
+                  kotlin("jvm") version "1.7.21"
+              }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  api("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.0")
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Transitive dependencies from plugins should not be upgraded by this recipe.
+     * kotlin-stdlib is a transitive dependency of kotlin-stdlib-jdk8 which is added by the Kotlin plugin.
+     */
+    @Test
+    void doesNotUpgradePluginProvidedTransitiveDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.jetbrains.kotlin", "kotlin-stdlib", "1.9.0", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'org.jetbrains.kotlin.jvm' version '1.7.21'
+              }
+              repositories { mavenCentral() }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}",
+      "${property('springCloudVersion')}",
+      "${project.property('springCloudVersion')}",
+      "${findProperty('springCloudVersion')}",
+      "${project.findProperty('springCloudVersion')}",
+      "${project.properties['springCloudVersion']}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithGroovyDSL(String versionRef) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradle(
+            //language=groovy
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.7'
+              }
+              repositories { mavenCentral() }
+
+              dependencyManagement {
+                  imports {
+                      mavenBom "org.springframework.cloud:spring-cloud-dependencies:%s"
+                  }
+              }
+              """.formatted(versionRef)
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "$springCloudVersion",
+      "${springCloudVersion}"
+    })
+    void upgradesSpringDependencyManagementPluginMavenBomVersionPropertyWithKotlinDSL(String versionRef) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2023.0.x", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  java
+                  id("io.spring.dependency-management") version "1.1.7"
+              }
+              repositories { mavenCentral() }
+
+              val springCloudVersion: String by project
+
+              dependencyManagement {
+                  imports {
+                      mavenBom("org.springframework.cloud:spring-cloud-dependencies:%s")
+                  }
+              }
+              """.formatted(versionRef)
+          ),
+          properties(
+            """
+              springCloudVersion=2021.0.8
+              """,
+            """
+              springCloudVersion=2023.0.6
+              """,
+            spec -> spec.path("gradle.properties")
           )
         );
     }

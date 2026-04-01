@@ -24,72 +24,6 @@ import static org.openrewrite.java.Assertions.java;
 
 class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
-    @Test
-    void replaceConstantInAnnotation() {
-        rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.constant.B.PATH_SEPARATOR")),
-          java(
-            """
-              package com.constant;
-              public class B {
-                  public static final String PATH_SEPARATOR = ":";
-              }
-              """
-          ),
-          java(
-            """
-              import java.io.File;
-              
-              @SuppressWarnings(File.pathSeparator)
-              class Test {
-                  @SuppressWarnings(value = File.pathSeparator)
-                  void foo() {
-                      System.out.println("Annotation");
-                  }
-              }
-              """,
-            """
-              import com.constant.B;
-              
-              @SuppressWarnings(B.PATH_SEPARATOR)
-              class Test {
-                  @SuppressWarnings(value = B.PATH_SEPARATOR)
-                  void foo() {
-                      System.out.println("Annotation");
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/pull/3448")
-    void replaceConstantInCurlyBracesInAnnotation() {
-        rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
-            .parser(JavaParser.fromJavaVersion().classpath("guava")),
-          java(
-            """
-              import java.io.File;
-              
-              class Test {
-                  @SuppressWarnings({File.pathSeparator})
-                  private String bar;
-              }
-              """,
-            """
-              import java.io.File;
-              
-              class Test {
-                  @SuppressWarnings({File.separator})
-                  private String bar;
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void replaceConstant() {
@@ -120,6 +54,115 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                       System.out.println(separator);
                       System.out.println(File.separator);
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceConstantInAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.constant.B.PATH_SEPARATOR")),
+          java(
+            """
+              package com.constant;
+              public class B {
+                  public static final String PATH_SEPARATOR = ":";
+              }
+              """
+          ),
+          java(
+            """
+              import java.io.File;
+
+              @SuppressWarnings(File.pathSeparator)
+              class Test {
+                  @SuppressWarnings(value = File.pathSeparator)
+                  void foo() {
+                      System.out.println("Annotation");
+                  }
+              }
+              """,
+            """
+              import com.constant.B;
+
+              @SuppressWarnings(B.PATH_SEPARATOR)
+              class Test {
+                  @SuppressWarnings(value = B.PATH_SEPARATOR)
+                  void foo() {
+                      System.out.println("Annotation");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceEnumConstant() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.constant.OldValue.A", "com.constant.NewValue.B")),
+          java(
+            """
+              package com.constant;
+              public enum OldValue {
+                  A
+              }
+              """
+          ),
+          java(
+            """
+              package com.constant;
+              public enum NewValue {
+                  B
+              }
+              """
+          ),
+          java(
+            """
+              import com.constant.OldValue;
+
+              class Test {
+                  void foo() {
+                      Object test = OldValue.A;
+                  }
+              }
+              """,
+            """
+              import com.constant.NewValue;
+
+              class Test {
+                  void foo() {
+                      Object test = NewValue.B;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/3448")
+    @Test
+    void replaceConstantInCurlyBracesInAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
+            .parser(JavaParser.fromJavaVersion().classpath("guava")),
+          java(
+            """
+              import java.io.File;
+
+              class Test {
+                  @SuppressWarnings({File.pathSeparator})
+                  private String bar;
+              }
+              """,
+            """
+              import java.io.File;
+
+              class Test {
+                  @SuppressWarnings({File.separator})
+                  private String bar;
               }
               """
           )
@@ -160,15 +203,15 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3555")
+    @Test
     void replaceConstantForAnnotatedParameter() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
           java(
             """
               import java.io.File;
-              
+
               class Test {
                   void foo(@SuppressWarnings(value = File.pathSeparator) String param) {
                       System.out.println(param);
@@ -177,7 +220,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import java.io.File;
-              
+
               class Test {
                   void foo(@SuppressWarnings(value = File.separator) String param) {
                       System.out.println(param);
@@ -188,8 +231,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5174")
+    @Test
     void shouldUpdateWithinMethod() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.QUX1", "foo.Bar.QUX2")),
@@ -228,8 +271,8 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/5174")
+    @Test
     void shouldUpdateWithinMethod2() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.QUX1", "foo.Bar.QUX2")),
@@ -246,7 +289,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           java(
             """
               import foo.Bar;
-              
+
               import static foo.Bar.QUX2;
 
               class Test {
@@ -260,7 +303,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import foo.Bar;
-              
+
               import static foo.Bar.QUX2;
 
               class Test {
@@ -269,6 +312,159 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   void a() {
                       String in = Bar.QUX2;
                       String in2 = QUX2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5224")
+    @Test
+    void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo2.Bar.QUX1")),
+          java(
+            """
+              package foo1;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1_FROM_FOO1";
+                  public static final String QUX2 = "QUX1_FROM_FOO2";
+              }
+              """
+          ),
+          java(
+            """
+              package foo2;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1_FROM_FOO1";
+              }
+              """
+          ),
+          java(
+            """
+              import foo1.Bar;
+
+              class Test {
+                  void a() {
+                      System.out.println(Bar.QUX1);
+                      System.out.println(Bar.QUX2);
+                  }
+              }
+              """,
+            """
+              import foo1.Bar;
+
+              class Test {
+                  void a() {
+                      System.out.println(foo2.Bar.QUX1);
+                      System.out.println(Bar.QUX2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5224")
+    @Test
+    void shouldFullyQualifyWhenNewTypeIsAmbiguous2() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo3.Bar.QUX2")),
+          java(
+            """
+              package foo1;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX_FROM_FOO1";
+              }
+              """
+          ),
+          java(
+            """
+              package foo2;
+
+              public class Bar {
+                  public static final String QUX2 = "QUX_FROM_FOO2";
+              }
+              """
+          ),
+          java(
+            """
+              package foo3;
+
+              public class Bar {
+                  public static final String QUX2 = "QUX_FROM_FOO3";
+              }
+              """
+          ),
+          java(
+            """
+              import static foo1.Bar.QUX1;
+              import static foo2.Bar.QUX2;
+
+              class Test {
+                  void a() {
+                      System.out.println(QUX1);
+                      System.out.println(QUX2);
+                  }
+              }
+              """,
+            """
+              import static foo2.Bar.QUX2;
+
+              class Test {
+                  void a() {
+                      System.out.println(foo3.Bar.QUX2);
+                      System.out.println(QUX2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5224")
+    @Test
+    void shouldFullyQualifyWhenNewTypeIsAmbiguous3() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo1.Bar.QUX1", "foo2.Bar.QUX1")),
+          java(
+            """
+              package foo1;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX_FROM_FOO1";
+              }
+              """
+          ),
+          java(
+            """
+              package foo2;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX_FROM_FOO2";
+              }
+              """
+          ),
+          java(
+            """
+              import static foo1.Bar.QUX1;
+
+              class Test {
+                  void a() {
+                      System.out.println(QUX1);
+                  }
+              }
+              """,
+            """
+              import static foo2.Bar.QUX1;
+
+              class Test {
+                  void a() {
+                      System.out.println(QUX1);
                   }
               }
               """

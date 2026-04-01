@@ -15,10 +15,18 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
@@ -30,9 +38,12 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -43,6 +54,7 @@ import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -79,15 +91,11 @@ public abstract class Recipe implements Cloneable {
     }
 
     static class Noop extends Recipe {
-        @Override
-        public String getDisplayName() {
-            return "Do nothing";
-        }
+        @Getter
+        final String displayName = "Do nothing";
 
-        @Override
-        public String getDescription() {
-            return "Default no-op test, does nothing.";
-        }
+        @Getter
+        final String description = "Default no-op test, does nothing.";
     }
 
     /**
@@ -195,12 +203,9 @@ public abstract class Recipe implements Cloneable {
      * A set of strings used for categorizing related recipes. For example
      * "testing", "junit", "spring". Any individual tag should consist of a
      * single word, all lowercase.
-     *
-     * @return The tags.
      */
-    public Set<String> getTags() {
-        return Collections.emptySet();
-    }
+    @Getter
+    final Set<String> tags = emptySet();
 
     /**
      * @return An estimated effort were a developer to fix manually instead of using this recipe.
@@ -218,11 +223,22 @@ public abstract class Recipe implements Cloneable {
 
     protected RecipeDescriptor createRecipeDescriptor() {
         List<OptionDescriptor> options = getOptionDescriptors();
-        ArrayList<RecipeDescriptor> recipeList1 = new ArrayList<>();
-        for (Recipe next : getRecipeList()) {
-            recipeList1.add(next.getDescriptor());
+        List<RecipeDescriptor> preconditionDescriptors = emptyList();
+        if (this instanceof RecipePreconditions) {
+            RecipePreconditions recipeWithPreconditions = (RecipePreconditions) this;
+            List<Recipe> preconditions = recipeWithPreconditions.getPreconditions();
+            preconditionDescriptors = new ArrayList<>(preconditions.size());
+            for (Recipe precondition : preconditions) {
+                preconditionDescriptors.add(precondition.getDescriptor());
+            }
         }
-        recipeList1.trimToSize();
+
+        List<Recipe> recipeList = getRecipeList();
+        List<RecipeDescriptor> recipeDescriptors = new ArrayList<>(recipeList.size());
+        for (Recipe next : recipeList) {
+            recipeDescriptors.add(next.getDescriptor());
+        }
+
         URI recipeSource;
         try {
             recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
@@ -231,7 +247,7 @@ public abstract class Recipe implements Cloneable {
         }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
+                getEstimatedEffortPerOccurrence(), options, preconditionDescriptors, recipeDescriptors, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
@@ -252,7 +268,6 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
-            //noinspection ConstantValue
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(),
                         field.getType().getSimpleName(),
@@ -268,7 +283,6 @@ public abstract class Recipe implements Cloneable {
         for (Method method : recipe.getClass().getDeclaredMethods()) {
             if (method.getName().startsWith("get") && method.getParameterCount() == 0) {
                 Option option = method.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(StringUtils.uncapitalize(method.getName().substring(3)),
                             method.getReturnType().getSimpleName(),
@@ -285,7 +299,6 @@ public abstract class Recipe implements Cloneable {
             Constructor<?> c = RecipeIntrospectionUtils.getPrimaryConstructor(getClass());
             for (Parameter parameter : c.getParameters()) {
                 Option option = parameter.getAnnotation(Option.class);
-                //noinspection ConstantValue
                 if (option != null) {
                     options.add(new OptionDescriptor(parameter.getName(),
                             parameter.getType().getSimpleName(),
@@ -307,6 +320,7 @@ public abstract class Recipe implements Cloneable {
 
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
             dataTableDescriptorFromDataTable(new SourcesFileResults(Recipe.noop())),
+            dataTableDescriptorFromDataTable(new SearchResults(Recipe.noop())),
             dataTableDescriptorFromDataTable(new SourcesFileErrors(Recipe.noop())),
             dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
@@ -364,6 +378,9 @@ public abstract class Recipe implements Cloneable {
      */
     @Incubating(since = "8.48.0")
     public void onComplete(ExecutionContext ctx) {
+        if (this instanceof DelegatingRecipe) {
+            ((DelegatingRecipe) this).getDelegate().onComplete(ctx);
+        }
     }
 
     /**
@@ -440,12 +457,7 @@ public abstract class Recipe implements Cloneable {
 
     @SuppressWarnings("unused")
     public Validated<Object> validate(ExecutionContext ctx) {
-        Validated<Object> validated = validate();
-
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate(ctx));
-        }
-        return validated;
+        return validate();
     }
 
     /**
@@ -461,13 +473,10 @@ public abstract class Recipe implements Cloneable {
         List<Field> requiredFields = NullUtils.findNonNullFields(clazz);
         for (Field field : requiredFields) {
             try {
-                validated = validated.and(Validated.required(clazz.getSimpleName() + '.' + field.getName(), field.get(this)));
+                validated = validated.and(Validated.required(clazz.getName() + '.' + field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
                 validated = Validated.invalid(field.getName(), null, "Unable to access " + clazz.getName() + "." + field.getName(), e);
             }
-        }
-        for (Recipe recipe : getRecipeList()) {
-            validated = validated.and(recipe.validate());
         }
         return validated;
     }
@@ -506,9 +515,9 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Override
-    public Object clone() {
+    public Recipe clone() {
         try {
-            return super.clone();
+            return (Recipe) super.clone();
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
@@ -525,6 +534,44 @@ public abstract class Recipe implements Cloneable {
     public static Builder builder(@NlsRewrite.DisplayName @Language("markdown") String displayName,
                                   @NlsRewrite.Description @Language("markdown") String description) {
         return new Builder(displayName, description);
+    }
+
+    @Incubating(since = "8.67.0")
+    public Recipe withOptions(@Nullable Map<String, Object> options) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("@c", getName());
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
+                .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
+                .build()
+                .registerModule(new ParameterNamesModule())
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        // This is necessary to allow setting options like `FindTags#xPath`, as Jackson otherwise only sees a `xpath`
+        // property, which it derives from the `getXPath()` method generated by Lombok
+        objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
+                .withFieldVisibility(JsonAutoDetect.Visibility.ANY));
+        try {
+            Recipe clone = clone();
+            if (options != null) {
+                m.putAll(options);
+                for (OptionDescriptor optionDescriptor : clone.getDescriptor().getOptions()) {
+                    Object value = options.get(optionDescriptor.getName());
+                    if (value instanceof String) {
+                        Map<String, Object> option = new HashMap<>();
+                        option.put("value", value);
+                        objectMapper.updateValue(optionDescriptor, option);
+
+                        if (optionDescriptor.getType().equals("List")) {
+                            m.put(optionDescriptor.getName(), Arrays.asList(((String) value).split(",")));
+                        }
+                    }
+                }
+            }
+            return objectMapper.updateValue(clone, m);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Incubating(since = "8.31.0")

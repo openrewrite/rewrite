@@ -32,29 +32,23 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.PathUtils.separatorsToUnix;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class EffectiveMavenRepositories extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "List effective Maven repositories";
-    }
+    String displayName = "List effective Maven repositories";
 
-    @Override
-    public String getDescription() {
-        return "Lists the Maven repositories that would be used for dependency resolution, in order of precedence. " +
+    String description = "Lists the Maven repositories that would be used for dependency resolution, in order of precedence. " +
                "This includes Maven repositories defined in the Maven settings file (and those contributed by active profiles) as " +
                "determined when the LST was produced.";
-    }
 
     @Option(displayName = "Use markers",
             description = "Whether to add markers for each effective Maven repository to the POM. Default `false`.",
@@ -88,12 +82,12 @@ public class EffectiveMavenRepositories extends Recipe {
                 } else {
                     Collection<MavenRepositoryMirror> mirrors = mctx.getMirrors(settings);
                     List<MavenRepository> effectiveRepositories = Stream.concat(
-                                    settings.getActiveRepositories(settings.getActiveProfiles() == null ? Collections.emptyList() : settings.getActiveProfiles().getActiveProfiles())
+                                    settings.getActiveRepositories(settings.getActiveProfiles() == null ? emptyList() : settings.getActiveProfiles().getActiveProfiles())
                                             .stream()
                                             .map(rawRepo -> MavenRepository.builder().uri(rawRepo.getUrl()).build()),
                                     Stream.concat(mrr.getPom().getRepositories().stream(), Stream.of(MavenRepository.MAVEN_CENTRAL)))
                             .map(repository -> MavenRepositoryMirror.apply(mirrors, repository))
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     for (MavenRepository repository : effectiveRepositories) {
                         repositories.add(repository.getUri());

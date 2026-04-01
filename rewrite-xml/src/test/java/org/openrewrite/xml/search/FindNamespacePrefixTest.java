@@ -39,7 +39,7 @@ class FindNamespacePrefixTest implements RewriteTest {
                   xsi:schemaLocation="
                       http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
                       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
-              
+
                   <jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
                       <jaxws:conduitSelector>
                           <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>
@@ -63,7 +63,7 @@ class FindNamespacePrefixTest implements RewriteTest {
                   xsi:schemaLocation="
                       http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
                       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
-              
+
                   <!--~~>--><jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
                       <jaxws:conduitSelector>
                           <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>
@@ -112,7 +112,7 @@ class FindNamespacePrefixTest implements RewriteTest {
           xsi:schemaLocation="
               http://cxf.apache.org/jaxws http://cxf.apache.org/schemas/jaxws.xsd
               http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
-      
+
           <jaxws:client name="{http://cxf.apache.org/hello_world_soap_http}SoapPort" createdFromAPI="true" xmlns:jaxws="http://cxf.apache.org/jaxws">
               <jaxws:conduitSelector>
                   <bean class="org.apache.cxf.endpoint.DeferredConduitSelector"/>

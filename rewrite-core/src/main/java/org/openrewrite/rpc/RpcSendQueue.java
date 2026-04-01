@@ -17,14 +17,12 @@ package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ThrowingConsumer;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static org.openrewrite.rpc.Reference.asRef;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.RpcObjectData.State.*;
 
@@ -32,15 +30,20 @@ public class RpcSendQueue {
     private final int batchSize;
     private final List<RpcObjectData> batch;
     private final Consumer<List<RpcObjectData>> drain;
-    private final Map<Object, Integer> refs;
+    private final IdentityHashMap<Object, Integer> refs;
+    private final @Nullable String sourceFileType;
+    private final boolean trace;
 
     private @Nullable Object before;
 
-    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, Map<Object, Integer> refs) {
+    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs,
+                        @Nullable String sourceFileType, boolean trace) {
         this.batchSize = batchSize;
         this.batch = new ArrayList<>(batchSize);
         this.drain = drain;
         this.refs = refs;
+        this.sourceFileType = sourceFileType;
+        this.trace = trace;
     }
 
     public void put(RpcObjectData rpcObjectData) {
@@ -61,32 +64,40 @@ public class RpcSendQueue {
         batch.clear();
     }
 
-    public <T> void sendMarkers(@Nullable T parent, Function<T, Markers> markersFn) {
-        getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
-            Markers markers = Reference.getValue(markersRef);
-            getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
-        });
-    }
-
-    public <T, U> void getAndSend(@Nullable T parent, Function<T, @Nullable U> value) {
+    public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
         getAndSend(parent, value, null);
     }
 
-    public <T, U> void getAndSend(@Nullable T parent, Function<T, @Nullable U> value, @Nullable Consumer<U> onChange) {
+    public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value, @Nullable Consumer<U> onChange) {
         U after = value.apply(parent);
         //noinspection unchecked
         U before = this.before == null ? null : value.apply((T) this.before);
-        send(after, before, onChange == null ? null : () -> onChange.accept(after));
+        send(after, before, onChange == null || after == null ? null : () -> onChange.accept(after));
+    }
+
+    public <T, U> void getAndSendListAsRef(@Nullable T parent,
+                                           Function<T, @Nullable List<U>> values,
+                                           Function<? super U, ?> id,
+                                           @Nullable Consumer<U> onChange) {
+        getAndSendList(parent, values, id, onChange, true);
     }
 
     public <T, U> void getAndSendList(@Nullable T parent,
                                       Function<T, @Nullable List<U>> values,
-                                      Function<U, ?> id,
+                                      Function<? super U, ?> id,
                                       @Nullable Consumer<U> onChange) {
-        List<U> after = values.apply(parent);
+        getAndSendList(parent, values, id, onChange, false);
+    }
+
+    private <T, U> void getAndSendList(@Nullable T parent,
+                                       Function<T, @Nullable List<U>> values,
+                                       Function<? super U, ?> id,
+                                       @Nullable Consumer<U> onChange,
+                                       boolean asRef) {
+        List<U> after = parent == null ? null : values.apply(parent);
         //noinspection unchecked
         List<U> before = this.before == null ? null : values.apply((T) this.before);
-        sendList(after, before, id, onChange);
+        sendList(after, before, id, onChange, asRef);
     }
 
     public <T> void send(@Nullable T after, @Nullable T before, @Nullable Runnable onChange) {
@@ -94,21 +105,24 @@ public class RpcSendQueue {
         Object beforeVal = Reference.getValue(before);
 
         if (beforeVal == afterVal) {
-            put(new RpcObjectData(NO_CHANGE, null, null, null));
-        } else if (beforeVal == null) {
+            put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
+        } else if (beforeVal == null || (afterVal != null && afterVal.getClass() != beforeVal.getClass())) {
+            // Treat as ADD when before is null OR types differ (it's a new object, not a change)
             add(after, onChange);
         } else if (afterVal == null) {
-            put(new RpcObjectData(DELETE, null, null, null));
+            put(new RpcObjectData(DELETE, null, null, null, trace));
         } else {
-            put(new RpcObjectData(CHANGE, null, onChange == null ? afterVal : null, null));
-            doChange(after, before, onChange);
+            RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
+            put(new RpcObjectData(CHANGE, getValueType(afterVal), onChange == null && afterCodec == null ? afterVal : null, null, trace));
+            doChange(afterVal, beforeVal, onChange, afterCodec);
         }
     }
 
-    public <T> void sendList(@Nullable List<T> after,
-                             @Nullable List<T> before,
-                             Function<T, ?> id,
-                             @Nullable Consumer<T> onChange) {
+    <T> void sendList(@Nullable List<T> after,
+                      @Nullable List<T> before,
+                      Function<? super T, ?> id,
+                      @Nullable Consumer<T> onChange,
+                      boolean asRef) {
         send(after, before, () -> {
             assert after != null : "A DELETE event should have been sent.";
 
@@ -118,22 +132,25 @@ public class RpcSendQueue {
                 Integer beforePos = beforeIdx.get(id.apply(anAfter));
                 Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
                 if (beforePos == null) {
-                    add(anAfter, onChangeRun);
+                    add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                 } else {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
-                        put(new RpcObjectData(NO_CHANGE, null, null, null));
+                        put(new RpcObjectData(NO_CHANGE, null, null, null, trace));
+                    } else if (aBefore == null || anAfter.getClass() != aBefore.getClass()) {
+                        // Type changed - treat as ADD
+                        add(asRef ? Reference.asRef(anAfter) : anAfter, onChangeRun);
                     } else {
-                        put(new RpcObjectData(CHANGE, null, null, null));
-                        doChange(anAfter, aBefore, onChangeRun);
+                        put(new RpcObjectData(CHANGE, getValueType(anAfter), null, null, trace));
+                        doChange(anAfter, aBefore, onChangeRun, RpcCodec.forInstance(anAfter, sourceFileType));
                     }
                 }
             }
         });
     }
 
-    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<T, ?> id) {
-        Map<Object, Integer> beforeIdx = new IdentityHashMap<>();
+    private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
+        Map<Object, Integer> beforeIdx = new HashMap<>();
         if (before != null) {
             for (int i = 0; i < before.size(); i++) {
                 beforeIdx.put(id.apply(before.get(i)), i);
@@ -144,47 +161,88 @@ public class RpcSendQueue {
             Integer beforePos = beforeIdx.get(id.apply(t));
             positions.add(beforePos == null ? ADDED_LIST_ITEM : beforePos);
         }
-        put(new RpcObjectData(CHANGE, null, positions, null));
+        put(new RpcObjectData(CHANGE, null, positions, null, trace));
         return beforeIdx;
     }
 
-    private void add(@Nullable Object after, @Nullable Runnable onChange) {
-        Object afterVal = Reference.getValue(after);
+    private void add(Object after, @Nullable Runnable onChange) {
+        Object afterVal = requireNonNull(Reference.getValue(after));
         Integer ref = null;
-        if (afterVal != null && after != afterVal /* Is a reference */) {
+        if (after instanceof Reference) {
             if (refs.containsKey(afterVal)) {
-                put(new RpcObjectData(ADD, getValueType(afterVal), null, refs.get(afterVal)));
+                put(new RpcObjectData(ADD, null, null, refs.get(afterVal), trace));
                 // No onChange call because the remote will be using an instance from its ref cache
                 return;
             }
             ref = refs.size() + 1;
             refs.put(afterVal, ref);
         }
+        RpcCodec<Object> afterCodec = RpcCodec.forInstance(afterVal, sourceFileType);
         put(new RpcObjectData(ADD, getValueType(afterVal),
-                onChange == null ? afterVal : null, ref));
-        doChange(afterVal, null, onChange);
+                onChange == null && afterCodec == null ? afterVal : null, ref, trace));
+        doChange(afterVal, null, onChange, afterCodec);
     }
 
-    private void doChange(@Nullable Object after, @Nullable Object before, @Nullable Runnable onChange) {
-        if (onChange != null) {
-            Object lastBefore = this.before;
-            this.before = before;
-            if (after != null) {
-                onChange.run();
+    private void doChange(@Nullable Object after, @Nullable Object before, @Nullable Runnable onChange, @Nullable RpcCodec<Object> afterCodec) {
+        Object lastBefore = this.before;
+        this.before = before;
+        try {
+            if (onChange != null) {
+                if (after != null) {
+                    onChange.run();
+                }
+            } else if (afterCodec != null && after != null) {
+                afterCodec.rpcSend(after, this);
             }
+        } finally {
             this.before = lastBefore;
         }
     }
 
+    private static final String JAVA_TYPE_PACKAGE = "org.openrewrite.java.tree";
+    private static final String JAVA_TYPE_NAME = JAVA_TYPE_PACKAGE + ".JavaType";
+
+    private static final ClassValue<@Nullable String> VALUE_TYPE_CACHE = new ClassValue<String>() {
+        private @Nullable Class<?> javaTypeClass;
+        private boolean javaTypeResolved;
+
+        private @Nullable Class<?> getJavaTypeClass(Class<?> from) {
+            if (!javaTypeResolved) {
+                try {
+                    javaTypeClass = Class.forName(JAVA_TYPE_NAME, false, from.getClassLoader());
+                } catch (ClassNotFoundException ignored) {
+                }
+                javaTypeResolved = true;
+            }
+            return javaTypeClass;
+        }
+
+        @Override
+        protected @Nullable String computeValue(Class<?> afterType) {
+            Package pkg = afterType.getPackage();
+            if (afterType.isPrimitive() || afterType.isArray() || (pkg != null && pkg.getName().startsWith("java.lang")) ||
+                afterType.equals(UUID.class) || Iterable.class.isAssignableFrom(afterType)) {
+                return null;
+            } else if (Enum.class.isAssignableFrom(afterType) && !JAVA_TYPE_NAME.concat("$Primitive").equals(afterType.getName())) {
+                // FIXME special case for `JavaType.Primitive` here
+                return null;
+            }
+
+            // If the class is a subtype of JavaType but in a different package,
+            // return the superclass name instead
+            Class<?> jt = getJavaTypeClass(afterType);
+            if (jt != null && pkg != null && !pkg.getName().equals(JAVA_TYPE_PACKAGE) && jt.isAssignableFrom(afterType)) {
+                Class<?> superclass = afterType.getSuperclass();
+                if (superclass != null && !Object.class.equals(superclass)) {
+                    return superclass.getName();
+                }
+            }
+
+            return afterType.getName();
+        }
+    };
+
     private static @Nullable String getValueType(@Nullable Object after) {
-        if (after == null) {
-            return null;
-        }
-        Class<?> type = after.getClass();
-        if (type.isPrimitive() || type.getPackage().getName().startsWith("java.lang") ||
-            type.equals(UUID.class) || Iterable.class.isAssignableFrom(type)) {
-            return null;
-        }
-        return type.getName();
+        return after == null ? null : VALUE_TYPE_CACHE.get(after.getClass());
     }
 }

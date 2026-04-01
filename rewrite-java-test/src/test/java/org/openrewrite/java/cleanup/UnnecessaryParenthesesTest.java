@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
@@ -43,6 +44,59 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(UnnecessaryParenthesesVisitor::new));
+    }
+
+    @DocumentExample
+    @Test
+    void fullUnwrappingDefault() {
+        rewriteRun(
+          java(
+            """
+              import java.util.*;
+
+              class Test {
+                  int square(int a, int b) {
+                      int square = (a * b);
+
+                      int sumOfSquares = 0;
+                      for (int i = (0); i < 10; i++) {
+                          sumOfSquares += (square(i * i, i));
+                      }
+                      double num = (10.0);
+
+                      List<String> list = Arrays.asList("a1", "b1", "c1");
+                      list.stream()
+                              .filter((s) -> s.startsWith("c"))
+                              .forEach(System.out::println);
+
+                      return (square);
+                  }
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Test {
+                  int square(int a, int b) {
+                      int square = a * b;
+
+                      int sumOfSquares = 0;
+                      for (int i = 0; i < 10; i++) {
+                          sumOfSquares += square(i * i, i);
+                      }
+                      double num = 10.0;
+
+                      List<String> list = Arrays.asList("a1", "b1", "c1");
+                      list.stream()
+                              .filter(s -> s.startsWith("c"))
+                              .forEach(System.out::println);
+
+                      return square;
+                  }
+              }
+              """
+          )
+        );
     }
 
     private static Consumer<RecipeSpec> unnecessaryParentheses(UnaryOperator<UnnecessaryParenthesesStyle> with) {
@@ -108,61 +162,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void fullUnwrappingDefault() {
-        rewriteRun(
-          java(
-            """
-              import java.util.*;
-
-              class Test {
-                  int square(int a, int b) {
-                      int square = (a * b);
-
-                      int sumOfSquares = 0;
-                      for (int i = (0); i < 10; i++) {
-                          sumOfSquares += (square(i * i, i));
-                      }
-                      double num = (10.0);
-
-                      List<String> list = Arrays.asList("a1", "b1", "c1");
-                      list.stream()
-                              .filter((s) -> s.startsWith("c"))
-                              .forEach(System.out::println);
-
-                      return (square);
-                  }
-              }
-              """,
-            """
-              import java.util.*;
-
-              class Test {
-                  int square(int a, int b) {
-                      int square = a * b;
-
-                      int sumOfSquares = 0;
-                      for (int i = 0; i < 10; i++) {
-                          sumOfSquares += square(i * i, i);
-                      }
-                      double num = 10.0;
-
-                      List<String> list = Arrays.asList("a1", "b1", "c1");
-                      list.stream()
-                              .filter(s -> s.startsWith("c"))
-                              .forEach(System.out::println);
-
-                      return square;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/798")
     @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/798")
     @Test
     void unwrapExpr() {
         rewriteRun(
@@ -295,7 +296,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       String t = ("literallyString" + "stringLiteral");
                       if (s == null) {
                           s = null;
-                      } else if (("someLiteral".toLowerCase()).equals(s)) {
+                      } else if ("someLiteral".toLowerCase().equals(s)) {
                           s = null;
                       }
                   }
@@ -878,8 +879,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
-    @Test
     @SuppressWarnings("SimplifiableConditionalExpression")
+    @Test
     void ternaryCondition() {
         rewriteRun(
           java(
@@ -931,10 +932,114 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unwrapUnaryInAssignment() {
+        rewriteRun(
+          unnecessaryParentheses(style -> style.withAssign(true)),
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = (++i);
+                      int b = (i++);
+                      int c = (--i);
+                      int d = (i--);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int a = ++i;
+                      int b = i++;
+                      int c = --i;
+                      int d = i--;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapUnaryInMethodArgument() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println((++i));
+                      System.out.println((i++));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int i = 1;
+                      System.out.println(++i);
+                      System.out.println(i++);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Not implemented yet")
+    @Test
+    void unwrapBinaryInIf() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s, int x) {
+                  if (((x > 3) || x < 0)) {}
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s, int x) {
+                  if (x > 3 || x < 0) {}
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapMethodArguments() {
+        rewriteRun(
+          //language=java
+          java(
+            """
+              class Test {
+                void f(String s, int x) {
+                  System.err.printf((s + "."), (x), (x + 3));
+                }
+              }
+              """,
+            """
+              class Test {
+                void f(String s, int x) {
+                  System.err.printf(s + ".", x, x + 3);
+                }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class DoNotUnwrap {
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/3913")
+        @Test
         void negatedAssignment() {
             rewriteRun(
               java(
@@ -1050,5 +1155,113 @@ class UnnecessaryParenthesesTest implements RewriteTest {
             );
         }
 
+        @Test
+        void methodInvocationSelect() {
+            //language=java
+            rewriteRun(
+              java(
+                """
+                  class A {
+                    void f(String s, int x) {
+                      (s + x).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class B {
+                    void f(String s, boolean b) {
+                      (b ? s : "not s").toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class C {
+                    void f(Object x) {
+                      ((String) x).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class D {
+                    void f(Object x) {
+                      (x = "Foo").toString();
+                    }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Issue("https://github.com/moderneinc/customer-requests/issues/1790")
+        @Test
+        void methodInvocationSelectUnary() {
+            //language=java
+            rewriteRun(
+              java(
+                """
+                  class A {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (++i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class B {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i++).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class C {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (--i).toString();
+                    }
+                  }
+                  """
+              ),
+              java(
+                """
+                  class D {
+                    void f() {
+                      Integer i = Integer.valueOf(1);
+                      String s = (i--).toString();
+                    }
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/534")
+    @Test
+    void doNotUnwrapSwitchWithMethodCall() {
+        rewriteRun(
+          java(
+            """
+            class Foo {
+                int foo(int i) {
+                    return (switch(i) {
+                        default -> "foo";
+                    }).length();
+               }
+            }
+            """
+          )
+        );
     }
 }

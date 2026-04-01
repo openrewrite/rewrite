@@ -22,9 +22,13 @@ import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.synchronizedMap;
 
 /**
  * Wherever whitespace can occur in TOML, so can comments (at least block style comments).
@@ -46,7 +50,7 @@ public class Space {
      * e.g.: a single space between keywords, or the common indentation of every line in a block.
      * So use flyweights to avoid storing many instances of functionally identical spaces
      */
-    private static final Map<String, Space> flyweights = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<String, Space> flyweights = synchronizedMap(new WeakHashMap<>());
 
     private Space(@Nullable String whitespace, List<Comment> comments) {
         this.comments = comments;

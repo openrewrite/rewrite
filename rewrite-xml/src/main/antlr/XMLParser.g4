@@ -32,7 +32,7 @@ parser grammar XMLParser;
 options { tokenVocab=XMLLexer; }
 
 document
-    :   UTF_ENCODING_BOM? prolog element
+    :   UTF_ENCODING_BOM? prolog element?
     ;
 
 prolog
@@ -44,7 +44,7 @@ xmldecl
     ;
 
 misc
-    :   (COMMENT | doctypedecl | processinginstruction)
+    :   (COMMENT | doctypedecl | processinginstruction | jspdeclaration | jspcomment)
     ;
 
 doctypedecl
@@ -73,7 +73,8 @@ processinginstruction
     ;
 
 content
-    :   (element | reference | processinginstruction | CDATA | COMMENT | chardata) ;
+    :   (element | reference | processinginstruction | CDATA | COMMENT |
+         jspscriptlet | jspexpression | jspdeclaration | jspcomment | chardata) ;
 
 element
     :   OPEN Name attribute* CLOSE content* OPEN '/' Name CLOSE
@@ -82,6 +83,22 @@ element
 
 jspdirective
     :   OPEN DIRECTIVE_OPEN Name attribute* DIRECTIVE_CLOSE CLOSE
+    ;
+
+jspscriptlet
+    :   JSP_SCRIPTLET
+    ;
+
+jspexpression
+    :   JSP_EXPRESSION
+    ;
+
+jspdeclaration
+    :   JSP_DECLARATION
+    ;
+
+jspcomment
+    :   JSP_COMMENT
     ;
 
 reference

@@ -29,19 +29,17 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Iterator;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindDeprecatedMethods extends Recipe {
     private static final AnnotationMatcher DEPRECATED_MATCHER = new AnnotationMatcher("@java.lang.Deprecated");
 
-    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
-
     @Option(displayName = "Method pattern",
-            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
             example = "java.util.List add(..)",
             required = false)
     @Nullable
@@ -53,10 +51,13 @@ public class FindDeprecatedMethods extends Recipe {
     @Nullable
     Boolean ignoreDeprecatedScopes;
 
-    @Override
-    public String getDisplayName() {
-        return "Find uses of deprecated methods";
+    transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
+
+    private String dataTableInstanceName() {
+        return methodPattern != null ? "Deprecated method calls matching `" + methodPattern + "`" : "Deprecated method calls";
     }
+
+    String displayName = "Find uses of deprecated methods";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -66,10 +67,7 @@ public class FindDeprecatedMethods extends Recipe {
         return super.getInstanceNameSuffix();
     }
 
-    @Override
-    public String getDescription() {
-        return "Find uses of deprecated methods in any API.";
-    }
+    String description = "Find uses of deprecated methods in any API.";
 
     @Override
     public Validated<Object> validate() {
@@ -131,7 +129,7 @@ public class FindDeprecatedMethods extends Recipe {
                                         method.getArguments().stream()
                                                 .map(Expression::getType)
                                                 .map(String::valueOf)
-                                                .collect(Collectors.joining(", "))
+                                                .collect(joining(", "))
                                 ));
                             }
                             m = SearchResult.found(m);

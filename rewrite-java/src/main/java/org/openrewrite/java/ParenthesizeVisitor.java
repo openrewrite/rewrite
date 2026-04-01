@@ -51,7 +51,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
               newTree instanceof J.Ternary ||
               newTree instanceof J.Assignment ||
               newTree instanceof J.InstanceOf ||
-              newTree instanceof J.TypeCast)) {
+              newTree instanceof J.TypeCast ||
+              newTree instanceof J.SwitchExpression)) {
             return newTree;
         }
 
@@ -155,10 +156,10 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         return TypeUtils.isAssignableTo("java.lang.String", type);
     }
 
-    private boolean needsParentheses(Expression expr, J parent) {
+    private boolean needsParentheses(Expression expr, Object parent) {
         return parent instanceof J.Unary ||
-               (parent instanceof J.MethodInvocation &&
-                expr.isScope(((J.MethodInvocation) parent).getSelect()));
+               (parent instanceof J.MethodInvocation && expr.isScope(((J.MethodInvocation) parent).getSelect())) ||
+                (expr instanceof J.SwitchExpression);
     }
 
     private boolean needsParenthesesForPrecedence(J.Binary inner, J.Binary outer) {
@@ -239,7 +240,10 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.Unary u = (J.Unary) j;
         Cursor parent = getCursor().getParentTreeCursor();
 
-        if (needsParentheses(u, parent.getValue())) {
+        if (u.getOperator() == J.Unary.Type.Not && parent.getValue() instanceof J.Unary) {
+            // no parens for `!!true` but for `-(-1)` and for `+(+1)`
+            return u;
+        } else if (needsParentheses(u, parent.getValue())) {
             return parenthesize(u);
         } else if (parent.getValue() instanceof J.Unary) {
             J.Unary parentUnary = parent.getValue();
@@ -321,6 +325,11 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         }
 
         return a;
+    }
+
+    @Override
+    public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
+        return parenthesize((Expression) super.visitSwitchExpression(switch_, p));
     }
 
     private boolean isInAddSubGroup(J.Binary.Type operator) {

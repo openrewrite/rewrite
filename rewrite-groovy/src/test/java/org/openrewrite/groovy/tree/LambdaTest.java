@@ -25,12 +25,24 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class LambdaTest implements RewriteTest {
 
     @Test
-    void lambdaExpressionNoParens() {
+    void lambdaExpression() {
         rewriteRun(
           groovy(
                 """
             def lambda = a -> a
-            """)
+            """
+          )
+        );
+    }
+
+    @Test
+    void lambdaExpressionWithCurlyBraces() {
+        rewriteRun(
+          groovy(
+            """
+              def lambda = a -> { a }
+              """
+          )
         );
     }
 
@@ -40,16 +52,19 @@ class LambdaTest implements RewriteTest {
           groovy(
                 """
             ( ) -> arg
-            """)
+            """
+          )
         );
     }
+
     @Test
     void lambdaExpressionWithArgument() {
         rewriteRun(
           groovy(
                 """
             ( String arg ) -> arg
-            """)
+            """
+          )
         );
     }
 
@@ -62,7 +77,8 @@ class LambdaTest implements RewriteTest {
             foo { String a ->
                 ( _ ) -> a
             }
-            """)
+            """
+          )
         );
     }
 
@@ -77,7 +93,23 @@ class LambdaTest implements RewriteTest {
                 a
                 a
             }
-            """)
+            """
+          )
+        );
+    }
+
+    @Test
+    void closureParameterWithDefaultValue() {
+        rewriteRun(
+          groovy(
+            """
+              javadoc {
+                  options {
+                      group = 'WDK Language' -> 'com.symphony.bdk.workflow*'
+                  }
+              }
+              """
+          )
         );
     }
 

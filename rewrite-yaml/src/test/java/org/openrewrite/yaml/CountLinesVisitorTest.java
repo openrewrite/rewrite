@@ -24,8 +24,8 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 class CountLinesVisitorTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void basic() {
         rewriteRun(
           yaml(

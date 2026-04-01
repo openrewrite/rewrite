@@ -21,6 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.UUID;
 
@@ -28,7 +31,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
-public class ParseExceptionResult implements Marker {
+public class ParseExceptionResult implements Marker, RpcCodec<ParseExceptionResult> {
     UUID id;
     String parserType;
     String exceptionType;
@@ -59,5 +62,24 @@ public class ParseExceptionResult implements Marker {
 
     public static ParseExceptionResult build(Parser parser, Throwable t) {
         return build(parser.getClass(), t, null);
+    }
+
+    @Override
+    public void rpcSend(ParseExceptionResult after, RpcSendQueue q) {
+        q.getAndSend(after, Marker::getId);
+        q.getAndSend(after, ParseExceptionResult::getParserType);
+        q.getAndSend(after, ParseExceptionResult::getExceptionType);
+        q.getAndSend(after, ParseExceptionResult::getMessage);
+        q.getAndSend(after, ParseExceptionResult::getTreeType);
+    }
+
+    @Override
+    public ParseExceptionResult rpcReceive(ParseExceptionResult before, RpcReceiveQueue q) {
+        return before
+                .withId(q.receiveAndGet(before.getId(), UUID::fromString))
+                .withParserType(q.receiveAndGet(before.getParserType(), String::valueOf))
+                .withExceptionType(q.receiveAndGet(before.getExceptionType(), String::valueOf))
+                .withMessage(q.receiveAndGet(before.getMessage(), String::valueOf))
+                .withTreeType(q.receiveAndGet(before.getTreeType(), String::valueOf));
     }
 }

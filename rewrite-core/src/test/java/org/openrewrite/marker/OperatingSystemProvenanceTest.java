@@ -17,9 +17,52 @@ package org.openrewrite.marker;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OperatingSystemProvenanceTest {
+
+    @Test
+    void noDeadlockBetweenLinuxAndMacOs() throws InterruptedException {
+        // This test must be first to ensure classes are not already initialized
+
+        // given
+        int threadCount = 10;
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch completeLatch = new CountDownLatch(threadCount);
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            final int threadNum = i;
+            executor.submit(() -> {
+                try {
+                    startLatch.await();
+
+                    if (threadNum % 2 == 0) {
+                        Class.forName("org.openrewrite.marker.OperatingSystemProvenance$Linux");
+                    } else {
+                        Class.forName("org.openrewrite.marker.OperatingSystemProvenance$MacOs");
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    completeLatch.countDown();
+                }
+            });
+        }
+
+        // when
+        startLatch.countDown();
+
+        // test
+        boolean completed = completeLatch.await(1, TimeUnit.SECONDS);
+        executor.shutdown();
+        assertThat(completed).as("All threads should complete within 1 second (no deadlock)").isTrue();
+    }
 
     @Test
     void hostname() {

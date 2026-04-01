@@ -29,6 +29,32 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
         spec.recipe(new IsOwaspSuppressionsFile());
     }
 
+    @DocumentExample
+    @Test
+    void addsMarkerToFilesWithCorrectXmlns() {
+        rewriteRun(
+                xml("""
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        """
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <!--~~>--><suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>
+                        """,
+                        spec -> spec.path("suppressions.xml")
+                )
+        );
+    }
+
     @Test
     void doesntAffectFilesWithoutXmlns() {
         rewriteRun(
@@ -56,32 +82,6 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
                                 </notes>
                             </suppress>
                         </suppressions>""",
-                        spec -> spec.path("suppressions.xml")
-                )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void addsMarkerToFilesWithCorrectXmlns() {
-        rewriteRun(
-                xml("""
-                        <?xml version="1.0" encoding="UTF-8" ?>
-                        <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                            <suppress>
-                                <notes>
-                                </notes>
-                            </suppress>
-                        </suppressions>""",
-                        """
-                        <?xml version="1.0" encoding="UTF-8" ?>
-                        <!--~~>--><suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                            <suppress>
-                                <notes>
-                                </notes>
-                            </suppress>
-                        </suppressions>
-                        """,
                         spec -> spec.path("suppressions.xml")
                 )
         );

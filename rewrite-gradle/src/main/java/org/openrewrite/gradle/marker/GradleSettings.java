@@ -25,11 +25,14 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.Serializable;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -81,7 +84,7 @@ public class GradleSettings implements Marker, Serializable {
     public Set<FeaturePreview> getActiveFeatures() {
         return featurePreviews.values().stream()
                 .filter(FeaturePreview::isActive)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     /**

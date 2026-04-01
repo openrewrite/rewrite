@@ -11,6 +11,7 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations")
 
     implementation(project(":rewrite-core"))
+    implementation("io.moderne:jsonrpc:latest.release")
     compileOnly(project(":rewrite-test"))
 
     // Caffeine 2.x works with Java 8, Caffeine 3.x is Java 11 only.
@@ -26,7 +27,7 @@ dependencies {
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
-    compileOnly("org.rocksdb:rocksdbjni:latest.release")
+    compileOnly("org.rocksdb:rocksdbjni:10.2.1")
     compileOnly(project(":rewrite-yaml"))
     implementation(project(":rewrite-properties"))
 
@@ -43,8 +44,8 @@ dependencies {
     testImplementation("org.mapdb:mapdb:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
-    testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
+    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly("org.rocksdb:rocksdbjni:10.2.1")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {
@@ -57,9 +58,11 @@ tasks.register<JavaExec>("generateAntlrSources") {
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = sourceSets["main"].runtimeClasspath
+
+    finalizedBy("licenseFormat")
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     // generated ANTLR sources violate doclint
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
@@ -75,4 +78,23 @@ tasks.withType<Javadoc> {
 
 configure<LicenseExtension> {
     excludePatterns.add("**/unresolvable.txt")
+}
+
+tasks.register<JavaExec>("generateRecipeMarketplace") {
+    group = "build"
+    description = "Generate recipe marketplace CSV from the rewrite-maven JAR"
+
+    dependsOn("jar")
+
+    mainClass.set("org.openrewrite.maven.marketplace.MavenRecipeMarketplaceGenerator")
+
+    val jarFile = tasks.jar.get().archiveFile.get().asFile
+    val outputCsv = project.file("build/recipes.csv")
+    val groupId = project.group.toString()
+    val artifactId = project.name
+
+    args = listOf("$groupId:$artifactId", outputCsv.absolutePath, jarFile.absolutePath) +
+           configurations.runtimeClasspath.get().files.map { it.absolutePath }
+
+    classpath = configurations.runtimeClasspath.get() + files(jarFile)
 }

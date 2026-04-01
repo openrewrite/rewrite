@@ -194,11 +194,15 @@ public class MavenSecuritySettings {
             byte[] clearBytes = cipher.doFinal(encryptedBytes);
 
             int paddingLength = clearBytes[clearBytes.length - 1];
+            if (paddingLength >= clearBytes.length) {
+                return null; // Invalid padding length
+            }
             byte[] decryptedBytes = new byte[clearBytes.length - paddingLength];
             System.arraycopy(clearBytes, 0, decryptedBytes, 0, decryptedBytes.length);
             return new String(decryptedBytes, StandardCharsets.UTF_8);
         } catch (NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException |
-                 InvalidKeyException | InvalidAlgorithmParameterException | IllegalArgumentException e) {
+                 InvalidKeyException | InvalidAlgorithmParameterException | NegativeArraySizeException |
+                 ArrayIndexOutOfBoundsException | IllegalArgumentException e) {
             return null;
         }
     }

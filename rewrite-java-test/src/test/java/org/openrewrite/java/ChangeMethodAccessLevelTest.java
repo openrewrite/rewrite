@@ -32,42 +32,42 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   public void aMethod(String s) {
                   }
-                      
+
                   // comment
                   @SuppressWarnings("ALL")
                   public void aMethod() {
                   }
-                      
+
                   // comment
                   public void aMethod(Integer i) {
                   }
-                      
+
                   public void aMethod(Double i) {
                   }
               }
               """,
             """
               package com.abc;
-                            
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   private void aMethod(String s) {
                   }
-                            
+
                   // comment
                   @SuppressWarnings("ALL")
                   private void aMethod() {
                   }
-                            
+
                   // comment
                   private void aMethod(Integer i) {
                   }
-                            
+
                   private void aMethod(Double i) {
                   }
               }
@@ -83,42 +83,42 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   static void aMethod(String s) {
                   }
-                      
+
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod() {
                   }
-                      
+
                   // comment
                   void aMethod(Integer i) {
                   }
-                      
+
                   void aMethod(Double i) {
                   }
               }
               """,
             """
               package com.abc;
-                    
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   protected static void aMethod(String s) {
                   }
-                    
+
                   // comment
                   @SuppressWarnings("ALL")
                   protected void aMethod() {
                   }
-                    
+
                   // comment
                   protected void aMethod(Integer i) {
                   }
-                    
+
                   protected void aMethod(Double i) {
                   }
               }
@@ -134,43 +134,43 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   @SuppressWarnings("ALL") // comment
                   public void aMethod(String s) {
                   }
-                      
+
                   // comment
                   @SuppressWarnings("ALL")
                   public void aMethod() {
                   }
-                      
+
                   // comment
                   public void aMethod(Integer i) {
                   }
-                      
+
                   public void aMethod(Double i) {
                   }
               }
               """,
             """
               package com.abc;
-                    
+
               class A {
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod(String s) {
                   }
-                    
+
                   // comment
                   @SuppressWarnings("ALL")
                   void aMethod() {
                   }
-                    
+
                   // comment
                   void aMethod(Integer i) {
                   }
-                    
+
                   void aMethod(Double i) {
                   }
               }
@@ -186,20 +186,20 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           java(
             """
               package com.abc;
-                      
+
               class A {
                   // comment
                   public A(Integer i) {
                   }
-                      
+
                   @Deprecated // comment
                   public A(Float f) {
                   }
-                      
+
                   @Deprecated // comment
                   public void aMethod(String s) {
                   }
-                      
+
                   // comment
                   public void aMethod(Integer i) {
                   }
@@ -207,22 +207,22 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
               """,
             """
               package com.abc;
-                    
+
               class A {
                   // comment
                   A(Integer i) {
                   }
-                    
+
                   // comment
                   @Deprecated
                   A(Float f) {
                   }
-                    
+
                   // comment
                   @Deprecated
                   void aMethod(String s) {
                   }
-                    
+
                   // comment
                   void aMethod(Integer i) {
                   }
@@ -312,9 +312,9 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("MethodMayBeStatic")
+    @Test
     void methodPatternExactMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
@@ -355,9 +355,9 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @SuppressWarnings("MethodMayBeStatic")
+    @Test
     void matchOverrides() {
         rewriteRun(
           spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", true)),
@@ -421,6 +421,116 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   @Deprecated
                   static void aMethod(Double d) {
                       System.out.print (  "foo");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void publicToPackagePrivateMovesLineComment() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.DatabaseConfiguration dataSource(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              class DatabaseConfiguration {
+                  @SuppressWarnings("ALL")
+                  // comments
+                  public static void dataSource() {
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class DatabaseConfiguration {
+                  @SuppressWarnings("ALL")
+                  // comments
+                  static void dataSource() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removePublicModifierFromBeanMethodsPreservesSpacing() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.DatabaseConfiguration dataSource(..)", "package", null)),
+          java(
+            """
+              package org.springframework.context.annotation;
+              public @interface Bean {}
+              """
+          ),
+          java(
+            """
+              package org.springframework.context.annotation;
+              public @interface Primary {}
+              """
+          ),
+          java(
+            """
+              package a.b.c;
+              public class DataSource {}
+              """
+          ),
+          java(
+            """
+              package com.abc;
+              
+              import a.b.c.DataSource;
+              import org.springframework.context.annotation.Bean;
+              import org.springframework.context.annotation.Primary;
+              
+              public class DatabaseConfiguration {
+                  // primary comments
+                  @Primary
+                  @Bean
+                  public DataSource dataSource() {
+                      return new DataSource();
+                  }
+
+                  @Bean // comments
+                  public final DataSource dataSource(Integer i) {
+                      return new DataSource();
+                  }
+
+                  @Bean
+                  // comments
+                  public static DataSource dataSource(Double i) {
+                      return new DataSource();
+                  }
+              }
+              """,
+            """
+              package com.abc;
+              
+              import a.b.c.DataSource;
+              import org.springframework.context.annotation.Bean;
+              import org.springframework.context.annotation.Primary;
+              
+              public class DatabaseConfiguration {
+                  // primary comments
+                  @Primary
+                  @Bean
+                  DataSource dataSource() {
+                      return new DataSource();
+                  }
+
+                  @Bean // comments
+                  final DataSource dataSource(Integer i) {
+                      return new DataSource();
+                  }
+
+                  @Bean
+                  // comments
+                  static DataSource dataSource(Double i) {
+                      return new DataSource();
                   }
               }
               """

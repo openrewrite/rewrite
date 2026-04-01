@@ -26,9 +26,9 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -47,7 +47,7 @@ class RecipeListTest implements RewriteTest {
                 Optional<Stream<String>> recipeNames = txt.getMarkers().findFirst(RecipesThatMadeChanges.class)
                   .map(recipes -> recipes.getRecipes().stream()
                     .map(stack -> stack.stream().map(Recipe::getDescriptor).map(RecipeDescriptor::getName)
-                      .collect(Collectors.joining("->")))
+                      .collect(joining("->")))
                   );
 
                 assertThat(recipeNames).isPresent();
@@ -61,8 +61,8 @@ class RecipeListTest implements RewriteTest {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
+@Value
 class FormalHello extends Recipe {
     @Option(example = "TODO Provide a usage example for the docs", displayName = "Before name",
             description = "The name of a person being greeted")
@@ -72,15 +72,9 @@ class FormalHello extends Recipe {
             description = "The more formal name of the person.")
     String afterName;
 
-    @Override
-    public String getDisplayName() {
-        return "Formal hello";
-    }
+    String displayName = "Formal hello";
 
-    @Override
-    public String getDescription() {
-        return "Be formal. Be cool.";
-    }
+    String description = "Be formal. Be cool.";
 
     @Override
     public void buildRecipeList(RecipeList recipes) {

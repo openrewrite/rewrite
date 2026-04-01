@@ -20,7 +20,9 @@ import lombok.EqualsAndHashCode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static java.util.Collections.emptyList;
 
@@ -43,7 +45,7 @@ public class Space {
      * e.g.: a single space between keywords, or the common indentation of every line in a block.
      * So use flyweights to avoid storing many instances of functionally identical spaces
      */
-    private static final Map<String, Space> flyweights = Collections.synchronizedMap(new WeakHashMap<>());
+    private static final ConcurrentHashMap<String, Space> flyweights = new ConcurrentHashMap<>();
 
     static {
         flyweights.put(" ", SINGLE_SPACE);
@@ -59,9 +61,10 @@ public class Space {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
-            } else if (whitespace.length() <= 100) {
-                //noinspection StringOperationCanBeSimplified
-                return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace), comments));
+            } else if (whitespace.length() <= 50) {
+                Space newSpace = new Space(whitespace, comments);
+                Space existing = flyweights.putIfAbsent(whitespace, newSpace);
+                return existing != null ? existing : newSpace;
             }
         }
         return new Space(whitespace, comments);

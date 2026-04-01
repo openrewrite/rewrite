@@ -25,6 +25,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.maven.search.FindMavenProject;
 import org.openrewrite.maven.utilities.MavenWrapper;
 import org.openrewrite.properties.PropertiesIsoVisitor;
 import org.openrewrite.properties.PropertiesParser;
@@ -38,8 +39,12 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
 import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.internal.StringUtils.isBlank;
@@ -115,15 +120,11 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     @Nullable
     final Boolean enforceWrapperChecksumVerification;
 
-    @Override
-    public String getDisplayName() {
-        return "Update Maven wrapper";
-    }
+    @Getter
+    final String displayName = "Update Maven wrapper";
 
-    @Override
-    public String getDescription() {
-        return "Update the version of Maven used in an existing Maven wrapper.";
-    }
+    @Getter
+    final String description = "Update the version of Maven used in an existing Maven wrapper.";
 
     @Override
     public Validated<Object> validate() {
@@ -149,6 +150,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     }
 
     static class MavenWrapperState {
+        boolean mavenProject = false;
         boolean needsWrapperUpdate = false;
 
         @Nullable BuildTool updatedMarker;
@@ -240,6 +242,10 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             return false;
                         }
 
+                        if (new FindMavenProject().getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
+                            acc.mavenProject = true;
+                        }
+
                         MavenWrapper mavenWrapper = getMavenWrapper(ctx);
 
                         if (sourceFile instanceof Quark || sourceFile instanceof Remote) {
@@ -277,21 +283,25 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
     @Override
     public Collection<SourceFile> generate(MavenWrapperState acc, ExecutionContext ctx) {
         if (Boolean.FALSE.equals(addIfMissing)) {
-            return Collections.emptyList();
+            return emptyList();
+        }
+
+        if (!acc.mavenProject) {
+            return emptyList();
         }
 
         MavenWrapper mavenWrapper = getMavenWrapper(ctx);
         if (mavenWrapper.getWrapperDistributionType() == DistributionType.Bin) {
             if (!(acc.addMavenWrapperJar || acc.addMavenWrapperProperties || acc.addMavenBatchScript || acc.addMavenShellScript)) {
-                return Collections.emptyList();
+                return emptyList();
             }
         } else if (mavenWrapper.getWrapperDistributionType() == DistributionType.OnlyScript) {
             if (!(acc.addMavenWrapperProperties || acc.addMavenBatchScript || acc.addMavenShellScript)) {
-                return Collections.emptyList();
+                return emptyList();
             }
         } else {
             if (!(acc.addMavenWrapperDownloader || acc.addMavenWrapperProperties || acc.addMavenBatchScript || acc.addMavenShellScript)) {
-                return Collections.emptyList();
+                return emptyList();
             }
         }
 

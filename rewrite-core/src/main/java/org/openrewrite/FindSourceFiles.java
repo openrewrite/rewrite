@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.table.SourcesFiles;
 
 import java.nio.file.Path;
@@ -42,15 +43,9 @@ public class FindSourceFiles extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Find files";
-    }
+    String displayName = "Find files";
 
-    @Override
-    public String getDescription() {
-        return "Find files by source path. Paths are always interpreted as relative to the repository root.";
-    }
+    String description = "Find files by source path. Paths are always interpreted as relative to the repository root.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -63,7 +58,7 @@ public class FindSourceFiles extends Recipe {
                     Path sourcePath = sourceFile.getSourcePath();
                     if (matches(sourcePath)) {
                         results.insertRow(ctx, new SourcesFiles.Row(sourcePath.toString(),
-                                tree.getClass().getSimpleName()));
+                                tree.getClass().getSimpleName(), sourceFile instanceof Quark || sourceFile.getCharset() == null ? null : sourceFile.getCharset().toString()));
                         return SearchResult.found(sourceFile);
                     }
                 }
@@ -96,5 +91,4 @@ public class FindSourceFiles extends Recipe {
         }
         return filePattern;
     }
-
 }

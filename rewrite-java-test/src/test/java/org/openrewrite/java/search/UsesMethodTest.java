@@ -27,50 +27,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("RedundantOperationOnEmptyContainer")
 class UsesMethodTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1169")
-    @Test
-    void emptyConstructor() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("abc.Thing newConcurrentHashSet()"))),
-          java(
-            """
-              package abc;
-                            
-              import java.util.Set;
-              import java.util.Collections;
-              import java.util.concurrent.ConcurrentHashMap;
-              public class Thing {
-                  public static <E> Set<E> newConcurrentHashSet() {
-                      return Collections.newSetFromMap(new ConcurrentHashMap<>());
-                  }
-                  public static <E> Set<E> newConcurrentHashSet(Iterable<? extends E> elements) {
-                      return newConcurrentHashSet();
-                  }
-              }
-              """,
-            SourceSpec::skip
-          ),
-          java(
-            """
-              package abc;
-                            
-              import java.util.Set;
-              class Test {
-                  Set<String> s = Thing.newConcurrentHashSet();
-              }
-              """,
-            """
-              /*~~>*/package abc;
-                            
-              import java.util.Set;
-              class Test {
-                  Set<String> s = Thing.newConcurrentHashSet();
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void usesMethodReferences() {
@@ -96,6 +52,50 @@ class UsesMethodTest implements RewriteTest {
             """
               class A {
                   public void singleArg(String s) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1169")
+    @Test
+    void emptyConstructor() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("abc.Thing newConcurrentHashSet()"))),
+          java(
+            """
+              package abc;
+
+              import java.util.Set;
+              import java.util.Collections;
+              import java.util.concurrent.ConcurrentHashMap;
+              public class Thing {
+                  public static <E> Set<E> newConcurrentHashSet() {
+                      return Collections.newSetFromMap(new ConcurrentHashMap<>());
+                  }
+                  public static <E> Set<E> newConcurrentHashSet(Iterable<? extends E> elements) {
+                      return newConcurrentHashSet();
+                  }
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package abc;
+
+              import java.util.Set;
+              class Test {
+                  Set<String> s = Thing.newConcurrentHashSet();
+              }
+              """,
+            """
+              /*~~>*/package abc;
+
+              import java.util.Set;
+              class Test {
+                  Set<String> s = Thing.newConcurrentHashSet();
               }
               """
           )

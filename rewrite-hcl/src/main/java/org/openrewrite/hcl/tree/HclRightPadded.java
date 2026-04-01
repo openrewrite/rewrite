@@ -27,7 +27,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toMap;
 
 /**
  * An HCL element that could have trailing space.
@@ -54,6 +55,7 @@ public class HclRightPadded<T> {
         OBJECT_VALUE_ARGUMENT(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX),
         PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
         SPLAT_OPERATOR(Space.Location.SPLAT_OPERATOR_SUFFIX),
+        TEMPLATE_INTERPOLATION(Space.Location.TEMPLATE_INTERPOLATION_SUFFIX),
         TUPLE_VALUE(Space.Location.TUPLE_VALUE_SUFFIX);
 
         private final Space.Location afterLocation;
@@ -105,8 +107,7 @@ public class HclRightPadded<T> {
         }
 
         List<HclRightPadded<H>> after = new ArrayList<>(elements.size());
-        Map<UUID, HclRightPadded<H>> beforeById = before.stream().collect(Collectors
-                .toMap(j -> j.getElement().getId(), Function.identity()));
+        Map<UUID, HclRightPadded<H>> beforeById = before.stream().collect(toMap(j -> j.getElement().getId(), Function.identity()));
 
         for (H t : elements) {
             if (beforeById.get(t.getId()) != null) {

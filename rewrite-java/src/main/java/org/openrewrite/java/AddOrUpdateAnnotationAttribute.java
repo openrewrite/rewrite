@@ -17,41 +17,34 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
+import java.util.*;
 
+import static java.lang.Boolean.TRUE;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
+import static org.openrewrite.marker.Markers.EMPTY;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddOrUpdateAnnotationAttribute extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add or update annotation attribute";
-    }
+    String displayName = "Add or update annotation attribute";
 
-    @Override
-    public String getDescription() {
-        return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
+    String description = "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
                 "or adds the argument if it is not already set.";
-    }
 
     @Option(displayName = "Annotation type",
             description = "The fully qualified name of the annotation.",
@@ -66,7 +59,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     String attributeName;
 
     @Option(displayName = "Attribute value",
-            description = "The value to set the attribute to. Set to `null` to remove the attribute.",
+            description = "The value to set the attribute to. If the attribute is an array, provide values separated by comma to add multiple attributes at once. Set to `null` to remove the attribute.",
             required = false,
             example = "500")
     @Nullable
@@ -80,16 +73,15 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     String oldAttributeValue;
 
     @Option(displayName = "Add only",
-            description = "When set to `true` will not change existing annotation attribute values.",
+            description = "If `true`, disables upgrading existing annotation attribute values, thus the recipe will only add the attribute if it does not already exist. " +
+                    "If omitted or `false`, the recipe adds the attribute if missing or updates its value if present.",
             required = false)
     @Nullable
     Boolean addOnly;
 
     @Option(displayName = "Append array",
-            description = "If the attribute is an array, setting this option to `true` will append the value(s). " +
-                    "In conjunction with `addOnly`, it is possible to control duplicates: " +
-                    "`addOnly=true`, always append. " +
-                    "`addOnly=false`, only append if the value is not already present.",
+            description = "If the attribute is an array and attribute is present, setting this option to `true` will append the value(s). Duplicate values will not be added. " +
+                    "If omitted or `false`, the recipe will replace the existing value(s) with the new value(s).",
             required = false)
     @Nullable
     Boolean appendArray;
@@ -98,361 +90,465 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
-                J.Annotation original = super.visitAnnotation(a, ctx);
-                if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
-                    return original;
+            public J.Annotation visitAnnotation(J.Annotation original, ExecutionContext ctx) {
+                J.Annotation a = super.visitAnnotation(original, ctx);
+                if (!TypeUtils.isOfClassType(a.getType(), annotationType) ||
+                        !(a.getType() instanceof JavaType.ShallowClass || findMethod(a, attributeName()).isPresent())) {
+                    return a;
                 }
 
-                String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
+                String newAttributeValue;
+                if (isFullyQualifiedClass()) {
+                    maybeAddImport(attributeValue.substring(0, attributeValue.length() - 6));
+                    newAttributeValue = attributeValue;
+                } else if (isFullyQualifiedEnumValue(a)) {
+                    maybeAddImport(getEnumClassName(attributeValue), false);
+                    newAttributeValue = getShortenedEnumValue(attributeValue);
+                } else {
+                    newAttributeValue = maybeQuoteStringArgument(a, attributeValue);
+                }
                 List<Expression> currentArgs = a.getArguments();
+
+                // ADD the value when the annotation has no arguments, e.g. @Foo` to @Foo(name="new")
                 if (currentArgs == null || currentArgs.isEmpty() || currentArgs.get(0) instanceof J.Empty) {
                     if (newAttributeValue == null || oldAttributeValue != null) {
                         return a;
                     }
-
-                    if (attributeName == null || "value".equals(attributeName)) {
-                        return JavaTemplate.builder("#{}")
-                                .contextSensitive()
-                                .build()
-                                .apply(getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
-                    } else {
-                        String newAttributeValueResult = newAttributeValue;
-                        if (((JavaType.FullyQualified) requireNonNull(a.getAnnotationType().getType())).getMethods().stream().anyMatch(method -> method.getReturnType().toString().equals("java.lang.String[]"))) {
-                            String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
-                            List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
-                            newAttributeValueResult = attributeList.stream()
-                                    .map(String::valueOf)
-                                    .collect(Collectors.joining("\", \"", "{\"", "\"}"));
-                        }
-                        return JavaTemplate.builder("#{} = #{}")
-                                .contextSensitive()
-                                .build()
-                                .apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValueResult);
+                    if ("value".equals(attributeName())) {
+                        String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsArray(a) : newAttributeValue;
+                        return getJavaTemplate("#{}").apply(getCursor(), a.getCoordinates().replaceArguments(), attrVal);
                     }
-                } else {
-                    // First assume the value exists amongst the arguments and attempt to update it
-                    AtomicBoolean foundOrSetAttributeWithDesiredValue = new AtomicBoolean(false);
+                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(a) ? getAttributeValuesAsString(a) : newAttributeValue;
+                    return getJavaTemplate("#{} = #{}").apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, attrVal);
+                }
+
+                // UPDATE the value when the annotation has arguments, e.g. @Foo(name="old") to `@Foo(name="new")
+                if (!TRUE.equals(addOnly)) {
                     final J.Annotation finalA = a;
-                    List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
+                    a = a.withArguments(ListUtils.map(currentArgs, it -> {
                         if (it instanceof J.Assignment) {
-                            J.Assignment as = (J.Assignment) it;
-                            J.Identifier var = (J.Identifier) as.getVariable();
-                            if (attributeName == null && !"value".equals(var.getSimpleName())) {
-                                return it;
-                            }
-                            if (attributeName != null && !attributeName.equals(var.getSimpleName())) {
-                                return it;
-                            }
-
-                            foundOrSetAttributeWithDesiredValue.set(true);
-
-                            if (newAttributeValue == null) {
-                                return null;
-                            }
-
-                            if (as.getAssignment() instanceof J.NewArray) {
-                                List<Expression> jLiteralList = requireNonNull(((J.NewArray) as.getAssignment()).getInitializer());
-                                String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
-                                List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
-
-                                if (as.getMarkers().findFirst(AlreadyAppended.class).filter(ap -> ap.getValues().equals(newAttributeValue)).isPresent()) {
-                                    return as;
-                                }
-
-                                if (Boolean.TRUE.equals(appendArray)) {
-                                    boolean changed = false;
-                                    for (String attrListValues : attributeList) {
-                                        String newAttributeListValue = maybeQuoteStringArgument(attributeName, attrListValues, finalA);
-                                        if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresent(jLiteralList, newAttributeListValue)) {
-                                            continue;
-                                        }
-                                        if (oldAttributeValue != null && !oldAttributeValue.equals(attrListValues)) {
-                                            continue;
-                                        }
-                                        changed = true;
-                                        Expression e = requireNonNull(((J.Annotation) JavaTemplate.builder(newAttributeListValue)
-                                                .contextSensitive()
-                                                .build()
-                                                .apply(getCursor(), finalA.getCoordinates().replaceArguments()))
-                                                .getArguments()).get(0);
-                                        jLiteralList.add(e);
-                                    }
-                                    return changed ? as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList))
-                                            .withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue))) : as;
-                                }
-                                int m = 0;
-                                for (int i = 0; i < requireNonNull(jLiteralList).size(); i++) {
-                                    if (i >= attributeList.size()) {
-                                        jLiteralList.remove(i);
-                                        i--;
-                                        continue;
-                                    }
-
-                                    String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
-                                    if (jLiteralList.size() == i + 1) {
-                                        m = i + 1;
-                                    }
-
-                                    if (newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                        continue;
-                                    }
-                                    if (oldAttributeValue != null && !oldAttributeValue.equals(attributeList.get(i))) {
-                                        continue;
-                                    }
-
-                                    jLiteralList.set(i, ((J.Literal) jLiteralList.get(i)).withValue(newAttributeListValue).withValueSource(newAttributeListValue).withPrefix(jLiteralList.get(i).getPrefix()));
-                                }
-                                if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)) {
-                                    if (Boolean.TRUE.equals(addOnly)) {
-                                        m = 0;
-                                    }
-                                    for (int j = m; j < attributeList.size(); j++) {
-                                        String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
-                                        jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
-                                    }
-                                }
-
-                                return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList));
-                            } else {
-                                Expression exp = as.getAssignment();
-                                if (exp instanceof J.Literal) {
-                                    J.Literal value = (J.Literal) exp;
-                                    if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                        return it;
-                                    }
-                                    if (!valueMatches(value, oldAttributeValue)) {
-                                        return it;
-                                    }
-                                    return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
-                                } else if (exp instanceof J.FieldAccess) {
-                                    if (Boolean.TRUE.equals(addOnly)) {
-                                        return it;
-                                    }
-                                    int index = finalA.getArguments().indexOf(as);
-                                    as = (J.Assignment) ((J.Annotation) JavaTemplate.apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var.getSimpleName(), newAttributeValue)).getArguments().get(index);
-                                    return as;
-                                }
-                            }
+                            return update((J.Assignment) it, finalA, newAttributeValue);
                         } else if (it instanceof J.Literal) {
-                            // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                            if (attributeName == null || "value".equals(attributeName)) {
-                                foundOrSetAttributeWithDesiredValue.set(true);
-                                if (newAttributeValue == null) {
-                                    return null;
-                                }
-                                J.Literal value = (J.Literal) it;
-                                if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                    return it;
-                                }
-                                if (!valueMatches(value, oldAttributeValue)) {
-                                    return it;
-                                }
-                                return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
-                            } else {
-                                // Make the attribute name explicit, before we add the new value below
-                                //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.builder("value = #{}")
-                                        .contextSensitive()
-                                        .build()
-                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
-                                ).getArguments().get(0);
-                            }
+                            return update((J.Literal) it, finalA, newAttributeValue);
                         } else if (it instanceof J.FieldAccess) {
-                            // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
-                            if (attributeName == null || "value".equals(attributeName)) {
-                                foundOrSetAttributeWithDesiredValue.set(true);
-                                if (!valueMatches(it, oldAttributeValue)) {
-                                    return it;
-                                }
-                                if (newAttributeValue == null) {
-                                    return null;
-                                }
-                                J.FieldAccess value = (J.FieldAccess) it;
-                                if (newAttributeValue.equals(value.toString()) || Boolean.TRUE.equals(addOnly)) {
-                                    return it;
-                                }
-                                //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.apply(newAttributeValue, getCursor(), finalA.getCoordinates().replaceArguments()))
-                                        .getArguments().get(0);
-                            } else {
-                                // Make the attribute name explicit, before we add the new value below
-                                //noinspection ConstantConditions
-                                return ((J.Annotation) JavaTemplate.builder("value = #{any()}")
-                                        .contextSensitive()
-                                        .build()
-                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it))
-                                        .getArguments().get(0);
-                            }
+                            return update((J.FieldAccess) it, finalA, newAttributeValue);
                         } else if (it instanceof J.NewArray) {
-                            if (it.getMarkers().findFirst(AlreadyAppended.class).filter(ap -> ap.getValues().equals(newAttributeValue)).isPresent()) {
-                                return it;
-                            }
-
-                            if (newAttributeValue == null) {
-                                return null;
-                            }
-
-                            J.NewArray arrayValue = (J.NewArray) it;
-                            List<Expression> jLiteralList = requireNonNull(arrayValue.getInitializer());
-                            String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
-                            List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
-
-                            if (Boolean.TRUE.equals(appendArray)) {
-                                boolean changed = false;
-                                for (String attrListValues : attributeList) {
-                                    String newAttributeListValue = maybeQuoteStringArgument(attributeName, attrListValues, finalA);
-                                    if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresent(jLiteralList, newAttributeListValue)) {
-                                        continue;
-                                    }
-                                    changed = true;
-
-                                    Expression e = requireNonNull(((J.Annotation) JavaTemplate.builder(newAttributeListValue)
-                                            .contextSensitive()
-                                            .build()
-                                            .apply(getCursor(), finalA.getCoordinates().replaceArguments()))
-                                            .getArguments()).get(0);
-                                    jLiteralList.add(e);
-                                }
-                                if (oldAttributeValue != null) { // remove old value from array
-                                    jLiteralList = ListUtils.map(jLiteralList, val -> valueMatches(val, oldAttributeValue) ? null : val);
-                                }
-
-                                return changed ? arrayValue.withInitializer(jLiteralList)
-                                        .withMarkers(it.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue))) : it;
-                            }
-                            int m = 0;
-                            for (int i = 0; i < requireNonNull(jLiteralList).size(); i++) {
-                                if (i >= attributeList.size()) {
-                                    jLiteralList.remove(i);
-                                    i--;
-                                    continue;
-                                }
-
-                                String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
-                                if (jLiteralList.size() == i + 1) {
-                                    m = i + 1;
-                                }
-
-                                if (newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                    continue;
-                                }
-                                if (oldAttributeValue != null && !oldAttributeValue.equals(newAttributeListValue)) {
-                                    continue;
-                                }
-
-                                jLiteralList.set(i, ((J.Literal) jLiteralList.get(i)).withValue(newAttributeListValue).withValueSource(newAttributeListValue).withPrefix(jLiteralList.get(i).getPrefix()));
-                            }
-                            if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)) {
-                                if (Boolean.TRUE.equals(addOnly)) {
-                                    m = 0;
-                                }
-                                for (int j = m; j < attributeList.size(); j++) {
-                                    String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
-
-                                    Expression e = requireNonNull(((J.Annotation) JavaTemplate.builder(newAttributeListValue)
-                                            .contextSensitive()
-                                            .build()
-                                            .apply(getCursor(), finalA.getCoordinates().replaceArguments()))
-                                            .getArguments()).get(0);
-                                    jLiteralList.add(j, e);
-                                }
-                            }
-
-                            return arrayValue.withInitializer(jLiteralList);
+                            return update((J.NewArray) it, finalA, newAttributeValue);
                         }
                         return it;
-                    });
+                    }));
+                }
 
-                    if (newArgs != currentArgs) {
-                        a = a.withArguments(newArgs);
+                // ADD the value into the argument list when there was no existing value to update and no requirements on a pre-existing old value, e.g. @Foo(name="old") to @Foo(value="new", name="old")
+                if (oldAttributeValue == null && newAttributeValue != null && !attributeNameOrValIsAlreadyPresent(a.getArguments(), getAttributeValues(a))) {
+                    J.Assignment as = createAnnotationAssignment(a, attributeName(), newAttributeValue);
+                    List<Expression> args = a.getArguments();
+                    // Case for existing attribute: `@Foo("q")` -> @Foo(value = "q")
+                    if (args.size() == 1 && !(args.get(0) instanceof J.Assignment)) {
+                        args = singletonList(createAnnotationAssignment(a, "value", a.getArguments().get(0)));
                     }
-                    if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue)) {
-                        // There was no existing value to update, so add a new value into the argument list
-                        String effectiveName = (attributeName == null) ? "value" : attributeName;
-                        //noinspection ConstantConditions
-                        J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
-                                .contextSensitive()
-                                .build()
-                                .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue))
-                                .getArguments().get(0);
-                        a = a.withArguments(ListUtils.concat(as, a.getArguments()));
+                    a = a.withArguments(ListUtils.concat(as, args));
+                }
+
+                if (original != a) {
+                    doAfterVisit(new SimplifySingleElementAnnotation().getVisitor());
+                    if (isFullyQualifiedClass()) {
+                        doAfterVisit(new ShortenFullyQualifiedTypeReferences().getVisitor());
                     }
                 }
-                a = maybeAutoFormat(original, a, ctx);
-                return a;
+                return maybeAutoFormat(original, a, ctx);
+            }
+
+            private @Nullable Expression update(J.Assignment as, J.Annotation annotation, @Nullable String newAttributeValue) {
+                J.Identifier var_ = (J.Identifier) as.getVariable();
+                if ((attributeName == null && !"value".equals(var_.getSimpleName())) ||
+                        (attributeName != null && !attributeName.equals(var_.getSimpleName()))) {
+                    return as;
+                }
+                if (newAttributeValue == null) {
+                    return null;
+                }
+                Expression exp = as.getAssignment();
+                if (exp instanceof J.NewArray) {
+                    List<Expression> initializerList = requireNonNull(((J.NewArray) exp).getInitializer());
+                    return as.withAssignment(((J.NewArray) exp)
+                            .withInitializer(updateInitializer(annotation, initializerList, getAttributeValues(annotation))));
+                }
+                if (exp instanceof J.Literal) {
+                    if (!valueMatches(exp, oldAttributeValue) || newAttributeValue.equals(((J.Literal) exp).getValueSource())) {
+                        return as;
+                    }
+                    // If appendArray is true and attribute is an array, convert literal to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.Literal) exp, getAttributeValues(annotation)));
+                    }
+                    return as.withAssignment(createAnnotationLiteral(annotation, newAttributeValue));
+                }
+                if (exp instanceof J.FieldAccess) {
+                    if (oldAttributeValue != null) {
+                        return as;
+                    }
+                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(exp.toString())) {
+                        return as;
+                    }
+                    if (newAttributeValue.equals(exp.toString())) {
+                        return as;
+                    }
+                    // If appendArray is true and attribute is an array, convert FieldAccess to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return as.withAssignment(createNewArrayWithExistingAndNew(annotation, (J.FieldAccess) exp, getAttributeValues(annotation)));
+                    }
+                    //noinspection ConstantConditions
+                    return getJavaTemplate("#{} = #{}").<J.Annotation>apply(getCursor(), as.getCoordinates().replace(), var_.getSimpleName(), newAttributeValue)
+                            .getArguments().get(annotation.getArguments().indexOf(as));
+                }
+                return as;
+            }
+
+            private @Nullable Expression update(J.Literal literal, J.Annotation annotation, @Nullable String newAttributeValue) {
+                // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
+                if ("value".equals(attributeName())) {
+                    if (newAttributeValue == null) {
+                        return null;
+                    }
+                    if (!valueMatches(literal, oldAttributeValue) || newAttributeValue.equals(literal.getValueSource())) {
+                        return literal;
+                    }
+                    // If appendArray is true and attribute is an array, convert literal to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return createNewArrayWithExistingAndNew(annotation, literal, getAttributeValues(annotation));
+                    }
+                    return createAnnotationLiteral(annotation, newAttributeValue);
+                }
+                if (oldAttributeValue == null && newAttributeValue != null) {
+                    // Without an oldAttributeValue and an attributeName not matching `value` we want to add an extra argument to the annotation.
+                    // Make the attribute name explicit, before we add the new value below
+                    return createAnnotationAssignment(annotation, "value", literal);
+                }
+                return literal;
+            }
+
+            private @Nullable Expression update(J.FieldAccess fieldAccess, J.Annotation annotation, @Nullable String newAttributeValue) {
+                // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
+                if ("value".equals(attributeName())) {
+                    if (newAttributeValue == null) {
+                        return null;
+                    }
+                    if (isFullyQualifiedClass() && getFullyQualifiedClass(newAttributeValue).equals(fieldAccess.toString())) {
+                        return fieldAccess;
+                    }
+                    if (!valueMatches(fieldAccess, oldAttributeValue) || newAttributeValue.equals(fieldAccess.toString())) {
+                        return fieldAccess;
+                    }
+                    // If appendArray is true and attribute is an array, convert FieldAccess to array and append
+                    if (TRUE.equals(appendArray) && attributeIsArray(annotation)) {
+                        return createNewArrayWithExistingAndNew(annotation, fieldAccess, getAttributeValues(annotation));
+                    }
+                    String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ?
+                            getAttributeValues(annotation).stream().map(String::valueOf).collect(joining(",", "{", "}")) :
+                            newAttributeValue;
+                    //noinspection ConstantConditions
+                    return getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
+                            .getArguments().get(0);
+                }
+                // Make the attribute name explicit, before we add the new value below
+                return createAnnotationAssignment(annotation, "value", fieldAccess);
+            }
+
+            private JavaTemplate getJavaTemplate(String template) {
+                JavaTemplate.Builder builder = JavaTemplate.builder(template);
+                if (isFullyQualifiedClass()) {
+                    JavaType.ShallowClass fqn = JavaType.ShallowClass.build(attributeValue.substring(0, attributeValue.length() - 6));
+                    builder
+                            .javaParser(JavaParser.fromJavaVersion().dependsOn(String.format("package %s;\npublic interface %s {}\n", fqn.getPackageName(), fqn.getClassName())))
+                            .imports(fqn.getFullyQualifiedName());
+                }
+                return builder.build();
+            }
+
+            private @Nullable Expression update(J.NewArray arrayValue, J.Annotation annotation, @Nullable String newAttributeValue) {
+                if (newAttributeValue == null) {
+                    return null;
+                }
+                if (attributeName != null && !"value".equals(attributeName)) {
+                    return isAnnotationWithOnlyValueMethod(annotation) ? arrayValue : createAnnotationAssignment(annotation, "value", arrayValue);
+                }
+                return arrayValue.withInitializer(updateInitializer(annotation, requireNonNull(arrayValue.getInitializer()), getAttributeValues(annotation)));
+            }
+
+            private Expression createAnnotationLiteral(J.Annotation annotation, String newAttributeValue) {
+                String attrVal = newAttributeValue.contains(",") && attributeIsArray(annotation) ? getAttributeValuesAsString(annotation) : newAttributeValue;
+                //noinspection ConstantConditions
+                return getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), attrVal)
+                        .getArguments().get(0);
+            }
+
+            private J.Assignment createAnnotationAssignment(J.Annotation annotation, String name, @Nullable Object parameter) {
+                //noinspection ConstantConditions
+                return (J.Assignment) getJavaTemplate(name + " = " + (parameter instanceof J ? "#{any()}" : "#{}")).<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), parameter)
+                        .getArguments().get(0);
+            }
+
+            private J.NewArray createNewArrayWithExistingAndNew(J.Annotation annotation, J.Literal existingLiteral, List<String> newValues) {
+                List<Expression> initializer = new ArrayList<>();
+                // Add the existing literal value first
+                initializer.add(existingLiteral.withPrefix(SINGLE_SPACE));
+                // Add new values, skipping duplicates
+                for (String attribute : newValues) {
+                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                        initializer.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
+                    }
+                }
+                // Use a template to create the array structure, then replace the initializer
+                //noinspection ConstantConditions
+                J.NewArray template = (J.NewArray) getJavaTemplate("{#{any()}}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), existingLiteral)
+                        .getArguments().get(0);
+                return template.withInitializer(initializer);
+            }
+
+            private J.NewArray createNewArrayWithExistingAndNew(J.Annotation annotation, J.FieldAccess existingFieldAccess, List<String> newValues) {
+                List<Expression> initializer = new ArrayList<>();
+                // Add the existing field access value first
+                initializer.add(existingFieldAccess.withPrefix(SINGLE_SPACE));
+                // Add new values, skipping duplicates - use template for non-string values
+                for (String attribute : newValues) {
+                    if (!attributeNameOrValIsAlreadyPresent(initializer, singleton(attribute))) {
+                        String templateValue = attribute;
+                        // For FQ classes, add stub so type info is resolved and use FQ name in template
+                        if (isFullyQualifiedClass()) {
+                            templateValue = getFullyQualifiedClass(attributeValue);
+                        }
+                        //noinspection ConstantConditions
+                        Expression newExpr = getJavaTemplate("#{}").<J.Annotation>apply(getCursor(), annotation.getCoordinates().replaceArguments(), templateValue)
+                                .getArguments().get(0).withPrefix(SINGLE_SPACE);
+                        initializer.add(newExpr);
+                    }
+                }
+                // Use a template to create the array structure, then replace the initializer
+                //noinspection ConstantConditions
+                J.NewArray template = (J.NewArray) JavaTemplate.<J.Annotation>apply("{#{any()}}", getCursor(), annotation.getCoordinates().replaceArguments(), existingFieldAccess)
+                        .getArguments().get(0);
+                return template.withInitializer(initializer);
             }
         });
+    }
+
+    private boolean isFullyQualifiedClass() {
+        return attributeValue != null &&
+               !attributeValue.contains(",") &&
+               attributeValue.endsWith(".class") &&
+               StringUtils.countOccurrences(attributeValue, ".") > 1;
+    }
+
+    private static String getFullyQualifiedClass(String fqn) {
+        String withoutClassSuffix = fqn.substring(0, fqn.length() - 6);
+        return withoutClassSuffix.substring(withoutClassSuffix.lastIndexOf('.') + 1) + ".class";
+    }
+
+    private boolean isFullyQualifiedEnumValue(J.Annotation annotation) {
+        if (attributeValue == null || attributeValue.endsWith(".class") || attributeValue.contains(",")) {
+            return false;
+        }
+        if (!attributeValue.matches("[\\w.$]+") || !attributeIsEnum(annotation)) {
+            return false;
+        }
+        int lastDot = attributeValue.lastIndexOf('.');
+        if (lastDot <= 0) {
+            return false;
+        }
+        String enumClassName = attributeValue.substring(0, lastDot);
+        return enumClassName.contains(".");
+    }
+
+    private static String getEnumClassName(String fqn) {
+        // Extract the enum class name from a fully qualified enum value
+        // e.g., org.example.Values.ONE -> org.example.Values
+        int lastDot = fqn.lastIndexOf('.');
+        return fqn.substring(0, lastDot);
+    }
+
+    private static String getShortenedEnumValue(String fqn) {
+        // Shorten org.example.Values.ONE to Values.ONE
+        String enumClassName = getEnumClassName(fqn);
+        String simpleName = enumClassName.substring(enumClassName.lastIndexOf('.') + 1);
+        String enumConstant = fqn.substring(fqn.lastIndexOf('.') + 1);
+        return simpleName + "." + enumConstant;
+    }
+
+    private String attributeName() {
+        return attributeName == null ? "value" : attributeName;
+    }
+
+    private List<Expression> updateInitializer(J.Annotation annotation, List<Expression> initializerList, List<String> attributeList) {
+        // If `oldAttributeValue` is defined, replace the old value with the new value(s). Ignore the `appendArray` option in this case.
+        if (oldAttributeValue != null) {
+            return ListUtils.flatMap(initializerList, it -> {
+                if (it instanceof J.Literal && oldAttributeValue.equals(((J.Literal) it).getValue())) {
+                    List<Expression> newItemsList = new ArrayList<>();
+                    for (String attribute : attributeList) {
+                        J.Literal newLiteral = new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String);
+                        newItemsList.add(newLiteral);
+                    }
+                    return newItemsList;
+                }
+                return it;
+            });
+        }
+
+        // If `appendArray` is true, add the new value(s) to the existing array (no duplicates)
+        if (TRUE.equals(appendArray)) {
+            List<Expression> newItemsList = new ArrayList<>();
+            for (String attribute : attributeList) {
+                if (attributeNameOrValIsAlreadyPresent(initializerList, singleton(attribute))) {
+                    continue;
+                }
+                newItemsList.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attribute, maybeQuoteStringArgument(annotation, attribute), null, JavaType.Primitive.String));
+            }
+            // Filter out empty elements (e.g., from an empty array initializer `{}`)
+            List<Expression> nonEmptyInitializer = ListUtils.filter(initializerList, it -> !(it instanceof J.Empty));
+            return ListUtils.concatAll(nonEmptyInitializer, newItemsList);
+        }
+
+        // If no option is defined, replace the old array elements with the new elements
+        List<Expression> list = ListUtils.map(initializerList, (i, it) -> {
+            if (i >= attributeList.size()) {
+                return null;
+            }
+            if (attributeNameOrValIsAlreadyPresent(it, singleton(attributeList.get(i)))) {
+                return it;
+            }
+            return new J.Literal(randomId(), it.getPrefix(), EMPTY, attributeList.get(i), maybeQuoteStringArgument(annotation, attributeList.get(i)), null, JavaType.Primitive.String);
+        });
+        // and add extra new items if needed
+        for (int i = initializerList.size(); i < attributeList.size(); i++) {
+            list.add(new J.Literal(randomId(), SINGLE_SPACE, EMPTY, attributeList.get(i), maybeQuoteStringArgument(annotation, attributeList.get(i)), null, JavaType.Primitive.String));
+        }
+        return list;
+    }
+
+    private List<String> getAttributeValues(J.Annotation annotation) {
+        if (attributeValue == null) {
+            return emptyList();
+        }
+        if (isFullyQualifiedClass()) {
+            return singletonList(getFullyQualifiedClass(attributeValue));
+        }
+        if (isFullyQualifiedEnumValue(annotation)) {
+            return singletonList(getShortenedEnumValue(attributeValue));
+        }
+        String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
+        return Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
+    }
+
+    private String getAttributeValuesAsString(J.Annotation annotation) {
+        return getAttributeValues(annotation).stream().map(String::valueOf).collect(joining("\", \"", "{\"", "\"}"));
+    }
+
+    private String getAttributeValuesAsArray(J.Annotation annotation) {
+        return getAttributeValues(annotation).stream().map(String::valueOf).collect(joining(", ", "{", "}"));
+    }
+
+    private static boolean isAnnotationWithOnlyValueMethod(J.Annotation annotation) {
+        return getMethods(annotation).size() == 1 && "value".equals(getMethods(annotation).get(0).getName());
     }
 
     private static boolean valueMatches(@Nullable Expression expression, @Nullable String oldAttributeValue) {
         if (expression == null) {
             return oldAttributeValue == null;
-        }
-        if (oldAttributeValue == null) { // null means wildcard
+        } else if (oldAttributeValue == null) { // null means wildcard
             return true;
         } else if (expression instanceof J.Literal) {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
         } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) expression;
+            if (!(fa.getTarget() instanceof J.Identifier)) {
+                return oldAttributeValue.equals(fa.toString());
+            }
             String currentValue = ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();
             return oldAttributeValue.equals(currentValue);
-        } else if (expression instanceof J.Identifier) { // class names, static variables ..
+        } else if (expression instanceof J.Identifier) { // class names, static variables, ...
             if (oldAttributeValue.endsWith(".class")) {
                 String className = TypeUtils.toString(requireNonNull(expression.getType())) + ".class";
                 return className.endsWith(oldAttributeValue);
-            } else {
-                return oldAttributeValue.equals(((J.Identifier) expression).getSimpleName());
             }
-        } else {
-            throw new IllegalArgumentException("Unexpected expression type: " + expression.getClass());
+            return oldAttributeValue.equals(((J.Identifier) expression).getSimpleName());
         }
+        throw new IllegalArgumentException("Unexpected expression type: " + expression.getClass());
     }
 
-    @Contract("_, null, _ -> null; _, !null, _ -> !null")
-    private static @Nullable String maybeQuoteStringArgument(@Nullable String attributeName, @Nullable String attributeValue, J.Annotation annotation) {
-        if ((attributeValue != null) && attributeIsString(attributeName, annotation)) {
+    @Contract("_, null -> null; _, !null -> !null")
+    private @Nullable String maybeQuoteStringArgument(J.Annotation annotation, @Nullable String attributeValue) {
+        if (attributeValue != null && attributeIsString(annotation)) {
             return "\"" + attributeValue + "\"";
-        } else {
-            return attributeValue;
         }
+        return attributeValue;
     }
 
-    private static boolean attributeIsString(@Nullable String attributeName, J.Annotation annotation) {
-        String actualAttributeName = (attributeName == null) ? "value" : attributeName;
-        JavaType.Class annotationType = (JavaType.Class) annotation.getType();
-        if (annotationType != null) {
-            for (JavaType.Method m : annotationType.getMethods()) {
-                if (m.getName().equals(actualAttributeName)) {
-                    return TypeUtils.isOfClassType(m.getReturnType(), "java.lang.String");
-                }
+    private boolean attributeIsArray(J.Annotation annotation) {
+        return findMethod(annotation, attributeName())
+                .map(it -> it.getReturnType() instanceof JavaType.Array)
+                .orElse(false);
+    }
+
+    private boolean attributeIsString(J.Annotation annotation) {
+        return findMethod(annotation, attributeName())
+                .map(it -> TypeUtils.isOfClassType(it.getReturnType(), "java.lang.String"))
+                .orElse(false);
+    }
+
+    private boolean attributeIsEnum(J.Annotation annotation) {
+        return findMethod(annotation, attributeName())
+                .map(it -> it.getReturnType() instanceof JavaType.FullyQualified &&
+                           ((JavaType.FullyQualified) it.getReturnType()).getKind() == JavaType.FullyQualified.Kind.Enum)
+                .orElse(false);
+    }
+
+    private static Optional<JavaType.Method> findMethod(J.Annotation annotation, String methodName) {
+        for (JavaType.Method it : getMethods(annotation)) {
+            if (methodName.equals(it.getName())) {
+                return Optional.of(it);
             }
         }
-        return false;
+        return Optional.empty();
     }
 
-    private static boolean attributeValIsAlreadyPresent(@Nullable List<Expression> expression, @Nullable String attributeValue) {
-        if (expression == null) {
-            return attributeValue == null;
-        }
+    private static List<JavaType.Method> getMethods(J.Annotation annotation) {
+        return ((JavaType.FullyQualified) requireNonNull(annotation.getAnnotationType().getType())).getMethods();
+    }
+
+    private boolean attributeNameOrValIsAlreadyPresent(Collection<Expression> expression, Collection<?> values) {
         for (Expression e : expression) {
-            if (e instanceof J.Literal) {
-                J.Literal literal = (J.Literal) e;
-                if (literal.getValueSource() != null && literal.getValueSource().equals(attributeValue)) {
-                    return true;
-                }
-            }
-            if (e instanceof J.NewArray) {
-                return attributeValIsAlreadyPresent(((J.NewArray) e).getInitializer(), attributeValue);
+            if (attributeNameOrValIsAlreadyPresent(e, values)) {
+                return true;
             }
         }
         return false;
     }
 
-    @Value
-    @With
-    private static class AlreadyAppended implements Marker {
-        UUID id;
-        String values;
+    private boolean attributeNameOrValIsAlreadyPresent(Expression e, Collection<?> values) {
+        if (e instanceof J.Assignment) {
+            J.Assignment as = (J.Assignment) e;
+            if (as.getVariable() instanceof J.Identifier) {
+                return ((J.Identifier) as.getVariable()).getSimpleName().equals(attributeName());
+            }
+        } else if (e instanceof J.Literal) {
+            return values.contains(((J.Literal) e).getValue() + "");
+        } else if (e instanceof J.FieldAccess) {
+            J.FieldAccess fa = (J.FieldAccess) e;
+            String fullString = fa.toString();
+            if (values.contains(fullString)) {
+                return true;
+            }
+            // For class literals, also check the simple name (e.g., com.example.MyClass.class -> MyClass.class)
+            if (fullString.endsWith(".class") && fa.getTarget() instanceof J.FieldAccess) {
+                String simpleName = getFullyQualifiedClass(fullString);
+                return values.contains(simpleName);
+            }
+            return false;
+        } else if (e instanceof J.NewArray) {
+            List<Expression> initializer = ((J.NewArray) e).getInitializer();
+            return (initializer == null && attributeValue == null) || (initializer != null && attributeNameOrValIsAlreadyPresent(initializer, values));
+        }
+        return false;
     }
 }

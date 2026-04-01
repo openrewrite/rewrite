@@ -25,15 +25,9 @@ import org.openrewrite.kotlin.format.TrailingCommaVisitor;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveTrailingComma extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove trailing comma in Kotlin";
-    }
+    String displayName = "Remove trailing comma in Kotlin";
 
-    @Override
-    public String getDescription() {
-        return "Remove trailing commas in variable, parameter, and class property lists.";
-    }
+    String description = "Remove trailing commas in variable, parameter, and class property lists.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

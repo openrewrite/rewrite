@@ -26,7 +26,7 @@ import java.util.UUID;
 /**
  * In Groovy methods can be declared with a return type and also a redundant 'def' keyword.
  * This captures the extra def keyword.
- * @deprecated The `def` keyword is now parsed as a {@link J.Modifier.Type.LanguageExtension} type.
+ * @deprecated The `def` keyword is now parsed as a {@link J.Modifier.Type#LanguageExtension} type.
  */
 @Value
 @With

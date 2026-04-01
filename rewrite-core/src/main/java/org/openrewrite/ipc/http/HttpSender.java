@@ -16,7 +16,7 @@
 package org.openrewrite.ipc.http;
 
 import io.micrometer.core.instrument.util.StringUtils;
-import io.micrometer.core.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.net.MalformedURLException;
@@ -30,6 +30,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.zip.GZIPOutputStream;
+
+import static java.util.Collections.emptyMap;
 
 /**
  * A general-purpose interface for controlling how components perform HTTP calls for various purposes.
@@ -414,11 +416,17 @@ public interface HttpSender {
     class Response implements AutoCloseable {
         private final int code;
         private final InputStream body;
+        private final Map<String, List<String>> headers;
         private final Runnable onClose;
 
         public Response(int code, @Nullable InputStream body, Runnable onClose) {
+            this(code, body, emptyMap(), onClose);
+        }
+
+        public Response(int code, @Nullable InputStream body, Map<String, List<String>> headers, Runnable onClose) {
             this.code = code;
             this.body = body;
+            this.headers = headers;
             this.onClose = onClose;
         }
 
@@ -426,11 +434,20 @@ public interface HttpSender {
             return code;
         }
 
+        public Map<String, List<String>> getHeaders() {
+            return headers;
+        }
+
         public InputStream getBody() {
             return new InputStream() {
                 @Override
                 public int read() throws IOException {
-                    return body == null ? 0 : body.read();
+                    return body == null ? -1 : body.read();
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) throws IOException {
+                    return body == null ? -1 : body.read(b, off, len);
                 }
 
                 @Override

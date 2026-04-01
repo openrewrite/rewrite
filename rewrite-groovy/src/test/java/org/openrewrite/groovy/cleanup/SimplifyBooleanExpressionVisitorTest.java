@@ -149,6 +149,22 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void doubleNegationPreservedForTruthinessCoercion() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def m(String s) {
+                      boolean a = !!s
+                      boolean b = !(!s)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doubleNegatedBinaryWithParentheses() {
         rewriteRun(
           groovy(
@@ -167,12 +183,12 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             """
               class A {
                   def m() {
-                      boolean a1 = 1 != 1
-                      boolean a2 = 1 == 1
-                      boolean a3 = 1 >= 1
-                      boolean a4 = 1 > 1
-                      boolean a5 = 1 <= 1
-                      boolean a6 = 1 < 1
+                      boolean a1 = false
+                      boolean a2 = true
+                      boolean a3 = true
+                      boolean a4 = false
+                      boolean a5 = true
+                      boolean a6 = false
                   }
               }
               """
@@ -431,9 +447,6 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
-    // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
     @CsvSource(delimiterString = "//", textBlock = """
       a == null || a.isEmpty()                                 // a == null || a.isEmpty()
       a == null || !a.isEmpty()                                // a == null || !a.isEmpty()
@@ -444,7 +457,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       "" == null || !"".isEmpty()                              // false
       "" != null && "".isEmpty()                               // true
       "" != null && !"".isEmpty()                              // false
-      
+
       "b" == null || "b".isEmpty()                             // false
       "b" == null || !"b".isEmpty()                            // true
       "b" != null && "b".isEmpty()                             // false
@@ -462,9 +475,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() || "" == null || !"".isEmpty() // a == null || !a.isEmpty()
       a == null || !a.isEmpty() || "" != null && "".isEmpty()  // true
       a == null || !a.isEmpty() || "" != null && !"".isEmpty() // a == null || !a.isEmpty()
-      a == null || !a.isEmpty() && "" == null || "".isEmpty()  // true 
+      a == null || !a.isEmpty() && "" == null || "".isEmpty()  // true
       a == null || !a.isEmpty() && "" == null || !"".isEmpty() // a == null
-      a == null || !a.isEmpty() && "" != null && "".isEmpty()  // a == null || !a.isEmpty() 
+      a == null || !a.isEmpty() && "" != null && "".isEmpty()  // a == null || !a.isEmpty()
       a == null || !a.isEmpty() && "" != null && !"".isEmpty() // a == null
 
       a == null || a.isEmpty() || "b" == null || "b".isEmpty()   // a == null || a.isEmpty()
@@ -479,11 +492,14 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
       a == null || !a.isEmpty() || "b" == null || !"b".isEmpty() // true
       a == null || !a.isEmpty() || "b" != null && "b".isEmpty()  // a == null || !a.isEmpty()
       a == null || !a.isEmpty() || "b" != null && !"b".isEmpty() // true
-      a == null || !a.isEmpty() && "b" == null || "b".isEmpty()  // a == null 
+      a == null || !a.isEmpty() && "b" == null || "b".isEmpty()  // a == null
       a == null || !a.isEmpty() && "b" == null || !"b".isEmpty() // true
-      a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null 
+      a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null
       a == null || !a.isEmpty() && "b" != null && !"b".isEmpty() // a == null || !a.isEmpty()
       """)
+    @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
+    // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
+    @ParameterizedTest
     void simplifyLiteralNull(String before, String after) {
         String template = """
           class A {

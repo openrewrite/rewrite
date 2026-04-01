@@ -92,7 +92,7 @@ public class TreeVisitorAdapter {
                         setCursor.returnValue(null);
 
                         for (Method method : delegate.getClass().getDeclaredMethods()) {
-                            if (method.getName().startsWith("visit") || method.getName().equals("preVisit") || method.getName().equals("postVisit")) {
+                            if (method.getName().startsWith("visit") || "preVisit".equals(method.getName()) || "postVisit".equals(method.getName())) {
                                 nextMethod:
                                 for (Method adaptToMethod : adaptTo.getMethods()) {
                                     if (method.getName().equals(adaptToMethod.getName()) && method.getParameterCount() == adaptToMethod.getParameterCount() && !Modifier.isFinal(adaptToMethod.getModifiers())) {

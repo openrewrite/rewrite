@@ -53,7 +53,6 @@ class RemoveTrailingSemicolonTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void doNotChangeVariableDeclarationsInSameLine() {
         rewriteRun(
@@ -146,7 +145,7 @@ class RemoveTrailingSemicolonTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Map;
-              
+
               class T
               """,
             """

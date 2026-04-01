@@ -23,9 +23,9 @@ import org.openrewrite.binary.Binary;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
-import java.util.Collections;
 import java.util.Set;
 
+import static java.util.Collections.singleton;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -36,26 +36,17 @@ public class ChangeText extends Recipe {
             example = "Some text.")
     String toText;
 
-    @Override
-    public Set<String> getTags() {
-        return Collections.singleton("plain text");
-    }
+    Set<String> tags = singleton("plain text");
 
-    @Override
-    public String getDisplayName() {
-        return "Change text";
-    }
+    String displayName = "Change text";
 
     @Override
     public String getInstanceNameSuffix() {
         return "to `" + toText + "`";
     }
 
-    @Override
-    public String getDescription() {
-        return "Completely replaces the contents of the text file with other text. " +
+    String description = "Completely replaces the contents of the text file with other text. " +
                "Use together with a `FindSourceFiles` precondition to limit which files are changed.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

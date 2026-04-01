@@ -23,8 +23,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ObjectExpressionTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/274")
+    @Test
     void referenceToObjectField() {
         rewriteRun(
           kotlin(
@@ -62,7 +62,7 @@ class ObjectExpressionTest implements RewriteTest {
             """
               open class A
               interface B
-              
+
               val foo: Any = object: A ( ), B { }
               """
           )

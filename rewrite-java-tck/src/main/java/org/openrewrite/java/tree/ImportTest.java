@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -31,10 +32,10 @@ class ImportTest implements RewriteTest {
             """
               import static java.util.Map.Entry;
               import java.util.Map.Entry;
-              
+
               import java.util.List;
               import java.util.*;
-              
+
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
               """,
@@ -58,10 +59,10 @@ class ImportTest implements RewriteTest {
             """
               import static java.util.Map.Entry;
               import java.util.Map.Entry;
-              
+
               import java.util.List;
               import java.util.*;
-              
+
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
               """,
@@ -146,7 +147,7 @@ class ImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite.BadPackage;
-              
+
               public class Foo {
                   public static class Bar {
                   }
@@ -158,10 +159,10 @@ class ImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite;
-              
+
               import org.openrewrite.BadPackage.Foo;
               import org.openrewrite.BadPackage.Foo.Bar;
-              
+
               public class Bar {
                   private Foo foo;
               }
@@ -181,6 +182,77 @@ class ImportTest implements RewriteTest {
           java(
             """
               import java.util.List ;
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
+    @Test
+    void semicolonAfterPackage() {
+        //language=java
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              package p;;
+              import java.util.List;
+              class AfterPackage { }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
+    @Test
+    void semicolonBetweenImports() {
+        //language=java
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.List;
+              ;import java.util.Set;
+              class BetweenImport { }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/396")
+    @Test
+    void semicolonAfterImports() {
+        //language=java
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.List;
+              ;class BetweenImport { }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6310")
+    @Test
+    void extraSemicolonAfterImportWithComment() {
+        rewriteRun(
+          spec -> spec
+            .typeValidationOptions(TypeValidation.all().allowNonWhitespaceInWhitespace(true)),
+          java(
+            """
+              import java.util.*;; // Semicolon here
+              import java.io.*;   // Followed by another import
+
+              public class Main {
+                  public static void main(String[] args) {
+                      System.out.printf("Hello and welcome!");
+                  }
+              }
               """
           )
         );

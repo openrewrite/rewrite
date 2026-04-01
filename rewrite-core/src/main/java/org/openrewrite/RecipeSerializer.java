@@ -28,6 +28,7 @@ import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import lombok.Getter;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,6 +38,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
+@Getter
 public class RecipeSerializer {
     private final ObjectMapper mapper;
 

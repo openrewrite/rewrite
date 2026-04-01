@@ -20,16 +20,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.java.format.*;
-import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.Style;
+import org.openrewrite.style.NamedStyles;
 
-import java.util.Optional;
-import java.util.function.Supplier;
-
-import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
+import java.util.List;
 
 public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
     @Nullable
@@ -46,41 +41,33 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
+        if (tree == null) {
+            tree = cursor.getValue();
+        }
         JavaSourceFile cu = (tree instanceof JavaSourceFile) ?
                 (JavaSourceFile) tree :
                 cursor.firstEnclosingOrThrow(JavaSourceFile.class);
 
-        J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
+        List<NamedStyles> activeStyles = cu.getMarkers().findAll(NamedStyles.class);
 
-        t = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
-                .visit(t, p, cursor.fork());
+        tree = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new SpacesVisitor<>(
-                Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
-                cu.getStyle(EmptyForInitializerPadStyle.class),
-                Style.from(EmptyForIteratorPadStyle.class, cu),
-                stopAfter
-        ).visit(t, p, cursor.fork());
-
-        t = new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, cu))
-                .orElse(autodetectGeneralFormatStyle(cu)), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
-
-        t = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
-
+        // Format the tree in multiple passes to visitors that "enlarge" the space (Eg. first spaces, then wrapping, then indents...)
+        J t = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
+        t = new SpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new WrappingAndBracesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new NormalizeTabsOrSpacesVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
+        t = new TabsAndIndentsVisitor<>(activeStyles, stopAfter).visitNonNull(t, p, cursor.fork());
         t = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(t, p, cursor.fork());
 
-        return t;
+        // With the updated tree, overwrite the original space with the newly computed space
+        tree = new MergeSpacesVisitor(activeStyles).visitNonNull(tree, t, cursor.fork());
+
+        // Then apply formatting that applies on line-endings / #lines / ...
+        tree = new BlankLinesVisitor<>(activeStyles, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new NormalizeLineBreaksVisitor<>(activeStyles, cu, stopAfter).visitNonNull(tree, p, cursor.fork());
+        tree = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
+
+        return (J) tree;
     }
 }

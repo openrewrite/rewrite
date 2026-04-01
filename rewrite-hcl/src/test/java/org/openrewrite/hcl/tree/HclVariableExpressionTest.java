@@ -48,4 +48,15 @@ class HclVariableExpressionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nullAsKey() {
+        rewriteRun(
+          hcl(
+            """
+              null = true
+              """
+          )
+        );
+    }
 }

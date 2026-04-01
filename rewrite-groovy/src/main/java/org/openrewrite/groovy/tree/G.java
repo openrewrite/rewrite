@@ -36,9 +36,11 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 public interface G extends J {
     @SuppressWarnings("unchecked")
@@ -184,7 +186,7 @@ public interface G extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.Import.class::isInstance)
                     .map(J.Import.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -199,7 +201,7 @@ public interface G extends J {
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -271,13 +273,13 @@ public interface G extends J {
                 return t.statements.stream()
                         .filter(s -> s.getElement() instanceof J.ClassDeclaration)
                         .map(s -> (JRightPadded<J.ClassDeclaration>) (Object) s)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
 
             public G.CompilationUnit withClasses(List<JRightPadded<ClassDeclaration>> classes) {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 int insertionIdx = 0;
                 for (JRightPadded<Statement> statement : statements) {
                     if (!(statement.getElement() instanceof J.Import)) {
@@ -289,7 +291,7 @@ public interface G extends J {
                 //noinspection unchecked
                 statements.addAll(insertionIdx, classes.stream()
                         .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(Collectors.toList()));
+                        .collect(toList()));
 
                 List<JRightPadded<ClassDeclaration>> originalClasses = t.getPadding().getClasses();
                 if (originalClasses.size() != classes.size()) {
@@ -313,18 +315,18 @@ public interface G extends J {
                 return t.statements.stream()
                         .filter(s -> s.getElement() instanceof J.Import)
                         .map(s -> (JRightPadded<J.Import>) (Object) s)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.Import))
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 //noinspection unchecked
                 statements.addAll(0, imports.stream()
                         .map(i -> (JRightPadded<Statement>) (Object) i)
-                        .collect(Collectors.toList()));
+                        .collect(toList()));
 
                 List<JRightPadded<Import>> originalImports = t.getPadding().getImports();
                 if (originalImports.size() != imports.size()) {
@@ -793,8 +795,14 @@ public interface G extends J {
             Find,
             Match,
             In,
+            NotIn,
             Access,
-            Spaceship
+            Spaceship,
+            ElvisAssignment,
+            Power,
+            PowerAssignment,
+            IdentityEquals,
+            IdentityNotEquals
         }
 
         public Padding getPadding() {
@@ -927,6 +935,191 @@ public interface G extends J {
 
             public Range withInclusive(JLeftPadded<Boolean> inclusive) {
                 return t.inclusive == inclusive ? t : new Range(t.id, t.prefix, t.markers, t.from, inclusive, t.to);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class Unary implements G, Expression, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JLeftPadded<G.Unary.Type> operator;
+
+        public G.Unary.Type getOperator() {
+            return operator.getElement();
+        }
+
+        @SuppressWarnings("unused")
+        public G.Unary withOperator(G.Unary.Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @With
+        @Getter
+        Expression expression;
+
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitUnary(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public enum Type {
+            Spread
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final G.Unary t;
+
+            public JLeftPadded<G.Unary.Type> getOperator() {
+                return t.operator;
+            }
+
+            public G.Unary withOperator(JLeftPadded<G.Unary.Type> operator) {
+                return t.operator == operator ? t : new G.Unary(t.id, t.prefix, t.markers, operator, t.expression, t.type);
+            }
+        }
+    }
+
+    /**
+     * Represents a Groovy tuple expression used in destructuring assignments.
+     * For example, in {@code def (a, b, c) = [1, 2, 3]} or
+     * {@code def (String key, String value) = "a:b".split(":")}, the
+     * parenthesized portion is a TupleExpression. Each element is a
+     * {@link J.VariableDeclarations} which can carry an optional per-variable type.
+     * Implements {@link VariableDeclarator} so it can be placed in
+     * {@link J.VariableDeclarations.NamedVariable#getDeclarator()}.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TupleExpression implements G, Expression, TypedTree, VariableDeclarator {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<J.VariableDeclarations> variables;
+
+        public List<J.VariableDeclarations> getVariables() {
+            return variables.getElements();
+        }
+
+        public TupleExpression withVariables(List<J.VariableDeclarations> variables) {
+            return getPadding().withVariables(JContainer.withElements(this.variables, variables));
+        }
+
+        @Override
+        public List<J.Identifier> getNames() {
+            List<J.Identifier> list = new ArrayList<>();
+            for (J.VariableDeclarations decl : variables.getElements()) {
+                for (J.VariableDeclarations.NamedVariable var : decl.getVariables()) {
+                    list.add(var.getName());
+                }
+            }
+            return list;
+        }
+
+        @Nullable
+        @With
+        @Getter
+        JavaType type;
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitTupleExpression(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TupleExpression t;
+
+            public JContainer<J.VariableDeclarations> getVariables() {
+                return t.variables;
+            }
+
+            public TupleExpression withVariables(JContainer<J.VariableDeclarations> variables) {
+                return t.variables == variables ? t : new TupleExpression(t.id, t.prefix, t.markers, variables, t.type);
             }
         }
     }

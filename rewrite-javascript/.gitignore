@@ -1,0 +1,7 @@
+rpc.*.log
+
+# Where recipes are installed during RPC tests
+/.rewrite
+/.working-dir
+
+src/main/resources/META-INF/rewrite-javascript-version.txt

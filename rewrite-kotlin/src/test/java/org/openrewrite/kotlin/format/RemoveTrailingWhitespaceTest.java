@@ -39,15 +39,15 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class Test {  
-              
+              class Test {
+
                   fun method(t: Test) {\s\s
                   }\s\s
               }\s\s
               """,
             """
               class Test {
-              
+
                   fun method(t: Test) {
                   }
               }

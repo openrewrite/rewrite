@@ -30,7 +30,7 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class ChangePackageTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangePackage("a.b", "x.y", false, null));
+        spec.recipe(new ChangePackage("a.b", "x.y", false));
     }
 
     @DocumentExample
@@ -50,14 +50,14 @@ class ChangePackageTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A {
                   val type = Original()
               }
               """,
             """
               import x.y.Original
-              
+
               class A {
                   val type = Original()
               }
@@ -97,7 +97,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void renamePackageRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true, null)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true)),
           kotlin(
             """
               package org.foo.internal
@@ -109,7 +109,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/internal/Test.kt").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.kt");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "org.foo.test.internal.Test")).isTrue();
             })
           )
         );
@@ -118,7 +118,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false, null)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
           kotlin(
             """
               package org.foo
@@ -130,7 +130,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/Test.kt").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.kt");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.z.Test")).isTrue();
             })
           )
         );
@@ -139,7 +139,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changePackageNameWithInheritance() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.a", "org.b", false, null)),
+          spec -> spec.recipe(new ChangePackage("org.a", "org.b", false)),
           kotlin(
             """
               package org.a
@@ -161,7 +161,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.path("org/a/Dog.kt").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/b/Dog.kt");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.b.Animal")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "org.b.Animal")).isTrue();
                 assertThat(TypeUtils.isOfClassType(cu.getClasses().get(1).getType(), "org.b.Dog")).isTrue();
             })
           )
@@ -185,14 +185,14 @@ class ChangePackageTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A() : Original() {
                     constructor(s1: String): this()
               }
               """,
             """
               import x.y.Original
-              
+
               class A() : Original() {
                     constructor(s1: String): this()
               }

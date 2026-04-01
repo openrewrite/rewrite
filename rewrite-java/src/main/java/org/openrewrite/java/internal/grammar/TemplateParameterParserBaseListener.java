@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -39,6 +39,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -123,6 +135,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterGenericName(TemplateParameterParser.GenericNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitGenericName(TemplateParameterParser.GenericNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

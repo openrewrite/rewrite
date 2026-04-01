@@ -1,0 +1,5 @@
+org.openrewrite.java.internal.rpc.JavaRpcCodec
+org.openrewrite.java.internal.rpc.JavaRightPaddedRpcCodec
+org.openrewrite.java.internal.rpc.JavaLeftPaddedRpcCodec
+org.openrewrite.java.internal.rpc.JavaContainerRpcCodec
+org.openrewrite.java.internal.rpc.JavaSpaceRpcCodec

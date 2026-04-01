@@ -31,7 +31,7 @@ class RemoveImplementsTest implements RewriteTest {
           java(
             """
               import java.io.Serializable;
-              
+
               class A implements Serializable {
               }
               """,
@@ -51,13 +51,13 @@ class RemoveImplementsTest implements RewriteTest {
             """
               import java.io.Closeable;
               import java.io.Serializable;
-              
+
               class A implements Serializable, Closeable {
               }
               """,
             """
               import java.io.Closeable;
-              
+
               class A implements Closeable {
               }
               """
@@ -90,9 +90,9 @@ class RemoveImplementsTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-              
+
               import java.io.Serializable;
-              
+
               class Outer implements Serializable {
                   class Inner implements Serializable {
                   }
@@ -100,9 +100,9 @@ class RemoveImplementsTest implements RewriteTest {
               """,
             """
               package com.yourorg;
-              
+
               import java.io.Serializable;
-              
+
               class Outer implements Serializable {
                   class Inner {
                   }
@@ -121,7 +121,7 @@ class RemoveImplementsTest implements RewriteTest {
             """
               import java.io.Closeable;
               import java.io.IOException;
-              
+
               class A implements Closeable {
                   @Override
                   public void close() throws IOException {}
@@ -129,7 +129,7 @@ class RemoveImplementsTest implements RewriteTest {
               """,
             """
               import java.io.IOException;
-              
+
               class A {
                   public void close() throws IOException {}
               }

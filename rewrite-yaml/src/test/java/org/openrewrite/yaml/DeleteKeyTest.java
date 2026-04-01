@@ -155,8 +155,8 @@ class DeleteKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1175")
+    @Test
     void deleteNestedKeyRemovingUnusedKeysRecursively() {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.b.c.d", null)),
@@ -224,4 +224,46 @@ class DeleteKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deleteSequenceEntryUsingChildRegexMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.b.c[?(@.name =~ 'b1-.*')]", null)),
+          yaml(
+            """
+                  a: a-value
+                  b:
+                    c:
+                      - name: b1-value
+                      - name: b2-value
+              """,
+            """
+                  a: a-value
+                  b:
+                    c:
+                      - name: b2-value
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteSequenceEntriesUsingChildRegexMatchRemovingUnusedKeysRecursively() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteKey("$.b.c[?(@.name =~ '.*-value')]", null)),
+          yaml(
+            """
+            a: a-value
+            b:
+              c:
+                - name: b1-value
+                - name: b2-value
+            """,
+            """
+            a: a-value
+            """
+          )
+        );
+    }
+
 }

@@ -82,12 +82,12 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
           java(
             """
               package org.mapstruct;
-                          
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-                          
+
               @Target({ElementType.METHOD})
               @Retention(RetentionPolicy.CLASS)
               public @interface ValueMappings {
@@ -99,7 +99,7 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
           java(
             """
               package org.mapstruct;
-                          
+
               public class MappingConstants {
                   public static final String NULL = "null";
               }

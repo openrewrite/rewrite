@@ -19,24 +19,24 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
+import org.openrewrite.gradle.trait.JvmTestSuite;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
-import java.util.function.Predicate;
 
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -117,20 +117,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Nullable
     Boolean acceptTransitive;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Gradle dependency";
-    }
+    String displayName = "Add Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a gradle dependency to a `build.gradle` file in the correct configuration based on where it is used.";
-    }
+    String description = "Add a gradle dependency to a `build.gradle` file in the correct configuration based on where it is used.";
 
     @Override
     public Validated<Object> validate() {
@@ -144,7 +138,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
-        Map<JavaProject, Set<String>> customJvmTestSuitesWithDependencies = new HashMap<>();
     }
 
     @Override
@@ -158,6 +151,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Nullable
             UsesType<ExecutionContext> usesType = null;
+            final TreeVisitor<?, ExecutionContext> hasTestSourceSet = new HasSourceSet("test").getVisitor();
 
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
                 if (onlyIfUsing == null) {
@@ -175,15 +169,22 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
+                if (sourceFile instanceof JavaSourceFile &&
+                        configuration != null && onlyIfUsing != null &&
+                        configuration.startsWith("test") && configuration.length() > 4 &&
+                        Character.isUpperCase(configuration.charAt(4)) &&
+                        sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
+                    return tree;
+                }
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
-                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || usesType(sourceFile, ctx));
-                    acc.customJvmTestSuitesWithDependencies
-                            .computeIfAbsent(javaProject, ignored -> new HashSet<>())
-                            .addAll(FindJVMTestSuites.jvmTestSuiteNames(tree, true));
+                    boolean uses = usesType(sourceFile, ctx);
+                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);
 
-                    Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                    sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
-                            configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                    if (uses) {
+                        Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
+                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                    }
                 });
                 return tree;
             }
@@ -192,8 +193,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(!acc.configurationsByProject.isEmpty(),
-                Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        // Allow when configuration is explicitly provided, when onlyIfUsing is not set (default to "implementation"),
+        // or when source files were scanned
+        boolean hasExplicitConfiguration = !StringUtils.isBlank(configuration);
+        return Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
+                Preconditions.check(new IsBuildGradle<>(true), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -202,58 +206,57 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
-                        if (!maybeJp.isPresent()) {
-                            return s;
-                        }
-
-                        JavaProject jp = maybeJp.get();
-                        if ((onlyIfUsing != null && !acc.usingType.getOrDefault(jp, false)) || !acc.configurationsByProject.containsKey(jp)) {
-                            return s;
-                        }
-
                         Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
+
                         if (!maybeGp.isPresent()) {
                             return s;
                         }
+                        if (onlyIfUsing != null) {
+                            // When onlyIfUsing is set, skip projects that don't use the specified type
+                            if (!maybeJp.isPresent() || !acc.usingType.getOrDefault(maybeJp.get(), false)) {
+                                return s;
+                            }
+                            // When configuration needs to be inferred, also require source set info
+                            if (!hasExplicitConfiguration && !acc.configurationsByProject.containsKey(maybeJp.get())) {
+                                return s;
+                            }
+                        }
 
+                        JavaProject jp = maybeJp.orElse(null);
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
-                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) :
-                                new HashSet<>(singletonList(configuration));
+                        Set<String> resolvedConfigurations = hasExplicitConfiguration ?
+                                new HashSet<>(singletonList(configuration)) :
+                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>());
                         if (resolvedConfigurations.isEmpty()) {
                             resolvedConfigurations.add("implementation");
                         }
-                        Set<String> tmpConfigurations = new HashSet<>(resolvedConfigurations);
-                        for (String tmpConfiguration : tmpConfigurations) {
-                            GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
-                            if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
-                                resolvedConfigurations.remove(tmpConfiguration);
-                            }
-                        }
 
-                        tmpConfigurations = new HashSet<>(resolvedConfigurations);
-                        for (String tmpConfiguration : tmpConfigurations) {
-                            GradleDependencyConfiguration gdc = requireNonNull((gp.getConfiguration(tmpConfiguration)));
-                            for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
-                                if (resolvedConfigurations.contains(transitive.getName()) ||
-                                        (Boolean.TRUE.equals(acceptTransitive) && transitive.findResolvedDependency(groupId, artifactId) != null)) {
-                                    resolvedConfigurations.remove(transitive.getName());
-                                }
-                            }
+                        // Only apply filtering when the configuration is known to the GradleProject
+                        // (which requires Java sources to have been scanned with the tooling API)
+                        boolean configurationKnown = resolvedConfigurations.stream()
+                                .anyMatch(c -> gp.getConfiguration(c) != null);
+                        if (configurationKnown) {
+                            GradleConfigurationFilter gradleConfigurationFilter = new GradleConfigurationFilter(gp, resolvedConfigurations);
+                            gradleConfigurationFilter.removeTransitiveConfigurations();
+                            gradleConfigurationFilter.removeConfigurationsContainingDependency(new GroupArtifact(groupId, artifactId));
+                            gradleConfigurationFilter.removeConfigurationsContainingTransitiveDependency(new GroupArtifact(groupId, artifactId));
+                            resolvedConfigurations = gradleConfigurationFilter.getFilteredConfigurations();
                         }
 
                         if (resolvedConfigurations.isEmpty()) {
                             return s;
                         }
 
+                        Set<JvmTestSuite> jvmTestSuites = FindJVMTestSuites.jvmTestSuites(s);
                         for (String resolvedConfiguration : resolvedConfigurations) {
-                            if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
-                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
-                                        classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(s, ctx);
+                            JvmTestSuite jvmTestSuite = maybeJvmTestSuite(resolvedConfiguration, jvmTestSuites);
+                            if (jvmTestSuite != null) {
+                                s = (JavaSourceFile) jvmTestSuite.addDependency(resolvedConfiguration, groupId, artifactId, version, versionPattern, classifier, extension, metadataFailures, null, ctx)
+                                        .visitNonNull(s, ctx);
                             } else {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                        classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(s, ctx);
+                                        classifier, extension, metadataFailures, this::isTopLevel, null).visitNonNull(s, ctx);
                             }
                         }
 
@@ -261,62 +264,19 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
+                        if (cursor.getValue() instanceof J.Block) {
+                            return cursor.getParentOrThrow().getValue() instanceof JavaSourceFile;
+                        }
                         return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
                     }
 
-                    private Predicate<Cursor> isMatchingJVMTestSuite(String resolvedConfiguration) {
-                        return cursor -> {
-                            String sourceSet = purgeConfigurationSuffix(resolvedConfiguration);
-                            J.MethodInvocation methodInvocation = cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
-                            return methodInvocation != null && sourceSet.equals(methodInvocation.getSimpleName());
-                        };
-                    }
-
-                    private final Set<String> gradleStandardConfigurations = new HashSet<>(Arrays.asList(
-                            "api",
-                            "implementation",
-                            "compileOnly",
-                            "compileOnlyApi",
-                            "runtimeOnly",
-                            "testImplementation",
-                            "testCompileOnly",
-                            "testRuntimeOnly"));
-
-                    boolean targetsCustomJVMTestSuite(String configuration, Set<String> customJvmTestSuites) {
-                        if (gradleStandardConfigurations.contains(configuration) || "default".equals(configuration)) {
-                            return false;
+                    private @Nullable JvmTestSuite maybeJvmTestSuite(String configuration, Set<JvmTestSuite> jvmTestSuites) {
+                        for (JvmTestSuite jvmTestSuite : jvmTestSuites) {
+                            if (jvmTestSuite.isAcceptable(configuration)) {
+                                return jvmTestSuite;
+                            }
                         }
-
-                        String sourceSet = purgeConfigurationSuffix(configuration);
-                        return customJvmTestSuites.contains(sourceSet);
-                    }
-
-                    private String purgeConfigurationSuffix(String configuration) {
-                        if (configuration.endsWith("Implementation")) {
-                            return configuration.substring(0, configuration.length() - 14);
-                        } else if (configuration.endsWith("CompileOnly")) {
-                            return configuration.substring(0, configuration.length() - 11);
-                        } else if (configuration.endsWith("RuntimeOnly")) {
-                            return configuration.substring(0, configuration.length() - 11);
-                        } else if (configuration.endsWith("AnnotationProcessor")) {
-                            return configuration.substring(0, configuration.length() - 19);
-                        } else {
-                            return configuration;
-                        }
-                    }
-
-                    private String purgeSourceSet(@Nullable String configuration) {
-                        if (StringUtils.isBlank(configuration) || configuration.endsWith("Implementation")) {
-                            return "implementation";
-                        } else if (configuration.endsWith("CompileOnly")) {
-                            return "compileOnly";
-                        } else if (configuration.endsWith("RuntimeOnly")) {
-                            return "runtimeOnly";
-                        } else if (configuration.endsWith("AnnotationProcessor")) {
-                            return "annotationProcessor";
-                        } else {
-                            return configuration;
-                        }
+                        return null;
                     }
                 })
         );

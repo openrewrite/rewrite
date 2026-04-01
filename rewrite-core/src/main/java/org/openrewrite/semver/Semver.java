@@ -28,7 +28,7 @@ public class Semver {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean isVersion(@Nullable String version) {
-        if (version == null) {
+        if (StringUtils.isBlank(version)) {
             return false;
         }
         return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
@@ -96,25 +96,37 @@ public class Semver {
     }
 
     public static @Nullable String max(@Nullable String version1, @Nullable String version2) {
-        if (StringUtils.isBlank(version1)) {
+        if (!isVersion(version1)) {
             return StringUtils.isBlank(version2) ? null : version2;
-        } else if (StringUtils.isBlank(version2)) {
+        } else if (!isVersion(version2)) {
             return version1;
         }
 
-        try {
-            int major1 = Integer.parseInt(Semver.majorVersion(version1));
-            int major2 = Integer.parseInt(Semver.majorVersion(version2));
-            if (major1 != major2) return major1 > major2 ? version1 : version2;
+        String major1 = Semver.majorVersion(version1);
+        String major2 = Semver.majorVersion(version2);
+        String minor1 = Semver.minorVersion(version1);
+        String minor2 = Semver.minorVersion(version2);
 
-            int minor1 = Integer.parseInt(Semver.minorVersion(version1));
-            int minor2 = Integer.parseInt(Semver.minorVersion(version2));
-            if (minor1 != minor2) return minor1 > minor2 ? version1 : version2;
+        if (!StringUtils.isNumeric(major1) || !StringUtils.isNumeric(major2) ||
+                !StringUtils.isNumeric(minor1) || !StringUtils.isNumeric(minor2)) {
+            if (version1.equals(version2)) {
+                return version1;
+            }
+            return version1.compareTo(version2) >= 0 ? version1 : version2;
+        }
+        try {
+            long maj1 = Long.parseLong(major1);
+            long maj2 = Long.parseLong(major2);
+            if (maj1 != maj2) return maj1 > maj2 ? version1 : version2;
+
+            long min1 = Long.parseLong(minor1);
+            long min2 = Long.parseLong(minor2);
+            if (min1 != min2) return min1 > min2 ? version1 : version2;
 
             String[] parts1 = version1.split("[.-]");
             String[] parts2 = version2.split("[.-]");
-            int patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Integer.parseInt(parts1[2]) : 0;
-            int patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Integer.parseInt(parts2[2]) : 0;
+            long patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Long.parseLong(parts1[2]) : 0;
+            long patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Long.parseLong(parts2[2]) : 0;
             if (patch1 != patch2) return patch1 > patch2 ? version1 : version2;
 
             String label1 = parts1.length > 3 ? parts1[3].toLowerCase() : "";

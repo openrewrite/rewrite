@@ -143,7 +143,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
+    public @Nullable Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
         try {
             return deserializePom(cache.get(serialize(gav.toString().getBytes(StandardCharsets.UTF_8))));
         } catch (RocksDBException e) {

@@ -25,6 +25,7 @@ import java.util.*;
 public interface ResourceLoader {
 
     enum RecipeDetail {
+        @Deprecated(/* No longer populated */)
         CONTRIBUTORS,
         MAINTAINERS,
         EXAMPLES;
@@ -42,11 +43,6 @@ public interface ResourceLoader {
     default @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
         return listRecipes().stream()
                 .filter(r -> r.getName().equals(recipeName))
-                .peek(r -> {
-                    if (!RecipeDetail.CONTRIBUTORS.includedIn(details)) {
-                        r.setContributors(null);
-                    }
-                })
                 .findFirst()
                 .orElse(null);
     }
@@ -59,6 +55,7 @@ public interface ResourceLoader {
 
     Collection<CategoryDescriptor> listCategoryDescriptors();
 
+    @Deprecated(/* No longer populated */)
     Map<String, List<Contributor>> listContributors();
 
     Map<String, List<RecipeExample>> listRecipeExamples();

@@ -23,9 +23,9 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.CompositeRecipe;
 
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 class RecipePrinterTest implements RewriteTest {
@@ -50,10 +50,10 @@ class RecipePrinterTest implements RewriteTest {
 
     @Test
     void printRecipeTreeForRecipeWithNestedRecipes() {
-        Recipe recipe = new CompositeRecipe(Arrays.asList(
+        Recipe recipe = new CompositeRecipe(List.of(
           new TestRecipe("the option"),
           new AnotherTestRecipe(),
-          new CompositeRecipe(Collections.singletonList(new AnotherTestRecipe()))
+          new CompositeRecipe(singletonList(new AnotherTestRecipe()))
         ));
         rewriteRun(
           spec -> spec
@@ -75,8 +75,8 @@ class RecipePrinterTest implements RewriteTest {
         assertThat(output).isEqualTo(expected);
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     private static class TestRecipe extends Recipe {
 
         @Option(displayName = "An option",
@@ -84,29 +84,17 @@ class RecipePrinterTest implements RewriteTest {
           example = "Some text.")
         String theOption;
 
-        @Override
-        public String getDisplayName() {
-            return "Test recipe";
-        }
+        String displayName = "Test recipe";
 
-        @Override
-        public String getDescription() {
-            return "Test recipe.";
-        }
+        String description = "Test recipe.";
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     private static class AnotherTestRecipe extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Another Test recipe";
-        }
+        String displayName = "Another Test recipe";
 
-        @Override
-        public String getDescription() {
-            return "Another Test recipe.";
-        }
+        String description = "Another Test recipe.";
     }
 }

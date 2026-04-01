@@ -43,7 +43,7 @@ class KotlinTemplateMatchTest implements RewriteTest {
                           class Test {
                               val b1 = 1 == 2
                               val b2 = 1 == 3
-            
+
                               val b3 = 2 == 1
                               val b4 = 2 == 2 + 3 /* no match because type is `kotlin.Int` */
                           }
@@ -52,7 +52,7 @@ class KotlinTemplateMatchTest implements RewriteTest {
                           class Test {
                               val b1 = /*~~>*/1 == 2
                               val b2 = /*~~>*/1 == 3
-            
+
                               val b3 = 2 == 1
                               val b4 = 2 == 2 + 3 /* no match because type is `kotlin.Int` */
                           }

@@ -19,8 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.internal.Dependency;
-import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.DependencyNotation;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
@@ -58,31 +59,22 @@ public class ChangeDependencyConfiguration extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Change a Gradle dependency configuration";
-    }
+    String displayName = "Change a Gradle dependency configuration";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s` to `%s`", groupId, artifactId, newConfiguration);
     }
 
-    @Override
-    public String getDescription() {
-        return "A common example is the need to change `compile` to `api`/`implementation` as " +
+    String description = "A common example is the need to change `compile` to `api`/`implementation` as " +
                "[part of the move](https://docs.gradle.org/current/userguide/upgrading_version_6.html) to Gradle 7.x and later.";
-    }
 
     @Override
     public Validated<Object> validate() {
         return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -110,7 +102,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         return m;
                     }
 
-                    Dependency dependency = DependencyStringNotationConverter.parse((String) arg.getValue());
+                    Dependency dependency = DependencyNotation.parse((String) arg.getValue());
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
@@ -125,7 +117,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                         return m;
                     }
 
-                    Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                    Dependency dependency = DependencyNotation.parse((String) groupArtifact.getValue());
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                         return m;
                     }
@@ -192,7 +184,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
                 } else if (args.get(0) instanceof J.MethodInvocation) {
                     J.MethodInvocation inner = (J.MethodInvocation) args.get(0);
-                    if (!(inner.getSimpleName().equals("project") || inner.getSimpleName().equals("platform") || inner.getSimpleName().equals("enforcedPlatform"))) {
+                    if (!("project".equals(inner.getSimpleName()) || "platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName()))) {
                         return m;
                     }
                     List<Expression> innerArgs = inner.getArguments();
@@ -205,10 +197,12 @@ public class ChangeDependencyConfiguration extends Recipe {
                     }
 
                     Dependency dependency;
-                    if (inner.getSimpleName().equals("project")) {
-                        dependency = new Dependency("", ((String) value.getValue()).substring(1), null, null, null);
+                    if ("project".equals(inner.getSimpleName())) {
+                        dependency = Dependency.builder()
+                                .gav(new GroupArtifactVersion("", ((String) value.getValue()).substring(1), null))
+                                .build();
                     } else {
-                        dependency = DependencyStringNotationConverter.parse((String) value.getValue());
+                        dependency = DependencyNotation.parse((String) value.getValue());
                     }
 
                     if (dependency == null || !dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
@@ -235,7 +229,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                 }
 
                 J.MethodInvocation inner = (J.MethodInvocation) m.getArguments().get(0);
-                if (!(inner.getSimpleName().equals("project") || inner.getSimpleName().equals("platform") || inner.getSimpleName().equals("enforcedPlatform"))) {
+                if (!("project".equals(inner.getSimpleName()) || "platform".equals(inner.getSimpleName()) || "enforcedPlatform".equals(inner.getSimpleName()))) {
                     return false;
                 }
 

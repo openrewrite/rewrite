@@ -33,7 +33,6 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,39 +45,33 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class DependencyConstraintToRule extends Recipe {
 
-    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final String CONSTRAINT_MATCHER = "org.gradle.api.artifacts.dsl.DependencyHandler *(..)";
 
-    @Override
-    public String getDisplayName() {
-        return "Dependency constraint to resolution rule";
-    }
+    String displayName = "Dependency constraint to resolution rule";
 
-    @Override
-    public String getDescription() {
-        return "Gradle [dependency constraints](https://docs.gradle.org/current/userguide/dependency_constraints.html#dependency-constraints) " +
-               "are useful for managing the versions of transitive dependencies. " +
-               "Some plugins, such as the Spring Dependency Management plugin, do not respect these constraints. " +
-               "This recipe converts constraints into [resolution rules](https://docs.gradle.org/current/userguide/resolution_rules.html), " +
-               "which can achieve similar effects to constraints but are harder for plugins to ignore.";
-    }
+    String description = "Gradle [dependency constraints](https://docs.gradle.org/current/userguide/dependency_constraints.html#dependency-constraints) " +
+                "are useful for managing the versions of transitive dependencies. " +
+                "Some plugins, such as the Spring Dependency Management plugin, do not respect these constraints. " +
+                "This recipe converts constraints into [resolution rules](https://docs.gradle.org/current/userguide/resolution_rules.html), " +
+                "which can achieve similar effects to constraints but are harder for plugins to ignore.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof JavaSourceFile) {
-                    List<GroupArtifactVersionBecause> gavs = new ArrayList<>();
-                    JavaSourceFile cu = (JavaSourceFile) new RemoveConstraints().visitNonNull(tree, gavs);
-                    if (gavs.isEmpty()) {
-                        return (J) tree;
-                    }
-                    cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
-                    cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
-                    return cu;
+                if (!(tree instanceof JavaSourceFile)) {
+                    return (J) tree;
                 }
-                return super.visit(tree, ctx);
+                List<GroupArtifactVersionBecause> gavs = new ArrayList<>();
+                JavaSourceFile cu = (JavaSourceFile) new RemoveConstraints().visitNonNull(tree, gavs);
+                if (gavs.isEmpty()) {
+                    return (J) tree;
+                }
+                cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
+                cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
+                return new MaybeRemoveDependencyBlock().visitNonNull(cu, ctx);
             }
         });
     }
@@ -134,7 +127,7 @@ public class DependencyConstraintToRule extends Recipe {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                             J.MethodInvocation m1 = super.visitMethodInvocation(method, integer);
-                            if("because".equals(m1.getSimpleName()) && m1.getArguments().get(0) instanceof J.Literal) {
+                            if ("because".equals(m1.getSimpleName()) && m1.getArguments().get(0) instanceof J.Literal) {
                                 because.set(((J.Literal) m1.getArguments().get(0)).getValue().toString());
                             }
                             return m1;
@@ -145,7 +138,7 @@ public class DependencyConstraintToRule extends Recipe {
                     return null;
                 });
                 // If nothing remains in the constraints{} it can be removed entirely
-                if(withoutConvertableConstraints.isEmpty()) {
+                if (withoutConvertableConstraints.isEmpty()) {
                     return null;
                 } else {
                     return m.withArguments(singletonList(closure.withBody(((J.Block) closure.getBody()).withStatements(withoutConvertableConstraints))));
@@ -160,10 +153,11 @@ public class DependencyConstraintToRule extends Recipe {
     static class UpdateEachDependency extends JavaIsoVisitor<ExecutionContext> {
         List<GroupArtifactVersionBecause> groupArtifactVersions;
         boolean isKotlinDsl;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (isEachDependency(m)) {
+            if (isEachDependency(m) && !isInBuildscriptBlock(getCursor())) {
                 Cursor parent = requireNonNull(getCursor().getParent());
                 for (GroupArtifactVersionBecause gav : groupArtifactVersions) {
                     m = (J.MethodInvocation) new MaybeAddIf(gav, isKotlinDsl).visitNonNull(m, ctx, parent);
@@ -209,8 +203,8 @@ public class DependencyConstraintToRule extends Recipe {
             if (!isKotlinDsl) {
                 @SuppressWarnings("GroovyEmptyStatementBody") @Language("groovy")
                 String snippet = "Object " + p + " = null\n" +
-                                 "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
-                                 p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
+                        "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
+                        p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
                 newIf = GroovyParser.builder().build()
                         .parse(ctx, snippet)
                         .map(G.CompilationUnit.class::cast)
@@ -220,8 +214,8 @@ public class DependencyConstraintToRule extends Recipe {
                         .orElseThrow(() -> new IllegalStateException("Unable to produce a new if statement"));
             } else {
                 String snippet = "var " + p + ": Any = null\n" +
-                                 "if (" + p + ".requested.group == \"" + groupArtifactVersion.getGroupId() + "\" && " +
-                                 p + ".requested.name == \"" + groupArtifactVersion.getArtifactId() + "\") {\n}";
+                        "if (" + p + ".requested.group == \"" + groupArtifactVersion.getGroupId() + "\" && " +
+                        p + ".requested.name == \"" + groupArtifactVersion.getArtifactId() + "\") {\n}";
                 newIf = KotlinParser.builder().isKotlinScript(true).build()
                         .parse(ctx, snippet)
                         .map(K.CompilationUnit.class::cast)
@@ -293,7 +287,7 @@ public class DependencyConstraintToRule extends Recipe {
                     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
                         // Comparison will involve "<variable name>.requested.group"
                         J.FieldAccess field = super.visitFieldAccess(fieldAccess, integer);
-                        if(field.getTarget() instanceof J.Identifier) {
+                        if (field.getTarget() instanceof J.Identifier) {
                             variableName.set(((J.Identifier) field.getTarget()).getSimpleName());
                         }
                         return fieldAccess;
@@ -344,7 +338,7 @@ public class DependencyConstraintToRule extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (isEachDependency(m)) {
+            if (isEachDependency(m) && !isInBuildscriptBlock(getCursor())) {
                 alreadyExists = true;
             }
             return m;
@@ -376,40 +370,47 @@ public class DependencyConstraintToRule extends Recipe {
                             .build()
                             .parse(ctx,
                                     "\n" +
-                                    "configurations.all {\n" +
-                                    "    resolutionStrategy.eachDependency { details ->\n" +
-                                    "    }\n" +
-                                    "}")
+                                            "configurations.all {\n" +
+                                            "    resolutionStrategy.eachDependency { details ->\n" +
+                                            "    }\n" +
+                                            "}")
                             .map(G.CompilationUnit.class::cast)
                             .map(G.CompilationUnit::getStatements)
                             .map(it -> it.get(0))
                             .map(J.MethodInvocation.class::cast)
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-                    cu = cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
-                    return cu;
+                    List<Statement> newStatements = ListUtils.insert(cu.getStatements(), m, insertionIndex);
+                    if (insertionIndex == 0) {
+                        newStatements = ListUtils.map(newStatements, (i, stat) ->
+                                i == 1 && stat.getPrefix().getWhitespace().isEmpty()
+                                        ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
+                                        : stat);
+                    }
+                    return cu.withStatements(newStatements);
                 } else {
                     K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
+                    assert cu != null;
                     J.Block block = (J.Block) cu.getStatements().get(0);
                     int insertionIndex = 0;
                     while (insertionIndex < block.getStatements().size()) {
                         Statement s = block.getStatements().get(insertionIndex);
-                        if (s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSimpleName().equals("dependencies")) {
+                        if (s instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) s).getSimpleName())) {
                             break;
                         }
                         insertionIndex++;
                     }
                     J.MethodInvocation m = GradleParser.builder()
                             .build()
-                            .parseInputs(Collections.singletonList(
+                            .parseInputs(singletonList(
                                     new Parser.Input(
                                             Paths.get("build.gradle.kts"),
                                             () -> new ByteArrayInputStream(
                                                     ("\n" +
-                                                     "configurations.all {\n" +
-                                                     "    resolutionStrategy.eachDependency { details ->}\n" +
-                                                     "}").getBytes(StandardCharsets.UTF_8)))
-                                    ), null, ctx)
+                                                            "configurations.all {\n" +
+                                                            "    resolutionStrategy.eachDependency { details ->}\n" +
+                                                            "}").getBytes(StandardCharsets.UTF_8)))
+                            ), null, ctx)
                             .map(K.CompilationUnit.class::cast)
                             .map(k -> (J.Block) k.getStatements().get(0))
                             .map(J.Block::getStatements)
@@ -429,30 +430,81 @@ public class DependencyConstraintToRule extends Recipe {
                             })))
                             .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
                     final int finalInsertionIndex = insertionIndex;
-                    cu = cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
+                    return cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
                         if (arg == block) {
-                            return block.withStatements(ListUtils.insert(block.getStatements(), m, finalInsertionIndex));
+                            List<Statement> newStatements = ListUtils.insert(block.getStatements(), m, finalInsertionIndex);
+                            if (finalInsertionIndex == 0) {
+                                newStatements = ListUtils.map(newStatements, (i, stat) ->
+                                        i == 1 && stat.getPrefix().getWhitespace().isEmpty()
+                                                ? stat.withPrefix(stat.getPrefix().withWhitespace("\n\n"))
+                                                : stat);
+                            }
+                            return block.withStatements(newStatements);
                         }
                         return arg;
                     }));
-                    return cu;
                 }
             }
             return super.visit(tree, ctx);
         }
     }
 
+    static class MaybeRemoveDependencyBlock extends JavaIsoVisitor<ExecutionContext> {
+        @Override
+        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            if (isEmptyDependenciesBlock(m)) {
+                return null;
+            }
+            return m;
+        }
+    }
+
+    private static boolean isEmptyDependenciesBlock(J.MethodInvocation m) {
+        if (!"dependencies".equals(m.getSimpleName())) {
+            return false;
+        }
+        if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
+            return false;
+        }
+        // `dependencies` should always take a single "closure"
+        if (m.getArguments().size() != 1 || !(m.getArguments().get(0) instanceof J.Lambda)) {
+            return false;
+        }
+        J.Lambda l = (J.Lambda) m.getArguments().get(0);
+        if (l.getBody() instanceof J.Block) {
+            J.Block b = (J.Block) l.getBody();
+            if (b.getStatements().isEmpty()) {
+                return true;
+            }
+            if (b.getStatements().size() == 1) {
+                return b.getStatements().get(0) instanceof J.Return && ((J.Return) b.getStatements().get(0)).getExpression() == null;
+            }
+        }
+        return false;
+    }
+
     private static boolean isInDependenciesBlock(Cursor cursor) {
         Cursor c = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
-                (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("dependencies")));
-        return c.getValue() instanceof J.MethodInvocation;
+                        (value instanceof J.MethodInvocation && "dependencies".equals(((J.MethodInvocation) value).getSimpleName())));
+        if (!(c.getValue() instanceof J.MethodInvocation)) {
+            return false;
+        }
+        // Exclude "dependencies" blocks inside of buildscripts
+        // No plugins can prevent the "constraints" block from working there, as they can for regular dependencies block
+        return !isInBuildscriptBlock(c);
+    }
+
+    private static boolean isInBuildscriptBlock(Cursor c) {
+        Cursor maybeBuildscript = c.dropParentUntil(value -> value == Cursor.ROOT_VALUE || (value instanceof J.MethodInvocation && "buildscript".equals(((J.MethodInvocation) value).getSimpleName())));
+        return maybeBuildscript.getValue() != Cursor.ROOT_VALUE;
     }
 
     private static boolean isEachDependency(J.MethodInvocation m) {
         return "eachDependency".equals(m.getSimpleName()) &&
-               (m.getSelect() instanceof J.Identifier &&
-                   "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
+                (m.getSelect() instanceof J.Identifier &&
+                        "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
     }
 
     private static boolean predicateRelatesToGav(J.If iff, GroupArtifactVersionBecause groupArtifactVersion) {

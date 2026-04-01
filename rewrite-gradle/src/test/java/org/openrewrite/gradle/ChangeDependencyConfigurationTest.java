@@ -97,8 +97,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void changeStringStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
@@ -107,11 +107,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
                   api "org.openrewrite:rewrite-core:latest.release"
@@ -121,11 +121,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation 'org.openrewrite:rewrite-core:latest.release'
                   implementation "org.openrewrite:rewrite-core:latest.release"
@@ -135,8 +135,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void changeMapStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
@@ -145,11 +145,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
@@ -159,11 +159,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   implementation group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
@@ -173,8 +173,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void changeGStringStyleDependency(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
@@ -183,11 +183,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   api "org.openrewrite:rewrite-core:${version}"
@@ -197,11 +197,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   implementation "org.openrewrite:rewrite-core:${version}"
@@ -211,8 +211,8 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource(value = {"*:project2", "*:*"}, delimiterString = ":")
+    @ParameterizedTest
     void worksForProjectDependencies(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyConfiguration(group, artifact, "implementation", null)),
@@ -270,11 +270,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   testImplementation group: "org.openrewrite", name: "rewrite-test", version: "latest.release"
@@ -284,11 +284,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   testImplementation group: "org.openrewrite", name: "rewrite-test", version: "latest.release"
@@ -308,11 +308,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               testing {
                   suites {
                       test {
@@ -328,11 +328,11 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               testing {
                   suites {
                       test {
@@ -357,7 +357,7 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -369,7 +369,7 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -397,7 +397,7 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
             settingsGradle(
               """
                 rootProject.name = "root"
-                
+
                 include "project1"
                 include "project2"
                 """

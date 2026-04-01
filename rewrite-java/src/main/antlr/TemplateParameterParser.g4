@@ -7,6 +7,10 @@ matcherPattern
     | parameterName
     ;
 
+genericPattern
+    : genericName (Extends (type AND)* type)?
+    ;
+
 typedPattern
     : (parameterName COLON)? patternType
     ;
@@ -25,7 +29,8 @@ typeParameter
     ;
 
 variance
-    : WILDCARD Variance
+    : WILDCARD Extends
+    | WILDCARD Super
     ;
 
 typeArray
@@ -33,6 +38,10 @@ typeArray
     ;
 
 parameterName
+    : Identifier
+    ;
+
+genericName
     : Identifier
     ;
 

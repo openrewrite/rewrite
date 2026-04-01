@@ -28,7 +28,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     void targetToStatic() {
         rewriteRun(
           spec -> spec.recipes(
-            new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null),
+              new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null, false),
             new ChangeMethodName("b.B nonStatic()", "foo", null, null)
           ),
           java(
@@ -58,7 +58,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               """,
             """
               import b.B;
-                            
+
               class C {
                  public void test() {
                      B.foo();
@@ -73,7 +73,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void staticTargetToStatic() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A foo()", "b.B", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A foo()", "b.B", null, null, false)),
           java(
             """
               package b;
@@ -93,7 +93,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
           java(
             """
               import static a.A.foo;
-                            
+
               class C {
                  public void test() {
                      foo();
@@ -102,7 +102,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               """,
             """
               import static b.B.foo;
-                            
+
               class C {
                  public void test() {
                      foo();
@@ -116,7 +116,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void targetToStaticWhenMethodHasSameName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),
           java(
             """
               package a;
@@ -149,7 +149,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void staticMethodCalledOnInstanceToCallOnClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null, false)),
           java(
             """
               package a;
@@ -185,17 +185,136 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
         );
     }
 
+    @Test
+    void memberReferenceTargetToStatic() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(A::of);
+                 }
+              }
+              """,
+            """
+              import b.B;
+
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(B::of);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void memberReferenceAlreadyOnTargetType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "a.A", null, null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(A::of);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void memberReferenceWithReturnTypeChange() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A of(..)", "b.B", "java.lang.CharSequence", null, false)),
+          java(
+            """
+              package a;
+              public class A {
+                 public static String of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static CharSequence of(String s) { return s; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(A::of);
+                 }
+              }
+              """,
+            """
+              import b.B;
+
+              import java.util.stream.Stream;
+
+              class Test {
+                 public void test() {
+                     Stream.of("a", "b").map(B::of);
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
-    @Disabled
     void keepImportComments() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null)),
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null, false)),
           java(
             """
               package org.codehaus.plexus.util;
-                            
+
               public class StringUtils {
                  public boolean isBlank(String s) {
                      s.isBlank();

@@ -19,8 +19,10 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,6 +31,7 @@ import org.openrewrite.test.SourceSpec;
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
@@ -39,7 +42,7 @@ class ChangePackageTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", null, null));
+        spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", null));
     }
 
     @Language("java")
@@ -60,25 +63,6 @@ class ChangePackageTest implements RewriteTest {
       }
       """;
 
-    @Test
-    void renamePackageNonRecursive() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePackage(
-            "org.openrewrite",
-            "org.openrewrite.test",
-            false,
-            null
-          )),
-          java(
-            """
-              package org.openrewrite.internal;
-              class Test {
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void renameUsingSimplePackageName() {
@@ -86,8 +70,7 @@ class ChangePackageTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackage(
             "org.openrewrite",
             "openrewrite",
-            false,
-            null
+            false
           )),
           java(
             """
@@ -97,6 +80,24 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import openrewrite.Foo;
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void renamePackageNonRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite",
+            "org.openrewrite.test",
+            false
+          )),
+          java(
+            """
+              package org.openrewrite.internal;
               class Test {
               }
               """
@@ -142,7 +143,7 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.Import imported = cu.getImports().get(0);
+                J.Import imported = cu.getImports().getFirst();
                 assertThat(imported.getPackageName()).isEqualTo("org.openrewrite.test");
             })
           )
@@ -274,7 +275,7 @@ class ChangePackageTest implements RewriteTest {
                 JavaType.Method methodType = cu.getTypesInUse().getUsedMethods().iterator().next();
                 assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
                   .isEqualTo("org.openrewrite.test.Test");
-                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().getFirst()).getFullyQualifiedName())
                   .isEqualTo("org.openrewrite.test.Test");
             })
           )
@@ -355,8 +356,7 @@ class ChangePackageTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackage(
             "org.openrewrite",
             "org.openrewrite.test",
-            true,
-            null
+            true
           )),
           java(
             """
@@ -389,14 +389,13 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageNullRecursiveImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
             "org.openrewrite.other",
             "org.openrewrite.test.other",
-            null,
             null
           )),
           java(
@@ -448,15 +447,14 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageImportedCheckStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
             "org.openrewrite.other",
             "org.openrewrite.test.other",
-            false,
-            null
+            false
           )),
           java(
             """
@@ -507,15 +505,14 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4189")
+    @Test
     void renamePackageRecursiveImportedStrictPackageMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage(
             "org.openrewrite.other",
             "org.openrewrite.test.other",
-            true,
-            null
+            true
           )),
           java(
             """
@@ -707,8 +704,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgument() {
         rewriteRun(
           java(
@@ -720,12 +717,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package com.acme;
-              
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Retention;
               import java.lang.annotation.RetentionPolicy;
               import java.lang.annotation.Target;
-              
+
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
@@ -759,8 +756,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentNamed() {
         rewriteRun(
           java(
@@ -809,8 +806,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentFullyQualified() {
         rewriteRun(
           java(
@@ -857,8 +854,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @Test
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
           java(
@@ -1005,7 +1002,6 @@ class ChangePackageTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackage(
             "com.acme.project",
             "com.acme.product",
-            null,
             null
           )),
           java(
@@ -1047,8 +1043,7 @@ class ChangePackageTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackage(
             "com.acme.project",
             "com.acme.product",
-            true,
-            null
+            true
           )),
           java(
             """
@@ -1122,7 +1117,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void typeInNestedPackageInheritingFromTypeInBasePackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("java.util", "util", null, null)),
+          spec -> spec.recipe(new ChangePackage("java.util", "util", null)),
           java(
             """
               import java.util.concurrent.ConcurrentHashMap;
@@ -1448,7 +1443,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import static org.openrewrite.Test.stat;
-              
+
               public class B {
                   public void test() {
                       stat();
@@ -1457,7 +1452,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import static org.openrewrite.test.Test.stat;
-              
+
               public class B {
                   public void test() {
                       stat();
@@ -1478,7 +1473,7 @@ class ChangePackageTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackage(
             "com.acme.product",
             "com.acme.product.v2",
-            null, null
+            null
           )),
           java(
             """
@@ -1530,7 +1525,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void updateImportPrefixWithEmptyPackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("a.b", "", false, null)),
+          spec -> spec.recipe(new ChangePackage("a.b", "", false)),
           java(
             """
               package a.b;
@@ -1554,8 +1549,7 @@ class ChangePackageTest implements RewriteTest {
             ChangePackage(
             "a.b",
             "",
-            false,
-            null
+            false
           )),
           java(
             """
@@ -1579,8 +1573,7 @@ class ChangePackageTest implements RewriteTest {
             ChangePackage(
             "x",
             "y",
-            false,
-            null
+            false
           )),
           java(
             """
@@ -1605,8 +1598,7 @@ class ChangePackageTest implements RewriteTest {
             ChangePackage(
             "x.y.z",
             "x",
-            false,
-            null
+            false
           )),
           java(
             """
@@ -1720,7 +1712,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changePackageInSpringXml() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true, null)),
+          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true)),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -1741,7 +1733,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changeTypeInPropertiesFile() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true, null)),
+          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),
           properties(
             """
               a.property=java.lang.String
@@ -1760,7 +1752,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changePackageInYaml() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true, null)),
+          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),
           yaml(
             """
               root:
@@ -1780,49 +1772,9 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    void changePackageInLiteral() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePackage("javax.type", "jakarta.type", true, true)),
-          java(
-            """
-              class Test {
-                  String ref = "javax.type.A";
-                  String extendedRef = "there is a type reference here -> javax.type.A <- hopefully it only replaces that";
-              }
-              """,
-            """
-              class Test {
-                  String ref = "jakarta.type.A";
-                  String extendedRef = "there is a type reference here -> jakarta.type.A <- hopefully it only replaces that";
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void changePackageInLiteralTrueButNoLiteral() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true, true)),
-          java(
-            """
-              package test.type;
-              class Test {
-              }
-              """,
-            """
-              package test.test.type;
-              class Test {
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void changeNonRecursivePackageInYamlKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.apache.http", "org.apache.hc.core5.http", false, null)),
+          spec -> spec.recipe(new ChangePackage("org.apache.http", "org.apache.hc.core5.http", false)),
           yaml(
             """
               logging:
@@ -1837,6 +1789,126 @@ class ChangePackageTest implements RewriteTest {
                   org.apache.hc.core5.http: debug
               """,
             spec -> spec.path("application.yaml")
+          )
+        );
+    }
+
+    @Test
+    void innerType() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangePackage("com.demo", "com.newdemo", true),
+            new ChangeType("com.newdemo.A.B", "some.thing.X.Y", true)
+          ).parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package com.demo;
+
+              public class A {
+                  public static class B {}
+              }
+              """
+          )),
+          java(
+            """
+              package app;
+
+              import com.demo.A.B;
+
+              interface Test {
+                  B foo();
+              }
+              """,
+            """
+              package app;
+
+              import some.thing.X.Y;
+
+              interface Test {
+                  Y foo();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inheritedTypesUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("com.before", "com.after", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.before;
+                  
+                  public class A { }
+                  """
+              )
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.before.A;
+              
+              class X extends A { }
+              """,
+            """
+              package app;
+              
+              import com.after.A;
+              
+              class X extends A { }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type-> TypeUtils.isAssignableTo("com.after.A", type), "Assignable to updated type")
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6513")
+    @Test
+    void changePackageUpdatesNestedClassImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "dev.nipafx.rewrite_bug",
+            "dev.nipafx.rewrite_changepackage_bug",
+            null
+          )),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              public class Outer {
+                  public static class Inner {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package dev.nipafx.rewrite_bug;
+              import dev.nipafx.rewrite_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """,
+            """
+              package dev.nipafx.rewrite_changepackage_bug;
+              import dev.nipafx.rewrite_changepackage_bug.Outer.Inner;
+              public class Importer {
+                  Inner inner;
+              }
+              """
           )
         );
     }

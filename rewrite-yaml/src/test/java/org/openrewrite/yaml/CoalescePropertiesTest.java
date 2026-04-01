@@ -22,12 +22,14 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CoalescePropertiesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new CoalesceProperties());
+        spec.recipe(new CoalesceProperties(null, null));
     }
 
     @DocumentExample
@@ -36,20 +38,20 @@ class CoalescePropertiesTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  management:
-                      metrics:
-                          enable.process.files: true
-                      endpoint:
-                          health:
-                              show-components: always
-                              show-details: always
-              """,
-            """
-                  management:
-                      metrics.enable.process.files: true
-                      endpoint.health:
+              management:
+                  metrics:
+                      enable.process.files: true
+                  endpoint:
+                      health:
                           show-components: always
                           show-details: always
+              """,
+            """
+              management:
+                  metrics.enable.process.files: true
+                  endpoint.health:
+                      show-components: always
+                      show-details: always
               """
           )
         );
@@ -61,19 +63,8 @@ class CoalescePropertiesTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                foo:
-                  bar:
-                    sequence:
-                      - name: name
-                        propertyA: fieldA
-                        propertyB: fieldB
-                      - name: name
-                        propertyA: fieldA
-                        propertyB: fieldB
-                    scalar: value
-              """,
-            """
-                foo.bar:
+              foo:
+                bar:
                   sequence:
                     - name: name
                       propertyA: fieldA
@@ -82,30 +73,30 @@ class CoalescePropertiesTest implements RewriteTest {
                       propertyA: fieldA
                       propertyB: fieldB
                   scalar: value
+              """,
+            """
+              foo.bar:
+                sequence:
+                  - name: name
+                    propertyA: fieldA
+                    propertyB: fieldB
+                  - name: name
+                    propertyA: fieldA
+                    propertyB: fieldB
+                scalar: value
               """
           )
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1133")
+    @Test
     void foldSequenceOfObjectsFormattedWithDashDirectlyUnderMappingKey() {
         rewriteRun(
           yaml(
             """
-                matrix:
-                  include:
-                  # comment-a
-                  # comment-b
-                  - name: entry-0-name # comment-c
-                      # comment-d
-                    value: entry-0-value
-                    # comment-e
-                  - name: entry-1-name
-                    value: entry-1-value
-              """,
-            """
-                matrix.include:
+              matrix:
+                include:
                 # comment-a
                 # comment-b
                 - name: entry-0-name # comment-c
@@ -114,6 +105,17 @@ class CoalescePropertiesTest implements RewriteTest {
                   # comment-e
                 - name: entry-1-name
                   value: entry-1-value
+              """,
+            """
+              matrix.include:
+              # comment-a
+              # comment-b
+              - name: entry-0-name # comment-c
+                  # comment-d
+                value: entry-0-value
+                # comment-e
+              - name: entry-1-name
+                value: entry-1-value
               """
           )
         );
@@ -145,8 +147,8 @@ class CoalescePropertiesTest implements RewriteTest {
         );
     }
 
-    @Test
     @Disabled
+    @Test
     void group() {
         rewriteRun(
           yaml(
@@ -155,112 +157,112 @@ class CoalescePropertiesTest implements RewriteTest {
               management.metrics.enable.jvm: true
               """,
             """
-                  management.metrics.enable:
-                      process.files: true
-                      jvm: true
+              management.metrics.enable:
+                  process.files: true
+                  jvm: true
               """
           )
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Test
     void foldWithCommentsInPrefix() {
         rewriteRun(
           yaml(
             """
-                  a:
-                    b:
-                      # d-comment
-                      d:
-                        e.f: true
-                      c: c-value
+              a:
+                b:
+                  # d-comment
+                  d:
+                    e.f: true
+                  c: c-value
               """,
             """
-                  a.b:
-                    # d-comment
-                    d.e.f: true
-                    c: c-value
+              a.b:
+                # d-comment
+                d.e.f: true
+                c: c-value
               """
           )
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Test
     void foldWithCommentsInPrefixWhenCommentsHaveDifferentIndentThanTheirElement() {
         rewriteRun(
           yaml(
             """
-                  a:
-                    b:
-                    # d-comment
-                      d:
-                        e.f: true
-                     # c-comment
-                      c:
-                        d: d-value
+              a:
+                b:
+                # d-comment
+                  d:
+                    e.f: true
+                 # c-comment
+                  c:
+                    d: d-value
               """,
             """
-                  a.b:
-                  # d-comment
-                    d.e.f: true
-                   # c-comment
-                    c.d: d-value
+              a.b:
+              # d-comment
+                d.e.f: true
+               # c-comment
+                c.d: d-value
               """
           )
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
+    @Test
     void doNotFoldKeysWithCommentsInPrefix() {
         rewriteRun(
           yaml(
             """
-                  a:
-                    b:
-                      d: # d-comment
-                        e:
-                          f: f-value # f-comment
-                      c:
-                        # g-comment
-                        g:
-                          h: h-value
+              a:
+                b:
+                  d: # d-comment
+                    e:
+                      f: f-value # f-comment
+                  c:
+                    # g-comment
+                    g:
+                      h: h-value
               """,
             """
-                  a.b:
-                    d: # d-comment
-                      e.f: f-value # f-comment
-                    c:
-                      # g-comment
-                      g.h: h-value
+              a.b:
+                d: # d-comment
+                  e.f: f-value # f-comment
+                c:
+                  # g-comment
+                  g.h: h-value
               """
           )
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1142")
+    @Test
     void doNotShiftYamlCommentsInPrefixFollowingPreviousYamlObject() {
         rewriteRun(
           yaml(
             """
-                a:
-                  b:
-                    c: c-value  # c-comment
-                    d: d-value # d-comment
-                    e: e-value   # e-comment
-                    f: f-value
-                    g: g-value
+              a:
+                b:
+                  c: c-value  # c-comment
+                  d: d-value # d-comment
+                  e: e-value   # e-comment
+                  f: f-value
+                  g: g-value
               """,
             """
-                  a.b:
-                    c: c-value  # c-comment
-                    d: d-value # d-comment
-                    e: e-value   # e-comment
-                    f: f-value
-                    g: g-value
+              a.b:
+                c: c-value  # c-comment
+                d: d-value # d-comment
+                e: e-value   # e-comment
+                f: f-value
+                g: g-value
               """
           )
         );
@@ -272,14 +274,104 @@ class CoalescePropertiesTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  management:
-                      metrics:
-                          &id enable.process.files: true
-                      endpoint:
-                          health:
-                              show-components: always
-                              show-details: always
-                              *id: false
+              management:
+                  metrics:
+                      &id enable.process.files: true
+                  endpoint:
+                      health:
+                          show-components: always
+                          show-details: always
+                          *id: false
+              """
+          )
+        );
+    }
+
+    @Test
+    void exclusion() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(List.of("$..logging", "$..some"), null)),
+          yaml(
+            """
+              a:
+                first:
+                  logging:
+                    level:
+                      com.company.extern.service: DEBUG
+                      com.another.package: INFO
+              some:
+                things:
+                  else: value
+              """,
+            """
+              a.first:
+                logging:
+                  level:
+                    com.company.extern.service: DEBUG
+                    com.another.package: INFO
+              some:
+                things:
+                  else: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void applyTo() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(null, List.of("$..logging", "$..some"))),
+          yaml(
+            """
+              a:
+                first:
+                  logging:
+                    level:
+                      com.company.extern.service: DEBUG
+                      com.another.package: INFO
+              some:
+                things:
+                  else: value
+              """,
+            """
+              a:
+                first:
+                  logging.level:
+                    com.company.extern.service: DEBUG
+                    com.another.package: INFO
+              some.things.else: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void applyToWithExclusion() {
+        rewriteRun(
+          spec -> spec.recipe(new CoalesceProperties(List.of("$..endpoint"), List.of("$.management2"))),
+          yaml(
+            """
+              management:
+                  metrics:
+                      enable.process.files: true
+                  endpoint:
+                      health.show-components: always
+              management2:
+                  metrics:
+                      enable.process.files: true
+                  endpoint:
+                      health.show-components: always
+              """,
+            """
+              management:
+                  metrics:
+                      enable.process.files: true
+                  endpoint:
+                      health.show-components: always
+              management2:
+                  metrics.enable.process.files: true
+                  endpoint:
+                      health.show-components: always
               """
           )
         );

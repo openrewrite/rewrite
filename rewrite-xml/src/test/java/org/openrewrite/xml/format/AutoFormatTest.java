@@ -29,35 +29,6 @@ class AutoFormatTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/707")
-    @Test
-    void autoFormatAttributes() {
-        rewriteRun(
-          xml(
-            """
-              <databaseChangeLog
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
-                xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog">
-              </databaseChangeLog>
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1503")
-    @Test
-    void autoFormatXmlDecl() {
-        rewriteRun(
-          xml(
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <tag>required tag</tag>
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void autoFormatTag() {
@@ -101,8 +72,37 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/707")
     @Test
+    void autoFormatAttributes() {
+        rewriteRun(
+          xml(
+            """
+              <databaseChangeLog
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog">
+              </databaseChangeLog>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1503")
+    @Test
+    void autoFormatXmlDecl() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <tag>required tag</tag>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1189")
+    @Test
     void tagContentIndentation() {
         rewriteRun(
           xml(

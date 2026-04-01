@@ -29,7 +29,7 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
-        if (scope.isScope(parens) && isUnwrappable(getCursor())) {
+        if (scope.isScope(parens) && isUnwrappable(getCursor()) && !(parens.getTree() instanceof J.SwitchExpression)) {
             J tree = parens.getTree().withPrefix(parens.getPrefix());
             if (tree.getPrefix().isEmpty()) {
                 Object parent = getCursor().getParentOrThrow().getValue();

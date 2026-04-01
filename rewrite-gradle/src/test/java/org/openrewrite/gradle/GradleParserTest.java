@@ -15,9 +15,21 @@
  */
 package org.openrewrite.gradle;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
+import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
@@ -32,11 +44,11 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               gradleEnterprise {
                   server = 'https://enterprise-samples.gradle.com'
                   buildScan {
@@ -54,26 +66,26 @@ class GradleParserTest implements RewriteTest {
           buildGradle(
             """
               import org.gradle.api.Project
-              
+
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Import.class);
-                J.Import i = (J.Import) cu.getStatements().get(0);
+                assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Import.class);
+                var i = (J.Import) cu.getStatements().getFirst();
                 assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);
+                var m = (J.MethodInvocation) cu.getStatements().get(3);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
             })
@@ -89,11 +101,11 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
@@ -105,11 +117,11 @@ class GradleParserTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
                 assertThat(cu.getStatements().get(2)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(2);
+                var m = (J.MethodInvocation) cu.getStatements().get(2);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
-                J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(3);
+                var d = (J.MethodDeclaration) cu.getStatements().get(3);
                 assertThat(d.getSimpleName()).isEqualTo("greet");
             })
           )
@@ -125,15 +137,15 @@ class GradleParserTest implements RewriteTest {
                * LICENSE
                */
               import org.gradle.api.Project
-              
+
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "junit:junit:4.13"
               }
@@ -150,11 +162,11 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               // Some comment
               dependencies {
                   testImplementation "junit:junit:4.13"
@@ -172,16 +184,74 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               // Deliberately not first, as per test
               import org.gradle.api.Project
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   testImplementation "junit:junit:4.13"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependencyNotations() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+
+                  // String notation
+                  implementation "org.openrewrite:rewrite-java:latest.release"
+                  implementation ("org.openrewrite:rewrite-java:latest.release")
+                  implementation ("org.openrewrite:rewrite-java:latest.release") { transitive = false }
+                  implementation ("org.openrewrite:rewrite-java:latest.release") {
+                      transitive = false
+                  }
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" )
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" ) { transitive = false }
+                  implementation ( "org.openrewrite:rewrite-java:latest.release" ) {
+                      transitive = false
+                  }
+
+                  // Map notation
+                  implementation group: "org.openrewrite", name: "rewrite-java", version: "latest.release"
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release")
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release") { transitive = false }
+                  implementation(group: "org.openrewrite", name: "rewrite-java", version: "latest.release") {
+                      transitive = false
+                  }
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" )
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" ) { transitive = false }
+                  implementation( group: "org.openrewrite", name: "rewrite-java", version: "latest.release" ) {
+                      transitive = false
+                  }
+
+                  // Map literal notation
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"])
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"]) { transitive = false }
+                  implementation([group: "org.openrewrite", name: "rewrite-java", version: "latest.release"]) {
+                      transitive = false
+                  }
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] )
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] ) { transitive = false }
+                  implementation( [group: "org.openrewrite", name: "rewrite-java", version: "latest.release"] ) {
+                      transitive = false
+                  }
               }
               """
           )
@@ -196,12 +266,330 @@ class GradleParserTest implements RewriteTest {
               plugins {
                   `java-library`
               }
-              
+
               repositories {
                   mavenCentral()
               }
               """
           )
+        );
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', "RESPONSE=\\$(curl --location -s --request POST \\"https://localhost/$path\\")"
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInSingleSingleQuotes() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', 'RESPONSE=\\$(curl --location -s --request POST "https://localhost/$path")'
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInTripleDoubleQuotes() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', \"""
+                          RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                          echo "TEST" > "\\$(echo $someVar)"
+                      \"""
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void escapedAndNonEscapedDollarSignsInTripleSingleQuotes() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
+          plugins {
+            id 'java-library'
+          }
+
+          task executeShellCommands {
+              doLast {
+                  exec {
+                      commandLine 'bash', '-c', '''
+                          RESPONSE=\\$(curl --location -s --request POST "https://localhost")
+                          echo "TEST" > "\\$(echo $someVar)"
+                      '''
+                  }
+              }
+          }
+          """)), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4614")
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:2.6", )
+                  implementation platform("commons-lang:commons-lang3:3.0",)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaWithClosures() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            foo('bar',) {}
+            foo('bar' , {} , )
+            foo('bar' , {} , ) {}
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithClosures() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            foo('bar') {}
+            foo('bar' , {} )
+            foo('bar' , {} ) {}
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void trailingCommaWithNamedParameters() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+          // lang=groovy
+          """
+              foo(a: "Hello World with no extra space",)
+              foo(a: "Hello World with space before comma" ,)
+              foo(a: "Hello World with space after comma", )
+              foo(a: "Hello World with space before & after comma" , )
+              foo(a: "Hello World with space before and new line after comma" ,
+              )
+          """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithNamedParameters() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+          // lang=groovy
+          """
+              foo(a: "Hello World with no extra space")
+              foo(a: "Hello World with space after parameter" )
+              foo(a: "Hello World with new line after parameter"
+              )
+          """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void trailingCommaWithNamedParametersAndClosures() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+              foo(a: 'bar',) {}
+              foo(a: 'bar', {} , )
+              foo(a: 'bar', b: {} , )
+              foo('bar', b: {} , )
+              foo(a: 'bar', {} , ) {}
+              foo(a: 'bar', {} , {} , )
+              foo(a: 'bar', b: {} , ) {}
+              foo(a: 'bar', b: {} , {} , )
+              foo('bar', b: {} , ) {}
+              foo('bar', b: {} , {} , )
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithNamedParametersAndClosures() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+              foo(a: 'bar') {}
+              foo(a: 'bar', {})
+              foo(a: 'bar', b: {})
+              foo('bar', b: {})
+              foo(a: 'bar', {} )
+              foo(a: 'bar', b: {} )
+              foo('bar', b: {} )
+              foo(a: 'bar', {} ) {}
+              foo(a: 'bar', {} , {} )
+              foo(a: 'bar', b: {} ) {}
+              foo(a: 'bar', b: {} , {} )
+              foo('bar', b: {} ) {}
+              foo('bar', b: {} , {} )
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void trailingCommaWithNamedParametersComplicated() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            task foo {
+              doLast {
+                bar.baz(
+                  a: 'fizbuz',
+                  b: 'buzfiz',
+                ) {
+                  c('d')
+                }
+              }
+            }
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @Test
+    void noTrailingCommaWithNamedParametersComplicated() {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
+            // lang=groovy
+            """
+            task foo {
+              doLast {
+                bar.baz(
+                  a: 'fizbuz',
+                  b: 'buzfiz'
+                ) {
+                  c('d')
+                }
+              }
+            }
+            """
+        )), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    @ParameterizedTest
+    void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(
+          Parser.Input.fromString(groovy)
+        ), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    /**
+     * Produces a stream of test expressions like `def a = "\\${System.getProperty('user.name')}"`
+     */
+    static Stream<String> escapedBackslashesAndInterpolationInGStringParams() {
+        return Stream.of(
+            "1 + 1",
+            "System.getProperty('user.name')"
+        ).flatMap(exp ->
+            """
+            %s
+            "%s"
+            "${%s}"
+            "\\${%s}"
+            "\\\\${%s}"
+            "\\\\\\${%s}"
+            "${%s}\\\\"
+            "\\t${%s}"
+            "${%s}\\t"
+            """.lines().map(s -> ("def a = " + s).formatted(exp))
         );
     }
 }

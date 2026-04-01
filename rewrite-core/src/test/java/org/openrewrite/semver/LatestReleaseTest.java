@@ -38,8 +38,11 @@ class LatestReleaseTest {
         assertThat(latestRelease.isValid("1.0", "1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1.1")).isTrue();
 
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1-SNAPSHOT")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.1.1-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.0-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.a")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isFalse();
@@ -93,6 +96,13 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare("1.0", "1.1.1", "1.1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1.1", "1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1", "1.1")).isLessThan(0);
+
+        // Different counts crossing the 5-group boundary
+        assertThat(latestRelease.compare(null, "1.2.3.4.5", "1.2.3.4.5.1")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.1", "1.2.3.4.5")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3", "1.2.3.4.5.6")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.6.0.0")).isZero();
     }
 
     @Test
@@ -120,9 +130,47 @@ class LatestReleaseTest {
     }
 
     @Test
+    void latestReleaseOrLatestIntegrationKeyword_beatsEverything() {
+        assertThat(latestRelease.compare(null, "latest.release", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "latest.release")).isNegative();
+        assertThat(latestRelease.compare(null, "latest.release", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "latest.release", "latest.release")).isZero();
+
+        assertThat(latestRelease.compare(null, "latest.integration", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3", "latest.integration")).isNegative();
+        assertThat(latestRelease.compare(null, "latest.integration", "999.999.999")).isPositive();
+        assertThat(latestRelease.compare(null, "latest.integration", "latest.integration")).isZero();
+
+        assertThat(latestRelease.compare(null, "lATesT.reLeaSE", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "lATesT.inTegRATion", "1.2.3")).isPositive();
+    }
+
+    @Test
+    void compareQualifiers() {
+        assertThat(latestRelease.compare(null, "1.2.3.final", "1.2.3")).isEqualTo(0);
+        assertThat(latestRelease.compare(null, "1.2.3.ga", "1.2.3")).isEqualTo(0);
+        assertThat(latestRelease.compare(null, "1.2.3.release", "1.2.3")).isEqualTo(0);
+
+        assertThat(latestRelease.compare(null, "1.2.3.alpha-1", "1.2.3")).isNegative();
+        assertThat(latestRelease.compare(null, "1.2.3.alpha-1", "1.2.3.alpha-2")).isNegative();
+        assertThat(latestRelease.compare(null, "1.2.3.m", "1.2.3")).isNegative();
+
+        assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3")).isPositive();
+        assertThat(latestRelease.compare(null, "1.2.3.sp", "1.2.3.final")).isPositive();
+
+        assertThat(latestRelease.compare(null, "1.2.3.mr", "1.2.3")).isPositive();
+    }
+
+    @Test
     void latestKeywordIsNewerThanReleaseKeyword() {
         assertThat(latestRelease.compare(null, "RELEASE", "LATEST")).isNegative();
         assertThat(latestRelease.compare(null, "LATEST", "RELEASE")).isPositive();
+    }
+
+    @Test
+    void latestIntegrationKeywordIsNewerThanLatestReleaseKeyword() {
+        assertThat(latestRelease.compare(null, "latest.release", "latest.integration")).isNegative();
+        assertThat(latestRelease.compare(null, "latest.integration", "latest.release")).isPositive();
     }
 
     @Test
@@ -164,6 +212,22 @@ class LatestReleaseTest {
     }
 
     @Test
+    void versionsWithMoreThanFiveParts() {
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.7")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.7", "1.2.3.4.5.6")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.3", "1.2.3.4.5.3")).isZero();
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6.7", "1.2.3.4.5.6.8")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5")).isGreaterThan(0);
+    }
+
+    @Test
+    void versionsWithMoreThanFivePartsAndQualifiers() {
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6-RC1", "1.2.3.4.5.6")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6", "1.2.3.4.5.6-RC1")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "1.2.3.4.5.6-alpha", "1.2.3.4.5.6-beta")).isLessThan(0);
+    }
+
+    @Test
     void datedSnapshotVersions() {
         assertThat(latestRelease.compare(null, "7.17.0-20211102.000501-28",
           "7.17.0-20211102.012229-29")).isLessThan(0);
@@ -172,5 +236,16 @@ class LatestReleaseTest {
     @Test
     void matchCustomMetadata() {
         assertThat(new LatestRelease(".Final-custom-\\d+").isValid(null, "3.2.9.Final-custom-00003")).isTrue();
+    }
+
+    @Test
+    void preReleaseVersionsShouldBeLessThanReleaseVersions() {
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0", "3.5.0-RC1")).isGreaterThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-RC2")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-alpha", "3.5.0-beta")).isLessThan(0);
+        // "RC" is a known qualifier and "beta" is not
+        assertThat(latestRelease.compare(null, "3.5.0-beta", "3.5.0-RC1")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "3.5.0-RC1", "3.5.0-beta")).isGreaterThan(0);
     }
 }

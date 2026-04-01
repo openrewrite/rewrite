@@ -30,6 +30,23 @@ class FindEmptyClassesTest implements RewriteTest {
         spec.recipe(new FindEmptyClasses());
     }
 
+    @DocumentExample
+    @Test
+    void findEmptyClass() {
+        rewriteRun(
+          java(
+            """
+              class IsEmpty {
+              }
+              """,
+            """
+              /*~~>*/class IsEmpty {
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void classNotEmpty() {
         rewriteRun(
@@ -100,23 +117,6 @@ class FindEmptyClassesTest implements RewriteTest {
           java(
             """
               class IsEmpty implements A {
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findEmptyClass() {
-        rewriteRun(
-          java(
-            """
-              class IsEmpty {
-              }
-              """,
-            """
-              /*~~>*/class IsEmpty {
               }
               """
           )

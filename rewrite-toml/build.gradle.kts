@@ -16,6 +16,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = antlrGeneration
+
+    finalizedBy("licenseFormat")
 }
 
 dependencies {
@@ -23,7 +25,9 @@ dependencies {
     implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("io.micrometer:micrometer-core:1.9.+")
 
-    antlrGeneration("org.antlr:antlr4:4.13.2")
+    antlrGeneration("org.antlr:antlr4:4.13.2"){
+        exclude(group = "com.ibm.icu", module = "icu4j")
+    }
 
     compileOnly(project(":rewrite-test"))
 

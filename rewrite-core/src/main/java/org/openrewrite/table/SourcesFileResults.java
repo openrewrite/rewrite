@@ -43,7 +43,7 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
 
         @Column(displayName = "Parent of the recipe that made changes",
                 description = "In a hierarchical recipe, the parent of the recipe that made a change. Empty if " +
-                              "this is the root of a hierarchy or if the recipe is not hierarchical at all.")
+                        "this is the root of a hierarchy or if the recipe is not hierarchical at all.")
         String parentRecipe;
 
         @Column(displayName = "Recipe that made changes",
@@ -52,7 +52,7 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
 
         @Column(displayName = "Estimated time saving",
                 description = "An estimated effort that a developer to fix manually instead of using this recipe," +
-                              " in unit of seconds.")
+                        " in unit of seconds.")
         Long estimatedTimeSaving;
 
         @Column(displayName = "Cycle",
@@ -63,15 +63,16 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
     public static SourcesFileResults build(Changeset changeset, int cycle, ExecutionContext ctx) {
         SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
         for (Result result : changeset.getAllResults()) {
-            Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
+            Stack<@Nullable RecipeDescriptor[]> recipeStack = new Stack<>();
 
             for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
-                recipeStack.push(new RecipeDescriptor[]{null, rd});
+                recipeStack.push(new @Nullable RecipeDescriptor[]{null, rd});
             }
 
             while (!recipeStack.isEmpty()) {
-                RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
+                @Nullable RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
 
+                assert recipeThatMadeChange[1] != null;
                 resultsTable.insertRow(ctx, new SourcesFileResults.Row(
                         result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),

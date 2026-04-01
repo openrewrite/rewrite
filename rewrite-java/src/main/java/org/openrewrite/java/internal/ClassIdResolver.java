@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import com.fasterxml.jackson.annotation.ObjectIdGenerator;
 import com.fasterxml.jackson.annotation.ObjectIdResolver;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +34,7 @@ public class ClassIdResolver implements ObjectIdResolver {
     }
 
     @Override
-    public Object resolveId(ObjectIdGenerator.IdKey id) {
+    public @Nullable Object resolveId(ObjectIdGenerator.IdKey id) {
         return (items == null) ? null : items.get(id);
     }
 

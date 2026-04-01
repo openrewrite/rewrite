@@ -31,14 +31,6 @@ class FindImportsTest implements RewriteTest {
         spec.recipe(new FindImports("java.util..*", null));
     }
 
-    @Test
-    void typeMatcherOnImports() {
-        assertThat(new TypeMatcher("java.util..*").matchesPackage("java.util.List")).isTrue();
-        assertThat(new TypeMatcher("java.util..*").matchesPackage("java.util.concurrent.*")).isTrue();
-        assertThat(new TypeMatcher("java.util..*").matchesPackage("java.util.*")).isTrue();
-        assertThat(new TypeMatcher("java.util.List").matchesPackage("java.util.*")).isTrue();
-    }
-
     @DocumentExample
     @Test
     void exactMatch() {
@@ -56,6 +48,14 @@ class FindImportsTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void typeMatcherOnImports() {
+        assertThat(new TypeMatcher("java.util..*").matchesPackage("java.util.List")).isTrue();
+        assertThat(new TypeMatcher("java.util..*").matchesPackage("java.util.concurrent.*")).isTrue();
+        assertThat(new TypeMatcher("java.util..*").matchesPackage("java.util.*")).isTrue();
+        assertThat(new TypeMatcher("java.util.List").matchesPackage("java.util.*")).isTrue();
     }
 
     @Test

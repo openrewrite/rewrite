@@ -89,34 +89,6 @@ public class MavenRepository implements Serializable {
     @NonFinal
     Boolean deriveMetadataIfMissing;
 
-    /**
-     * Constructor required by {@link org.openrewrite.maven.tree.OpenRewriteModelSerializableTest}.
-     *
-     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Boolean)}
-     */
-    @Deprecated
-    @JsonIgnore
-    public MavenRepository(
-            @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots,
-            @Nullable String username, @Nullable String password
-    ) {
-        this(id, uri, releases, snapshots, false, username, password, null, null);
-    }
-
-    /**
-     * Constructor required by {@link org.openrewrite.gradle.marker.GradleProject}.
-     *
-     * @deprecated Use {@link #MavenRepository(String, String, String, String, boolean, String, String, Duration, Boolean)}
-     */
-    @Deprecated
-    @JsonIgnore
-    public MavenRepository(
-            @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots, boolean knownToExist,
-            @Nullable String username, @Nullable String password, @Nullable Boolean deriveMetadataIfMissing
-    ) {
-        this(id, uri, releases, snapshots, knownToExist, username, password, null, deriveMetadataIfMissing);
-    }
-
     @JsonIgnore
     public MavenRepository(
             @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots, boolean knownToExist,

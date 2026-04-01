@@ -15,11 +15,13 @@
  */
 package org.openrewrite.yaml.format;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
 
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -37,26 +39,12 @@ class IndentsTest implements RewriteTest {
         ));
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
-    void multilineString() {
-        rewriteRun(
-          yaml("""
-            foo:
-              bar: >
-                A multiline string.
-              baz:
-                quz: Another string.
-            """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void indentSequence() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                   root:
                       - a: 0
                         b: 0
@@ -70,10 +58,27 @@ class IndentsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3531")
+    @Test
+    void multilineString() {
+        rewriteRun(
+          yaml(
+                """
+            foo:
+              bar: >
+                A multiline string.
+              baz:
+                quz: Another string.
+            """
+          )
+        );
+    }
+
     @Test
     void indents() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                   apiVersion: storage.cnrm.cloud.google.com/v1beta1
                   kind: StorageBucket
                   spec:
@@ -99,11 +104,12 @@ class IndentsTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1135")
+    @Test
     void maintainIndentSpacingOnMixedTypeSequences() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                 steps:
                   - checkout
                   - run:
@@ -120,7 +126,8 @@ class IndentsTest implements RewriteTest {
     @Test
     void indentSequenceComments() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
               key:
               # a under-indented
                   # a over-indented
@@ -145,13 +152,14 @@ class IndentsTest implements RewriteTest {
     @Test
     void indentMappingComments() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
               key: # no change
               # under-indented
                   # over-indented
                 a : # no change
-              
-              
+
+
                 # under-indented
                     # over-indented
                   b : c
@@ -161,8 +169,8 @@ class IndentsTest implements RewriteTest {
                 # under-indented
                 # over-indented
                 a : # no change
-              
-              
+
+
                   # under-indented
                   # over-indented
                   b : c
@@ -174,7 +182,8 @@ class IndentsTest implements RewriteTest {
     @Test
     void indentRootComments() {
         rewriteRun(
-          yaml("""
+          yaml(
+                """
                 # over-indented 1
               ---
                 # over-indented 2
@@ -192,5 +201,128 @@ class IndentsTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    @Issue("https://github.com/openrewrite/rewrite/issues/7125")
+    class SameColumnSequenceIndent implements RewriteTest {
+
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipe(toRecipe(() -> new IndentsVisitor<>(
+                new IndentsStyle(2, false),
+                null
+              )
+            ));
+        }
+
+        @Test
+        void sameColumnSequenceIndent() {
+            rewriteRun(
+              yaml(
+                    """
+                  fruit:
+                      - name: apple
+                        color: red
+                  """,
+                """
+                  fruit:
+                  - name: apple
+                    color: red
+                  """
+              )
+            );
+        }
+
+        @Test
+        void sameColumnPreservesCorrectIndent() {
+            rewriteRun(
+              yaml(
+                    """
+                  fruit:
+                  - name: apple
+                    color: red
+                  """
+              )
+            );
+        }
+
+        @Test
+        void sameColumnNestedMapping() {
+            rewriteRun(
+              yaml(
+                    """
+                  spec:
+                    lifecycleRule:
+                    - action:
+                        type: Delete
+                      condition:
+                        age: 7
+                  """
+              )
+            );
+        }
+
+        @Test
+        void sameColumnMultipleEntries() {
+            rewriteRun(
+              yaml(
+                    """
+                  items:
+                  - name: first
+                    value: 1
+                  - name: second
+                    value: 2
+                  """
+              )
+            );
+        }
+
+        @Test
+        void sameColumnMixedTypeSequences() {
+            rewriteRun(
+              yaml(
+                    """
+                  steps:
+                  - checkout
+                  - run:
+                      name: Install dependencies
+                      command: npm ci
+                  """
+              )
+            );
+        }
+
+        @Test
+        void sameColumnNestedSequences() {
+            rewriteRun(
+              yaml(
+                    """
+                  outer:
+                  - inner:
+                    - name: nested
+                      value: 1
+                    - name: nested2
+                      value: 2
+                  """
+              )
+            );
+        }
+
+        @Test
+        void sameColumnWithDashOnOwnLine() {
+            rewriteRun(
+              yaml(
+                    """
+                  props:
+                  - prop: 'name1'
+                    value: 1
+                  -
+                    prop: 'name2'
+                    value: 2
+                  """
+              )
+            );
+        }
     }
 }

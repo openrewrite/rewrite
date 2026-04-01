@@ -18,7 +18,6 @@ package org.openrewrite.ipc.http;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
@@ -28,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class HttpUrlConnectionSenderTest {
 
     @Test
-    void withMultipartContentWithApplicationJsonType() throws IOException {
+    void withMultipartContentWithApplicationJsonType() throws Exception {
         HttpSender.Request request =
           new HttpUrlConnectionSender().newRequest("http://github.com")
             .withMultipartContent(HttpSender.Request.Builder.APPLICATION_JSON,
@@ -45,7 +44,7 @@ public class HttpUrlConnectionSenderTest {
     }
 
     @Test
-    void withMultipartContentWithApplicationJsonAndTextPlainType() throws IOException {
+    void withMultipartContentWithApplicationJsonAndTextPlainType() throws Exception {
         HttpSender.Request request = new HttpUrlConnectionSender().newRequest("http://github.com")
           .withMultipartContent(HttpSender.Request.Builder.APPLICATION_JSON, "json", "{\"foo\":\"bar\"}")
           .withMultipartContent(HttpSender.Request.Builder.TEXT_PLAIN, "text", "abc123")
@@ -66,7 +65,7 @@ public class HttpUrlConnectionSenderTest {
     }
 
     @Test
-    void withMultipartContentWithTextPlainAndFileType(@TempDir Path tempDir) throws IOException {
+    void withMultipartContentWithTextPlainAndFileType(@TempDir Path tempDir) throws Exception {
         Path path = tempDir.resolve("file.dat");
         Files.writeString(path, "The quick brown fox...");
         HttpSender.Request request = new HttpUrlConnectionSender().newRequest("http://github.com")

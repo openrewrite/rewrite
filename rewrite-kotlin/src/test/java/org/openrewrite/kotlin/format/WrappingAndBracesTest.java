@@ -27,7 +27,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Arrays;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -42,40 +42,6 @@ class WrappingAndBracesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(IntelliJ.wrappingAndBraces())));
-    }
-
-    private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
-                                                          UnaryOperator<WrappingAndBracesStyle> wrapping) {
-        return spec -> spec
-          .recipes(
-            toRecipe(() -> new WrappingAndBracesVisitor<>(wrapping.apply(IntelliJ.wrappingAndBraces()))),
-            toRecipe(() -> new TabsAndIndentsVisitor<>(IntelliJ.tabsAndIndents(), IntelliJ.wrappingAndBraces())),
-            toRecipe(() -> new SpacesVisitor<>(spaces.apply(IntelliJ.spaces())))
-          )
-          .parser(KotlinParser.builder().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              Arrays.asList(
-                spaces.apply(IntelliJ.spaces()),
-                wrapping.apply(IntelliJ.wrappingAndBraces())
-              )
-            )
-          )));
-    }
-
-    @Test
-    void classConstructor() {
-        rewriteRun(
-          kotlin(
-            """
-              class A   (
-                      val type: Int = 1
-              ) {
-                   var a = 2
-              }
-              """
-          )
-        );
     }
 
     @DocumentExample
@@ -97,6 +63,40 @@ class WrappingAndBracesTest implements RewriteTest {
                       var n: Int = 0
                       n++
                   }
+              }
+              """
+          )
+        );
+    }
+
+    private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
+                                                          UnaryOperator<WrappingAndBracesStyle> wrapping) {
+        return spec -> spec
+          .recipes(
+            toRecipe(() -> new WrappingAndBracesVisitor<>(wrapping.apply(IntelliJ.wrappingAndBraces()))),
+            toRecipe(() -> new TabsAndIndentsVisitor<>(IntelliJ.tabsAndIndents(), IntelliJ.wrappingAndBraces())),
+            toRecipe(() -> new SpacesVisitor<>(spaces.apply(IntelliJ.spaces())))
+          )
+          .parser(KotlinParser.builder().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              List.of(
+                spaces.apply(IntelliJ.spaces()),
+                wrapping.apply(IntelliJ.wrappingAndBraces())
+              )
+            )
+          )));
+    }
+
+    @Test
+    void classConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              class A   (
+                      val type: Int = 1
+              ) {
+                   var a = 2
               }
               """
           )
@@ -270,7 +270,7 @@ class WrappingAndBracesTest implements RewriteTest {
               """,
             """
               class Test {
-                  @Suppress("ALL") 
+                  @Suppress("ALL")
                @Deprecated("", ReplaceWith("Any()"))
                  fun method(): Any {
                       return Any()
@@ -591,12 +591,12 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               class T {
                   @Suppress val i = 1
                   @Suppress val j = 1
@@ -607,14 +607,14 @@ class WrappingAndBracesTest implements RewriteTest {
                   @Suppress val i = 1
                   @Suppress val j = 1
               }
-              
+
               val o = object {
                   @Suppress
                val i = 1
                   @Suppress
                val j = 1
               }
-              
+
               class T {
                   @Suppress
                val i = 1

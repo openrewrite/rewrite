@@ -29,10 +29,10 @@ class FindFieldsTest implements RewriteTest {
         spec.recipe(new FindFields("java.nio.charset.StandardCharsets", null,"UTF_8"));
     }
 
+    @DocumentExample
     @Test
-    void fieldMatch() {
+    void findFullyQualifiedFields() {
         rewriteRun(
-          spec -> spec.recipe(new FindFields("java.nio..*", true, "*")),
           java(
             """
               class Test {
@@ -48,10 +48,10 @@ class FindFieldsTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
-    void findFullyQualifiedFields() {
+    void fieldMatch() {
         rewriteRun(
+          spec -> spec.recipe(new FindFields("java.nio..*", true, "*")),
           java(
             """
               class Test {

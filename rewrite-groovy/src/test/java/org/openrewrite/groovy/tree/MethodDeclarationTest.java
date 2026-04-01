@@ -44,7 +44,7 @@ class MethodDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(cu -> {
-                var method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                var method = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst();
                 JavaType.Method methodType = method.getMethodType();
                 assertThat(methodType).isNotNull();
                 assertThat(methodType.getName()).isEqualTo("method");
@@ -194,24 +194,25 @@ class MethodDeclarationTest implements RewriteTest {
           groovy(
             """
               def foo(String[][] s) {}
-              """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                    if (arrayType.getElementType() instanceof J.ArrayType) {
-                        assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
-                        assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+              """,
+                spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                        if (arrayType.getElementType() instanceof J.ArrayType) {
+                            assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
+                            assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+                        }
+                        return super.visitArrayType(arrayType, o);
                     }
-                    return super.visitArrayType(arrayType, o);
-                }
-            }.visit(cu, 0))
+                }.visit(cu, 0))
           )
         );
     }
 
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3559")
-    void escapedMethodNameTest() {
+    @Test
+    void escapedMethodName() {
         rewriteRun(
           groovy(
             """
@@ -223,12 +224,24 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void escapedMethodNameWithSpacesTest() {
+    void escapedMethodNameWithSpaces() {
         rewriteRun(
           groovy(
             """
               def 'some test scenario description'() {}
               'some test scenario description'()
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapedMethodNameWithDollarSign() {
+        rewriteRun(
+          groovy(
+            """
+              def "xMethod\\${regularText}"() {}
+              "xMethod\\${regularText}"()
               """
           )
         );
@@ -258,8 +271,8 @@ class MethodDeclarationTest implements RewriteTest {
               def accept(final def variable m) {}
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(1);
-                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().get(0);
+                var accept = (J.MethodDeclaration) cu.getStatements().get(1);
+                var m = (J.VariableDeclarations) accept.getParameters().getFirst();
                 assertThat(m.getModifiers()).satisfiesExactly(
                   mod -> assertThat(mod.getType()).isEqualTo(J.Modifier.Type.Final),
                   mod -> assertThat(mod.getKeyword()).isEqualTo("def")
@@ -278,7 +291,7 @@ class MethodDeclarationTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(0);
+                var accept = (J.MethodDeclaration) cu.getStatements().getFirst();
                 assertThat(accept.getReturnTypeExpression()).isNull();
             })
           )

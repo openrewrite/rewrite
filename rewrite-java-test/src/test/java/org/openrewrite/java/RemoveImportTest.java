@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,13 +32,6 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class RemoveImportTest implements RewriteTest {
-    private static Recipe removeImport(String type) {
-        return removeImport(type, false);
-    }
-
-    private static Recipe removeImport(String type, boolean force) {
-        return toRecipe(() -> new RemoveImport<>(type, force));
-    }
 
     @DocumentExample
     @Test
@@ -52,6 +46,13 @@ class RemoveImportTest implements RewriteTest {
             "class A {}"
           )
         );
+    }
+    private static Recipe removeImport(String type) {
+        return removeImport(type, false);
+    }
+
+    private static Recipe removeImport(String type, boolean force) {
+        return toRecipe(() -> new RemoveImport<>(type, force));
     }
 
     @Test
@@ -105,14 +106,14 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               import java.util.*;
-                            
+
               class A {
                  Collection<Integer> c;
               }
               """,
             """
               import java.util.Collection;
-                            
+
               class A {
                  Collection<Integer> c;
               }
@@ -223,10 +224,10 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               import java.time.DayOfWeek;
-                            
+
               import static java.time.DayOfWeek.MONDAY;
               import static java.time.DayOfWeek.TUESDAY;
-                            
+
               class WorkWeek {
                   DayOfWeek shortWeekStarts(){
                       return TUESDAY;
@@ -235,9 +236,9 @@ class RemoveImportTest implements RewriteTest {
               """,
             """
               import java.time.DayOfWeek;
-                            
+
               import static java.time.DayOfWeek.TUESDAY;
-                            
+
               class WorkWeek {
                   DayOfWeek shortWeekStarts(){
                       return TUESDAY;
@@ -256,14 +257,14 @@ class RemoveImportTest implements RewriteTest {
             """
               import static java.util.Collections.emptyList;
               import static java.util.Collections.emptySet;
-                            
+
               class A {
                  Object o = emptyList();
               }
               """,
             """
               import static java.util.Collections.emptyList;
-                            
+
               class A {
                  Object o = emptyList();
               }
@@ -280,19 +281,19 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-                            
+
               import java.util.List;
               import java.util.ArrayList;
-                            
+
               public class A {
                   ArrayList<String> foo = new ArrayList<>();
               }
               """,
             """
               package com.example.foo;
-                            
+
               import java.util.ArrayList;
-                            
+
               public class A {
                   ArrayList<String> foo = new ArrayList<>();
               }
@@ -308,22 +309,22 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-                            
+
               import java.util.Collection;
               import java.util.List;
-                            
+
               import java.util.ArrayList;
-                            
+
               public class A {
               }
               """,
             """
               package com.example.foo;
-                            
+
               import java.util.Collection;
-                            
+
               import java.util.ArrayList;
-                            
+
               public class A {
               }
               """
@@ -415,13 +416,13 @@ class RemoveImportTest implements RewriteTest {
             """
               import static java.util.Collection.*;
               import static java.util.List.*;
-                            
+
               public class A {
               }
               """,
             """
               import static java.util.List.*;
-                            
+
               public class A {
               }
               """
@@ -436,20 +437,20 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-                            
+
               import java.util.List;
               // import java.util.UUID
               import java.util.ArrayList;
-                            
+
               public class A {
               }
               """,
             """
               package com.example.foo;
-                            
+
               // import java.util.UUID
               import java.util.ArrayList;
-                            
+
               public class A {
               }
               """
@@ -467,19 +468,19 @@ class RemoveImportTest implements RewriteTest {
 
               import static java.util.Collections.emptySet;
               import static java.util.Collections.singletonList;
-                            
+
               import java.util.UUID;
-                            
+
               public class A {
               }
               """,
             """
               package com.example.foo;
-                            
+
               import static java.util.Collections.emptySet;
 
               import java.util.UUID;
-                            
+
               public class A {
               }
               """
@@ -495,15 +496,15 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-                            
+
               import java.util.List;
-                            
+
               public class A {
               }
               """,
             """
               package com.example.foo;
-                            
+
               public class A {
               }
               """
@@ -525,23 +526,23 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-                            
+
               import com.yourorg.b.B;
-                            
+
               import java.util.List;
               import java.util.ArrayList;
-                            
+
               public class A {
                   ArrayList<B> foo = new ArrayList<>();
               }
               """,
             """
               package com.example.foo;
-                            
+
               import com.yourorg.b.B;
-                            
+
               import java.util.ArrayList;
-                            
+
               public class A {
                   ArrayList<B> foo = new ArrayList<>();
               }
@@ -557,10 +558,10 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package com.example.foo;
-                            
+
               import java.util.List;
               import java.util.ArrayList;
-                            
+
               public class A {
               // Intentionally misaligned to ensure AutoFormat has not been applied to the class body
               ArrayList<String> foo = new ArrayList<>();
@@ -568,9 +569,9 @@ class RemoveImportTest implements RewriteTest {
               """,
             """
               package com.example.foo;
-                            
+
               import java.util.ArrayList;
-                            
+
               public class A {
               // Intentionally misaligned to ensure AutoFormat has not been applied to the class body
               ArrayList<String> foo = new ArrayList<>();
@@ -618,7 +619,7 @@ class RemoveImportTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(
             removeImport("java.util.Collection"),
-            new ChangeType("java.util.List", "java.util.Collection", null, null)
+            new ChangeType("java.util.List", "java.util.Collection", null)
           ),
           java(
             """
@@ -643,7 +644,7 @@ class RemoveImportTest implements RewriteTest {
                   Collection<Integer> l;
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().get(0).getId()).isNotEqualTo(cu.getImports().get(1).getId())))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().getFirst().getId()).isNotEqualTo(cu.getImports().get(1).getId())))
         );
     }
 
@@ -666,9 +667,9 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package org.test.a;
-                            
+
               import static org.test.Example.*;
-                            
+
               public class Test {
                   public void method() {
                       int value2 = VALUE_2;
@@ -700,9 +701,9 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               package org.test.a;
-                            
+
               import static org.test.Example.*;
-                            
+
               public class Test {
                   public void method() {
                       int value2 = VALUE_2;
@@ -712,10 +713,10 @@ class RemoveImportTest implements RewriteTest {
               """,
             """
               package org.test.a;
-                            
+
               import static org.test.Example.method1;
               import static org.test.Example.VALUE_2;
-                            
+
               public class Test {
                   public void method() {
                       int value2 = VALUE_2;
@@ -746,7 +747,7 @@ class RemoveImportTest implements RewriteTest {
           java(
             """
               import java.util.*;
-                            
+
               class Test {
                   List<String> l;
               }
@@ -777,11 +778,50 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.concurrent.*;
-                            
+
               class Test {
                   Map<Integer, Integer> m = new ConcurrentHashMap<>();
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1521")
+    @Test
+    void unfoldedStarImportHasTypeAttribution() {
+        rewriteRun(
+          spec -> spec.recipes(
+            removeImport("java.util.List"),
+            new ChangeType("java.util.Set", "java.util.HashSet", null)
+          ),
+          java(
+            """
+              package a;
+
+              import java.util.*;
+
+              public class A {
+                  Set<Integer> s;
+              }
+              """,
+            """
+              package a;
+
+              import java.util.HashSet;
+
+              public class A {
+                  HashSet<Integer> s;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                // Verify the unfolded import has proper type attribution
+                assertThat(cu.getImports()).hasSize(1);
+                assertThat(cu.getImports().getFirst().getQualid().getType())
+                  .isInstanceOf(JavaType.FullyQualified.class);
+                assertThat(((JavaType.FullyQualified) cu.getImports().getFirst().getQualid().getType())
+                  .getFullyQualifiedName()).isEqualTo("java.util.HashSet");
+            })
           )
         );
     }
@@ -808,7 +848,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.concurrent.*;
-                            
+
               class Test {
                   Map<Integer, Integer> m = new ConcurrentHashMap<>();
               }
@@ -816,7 +856,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.concurrent.ConcurrentHashMap;
-                            
+
               class Test {
                   Map<Integer, Integer> m = new ConcurrentHashMap<>();
               }
@@ -847,7 +887,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.*;
               import static java.util.Collections.*;
-                            
+
               class Test {
                   List<String> l = emptyList();
               }
@@ -878,7 +918,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.List;
               import static java.util.Collections.*;
-                            
+
               class Test {
                   List<Integer> l = emptyList();
               }
@@ -909,7 +949,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.List;
               import static java.util.Collections.*;
-                            
+
               class Test {
                   List<Integer> l = emptyList();
               }
@@ -917,7 +957,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.List;
               import static java.util.Collections.emptyList;
-                            
+
               class Test {
                   List<Integer> l = emptyList();
               }

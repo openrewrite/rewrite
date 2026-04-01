@@ -29,11 +29,11 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class JavaTemplateTest7Test implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
-    @Test
     @SuppressWarnings({
       "CachedNumberConstructorCall",
       "Convert2MethodRef"
       , "removal"})
+    @Test
     void lambdaIsVariableInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -42,7 +42,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().getFirst());
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -73,18 +73,13 @@ class JavaTemplateTest7Test implements RewriteTest {
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                   var cd = classDecl;
                   if (cd.getBody().getStatements().isEmpty()) {
-                      cd = JavaTemplate.builder(
-                          //language=groovy
-                          """
-                            /**
-                             * comment
-                             */
-                            void foo() {
-                            }
-                            """
-                        )
-                        .build()
-                        .apply(getCursor(), cd.getBody().getCoordinates().firstStatement());
+                      cd = JavaTemplate.apply("""
+                          /**
+                           * comment
+                           */
+                          void foo() {
+                          }
+                          """, getCursor(), cd.getBody().getCoordinates().firstStatement());
                   }
                   return cd;
               }
@@ -109,8 +104,8 @@ class JavaTemplateTest7Test implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("UnusedAssignment")
     @Issue("https://github.com/openrewrite/rewrite/issues/1821")
+    @SuppressWarnings("UnusedAssignment")
     @Test
     void assignmentNotPartOfVariableDeclaration() {
         rewriteRun(
@@ -119,7 +114,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
                   var a = assignment;
                   if (a.getAssignment() instanceof J.MethodInvocation) {
-                      J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
+                      var mi = (J.MethodInvocation) a.getAssignment();
                       a = JavaTemplate.apply("1", getCursor(), mi.getCoordinates().replace());
                   }
                   return a;
@@ -179,7 +174,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               """,
             """
               import java.nio.charset.StandardCharsets;
-              
+
               public class Test {
                   byte[] test() {
                       String s = "hello";

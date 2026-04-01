@@ -20,10 +20,10 @@ import org.openrewrite.kotlin.internal.PsiTreePrinter.TreePrinterContext
 
 open class IrTreePrinterVisitor(val IrPrinter : PsiTreePrinter.IrPrinter) : IrTreeVisitor<TreePrinterContext>() {
 
-    override fun visitElement(element: IrElement, ctx: TreePrinterContext) {
-        IrPrinter.printElement(element, ctx)
-        ctx.depth++
-        super.visitElement(element, ctx)
-        ctx.depth--
+    override fun visitElement(element: IrElement, data: TreePrinterContext) {
+        IrPrinter.printElement(element, data)
+        data.depth++
+        super.visitElement(element, data)
+        data.depth--
     }
 }

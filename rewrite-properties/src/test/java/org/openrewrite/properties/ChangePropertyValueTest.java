@@ -40,6 +40,17 @@ class ChangePropertyValueTest implements RewriteTest {
         ));
     }
 
+    @DocumentExample
+    @Test
+    void changeValue() {
+        rewriteRun(
+          properties(
+            "management.metrics.binders.files.enabled=true",
+            "management.metrics.binders.files.enabled=false"
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/575")
     @Test
     void preserveComment() {
@@ -53,17 +64,6 @@ class ChangePropertyValueTest implements RewriteTest {
               management.metrics.binders.files.enabled=false
               # comment
               """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void changeValue() {
-        rewriteRun(
-          properties(
-            "management.metrics.binders.files.enabled=true",
-            "management.metrics.binders.files.enabled=false"
           )
         );
     }
@@ -89,13 +89,13 @@ class ChangePropertyValueTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {
       "acme.my-project.person.first-name",
       "acme.myProject.person.firstName",
       "acme.my_project.person.first_name",
     })
-    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue(propertyKey, "updated", "example", false, null)),
@@ -114,8 +114,8 @@ class ChangePropertyValueTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    @Test
     void exactMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue(
@@ -171,12 +171,14 @@ class ChangePropertyValueTest implements RewriteTest {
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test
             multiple-both=test[replaceme:1]test[replaceme:2]test
-            """, """
+            """,
+                """
             multiple=[replaced:1][replaced:2]
             multiple-prefixed=test[replaced:1]test[replaced:2]
             multiple-suffixed=[replaced:1]test[replaced:2]test
             multiple-both=test[replaced:1]test[replaced:2]test
-            """)
+            """
+          )
         );
     }
 
@@ -190,7 +192,8 @@ class ChangePropertyValueTest implements RewriteTest {
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test
             multiple-both=test[replaceme:1]test[replaceme:2]test
-            """)
+            """
+          )
         );
     }
 

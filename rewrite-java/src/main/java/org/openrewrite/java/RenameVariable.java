@@ -43,7 +43,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (!VariableNameUtils.JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
+        if (!JavaKeywordUtils.isReservedKeyword(toName) && !JavaKeywordUtils.isReservedLiteral(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableVisitor(variable, toName));
             return variable;
         }
@@ -88,9 +88,15 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     it instanceof SourceFile).getValue() instanceof Javadoc.Parameter) {
                 return ident;
             }
+
             Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
-                if (parent.getValue() instanceof J.FieldAccess) {
+                if (ident.getFieldType() != null && ident.getFieldType().getOwner() instanceof JavaType.FullyQualified &&
+                        TypeUtils.isOfType(ident.getFieldType(), renameVariable.getVariableType())) {
+                    parent.putMessage("renamed", true);
+                    return ident.withFieldType(ident.getFieldType().withName(newName)).withSimpleName(newName);
+                } else if (parent.getValue() instanceof J.FieldAccess &&
+                        !ident.equals(((J.FieldAccess) parent.getValue()).getTarget())) {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
                         if (ident.getFieldType() != null) {
                             ident = ident.withFieldType(ident.getFieldType().withName(newName));
@@ -105,8 +111,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         if (maybeParameter instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
                             if (methodDeclaration.getParameters().contains((Statement) variableDeclaration) &&
-                                methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
-                                ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
+                                    methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
+                                    ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
                                 doAfterVisit(new RenameJavaDocParamNameVisitor<>((J.MethodDeclaration) maybeParameter, renameVariable.getSimpleName(), newName));
                             }
                         }
@@ -124,6 +130,16 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
 
         @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+            if ("class".equals(fieldAccess.getName().getSimpleName()) &&
+                    fieldAccess.getType() instanceof JavaType.Parameterized &&
+                    ((JavaType.Parameterized) fieldAccess.getType()).getType() instanceof JavaType.Class) {
+                return fieldAccess; // Avoid renaming `Foo` in `Foo.class`
+            }
+            return super.visitFieldAccess(fieldAccess, p);
+        }
+
+        @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
             J.MemberReference m = super.visitMemberReference(memberRef, p);
             if (m != memberRef && m.getVariableType() != null && m.getVariableType().getName().equals(renameVariable.getSimpleName())) {
@@ -136,61 +152,32 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             if (value instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) value;
                 return m.getName() != ident;
-            } else if(value instanceof J.NewClass) {
+            } else if (value instanceof J.MethodDeclaration) {
+                J.MethodDeclaration m = (J.MethodDeclaration) value;
+                return m.getName() != ident;
+            } else if (value instanceof J.NewClass) {
                 J.NewClass m = (J.NewClass) value;
                 return m.getClazz() != ident;
-            } else if(value instanceof J.NewArray) {
+            } else if (value instanceof J.NewArray) {
                 J.NewArray a = (J.NewArray) value;
                 return a.getTypeExpression() != ident;
-            } else if(value instanceof J.VariableDeclarations) {
+            } else if (value instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) value;
                 return ident != v.getTypeExpression();
             } else return !(value instanceof J.ParameterizedType);
         }
 
         /**
-         * FieldAccess targets the variable if its target is an Identifier and either
-         * its target FieldType equals variable.Name.FieldType
-         * or its target Type equals variable.Name.FieldType.Owner
-         * or if FieldAccess targets a TypCast and either
-         * its type equals variable.Name.FieldType
-         * or its type equals variable.Name.FieldType.Owner.
-         * In case the FieldAccess targets another FieldAccess, the target is followed
-         * until it is either an Identifier or a TypeCast.
+         * FieldAccess targets the variable if its target type equals variable.Name.FieldType.Owner.
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
-            if (renameVariable.getName().getFieldType() != null) {
-                Expression target = getTarget(fieldAccess);
-                JavaType targetType = resolveType(target.getType());
+            if (renameVariable.getName().getFieldType() != null &&
+                    fieldAccess.getTarget().getType() != null) {
+                JavaType targetType = resolveType(fieldAccess.getTarget().getType());
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                if (TypeUtils.isOfType(variableNameFieldType.getOwner(), targetType)) {
-                    return true;
-                }
-                if (target instanceof J.TypeCast) {
-                    return TypeUtils.isOfType(variableNameFieldType, targetType);
-                } else if (target instanceof J.Identifier) {
-                    return TypeUtils.isOfType(variableNameFieldType, ((J.Identifier) target).getFieldType());
-                }
+                return TypeUtils.isOfType(resolveType(variableNameFieldType.getOwner()), targetType);
             }
             return false;
-        }
-
-        private @Nullable Expression getTarget(J.FieldAccess fieldAccess) {
-            Expression target = fieldAccess.getTarget();
-            if (target instanceof J.Identifier) {
-                return target;
-            }
-            if (target instanceof J.FieldAccess) {
-                return getTarget((J.FieldAccess) target);
-            }
-            if (target instanceof J.Parentheses<?>) {
-                J tree = ((J.Parentheses<?>) target).getTree();
-                if (tree instanceof J.TypeCast) {
-                    return (J.TypeCast) tree;
-                }
-                return null;
-            }
-            return null;
         }
 
         private @Nullable JavaType resolveType(@Nullable JavaType type) {
@@ -256,15 +243,15 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         private Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
                     is instanceof JavaSourceFile ||
-                    is instanceof J.ClassDeclaration ||
-                    is instanceof J.MethodDeclaration ||
-                    is instanceof J.Block ||
-                    is instanceof J.ForLoop ||
-                    is instanceof J.ForEachLoop ||
-                    is instanceof J.Case ||
-                    is instanceof J.Try ||
-                    is instanceof J.Try.Catch ||
-                    is instanceof J.Lambda);
+                            is instanceof J.ClassDeclaration ||
+                            is instanceof J.MethodDeclaration ||
+                            is instanceof J.Block ||
+                            is instanceof J.ForLoop ||
+                            is instanceof J.ForEachLoop ||
+                            is instanceof J.Case ||
+                            is instanceof J.Try ||
+                            is instanceof J.Try.Catch ||
+                            is instanceof J.Lambda);
         }
     }
 

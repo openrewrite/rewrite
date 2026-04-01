@@ -24,6 +24,7 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Objects;
 import java.util.Optional;
 
 @Value
@@ -42,7 +43,7 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
         if (!properties.isPresent()) {
             Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + value + "</" + key + ">\n</properties>");
             d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
-        } else if (!properties.get().getChildValue(key).isPresent()) {
+        } else if (!properties.get().getChild(key).isPresent()) {
             Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + value + "</" + key + ">");
             d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
         }
@@ -55,9 +56,12 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
     @Override
     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
         if (!Boolean.TRUE.equals(preserveExistingValue) &&
-            isPropertyTag() && key.equals(tag.getName()) &&
-            !value.equals(tag.getValue().orElse(null))) {
-            doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
+            isPropertyTag() && key.equals(tag.getName())) {
+            String tagValue = tag.getValue().orElse(null);
+            // Only update if values are different, considering null values
+            if (!Objects.equals(value, tagValue)) {
+                return (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(tag, ctx);
+            }
         }
         return super.visitTag(tag, ctx);
     }

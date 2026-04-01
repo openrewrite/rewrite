@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Read(//Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

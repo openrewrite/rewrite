@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.tree.*;
@@ -30,6 +31,7 @@ import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -207,7 +209,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         if (!destructuringDeclaration.getInitializer().getVariables().isEmpty() &&
-                destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer() != null) {
+            destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer() != null) {
             visitSpace(Objects.requireNonNull(destructuringDeclaration.getInitializer().getVariables().get(0).getPadding()
                     .getInitializer()).getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
             p.append("=");
@@ -359,7 +361,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
         }
 
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> rpvs =  vd.getPadding().getVariables();
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> rpvs = vd.getPadding().getVariables();
         if (!rpvs.isEmpty()) {
             JRightPadded<J.VariableDeclarations.NamedVariable> rpv = vd.getPadding().getVariables().get(0);
             J.VariableDeclarations.NamedVariable nv = rpv.getElement();
@@ -439,7 +441,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(":");
         }
 
-        delegate.visitContainer("[", multiAnnotationType.getAnnotations(), JContainer.Location.TYPE_PARAMETERS, "", "]",  p);
+        delegate.visitContainer("[", multiAnnotationType.getAnnotations(), JContainer.Location.TYPE_PARAMETERS, "", "]", p);
         return multiAnnotationType;
     }
 
@@ -516,73 +518,82 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitBinary(J.Binary binary, PrintOutputCapture<P> p) {
-            String keyword = "";
+            // Collect left-recursive binary chain to avoid StackOverflow on deeply nested expressions.
+            // For a left-associative tree like ((a + b) + c) + d, this collects [outer, middle, inner]
+            // and prints them iteratively instead of recursively.
+            List<J.Binary> chain = new ArrayList<>();
+            J.Binary current = binary;
+            while (true) {
+                chain.add(current);
+                if (current.getLeft() instanceof J.Binary) {
+                    current = (J.Binary) current.getLeft();
+                } else {
+                    break;
+                }
+            }
+
+            // Print beforeSyntax for each binary, outermost first
+            for (J.Binary b : chain) {
+                beforeSyntax(b, Space.Location.BINARY_PREFIX, p);
+            }
+
+            // Visit the leftmost non-binary expression
+            visit(chain.get(chain.size() - 1).getLeft(), p);
+
+            // Unwind from innermost to outermost: print operator + right + afterSyntax
+            for (int i = chain.size() - 1; i >= 0; i--) {
+                J.Binary b = chain.get(i);
+                visitSpace(b.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
+                p.append(binaryKeyword(b));
+                visit(b.getRight(), p);
+                afterSyntax(b, p);
+            }
+            return binary;
+        }
+
+        private String binaryKeyword(J.Binary binary) {
             switch (binary.getOperator()) {
                 case Addition:
-                    keyword = "+";
-                    break;
+                    return "+";
                 case Subtraction:
-                    keyword = "-";
-                    break;
+                    return "-";
                 case Multiplication:
-                    keyword = "*";
-                    break;
+                    return "*";
                 case Division:
-                    keyword = "/";
-                    break;
+                    return "/";
                 case Modulo:
-                    keyword = "%";
-                    break;
+                    return "%";
                 case LessThan:
-                    keyword = "<";
-                    break;
+                    return "<";
                 case GreaterThan:
-                    keyword = ">";
-                    break;
+                    return ">";
                 case LessThanOrEqual:
-                    keyword = "<=";
-                    break;
+                    return "<=";
                 case GreaterThanOrEqual:
-                    keyword = ">=";
-                    break;
+                    return ">=";
                 case Equal:
-                    keyword = "==";
-                    break;
+                    return "==";
                 case NotEqual:
-                    keyword = "!=";
-                    break;
+                    return "!=";
                 case BitAnd:
-                    keyword = "and";
-                    break;
+                    return "and";
                 case BitOr:
-                    keyword = "or";
-                    break;
+                    return "or";
                 case BitXor:
-                    keyword = "xor";
-                    break;
+                    return "xor";
                 case LeftShift:
-                    keyword = "shl";
-                    break;
+                    return "shl";
                 case RightShift:
-                    keyword = "shr";
-                    break;
+                    return "shr";
                 case UnsignedRightShift:
-                    keyword = "ushr";
-                    break;
+                    return "ushr";
                 case Or:
-                    keyword = (binary.getMarkers().findFirst(LogicalComma.class).isPresent()) ? "," : "||";
-                    break;
+                    return binary.getMarkers().findFirst(LogicalComma.class).isPresent() ? "," : "||";
                 case And:
-                    keyword = "&&";
-                    break;
+                    return "&&";
+                default:
+                    return "";
             }
-            beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
-            visit(binary.getLeft(), p);
-            visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
-            p.append(keyword);
-            visit(binary.getRight(), p);
-            afterSyntax(binary, p);
-            return binary;
         }
 
         @Override
@@ -599,7 +610,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("=");
             }
 
-            boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+            boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent() ||
+                                 block.getMarkers().findFirst(org.openrewrite.kotlin.marker.OmitBraces.class).isPresent();
             if (!omitBraces) {
                 p.append("{");
             }
@@ -671,8 +683,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             if (classDecl.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
                 for (Statement statement : classDecl.getBody().getStatements()) {
                     if (statement instanceof J.MethodDeclaration &&
-                            statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent() &&
-                            !statement.getMarkers().findFirst(Implicit.class).isPresent()) {
+                        statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent() &&
+                        !statement.getMarkers().findFirst(Implicit.class).isPresent()) {
                         J.MethodDeclaration method = (J.MethodDeclaration) statement;
                         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
                         visit(method.getLeadingAnnotations(), p);
@@ -716,7 +728,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitContainer("where", typeConstraints.getPadding().getConstraints(), JContainer.Location.TYPE_PARAMETERS, ",", "", p);
             }
 
-            if (!classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
+            if (classDecl.getBody() != null && !classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
                 visit(classDecl.getBody(), p);
             }
             afterSyntax(classDecl, p);
@@ -852,15 +864,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             return lambda;
         }
 
-        private void visitLambdaParameters(J.Lambda.Parameters parameters, PrintOutputCapture<P> p) {
+        @Override
+        public J visitLambdaParameters(J.Lambda.Parameters parameters, PrintOutputCapture<P> p) {
             visitMarkers(parameters.getMarkers(), p);
             if (parameters.isParenthesized()) {
                 visitSpace(parameters.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
                 p.append('(');
-                visitRightPadded(parameters.getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+                visitRightPadded(parameters.getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
                 p.append(')');
             } else {
-                List<JRightPadded<J>> params = parameters.getPadding().getParams();
+                List<JRightPadded<J>> params = parameters.getPadding().getParameters();
                 for (int i = 0; i < params.size(); i++) {
                     JRightPadded<J> param = params.get(i);
                     if (param.getElement() instanceof J.Lambda.Parameters) {
@@ -876,6 +889,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     }
                 }
             }
+            return parameters;
         }
 
         @Override
@@ -978,7 +992,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("?");
                 }
 
-                if (!method.getName().getSimpleName().equals("<empty>") &&
+                if (!"<empty>".equals(method.getName().getSimpleName()) &&
                     !method.getName().getMarkers().findFirst(Implicit.class).isPresent()) {
                     p.append(".");
                 }
@@ -1178,7 +1192,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("val");
                 }
 
-                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword() != null && m.getKeyword().equals("typealias")) {
+                if (m.getType() == J.Modifier.Type.LanguageExtension && "typealias".equals(m.getKeyword())) {
                     isTypeAlias = true;
                 }
             }

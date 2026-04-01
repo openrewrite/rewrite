@@ -17,7 +17,7 @@ package org.openrewrite.kotlin.internal;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import org.jetbrains.kotlin.KtFakeSourceElement;
+import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
@@ -29,7 +29,7 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirProperty;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
-import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
+import org.jetbrains.kotlin.fir.types.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.ir.IrElement;
@@ -48,8 +48,11 @@ import org.openrewrite.kotlin.KotlinIrTypeMapping;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.nCopies;
+import static java.util.Collections.reverse;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
 @SuppressWarnings({"unused", "DuplicatedCode"})
@@ -123,7 +126,7 @@ public class PsiTreePrinter {
         int depth;
     }
 
-    public static @Nullable String printFirFile(FirFile file) {
+    public static String printFirFile(FirFile file) {
         StringBuilder sb = new StringBuilder();
         List<StringBuilder> lines = new ArrayList<>();
         sb.append("------------").append("\n");
@@ -158,12 +161,11 @@ public class PsiTreePrinter {
         return sb.toString();
     }
 
-    public static @Nullable String printFirTree(FirElement firElement) {
+    public static String printFirTree(FirElement firElement) {
         StringBuilder sb = new StringBuilder();
         List<StringBuilder> lines = new ArrayList<>();
         TreePrinterContext context = new TreePrinterContext(lines, 1);
         new FirDefaultVisitor<Void, TreePrinterContext>() {
-
             @Override
             public @Nullable Void visitElement(FirElement fir, TreePrinterContext ctx) {
                 StringBuilder line = new StringBuilder();
@@ -245,8 +247,8 @@ public class PsiTreePrinter {
             Cursor cursor = this.getCursor();
             List<Object> cursorStack =
                     stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
-                            .collect(Collectors.toList());
-            Collections.reverse(cursorStack);
+                            .collect(toList());
+            reverse(cursorStack);
             int depth = cursorStack.size();
 
             // Compare lastCursorStack vs cursorStack, find the fork and print the diff
@@ -429,7 +431,7 @@ public class PsiTreePrinter {
         String sb = " whitespace=\"" +
                     space.getWhitespace() + "\"" +
                     " comments=\"" +
-                    space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.joining(",")) +
+                    space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(joining(",")) +
                     "\"";
         return sb.replace("\n", "\\s\n");
     }
@@ -486,7 +488,7 @@ public class PsiTreePrinter {
 
             if (source instanceof KtRealPsiSourceElement) {
                 sb.append("Real ");
-            } else if (source instanceof KtFakeSourceElement) {
+            } else if (source.getKind() instanceof KtFakeSourceElementKind) {
                 sb.append("Fake ");
             } else {
                 sb.append(source.getClass().getSimpleName());
@@ -545,7 +547,7 @@ public class PsiTreePrinter {
             return ((FirProperty) firElement).getName().toString();
         } else if (firElement instanceof FirResolvedTypeRef) {
             FirResolvedTypeRef resolvedTypeRef = (FirResolvedTypeRef) firElement;
-            ConeKotlinType coneKotlinType = resolvedTypeRef.getType();
+            ConeKotlinType coneKotlinType = resolvedTypeRef.getConeType();
             return printConeKotlinType(coneKotlinType);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return ((FirResolvedNamedReference) firElement).getName().toString();
@@ -575,16 +577,16 @@ public class PsiTreePrinter {
                 }
                 return sb.toString();
             }
-        } else if (firElement instanceof FirConstExpression) {
-            Object value = ((FirConstExpression<?>) firElement).getValue();
+        } else if (firElement instanceof FirLiteralExpression) {
+            Object value = ((FirLiteralExpression) firElement).getValue();
             return value != null ? value.toString() : null;
             // return ((FirConstExpression<?>) firElement).getKind().toString();
         } else if (firElement instanceof FirWhenBranch) {
             FirWhenBranch whenBranch = (FirWhenBranch) firElement;
             return "when(" + firElementToString(whenBranch.getCondition()) + ")" + " -> " + firElementToString(whenBranch.getResult());
-        } else if (firElement.getClass().getSimpleName().equals("FirElseIfTrueCondition")) {
+        } else if ("FirElseIfTrueCondition".equals(firElement.getClass().getSimpleName())) {
             return PsiElementAssociations.Companion.printElement(firElement);
-        } else if (firElement.getClass().getSimpleName().equals("FirSingleExpressionBlock")) {
+        } else if ("FirSingleExpressionBlock".equals(firElement.getClass().getSimpleName())) {
             return PsiElementAssociations.Companion.printElement(firElement);
         }
         return "";
@@ -681,7 +683,7 @@ public class PsiTreePrinter {
         StringBuilder sb = new StringBuilder();
         int tabCount = depth - 1;
         if (tabCount > 0) {
-            sb.append(java.lang.String.join("", Collections.nCopies(tabCount, TAB)));
+            sb.append(java.lang.String.join("", nCopies(tabCount, TAB)));
         }
         // only root has not prefix
         if (depth > 0) {

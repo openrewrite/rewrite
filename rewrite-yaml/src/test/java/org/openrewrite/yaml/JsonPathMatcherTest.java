@@ -22,10 +22,11 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JsonPathMatcherTest {
 
@@ -763,6 +764,215 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void matchesListInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'release')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: another
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 3
+                - name: command 4
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesListsInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'quick')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 1
+                - name: command 2
+              """,
+            """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesListItemInPropertyWithByFilterConditionInList() {
+        assertMatched(
+          "$.build_types.build_type[?(@.name == 'quick')][1].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void matchesInNestedPropertyByFilterCondition() {
+        assertMatched(
+          "$..[?(@.name == 'quick')].build",
+          //language=yaml
+          List.of("""
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                  - name: command 1
+                  - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """),
+          List.of(
+            """
+              build:
+                - name: command 1
+                - name: command 2
+              """,
+              """
+              build:
+                - name: command 5
+                - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void negateUnaryExistence() {
+        assertMatched(
+          "$.list[?(!@.item1)]",
+          sliceList,
+          List.of(
+            """
+                  item2: index1
+                     property: property
+              """,
+            """
+                  item3: index2
+                     property: property
+              """)
+        );
+    }
+
+    @Test
+    void negateUnaryExistenceMatchesNone() {
+        assertNotMatched(
+          "$.list[?(!@.property)]",
+          sliceList
+        );
+    }
+
+    @Test
+    void negateEqualityExpression() {
+        assertNotMatched(
+          "$.list[?(!(@.property == 'property'))]",
+          sliceList
+        );
+    }
+
+    @Test
+    void negateEqualityExpressionPartialMatch() {
+        assertMatched(
+          "$.list[?(!(@.item1 == 'index0'))]",
+          sliceList,
+          List.of(
+            """
+                  item2: index1
+                     property: property
+              """,
+            """
+                  item3: index2
+                     property: property
+              """)
+        );
+    }
+
+    @Test
+    void negateWithLogicalAnd() {
+        assertMatched(
+          "$.list[?(!@.item1 && @.property == 'property')]",
+          sliceList,
+          List.of(
+            """
+                  item2: index1
+                     property: property
+              """,
+            """
+                  item3: index2
+                     property: property
+              """)
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3401")
     @Test
     void multipleBinaryExpressions() {
@@ -812,7 +1022,7 @@ class JsonPathMatcherTest {
                     types: "something"
                     pattern: "p2"
               """),
-          Collections.emptyList()
+          emptyList()
         );
     }
 
@@ -964,5 +1174,35 @@ class JsonPathMatcherTest {
         }.reduce(new YamlParser().parse(before.toArray(new String[0]))
           .findFirst()
           .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")), new ArrayList<>());
+    }
+
+    @Test
+    void invalidJsonPathValidationReturnsInvalid() {
+        var validated = JsonPathMatcher.validate("key", "$[invalid syntax");
+        assertThat(validated.isValid()).isFalse();
+        assertThat(validated.failures().get(0).getMessage())
+          .contains("Invalid JsonPath expression")
+          .contains("extraneous input '[' expecting EOF");
+    }
+
+    @Test
+    void invalidJsonPathMatchesThrowsIllegalArgumentException() {
+        Yaml.Documents yaml = (Yaml.Documents) new YamlParser().parse("key: value").findFirst().orElseThrow();
+        JsonPathMatcher matcher = new JsonPathMatcher("$[invalid syntax");
+        assertThatThrownBy(() -> new YamlVisitor<Integer>() {
+            @Override
+            public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, Integer p) {
+                matcher.matches(getCursor());
+                return entry;
+            }
+        }.reduce(yaml, 0))
+          .hasRootCauseInstanceOf(IllegalArgumentException.class)
+          .rootCause().hasMessageContaining("extraneous input '[' expecting EOF");
+    }
+
+    @Test
+    void rootOnlyJsonPathIsValid() {
+        // "$" alone is valid and means "root" - handled as special case
+        assertThat(JsonPathMatcher.validate("key", "$").isValid()).isTrue();
     }
 }

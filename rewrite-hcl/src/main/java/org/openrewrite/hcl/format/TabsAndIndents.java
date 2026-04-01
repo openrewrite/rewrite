@@ -15,24 +15,22 @@
  */
 package org.openrewrite.hcl.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.TabsAndIndentsStyle;
 import org.openrewrite.hcl.tree.Hcl;
+import org.openrewrite.style.Style;
 
 public class TabsAndIndents extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Tabs and indents";
-    }
+    @Getter
+    final String displayName = "Tabs and indents";
 
-    @Override
-    public String getDescription() {
-        return "Format tabs and indents in HCL code.";
-    }
+    @Getter
+    final String description = "Format tabs and indents in HCL code.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -42,10 +40,7 @@ public class TabsAndIndents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends HclIsoVisitor<ExecutionContext> {
         @Override
         public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile cf, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = cf.getStyle(TabsAndIndentsStyle.class);
-            if (style == null) {
-                style = TabsAndIndentsStyle.DEFAULT;
-            }
+            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cf, () -> TabsAndIndentsStyle.DEFAULT);
             return (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(style).visitNonNull(cf, ctx);
         }
     }

@@ -28,7 +28,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -53,36 +52,6 @@ class NoWhitespaceAfterTest implements RewriteTest {
         spec.recipe(new NoWhitespaceAfter());
     }
 
-    private static List<NamedStyles> noWhitespaceAfterStyle() {
-        return noWhitespaceAfterStyle(style -> style);
-    }
-
-    private static List<NamedStyles> noWhitespaceAfterStyle(UnaryOperator<NoWhitespaceAfterStyle> with) {
-        return Collections.singletonList(
-          new NamedStyles(
-            Tree.randomId(), "test", "test", "test", emptySet(),
-            singletonList(with.apply(Checkstyle.noWhitespaceAfterStyle()))
-          )
-        );
-    }
-
-    @Test
-    void arrayAccess() {
-        rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
-              class Test {
-                  static void method(int[] n) {
-                      int m = n[0];
-                  }
-              }
-              """,
-            autoFormatIsIdempotent()
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void variableDeclaration() {
@@ -104,6 +73,36 @@ class NoWhitespaceAfterTest implements RewriteTest {
                       int[][] a;
                       int[] b;
                       int c, d = 0;
+                  }
+              }
+              """,
+            autoFormatIsIdempotent()
+          )
+        );
+    }
+
+    private static List<NamedStyles> noWhitespaceAfterStyle() {
+        return noWhitespaceAfterStyle(style -> style);
+    }
+
+    private static List<NamedStyles> noWhitespaceAfterStyle(UnaryOperator<NoWhitespaceAfterStyle> with) {
+        return singletonList(
+          new NamedStyles(
+            Tree.randomId(), "test", "test", "test", emptySet(),
+            singletonList(with.apply(Checkstyle.noWhitespaceAfterStyle()))
+          )
+        );
+    }
+
+    @Test
+    void arrayAccess() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+          java(
+            """
+              class Test {
+                  static void method(int[] n) {
+                      int m = n[0];
                   }
               }
               """,
@@ -341,6 +340,35 @@ class NoWhitespaceAfterTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/6917")
+    @Test
+    void typeUseAnnotationOnFieldAccess() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
+            style.withDot(true)))),
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+
+              class Test {
+                  Cache.@Nullable ValueWrapper get(Object key) {
+                      return null;
+                  }
+              }
+
+              class Cache {
+                  class ValueWrapper {}
+              }
+
+              @Target(ElementType.TYPE_USE)
+              @interface Nullable {}
+              """,
+            autoFormatIsIdempotent()
+          )
+        );
+    }
+
     @Test
     void doNotAllowLinebreak() {
         rewriteRun(
@@ -430,32 +458,32 @@ class NoWhitespaceAfterTest implements RewriteTest {
           java(
             """
               package sample;
-              
+
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               public class ArrayNotNull {
-              
+
                   byte[] bytes = new byte[0];
-              
+
                   public byte @NotNull [] getBytes() {
                       return bytes;
                   }
-              
+
                   int[] ints = new int[0];
-              
+
                   public int @NotNull [] getInts() {
                       return ints;
                   }
-              
+
                   Object[] objects = new Object[0];
-              
+
                   public Object @NotNull [] getObjects() {
                       return objects;
                   }
-              
+
               }
-              
+
               @Target(ElementType.TYPE_USE)
               @interface NotNull {}
               """,

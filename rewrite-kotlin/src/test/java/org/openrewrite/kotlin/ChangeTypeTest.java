@@ -30,7 +30,27 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class ChangeTypeTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true, null));
+        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
+    }
+
+    @DocumentExample
+    @Test
+    void changeDefinition() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          kotlin(
+            """
+              class file {
+              }
+              """,
+            """
+              class newFile {
+              }
+              """,
+            spec -> spec.path("file.kt").afterRecipe(cu ->
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "newFile")).isTrue())
+          )
+        );
     }
 
     @Test
@@ -40,7 +60,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original
@@ -67,7 +88,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original
@@ -95,7 +117,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.`Original`
@@ -122,7 +145,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original as MyAlias
@@ -150,12 +174,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package x.y
               class Target<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package example
@@ -184,12 +210,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package x.y
               class Target<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package example
@@ -216,12 +244,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package x.y
               class Target<A>
-              """),
+              """
+          ),
           kotlin(
             """
               package example
@@ -246,7 +276,8 @@ class ChangeTypeTest implements RewriteTest {
             """
               package a.b
               class Original
-              """),
+              """
+          ),
           kotlin(
             """
               class A {
@@ -264,30 +295,10 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void changeDefinition() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false, null)),
-          kotlin(
-            """
-              class file {
-              }
-              """,
-            """
-              class newFile {
-              }
-              """,
-            spec -> spec.path("file.kt").afterRecipe(cu ->
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue())
-          )
-        );
-    }
-
     @Test
     void addImportAlias() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
           kotlin(
             """
               import java.util.ArrayList as MyList
@@ -314,7 +325,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateImportAlias() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
           kotlin(
             """
               import java.util.ArrayList as MyList
@@ -341,7 +352,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void usingAliasOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
           kotlin(
             """
               import java.util.ArrayList as MyList
@@ -364,7 +375,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void implicitImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
           kotlin(
             """
               fun main() {
@@ -385,7 +396,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void qualifiedReference() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
           kotlin(
             """
               import java.util.ArrayList as MyList
@@ -414,7 +425,8 @@ class ChangeTypeTest implements RewriteTest {
               package a.b
 
               open class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original
@@ -443,7 +455,8 @@ class ChangeTypeTest implements RewriteTest {
               package a.b
 
               annotation class Original
-              """),
+              """
+          ),
           kotlin(
             """
               import a.b.Original
@@ -488,6 +501,30 @@ class ChangeTypeTest implements RewriteTest {
                 @get:Target
                 val field: String
               )
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOnUnusedImport() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+              
+              class A {
+              }
+              """,
+            """
+              class A {
+              }
               """
           )
         );

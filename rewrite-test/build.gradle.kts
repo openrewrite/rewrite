@@ -3,18 +3,19 @@ plugins {
 }
 
 dependencies {
-    api(platform("org.junit:junit-bom:latest.release"))
+    api(platform("org.junit:junit-bom:5.14.0"))
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")
     api("org.junit.jupiter:junit-jupiter-params")
-    api("org.junit.platform:junit-platform-launcher")
 
-    implementation("org.assertj:assertj-core:3.+")
+    implementation("org.assertj:assertj-core:3.+") // CVE-2026-24400 in 4.0.0-M1 and no higher versions available
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
     implementation("org.slf4j:slf4j-api:1.7.36")
     implementation("org.slf4j:slf4j-nop:1.7.36")
 
+    testImplementation(project(":rewrite-java"))
     testImplementation(project(":rewrite-groovy"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 }

@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTypeSignatureBuilderTest;
@@ -27,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
 
@@ -43,7 +45,7 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
 
     private final JavaType.Parameterized goatCuType = requireNonNull(TypeUtils.asParameterized(goatCu
       .getClasses()
-      .get(0)
+      .getFirst()
       .getType()));
 
     @Override
@@ -65,7 +67,7 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     @Override
     public String constructorSignature() {
         return signatureBuilder().methodSignature(goatCuType.getType().getMethods().stream()
-          .filter(m -> m.getName().equals("<constructor>"))
+          .filter(m -> "<constructor>".equals(m.getName()))
           .findAny()
           .orElseThrow());
     }
@@ -74,14 +76,14 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     public JavaType firstMethodParameter(String methodName) {
         return goatCuType.getType().getMethods().stream()
           .filter(m -> m.getName().equals(methodName))
-          .map(m -> m.getParameterTypes().get(0))
+          .map(m -> m.getParameterTypes().getFirst())
           .findAny()
           .orElseThrow();
     }
 
     @Override
     public JavaType innerClassSignature(String innerClassSimpleName) {
-        return requireNonNull(goatCu.getClasses().get(0).getBody().getStatements()
+        return requireNonNull(goatCu.getClasses().getFirst().getBody().getStatements()
           .stream()
           .filter(it -> it instanceof J.ClassDeclaration)
           .map(it -> (J.ClassDeclaration) it)
@@ -94,11 +96,34 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     @Override
     public JavaType lastClassTypeParameter() {
         List<JavaType> typeParameters = goatCuType.getTypeParameters();
-        return typeParameters.get(typeParameters.size() - 1);
+        return typeParameters.getLast();
     }
 
     @Override
     public DefaultJavaTypeSignatureBuilder signatureBuilder() {
         return new DefaultJavaTypeSignatureBuilder();
+    }
+
+    @Test
+    void cyclicParameterizedWithMultiCatch() {
+        JavaType.Class listType = JavaType.ShallowClass.build("java.util.List");
+        JavaType.Parameterized parameterized = new JavaType.Parameterized(null, listType, null);
+        JavaType.MultiCatch multiCatch = new JavaType.MultiCatch(List.of(parameterized));
+        // Create a cycle: Parameterized -> MultiCatch -> Parameterized
+        parameterized.unsafeSet(listType, List.of(multiCatch));
+
+        String sig = signatureBuilder().signature(parameterized);
+        assertThat(sig).isNotNull();
+    }
+
+    @Test
+    void cyclicParameterizedSelfReferencing() {
+        JavaType.Class mapType = JavaType.ShallowClass.build("java.util.Map");
+        JavaType.Parameterized parameterized = new JavaType.Parameterized(null, mapType, null);
+        // Parameterized references itself as a type parameter
+        parameterized.unsafeSet(mapType, List.of(JavaType.Primitive.String, parameterized));
+
+        String sig = signatureBuilder().signature(parameterized);
+        assertThat(sig).isNotNull();
     }
 }

@@ -19,11 +19,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
+import org.openrewrite.trait.VisitFunction2;
 
 import java.util.Optional;
 
@@ -85,6 +89,19 @@ public class Annotated implements Trait<J.Annotation> {
 
         public Matcher(Class<?> annotationType) {
             this.matcher = new AnnotationMatcher(annotationType);
+        }
+
+        @Override
+        public <P> TreeVisitor<? extends Tree, P> asVisitor(VisitFunction2<Annotated, P> visitor) {
+            return new JavaVisitor<P>() {
+                @Override
+                public J visitAnnotation(J.Annotation annotation, P p) {
+                    Annotated annotated = test(getCursor());
+                    return annotated != null ?
+                            (J) visitor.visit(annotated, p) :
+                            super.visitAnnotation(annotation, p);
+                }
+            };
         }
 
         @Override

@@ -25,32 +25,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class GenerateGetterAndSetterVisitorTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1301")
-    @Test
-    void getterAndSetterForPrimitiveInteger() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("counter"))),
-          java(
-            """
-              class T {
-                  int counter;
-              }
-              """,
-            """
-              class T {
-                  int counter;
-                  public int getCounter() {
-                      return counter;
-                  }
-                  public void setCounter(int counter) {
-                      this.counter = counter;
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void getterAndSetterForNonPrimitive() {
@@ -70,6 +44,32 @@ class GenerateGetterAndSetterVisitorTest implements RewriteTest {
                   }
                   public void setSize(Float size) {
                       this.size = size;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1301")
+    @Test
+    void getterAndSetterForPrimitiveInteger() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("counter"))),
+          java(
+            """
+              class T {
+                  int counter;
+              }
+              """,
+            """
+              class T {
+                  int counter;
+                  public int getCounter() {
+                      return counter;
+                  }
+                  public void setCounter(int counter) {
+                      this.counter = counter;
                   }
               }
               """

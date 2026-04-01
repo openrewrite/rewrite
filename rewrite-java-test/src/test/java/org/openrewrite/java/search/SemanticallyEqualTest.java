@@ -29,8 +29,10 @@ import java.util.Map;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SuppressWarnings({"UnnecessaryCallToStringValueOf", "AccessStaticViaInstance", "RedundantCast", "rawtypes", "UnnecessaryLocalVariable", "ComparatorCombinators", "SameParameterValue"})
 class SemanticallyEqualTest {
 
     private final JavaParser javaParser = JavaParser.fromJavaVersion().build();
@@ -65,7 +67,7 @@ class SemanticallyEqualTest {
         assertEqual(
           """
             import static java.lang.String.valueOf;
-            
+
             class T {
                 Object o1 = String.valueOf("1");
                 Object o2 = String.valueOf("1");
@@ -74,7 +76,7 @@ class SemanticallyEqualTest {
             """,
           """
             import static java.lang.String.valueOf;
-            
+
             class T {
                 Object o1 = String.valueOf("1");
                 Object o2 = "1".valueOf("1");
@@ -276,6 +278,15 @@ class SemanticallyEqualTest {
             }
             """
         );
+        assertExpressionsNotEqual(
+          """
+           import java.math.BigDecimal;
+           class T {
+               BigDecimal a = BigDecimal.ONE;
+               BigDecimal b = BigDecimal.ZERO;
+           }
+           """
+        );
     }
 
     @ExpectedToFail
@@ -337,6 +348,7 @@ class SemanticallyEqualTest {
         );
     }
 
+    @SuppressWarnings({"DataFlowIssue", "OptionalGetWithoutIsPresent", "Convert2Diamond"})
     @Nested
     class Generics {
         @Test
@@ -403,6 +415,45 @@ class SemanticallyEqualTest {
                 """
             );
         }
+
+        @Test
+        void fieldNotEqualToShadowedNameVariable() {
+            J.CompilationUnit cu = javaParser.parse(
+                """
+                  class T {
+                      int a = 1;
+                      void m(int a) {
+                          this.a = a;
+                      }
+                  }
+                  """
+              ).findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .get();
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Assignment a = (J.Assignment) m.getBody().getStatements().getFirst();
+            assertFalse(SemanticallyEqual.areEqual(a.getVariable(), a.getAssignment()));
+            assertFalse(SemanticallyEqual.areEqual(((J.FieldAccess) a.getVariable()).getName(), a.getAssignment()));
+        }
+
+        @Test
+        void fieldsFromDifferentInstances() {
+            J.CompilationUnit cu = javaParser.parse(
+                """
+                  class T {
+                      int n;
+                      boolean m(T a, T b) {
+                          return a.n == b.n;
+                      }
+                  }
+                  """
+              ).findFirst()
+              .map(J.CompilationUnit.class::cast)
+              .get();
+            J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().get(1);
+            J.Binary b = (J.Binary) ((J.Return) m.getBody().getStatements().getFirst()).getExpression();
+            assertFalse(SemanticallyEqual.areEqual(b.getLeft(), b.getRight()));
+        }
     }
 
     private void assertEqualToSelf(@Language("java") String a) {
@@ -419,7 +470,7 @@ class SemanticallyEqualTest {
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private void assertExpressionsEqual(@Language(value = "java") String source) {
+    private void assertExpressionsEqual(@Language("java") String source) {
         J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
         javaParser.reset();
 
@@ -439,7 +490,7 @@ class SemanticallyEqualTest {
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private void assertExpressionsNotEqual(@Language(value = "java") String source) {
+    private void assertExpressionsNotEqual(@Language("java") String source) {
         J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
         javaParser.reset();
 

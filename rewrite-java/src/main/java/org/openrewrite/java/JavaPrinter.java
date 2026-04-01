@@ -19,9 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.marker.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -29,6 +27,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
@@ -188,6 +187,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(annotatedType.getTypeExpression(), p);
         afterSyntax(annotatedType, p);
         return annotatedType;
+    }
+
+    @Override
+    public J visitArrayAccess(ArrayAccess arrayAccess, PrintOutputCapture<P> p) {
+        beforeSyntax(arrayAccess, Space.Location.ARRAY_ACCESS_PREFIX, p);
+        visit(arrayAccess.getIndexed(), p);
+        visit(arrayAccess.getDimension(), p);
+        afterSyntax(arrayAccess, p);
+        return arrayAccess;
     }
 
     @Override
@@ -381,10 +389,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
         }
 
-        p.append('{');
+        boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+        if (!omitBraces) {
+            p.append("{");
+        }
         visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
         visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
-        p.append('}');
+        if (!omitBraces) {
+            p.append("}");
+        }
         afterSyntax(block, p);
         return block;
     }
@@ -409,19 +422,19 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
         while (true) {
             if (s instanceof Assert ||
-                s instanceof Assignment ||
-                s instanceof AssignmentOperation ||
-                s instanceof Break ||
-                s instanceof Continue ||
-                s instanceof DoWhileLoop ||
-                s instanceof Empty ||
-                s instanceof MethodInvocation ||
-                s instanceof NewClass ||
-                s instanceof Return ||
-                s instanceof Throw ||
-                s instanceof Unary ||
-                s instanceof VariableDeclarations ||
-                s instanceof Yield) {
+                    s instanceof Assignment ||
+                    s instanceof AssignmentOperation ||
+                    s instanceof Break ||
+                    s instanceof Continue ||
+                    s instanceof DoWhileLoop ||
+                    s instanceof Empty ||
+                    s instanceof MethodInvocation ||
+                    s instanceof NewClass ||
+                    s instanceof Return ||
+                    s instanceof Throw ||
+                    s instanceof Unary ||
+                    s instanceof VariableDeclarations ||
+                    s instanceof Yield) {
                 p.append(';');
                 return;
             }
@@ -442,13 +455,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                         getCursor()
                                 .dropParentUntil(
                                         c -> c instanceof Switch ||
-                                             c instanceof SwitchExpression ||
-                                             c == Cursor.ROOT_VALUE
+                                                c instanceof SwitchExpression ||
+                                                c == Cursor.ROOT_VALUE
                                 )
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
                     Case aCase = getCursor().getValue();
-                    if (!(aCase.getBody() instanceof Block)) {
+                    if (!(aCase.getBody() instanceof Block || s instanceof Block)) {
                         p.append(';');
                     }
                     return;
@@ -485,7 +498,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     public J visitCase(Case case_, PrintOutputCapture<P> p) {
         beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
         J elem = case_.getCaseLabels().get(0);
-        if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
+        if (!(elem instanceof Identifier) || !"default".equals(((Identifier) elem).getSimpleName())) {
             p.append("case");
         }
         visitContainer("", case_.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, ",", "", p);
@@ -537,6 +550,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             case Record:
                 kind = "record";
                 break;
+        }
+
+        if (classDecl.getMarkers().findFirst(CompactSourceFile.class).isPresent()) {
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visit(classDecl.getBody(), p);
+            afterSyntax(classDecl, p);
+            return classDecl;
         }
 
         beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
@@ -831,15 +851,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         for (Modifier m : method.getModifiers()) {
             visitModifier(m, p);
         }
-        TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
-        if (typeParameters != null) {
-            visit(typeParameters.getAnnotations(), p);
-            visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
-            visitMarkers(typeParameters.getMarkers(), p);
-            p.append('<');
-            visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
-            p.append('>');
-        }
+        visit(method.getAnnotations().getTypeParameters(), p);
         visit(method.getReturnTypeExpression(), p);
         visit(method.getAnnotations().getName().getAnnotations(), p);
         visit(method.getName(), p);
@@ -881,13 +893,6 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitModifier(m, p);
         }
         visit(multiVariable.getTypeExpression(), p);
-        // For backwards compatibility.
-        for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-            visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
-            p.append('[');
-            visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
-            p.append(']');
-        }
         if (multiVariable.getVarargs() != null) {
             visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
             p.append("...");
@@ -1118,6 +1123,17 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitContainer("extends", typeParam.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
         afterSyntax(typeParam, p);
         return typeParam;
+    }
+
+    @Override
+    public J visitTypeParameters(TypeParameters typeParameters, PrintOutputCapture<P> p) {
+        visit(typeParameters.getAnnotations(), p);
+        visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
+        visitMarkers(typeParameters.getMarkers(), p);
+        p.append('<');
+        visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
+        p.append('>');
+        return typeParameters;
     }
 
     @Override

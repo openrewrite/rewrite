@@ -31,9 +31,9 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
           .beforeRecipe(withToolingApi());
     }
 
-    @Test
     @DocumentExample
     @Issue("https://github.com/openrewrite/rewrite/issues/4135")
+    @Test
     void migrate() {
         rewriteRun(
           settingsGradle(

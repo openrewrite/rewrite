@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -30,16 +29,12 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class GradleJavaTemplateTest implements RewriteTest {
 
     @Test
-    @Disabled("work in progress")
     void useJavaTemplateInBuildGradle() {
         Recipe addDependency = toRecipe(() -> new JavaIsoVisitor<>() {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 if (block.getStatements().isEmpty()) {
-                    return JavaTemplate.builder("implementation(\"com.google.guava:guava:latest.release\")")
-                      .contextSensitive()
-                      .build()
-                      .apply(getCursor(), block.getCoordinates().replace());
+                    return JavaTemplate.apply("implementation(\"com.google.guava:guava:latest.release\")", getCursor(), block.getCoordinates().lastStatement());
                 }
                 return super.visitBlock(block, ctx);
             }

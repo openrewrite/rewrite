@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -32,6 +32,16 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#genericPattern}.
+	 * @param ctx the parse tree
+	 */
+	void enterGenericPattern(TemplateParameterParser.GenericPatternContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#genericPattern}.
+	 * @param ctx the parse tree
+	 */
+	void exitGenericPattern(TemplateParameterParser.GenericPatternContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#typedPattern}.
 	 * @param ctx the parse tree
@@ -102,6 +112,16 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitParameterName(TemplateParameterParser.ParameterNameContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#genericName}.
+	 * @param ctx the parse tree
+	 */
+	void enterGenericName(TemplateParameterParser.GenericNameContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#genericName}.
+	 * @param ctx the parse tree
+	 */
+	void exitGenericName(TemplateParameterParser.GenericNameContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#typeName}.
 	 * @param ctx the parse tree

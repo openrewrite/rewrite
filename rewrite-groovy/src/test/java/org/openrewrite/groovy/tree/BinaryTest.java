@@ -65,6 +65,18 @@ class BinaryTest implements RewriteTest {
     }
 
     @Test
+    void notIn() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              boolean b = 42 !in a;
+              """
+          )
+        );
+    }
+
+    @Test
     void withVariable() {
         rewriteRun(
           groovy(
@@ -176,7 +188,8 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               def isString = "" instanceof java.lang.String
-              """)
+              """
+          )
         );
     }
 
@@ -190,7 +203,8 @@ class BinaryTest implements RewriteTest {
                   def value = 1
               }
               [ new A() ].findAll { it -> it.value == 1 } *. value = 2
-              """)
+              """
+          )
         );
     }
 
@@ -267,13 +281,49 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def justPrint(){
-                  println(1 <=> 2)
-                  println('a' <=> 'z')
-                  def a = 'tiger'
-                  def b = 'cheetah'
-                  println(a <=> b)
-              }
+              println(1 <=> 2)
+              println('a' <=> 'z')
+              def a = 'tiger'
+              def b = 'cheetah'
+              println(a <=> b)
+              """
+          ));
+    }
+
+    @Test
+    void powerOperator() {
+        rewriteRun(
+          groovy(
+            """
+              4 ** 3
+              """
+          ));
+    }
+
+    @Test
+    void powerAssigmentOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def f = 3
+              f **= 2
+              """
+          ));
+    }
+
+    @Test
+    void identicalOperators() {
+        rewriteRun(
+          groovy(
+            """
+              class Creature {}
+
+              def cat = new Creature()
+              def copyCat = cat
+              def lion = new Creature()
+
+              assert cat === copyCat
+              assert cat !== lion
               """
           ));
     }

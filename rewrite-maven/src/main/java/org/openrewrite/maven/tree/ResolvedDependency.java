@@ -23,12 +23,13 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.newSetFromMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -53,7 +54,8 @@ public class ResolvedDependency implements Serializable {
      */
     @NonFinal
     @EqualsAndHashCode.Exclude
-    List<ResolvedDependency> dependencies;
+    @Builder.Default
+    List<ResolvedDependency> dependencies = emptyList();
 
     @Builder.Default
     List<License> licenses = emptyList();
@@ -118,18 +120,46 @@ public class ResolvedDependency implements Serializable {
         return gav.getDatedSnapshotVersion();
     }
 
-    public @Nullable ResolvedDependency findDependency(String groupId, String artifactId) {
-        return findDependency0(groupId, artifactId, Collections.newSetFromMap(new IdentityHashMap<>()));
+    public List<ResolvedDependency> findDependencies(String groupId, String artifactId) {
+        return findDependencies0(groupId, artifactId, newSetFromMap(new IdentityHashMap<>()));
     }
 
-    private @Nullable ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
+    private List<ResolvedDependency> findDependencies0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
+        List<ResolvedDependency> dependencies = new ArrayList<>();
+        if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
+            dependencies.add(this);
+        } else if (!visited.add(this)) {
+            return emptyList();
+        }
+        for (ResolvedDependency dependency : this.dependencies) {
+            dependency.findDependencies0(groupId, artifactId, visited).stream()
+                    .filter(found -> {
+                        if (getRequested().getExclusions() != null) {
+                            for (GroupArtifact exclusion : getRequested().getExclusions()) {
+                                if (matchesGlob(found.getGroupId(), exclusion.getGroupId()) &&
+                                        matchesGlob(found.getArtifactId(), exclusion.getArtifactId())) {
+                                    return false;
+                                }
+                            }
+                        }
+                        return true;
+                    }).forEach(dependencies::add);
+        }
+        return dependencies;
+    }
+
+    public @Nullable ResolvedDependency findDependency(@Nullable String groupId, @Nullable String artifactId) {
+        return findDependency0(groupId, artifactId, newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private @Nullable ResolvedDependency findDependency0(@Nullable String groupId, @Nullable String artifactId, Set<ResolvedDependency> visited) {
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             return this;
         } else if (!visited.add(this)) {
             return null;
         }
         outer:
-        for (ResolvedDependency dependency : dependencies) {
+        for (ResolvedDependency dependency : this.dependencies) {
             ResolvedDependency found = dependency.findDependency0(groupId, artifactId, visited);
             if (found != null) {
                 if (getRequested().getExclusions() != null) {

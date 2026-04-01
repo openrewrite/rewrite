@@ -33,7 +33,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangePackage("a.b", "x.y", false, null));
+        spec.recipe(new ChangePackage("a.b", "x.y", false));
     }
 
     @DocumentExample
@@ -54,14 +54,14 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Original
-              
+
               class A {
                   Original type
               }
@@ -103,7 +103,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void renamePackageRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true, null)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true)),
           groovy(
             """
               package org.foo.internal
@@ -117,7 +117,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/internal/Test.groovy").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.groovy");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "org.foo.test.internal.Test")).isTrue();
             })
           )
         );
@@ -127,7 +127,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false, null)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
           groovy(
             """
               package org.foo
@@ -141,7 +141,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
               """,
             spec -> spec.path("org/foo/Test.groovy").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.groovy");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "x.y.z.Test")).isTrue();
             })
           )
         );

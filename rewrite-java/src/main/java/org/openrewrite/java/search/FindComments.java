@@ -28,8 +28,8 @@ import org.openrewrite.marker.SearchResult;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false)
@@ -41,16 +41,10 @@ public class FindComments extends Recipe {
             example = "-----BEGIN RSA PRIVATE KEY-----")
     List<String> patterns;
 
-    @Override
-    public String getDisplayName() {
-        return "Find within comments and literals";
-    }
+    String displayName = "Find within comments and literals";
 
-    @Override
-    public String getDescription() {
-        return "Find regular expression matches within comments and literals. \"Literals\" includes string literals, " +
+    String description = "Find regular expression matches within comments and literals. \"Literals\" includes string literals, " +
                "character literals, and numeric literals.";
-    }
 
     @Override
     public Validated<Object> validate() {
@@ -74,7 +68,7 @@ public class FindComments extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<Pattern> compiledPatterns = patterns.stream()
                 .map(Pattern::compile)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         return new JavaIsoVisitor<ExecutionContext>() {
 

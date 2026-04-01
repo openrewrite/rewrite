@@ -59,12 +59,12 @@ ARRAY_START : L_BRACKET -> type(L_BRACKET), mode(ARRAY_MODE);
 // booleans
 BOOLEAN: ('true' | 'false') -> popMode;
 
-// strings
-fragment ML_ESC      : '\\' '\r'? '\n' | ESC;
+// multiline strings
+fragment ML_ESC      : '\\' [ \t]* '\r'? '\n' | ESC;  // Allow whitespace before newline
 VALUE_BASIC_STRING   : BASIC_STRING                    -> type(BASIC_STRING), popMode;
-ML_BASIC_STRING      : '"""' (ML_ESC | ~["\\])*? '"""' -> popMode;
+ML_BASIC_STRING      : '"""' ( ML_ESC | ~["\\] | '"' ~["] | '""' ~["] )*? '"""' -> popMode;
 VALUE_LITERAL_STRING : LITERAL_STRING                  -> type(LITERAL_STRING), popMode;
-ML_LITERAL_STRING    : '\'\'\'' (.)*? '\'\'\''         -> popMode;
+ML_LITERAL_STRING    : '\'\'\'' ( ~['] | '\'' ~['] | '\'\'' ~['] )*? '\'\'\'' -> popMode;
 
 // floating point numbers
 fragment EXP                 : ('e' | 'E') [+-]? ZERO_PREFIXABLE_INT;

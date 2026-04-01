@@ -42,7 +42,7 @@ class ChangeFieldTypeTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
-                            
+
               public class A {
                  Collection collection;
               }

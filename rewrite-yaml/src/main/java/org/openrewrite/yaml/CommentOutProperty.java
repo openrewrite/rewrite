@@ -26,9 +26,10 @@ import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.stream.Collectors;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toCollection;
 import static java.util.stream.StreamSupport.stream;
 
 @Value
@@ -50,20 +51,14 @@ public class CommentOutProperty extends Recipe {
     @Nullable
     Boolean commentOutProperty;
 
-    @Override
-    public String getDisplayName() {
-        return "Comment out property";
-    }
+    String displayName = "Comment out property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s`", propertyKey);
     }
 
-    @Override
-    public String getDescription() {
-        return "Comment out a YAML property and add a comment in front.";
-    }
+    String description = "Comment out a YAML property and add a comment in front.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -172,11 +167,11 @@ public class CommentOutProperty extends Recipe {
                 Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
                         .filter(Yaml.Mapping.Entry.class::isInstance)
                         .map(Yaml.Mapping.Entry.class::cast)
-                        .collect(Collectors.toCollection(ArrayDeque::new));
+                        .collect(toCollection(ArrayDeque::new));
 
                 return stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
                         .map(e2 -> e2.getKey().getValue())
-                        .collect(Collectors.joining("."));
+                        .collect(joining("."));
             }
         };
     }

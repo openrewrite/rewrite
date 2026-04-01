@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -104,6 +105,52 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
     @Nullable
     Boolean addToRootPom;
 
+    @Option(displayName = "Because",
+            description = "The reason for adding the managed dependency. This will be added as an XML comment preceding the managed dependency.",
+            required = false,
+            example = "CVE-2021-1234")
+    @Nullable
+    String because;
+
+    @Deprecated
+    public AddManagedDependency(String groupId,
+                                String artifactId,
+                                String version,
+                                @Nullable String scope,
+                                @Nullable String type,
+                                @Nullable String classifier,
+                                @Nullable String versionPattern,
+                                @Nullable Boolean releasesOnly,
+                                @Nullable String onlyIfUsing,
+                                @Nullable Boolean addToRootPom) {
+        this(groupId, artifactId, version, scope, type, classifier, versionPattern, releasesOnly, onlyIfUsing, addToRootPom, null);
+    }
+
+    @JsonCreator
+    public AddManagedDependency(String groupId,
+                                String artifactId,
+                                String version,
+                                @Nullable String scope,
+                                @Nullable String type,
+                                @Nullable String classifier,
+                                @Nullable String versionPattern,
+                                @Nullable Boolean releasesOnly,
+                                @Nullable String onlyIfUsing,
+                                @Nullable Boolean addToRootPom,
+                                @Nullable String because) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.scope = scope;
+        this.type = type;
+        this.classifier = classifier;
+        this.versionPattern = versionPattern;
+        this.releasesOnly = releasesOnly;
+        this.onlyIfUsing = onlyIfUsing;
+        this.addToRootPom = addToRootPom;
+        this.because = because;
+    }
+
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
@@ -123,20 +170,14 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
         return validated;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add managed Maven dependency";
-    }
+    String displayName = "Add managed Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a managed Maven dependency to a `pom.xml` file.";
-    }
+    String description = "Add a managed Maven dependency to a `pom.xml` file.";
 
     public static class Scanned {
         boolean usingType;
@@ -213,13 +254,20 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                                     .findFirst()
                                     .orElse(existingManagedDependencyVersion());
                             String versionToUse = MavenDependency.findNewerVersion(convertedGroup, convertedArtifact, currentVersion, getResolutionResult(), metadataFailures, versionComparator, ctx);
+
+                            // Prevent downgrades
+                            if (currentVersion != null && versionToUse != null &&
+                                    versionComparator.compare(null, currentVersion, versionToUse) >= 0) {
+                                return maven;
+                            }
+
                             if (versionToUse != null && !versionToUse.equals(pom.getValue(existingManagedDependencyVersion()))) {
                                 if (ResolvedPom.placeholderHelper.hasPlaceholders(version) && Objects.equals(convertedVersion, versionToUse)) {
                                     // revert back to the original version if the version has a placeholder
                                     versionToUse = version;
                                 }
                                 doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
-                                        versionToUse, scope, type, classifier));
+                                        versionToUse, scope, type, classifier, because));
                                 maybeUpdateModel();
                             }
                         } catch (MavenDownloadingException e) {

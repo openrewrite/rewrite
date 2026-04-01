@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.security;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -24,15 +25,11 @@ import org.openrewrite.xml.tree.Xml;
 
 public class IsOwaspSuppressionsFile extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find OWASP vulnerability suppression XML files";
-    }
+    @Getter
+    final String displayName = "Find OWASP vulnerability suppression XML files";
 
-    @Override
-    public String getDescription() {
-        return "These files are used to suppress false positives in OWASP [Dependency Check](https://jeremylong.github.io/DependencyCheck).";
-    }
+    @Getter
+    final String description = "These files are used to suppress false positives in OWASP [Dependency Check](https://jeremylong.github.io/DependencyCheck).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -45,14 +42,14 @@ public class IsOwaspSuppressionsFile extends Recipe {
                 }
                 Xml.Tag root = doc.getRoot();
 
-                if (!root.getName().equals("suppressions")) {
+                if (!"suppressions".equals(root.getName())) {
                     return doc;
                 }
 
                 // check that root xmlns matches
                 boolean isOwaspSuppressionFile = false;
                 for (Xml.Attribute attribute : root.getAttributes()) {
-                    if (attribute.getKeyAsString().equals("xmlns")) {
+                    if ("xmlns".equals(attribute.getKeyAsString())) {
                         if (attribute.getValueAsString().matches("https://jeremylong.github.io/DependencyCheck/dependency-suppression(.*?).xsd")) {
                             isOwaspSuppressionFile = true;
                         }

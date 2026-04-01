@@ -28,7 +28,6 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -89,7 +88,7 @@ public class Literal implements Trait<Expression> {
             return stringValue == null ? emptyList() : singletonList(stringValue);
         }
         List<String> result = getValue(new TypeReference<List<String>>() {});
-        return result == null ? Collections.emptyList() : result;
+        return result == null ? emptyList() : result;
     }
 
     public <T> @Nullable T getValue(Class<T> type) {

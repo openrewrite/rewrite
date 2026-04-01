@@ -20,17 +20,19 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
-import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Collections;
 import java.util.List;
 
+import static java.lang.Boolean.TRUE;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
@@ -38,6 +40,11 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpdateJavaCompatibility extends Recipe {
+    private static final MethodMatcher SOURCE_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setSourceCompatibility(..)", true);
+    private static final MethodMatcher TARGET_COMPATIBILITY_DSL = new MethodMatcher("org.gradle.api.Project setTargetCompatibility(..)", true);
+    private static final MethodMatcher SOURCE_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project sourceCompatibility(..)", true);
+    private static final MethodMatcher TARGET_COMPATIBILITY_METHOD = new MethodMatcher("org.gradle.api.Project targetCompatibility(..)", true);
+
     @Option(displayName = "Java version",
             description = "The Java version to upgrade to.",
             example = "11")
@@ -71,18 +78,9 @@ public class UpdateJavaCompatibility extends Recipe {
     @Nullable
     Boolean addIfMissing;
 
-    private static final String SOURCE_COMPATIBILITY_FOUND = "SOURCE_COMPATIBILITY_FOUND";
-    private static final String TARGET_COMPATIBILITY_FOUND = "TARGET_COMPATIBILITY_FOUND";
+    String displayName = "Update Gradle project Java compatibility";
 
-    @Override
-    public String getDisplayName() {
-        return "Update Gradle project Java compatibility";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Find and updates the Java compatibility for the Gradle project.";
-    }
+    String description = "Find and updates the Java compatibility for the Gradle project.";
 
     @Override
     public Validated<Object> validate() {
@@ -91,311 +89,380 @@ public class UpdateJavaCompatibility extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
-            final MethodMatcher sourceCompatibilityDsl = new MethodMatcher("RewriteGradleProject setSourceCompatibility(..)");
-            final MethodMatcher targetCompatibilityDsl = new MethodMatcher("RewriteGradleProject setTargetCompatibility(..)");
-            final MethodMatcher javaLanguageVersionMatcher = new MethodMatcher("org.gradle.jvm.toolchain.JavaLanguageVersion of(int)");
-            final MethodMatcher javaVersionToVersionMatcher = new MethodMatcher("org.gradle.api.JavaVersion toVersion(..)");
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+            boolean sourceCompatibilityFound;
+            boolean targetCompatibilityFound;
 
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
-                if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "source", ctx);
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return super.visit(tree, ctx);
                 }
-                if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "target", ctx);
+                sourceCompatibilityFound = false;
+                targetCompatibilityFound = false;
+                J visited = super.visit(tree, ctx);
+                if (visited instanceof G.CompilationUnit) {
+                    G.CompilationUnit c = (G.CompilationUnit) visited;
+                    if (!sourceCompatibilityFound) {
+                        c = addGroovyCompatibilityType(c, "source", ctx);
+                    }
+                    if (!targetCompatibilityFound) {
+                        c = addGroovyCompatibilityType(c, "target", ctx);
+                    }
+                    return c;
+                } else if (visited instanceof K.CompilationUnit) {
+                    K.CompilationUnit c = (K.CompilationUnit) visited;
+                    if (!sourceCompatibilityFound) {
+                        c = addKotlinCompatibilityType(c, "source", ctx);
+                    }
+                    if (!targetCompatibilityFound) {
+                        c = addKotlinCompatibilityType(c, "target", ctx);
+                    }
+                    return c;
                 }
-                return c;
+                return visited;
             }
 
             @Override
-            public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
-                J.Assignment a = (J.Assignment) super.visitAssignment(assignment, ctx);
-
+            public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+                J.Assignment a = super.visitAssignment(assignment, ctx);
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
                     if ("sourceCompatibility".equals(variable.getSimpleName())) {
-                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, a.getAssignment());
+                        sourceCompatibilityFound = true;
                     }
                     if ("targetCompatibility".equals(variable.getSimpleName())) {
-                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, a.getAssignment());
+                        targetCompatibilityFound = true;
                     }
-
-                    if (compatibilityType == null) {
-                        if (!("sourceCompatibility".equals(variable.getSimpleName()) || "targetCompatibility".equals(variable.getSimpleName()))) {
-                            return a;
-                        }
-                    } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(variable.getSimpleName())) {
-                        return a;
-                    }
-                } else if (a.getVariable() instanceof J.FieldAccess) {
-                    J.FieldAccess fieldAccess = (J.FieldAccess) a.getVariable();
-                    if (compatibilityType == null) {
-                        if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()))) {
-                            return a;
-                        }
-                    } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(fieldAccess.getSimpleName())) {
-                        return a;
-                    }
-                } else {
-                    return a;
                 }
-
-                DeclarationStyle currentStyle = getCurrentStyle(a.getAssignment());
-                int currentMajor = getMajorVersion(a.getAssignment());
-                if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(currentStyle)) {
-                    DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
-                    return a.withAssignment(changeExpression(a.getAssignment(), actualStyle));
-                }
-
-                return a;
-            }
-
-            private boolean shouldUpdateVersion(int currentMajor) {
-                return currentMajor < version || currentMajor > version && Boolean.TRUE.equals(allowDowngrade);
-            }
-
-            private boolean shouldUpdateStyle(@Nullable DeclarationStyle currentStyle) {
-                return declarationStyle != null && declarationStyle != currentStyle;
+                return handleAssignment(a);
             }
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if ("sourceCompatibility".equals(m.getSimpleName())) {
-                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, SOURCE_COMPATIBILITY_FOUND, true);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (SOURCE_COMPATIBILITY_METHOD.matches(m) || SOURCE_COMPATIBILITY_DSL.matches(m)) {
+                    sourceCompatibilityFound = true;
                 }
-                if ("targetCompatibility".equals(m.getSimpleName())) {
-                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, TARGET_COMPATIBILITY_FOUND, true);
+                if (TARGET_COMPATIBILITY_METHOD.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+                    targetCompatibilityFound = true;
                 }
-                if (javaLanguageVersionMatcher.matches(m)) {
-                    List<Expression> args = m.getArguments();
-
-                    if (args.size() == 1 && args.get(0) instanceof J.Literal) {
-                        J.Literal versionArg = (J.Literal) args.get(0);
-                        if (versionArg.getValue() instanceof Integer) {
-                            Integer versionNumber = (Integer) versionArg.getValue();
-                            if (shouldUpdateVersion(versionNumber)) {
-                                return m.withArguments(
-                                        Collections.singletonList(versionArg.withValue(version)
-                                                .withValueSource(version.toString())));
-                            } else {
-                                return m;
-                            }
-                        }
-                    }
-
-                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
-                            "  but was unsuccessful, please update manually");
-                }
-
-                if (sourceCompatibilityDsl.matches(m) || targetCompatibilityDsl.matches(m)) {
-                    if (compatibilityType != null && (
-                            (compatibilityType == CompatibilityType.source && !sourceCompatibilityDsl.matches(m)) ||
-                                    (compatibilityType == CompatibilityType.target && !targetCompatibilityDsl.matches(m)))) {
-                        return m;
-                    }
-
-                    if (m.getArguments().size() == 1 && (m.getArguments().get(0) instanceof J.Literal || m.getArguments().get(0) instanceof J.FieldAccess)) {
-                        DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
-                        int currentMajor = getMajorVersion(m.getArguments().get(0));
-                        if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
-                            DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
-                            //noinspection DataFlowIssue
-                            return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeExpression(arg, actualStyle)));
-                        } else {
-                            return m;
-                        }
-                    }
-
-                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
-                            "  but was unsuccessful, please update manually");
-                }
-
-                return m;
-            }
-
-            private int getMajorVersion(@Nullable String version) {
-                if(version == null) {
-                    return -1;
-                }
-                try {
-                    return Integer.parseInt(normalize(version));
-                } catch (NumberFormatException e) {
-                    return -1;
-                }
-            }
-
-            private int getMajorVersion(Expression expression) {
-                if (expression instanceof J.Literal) {
-                    J.Literal argument = (J.Literal) expression;
-                    JavaType.Primitive type = argument.getType();
-                    if (type == JavaType.Primitive.String) {
-                        return getMajorVersion((String) argument.getValue());
-                    } else if (type == JavaType.Primitive.Int) {
-                        return (int) requireNonNull(argument.getValue());
-                    } else if (type == JavaType.Primitive.Double) {
-                        return getMajorVersion(requireNonNull(argument.getValue()).toString());
-                    }
-                } else if (expression instanceof J.FieldAccess) {
-                    J.FieldAccess field = (J.FieldAccess) expression;
-                    J.Identifier identifier = field.getName();
-                    return getMajorVersion(identifier.getSimpleName());
-                } else if (expression instanceof J.MethodInvocation && javaVersionToVersionMatcher.matches((J.MethodInvocation) expression)) {
-                    J.MethodInvocation method = (J.MethodInvocation) expression;
-                    if (method.getArguments().get(0) instanceof J.Literal) {
-                        return getMajorVersion(method.getArguments().get(0));
-                    }
-                }
-
-                return -1;
-            }
-
-            private @Nullable DeclarationStyle getCurrentStyle(Expression expression) {
-                if (expression instanceof J.Literal) {
-                    J.Literal argument = (J.Literal) expression;
-                    JavaType.Primitive type = argument.getType();
-                    if (type == JavaType.Primitive.String) {
-                        return DeclarationStyle.String;
-                    } else if (type == JavaType.Primitive.Int) {
-                        return DeclarationStyle.Number;
-                    } else if (type == JavaType.Primitive.Double) {
-                        return DeclarationStyle.Number;
-                    }
-                } else if (expression instanceof J.FieldAccess) {
-                    return DeclarationStyle.Enum;
-                }
-
-                return null;
-            }
-
-            private String normalize(String version) {
-                if (version.contains("\"") || version.contains("'")) {
-                    version = version.replace("\"", "").replace("'", "");
-                }
-
-                if (!version.contains(".") && !version.contains("_")) {
-                    return version;
-                }
-
-                if (version.contains("_")) {
-                    String removePrefix = version.substring(version.indexOf("_") + 1);
-                    if (removePrefix.startsWith("1_")) {
-                        return removePrefix.substring(removePrefix.indexOf("_") + 1);
-                    } else {
-                        return removePrefix;
-                    }
-                } else {
-                    return version.substring(version.indexOf(".") + 1);
-                }
-            }
-
-            private Expression changeExpression(Expression expression, @Nullable DeclarationStyle style) {
-                if (expression instanceof J.Literal) {
-                    J.Literal literal = (J.Literal) expression;
-                    if (style == DeclarationStyle.String) {
-                        String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                        if (literal.getType() == JavaType.Primitive.String) {
-                            expression = ChangeStringLiteral.withStringValue(literal, newVersion);
-                        } else {
-                            expression = literal.withType(JavaType.Primitive.String).withValue(newVersion).withValueSource("'" + newVersion + "'");
-                        }
-                    } else if (style == DeclarationStyle.Enum) {
-                        String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
-                        expression = new J.FieldAccess(
-                                randomId(),
-                                literal.getPrefix(),
-                                literal.getMarkers(),
-                                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
-                                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, null, null), Markers.EMPTY),
-                                JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
-                        );
-                    } else if (style == DeclarationStyle.Number) {
-                        if (version <= 8) {
-                            double doubleValue = Double.parseDouble("1." + version);
-                            expression = literal.withType(JavaType.Primitive.Double).withValue(doubleValue).withValueSource("1." + version);
-                        } else {
-                            expression = literal.withType(JavaType.Primitive.Int).withValue(version).withValueSource(String.valueOf(version));
-                        }
-                    }
-                } else if (expression instanceof J.FieldAccess) {
-                    J.FieldAccess fieldAccess = (J.FieldAccess) expression;
-                    if (style == DeclarationStyle.String) {
-                        String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, "'" + newVersion + "'", emptyList(), JavaType.Primitive.String);
-                    } else if (style == DeclarationStyle.Enum) {
-                        String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
-                        expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(name));
-                    } else if (style == DeclarationStyle.Number) {
-                        if (version <= 8) {
-                            double doubleValue = Double.parseDouble("1." + version);
-                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), doubleValue, String.valueOf(doubleValue), emptyList(), JavaType.Primitive.Double);
-                        } else {
-                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
-                        }
-                    }
-                } else if (expression instanceof J.MethodInvocation && javaVersionToVersionMatcher.matches((J.MethodInvocation) expression)) {
-                    J.MethodInvocation m = (J.MethodInvocation) expression;
-                    if (style == null) {
-                        expression = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                            if (arg instanceof J.Literal) {
-                                if (arg.getType() == JavaType.Primitive.String) {
-                                    String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                                    return ChangeStringLiteral.withStringValue((J.Literal) arg, newVersion);
-                                } else if (arg.getType() == JavaType.Primitive.Int) {
-                                    return ((J.Literal) arg).withValue(version).withValueSource(String.valueOf(version));
-                                } else if (arg.getType() == JavaType.Primitive.Double) {
-                                    if (version <= 8) {
-                                        double doubleValue = Double.parseDouble("1." + version);
-                                        return ((J.Literal) arg).withValue(doubleValue).withValueSource(String.valueOf(doubleValue));
-                                    } else {
-                                        return ((J.Literal) arg).withType(JavaType.Primitive.Int).withValue(version).withValueSource(String.valueOf(version));
-                                    }
-                                }
-                            }
-                            return arg;
-                        }));
-                    } else if (style == DeclarationStyle.String) {
-                        String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                        expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), newVersion, "'" + newVersion + "'", emptyList(), JavaType.Primitive.String);
-                    } else if (style == DeclarationStyle.Enum) {
-                        String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
-                        expression = new J.FieldAccess(
-                                randomId(),
-                                m.getPrefix(),
-                                m.getMarkers(),
-                                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
-                                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, null, null), Markers.EMPTY),
-                                JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
-                        );
-                    } else if (style == DeclarationStyle.Number) {
-                        if (version <= 8) {
-                            double doubleValue = Double.parseDouble("1." + version);
-                            expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), doubleValue, String.valueOf(doubleValue), emptyList(), JavaType.Primitive.Double);
-                        } else {
-                            expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
-                        }
-                    }
-                }
-
-                return expression;
+                return handleMethodInvocation(m);
             }
         });
     }
 
-    private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
-        if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
-            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
+    private G.CompilationUnit addGroovyCompatibilityType(G.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+        if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
+            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build()
+                    .parse(ctx, "\n" + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(declarationStyle))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
-            sourceFile.getStatements();
             c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
         }
         return c;
     }
 
-    private String styleMissingCompatibilityVersion() {
+    private K.CompilationUnit addKotlinCompatibilityType(K.CompilationUnit c, String targetCompatibilityType, ExecutionContext ctx) {
+        if ((compatibilityType == null || targetCompatibilityType.equals(compatibilityType.toString())) && TRUE.equals(addIfMissing)) {
+            J withExistingJavaMethod = maybeAddToExistingJavaMethod(c, targetCompatibilityType, ctx);
+            if (withExistingJavaMethod != c) {
+                return (K.CompilationUnit) withExistingJavaMethod;
+            }
+
+            K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
+                    .isKotlinScript(true)
+                    .build().parse(ctx, "\n\njava {\n    " + targetCompatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum) + "\n}")
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
+            c = c.withStatements(ListUtils.concatAll(c.getStatements(), sourceFile.getStatements()));
+        }
+        return c;
+    }
+
+    private J maybeAddToExistingJavaMethod(K.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if ("java".equals(method.getSimpleName())) {
+                    return new JavaIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                            J.Block body = (J.Block) lambda.getBody();
+                            List<Statement> statements = body.getStatements();
+                            K.CompilationUnit sourceFile = (K.CompilationUnit) KotlinParser.builder()
+                                    .isKotlinScript(true)
+                                    .build().parse(ctx, "\n    " + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion(DeclarationStyle.Enum))
+                                    .findFirst()
+                                    .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
+                            return lambda.withBody(body.withStatements(ListUtils.concatAll(statements, sourceFile.getStatements())));
+                        }
+                    }.visitMethodInvocation(method, ctx);
+                }
+                return super.visitMethodInvocation(method, ctx);
+            }
+        }.visitNonNull(c, ctx);
+    }
+
+    private J.Assignment handleAssignment(J.Assignment a) {
+        if (a.getVariable() instanceof J.Identifier) {
+            J.Identifier variable = (J.Identifier) a.getVariable();
+
+            if (compatibilityType == null) {
+                if (!("sourceCompatibility".equals(variable.getSimpleName()) || "targetCompatibility".equals(variable.getSimpleName()))) {
+                    return a;
+                }
+            } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(variable.getSimpleName())) {
+                return a;
+            }
+        } else if (a.getVariable() instanceof J.FieldAccess) {
+            J.FieldAccess fieldAccess = (J.FieldAccess) a.getVariable();
+            if (compatibilityType == null) {
+                if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()) ||
+                        ("release".equals(fieldAccess.getSimpleName()) &&
+                                ((fieldAccess.getTarget() instanceof J.Identifier && "options".equals(((J.Identifier) fieldAccess.getTarget()).getSimpleName())) ||
+                                        (fieldAccess.getTarget() instanceof J.FieldAccess && "options".equals(((J.FieldAccess) fieldAccess.getTarget()).getSimpleName())))))) {
+                    return a;
+                }
+            } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(fieldAccess.getSimpleName())) {
+                return a;
+            }
+        } else {
+            return a;
+        }
+
+        DeclarationStyle currentStyle = getCurrentStyle(a.getAssignment());
+        Integer currentMajor = getMajorVersion(a.getAssignment());
+        if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(currentStyle)) {
+            DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
+            return a.withAssignment(changeJavaVersion(a.getAssignment(), actualStyle));
+        }
+
+        return a;
+    }
+
+    private boolean shouldUpdateVersion(@Nullable Integer currentMajor) {
+        return currentMajor != null && (currentMajor < version || currentMajor > version && TRUE.equals(allowDowngrade));
+    }
+
+    private boolean shouldUpdateStyle(@Nullable DeclarationStyle currentStyle) {
+        return declarationStyle != null && declarationStyle != currentStyle;
+    }
+
+    private J.MethodInvocation handleMethodInvocation(J.MethodInvocation m) {
+        if ("jvmToolchain".equals(m.getSimpleName()) || isMethodInvocation(m, "JavaLanguageVersion", "of")) {
+            List<Expression> args = m.getArguments();
+
+            if (args.size() == 1) {
+                if (args.get(0) instanceof J.Literal || args.get(0) instanceof J.FieldAccess ||
+                        ("jvmToolchain".equals(m.getSimpleName()) && args.get(0) instanceof J.Lambda)) {
+                    DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
+                    Integer currentMajor = getMajorVersion(args.get(0));
+                    if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
+                        DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
+                        return m.withArguments(ListUtils.mapFirst(m.getArguments(), it -> changeJavaVersion(it, actualStyle)));
+                    }
+                    return m;
+                }
+            }
+
+            return SearchResult.found(m, "Attempted to update to Java version to " + version +
+                    "  but was unsuccessful, please update manually");
+        }
+
+        if (SOURCE_COMPATIBILITY_DSL.matches(m) || TARGET_COMPATIBILITY_DSL.matches(m)) {
+            if (compatibilityType != null && (
+                    (compatibilityType == CompatibilityType.source && !SOURCE_COMPATIBILITY_DSL.matches(m)) ||
+                            (compatibilityType == CompatibilityType.target && !TARGET_COMPATIBILITY_DSL.matches(m)))) {
+                return m;
+            }
+
+            if (m.getArguments().size() == 1 && (m.getArguments().get(0) instanceof J.Literal || m.getArguments().get(0) instanceof J.FieldAccess)) {
+                DeclarationStyle currentStyle = getCurrentStyle(m.getArguments().get(0));
+                Integer currentMajor = getMajorVersion(m.getArguments().get(0));
+                if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
+                    DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
+                    return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeJavaVersion(arg, actualStyle)));
+                }
+                return m;
+            }
+
+            return SearchResult.found(m, "Attempted to update to Java version to " + version +
+                    "  but was unsuccessful, please update manually");
+        }
+
+        return m;
+    }
+
+    private int getMajorVersion(@Nullable String version) {
+        if (version == null) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(normalize(version));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private @Nullable Integer getMajorVersion(Expression expression) {
+        if (expression instanceof J.Literal) {
+            J.Literal argument = (J.Literal) expression;
+            JavaType.Primitive type = argument.getType();
+            if (type == JavaType.Primitive.String) {
+                return getMajorVersion((String) argument.getValue());
+            } else if (type == JavaType.Primitive.Int) {
+                return (int) requireNonNull(argument.getValue());
+            } else if (type == JavaType.Primitive.Double) {
+                return getMajorVersion(requireNonNull(argument.getValue()).toString());
+            }
+        } else if (expression instanceof J.FieldAccess) {
+            J.FieldAccess field = (J.FieldAccess) expression;
+            J.Identifier identifier = field.getName();
+            if (field.getTarget() instanceof J.FieldAccess && "majorVersion".equals(identifier.getSimpleName())) {
+                identifier = ((J.FieldAccess) field.getTarget()).getName();
+            }
+            return getMajorVersion(identifier.getSimpleName());
+        } else if (isMethodInvocation(expression, "JavaVersion", "toVersion")) {
+            J.MethodInvocation method = (J.MethodInvocation) expression;
+            if (method.getArguments().get(0) instanceof J.Literal) {
+                return getMajorVersion(method.getArguments().get(0));
+            }
+        }
+
+        return null;
+    }
+
+    private @Nullable DeclarationStyle getCurrentStyle(Expression expression) {
+        if (expression instanceof J.Literal) {
+            J.Literal argument = (J.Literal) expression;
+            JavaType.Primitive type = argument.getType();
+            if (type == JavaType.Primitive.String) {
+                return DeclarationStyle.String;
+            } else if (type == JavaType.Primitive.Int) {
+                return DeclarationStyle.Number;
+            } else if (type == JavaType.Primitive.Double) {
+                return DeclarationStyle.Number;
+            }
+        } else if (expression instanceof J.FieldAccess) {
+            return DeclarationStyle.Enum;
+        }
+
+        return null;
+    }
+
+    private String normalize(String version) {
+        if (version.contains("\"") || version.contains("'")) {
+            version = version.replace("\"", "").replace("'", "");
+        }
+
+        if (!version.contains(".") && !version.contains("_")) {
+            return version;
+        }
+
+        if (version.contains("_")) {
+            String removePrefix = version.substring(version.indexOf("_") + 1);
+            if (removePrefix.startsWith("1_")) {
+                return removePrefix.substring(removePrefix.indexOf("_") + 1);
+            }
+            return removePrefix;
+        }
+
+        return version.substring(version.indexOf(".") + 1);
+    }
+
+    private Expression changeJavaVersion(Expression expression, @Nullable DeclarationStyle style) {
+        String newJavaVersion = version <= 8 ? "1." + version : String.valueOf(version);
+        String newJavaVersionEnum = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
+        double newJavaVersionDouble = Double.parseDouble("1." + version);
+
+        if (expression instanceof J.Literal) {
+            J.Literal literal = (J.Literal) expression;
+            if (style == null) {
+                if (literal.getType() == JavaType.Primitive.String) {
+                    return changeJavaVersion(literal, DeclarationStyle.String);
+                } else if (literal.getType() == JavaType.Primitive.Int || literal.getType() == JavaType.Primitive.Double) {
+                    return changeJavaVersion(literal, DeclarationStyle.Number);
+                }
+            } else if (style == DeclarationStyle.String) {
+                if (literal.getType() == JavaType.Primitive.String) {
+                    expression = ChangeStringLiteral.withStringValue(literal, newJavaVersion);
+                } else {
+                    expression = literal.withType(JavaType.Primitive.String).withValue(newJavaVersion).withValueSource("'" + newJavaVersion + "'");
+                }
+            } else if (style == DeclarationStyle.Enum) {
+                expression = changeJavaVersion(newJavaVersionEnum, literal.getPrefix(), literal.getMarkers());
+            } else if (style == DeclarationStyle.Number) {
+                if (version <= 8) {
+                    expression = literal.withType(JavaType.Primitive.Double).withValue(newJavaVersionDouble).withValueSource("1." + version);
+                } else {
+                    expression = literal.withType(JavaType.Primitive.Int).withValue(version).withValueSource(String.valueOf(version));
+                }
+            }
+        } else if (expression instanceof J.FieldAccess) {
+            J.FieldAccess fieldAccess = (J.FieldAccess) expression;
+            if (style == DeclarationStyle.String) {
+                expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
+            } else if (style == DeclarationStyle.Enum) {
+                if (((J.FieldAccess) expression).getTarget() instanceof J.FieldAccess && "majorVersion".equals(((J.FieldAccess) expression).getName().getSimpleName())) {
+                    expression = fieldAccess.withTarget(changeJavaVersion(fieldAccess.getTarget(), style));
+                } else {
+                    expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(newJavaVersionEnum));
+                }
+            } else if (style == DeclarationStyle.Number) {
+                expression = changeJavaVersion(newJavaVersionDouble, fieldAccess.getPrefix(), fieldAccess.getMarkers());
+            }
+        } else if (isMethodInvocation(expression, "JavaVersion", "toVersion")) {
+            J.MethodInvocation m = (J.MethodInvocation) expression;
+            if (style == null) {
+                expression = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                    if (arg instanceof J.Literal) {
+                        if (arg.getType() == JavaType.Primitive.String) {
+                            return changeJavaVersion(arg, DeclarationStyle.String);
+                        } else if (arg.getType() == JavaType.Primitive.Int || arg.getType() == JavaType.Primitive.Double) {
+                            return changeJavaVersion(arg, DeclarationStyle.Number);
+                        }
+                    }
+                    return arg;
+                }));
+            } else if (style == DeclarationStyle.String) {
+                expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), newJavaVersion, "'" + newJavaVersion + "'", emptyList(), JavaType.Primitive.String);
+            } else if (style == DeclarationStyle.Enum) {
+                expression = changeJavaVersion(newJavaVersionEnum, m.getPrefix(), m.getMarkers());
+            } else if (style == DeclarationStyle.Number) {
+                expression = changeJavaVersion(newJavaVersionDouble, m.getPrefix(), m.getMarkers());
+            }
+        }
+
+        return expression;
+    }
+
+    private Expression changeJavaVersion(String newJavaVersionEnum, Space prefix, Markers markers) {
+        return new J.FieldAccess(
+                randomId(),
+                prefix,
+                markers,
+                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
+                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), newJavaVersionEnum, null, null), Markers.EMPTY),
+                JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
+        );
+    }
+
+    private Expression changeJavaVersion(double newJavaVersionDouble, Space prefix, Markers markers) {
+        if (version <= 8) {
+            return new J.Literal(randomId(), prefix, markers, newJavaVersionDouble, String.valueOf(newJavaVersionDouble), emptyList(), JavaType.Primitive.Double);
+        }
+        return new J.Literal(randomId(), prefix, markers, version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
+    }
+
+    private static boolean isMethodInvocation(J expression, String clazz, String method) {
+        return expression instanceof J.MethodInvocation &&
+                ((J.MethodInvocation) expression).getSimpleName().equals(method) &&
+                ((J.MethodInvocation) expression).getSelect() instanceof J.Identifier &&
+                ((J.Identifier) ((J.MethodInvocation) expression).getSelect()).getSimpleName().equals(clazz);
+    }
+
+    private String styleMissingCompatibilityVersion(@Nullable DeclarationStyle declarationStyle) {
         if (declarationStyle == DeclarationStyle.String) {
             return version <= 8 ? "'1." + version + "'" : "'" + version + "'";
         } else if (declarationStyle == DeclarationStyle.Enum) {

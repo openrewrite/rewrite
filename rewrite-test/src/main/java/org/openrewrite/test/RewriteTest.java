@@ -15,12 +15,11 @@
  */
 package org.openrewrite.test;
 
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.Delegate;
 import org.assertj.core.api.SoftAssertions;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.*;
@@ -31,6 +30,8 @@ import org.openrewrite.remote.Remote;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
@@ -39,9 +40,11 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.newSetFromMap;
+import static java.util.stream.Collectors.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
@@ -78,11 +81,13 @@ public interface RewriteTest extends SourceSpecs {
     default void assertRecipesConfigure(String packageName) {
         // soft assertions allow the entire stack trace to be displayed for each
         // recipe that fails to configure
-        SoftAssertions softly = new SoftAssertions();
-        for (Recipe recipe : Environment.builder()
+        List<Recipe> recipes = Environment.builder()
                 .scanRuntimeClasspath(packageName)
                 .build()
-                .listRecipes()) {
+                .listRecipes();
+        assertThat(recipes).as("No recipes found in %s", packageName).isNotEmpty();
+        SoftAssertions softly = new SoftAssertions();
+        for (Recipe recipe : recipes) {
             // scanRuntimeClasspath picks up all recipes in META-INF/rewrite regardless of whether their
             // names start with the package we intend to filter on here
             if (recipe.getName().startsWith(packageName)) {
@@ -172,18 +177,25 @@ public interface RewriteTest extends SourceSpecs {
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
-            assertThatCode(() -> {
-                Recipe r = RecipeIntrospectionUtils.constructRecipe(recipe.getClass());
-                // getRecipeList should not fail with default parameters from RecipeIntrospectionUtils.
-                r.getRecipeList();
-                // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
-                //noinspection ResultOfMethodCallIgnored
-                r.hashCode();
-                //noinspection EqualsWithItself,ResultOfMethodCallIgnored
-                r.equals(r);
-            })
-                    .as("Recipe must be able to instantiate via RecipeIntrospectionUtils")
-                    .doesNotThrowAnyException();
+            // Skip RecipeLoader null-instantiation test for Kotlin recipes with required options,
+            // as Jackson's Kotlin module enforces non-nullability and will fail when trying to
+            // instantiate with null arguments. The serialization round-trip test above still
+            // validates that actual recipe instances work correctly.
+            if (!RewriteTestUtils.isKotlinRecipeWithRequiredOptions(recipe.getClass())) {
+                assertThatCode(() -> {
+                    Recipe r = new RecipeLoader(recipe.getClass().getClassLoader())
+                            .load(recipe.getClass(), null);
+                    // getRecipeList should not fail with default parameters from RecipeLoader.
+                    r.getRecipeList();
+                    // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
+                    //noinspection ResultOfMethodCallIgnored
+                    r.hashCode();
+                    //noinspection EqualsWithItself,ResultOfMethodCallIgnored
+                    r.equals(r);
+                })
+                        .as("Recipe must be able to instantiate via RecipeLoader")
+                        .doesNotThrowAnyException();
+            }
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
         }
@@ -215,18 +227,25 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
         }
-        List<Validated<Object>> validations = new ArrayList<>();
-        recipe.validateAll(ctx, validations);
-        assertThat(validations.stream().filter(Validated::isInvalid))
-                .as("Recipe validation must have no failures")
-                .isEmpty();
+
+        // Imperative recipes are loaded with no user-provided arguments, so all optional parameters are null.
+        // Skip recipe validation for these since custom validate() methods (e.g. requiring at least one of several
+        // optional parameters) would fail on an unconfigured instance.
+        if (recipe instanceof DeclarativeRecipe
+                || recipe.getDescriptor().getOptions().stream().allMatch(OptionDescriptor::isRequired)) {
+            List<Validated<Object>> validations = new ArrayList<>();
+            recipe.validateAll(ctx, validations);
+            assertThat(validations.stream().filter(Validated::isInvalid))
+                    .as("Recipe validation must have no failures")
+                    .isEmpty();
+        }
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
         // Clone class-level parsers to ensure that no state leaks between tests
         List<Parser.Builder> testClassSpecParsers = testClassSpec.parsers.stream()
                 .map(Parser.Builder::clone)
-                .collect(Collectors.toList());
+                .collect(toList());
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             // ----- method specific parser -------------------------
             if (RewriteTestUtils.groupSourceSpecsByParser(methodSpecParsers, sourceSpecsByParser, sourceSpec)) {
@@ -279,7 +298,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             List<SourceFile> sourceFiles = parser.parseInputs(inputs.values(), relativeTo, ctx)
-                    .collect(Collectors.toList());
+                    .collect(toList());
             assertThat(sourceFiles.size())
                     .as("Every input should be parsed into a SourceFile.")
                     .isEqualTo(inputs.size());
@@ -294,9 +313,13 @@ public interface RewriteTest extends SourceSpecs {
 
                 SourceSpec<?> nextSpec = sourceSpecIter.next();
                 for (Marker marker : nextSpec.getMarkers()) {
-                    markers = markers.setByType(marker);
+                    markers = markers.add(marker);
                 }
                 sourceFile = sourceFile.withMarkers(markers);
+
+                // Call user hook to inspect source file before validation and recipe execution
+                //noinspection unchecked
+                SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
 
                 // Validate before source
                 TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
@@ -308,30 +331,46 @@ public interface RewriteTest extends SourceSpecs {
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
-                        assertContentEquals(
-                                sourceFile,
-                                StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
-                                sourceFile.printAll(out.clone()),
-                                "When parsing and printing the source code back to text without modifications, " +
-                                "the printed source didn't match the original source code. This means there is a bug in the " +
-                                "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                "code that generated this error for"
-                        );
-                        try {
-                            WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
-                            SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
-                            if(whitespaceValidated != null && whitespaceValidated != sourceFile) {
-                                fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
-                                     "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                        if (beforeValidations.parseAndPrintEquality()) {
+                            // EncodingDetectingInputStream strips BOM from expected
+                            String expected = StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx));
+                            String actual = sourceFile.printAll(out.clone());
+
+                            // Strip BOM from actual for comparison, but verify it matches charsetBomMarked flag
+                            boolean actualHasBom = actual.startsWith("\uFEFF");
+                            if (actualHasBom) {
+                                actual = actual.substring(1);
                             }
-                        } catch (UnsupportedOperationException e) {
-                            // Language/parser does not provide whitespace validation and that's OK for now
+                            if (sourceFile.isCharsetBomMarked() && !actualHasBom) {
+                                fail("Source file was parsed with a BOM (charsetBomMarked=true) but printing did not restore it.");
+                            } else if (!sourceFile.isCharsetBomMarked() && actualHasBom) {
+                                fail("Source file was parsed without a BOM (charsetBomMarked=false) but printing added one.");
+                            }
+                            assertContentEquals(
+                                    sourceFile,
+                                    expected,
+                                    actual,
+                                    "When parsing and printing the source code back to text without modifications, " +
+                                    "the printed source didn't match the original source code. This means there is a bug in the " +
+                                    "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                                    "code that generated this error."
+                            );
+                        }
+                        if (!beforeValidations.allowNonWhitespaceInWhitespace()) {
+                            try {
+                                WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
+                                SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
+                                if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                                    fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
+                                         "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                                }
+                            } catch (UnsupportedOperationException e) {
+                                // Language/parser does not provide whitespace validation and that's OK for now
+                            }
                         }
                     }
                 }
 
-                //noinspection unchecked
-                SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
                 specBySourceFile.put(mapped, nextSpec);
             }
         }
@@ -362,6 +401,13 @@ public interface RewriteTest extends SourceSpecs {
             recipeCtx = testClassSpec.getRecipeExecutionContext();
         }
 
+        // Apply customizations (like Maven settings) to recipe execution context when different from parsing context
+        if (recipeCtx != ctx) {
+            for (SourceSpec<?> s : sourceSpecs) {
+                s.customizeExecutionContext.accept(recipeCtx);
+            }
+        }
+
         LargeSourceSet lss;
         if (testMethodSpec.getSourceSet() != null) {
             lss = testMethodSpec.getSourceSet().apply(runnableSourceFiles);
@@ -388,8 +434,8 @@ public interface RewriteTest extends SourceSpecs {
             afterRecipe.accept(recipeRun);
         }
 
-        Collection<SourceSpec<?>> expectedNewSources = Collections.newSetFromMap(new IdentityHashMap<>());
-        Collection<Result> expectedNewResults = Collections.newSetFromMap(new IdentityHashMap<>());
+        Collection<SourceSpec<?>> expectedNewSources = newSetFromMap(new IdentityHashMap<>());
+        Collection<Result> expectedNewResults = newSetFromMap(new IdentityHashMap<>());
 
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             if (sourceSpec.before == null) {
@@ -416,7 +462,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         assertThat(result.getBefore())
                                 .as("Expected a new file for the source path but there was an existing file already present: " +
-                                        sourceSpec.getSourcePath())
+                                    sourceSpec.getSourcePath())
                                 .isNull();
                         String actual = result.getAfter().printAll(out.clone());
                         actual = sourceSpec.noTrim ? actual : actual.trim();
@@ -424,6 +470,7 @@ public interface RewriteTest extends SourceSpecs {
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         continue nextSourceSpec;
                     }
                 }
@@ -433,7 +480,7 @@ public interface RewriteTest extends SourceSpecs {
                             String afterPath = (it.getAfter() == null) ? "null" : it.getAfter().getSourcePath().toString();
                             return "    " + beforePath + " -> " + afterPath;
                         })
-                        .collect(Collectors.joining("\n"));
+                        .collect(joining("\n"));
                 fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath() +
                      "\nAll source file paths, before and after recipe run:\n" + paths);
             }
@@ -450,6 +497,7 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewResults.add(result);
                         //noinspection unchecked
                         ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                        sourceSpec.validateSource.accept(result.getAfter(), TypeValidation.after(testMethodSpec, testClassSpec));
                         if (sourceSpec.sourcePath != null) {
                             assertThat(result.getAfter().getSourcePath())
                                     .isEqualTo(sourceSpec.dir.resolve(sourceSpec.sourcePath));
@@ -485,19 +533,20 @@ public interface RewriteTest extends SourceSpecs {
             SourceFile source = specForSourceFile.getKey();
             if (source instanceof ParseError) {
                 ParseError parseError = (ParseError) source;
-                if (parseError.getErroneous() != null) {
-                    assertContentEquals(
-                            parseError,
-                            parseError.getText(),
-                            parseError.getErroneous().printAll(),
-                            "Bug in source parser or printer resulted in the following difference for"
-                    );
+                if (parseError.getErroneous() == null) {
+                    throw parseError.toException();
                 }
+                assertContentEquals(
+                        parseError,
+                        parseError.getText(),
+                        parseError.getErroneous().printAll(),
+                        "Bug in source parser or printer resulted in the following difference for"
+                );
             }
 
             for (Result result : allResults) {
                 if ((result.getBefore() == null && source == null) ||
-                        (result.getBefore() != null && result.getBefore().getId().equals(source.getId()))) {
+                    (result.getBefore() != null && result.getBefore().getId().equals(source.getId()))) {
                     if (result.getAfter() != null) {
                         String before = result.getBefore() == null ? null : result.getBefore().printAll(out.clone());
                         String actualAfter = result.getAfter().printAll(out.clone());
@@ -512,7 +561,7 @@ public interface RewriteTest extends SourceSpecs {
                         } else {
                             boolean isRemote = result.getAfter() instanceof Remote;
                             if (!isRemote && Objects.equals(result.getBefore().getSourcePath(), result.getAfter().getSourcePath()) &&
-                                    Objects.equals(before, actualAfter)) {
+                                Objects.equals(before, actualAfter)) {
                                 fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
                             }
 
@@ -585,21 +634,20 @@ public interface RewriteTest extends SourceSpecs {
         newFilesGenerated.assertAll();
 
         Map<Result, Boolean> resultToUnexpected = allResults.stream()
-                .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null &&
-                                                                      !(result.getAfter() instanceof Remote) &&
-                                                                      !expectedNewResults.contains(result) &&
-                                                                      testMethodSpec.afterRecipes.isEmpty()));
+                .collect(toMap(result -> result, result -> result.getBefore() == null &&
+                                                           !(result.getAfter() instanceof Remote) &&
+                                                           !expectedNewResults.contains(result) &&
+                                                           testMethodSpec.afterRecipes.isEmpty()));
         if (resultToUnexpected.values().stream().anyMatch(unexpected -> unexpected)) {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
                         Result result = it.getKey();
-                        assert result.getAfter() != null;
-                        String beforePath = (result.getBefore() == null) ? "null" : result.getAfter().getSourcePath().toString();
+                        String beforePath = (result.getBefore() == null) ? "null" : result.getBefore().getSourcePath().toString();
                         String afterPath = (result.getAfter() == null) ? "null" : result.getAfter().getSourcePath().toString();
                         String status = it.getValue() ? "❌️" : "✔";
                         return "    " + beforePath + " | " + afterPath + " | " + status;
                     })
-                    .collect(Collectors.joining("\n"));
+                    .collect(joining("\n"));
             fail("The recipe generated source files the test did not expect.\n" +
                  "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
                  "    before | after | expected\n" + paths);
@@ -614,7 +662,7 @@ public interface RewriteTest extends SourceSpecs {
                     null,
                     expected,
                     actual,
-                    Collections.emptySet()
+                    emptySet()
             )) {
                 assertThat(actual)
                         .as(errorMessagePrefix + " \"%s\":\n%s", sourceFile.getSourcePath(), diffEntry.getDiff())
@@ -635,13 +683,12 @@ public interface RewriteTest extends SourceSpecs {
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
-            if (t instanceof RecipeRunException){
+            if (t instanceof RecipeRunException) {
                 fail("Failed to run recipe at " + ((RecipeRunException) t).getCursor(), t);
             }
             fail("Failed to parse sources or run recipe", t);
         });
-        ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
-        return ctx;
+        return ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
     }
 
     @Override
@@ -687,6 +734,30 @@ public interface RewriteTest extends SourceSpecs {
 }
 
 class RewriteTestUtils {
+
+    /**
+     * Checks if a Kotlin recipe class has required options that will fail when
+     * instantiated with null arguments via Jackson. This is because Jackson's
+     * Kotlin module enforces non-nullability for Kotlin classes.
+     * <p>
+     * This check only applies to Kotlin classes since Java classes can have
+     * null values for any parameter type.
+     */
+    static boolean isKotlinRecipeWithRequiredOptions(Class<?> recipeClass) {
+        for (Annotation a : recipeClass.getDeclaredAnnotations()) {
+            if ("kotlin.Metadata".equals(a.annotationType().getName())) {
+                // Check for @Option fields with required=true (which is the default)
+                for (Field field : recipeClass.getDeclaredFields()) {
+                    Option option = field.getAnnotation(Option.class);
+                    if (option != null && option.required()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     static boolean groupSourceSpecsByParser(List<Parser.Builder> parserBuilders, Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> entry : sourceSpecsByParser.entrySet()) {
             if (entry.getKey().getSourceFileType().equals(sourceSpec.sourceFileType) && sourceSpec.getParser().getClass().isAssignableFrom(entry.getKey().getClass())) {
@@ -701,24 +772,5 @@ class RewriteTestUtils {
             }
         }
         return false;
-    }
-}
-
-@RequiredArgsConstructor
-class DelegateSourceFileForDiff implements SourceFile {
-    @Delegate(excludes = PrintAll.class)
-    private final SourceFile delegate;
-
-    private final String expected;
-
-    @Override
-    public <P> String printAll(PrintOutputCapture<P> out) {
-        out.append(expected);
-        return out.getOut();
-    }
-
-    @SuppressWarnings("unused") // Lombok delegate exclude
-    interface PrintAll {
-        <P> String printAll(PrintOutputCapture<P> out);
     }
 }

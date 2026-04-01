@@ -42,7 +42,6 @@ import static java.util.Objects.requireNonNull;
 @Incubating(since = "8.17.0")
 @Value
 public class DependencyVersionSelector {
-    @Nullable
     MavenMetadataFailures metadataFailures;
 
     @Nullable
@@ -65,12 +64,12 @@ public class DependencyVersionSelector {
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
     public @Nullable String select(GroupArtifact ga,
-                         String configuration,
+                         @Nullable String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
                          ExecutionContext ctx) throws MavenDownloadingException {
         String currentVersion = "0";
-        if (gradleProject != null) {
+        if (gradleProject != null && configuration != null) {
             GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
             if(gdc != null) {
                 Dependency requested = gdc.findRequestedDependency(ga.getGroupId(), ga.getArtifactId());
@@ -95,7 +94,8 @@ public class DependencyVersionSelector {
      * @param gav            The group, artifact, and version of the existing dependency.
      * @param configuration  The configuration to select the version for. The configuration influences
      *                       which set of Maven repositories (either plugin repositories or regular repositories)
-     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
+     *                       are used to resolve Maven metadata from.
+     * @param version        The version to select, in node-semver format.
      * @param versionPattern The version pattern to select, if any.
      * @param ctx            The execution context, which can influence dependency resolution.
      * @return The selected version, if any.
@@ -187,6 +187,7 @@ public class DependencyVersionSelector {
                 return Optional.empty();
             }
             List<MavenRepository> repos = determineRepos(configuration);
+            // There is still at least one place where this is null that remains to be fixed
             MavenMetadata mavenMetadata = metadataFailures == null ?
                     downloadMetadata(gav.getGroupId(), gav.getArtifactId(), repos, ctx) :
                     metadataFailures.insertRows(ctx, () -> downloadMetadata(gav.getGroupId(), gav.getArtifactId(),

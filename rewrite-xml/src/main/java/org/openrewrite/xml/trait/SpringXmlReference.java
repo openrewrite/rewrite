@@ -79,7 +79,7 @@ public class SpringXmlReference extends XmlReference {
                 //noinspection ConstantValue
                 if (doc.getRoot() != null) {
                     for (Xml.Attribute attrib : doc.getRoot().getAttributes()) {
-                        if (attrib.getKeyAsString().equals("xsi:schemaLocation") && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
+                        if ("xsi:schemaLocation".equals(attrib.getKeyAsString()) && attrib.getValueAsString().contains("www.springframework.org/schema/beans")) {
                             return true;
                         }
                     }

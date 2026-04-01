@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -25,6 +26,7 @@ import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.ToBeRemoved;
 import org.openrewrite.marker.Markers;
 
 import java.lang.ref.WeakReference;
@@ -35,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 
 @SuppressWarnings("unused")
 public interface Hcl extends Tree {
@@ -1531,20 +1534,52 @@ public interface Hcl extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class TemplateInterpolation implements Hcl, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
         @With
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
-        Expression expression;
+        HclRightPadded<Expression> paddedExpression;
+
+        @JsonCreator
+        @ToBeRemoved(after = "2026-04-01", reason = "Temporary constructor to aid deserialization of older models")
+        TemplateInterpolation(UUID id,
+                              Space prefix,
+                              Markers markers,
+                              @Nullable Expression expression,
+                              @Nullable HclRightPadded<Expression> paddedExpression) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            if (expression != null) {
+                this.paddedExpression = HclRightPadded.withElement(null, expression);
+            } else {
+                this.paddedExpression = requireNonNull(paddedExpression);
+            }
+        }
+
+        public Expression getExpression() {
+            return paddedExpression.getElement();
+        }
+
+        public TemplateInterpolation withExpression(Expression expression) {
+            return getPadding().withExpression(this.paddedExpression.withElement(expression));
+        }
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
@@ -1554,6 +1589,34 @@ public interface Hcl extends Tree {
         @Override
         public String toString() {
             return "TemplateInterpolation";
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TemplateInterpolation t;
+
+            public HclRightPadded<Expression> getExpression() {
+                return t.paddedExpression;
+            }
+
+            public TemplateInterpolation withExpression(HclRightPadded<Expression> expression) {
+                return t.paddedExpression == expression ? t : new TemplateInterpolation(t.padding, t.id, t.prefix, t.markers, expression);
+            }
         }
     }
 

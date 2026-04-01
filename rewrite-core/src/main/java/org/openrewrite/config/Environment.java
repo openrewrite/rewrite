@@ -15,11 +15,13 @@
  */
 package org.openrewrite.config;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeListing;
+import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.File;
@@ -35,7 +37,6 @@ import static java.util.Comparator.comparingInt;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
-import static org.openrewrite.config.ResourceLoader.RecipeDetail.CONTRIBUTORS;
 import static org.openrewrite.config.ResourceLoader.RecipeDetail.EXAMPLES;
 
 public class Environment {
@@ -50,12 +51,10 @@ public class Environment {
         Map<String, Recipe> dependencyRecipeMap = new HashMap<>();
         dependencyRecipes.forEach(r -> dependencyRecipeMap.putIfAbsent(r.getName(), r));
 
-        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
                 recipeExamples.putAll(r.listRecipeExamples());
-                recipeToContributors.putAll(r.listContributors());
             }
         }
 
@@ -65,7 +64,7 @@ public class Environment {
         }
         for (Recipe recipe : dependencyRecipes) {
             if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(dependencyRecipeMap::get, recipeToContributors);
+                ((DeclarativeRecipe) recipe).initialize(dependencyRecipeMap::get);
             }
         }
 
@@ -73,14 +72,12 @@ public class Environment {
         recipes.forEach(r -> availableRecipeMap.putIfAbsent(r.getName(), r));
 
         for (Recipe recipe : recipes) {
-            recipe.setContributors(recipeToContributors.get(recipe.getName()));
-
             if (recipeExamples.containsKey(recipe.getName())) {
                 recipe.setExamples(recipeExamples.get(recipe.getName()));
             }
 
             if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(availableRecipeMap::get, recipeToContributors);
+                ((DeclarativeRecipe) recipe).initialize(availableRecipeMap::get);
             }
         }
         return recipes;
@@ -93,24 +90,12 @@ public class Environment {
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
-                recipeToContributors.putAll(r.listContributors());
                 recipeToExamples.putAll(r.listRecipeExamples());
             } else if (r instanceof ClasspathScanningLoader) {
                 ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
-
-                Map<String, List<Contributor>> contributors = classpathScanningLoader.listContributors();
-                for (String key : contributors.keySet()) {
-                    if (recipeToContributors.containsKey(key)) {
-                        recipeToContributors.get(key).addAll(contributors.get(key));
-                    } else {
-                        recipeToContributors.put(key, contributors.get(key));
-                    }
-                }
-
                 Map<String, List<RecipeExample>> examplesMap = classpathScanningLoader.listRecipeExamples();
                 for (String key : examplesMap.keySet()) {
                     if (recipeToExamples.containsKey(key)) {
@@ -125,17 +110,11 @@ public class Environment {
         List<RecipeDescriptor> result = new ArrayList<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
-                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToContributors, recipeToExamples)));
+                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToExamples)));
             } else {
                 Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
                 for (RecipeDescriptor descriptor : descriptors) {
-                    if (descriptor.getContributors() != null &&
-                        recipeToContributors.containsKey(descriptor.getName())) {
-                        descriptor.getContributors().addAll(recipeToContributors.get(descriptor.getName()));
-                    }
-
-                    if (descriptor.getExamples() != null &&
-                        recipeToExamples.containsKey(descriptor.getName())) {
+                    if (recipeToExamples.containsKey(descriptor.getName())) {
                         descriptor.getExamples().addAll(recipeToExamples.get(descriptor.getName()));
                     }
                 }
@@ -145,21 +124,12 @@ public class Environment {
         return result;
     }
 
-    @Deprecated
-    public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        List<String> asList = new ArrayList<>();
-        for (String activeRecipe : activeRecipes) {
-            asList.add(activeRecipe);
-        }
-        return activateRecipes(asList);
-    }
-
     public Recipe activateRecipes(Collection<String> activeRecipes) {
         List<Recipe> recipes;
         if (activeRecipes.isEmpty()) {
             recipes = emptyList();
         } else if (activeRecipes.size() == 1) {
-            Recipe recipe = loadRecipe(activeRecipes.iterator().next(), CONTRIBUTORS, EXAMPLES);
+            Recipe recipe = loadRecipe(activeRecipes.iterator().next(), EXAMPLES);
             if (recipe != null) {
                 return recipe;
             }
@@ -180,10 +150,9 @@ public class Environment {
             }
         }
         if (!recipesNotFound.isEmpty()) {
-            @SuppressWarnings("deprecation")
             List<String> suggestions = recipesNotFound.stream()
                     .map(r -> recipesByName.keySet().stream()
-                            .min(comparingInt(a -> StringUtils.getLevenshteinDistance(a, r)))
+                            .min(comparingInt(a -> LevenshteinDistance.getDefaultInstance().apply(a, r)))
                             .orElse(r))
                     .collect(toList());
             String message = String.format("Recipe(s) not found: %s\nDid you mean: %s",
@@ -213,41 +182,38 @@ public class Environment {
             }
         }
         if (recipe == null) {
+            for (ResourceLoader loader : dependencyResourceLoaders) {
+                recipe = loader.loadRecipe(recipeName, details);
+                if (recipe != null) {
+                    break;
+                }
+            }
+        }
+        if (recipe == null) {
             return null;
         }
 
         boolean includeExamples = ResourceLoader.RecipeDetail.EXAMPLES.includedIn(details);
-        boolean includeContributors = ResourceLoader.RecipeDetail.CONTRIBUTORS.includedIn(details);
 
-        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        if (includeContributors || includeExamples) {
+        if (includeExamples) {
             for (ResourceLoader r : resourceLoaders) {
                 if (r instanceof YamlResourceLoader) {
-                    if (includeExamples) {
-                        recipeExamples.putAll(r.listRecipeExamples());
-                    }
-                    if (includeContributors) {
-                        recipeToContributors.putAll(r.listContributors());
-                    }
+                    recipeExamples.putAll(r.listRecipeExamples());
                 }
             }
         }
 
-        Map<String, Recipe> dependencyRecipes = new HashMap<>();
+        Map<String, Recipe> nameToRecipe = new HashMap<>();
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
             for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
-                dependencyRecipes.putIfAbsent(listedRecipe.getName(), listedRecipe);
+                nameToRecipe.putIfAbsent(listedRecipe.getName(), listedRecipe);
             }
         }
-        for (Recipe dependency : dependencyRecipes.values()) {
+        for (Recipe dependency : nameToRecipe.values()) {
             if (dependency instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) dependency).initialize(dependencyRecipes::get, recipeToContributors);
+                ((DeclarativeRecipe) dependency).initialize(nameToRecipe::get);
             }
-        }
-
-        if (includeContributors && recipeToContributors.containsKey(recipe.getName())) {
-            recipe.setContributors(recipeToContributors.get(recipe.getName()));
         }
 
         if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
@@ -255,19 +221,28 @@ public class Environment {
         }
 
         if (recipe instanceof DeclarativeRecipe) {
-            Function<String, @Nullable Recipe> loadFunction = key -> {
-                if (dependencyRecipes.containsKey(key)) {
-                    return dependencyRecipes.get(key);
-                }
-                for (ResourceLoader resourceLoader : resourceLoaders) {
-                    Recipe r = resourceLoader.loadRecipe(key, details);
-                    if (r != null) {
-                        return r;
+            Function<String, @Nullable Recipe> loadFunction = new Function<String, Recipe>() {
+                @Override
+                public @Nullable Recipe apply(String key) {
+                    Recipe cached = nameToRecipe.get(key);
+                    if (cached != null) {
+                        return cached;
                     }
+
+                    for (ResourceLoader resourceLoader : resourceLoaders) {
+                        Recipe r = resourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
+                            return r;
+                        }
+                    }
+                    return null;
                 }
-                return null;
             };
-            ((DeclarativeRecipe) recipe).initialize(loadFunction, recipeToContributors);
+            ((DeclarativeRecipe) recipe).initialize(loadFunction);
         }
         return recipe;
     }
@@ -299,6 +274,17 @@ public class Environment {
         return activateStyles(Arrays.asList(activeStyles));
     }
 
+    public RecipeMarketplace toMarketplace(RecipeBundle bundle) {
+        RecipeMarketplace marketplace = new RecipeMarketplace();
+        for (RecipeDescriptor descriptor : listRecipeDescriptors()) {
+            marketplace.install(
+                    RecipeListing.fromDescriptor(descriptor, bundle),
+                    descriptor.inferCategoriesFromName(this)
+            );
+        }
+        return marketplace;
+    }
+
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
         this.resourceLoaders = resourceLoaders;
         this.dependencyResourceLoaders = emptyList();
@@ -310,7 +296,7 @@ public class Environment {
         this.dependencyResourceLoaders = dependencyResourceLoaders;
     }
 
-    public static Builder builder(Properties properties) {
+    public static Builder builder(@Nullable Properties properties) {
         return new Builder(properties);
     }
 
@@ -319,11 +305,11 @@ public class Environment {
     }
 
     public static class Builder {
-        private final Properties properties;
+        private final @Nullable Properties properties;
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
         private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
 
-        public Builder(Properties properties) {
+        public Builder(@Nullable Properties properties) {
             this.properties = properties;
         }
 
@@ -331,7 +317,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(properties, acceptPackages));
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings("unused") // Used by rewrite-gradle-plugin
         public Builder scanClassLoader(ClassLoader classLoader) {
             return load(new ClasspathScanningLoader(properties, classLoader));
         }
@@ -341,7 +327,7 @@ public class Environment {
         }
 
         /**
-         * @param jar         A path to a jar file to scan.
+         * @param jar         A path to a jar file or directory containing class files to scan.
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
          * @return This builder.
          */
@@ -366,7 +352,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
         }
 
-        @SuppressWarnings("unused")
+        @SuppressWarnings("unused") // Used by rewrite-maven-plugin and CLI
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
@@ -380,12 +366,12 @@ public class Environment {
         }
 
         public Builder load(ResourceLoader resourceLoader) {
-            resourceLoaders.add(resourceLoader);
+            this.resourceLoaders.add(resourceLoader);
             return this;
         }
 
         public Builder load(ResourceLoader resourceLoader, Collection<? extends ResourceLoader> dependencyResourceLoaders) {
-            resourceLoaders.add(resourceLoader);
+            this.resourceLoaders.add(resourceLoader);
             this.dependencyResourceLoaders.addAll(dependencyResourceLoaders);
             return this;
         }

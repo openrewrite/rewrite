@@ -23,9 +23,10 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.StringJoiner;
+
+import static java.util.Collections.emptyMap;
 
 @Getter
 public class MavenDownloadingException extends Exception {
@@ -48,7 +49,7 @@ public class MavenDownloadingException extends Exception {
      * or a reason why the downloaded artifact was invalid from a given repository.
      */
     @NonFinal
-    private Map<MavenRepository, String> repositoryResponses = Collections.emptyMap();
+    private Map<MavenRepository, String> repositoryResponses = emptyMap();
 
     public MavenDownloadingException setRoot(GroupArtifactVersion root) {
         this.root = root;

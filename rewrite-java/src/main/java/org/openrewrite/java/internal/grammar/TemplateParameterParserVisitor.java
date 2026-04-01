@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
@@ -31,6 +31,12 @@ public interface TemplateParameterParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#genericPattern}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitGenericPattern(TemplateParameterParser.GenericPatternContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#typedPattern}.
 	 * @param ctx the parse tree
@@ -73,6 +79,12 @@ public interface TemplateParameterParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitParameterName(TemplateParameterParser.ParameterNameContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#genericName}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitGenericName(TemplateParameterParser.GenericNameContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#typeName}.
 	 * @param ctx the parse tree

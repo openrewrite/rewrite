@@ -24,9 +24,10 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.reverse;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -48,15 +49,9 @@ public class SimplifyMethodChain extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Simplify a call chain";
-    }
+    String displayName = "Simplify a call chain";
 
-    @Override
-    public String getDescription() {
-        return "Simplify `a.b().c()` to `a.d()`.";
-    }
+    String description = "Simplify `a.b().c()` to `a.d()`.";
 
     @Override
     public Validated<Object> validate() {
@@ -69,18 +64,13 @@ public class SimplifyMethodChain extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<MethodMatcher> matchers = methodPatternChain.stream()
                 .map(matcher -> new MethodMatcher(matcher, matchOverrides))
-                .collect(Collectors.toList());
-        Collections.reverse(matchers);
-
-        return Preconditions.check(new JavaVisitor<ExecutionContext>() {
-            @Override
-            public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                for (String method : methodPatternChain) {
-                    doAfterVisit(new UsesMethod<>(method, matchOverrides));
-                }
-                return cu;
-            }
-        }, new JavaIsoVisitor<ExecutionContext>() {
+                .collect(toList());
+        reverse(matchers);
+        @SuppressWarnings("unchecked")
+        TreeVisitor<?, ExecutionContext> allMethods = Preconditions.and(matchers.stream()
+                .<TreeVisitor<?, ExecutionContext>>map(UsesMethod::new)
+                .toArray(TreeVisitor[]::new));
+        return Preconditions.check(allMethods, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);

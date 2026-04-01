@@ -1,0 +1,5 @@
+org.openrewrite.javascript.internal.rpc.JavaScriptRpcCodec
+org.openrewrite.javascript.internal.rpc.JavaScriptRightPaddedRpcCodec
+org.openrewrite.javascript.internal.rpc.JavaScriptLeftPaddedRpcCodec
+org.openrewrite.javascript.internal.rpc.JavaScriptContainerRpcCodec
+org.openrewrite.javascript.internal.rpc.JavaScriptSpaceRpcCodec

@@ -22,10 +22,15 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * A JSON element that could have trailing space.
@@ -75,8 +80,7 @@ public class JsonRightPadded<T extends Json> {
         }
 
         List<JsonRightPadded<J2>> after = new ArrayList<>(elements.size());
-        Map<UUID, JsonRightPadded<J2>> beforeById = before.stream().collect(Collectors
-                .toMap(j -> j.getElement().getId(), Function.identity()));
+        Map<UUID, JsonRightPadded<J2>> beforeById = before.stream().collect(toMap(j -> j.getElement().getId(), Function.identity()));
 
         int counter = 0;
         String paddingAfterLastElement = "\n";
@@ -94,7 +98,7 @@ public class JsonRightPadded<T extends Json> {
                 }
                 after.add(found.withElement(t));
             } else {
-                Space space = counter == elements.size() ? Space.build(paddingAfterLastElement, Collections.emptyList()) : Space.EMPTY;
+                Space space = counter == elements.size() ? Space.build(paddingAfterLastElement, emptyList()) : Space.EMPTY;
                 after.add(new JsonRightPadded<>(t, space, Markers.EMPTY));
             }
         }

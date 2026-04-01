@@ -27,8 +27,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
@@ -43,17 +42,201 @@ class UpgradePluginVersionTest implements RewriteTest {
     void upgradePlugin() {
         rewriteRun(
           spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
-          buildGradle(
+          buildGradleKts(
             """
               plugins {
-                  id 'org.openrewrite.rewrite' version '5.40.0'
-                  id 'com.github.johnrengelman.shadow' version '6.1.0'
+                  id("org.openrewrite.rewrite") version("5.40.0")
+                  id("com.github.johnrengelman.shadow") version("6.1.0")
               }
               """,
             """
               plugins {
-                  id 'org.openrewrite.rewrite' version '5.40.6'
+                  id("org.openrewrite.rewrite") version("5.40.6")
+                  id("com.github.johnrengelman.shadow") version("6.1.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeKotlinPluginLiteralVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "2.3.0", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  kotlin("jvm") version "2.0.0"
+              }
+              """,
+            """
+              plugins {
+                  kotlin("jvm") version "2.3.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeKotlinPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "latest.minor", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  kotlin("jvm") version "2.0.0"
+              }
+              """,
+            spec -> spec.after(s -> {
+                  assertThat(s).doesNotContain("2.0.0");
+                  assertThat(s).containsPattern("2.\\d+.\\d+(.\\d+)*");
+                  return s;
+              }
+            )
+          )
+        );
+    }
+
+    @Test
+    void upgradeKotlinPluginLocalVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "2.1.0", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "1.9.25"
+                  kotlin("jvm") version kotlinVersion
+                  kotlin("plugin.allopen") version kotlinVersion
+                  kotlin("plugin.spring") version kotlinVersion
+              }
+              """,
+            """
+              plugins {
+                  val kotlinVersion = "2.1.0"
+                  kotlin("jvm") version kotlinVersion
+                  kotlin("plugin.allopen") version kotlinVersion
+                  kotlin("plugin.spring") version kotlinVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeKotlinPluginLocalVariableWithSemverSelector() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "latest.minor", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "2.0.0"
+                  kotlin("jvm") version kotlinVersion
+              }
+              """,
+            spec -> spec.after(s -> {
+                assertThat(s).doesNotContain("2.0.0");
+                assertThat(s).containsPattern("val kotlinVersion = \"2.\\d+.\\d+\"");
+                return s;
+            })
+          )
+        );
+    }
+
+    @Test
+    void dontDowngradeKotlinPluginLocalVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("kotlin", "1.9.0", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  val kotlinVersion = "1.9.25"
+                  kotlin("jvm") version kotlinVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeGradleSettingsPlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.10'
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.10.3'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradePluginVersionInProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.x", null)),
+          properties(
+            """
+              rewriteVersion=5.40.0
+              """,
+            """
+              rewriteVersion=5.40.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version "$rewriteVersion"
                   id 'com.github.johnrengelman.shadow' version '6.1.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void change() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.x", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  plugins {
+                      String v = '5.40.0'
+                      id 'org.openrewrite.rewrite' version v
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  plugins {
+                      String v = '5.40.6'
+                      id 'org.openrewrite.rewrite' version v
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontDowngradeWhenExactVersionVariable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.39.9", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  plugins {
+                      String v = '5.40.0'
+                      id 'org.openrewrite.rewrite' version v
+                  }
               }
               """
           )
@@ -77,26 +260,6 @@ class UpgradePluginVersionTest implements RewriteTest {
                   plugins {
                       id 'org.openrewrite.rewrite' version '5.40.6'
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample("Upgrading a settings plugin")
-    @Test
-    void upgradeGradleSettingsPlugin() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
-          settingsGradle(
-            """
-              plugins {
-                  id 'com.gradle.enterprise' version '3.10'
-              }
-              """,
-            """
-              plugins {
-                  id 'com.gradle.enterprise' version '3.10.3'
               }
               """
           )
@@ -202,31 +365,6 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
-    @DocumentExample("Upgrading a build plugin with version in gradle.properties")
-    @Test
-    void upgradePluginVersionInProperties() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.x", null)),
-          properties(
-            """
-              rewriteVersion=5.40.0
-              """,
-            """
-              rewriteVersion=5.40.6
-              """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
-              plugins {
-                  id 'org.openrewrite.rewrite' version "$rewriteVersion"
-                  id 'com.github.johnrengelman.shadow' version '6.1.0'
-              }
-              """
-          )
-        );
-    }
-
     @Test
     void upgradePluginVersionInPropertiesWhenUsingGlobs() {
         rewriteRun(
@@ -270,6 +408,127 @@ class UpgradePluginVersionTest implements RewriteTest {
             """
               plugins {
                   id 'org.openrewrite.rewrite' version "5.40.7"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeSpringBootPluginWithoutDependencyManagementEnabled() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.springframework.boot", "3.2.4", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.7.0'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api:4.0.1'
+                  implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '3.2.4'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api:4.0.1'
+                  implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void springBootPluginsAreDependencyManagedVersionAware() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradePluginVersion("org.springframework.boot", "3.2.4", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.7.0'
+                  id 'io.spring.dependency-management' version '1.1.6'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api'
+                  implementation 'org.apache.activemq:activemq-client-jakarta:5.18.2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '3.2.4'
+                  id 'io.spring.dependency-management' version '1.1.6'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'javax.servlet:javax.servlet-api:4.0.1'
+                  implementation 'org.apache.activemq:activemq-client-jakarta'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotPinPropertyManagedVersions() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradePluginVersion("org.springframework.boot", "2.5.x", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.5.14'
+                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'mysql:mysql-connector-java'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'org.springframework.boot' version '2.5.15'
+                  id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'mysql:mysql-connector-java'
               }
               """
           )

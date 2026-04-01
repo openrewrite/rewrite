@@ -17,6 +17,8 @@ package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Supplier;
+
 public class Repeat {
 
     /**
@@ -29,6 +31,10 @@ public class Repeat {
         return repeatUntilStable(v, 3);
     }
 
+    public static TreeVisitor<?, ExecutionContext> repeatUntilStable(Supplier<TreeVisitor<?, ExecutionContext>> v) {
+        return repeatUntilStable(v, 3);
+    }
+
     /**
      * Returns a new visitor which runs the supplied visitor in a loop until no more changes are made, or the maximum
      * number of cycles is reached.
@@ -36,13 +42,14 @@ public class Repeat {
      * Stops early if the visitor ceases to make changes to the tree before the maximum number of cycles is reached.
      */
     public static TreeVisitor<?, ExecutionContext> repeatUntilStable(TreeVisitor<?, ExecutionContext> v, int maxCycles) {
+        return repeatUntilStable(() -> v, maxCycles);
+    }
+
+    public static TreeVisitor<?, ExecutionContext> repeatUntilStable(Supplier<TreeVisitor<?, ExecutionContext>> vp, int maxCycles) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if (tree instanceof SourceFile && !v.isAcceptable((SourceFile) tree, ctx)) {
-                    return tree;
-                }
-
                 if (tree != null && !(tree instanceof SourceFile) && getCursor().isRoot()) {
                     throw new IllegalArgumentException(
                             String.format(
@@ -56,6 +63,10 @@ public class Repeat {
                 Tree previous = tree;
                 Tree current = null;
                 for (int i = 0; i < maxCycles; i++) {
+                    TreeVisitor<?, ExecutionContext> v = vp.get();
+                    if (tree instanceof SourceFile && !v.isAcceptable((SourceFile) tree, ctx)) {
+                        return tree;
+                    }
                     current = v.visit(previous, ctx);
                     if (current == previous) {
                         break;
@@ -68,13 +79,13 @@ public class Repeat {
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
-                if (tree instanceof SourceFile && !v.isAcceptable((SourceFile) tree, ctx)) {
-                    return tree;
-                }
-
                 Tree previous = tree;
                 Tree current = null;
                 for (int i = 0; i < maxCycles; i++) {
+                    final TreeVisitor<?, ExecutionContext> v = vp.get();
+                    if (tree instanceof SourceFile && !v.isAcceptable((SourceFile) tree, ctx)) {
+                        return tree;
+                    }
                     current = v.visit(previous, ctx, parent);
                     if (current == previous) {
                         break;

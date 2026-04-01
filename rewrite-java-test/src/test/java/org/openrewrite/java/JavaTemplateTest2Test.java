@@ -44,8 +44,38 @@ class JavaTemplateTest2Test implements RewriteTest {
         }
     });
 
-    @SuppressWarnings("StringOperationCanBeSimplified")
+    @DocumentExample
+    @Test
+    void chainedMethodInvocationsAsNewClassArgument2() {
+        rewriteRun(
+          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+          java(
+            """
+              class T {
+                  void m(String jsonPayload) {
+                      HttpEntity entity = new HttpEntity(jsonPayload.toString(), 0);
+                  }
+                  class HttpEntity {
+                      HttpEntity(String s, int i){}
+                  }
+              }
+              """,
+            """
+              class T {
+                  void m(String jsonPayload) {
+                      HttpEntity entity = new HttpEntity(jsonPayload, 0);
+                  }
+                  class HttpEntity {
+                      HttpEntity(String s, int i){}
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2185")
+    @SuppressWarnings("StringOperationCanBeSimplified")
     @Test
     void chainedMethodInvocationsAsNewClassArgument() {
         rewriteRun(
@@ -79,36 +109,6 @@ class JavaTemplateTest2Test implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void chainedMethodInvocationsAsNewClassArgument2() {
-        rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
-              class T {
-                  void m(String jsonPayload) {
-                      HttpEntity entity = new HttpEntity(jsonPayload.toString(), 0);
-                  }
-                  class HttpEntity {
-                      HttpEntity(String s, int i){}
-                  }
-              }
-              """,
-            """
-              class T {
-                  void m(String jsonPayload) {
-                      HttpEntity entity = new HttpEntity(jsonPayload, 0);
-                  }
-                  class HttpEntity {
-                      HttpEntity(String s, int i){}
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @Test
     void methodArgumentStopCommentsOnlyTerminateEnumInitializers() {
         rewriteRun(
@@ -118,7 +118,7 @@ class JavaTemplateTest2Test implements RewriteTest {
               import java.io.File;
               import java.io.IOException;
               import java.util.List;
-                            
+
               class Test {
                   File getFile(File testDir, List<String> compileClassPath ) throws IOException {
                       assertEquals(new File(testDir, "ejbs/target/classes").getCanonicalFile(),
@@ -131,7 +131,7 @@ class JavaTemplateTest2Test implements RewriteTest {
               import java.io.File;
               import java.io.IOException;
               import java.util.List;
-                            
+
               class Test {
                   File getFile(File testDir, List<String> compileClassPath ) throws IOException {
                       assertEquals(new File(testDir, "ejbs/target/classes").getCanonicalFile(),
@@ -181,16 +181,16 @@ class JavaTemplateTest2Test implements RewriteTest {
               @Override
               public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                   var md = getCursor().firstEnclosing(J.MethodDeclaration.class);
-                  if (md != null && md.getSimpleName().equals("createBis")) {
+                  if (md != null && "createBis".equals(md.getSimpleName())) {
                       return newClass;
                   }
                   if (newClass.getType() != null &&
-                      TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName().equals("java.io.ByteArrayInputStream") &&
+                      "java.io.ByteArrayInputStream".equals(TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName()) &&
                       !newClass.getArguments().isEmpty()) {
                       return JavaTemplate.builder("createBis(#{anyArray()})")
                         .contextSensitive()
                         .build()
-                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
+                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().getFirst());
                   }
                   return newClass;
               }
@@ -199,12 +199,12 @@ class JavaTemplateTest2Test implements RewriteTest {
             """
               import java.io.*;
               import java.nio.charset.StandardCharsets;
-                            
+
               class Test {
                   ByteArrayInputStream createBis(byte[] bytes) {
                       return new ByteArrayInputStream(bytes);
                   }
-                  
+
                   void doSomething() {
                       String sout = "";
                       try (BufferedReader br = new BufferedReader(new FileReader(null))) {
@@ -218,12 +218,12 @@ class JavaTemplateTest2Test implements RewriteTest {
             """
               import java.io.*;
               import java.nio.charset.StandardCharsets;
-                            
+
               class Test {
                   ByteArrayInputStream createBis(byte[] bytes) {
                       return new ByteArrayInputStream(bytes);
                   }
-                  
+
                   void doSomething() {
                       String sout = "";
                       try (BufferedReader br = new BufferedReader(new FileReader(null))) {
@@ -250,7 +250,7 @@ class JavaTemplateTest2Test implements RewriteTest {
 
               @Override
               public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-                  if (identifier.getSimpleName().equals("f")) {
+                  if ("f".equals(identifier.getSimpleName())) {
                       return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
                         getCursor(), identifier.getCoordinates().replace(), identifier);
                   }

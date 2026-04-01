@@ -17,24 +17,32 @@ package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class RewriteTestTest implements RewriteTest {
@@ -74,10 +82,20 @@ class RewriteTestTest implements RewriteTest {
 
     @Test
     void multipleFilesWithSamePath() {
-        assertThrows(AssertionError.class,
+        AssertionError e = assertThrows(AssertionError.class,
           () -> rewriteRun(
             spec -> spec.recipe(new CreatesTwoFilesSamePath()),
             text(null, "duplicate", spec -> spec.path("duplicate.txt"))));
+        assertThat(e).hasStackTraceContaining("Recipe generated multiple source files at the same path");
+    }
+
+    @Test
+    void generatesFileCollidingWithExistingFile() {
+        AssertionError e = assertThrows(AssertionError.class,
+          () -> rewriteRun(
+            spec -> spec.recipe(new GeneratesExistingFile()),
+            text("existing content", spec -> spec.path("existing.txt"))));
+        assertThat(e).hasStackTraceContaining("Recipe generated a source file that already exists in the source set");
     }
 
     @Test
@@ -132,6 +150,22 @@ class RewriteTestTest implements RewriteTest {
     }
 
     @Test
+    void typeValidationAppliedToNewSourceFiles() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new GeneratesCompilationUnitMissingTypes()),
+            java(null, """
+              public class A {
+                  void foo() {
+                  }
+              }
+              """,
+              s -> s.path("A.java"))
+          )
+        );
+    }
+
+    @Test
     void allowScannerEdit() {
         rewriteRun(
           spec -> spec
@@ -140,22 +174,69 @@ class RewriteTestTest implements RewriteTest {
           text("foo")
         );
     }
+
+    @Nested
+    class RecipeValidation {
+
+        @Test
+        void validateRecipeWithNoOptions() {
+            rewriteRun(
+              spec -> spec.recipe(new RecipeWithNoOptions()),
+              new SourceSpecs[0]
+            );
+        }
+
+        @Test
+        void validateRecipeWithOnlyRequiredOptionsPositive() {
+            rewriteRun(
+              spec -> spec.recipe(new RecipeWithRequiredOptionValidateNoBlank("Test")),
+              new SourceSpecs[0]
+            );
+        }
+
+        @Test
+        void validateRecipeWithOnlyRequiredOptionsNegative() {
+            assertThatThrownBy(() ->
+              rewriteRun(
+                spec -> spec.recipe(new RecipeWithRequiredOptionValidateNoBlank("")),
+                new SourceSpecs[0]
+              )
+            );
+        }
+
+        @Test
+        void skipValidationForRecipeWithOptionalOptions() {
+            rewriteRun(
+              spec -> spec.recipe(new RecipeWithOptionalOrValidation(null, null)),
+              new SourceSpecs[0]
+            );
+        }
+
+        @Test
+        void validateDeclarativeRecipe() {
+            assertThrows(AssertionError.class, () ->
+              rewriteRun(
+                spec -> spec.recipeFromYaml("""
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.test.internal.StillValidated
+                  displayName: Still validated
+                  description: Declarative recipe with a non-existent sub-recipe should still fail validation.
+                  recipeList:
+                    - org.openrewrite.DoesNotExist
+                  """, "org.openrewrite.test.internal.StillValidated")
+              ));
+        }
+    }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
 
-    @Override
-    public String getDisplayName() {
-        return "Attempts mutation during getScanner()";
-    }
+    String displayName = "Attempts mutation during getScanner()";
 
-    @Override
-    public String getDescription() {
-        return "Any changes attempted by a visitor returned from getScanner() should be an error during test execution.";
-    }
+    String description = "Any changes attempted by a visitor returned from getScanner() should be an error during test execution.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -173,20 +254,14 @@ class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class MutateExecutionContext extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Mutate execution context";
-    }
+    String displayName = "Mutate execution context";
 
-    @Override
-    public String getDescription() {
-        return "Mutates the execution context to trigger a validation failure.";
-    }
+    String description = "Mutates the execution context to trigger a validation failure.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -200,20 +275,14 @@ class MutateExecutionContext extends Recipe {
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class ImproperCursorUsage extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Uses cursor improperly";
-    }
+    String displayName = "Uses cursor improperly";
 
-    @Override
-    public String getDescription() {
-        return "LST elements are acyclic. So a cursor which indicates an element is its own parent is invalid.";
-    }
+    String description = "LST elements are acyclic. So a cursor which indicates an element is its own parent is invalid.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -221,27 +290,22 @@ class ImproperCursorUsage extends Recipe {
         return new TreeVisitor<>() {
             @Override
             public @Nullable Tree visit(Tree tree, ExecutionContext ctx) {
-                return new TreeVisitor<>(){}.visit(tree, ctx, new Cursor(getCursor(), tree));
+                return new TreeVisitor<>() {
+                }.visit(tree, ctx, new Cursor(getCursor(), tree));
             }
         };
     }
 }
 
-@Value
 @EqualsAndHashCode(callSuper = false)
 @NullMarked
+@Value
 class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
 
-    @Override
-    public String getDisplayName() {
-        return "Creates two source files with the same path";
-    }
+    String displayName = "Creates two source files with the same path";
 
-    @Override
-    public String getDescription() {
-        return "A source file's path must be unique. " +
-               "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
-    }
+    String description = "A source file's path must be unique. " +
+      "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -254,7 +318,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile s) {
-                    if (s.getSourcePath().toString().equals("duplicate.txt")) {
+                    if ("duplicate.txt".equals(s.getSourcePath().toString())) {
                         alreadyExists.set(true);
                     }
                 }
@@ -268,8 +332,8 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
         if (alreadyExists.get()) {
             return emptyList();
         }
-        Path duplicatePath = Paths.get("duplicate.txt");
-        return Arrays.asList(PlainText.builder()
+        Path duplicatePath = Path.of("duplicate.txt");
+        return List.of(PlainText.builder()
             .text("duplicate")
             .sourcePath(duplicatePath)
             .build(),
@@ -281,8 +345,8 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     }
 }
 
-@SuppressWarnings({"FieldCanBeLocal", "unused"})
 @NullMarked
+@SuppressWarnings({"FieldCanBeLocal", "unused"})
 class RecipeWithNameOption extends Recipe {
     @Option
     private final String name;
@@ -292,63 +356,161 @@ class RecipeWithNameOption extends Recipe {
         this.name = name;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return "A fancy description.";
-    }
+    @Getter
+    final String description = "A fancy description.";
 }
 
 @NullMarked
 class RecipeWithDescriptionListOfLinks extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return """
-          A fancy description.
-          For more information, see:
-            - [link 1](https://example.com/link1)
-            - [link 2](https://example.com/link2)""";
-    }
+    @Getter
+    final String description = """
+      A fancy description.
+      For more information, see:
+        - [link 1](https://example.com/link1)
+        - [link 2](https://example.com/link2)""";
 }
 
 @NullMarked
 class RecipeWithDescriptionListOfDescribedLinks extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
-    }
+    @Getter
+    final String displayName = "Recipe with name option";
 
-    @Override
-    public String getDescription() {
-        return """
-          A fancy description.
-          For more information, see:
-            - First Resource [link 1](https://example.com/link1).
-            - Second Resource [link 2](https://example.com/link2).""";
-    }
+    @Getter
+    final String description = """
+      A fancy description.
+      For more information, see:
+        - First Resource [link 1](https://example.com/link1).
+        - Second Resource [link 2](https://example.com/link2).""";
 }
 
 @NullMarked
 class RecipeWithDescriptionNotEndingWithPeriod extends Recipe {
 
+    @Getter
+    final String displayName = "Recipe with name option";
+
+    @Getter
+    final String description = "A fancy description";
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class GeneratesExistingFile extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a file that already exists";
+
+    String description = "A recipe that generates a source file at a path that already exists in the source set.";
+
     @Override
-    public String getDisplayName() {
-        return "Recipe with name option";
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
     }
 
     @Override
-    public String getDescription() {
-        return "A fancy description";
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("generated content")
+          .sourcePath(Path.of("existing.txt"))
+          .build());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@Value
+class RecipeWithNoOptions extends Recipe {
+    String displayName = "Recipe with no options";
+    String description = "Has no configurable options at all.";
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class GeneratesCompilationUnitMissingTypes extends ScanningRecipe<AtomicBoolean> {
+
+    String displayName = "Generates a compilation unit missing type information";
+
+    String description = "A recipe that generates a J.CompilationUnit with class and method declarations that have null types.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean(false);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return JavaParser.fromJavaVersion().build()
+          .parse("public class A {\n    void foo() {\n    }\n}\n")
+          .map(cu -> (J.CompilationUnit) cu)
+          .map(cu -> cu.withClasses(cu.getClasses().stream()
+            .map(c -> c.withType(null))
+            .collect(Collectors.toList())))
+          .map(cu -> (SourceFile) cu.withSourcePath(Path.of("A.java")))
+          .collect(Collectors.toList());
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RecipeWithRequiredOptionValidateNoBlank extends Recipe {
+    String displayName = "Recipe with required option";
+    String description = "Has a single required parameter.";
+
+    @Option(displayName = "Required param",
+      description = "A required parameter.")
+    String requiredParam;
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate()
+          .and(Validated.notBlank("Required param", requiredParam));
+    }
+}
+
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+@Value
+class RecipeWithOptionalOrValidation extends Recipe {
+    String displayName = "Recipe with optional OR validation";
+    String description = "Has two optional parameters where at least one must be set.";
+
+    @Option(displayName = "Option A",
+      description = "First optional parameter.",
+      example = "valueA",
+      required = false)
+    @Nullable
+    String optionA;
+
+    @Option(displayName = "Option B",
+      description = "Second optional parameter.",
+      example = "valueB",
+      required = false)
+    @Nullable
+    String optionB;
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(
+          Validated.required("optionA", optionA)
+            .or(Validated.required("optionB", optionB)));
     }
 }

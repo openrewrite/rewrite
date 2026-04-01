@@ -70,9 +70,9 @@ class ExplicitPluginGroupIdTest implements RewriteTest {
       </project>
       """;
 
-    @Test
     @DocumentExample
     @Issue("https://github.com/openrewrite/rewrite/issues/3529")
+    @Test
     void addGroupId() {
         rewriteRun(pomXml(BEFORE, AFTER));
     }

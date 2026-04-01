@@ -133,6 +133,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitUnary(G.Unary unary, PrintOutputCapture<P> p) {
+        beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
+        switch (unary.getOperator()) {
+            case Spread:
+                p.append("*");
+                visit(unary.getExpression(), p);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unknown unary operator.");
+        }
+        afterSyntax(unary, p);
+        return unary;
+    }
+
+    @Override
     public J visitBinary(G.Binary binary, PrintOutputCapture<P> p) {
         String keyword = "";
         switch (binary.getOperator()) {
@@ -148,8 +163,26 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case In:
                 keyword = "in";
                 break;
+            case NotIn:
+                keyword = "!in";
+                break;
             case Spaceship:
                 keyword = "<=>";
+                break;
+            case ElvisAssignment:
+                keyword = "?=";
+                break;
+            case Power:
+                keyword = "**";
+                break;
+            case PowerAssignment:
+                keyword = "**=";
+                break;
+            case IdentityEquals:
+                keyword = "===";
+                break;
+            case IdentityNotEquals:
+                keyword = "!==";
                 break;
         }
         beforeSyntax(binary, GSpace.Location.BINARY_PREFIX, p);
@@ -163,6 +196,14 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(binary, p);
         return binary;
+    }
+
+    @Override
+    public J visitTupleExpression(G.TupleExpression tuple, PrintOutputCapture<P> p) {
+        beforeSyntax(tuple, GSpace.Location.TUPLE_PREFIX, p);
+        visitContainer("(", tuple.getPadding().getVariables(), GContainer.Location.TUPLE_ELEMENTS, ",", ")", p);
+        afterSyntax(tuple, p);
+        return tuple;
     }
 
     @Override
@@ -264,6 +305,18 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
 
         @Override
+        public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
+            if (variable.getDeclarator() instanceof G.TupleExpression) {
+                beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
+                visit(variable.getDeclarator(), p);
+                visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                afterSyntax(variable, p);
+                return variable;
+            }
+            return super.visitVariable(variable, p);
+        }
+
+        @Override
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
@@ -280,18 +333,13 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 p.append(",");
             });
             visit(multiVariable.getTypeExpression(), p);
-            // For backwards compatibility.
-            for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-                visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
-                p.append('[');
-                visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
-                p.append(']');
-            }
             if (multiVariable.getVarargs() != null) {
                 visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
                 p.append("...");
             }
+
             visitRightPadded(multiVariable.getPadding().getVariables(), JRightPadded.Location.NAMED_VARIABLE, ",", p);
+
             afterSyntax(multiVariable, p);
             return multiVariable;
         }
@@ -318,7 +366,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                 visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.append("->");
             }
-            if (lambda.getBody() instanceof J.Block) {
+            if (lambda.getBody() instanceof J.Block && !ls.isJavaStyle()) {
                 J.Block block = (J.Block) lambda.getBody();
                 visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
                 visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
@@ -330,6 +378,21 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(lambda, p);
             return lambda;
+        }
+
+        @Override
+        public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
+            beforeSyntax(memberRef, Space.Location.MEMBER_REFERENCE_PREFIX, p);
+            visitRightPadded(memberRef.getPadding().getContaining(), JRightPadded.Location.MEMBER_REFERENCE_CONTAINING, p);
+            if (memberRef.getMarkers().findFirst(MethodPointer.class).isPresent()) {
+                p.append(".&");
+            } else {
+                p.append("::");
+            }
+            visitContainer("<", memberRef.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            visitLeftPadded("", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
+            afterSyntax(memberRef, p);
+            return memberRef;
         }
 
         @Override
@@ -374,15 +437,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             for (J.Modifier m : method.getModifiers()) {
                 visitModifier(m, p);
             }
-            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
-            if (typeParameters != null) {
-                visit(typeParameters.getAnnotations(), p);
-                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
-                visitMarkers(typeParameters.getMarkers(), p);
-                p.append('<');
-                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
-                p.append('>');
-            }
+            visit(method.getAnnotations().getTypeParameters(), p);
             method.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
                 visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("def");
@@ -484,6 +539,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (ternary.getMarkers().findFirst(Elvis.class).isPresent()) {
                 visitSpace(ternary.getPadding().getTruePart().getBefore(), Space.Location.TERNARY_TRUE, p);
                 p.append("?:");
+                visitSpace(ternary.getPadding().getFalsePart().getBefore(), Space.Location.TERNARY_FALSE, p);
                 visit(ternary.getFalsePart(), p);
             } else {
                 visitLeftPadded("?", ternary.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p);

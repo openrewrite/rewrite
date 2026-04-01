@@ -21,6 +21,9 @@ import org.openrewrite.Validated;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+import static org.openrewrite.semver.Semver.isVersion;
+
 public class SetRange extends LatestRelease {
     private static final Pattern SET_RANGE_PATTERN = Pattern.compile("([\\[(])(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?\\s*,\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?([\\])])");
 
@@ -53,5 +56,82 @@ public class SetRange extends LatestRelease {
             return Validated.invalid("setRange", pattern, "not a set range");
         }
         return Validated.valid("setRange", new SetRange(matcher.group(2), "[".equals(matcher.group(1)), matcher.group(6), "]".equals(matcher.group(10)), metadataPattern));
+    }
+
+    @Override
+    public int compare(@Nullable String currentVersion, String v1, String v2) {
+        Validated<SetRange> maybeSetRangeV1 = build(v1, null);
+        Validated<SetRange> maybeSetRangeV2 = build(v2, null);
+        if (maybeSetRangeV1.isValid() && maybeSetRangeV2.isValid()) {
+            SetRange setRangeV1 = requireNonNull(maybeSetRangeV1.getValue());
+            SetRange setRangeV2 = requireNonNull(maybeSetRangeV2.getValue());
+            int compare = super.compare(currentVersion, setRangeV1.upper, setRangeV2.upper);
+            if (compare != 0) {
+                return compare;
+            }
+
+            if (setRangeV1.upperClosed && !setRangeV2.upperClosed) {
+                return 1;
+            } else if (!setRangeV1.upperClosed && setRangeV2.upperClosed) {
+                return -1;
+            }
+
+            compare = super.compare(currentVersion, setRangeV1.lower, setRangeV2.lower);
+            if (compare != 0) {
+                return compare;
+            }
+
+            if (setRangeV1.lowerClosed && !setRangeV2.lowerClosed) {
+                return -1;
+            } else if (!setRangeV1.lowerClosed && setRangeV2.lowerClosed) {
+                return 1;
+            }
+
+            return 0;
+        } else if (maybeSetRangeV1.isValid()) {
+            if (!isVersion(v2)) {
+                return 1;
+            }
+
+            SetRange setRangeV1 = requireNonNull(maybeSetRangeV1.getValue());
+            int compare = super.compare(currentVersion, setRangeV1.upper, v2);
+            if (setRangeV1.upperClosed && compare < 0) {
+                return compare;
+            } else if (!setRangeV1.upperClosed && compare == 0) {
+                return -1;
+            }
+
+            compare = super.compare(currentVersion, setRangeV1.lower, v2);
+            if (setRangeV1.lowerClosed && compare > 0) {
+                return compare;
+            } else if (!setRangeV1.lowerClosed && compare == 0) {
+                return 1;
+            }
+
+            return 0;
+        } else if (maybeSetRangeV2.isValid()) {
+            if (!isVersion(v1)) {
+                return -1;
+            }
+
+            SetRange setRangeV2 = requireNonNull(maybeSetRangeV2.getValue());
+            int compare = super.compare(currentVersion, v1, setRangeV2.upper);
+            if (setRangeV2.upperClosed && compare > 0) {
+                return compare;
+            } else if (!setRangeV2.upperClosed && compare == 0) {
+                return 1;
+            }
+
+            compare = super.compare(currentVersion, v1, setRangeV2.lower);
+            if (setRangeV2.lowerClosed && compare < 0) {
+                return compare;
+            } else if (!setRangeV2.lowerClosed && compare == 0) {
+                return -1;
+            }
+
+            return 0;
+        }
+
+        return super.compare(currentVersion, v1, v2);
     }
 }

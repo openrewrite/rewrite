@@ -42,7 +42,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                       gradlePluginPortal()
                   }
               }
-            
+
               rootProject.name = 'merge-service'
               enableFeaturePreview('ONE_LOCKFILE_PER_PROJECT')
               """,
@@ -52,7 +52,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                       gradlePluginPortal()
                   }
               }
-            
+
               rootProject.name = 'merge-service'
               """
           )
@@ -70,10 +70,10 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                       gradlePluginPortal()
                   }
               }
-              
+
               rootProject.name = 'merge-service'
               enableFeaturePreview("ONE_LOCKFILE_PER_PROJECT")
-              
+
               include 'service'
               """,
             """
@@ -82,9 +82,9 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                       gradlePluginPortal()
                   }
               }
-              
+
               rootProject.name = 'merge-service'
-              
+
               include 'service'
               """
           )
@@ -104,11 +104,11 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                   }
-                  
+
                   enableFeaturePreview("DIFFERENT_FEATURE")
-                  
+
                   rootProject.name = 'merge-service'
-                  
+
                   include 'service'
                   """
               )
@@ -126,11 +126,11 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                           gradlePluginPortal()
                       }
                   }
-                  
+
                   enableFeaturePreview(null)
-                  
+
                   rootProject.name = 'merge-service'
-                  
+
                   include 'service'
                   """
               )

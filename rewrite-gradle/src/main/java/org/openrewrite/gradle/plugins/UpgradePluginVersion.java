@@ -19,20 +19,24 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.DependencyVersionSelector;
-import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
-import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.gradle.trait.GradlePlugin;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.properties.PropertiesVisitor;
@@ -40,17 +44,22 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 
+@SuppressWarnings("DuplicatedCode")
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.DependencyVersionState> {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
+    private static final MethodMatcher VERSION_MATCHER = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
+
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
@@ -59,10 +68,10 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
-                          "Defaults to `latest.release`.",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
+                    "Defaults to `latest.release`.",
             example = "29.X",
             required = false)
     @Nullable
@@ -70,21 +79,17 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
     String versionPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Update a Gradle plugin by id";
-    }
+    String displayName = "Update a Gradle plugin by id";
 
-    @Override
-    public String getDescription() {
-        return "Update a Gradle plugin by id to a later version.";
-    }
+    String description = "Update a Gradle plugin by id to a later version defined by the plugins DSL. " +
+                "To upgrade a plugin dependency defined by `buildscript.dependencies`, use the `UpgradeDependencyVersion` " +
+                "recipe instead.";
 
     @Override
     public Validated<Object> validate() {
@@ -97,7 +102,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
     public static class DependencyVersionState {
         Map<String, String> versionPropNameToPluginId = new HashMap<>();
-        Map<String, String> pluginIdToNewVersion = new HashMap<>();
+        Map<String, @Nullable String> pluginIdToNewVersion = new HashMap<>();
     }
 
     @Override
@@ -105,84 +110,141 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         return new DependencyVersionState();
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private boolean isPluginVersion(Cursor cursor) {
+        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation maybeVersion = cursor.getValue();
+        if (!VERSION_MATCHER.matches(maybeVersion, true)) {
+            return false;
+        }
+        Cursor parent = cursor.dropParentUntil(it -> (it instanceof J.MethodInvocation) || it == Cursor.ROOT_VALUE);
+        if (!(parent.getValue() instanceof J.MethodInvocation)) {
+            return false;
+        }
+        J.MethodInvocation maybePlugins = parent.getValue();
+        return "plugins".equals(maybePlugins.getSimpleName());
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
+
+        JavaVisitor<ExecutionContext> javaVisitor = new JavaVisitor<ExecutionContext>() {
             @Nullable
             private GradleProject gradleProject;
 
             @Nullable
             private GradleSettings gradleSettings;
 
+            private final Map<String, String> localVariableValues = new HashMap<>();
+
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                gradleProject = cu.getMarkers().findFirst(GradleProject.class).orElse(null);
-                gradleSettings = cu.getMarkers().findFirst(GradleSettings.class).orElse(null);
-
-                if (gradleProject == null && gradleSettings == null) {
-                    return cu;
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
+                    gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    gradleSettings = tree.getMarkers().findFirst(GradleSettings.class).orElse(null);
+                    localVariableValues.clear();
                 }
+                return super.visit(tree, ctx);
+            }
 
-                return super.visitCompilationUnit(cu, ctx);
+            @Override
+            public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
+                if (v.getInitializer() instanceof J.Literal) {
+                    String value = literalValue(v.getInitializer());
+                    if (value != null) {
+                        localVariableValues.put(v.getSimpleName(), value);
+                    }
+                }
+                return v;
             }
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!(versionMatcher.matches(m) &&
-                      m.getSelect() instanceof J.MethodInvocation &&
-                      pluginMatcher.matches(m.getSelect()))) {
+                if (!isPluginVersion(getCursor())) {
                     return m;
                 }
+                assert m.getSelect() != null;
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
                 if (!(pluginArgs.get(0) instanceof J.Literal)) {
                     return m;
                 }
-                String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
+                String pluginId;
+                if ("kotlin".equals(((J.MethodInvocation) m.getSelect()).getSimpleName())) {
+                    pluginId = "kotlin";
+                } else {
+                    pluginId = literalValue(pluginArgs.get(0));
+                }
                 if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                     return m;
                 }
 
                 List<Expression> versionArgs = m.getArguments();
                 try {
-                    if (versionArgs.get(0) instanceof J.Literal) {
-                        String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
-                        if (currentVersion == null) {
-                            return m;
+                    String currentVersion = literalValue(versionArgs.get(0));
+                    if (currentVersion != null) {
+                        String resolvedVersion;
+                        if ("kotlin".equals(pluginId)) {
+                            String fullPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
+                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifactVersion(fullPluginId, fullPluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
+                        } else {
+                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
                         }
-
-                        String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
-                                .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
                     } else if (versionArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) versionArgs.get(0);
-                        if (gString == null || gString.getStrings().isEmpty() || !(gString.getStrings().get(0) instanceof G.GString.Value)) {
+                        if (gString.getStrings().isEmpty() || !(gString.getStrings().get(0) instanceof G.GString.Value)) {
                             return m;
                         }
 
                         G.GString.Value gStringValue = (G.GString.Value) gString.getStrings().get(0);
                         String versionVariableName = gStringValue.getTree().toString();
-                        String resolvedPluginVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
-                                .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                        String resolverPluginId = pluginId;
+                        if ("kotlin".equals(pluginId)) {
+                            resolverPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
+                        }
+                        String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                .select(new GroupArtifact(resolverPluginId, resolverPluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+
+                        acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
+                        assert resolvedPluginVersion != null;
+                        acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
+                    } else if (versionArgs.get(0) instanceof J.Identifier) {
+                        J.Identifier identifier = (J.Identifier) versionArgs.get(0);
+                        String versionVariableName = identifier.getSimpleName();
+                        String resolverPluginId = pluginId;
+                        if ("kotlin".equals(pluginId)) {
+                            resolverPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
+                        }
+                        String localCurrentVersion = localVariableValues.get(versionVariableName);
+                        String resolvedPluginVersion;
+                        if (localCurrentVersion != null) {
+                            resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifactVersion(resolverPluginId, resolverPluginId + ".gradle.plugin", localCurrentVersion), "classpath", newVersion, versionPattern, ctx);
+                        } else {
+                            resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                    .select(new GroupArtifact(resolverPluginId, resolverPluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                        }
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
                         acc.pluginIdToNewVersion.put(pluginId, resolvedPluginVersion);
                     }
                 } catch (MavenDownloadingException e) {
-                    // continue
+                    m = Markup.warn(m, e);
                 }
                 return m;
             }
         };
-        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor);
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(DependencyVersionState acc) {
-        MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
         PropertiesVisitor<ExecutionContext> propertiesVisitor = new PropertiesVisitor<ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -203,36 +265,97 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
                         Optional<String> finalVersion = versionComparator.upgrade(currentVersion, singletonList(resolvedVersion));
                         if (finalVersion.isPresent()) {
-                            return entry.withValue(entry.getValue().withText(resolvedVersion));
+                            return entry.withValue(entry.getValue().withText(finalVersion.get()));
                         }
                     }
                 }
                 return entry;
             }
         };
-        GroovyVisitor<ExecutionContext> groovyVisitor = new GroovyVisitor<ExecutionContext>() {
+        JavaVisitor<ExecutionContext> javaVisitor = new JavaVisitor<ExecutionContext>() {
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof SourceFile) {
+                    GradleProject gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
+                    String sbVersion = acc.pluginIdToNewVersion.get("org.springframework.boot");
+                    if (gradleProject != null && sbVersion != null) {
+                        if (acc.pluginIdToNewVersion.containsKey("org.springframework.boot") &&
+                                gradleProject.getPlugins().stream().anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId())) &&
+                                gradleProject.getPlugins().stream().anyMatch(plugin -> "org.springframework.boot".equals(plugin.getId()))) {
+                            //noinspection NullableProblems
+                            AtomicReference<@Nullable String> springBootPluginVersion = new GradlePlugin.Matcher()
+                                    .pluginIdPattern("org.springframework.boot")
+                                    .asVisitor((GradlePlugin plugin, AtomicReference<String> ref) -> {
+                                        if (plugin.getVersion() != null) {
+                                            ref.set(plugin.getVersion());
+                                        }
+                                        return plugin.getTree();
+                                    }).reduce(tree, new AtomicReference<>());
+                            if (springBootPluginVersion.get() != null) {
+                                Set<GroupArtifact> requested = gradleProject.getConfigurations().stream()
+                                        .flatMap(conf -> conf.getRequested().stream())
+                                        .map(Dependency::getGav)
+                                        .map(GroupArtifactVersion::asGroupArtifact)
+                                        .collect(toSet());
+                                try {
+                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                    List<GroupArtifact> oldPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", springBootPluginVersion.get()), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                            .map(md -> new GroupArtifact(md.getGroupId(), md.getArtifactId()))
+                                            .filter(requested::contains)
+                                            .collect(toList());
+                                    List<GroupArtifactVersion> newPlatformManaged = mpd.download(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", sbVersion), null, null, gradleProject.getMavenRepositories()).getDependencyManagement().stream()
+                                            .map(md -> new GroupArtifactVersion(md.getGroupId(), md.getArtifactId(), md.getVersion()))
+                                            .filter(gav -> requested.stream().anyMatch(r -> r.equals(gav.asGroupArtifact())))
+                                            .collect(toList());
+
+                                    List<GroupArtifact> newlyManaged = newPlatformManaged.stream().map(GroupArtifactVersion::asGroupArtifact).collect(toList());
+                                    List<GroupArtifact> noLongerManaged = new ArrayList<>(oldPlatformManaged);
+                                    noLongerManaged.removeAll(newlyManaged);
+
+                                    newlyManaged.removeAll(oldPlatformManaged);
+
+
+                                    gradleProject = gradleProject.upgradeDirectDependencyVersions(newPlatformManaged, ctx);
+                                    for (GroupArtifact ga : noLongerManaged) {
+                                        doAfterVisit(new AddExplicitDependencyVersion(ga.getGroupId(), ga.getArtifactId()));
+                                    }
+
+                                    for (GroupArtifact ga : newlyManaged) {
+                                        doAfterVisit(new RemoveRedundantDependencyVersions(ga.getGroupId(), ga.getArtifactId(), RemoveRedundantDependencyVersions.Comparator.GTE).getVisitor());
+                                    }
+                                } catch (MavenDownloadingException e) {
+                                    tree = Markup.warn(tree, e);
+                                }
+                            }
+                        }
+                        gradleProject = gradleProject.upgradeBuildscriptDirectDependencyVersions(singletonList(new GroupArtifactVersion("org.springframework.boot", "org.springframework.boot.gradle.plugin", sbVersion)), ctx);
+                        tree = tree.withMarkers(tree.getMarkers().setByType(gradleProject));
+                    }
+                }
+                return super.visit(tree, ctx);
+            }
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!(versionMatcher.matches(m) &&
-                      m.getSelect() instanceof J.MethodInvocation &&
-                      pluginMatcher.matches(m.getSelect()))) {
+                if (!isPluginVersion(getCursor())) {
                     return m;
                 }
+                assert m.getSelect() != null;
                 List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
-                if (!(pluginArgs.get(0) instanceof J.Literal)) {
-                    return m;
+                String pluginId;
+                if ("kotlin".equals(((J.MethodInvocation) m.getSelect()).getSimpleName())) {
+                    pluginId = "kotlin";
+                } else {
+                    pluginId = literalValue(pluginArgs.get(0));
                 }
-                String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
                 if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
                     return m;
                 }
 
                 List<Expression> versionArgs = m.getArguments();
-                if (!(versionArgs.get(0) instanceof J.Literal)) {
-                    return m;
-                }
-                String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
+                String currentVersion = literalValue(m.getArguments().get(0));
                 if (currentVersion == null) {
                     return m;
                 }
@@ -240,9 +363,43 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                 if (resolvedVersion == null) {
                     return m;
                 }
-                return m.withArguments(ListUtils.map(versionArgs, v -> ChangeStringLiteral.withStringValue((J.Literal) v, resolvedVersion)));
+                return m.withArguments(ListUtils.map(versionArgs, v -> ChangeStringLiteral.withStringValue(v, resolvedVersion)));
+            }
+
+            @Override
+            public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                J.VariableDeclarations.NamedVariable visited = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
+                if (acc.versionPropNameToPluginId.containsKey(visited.getSimpleName()) && visited.getInitializer() instanceof J.Literal) {
+                    J.Literal initializer = (J.Literal) visited.getInitializer();
+                    String oldVersion = literalValue(initializer);
+                    String newVersion = acc.pluginIdToNewVersion.get(acc.versionPropNameToPluginId.get(visited.getSimpleName()));
+                    if (newVersion != null && !newVersion.equals(oldVersion)) {
+                        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+                        if (versionComparator == null) {
+                            return visited;
+                        }
+                        Optional<String> finalVersion = versionComparator.upgrade(oldVersion != null ? oldVersion : "", singletonList(newVersion));
+                        if (finalVersion.isPresent()) {
+                            String valueSource = initializer.getValueSource() == null || oldVersion == null ? initializer.getValueSource() : initializer.getValueSource().replace(oldVersion, newVersion);
+                            return visited.withInitializer(initializer.withValueSource(valueSource).withValue(finalVersion.get()));
+                        }
+                    }
+                }
+                return visited;
             }
         };
-        return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), groovyVisitor));
+        return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
+    }
+
+    private @Nullable String literalValue(Expression expr) {
+        return new JavaVisitor<AtomicReference<@Nullable String>>() {
+            @Override
+            public J visitLiteral(J.Literal literal, AtomicReference<@Nullable String> value) {
+                if (literal.getType() == JavaType.Primitive.String) {
+                    value.compareAndSet(null, (String) literal.getValue());
+                }
+                return literal;
+            }
+        }.reduce(expr, new AtomicReference<>(null)).get();
     }
 }

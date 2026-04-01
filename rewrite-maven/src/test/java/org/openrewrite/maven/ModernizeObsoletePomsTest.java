@@ -97,7 +97,8 @@ class ModernizeObsoletePomsTest implements RewriteTest {
                   </resources>
               </build>
           </project>
-          """)
+          """
+          )
         );
     }
 }

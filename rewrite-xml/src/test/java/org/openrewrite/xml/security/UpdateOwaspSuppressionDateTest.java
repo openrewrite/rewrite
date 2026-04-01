@@ -22,37 +22,19 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
 class UpdateOwaspSuppressionDateTest implements RewriteTest {
 
-    @Test
-    void noUpdateIfCveDoesNotExist() {
-        rewriteRun(
-                spec -> spec.recipe(new UpdateOwaspSuppressionDate(Collections.singletonList("CVE-2022-5678"), "2020-02-01")),
-                xml("""
-                    <?xml version="1.0" encoding="UTF-8" ?>
-                    <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                        <suppress until="2020-01-01Z">
-                            <notes>
-                            </notes>
-                            <cve>CVE-2019-10321</cve>
-                            <cve>CVE-2022-1234</cve>
-                        </suppress>
-                    </suppressions>""",
-                spec -> spec.path("suppressions.xml"))
-        );
-    }
-
     @DocumentExample
     @Test
     void updatesUntilIfCveExists() {
         rewriteRun(
-                spec -> spec.recipe(new UpdateOwaspSuppressionDate(Collections.singletonList("CVE-2022-1234"), "2020-02-01")),
+                spec -> spec.recipe(new UpdateOwaspSuppressionDate(singletonList("CVE-2022-1234"), "2020-02-01")),
                 xml("""
                     <?xml version="1.0" encoding="UTF-8" ?>
                     <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -69,6 +51,24 @@ class UpdateOwaspSuppressionDateTest implements RewriteTest {
                             <notes>
                             </notes>
                             <cve>CVE-2019-5678</cve>
+                            <cve>CVE-2022-1234</cve>
+                        </suppress>
+                    </suppressions>""",
+                spec -> spec.path("suppressions.xml"))
+        );
+    }
+
+    @Test
+    void noUpdateIfCveDoesNotExist() {
+        rewriteRun(
+                spec -> spec.recipe(new UpdateOwaspSuppressionDate(singletonList("CVE-2022-5678"), "2020-02-01")),
+                xml("""
+                    <?xml version="1.0" encoding="UTF-8" ?>
+                    <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                        <suppress until="2020-01-01Z">
+                            <notes>
+                            </notes>
+                            <cve>CVE-2019-10321</cve>
                             <cve>CVE-2022-1234</cve>
                         </suppress>
                     </suppressions>""",
@@ -130,11 +130,11 @@ class UpdateOwaspSuppressionDateTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({"abcd,false",
             "2022,false",
             "2022-01-01,true"})
+    @ParameterizedTest
     void valid(String untilDate, boolean valid) {
-        assertThat(new UpdateOwaspSuppressionDate(Collections.singletonList(""), untilDate).validate().isValid()).isEqualTo(valid);
+        assertThat(new UpdateOwaspSuppressionDate(singletonList(""), untilDate).validate().isValid()).isEqualTo(valid);
     }
 }

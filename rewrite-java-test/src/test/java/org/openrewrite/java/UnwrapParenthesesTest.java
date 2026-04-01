@@ -204,14 +204,14 @@ class UnwrapParenthesesTest implements RewriteTest {
           java(
             """
               import java.util.HashSet;
-              
+
               public class A {
                   static boolean notEmpty = !(new HashSet<>().isEmpty());
               }
               """,
             """
               import java.util.HashSet;
-              
+
               public class A {
                   static boolean notEmpty = !new HashSet<>().isEmpty();
               }
@@ -253,5 +253,22 @@ class UnwrapParenthesesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void parensAroundSwitchAreNecessary() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            public class Foo {
+                public int foo(int i) {
+                    return (switch(i) {
+                        default -> "foo";
+                    }).length();
+               }
+            }
+            """
+          ));
     }
 }

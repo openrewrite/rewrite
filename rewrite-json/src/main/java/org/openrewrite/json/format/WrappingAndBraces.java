@@ -15,6 +15,7 @@
  */
 package org.openrewrite.json.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
@@ -38,15 +39,11 @@ public class WrappingAndBraces extends Recipe {
         this.generalFormatStyle = generalFormatStyle;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "JSON new lines";
-    }
+    @Getter
+    final String displayName = "JSON new lines";
 
-    @Override
-    public String getDescription() {
-        return "Split members into separate lines in JSON.";
-    }
+    @Getter
+    final String description = "Split members into separate lines in JSON.";
 
     @Override
     public WrappingAndBracesVisitor<ExecutionContext> getVisitor() {

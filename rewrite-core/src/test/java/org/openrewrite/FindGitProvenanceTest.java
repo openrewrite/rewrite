@@ -40,9 +40,9 @@ class FindGitProvenanceTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTable(DistinctGitProvenance.Row.class, rows -> {
               assertThat(rows).hasSize(1);
-              assertThat(rows.get(0).getBranch()).isEqualTo("main");
-              assertThat(rows.get(0).getChangeset()).isEqualTo("1234567");
-              assertThat(rows.get(0).getOrigin()).isEqualTo("https://github.com/openrewrite/rewrite");
+              assertThat(rows.getFirst().getBranch()).isEqualTo("main");
+              assertThat(rows.getFirst().getChangeset()).isEqualTo("1234567");
+              assertThat(rows.getFirst().getOrigin()).isEqualTo("https://github.com/openrewrite/rewrite");
           }),
           text(
             "Hello, World!",

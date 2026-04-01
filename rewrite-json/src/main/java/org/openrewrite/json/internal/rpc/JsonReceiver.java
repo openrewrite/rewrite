@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.internal.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
@@ -34,23 +33,21 @@ import static java.util.Objects.requireNonNull;
 public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     @Override
-    public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
-        j = j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString)));
+    public Json preVisit(Json j, RpcReceiveQueue q) {
+        j = j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
         j = j.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
-        j = j.withMarkers(q.receiveMarkers(j.getMarkers()));
-        return j;
+        return j.withMarkers(q.receive(j.getMarkers()));
     }
 
     @Override
     public Json visitDocument(Json.Document document, RpcReceiveQueue q) {
-        String sourcePath = q.receiveAndGet(document.getSourcePath(), Path::toString);
-        return document.withSourcePath(Paths.get(sourcePath))
-                .withCharset(Charset.forName(q.receiveAndGet(document.getCharset(), Charset::name)))
+        return document.withSourcePath(q.<Path, String>receiveAndGet(document.getSourcePath(), Paths::get))
+                .withCharset(q.<Charset, String>receiveAndGet(document.getCharset(), Charset::forName))
                 .withCharsetBomMarked(q.receive(document.isCharsetBomMarked()))
                 .withChecksum(q.receive(document.getChecksum()))
                 .withFileAttributes(q.receive(document.getFileAttributes()))
                 .withValue(q.receive(document.getValue(), j -> (JsonValue) visitNonNull(j, q)))
-                .withEof(q.receive(document.getEof()));
+                .withEof(q.receive(document.getEof(), space -> visitSpace(space, q)));
     }
 
     @Override
@@ -96,7 +93,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                         .withMultiline(q.receive(c.isMultiline()))
                         .withText(q.receive(c.getText()))
                         .withSuffix(q.receive(c.getSuffix()))
-                        .withMarkers(q.receiveMarkers(c.getMarkers()))))
+                        .withMarkers(q.receive(c.getMarkers()))))
                 .withWhitespace(q.receive(space.getWhitespace()));
     }
 
@@ -107,6 +104,6 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         //noinspection unchecked
         return right.withElement(q.receive(right.getElement(), j -> (T) visitNonNull(j, q)))
                 .withAfter(q.receive(right.getAfter(), space -> visitSpace(space, q)))
-                .withMarkers(q.receiveMarkers(right.getMarkers()));
+                .withMarkers(q.receive(right.getMarkers()));
     }
 }

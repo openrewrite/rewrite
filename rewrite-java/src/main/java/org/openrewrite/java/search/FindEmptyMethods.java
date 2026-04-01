@@ -24,15 +24,15 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.singleton;
+import static java.util.stream.Collectors.toList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -44,20 +44,11 @@ public class FindEmptyMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Find methods with empty bodies";
-    }
+    String displayName = "Find methods with empty bodies";
 
-    @Override
-    public String getDescription() {
-        return "Find methods with empty bodies and single public no arg constructors.";
-    }
+    String description = "Find methods with empty bodies and single public no arg constructors.";
 
-    @Override
-    public Set<String> getTags() {
-        return Collections.singleton("RSPEC-S1186");
-    }
+    Set<String> tags = singleton("RSPEC-S1186");
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -68,7 +59,7 @@ public class FindEmptyMethods extends Recipe {
                     return classDecl;
                 }
 
-                if (hasSinglePublicNoArgsConstructor(classDecl.getBody().getStatements())) {
+                if (hasEmptySinglePublicNoArgsConstructor(classDecl.getBody().getStatements())) {
                     getCursor().putMessage("CHECK_CONSTRUCTOR", true);
                 }
 
@@ -87,30 +78,27 @@ public class FindEmptyMethods extends Recipe {
                 return super.visitMethodDeclaration(method, ctx);
             }
 
+            private boolean hasEmptyBody(J.MethodDeclaration method) {
+                return method.getBody() != null && method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty();
+            }
+
             private boolean isEmptyMethod(J.MethodDeclaration method) {
-                return !method.isConstructor() && !isInterfaceMethod(method) &&
+                return !method.isConstructor() &&
                        (matchOverrides == null || !matchOverrides && !TypeUtils.isOverride(method.getMethodType()) || matchOverrides) &&
-                       (method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty());
+                       hasEmptyBody(method);
             }
 
-            private boolean isInterfaceMethod(J.MethodDeclaration method) {
-                //noinspection ConstantConditions
-                return method.getMethodType() != null &&
-                       method.getMethodType().getDeclaringType() != null &&
-                       method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface &&
-                       !method.hasModifier(J.Modifier.Type.Default);
-            }
-
-            private boolean hasSinglePublicNoArgsConstructor(List<Statement> classStatements) {
+            private boolean hasEmptySinglePublicNoArgsConstructor(List<Statement> classStatements) {
                 List<J.MethodDeclaration> constructors = classStatements.stream()
                         .filter(o -> o instanceof J.MethodDeclaration)
                         .map(o -> (J.MethodDeclaration) o)
                         .filter(J.MethodDeclaration::isConstructor)
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 return constructors.size() == 1 &&
                        constructors.get(0).hasModifier(J.Modifier.Type.Public) &&
                        constructors.get(0).getParameters().size() == 1 &&
-                       constructors.get(0).getParameters().get(0) instanceof J.Empty;
+                       constructors.get(0).getParameters().get(0) instanceof J.Empty &&
+                       hasEmptyBody(constructors.get(0));
             }
         };
     }

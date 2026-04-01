@@ -36,7 +36,7 @@ class CreateEmptyJavaClassTest implements RewriteTest {
             "foo/bar/"
           )),
           java(
-            null,
+            doesNotExist(),
             """
               package org.openrewrite.example;
 
@@ -48,7 +48,6 @@ class CreateEmptyJavaClassTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
     void hasOverwrittenFile() {
         rewriteRun(
@@ -141,7 +140,7 @@ class CreateEmptyJavaClassTest implements RewriteTest {
             spec -> spec.path("src/main/java/org/openrewrite/example/ExampleClass1.java")
           ),
           java(
-            null,
+            doesNotExist(),
             """
               package org.openrewrite.example;
 
@@ -165,7 +164,7 @@ class CreateEmptyJavaClassTest implements RewriteTest {
             "foo/bar"
           )),
           java(
-            null,
+            doesNotExist(),
             """
               package org.openrewrite.example;
 

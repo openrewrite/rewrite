@@ -29,7 +29,9 @@
 /** XML lexer derived from ANTLR v4 ref guide book example */
 lexer grammar XMLLexer;
 
+
 // Default "mode": Everything OUTSIDE of a tag
+WS                : [ \t\n\r\u000C]+ -> skip;
 COMMENT           :  '<!--' .*? '-->' ;
 CDATA             :  '<![CDATA[' .*? ']]>' ;
 
@@ -49,6 +51,12 @@ OPEN              :  '<'                           -> pushMode(INSIDE) ;
 SPECIAL_OPEN      :  '<' QUESTION_MARK Name        -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;
 
 DTD_OPEN          :  '<!'                          -> pushMode(INSIDE_DTD) ;
+
+// JSP elements
+JSP_COMMENT       :  '<%--' .*? '--%>' ;
+JSP_DECLARATION   :  '<%!' .*? '%>' ;
+JSP_EXPRESSION    :  '<%=' .*? '%>' ;
+JSP_SCRIPTLET     :  '<%' ~[@=!-] .*? '%>' ;  // Matches <% but not <%@, <%=, <%!, or <%--
 
 TEXT              :  ~[<&]+ ;  // match any 16 bit char other than < and &
 

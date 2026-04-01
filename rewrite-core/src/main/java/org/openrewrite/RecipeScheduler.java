@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SearchResults;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
@@ -26,7 +27,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
@@ -41,7 +41,7 @@ public class RecipeScheduler {
             LargeSourceSet after = runRecipeCycles(recipe, sourceSet, ctx, maxCycles, minCycles);
             return new RecipeRun(
                     after.getChangeset(),
-                    ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
+                    DataTableExecutionContextView.view(ctx).getDataTableStore()
             );
         } finally {
             Path workingDirectoryRoot = ctx.getMessage(WORKING_DIRECTORY_ROOT);
@@ -56,6 +56,7 @@ public class RecipeScheduler {
 
         RecipeRunStats recipeRunStats = new RecipeRunStats(Recipe.noop());
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
+        SearchResults searchResults = new SearchResults(Recipe.noop());
         SourcesFileResults sourceFileResults = new SourcesFileResults(Recipe.noop());
 
         LargeSourceSet after = sourceSet;
@@ -71,17 +72,13 @@ public class RecipeScheduler {
                 // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
                 Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
                 try {
-                    RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
-                            recipeRunStats, sourceFileResults, errorsTable, LargeSourceSet::edit);
+                    RecipeRunCycle<LargeSourceSet> cycle = createRecipeRunCycle(recipe, i, rootCursor, ctxWithWatch, recipeRunStats, searchResults, sourceFileResults, errorsTable);
                     ctxWithWatch.putCycle(cycle);
                     after.beforeCycle(i == maxCycles);
 
                     // pre-transformation scanning phase where there can only be modifications to capture exceptions
                     // occurring during the scanning phase
-                    if (hasScanningRecipe(recipe)) {
-                        after = cycle.scanSources(after);
-                    }
-
+                    after = cycle.scanSources(after);
                     // transformation phases
                     after = cycle.generateSources(after);
                     after = cycle.editSources(after);
@@ -118,23 +115,16 @@ public class RecipeScheduler {
         return after;
     }
 
+    protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(Recipe recipe, int cycle, Cursor rootCursor, WatchableExecutionContext ctxWithWatch, RecipeRunStats recipeRunStats, SearchResults searchResults, SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
+        return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
+    }
+
     private void recursiveOnComplete(Recipe recipe, ExecutionContext ctx) {
         recipe.onComplete(ctx);
         for (Recipe r : recipe.getRecipeList()) {
             recursiveOnComplete(r, ctx);
         }
-    }
-
-    private boolean hasScanningRecipe(Recipe recipe) {
-        if (recipe instanceof ScanningRecipe) {
-            return true;
-        }
-        for (Recipe r : recipe.getRecipeList()) {
-            if (hasScanningRecipe(r)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // Delete any files created in the working directory

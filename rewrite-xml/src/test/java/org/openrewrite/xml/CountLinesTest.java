@@ -32,17 +32,17 @@ class CountLinesTest implements RewriteTest {
                        xmlns="http://maven.apache.org/POM/4.0.0"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
-                  
+
                   <groupId>org.openrewrite.maven</groupId>
                   <artifactId>round_trip_serialization</artifactId>
                   <version>1.0</version>
                   <packaging>jar</packaging>
                   <name>BasicIT#round_trip_serialization</name>
-                  
+
                   <properties>
                       <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
                   </properties>
-                  
+
                   <build>
                       <plugins>
                           <plugin>

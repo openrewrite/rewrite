@@ -6,16 +6,15 @@ plugins {
 
 dependencies {
     constraints {
-        rootProject.subprojects.filter { it != project && !it.name.contains("benchmark") && it.name != "tools" }.sortedBy { it.name }.forEach {
-            api(it)
-        }
-    }
-}
-
-publishing {
-    publications {
-        named("nebula", MavenPublication::class.java) {
-            from(components["javaPlatform"])
-        }
+        rootProject.subprojects
+            .filter {
+                it != project &&
+                        !it.name.contains("benchmark") &&
+                        !it.name.contains("tck") &&
+                        it.name != "tools" &&
+                        it.name != "rewrite-gradle-tooling-model"
+            }
+            .sortedBy { it.name }
+            .forEach { api(it) }
     }
 }

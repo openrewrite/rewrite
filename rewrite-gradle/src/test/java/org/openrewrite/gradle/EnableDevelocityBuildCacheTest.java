@@ -23,8 +23,8 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class EnableDevelocityBuildCacheTest implements RewriteTest {
 
-    @Test
     @DocumentExample
+    @Test
     void addBuildCacheRemoteConfig() {
         rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache("true", "System.getenv(\"CI\") != null")),
           settingsGradle(

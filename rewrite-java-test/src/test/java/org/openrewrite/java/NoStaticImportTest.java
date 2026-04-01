@@ -41,7 +41,7 @@ class NoStaticImportTest implements RewriteTest {
               """,
             """
               import java.util.Collections;
-                              
+
               class Test {
                   void test() {
                       Object o = Collections.emptyList();
@@ -59,7 +59,7 @@ class NoStaticImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-                            
+
               import static org.openrewrite.java.TestNoStaticImport.method0;
 
               public class TestNoStaticImport {
@@ -112,7 +112,8 @@ class NoStaticImportTest implements RewriteTest {
                     }
                   }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -127,10 +128,11 @@ class NoStaticImportTest implements RewriteTest {
                     default boolean isLast() {
                         return !hasNext();
                     }
-                    
+
                     boolean hasNext();
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -140,13 +142,14 @@ class NoStaticImportTest implements RewriteTest {
               java(
                     """
                 package org.example;
-                        
+
                 public abstract class AbstractClass {
                     public static boolean foo() {
                         return false;
                     }
                 }
-                """),
+                """
+              ),
               java(
                     """
                 package org.example;
@@ -156,7 +159,8 @@ class NoStaticImportTest implements RewriteTest {
                         return foo();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -176,7 +180,8 @@ class NoStaticImportTest implements RewriteTest {
                         method0();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -193,7 +198,8 @@ class NoStaticImportTest implements RewriteTest {
                         super();
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -214,7 +220,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -235,7 +242,8 @@ class NoStaticImportTest implements RewriteTest {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -250,13 +258,14 @@ class NoStaticImportTest implements RewriteTest {
                     public static void method0() {
                         InnerClass.method1();
                     }
-                            
+
                     public class InnerClass {
                         public static void method1() {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
 
         @Test
@@ -280,44 +289,47 @@ class NoStaticImportTest implements RewriteTest {
                         }.run();
                     }
                 }
-                """));
+                """
+              ));
         }
 
-        @Test
         @ExpectedToFail("static import not yet replaced with Nested.foo()")
+        @Test
         void localImport() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
               java(
                     """
                 package org.openrewrite.java;
-                                
+
                 import static org.openrewrite.test.Test.Nested.foo;
-                                
+
                 public class Test {
                     public static void m() {
                         foo();
                     }
-                                
+
                     public static class Nested {
                         public static void foo() {
                         }
                     }
                 }
-                """, """
+                """,
+                    """
                 package org.openrewrite.java;
-                                
+
                 public class Test {
                     public static void m() {
                         Nested.foo();
                     }
-                                
+
                     public static class Nested {
                         public static void foo() {
                         }
                     }
                 }
-                """));
+                """
+              ));
         }
     }
 }

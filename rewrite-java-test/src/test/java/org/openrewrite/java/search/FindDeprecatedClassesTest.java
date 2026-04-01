@@ -40,6 +40,28 @@ class FindDeprecatedClassesTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
+    @Test
+    void findDeprecations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
+          java(
+            """
+              import org.old.types.D;
+              class Test {
+                  D d;
+              }
+              """,
+            """
+              import org.old.types.D;
+              class Test {
+                  /*~~>*/D d;
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
@@ -68,28 +90,6 @@ class FindDeprecatedClassesTest implements RewriteTest {
               @Deprecated
               class Test {
                   D d;
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void findDeprecations() {
-        rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
-          java(
-            """
-              import org.old.types.D;
-              class Test {
-                  D d;
-              }
-              """,
-            """
-              import org.old.types.D;
-              class Test {
-                  /*~~>*/D d;
               }
               """
           )

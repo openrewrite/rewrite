@@ -20,8 +20,6 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.stream.Collectors;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -35,7 +33,7 @@ class TypesInUseTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-              
+
               public @interface YesOrNo {
                   Status status();
                   enum Status {
@@ -47,16 +45,16 @@ class TypesInUseTest implements RewriteTest {
           java(
             """
               package org.openrewrite.test;
-              
+
               import static org.openrewrite.test.YesOrNo.Status.YES;
-              
+
               @YesOrNo(status = YES)
               public class Foo {}
               """,
             spec -> spec.afterRecipe(cu -> {
                 var foundTypes = cu.getTypesInUse().getVariables().stream()
                   .map(v -> TypeUtils.asFullyQualified(v.getType()).getFullyQualifiedName())
-                  .collect(Collectors.toList());
+                  .toList();
                 assertThat(foundTypes).containsExactlyInAnyOrder("org.openrewrite.test.YesOrNo$Status");
             })
           )

@@ -41,11 +41,10 @@ public class BlankLinesVisitor<P> extends HclIsoVisitor<P> {
     @Override
     public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile configFile, P p) {
         Hcl.ConfigFile c = super.visitConfigFile(configFile, p);
-        c = c.withBody(ListUtils.map(c.getBody(), (i, b) -> b.withPrefix(minimumLines(
+        return c.withBody(ListUtils.map(c.getBody(), (i, b) -> b.withPrefix(minimumLines(
                 keepMaximumLines(b.getPrefix(), style.getKeepMaximum().getInBodyContent()),
                 i == 0 ? 0 : style.getMinimum().getBeforeBodyContent()
         ))));
-        return c;
     }
 
     @Override
@@ -55,8 +54,7 @@ public class BlankLinesVisitor<P> extends HclIsoVisitor<P> {
                 keepMaximumLines(b.getPrefix(), style.getKeepMaximum().getInBodyContent()),
                 i == 0 ? 0 : style.getMinimum().getBeforeBodyContent()
         ))));
-        c = c.withEnd(keepMaximumLines(c.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
-        return c;
+        return c.withEnd(keepMaximumLines(c.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
     }
 
     private <H extends Hcl> H keepMaximumLines(H tree, int max) {

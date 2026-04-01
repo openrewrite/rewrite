@@ -65,13 +65,21 @@ class TernaryTest implements RewriteTest {
     }
 
     @Test
+    void elvisOperatorSpacing() {
+        rewriteRun(
+          groovy("x ?: y")
+        );
+    }
+
+    @Test
     void complex() {
         rewriteRun(
           groovy(
                 """
             (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
             (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
-            """)
+            """
+          )
         );
     }
 

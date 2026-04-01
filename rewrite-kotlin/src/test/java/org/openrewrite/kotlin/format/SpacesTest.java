@@ -46,6 +46,11 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("All")
 class SpacesTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spaces().accept(spec);
+    }
+
     private static Consumer<RecipeSpec> spaces() {
         return spaces(style -> style);
     }
@@ -58,11 +63,6 @@ class SpacesTest implements RewriteTest {
               singletonList(with.apply(IntelliJ.spaces()))
             )
           )));
-    }
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spaces().accept(spec);
     }
 
     @Test
@@ -111,7 +111,7 @@ class SpacesTest implements RewriteTest {
             rewriteRun(
               kotlin(
                 """
-                  fun method 
+                  fun method
                   () {
                   }
                   """
@@ -708,8 +708,8 @@ class SpacesTest implements RewriteTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/321")
+        @Test
         void afterSpreadOperator() {
             rewriteRun(
               spaces(style -> style.withAroundOperators(style.getAroundOperators().withUnary(false))
@@ -2609,7 +2609,7 @@ class SpacesTest implements RewriteTest {
                   kotlin(
                     """
                       import java.util.ArrayList
-                       
+
                       class Test< T, U > {
                           fun < T2 : T > foo(): T2? {
                               val myList: List<T2> = ArrayList()

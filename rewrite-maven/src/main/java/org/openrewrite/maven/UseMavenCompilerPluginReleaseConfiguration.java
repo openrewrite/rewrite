@@ -21,8 +21,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -33,7 +33,6 @@ import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project//build//plugins");
 
     @Option(
             displayName = "Release version",
@@ -42,16 +41,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
     )
     Integer releaseVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Use Maven compiler plugin release configuration";
-    }
+    String displayName = "Use Maven compiler plugin release configuration";
 
-    @Override
-    public String getDescription() {
-        return "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
+    String description = "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
                 "`release`, and updates the `release` value if needed. Will not downgrade the Java version if the current version is higher.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -59,17 +52,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (!PLUGINS_MATCHER.matches(getCursor())) {
+                if (!isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
                     return t;
                 }
-                Optional<Xml.Tag> maybeCompilerPlugin = t.getChildren().stream()
-                        .filter(plugin ->
-                                "plugin".equals(plugin.getName()) &&
-                                "org.apache.maven.plugins".equals(plugin.getChildValue("groupId").orElse("org.apache.maven.plugins")) &&
-                                "maven-compiler-plugin".equals(plugin.getChildValue("artifactId").orElse(null)))
-                        .findAny();
-                Optional<Xml.Tag> maybeCompilerPluginConfig = maybeCompilerPlugin
-                        .flatMap(it -> it.getChild("configuration"));
+                Optional<Xml.Tag> maybeCompilerPluginConfig = t.getChild("configuration");
                 if (!maybeCompilerPluginConfig.isPresent()) {
                     return t;
                 }
@@ -77,33 +63,62 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
                 Optional<String> source = compilerPluginConfig.getChildValue("source");
                 Optional<String> target = compilerPluginConfig.getChildValue("target");
                 Optional<String> release = compilerPluginConfig.getChildValue("release");
-                if (!source.isPresent() &&
-                        !target.isPresent() &&
-                        !release.isPresent() ||
+                if (!source.isPresent() && !target.isPresent() && !release.isPresent()) {
+                    return t; // Do not introduce a new tag if none of the values are present
+                }
+                if (currentNewerThanProposed(source) ||
+                        currentNewerThanProposed(target) ||
                         currentNewerThanProposed(release)) {
                     return t;
                 }
+
                 Xml.Tag updated = filterTagChildren(t, compilerPluginConfig,
                         child -> !("source".equals(child.getName()) || "target".equals(child.getName())));
-                String releaseVersionValue = hasJavaVersionProperty(getCursor().firstEnclosingOrThrow(Xml.Document.class)) ?
-                        "${java.version}" : releaseVersion.toString();
+                String existingPropertyRef = getExistingPropertyReference(release, source, target);
+                String releaseVersionValue;
+                if (existingPropertyRef != null) {
+                    releaseVersionValue = existingPropertyRef;
+                } else if (hasJavaVersionProperty(getCursor().firstEnclosingOrThrow(Xml.Document.class))) {
+                    releaseVersionValue = "${java.version}";
+                } else {
+                    releaseVersionValue = releaseVersion.toString();
+                }
                 return addOrUpdateChild(updated, compilerPluginConfig,
                         Xml.Tag.build("<release>" + releaseVersionValue + "</release>"), getCursor().getParentOrThrow());
             }
         };
     }
 
-    private boolean currentNewerThanProposed(@SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String> maybeRelease) {
-        if (!maybeRelease.isPresent()) {
+    private boolean currentNewerThanProposed(@SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String> config) {
+        if (!config.isPresent()) {
             return false;
         }
         try {
-            float currentVersion = Float.parseFloat(maybeRelease.get());
+            float currentVersion = Float.parseFloat(config.get());
             float proposedVersion = Float.parseFloat(releaseVersion.toString());
             return proposedVersion < currentVersion;
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+
+    private static @Nullable String getExistingPropertyReference(
+            @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String>... configs) {
+        for (Optional<String> config : configs) {
+            if (config.isPresent()) {
+                String value = config.get();
+                if (value.startsWith("${") && value.endsWith("}") && !isDefaultMavenCompilerProperty(value)) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isDefaultMavenCompilerProperty(String value) {
+        return "${maven.compiler.source}".equals(value) ||
+               "${maven.compiler.target}".equals(value) ||
+               "${maven.compiler.release}".equals(value);
     }
 
     private boolean hasJavaVersionProperty(Xml.Document xml) {

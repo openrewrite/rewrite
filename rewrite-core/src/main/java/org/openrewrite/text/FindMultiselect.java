@@ -40,16 +40,10 @@ import static java.util.stream.Collectors.toSet;
 @EqualsAndHashCode(callSuper = false)
 public class FindMultiselect extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Experimental find text with multiselect";
-    }
+    String displayName = "Experimental find text with multiselect";
 
-    @Override
-    public String getDescription() {
-        return "Search for text, treating all textual sources as plain text. " +
+    String description = "Search for text, treating all textual sources as plain text. " +
                "This version of the recipe exists to experiment with multiselect recipe options.";
-    }
 
     @Option(displayName = "Find",
             description = "The text to find. This snippet can be multiline.",

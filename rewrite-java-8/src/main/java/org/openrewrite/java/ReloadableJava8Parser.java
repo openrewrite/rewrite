@@ -102,6 +102,7 @@ class ReloadableJava8Parser implements JavaParser {
         // https://docs.oracle.com/en/java/javacard/3.1/guide/setting-java-compiler-options.html
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
+        Options.instance(context).put("-parameters", "true");
 
         // Ensure type attribution continues despite errors in individual files or nodes.
         // If an error occurs in a single file or node, type attribution should still proceed
@@ -218,11 +219,15 @@ class ReloadableJava8Parser implements JavaParser {
             try {
                 enterAll(cus.values());
                 JavaCompiler delegate = annotationProcessors.isEmpty() ? compiler : compiler.processAnnotations(jcCompilationUnits, nil());
-                delegate.attribute(delegate.todo);
+                while (!delegate.todo.isEmpty()) {
+                    try {
+                        delegate.attribute(delegate.todo);
+                    } catch (Throwable t) {
+                        handleParsingException(ctx, t);
+                    }
+                }
             } catch (Throwable t) {
-                // when symbol entering fails on problems like missing types, attribution can often times proceed
-                // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
-                ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
+                handleParsingException(ctx, t);
             }
         } catch (IllegalStateException e) {
             if ("endPosTable already set".equals(e.getMessage())) {
@@ -234,6 +239,12 @@ class ReloadableJava8Parser implements JavaParser {
         }
 
         return cus;
+    }
+
+    private void handleParsingException(ExecutionContext ctx, Throwable t) {
+        // when symbol entering fails on problems like missing types, attribution can often times proceed
+        // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
+        ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
     }
 
     @Override

@@ -29,13 +29,19 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
+import static java.nio.file.Files.*;
 import static java.util.Collections.emptyList;
-import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
+import static java.util.Collections.emptyMap;
 
 public class ClasspathScanningLoader implements ResourceLoader {
 
@@ -45,20 +51,22 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
 
-    private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
 
     private final ClassLoader classLoader;
+    private final RecipeLoader recipeLoader;
     private @Nullable Runnable performScan;
 
     /**
-     * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
+     * Construct a ClasspathScanningLoader that scans the runtime classpath of the current java process for recipes,
+     * mostly for use in tests.
      *
      * @param properties     Yaml placeholder properties
      * @param acceptPackages Limit scan to specified packages
      */
-    public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
+    public ClasspathScanningLoader(@Nullable Properties properties, String[] acceptPackages) {
         this.classLoader = ClasspathScanningLoader.class.getClassLoader();
+        this.recipeLoader = new RecipeLoader(classLoader);
         this.performScan = () -> {
             scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
             scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
@@ -69,13 +77,14 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     /**
-     * Construct a ClasspathScanningLoader scans the provided classload for recipes
+     * Construct a ClasspathScanningLoader scans the provided classloader for recipes.
      *
-     * @param properties  Yaml placeholder properties
+     * @param properties  YAML placeholder properties
      * @param classLoader Limit scan to classes loadable by this classloader
      */
-    public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
+    public ClasspathScanningLoader(@Nullable Properties properties, ClassLoader classLoader) {
         this.classLoader = classLoader;
+        this.recipeLoader = new RecipeLoader(classLoader);
         this.performScan = () -> {
             scanClasses(new ClassGraph()
                     .ignoreParentClassLoaders()
@@ -91,41 +100,115 @@ public class ClasspathScanningLoader implements ResourceLoader {
         };
     }
 
-    public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
+    /**
+     * Construct a ClasspathScanningLoader as used from `Environment.scanJar` for
+     * `MavenRecipeBundleReader.marketplaceFromClasspathScan`.
+     * Supports both jar files and directories containing class files.
+     */
+    public ClasspathScanningLoader(Path jar, @Nullable Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         this.classLoader = classLoader;
-        String jarName = jar.toFile().getName();
+        this.recipeLoader = new RecipeLoader(classLoader);
 
         this.performScan = () -> {
-            scanClasses(new ClassGraph()
-                    .acceptJars(jarName)
-                    .ignoreParentClassLoaders()
-                    .overrideClassLoaders(classLoader), classLoader);
+            Path jarPath;
+            if (isDirectory(jar)) {
+                try {
+                    jarPath = createTempJarFromDirectory(jar);
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to create temporary jar from directory: " + jar, e);
+                }
+            } else {
+                jarPath = jar;
+            }
 
-            scanYaml(new ClassGraph()
+            String jarName = jarPath.toFile().getName();
+            ClassGraph classGraph = new ClassGraph()
+                    .overrideClasspath(jarPath.toString())
                     .acceptJars(jarName)
-                    .ignoreParentClassLoaders()
+                    .overrideClassLoaders(classLoader);
+
+            ClassGraph yamlGraph = new ClassGraph()
+                    .overrideClasspath(jarPath.toString())
+                    .acceptJars(jarName)
                     .overrideClassLoaders(classLoader)
-                    .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+                    .acceptPaths("META-INF/rewrite");
+
+            scanClasses(classGraph, classLoader);
+            scanYaml(yamlGraph, properties, dependencyResourceLoaders, classLoader);
         };
     }
 
-    public static ClasspathScanningLoader onlyYaml(Properties properties) {
+    /**
+     * Creates a temporary jar file containing all files from the given directory.
+     */
+    private static Path createTempJarFromDirectory(Path directory) throws IOException {
+        Path tempJar = createTempFile("recipe-scan-", ".jar");
+        tempJar.toFile().deleteOnExit();
+
+        try (JarOutputStream jos = new JarOutputStream(newOutputStream(tempJar))) {
+            walkFileTree(directory, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String entryName = directory.relativize(file).toString().replace('\\', '/');
+                    jos.putNextEntry(new JarEntry(entryName));
+                    copy(file, jos);
+                    jos.closeEntry();
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                    if (!dir.equals(directory)) {
+                        String entryName = directory.relativize(dir).toString().replace('\\', '/') + "/";
+                        jos.putNextEntry(new JarEntry(entryName));
+                        jos.closeEntry();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+        return tempJar;
+    }
+
+    /**
+     * Construct a ClasspathScanningLoader to load Yaml categories and recipes from the runtime classpath, as part of
+     * running tests or inferring local recipe categories.
+     */
+    public static ClasspathScanningLoader onlyYaml(@Nullable Properties properties) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
-        classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties, emptyList(), null);
+        classpathScanningLoader.scanYaml(
+                new ClassGraph().acceptPaths("META-INF/rewrite"),
+                properties,
+                emptyList(),
+                null);
+        return classpathScanningLoader;
+    }
+
+    /**
+     * Construct a ClasspathScanningLoader to load categories from the provided dependencies only, as part of migration
+     * in the CLI.
+     */
+    public static ClasspathScanningLoader onlyYaml(@Nullable Properties properties, Collection<Path> dependencies) {
+        ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
+        classpathScanningLoader.scanYaml(
+                new ClassGraph().acceptPaths("META-INF/rewrite").overrideClasspath(dependencies),
+                properties,
+                emptyList(),
+                null);
         return classpathScanningLoader;
     }
 
     private ClasspathScanningLoader() {
         this.classLoader = ClasspathScanningLoader.class.getClassLoader();
+        this.recipeLoader = new RecipeLoader(classLoader);
     }
 
     /**
      * This must be called _after_ scanClasses or the descriptors of declarative recipes will be missing any
      * non-declarative recipes they depend on that would be discovered by scanClasses
      */
-    private void scanYaml(ClassGraph classGraph, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, @Nullable ClassLoader classLoader) {
-        try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
+    private void scanYaml(ClassGraph classGraph, @Nullable Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, @Nullable ClassLoader classLoader) {
+        try (ScanResult scanResult = classGraph.scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
@@ -140,11 +223,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 }
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
-                recipeAttributions.putAll(resourceLoader.listContributors());
                 recipeExamples.putAll(resourceLoader.listRecipeExamples());
             }
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes.values(), recipeAttributions, recipeExamples));
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes.values(), recipeExamples));
             }
         }
     }
@@ -160,15 +242,15 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
-                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                    if (constructor != null) {
-                        constructor.setAccessible(true);
-                        try {
-                            styles.add((NamedStyles) constructor.newInstance());
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
+                Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
+                if (constructor != null) {
+                    constructor.setAccessible(true);
+                    try {
+                        styles.add((NamedStyles) constructor.newInstance());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
+                }
 
             }
         }
@@ -178,15 +260,15 @@ public class ClasspathScanningLoader implements ResourceLoader {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
             Class<?> recipeClass = classInfo.loadClass();
             if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
-                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
-                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
+                    // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                    (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
             Timer.Sample sample = Timer.start();
             try {
-                Recipe recipe = constructRecipe(recipeClass);
+                Recipe recipe = recipeLoader.load(recipeClass, emptyMap());
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.put(recipe.getName(), recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
@@ -202,7 +284,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
         if (performScan != null) {
             try {
-                return new RecipeLoader(classLoader).load(recipeName, null);
+                return recipeLoader.load(recipeName, null);
             } catch (NoClassDefFoundError | IllegalArgumentException ignored) {
                 // it's probably declarative
             }
@@ -250,7 +332,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     @Override
     public Map<String, List<Contributor>> listContributors() {
-        ensureScanned();
-        return recipeAttributions;
+        return emptyMap();
     }
 }

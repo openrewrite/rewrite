@@ -35,9 +35,9 @@ import org.openrewrite.json.tree.JsonRightPadded;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.disjoint;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Provides methods for matching the given cursor location to a specific JsonPath expression.
@@ -72,7 +72,10 @@ public class JsonPathMatcher {
         }
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
-        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
+        ParseTree lastChild = ctx.children.get(ctx.children.size() - 1);
+        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext ?
+                (JsonPathParser.ExpressionContext) lastChild :
+                null;
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
@@ -104,13 +107,16 @@ public class JsonPathMatcher {
 
     private JsonPathParser.JsonPathContext parse() {
         if (parsed == null) {
-            parsed = jsonPath().jsonPath();
+            JsonPathParser parser = new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(jsonPath))));
+            parsed = parser.jsonPath();
+            // Ensure all input was consumed
+            if (parser.getCurrentToken().getType() != org.antlr.v4.runtime.Token.EOF) {
+                throw new IllegalArgumentException(
+                        "Syntax error: extraneous input '" + parser.getCurrentToken().getText() +
+                        "' expecting EOF. Original input: '" + jsonPath + "'");
+            }
         }
         return parsed;
-    }
-
-    private JsonPathParser jsonPath() {
-        return new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -176,7 +182,7 @@ public class JsonPathMatcher {
             // `$..foo` or `$.foo..bar[?($..buz == 'buz')]`
             List<ParseTree> previous = ctx.getParent().getParent().children;
             ParserRuleContext current = ctx.getParent();
-            if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
+            if (previous.indexOf(current) < 1 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
                     JsonPathMatcher.JsonPathParserJsonVisitor v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, path, null, false);
@@ -211,7 +217,7 @@ public class JsonPathMatcher {
                 // Return a list if more than 1 property is specified.
                 return ctx.property().stream()
                         .map(this::visitProperty)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             } else if (ctx.slice() != null) {
                 return visitSlice(ctx.slice());
             } else if (ctx.indexes() != null) {
@@ -260,7 +266,7 @@ public class JsonPathMatcher {
             return results.stream()
                     .skip(start)
                     .limit(limit)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         @Override
@@ -282,7 +288,7 @@ public class JsonPathMatcher {
             List<Object> indexes = new ArrayList<>();
             for (TerminalNode terminalNode : ctx.PositiveNumber()) {
                 for (int i = 0; i < results.size(); i++) {
-                    if (terminalNode.getText().contains(String.valueOf(i))) {
+                    if (terminalNode.getText().equals(String.valueOf(i))) {
                         indexes.add(results.get(i));
                     }
                 }
@@ -342,7 +348,7 @@ public class JsonPathMatcher {
                             return visitProperty(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
                 return getResultFromList(matches);
             } else if (scope instanceof List) {
                 List<Object> results = ((List<Object>) scope).stream()
@@ -351,7 +357,7 @@ public class JsonPathMatcher {
                             return visitProperty(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 // Unwrap lists of results from visitProperty to match the position of the cursor.
                 List<Object> matches = new ArrayList<>();
@@ -380,7 +386,7 @@ public class JsonPathMatcher {
                             return visitWildcard(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 List<Object> matches = new ArrayList<>();
                 if (stop != null && stop == getExpressionContext(ctx)) {
@@ -408,14 +414,14 @@ public class JsonPathMatcher {
                             return visitWildcard(ctx);
                         })
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             }
 
             return null;
         }
 
         @Override
-        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
+        public @Nullable Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
             String s = null;
             if (ctx.StringLiteral() != null) {
                 s = ctx.StringLiteral().getText();
@@ -477,7 +483,7 @@ public class JsonPathMatcher {
                                 return visitUnaryExpression(ctx);
                             })
                             .filter(Objects::nonNull)
-                            .collect(Collectors.toList());
+                            .collect(toList());
 
                     // Unwrap lists of results from visitUnaryExpression to match the position of the cursor.
                     List<Object> matches = new ArrayList<>();
@@ -571,6 +577,47 @@ public class JsonPathMatcher {
             }
 
             return null;
+        }
+
+        @Override
+        public @Nullable Object visitNegationExpression(JsonPathParser.NegationExpressionContext ctx) {
+            Object originalScope = scope;
+
+            // When scope contains multiple elements, iterate and collect
+            // elements where the inner expression does NOT match.
+            List<Object> elements = null;
+            if (originalScope instanceof List) {
+                elements = (List<Object>) originalScope;
+            } else if (originalScope instanceof Json.Array) {
+                elements = new ArrayList<>(((Json.Array) originalScope).getValues());
+            } else if (originalScope instanceof Json.Member &&
+                       ((Json.Member) originalScope).getValue() instanceof Json.Array) {
+                elements = new ArrayList<>(((Json.Array) ((Json.Member) originalScope).getValue()).getValues());
+            }
+
+            if (elements != null) {
+                List<Object> results = new ArrayList<>();
+                for (Object element : elements) {
+                    scope = element;
+                    Object result = ctx.filterExpression() != null ?
+                            visit(ctx.filterExpression()) :
+                            visitUnaryExpression(ctx.unaryExpression());
+                    boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+                    if (!matched) {
+                        results.add(element);
+                    }
+                }
+                scope = originalScope;
+                return getResultFromList(results);
+            }
+
+            // Non-list scope: simple boolean flip
+            Object result = ctx.filterExpression() != null ?
+                    visit(ctx.filterExpression()) :
+                    visitUnaryExpression(ctx.unaryExpression());
+            boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+            scope = originalScope;
+            return matched ? null : originalScope;
         }
 
         @Override
@@ -669,6 +716,9 @@ public class JsonPathMatcher {
 
             } else if (ctx instanceof JsonPathParser.LiteralExpressionContext) {
                 ctx = visitLiteralExpression((JsonPathParser.LiteralExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.NegationExpressionContext) {
+                ctx = visitNegationExpression((JsonPathParser.NegationExpressionContext) ctx);
             }
             return ctx;
         }
@@ -772,7 +822,7 @@ public class JsonPathMatcher {
                 return ((List<Object>) result).stream()
                         .map(this::getValue)
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                        .collect(toList());
             } else if (result instanceof Json.Array) {
                 return ((Json.Array) result).getValues();
             } else if (result instanceof Json.Literal) {

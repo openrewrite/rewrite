@@ -15,22 +15,40 @@
  */
 package org.openrewrite.java.internal.template;
 
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.java.internal.ThrowingErrorListener;
+import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.*;
 
 public class TypeParameter {
 
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
 
-    public static JavaType toFullyQualifiedName(TemplateParameterParser.@Nullable TypeContext type) {
+    public static TemplateParameterParser parser(String value) {
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(value);
+        TemplateParameterLexer lexer = new TemplateParameterLexer(CharStreams.fromString(value));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
+        return parser;
+    }
+
+    public static JavaType toJavaType(TemplateParameterParser.@Nullable TypeContext type, Map<String, JavaType.GenericTypeVariable> genericTypes) {
         if (type == null) {
             return TYPE_OBJECT;
         }
@@ -59,14 +77,16 @@ public class TypeParameter {
                 JavaType type;
                 if (fqn.contains(".")) {
                     type = JavaType.ShallowClass.build(fqn);
-                } else if (fqn.equals("String")) {
+                } else if (genericTypes.containsKey(fqn)) {
+                    type = genericTypes.get(fqn);
+                } else if ("String".equals(fqn)) {
                     type = JavaType.ShallowClass.build("java.lang.String");
-                } else if (fqn.equals("Object")) {
+                } else if ("Object".equals(fqn)) {
                     type = TYPE_OBJECT;
                 } else if ((type = JavaType.Primitive.fromKeyword(fqn)) != null) {
                     // empty
                 } else {
-                    type = JavaType.Unknown.getInstance();
+                    throw new IllegalArgumentException("Unknown type " + fqn + ". Make sure all types are fully qualified.");
                 }
                 return type;
             }
@@ -75,7 +95,7 @@ public class TypeParameter {
             public JavaType visitTypeParameter(TemplateParameterParser.TypeParameterContext ctx) {
                 JavaType type1 = super.visitTypeParameter(ctx);
                 if (ctx.variance() != null) {
-                    JavaType.GenericTypeVariable.Variance variance = ctx.variance().Variance().getSymbol().getText().equals("extends") ?
+                    JavaType.GenericTypeVariable.Variance variance = ctx.variance().Extends() != null ?
                             JavaType.GenericTypeVariable.Variance.COVARIANT : JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
                     type1 = new JavaType.GenericTypeVariable(null, ctx.variance().WILDCARD().getText(), variance, singletonList(type1));
                 } else if (ctx.WILDCARD() != null) {
@@ -84,5 +104,31 @@ public class TypeParameter {
                 return type1;
             }
         });
+    }
+
+    public static Map<String, JavaType.GenericTypeVariable> parseGenericTypes(Set<String> genericTypes) {
+        Map<String, List<TemplateParameterParser.GenericPatternContext>> contexts = genericTypes.stream()
+                .map(e -> parser(e).genericPattern())
+                .collect(groupingBy(e -> e.genericName().getText()));
+        if (contexts.values().stream().anyMatch(e -> e.size() > 1)) {
+            throw new IllegalArgumentException("Found duplicated generic type.");
+        }
+
+        Map<String, JavaType.GenericTypeVariable> genericTypesMap = contexts.keySet().stream()
+                .collect(toMap(e -> e,
+                        e -> new JavaType.GenericTypeVariable(null, e, JavaType.GenericTypeVariable.Variance.INVARIANT, emptyList())));
+
+        for (String name : genericTypesMap.keySet()) {
+            JavaType.GenericTypeVariable genericType = genericTypesMap.get(name);
+            TemplateParameterParser.GenericPatternContext context = contexts.get(name).get(0);
+            List<JavaType> bounds = context.type().stream()
+                    .map(e -> toJavaType(e, genericTypesMap))
+                    .collect(toList());
+            if (!bounds.isEmpty()) {
+                //noinspection ResultOfMethodCallIgnored
+                genericType.unsafeSet(name, JavaType.GenericTypeVariable.Variance.COVARIANT, bounds);
+            }
+        }
+        return genericTypesMap;
     }
 }

@@ -18,7 +18,6 @@ package org.openrewrite.maven.tree;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
@@ -29,8 +28,8 @@ import java.io.Serializable;
 class OpenRewriteModelSerializableTest {
 
     @Test
-    void mavenRepository() throws IOException {
-        MavenRepository mavenRepository = new MavenRepository("id", "url", null, null, null, null);
+    void mavenRepository() throws Exception {
+        MavenRepository mavenRepository = new MavenRepository("id", "url", null, null, null, null, null);
         ObjectOutputStream os = new ObjectOutputStream(new ByteArrayOutputStream());
         os.writeObject(mavenRepository);
     }

@@ -36,7 +36,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               import java . util . Collections as cs
               import java . io . *
-              
+
               class A
               """
           )
@@ -159,11 +159,12 @@ class ClassDeclarationTest implements RewriteTest {
                   class Inner {
                   }
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements().stream()
-                  .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
-            })
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    assertThat(cu.getStatements().stream()
+                            .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
+                                    cd.getKind() == J.ClassDeclaration.Kind.Type.Interface)).isTrue();
+                })
           )
         );
     }
@@ -181,8 +182,8 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("annotation class A",
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements().stream()
-                  .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isTrue();
+                  .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
+                    cd.getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isTrue();
             }))
           );
     }
@@ -193,8 +194,8 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("enum  class A",
             spec -> spec.afterRecipe(cu -> {
               assertThat(cu.getStatements().stream()
-                .anyMatch(it -> it instanceof J.ClassDeclaration &&
-                  ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Enum)).isTrue();
+                .anyMatch(it -> it instanceof J.ClassDeclaration cd &&
+                  cd.getKind() == J.ClassDeclaration.Kind.Type.Enum)).isTrue();
           }))
         );
     }
@@ -205,11 +206,11 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
               public  @Deprecated ( "message 0" )   abstract    @Suppress("") class Test
-              
+
               @Deprecated ( "message 1" )
               @Suppress ( "" )
               class A
-              
+
               @Suppress ( "unused" , "unchecked" )
               @Deprecated ( "message 2" )
               class B
@@ -239,7 +240,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               interface A
               interface B
-              
+
               class KotlinTypeGoat < T : A , S : B>
               """
           )
@@ -314,8 +315,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/160")
+    @Test
     void multipleBounds() {
         rewriteRun(
           kotlin(
@@ -324,7 +325,7 @@ class ClassDeclarationTest implements RewriteTest {
               interface B
               interface C
               interface D
-              
+
               class KotlinTypeGoat<T, S>  where   S : A, T : D, S : B, T : C
               """
           )
@@ -471,7 +472,8 @@ class ClassDeclarationTest implements RewriteTest {
                     println ( "Hello, world!" )
                 }
             }
-            """)
+            """
+          )
         );
     }
 
@@ -492,13 +494,13 @@ class ClassDeclarationTest implements RewriteTest {
                   val parent : T,
                   val root : R
               ) {
-                  
+
                   constructor ( parent : T , root : R , id : Int ) : this ( parent , root )
-                  
+
                   fun parent ( ) : T {
                       return parent
                   }
-                  
+
                   fun root ( ) : R {
                       return root
                   }
@@ -531,7 +533,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               @Repeatable
               annotation class A ( val s : String )
-              
+
               open @A ( "1" ) public @A ( "2" ) class TestA
               @A ( "1" ) open @A ( "2" ) public class TestB
               """
@@ -556,17 +558,17 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("class A",
             spec -> spec.afterRecipe(cu -> {
                 for (Statement statement : cu.getStatements()) {
-                    if (statement instanceof J.ClassDeclaration) {
-                        J.Modifier.hasModifier(((J.ClassDeclaration) statement).getModifiers(), J.Modifier.Type.Final);
-                        assertThat(J.Modifier.hasModifier(((J.ClassDeclaration) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                    if (statement instanceof J.ClassDeclaration declaration) {
+                        J.Modifier.hasModifier(declaration.getModifiers(), J.Modifier.Type.Final);
+                        assertThat(J.Modifier.hasModifier(declaration.getModifiers(), J.Modifier.Type.Final)).isTrue();
                     }
                 }
             }))
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/270")
+    @Test
     void onlySecondaryConstructors() {
         rewriteRun(
           kotlin(
@@ -577,9 +579,9 @@ class ClassDeclarationTest implements RewriteTest {
               """,
               spec -> spec.afterRecipe(cu -> {
                   assertThat(cu.getStatements()).satisfiesExactly(stmt -> {
-                      J.ClassDeclaration clazz = (J.ClassDeclaration) stmt;
+                      var clazz = (J.ClassDeclaration) stmt;
                       assertThat(clazz.getBody().getStatements()).satisfiesExactly(decl -> {
-                          K.Constructor constructor = (K.Constructor) decl;
+                          var constructor = (K.Constructor) decl;
                           assertThat(constructor.getMethodDeclaration().getParameters()).satisfiesExactly(
                               message -> assertThat(message).isInstanceOf(J.VariableDeclarations.class),
                               cause -> assertThat(cause).isInstanceOf(J.VariableDeclarations.class)
@@ -596,8 +598,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/270")
+    @Test
     void secondaryConstructorWithBody() {
         rewriteRun(
           kotlin(
@@ -652,8 +654,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/301")
+    @Test
     void qualifiedSuperType() {
         rewriteRun(
           kotlin(

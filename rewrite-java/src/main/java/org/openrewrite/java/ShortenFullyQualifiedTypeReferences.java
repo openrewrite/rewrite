@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -36,22 +37,16 @@ import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Add imports for fully qualified references to types";
-    }
+    @Getter
+    final String displayName = "Add imports for fully qualified references to types";
 
-    @Override
-    public String getDescription() {
-        return "Any fully qualified references to Java types will be replaced with corresponding simple " +
-               "names and import statements, provided that it doesn't result in " +
-               "any conflicts with other imports or types declared in the local compilation unit.";
-    }
+    @Getter
+    final String description = "Any fully qualified references to Java types will be replaced with corresponding simple " +
+        "names and import statements, provided that it doesn't result in " +
+        "any conflicts with other imports or types declared in the local compilation unit.";
 
-    @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
@@ -68,15 +63,15 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
     }
 
     /**
-     * Returns a visitor which replaces all fully qualified references in the given subtree with simple names and adds 
+     * Returns a visitor which replaces all fully qualified references in the given subtree with simple names and adds
      * corresponding import statements.
      * <p>
      * For compatibility with other Java-based languages it is recommended to use this as a service via
      * {@link ImportService#shortenFullyQualifiedTypeReferencesIn(J)}, as that will dispatch to the correct
      * implementation for the language.
-     * 
+     *
      * @see ImportService#shortenFullyQualifiedTypeReferencesIn(J)
-     * @see JavaVisitor#service(Class) 
+     * @see JavaVisitor#service(Class)
      */
     public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree) {
         return getVisitor(subtree);

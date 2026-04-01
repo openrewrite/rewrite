@@ -24,9 +24,10 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
+
+import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -64,10 +65,7 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
     }
 
-    @Override
-    public String getDescription() {
-        return "An ad hoc recipe used in RewriteTest.";
-    }
+    String description = "An ad hoc recipe used in RewriteTest.";
 
     @Override
     public String getName() {
@@ -86,7 +84,7 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
 
     @Override
     public List<Maintainer> getMaintainers() {
-        return maintainers == null ? Collections.emptyList() : maintainers;
+        return maintainers == null ? emptyList() : maintainers;
     }
 
     @Override
@@ -101,7 +99,7 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
 
     @Override
     public Collection<? extends SourceFile> generate(Void acc, ExecutionContext ctx) {
-        return generator == null ? Collections.emptyList() : generator.get();
+        return generator == null ? emptyList() : generator.get();
     }
 
     @Override

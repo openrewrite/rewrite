@@ -28,9 +28,11 @@ class CRLFTest implements RewriteTest {
     void crlf() {
         rewriteRun(
           kotlin(
-            "package some.other.name\r\n" +
-              "class A { }\r\n" +
-              "class B { }"
+            """
+            package some.other.name
+            class A { }
+            class B { }\
+            """
           )
         );
     }
@@ -39,9 +41,15 @@ class CRLFTest implements RewriteTest {
     void consecutiveCRLF() {
         rewriteRun(
           kotlin(
-            "package some.other.name\r\n\r\n\r\n" +
-              "class A { }\r\n\r\n\r\n" +
-              "class B { }"
+            """
+            package some.other.name
+            
+            
+            class A { }
+            
+            
+            class B { }\
+            """
           )
         );
     }
@@ -59,12 +67,14 @@ class CRLFTest implements RewriteTest {
     @Test
     void crlfInKdoc() {
         String windowsJavadoc =
-          "/**\r\n" +
-          " *\r\n" +
-          " * Foo\r\n" +
-          " */\r\n" +
-          "class Test {\r\n" +
-          "}";
+          """
+          /**
+           *
+           * Foo
+           */
+          class Test {
+          }\
+          """;
 
         rewriteRun(
           kotlin(
@@ -77,11 +87,13 @@ class CRLFTest implements RewriteTest {
     void crlfInBlockComment() {
         rewriteRun(
           kotlin(
-            "public class A {\r\n" +
-              "/*a\r\n" +
-              "  b*/\r\n" +
-              "public fun method() {}\r\n" +
-              "}"
+            """
+            public class A {
+            /*a
+              b*/
+            public fun method() {}
+            }\
+            """
           )
         );
     }
@@ -91,10 +103,12 @@ class CRLFTest implements RewriteTest {
     void crlfInMultilineString() {
         rewriteRun(
           kotlin(
-            "val s = \"\"\"\r\n" +
-              "l1\r\n" +
-              "l2\n" +
-              "\"\"\""
+            """
+            val s = ""\"
+            l1
+            l2
+            ""\"\
+            """
           )
         );
     }
@@ -104,11 +118,13 @@ class CRLFTest implements RewriteTest {
     void crlfInMultilineStringWithParameters() {
         rewriteRun(
           kotlin(
-            "val a = \"\"\r\n" +
-            "val s = \"\"\"${a}\r\n" +
-            "l1\r\n" +
-            "l2\n" +
-            "\"\"\""
+            """
+            val a = ""
+            val s = ""\"${a}
+            l1
+            l2
+            ""\"\
+            """
           )
         );
     }

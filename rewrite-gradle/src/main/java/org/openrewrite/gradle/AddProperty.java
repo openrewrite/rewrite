@@ -24,11 +24,11 @@ import org.openrewrite.properties.PropertiesParser;
 
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -57,20 +57,14 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Gradle property";
-    }
+    String displayName = "Add Gradle property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s=%s`", key, value);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a property to the `gradle.properties` file.";
-    }
+    String description = "Add a property to the `gradle.properties` file.";
 
     public static class NeedsProperty {
         boolean isGradleProject;
@@ -112,9 +106,9 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
             return PropertiesParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(Paths.get("gradle.properties"),
                             key + "=" + value)), null, ctx)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     @Override
@@ -130,7 +124,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
                                 sourceFile :
                                 new ChangePropertyValue(key, value, null, false, null)
                                         .getVisitor().visitNonNull(sourceFile, ctx);
-                        return new org.openrewrite.properties.AddProperty(key, value, null, null)
+                        return new org.openrewrite.properties.AddProperty(key, value, null, null, null)
                                 .getVisitor()
                                 .visitNonNull(t, ctx);
                     }
@@ -139,7 +133,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
                             sourceFile :
                             new ChangePropertyValue(key, value, null, false, null)
                                     .getVisitor().visitNonNull(sourceFile, ctx);
-                    return new org.openrewrite.properties.AddProperty(key, value, null, null)
+                    return new org.openrewrite.properties.AddProperty(key, value, null, null, null)
                             .getVisitor()
                             .visitNonNull(t, ctx);
                 }

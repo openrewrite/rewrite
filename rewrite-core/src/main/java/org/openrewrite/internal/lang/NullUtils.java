@@ -21,7 +21,13 @@ import org.openrewrite.Option;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 public class NullUtils {
 
@@ -72,7 +78,7 @@ public class NullUtils {
      * <li>javax.annotations.Nullable</li>
      * <li>org.checkerframework.checker.nullness.qual.Nullable</li>
      */
-    private static final List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
+    private static final List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = singletonList(
             "Nullable"
     );
 
@@ -96,7 +102,7 @@ public class NullUtils {
 
         Field[] fields = _class.getDeclaredFields();
         if (fields.length == 0) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         List<Field> nonNullFields = new ArrayList<>(fields.length);

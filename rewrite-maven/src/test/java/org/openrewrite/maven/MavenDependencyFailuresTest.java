@@ -28,7 +28,6 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -39,6 +38,45 @@ import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class MavenDependencyFailuresTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
+        rewriteRun(
+          spec -> spec
+            .recipe(new UpgradeParentVersion(
+              "*",
+              "*",
+              "latest.patch",
+              null,
+              null))
+            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setRepositories(List.of(
+                MavenRepository.builder().id("central").uri("https://repo1.maven.org/maven2").knownToExist(true).build(),
+                MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build()
+              )))
+            .recipeExecutionContext(new InMemoryExecutionContext())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          pomXml(
+            """
+              <project>
+                <parent>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>credentials</artifactId>
+                    <version>2.3.0</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            spec -> spec.after(xml -> {
+                return assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:").actual();
+            }
+          ))
+        );
+    }
 
     @Test
     void unresolvableMavenMetadata() {
@@ -81,52 +119,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
     @Test
-    void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
-        rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(
-                MavenRepository.builder().id("central").uri("https://repo1.maven.org/maven2").knownToExist(true).build(),
-                MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build()
-              )))
-            .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
-          pomXml(
-            """
-              <project>
-                <parent>
-                    <groupId>org.jenkins-ci.plugins</groupId>
-                    <artifactId>credentials</artifactId>
-                    <version>2.3.0</version>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """,
-            """
-              <project>
-                <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
-              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
-                    <groupId>org.jenkins-ci.plugins</groupId>
-                    <artifactId>credentials</artifactId>
-                    <version>2.3.0</version>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
-
-    @Test
-    void unresolvableTransitiveDependencyDueToInvalidPom(@TempDir Path localRepository) throws IOException {
+    void unresolvableTransitiveDependencyDueToInvalidPom(@TempDir Path localRepository) throws Exception {
         // it's hard to simulate a transitive dependency failure since Maven Central validates
         // transitive dependency resolvability on publishing.
         //
@@ -311,7 +305,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                   </dependency>
                 </dependencies>
               </project>
-              """)
+              """
+          )
         );
     }
 
@@ -340,10 +335,50 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 .get()
                 .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
                 .matches(deps -> deps.size() == 1)
-                .extracting(deps -> deps.get(0))
-                .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
-                  dep.getArtifactId().equals("stax-ex") &&
-                  dep.getVersion().equals("1.0"))))
+                .extracting(List::getFirst)
+                .matches(dep -> "org.jvnet.staxex".equals(dep.getGroupId()) &&
+                  "stax-ex".equals(dep.getArtifactId()) &&
+                  "1.0".equals(dep.getVersion()))))
+        );
+    }
+
+    @Test
+    void unresolvableTgzDependencyShouldNotFailBuild() {
+        rewriteRun(
+          spec -> spec.executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder()
+              .dependencyModel(false)
+              .build()),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.example.mongo.osx</groupId>
+                    <artifactId>mongodb-osx-ssl-x86_64</artifactId>
+                    <version>3.6.23</version>
+                    <type>tgz</type>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.example.mongo.linux</groupId>
+                    <artifactId>mongodb-linux-x86_64</artifactId>
+                    <version>3.6.23</version>
+                    <type>tgz</type>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(after -> {
+                // tgz dependencies that can't be downloaded should NOT cause a parse failure
+                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                assertThat(maybeParseException).isEmpty();
+            })
+          )
         );
     }
 

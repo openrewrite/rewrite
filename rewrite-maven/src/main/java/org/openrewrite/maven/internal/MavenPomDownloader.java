@@ -39,6 +39,7 @@ import org.openrewrite.semver.Semver;
 import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -50,8 +51,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.ListUtils.concatAll;
 
@@ -68,6 +68,9 @@ public class MavenPomDownloader {
     private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
     private static final String SNAPSHOT = "SNAPSHOT";
+    private static final String LATEST = "LATEST";
+    private static final String RELEASE = "RELEASE";
+    private static final List<String> NAMED_VERSIONS = Arrays.asList(LATEST, RELEASE);
 
 
     private final MavenPomCache mavenCache;
@@ -96,7 +99,8 @@ public class MavenPomDownloader {
      * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
      *                       set on the execution context.
      */
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
+    public MavenPomDownloader(Map<Path, Pom> projectPoms,
+                              ExecutionContext ctx,
                               @Nullable MavenSettings mavenSettings,
                               @Nullable List<String> activeProfiles) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
@@ -131,10 +135,8 @@ public class MavenPomDownloader {
      * @param projectPoms Project poms on disk.
      * @param httpSender  The HTTP sender.
      * @param ctx         The execution context.
-     * @deprecated Use {@link #MavenPomDownloader(Map, ExecutionContext)} instead.
      */
-    @Deprecated
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
+    private MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
@@ -176,8 +178,8 @@ public class MavenPomDownloader {
             List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
             Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
             GroupArtifactVersion gav = new GroupArtifactVersion(
-                    projectPom.getGroupId(),
-                    projectPom.getArtifactId(),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getGroupId(), mergedProperties::get),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getArtifactId(), mergedProperties::get),
                     ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
             );
             result.put(gav, projectPom);
@@ -189,7 +191,10 @@ public class MavenPomDownloader {
         Map<String, String> mergedProperties = new HashMap<>();
         for (Pom pom : pomAncestry) {
             for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
-                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
+                mergedProperties.putIfAbsent(
+                        property.getKey(),
+                        // null property values like `<sha1 />` are treated as empty strings to avoid showing in URLs
+                        Objects.toString(property.getValue(), ""));
             }
         }
         return mergedProperties;
@@ -198,7 +203,7 @@ public class MavenPomDownloader {
     private List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         Pom parentPom = getParentWithinProject(projectPom, projectPoms);
         if (parentPom == null) {
-            return Collections.singletonList(projectPom);
+            return singletonList(projectPom);
         } else {
             return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
         }
@@ -210,12 +215,23 @@ public class MavenPomDownloader {
             return null;
         }
         String relativePath = parent.getRelativePath();
-        if (StringUtils.isBlank(relativePath)) {
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
+        if (relativePath != null && relativePath.isEmpty()) {
+            return null;
+        }
+        if (relativePath == null) {
             relativePath = "../pom.xml";
+        }
+        // Maven resolves <relativePath> to a directory + /pom.xml when it doesn't
+        // already point to a file. Match that behaviour so that directory-style
+        // relative paths like "../my-parent" resolve correctly.
+        Path resolvedRelativePath = Paths.get(relativePath);
+        if (!relativePath.endsWith(".xml")) {
+            resolvedRelativePath = resolvedRelativePath.resolve("pom.xml");
         }
         Path parentPath = projectPom.getSourcePath()
                 .resolve("..")
-                .resolve(Paths.get(relativePath))
+                .resolve(resolvedRelativePath)
                 .normalize();
         Pom parentPom = projectPoms.get(parentPath);
         return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
@@ -243,9 +259,9 @@ public class MavenPomDownloader {
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        List<String> attemptedUris = new ArrayList<>(normalizedRepos.size());
+        List<String> attemptedUris = new ArrayList<>();
         for (MavenRepository repo : normalizedRepos) {
             ctx.getResolutionListener().repository(repo, containingPom);
             if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
@@ -261,7 +277,7 @@ public class MavenPomDownloader {
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                                      requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                      gav.getArtifactId() + '/' +
-                                     (gav.getVersion() == null ? "" : gav.getVersion() + '/');
+                                     (gav.getVersion() == null || NAMED_VERSIONS.contains(gav.getVersion().toUpperCase()) ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -296,7 +312,7 @@ public class MavenPomDownloader {
                         if (derivedMeta != null) {
                             Counter.builder("rewrite.maven.derived.metadata")
                                     .tag("repositoryUri", repo.getUri())
-                                    .tag("group", gav.getGroupId())
+                                    .tag("group", gav.getGroupId() == null ? "" : gav.getGroupId())
                                     .tag("artifact", gav.getArtifactId())
                                     .register(Metrics.globalRegistry)
                                     .increment();
@@ -406,13 +422,13 @@ public class MavenPomDownloader {
         List<String> versions = new ArrayList<>();
         int start = responseBody.indexOf("<a href=\"");
         while (start > 0) {
-            start = start + 9;
-            int end = responseBody.indexOf("\">", start);
+            start += 9;
+            int end = responseBody.indexOf("\"", start);
             if (end < 0) {
                 break;
             }
             String href = responseBody.substring(start, end).trim();
-            if (href.endsWith("/")) {
+            if (!href.startsWith("../") && href.endsWith("/")) {
                 //Only look for hrefs that have directories (the directory names are the versions)
                 versions.add(hrefToVersion(href, uri));
             }
@@ -512,33 +528,42 @@ public class MavenPomDownloader {
             }
         }
 
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-            !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
-            Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
-            if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
-                        .normalize());
-                // Even poms published to remote repositories still contain relative paths to their parent poms
-                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
-                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                if (maybeLocalPom != null &&
-                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
-                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
-                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
-                    return maybeLocalPom;
+                !(relativePath != null && relativePath.isEmpty())) {
+            // Maven POM §4.0.0 specifies that <relativePath> defaults to ".." when omitted.
+            // See DefaultModelBuilder#readParentLocally in maven-model-builder.
+            String effectiveRelativePath = relativePath == null ? ".." : relativePath;
+            if (!effectiveRelativePath.contains(":")) {
+                Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
+                if (folderContainingPom != null) {
+                    Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(effectiveRelativePath).resolve("pom.xml"))
+                            .normalize());
+                    // Even poms published to remote repositories still contain relative paths to their parent poms.
+                    // Like Maven 3's DefaultModelBuilder#readParentLocally, check groupId, artifactId,
+                    // and version to guard against a relative path like ".." or "../.." coincidentally
+                    // resolving to an unrelated local pom. The version check is relaxed when it contains
+                    // unresolved placeholders (e.g. ${project.version}) that only the parent can resolve.
+                    if (maybeLocalPom != null &&
+                            gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                            gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                            (gav.getVersion().equals(maybeLocalPom.getVersion()) || gav.getVersion().contains("${"))) {
+                        return maybeLocalPom;
+                    }
                 }
             }
         }
 
-        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
+        GroupArtifactVersion originalGav = gav;
+        gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
+        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
+        gav = handleSnapshotTimestampVersion(gav);
+        Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
         Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
-        String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
-        GroupArtifactVersion originalGav = gav;
-        gav = handleSnapshotTimestampVersion(gav);
         List<String> uris = new ArrayList<>();
 
         // Keep the repo and resolved GAV of the found JAR to avoid throwing if JAR is found
@@ -613,20 +638,50 @@ public class MavenPomDownloader {
                             // Record the absense of the pom file
                             ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         // unable to read the pom from a file-based repository.
                         repositoryResponses.put(repo, e.getMessage());
                     }
                 } else {
                     try {
                         try {
-                            byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
+                            byte[] pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
                             Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
                             RawPom rawPom = RawPom.parse(
-                                    new ByteArrayInputStream(responseBody),
+                                    new ByteArrayInputStream(pomResponseBody),
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(pomResponseBody)))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    if (line.contains("published-with-gradle-metadata")) {
+                                        // Some artifacts do not have the bom as dependency listed, we need to add it by fetching the gradle metadata module.
+                                        // It isn't strictly correct to do this from a maven standpoint, but helps with emulating Gradle dependency resolution
+                                        pomResponseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString().replaceFirst(".pom$", ".module"));
+                                        RawGradleModule module = RawGradleModule.parse(new ByteArrayInputStream(pomResponseBody));
+                                        for (Dependency dependency : module.getDependencies("apiElements", "platform", "enforcedPlatform")) {
+                                            String category = dependency.getAttributes().get("org.gradle.category");
+                                            // Platform and enforcedPlatform dependencies are BOMs that should be in dependencyManagement,
+                                            // not regular dependencies - they only provide version constraints
+                                            if ("platform".equalsIgnoreCase(category) || "enforcedPlatform".equalsIgnoreCase(category)) {
+                                                if (rawPom.getDependencyManagement() == null) {
+                                                    rawPom.setDependencyManagement(new RawPom.DependencyManagement(new RawPom.Dependencies()));
+                                                }
+                                                assert rawPom.getDependencyManagement().getDependencies() != null;
+                                                rawPom.getDependencyManagement().getDependencies().getDependencies().add(
+                                                        new RawPom.Dependency(dependency.getGroupId() == null ? "" : dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), "import", "pom", null, null, null)
+                                                );
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                            } catch (HttpSenderResponseException e) {
+                                if (e.getResponseCode() != 404) {
+                                    throw e;
+                                }
+                            }
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
@@ -658,7 +713,7 @@ public class MavenPomDownloader {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
-                    } catch (IOException e) {
+                    } catch (IOException | UncheckedIOException e) {
                         repositoryResponses.put(repo, e.getMessage());
                     }
                 }
@@ -669,6 +724,7 @@ public class MavenPomDownloader {
                 repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
+
         if (foundJarInRepo != null && foundResolvedGav != null) {
             // IF JAR has been found return the artificially created POM not to throw exception
             RawPom rawPom = rawPomFromGav(gav);
@@ -756,7 +812,30 @@ public class MavenPomDownloader {
         return gav.getVersion();
     }
 
-    Collection<MavenRepository> distinctNormalizedRepositories(
+    private GroupArtifactVersion resolveNamedVersion(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories, ExecutionContext ctx) {
+        if (gav.getVersion() == null) {
+            return gav;
+        }
+        String version = gav.getVersion().toUpperCase();
+        if (NAMED_VERSIONS.contains(version)) {
+            MavenMetadata mavenMetadata;
+            try {
+                mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            } catch (MavenDownloadingException e) {
+                //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
+                return gav;
+            }
+
+            if (RELEASE.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getRelease());
+            } else if (LATEST.equals(version)) {
+                return gav.withVersion(mavenMetadata.getVersioning().getLatest());
+            }
+        }
+        return gav;
+    }
+
+    Iterable<MavenRepository> distinctNormalizedRepositories(
             List<MavenRepository> repositories,
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
@@ -767,35 +846,67 @@ public class MavenPomDownloader {
             repositories = emptyList();
         }
 
-        LinkedHashMap<String, MavenRepository> normalizedRepositories = new LinkedHashMap<>();
+        // Create a list of raw repository suppliers in the correct order
+        Map<@Nullable String, MavenRepository> repositoriesById = new LinkedHashMap<>();
 
+        // Add local repository if needed
         if (addLocalRepository) {
-            normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
+            repositoriesById.put("local", ctx.getLocalRepository());
         }
 
-        // repositories from maven settings
+        // Add repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositoriesById.put(repo.getId(), repo);
         }
 
+        // Add repositories passed as parameter
         for (MavenRepository repo : repositories) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+            repositoriesById.put(repo.getId(), repo);
         }
 
-        if (!normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId()) && addCentralRepository) {
-            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
-            if (normalizedRepo != null) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
+        // Add Maven Central if needed
+        if (addCentralRepository && !repositoriesById.containsKey("central")) {
+            repositoriesById.put("central", MavenRepository.MAVEN_CENTRAL);
         }
 
-        return normalizedRepositories.values();
+        // Return lazy iterable
+        return () -> new Iterator<MavenRepository>() {
+            private final Iterator<MavenRepository> repoIterator = repositoriesById.values().iterator();
+            private final Map<@Nullable String, MavenRepository> seen = new LinkedHashMap<>();
+            private @Nullable MavenRepository next;
+
+            private @Nullable MavenRepository findNext() {
+                while (repoIterator.hasNext()) {
+                    MavenRepository repo = repoIterator.next();
+                    MavenRepository normalized = normalizeRepository(repo, ctx, containingPom);
+
+                    if (normalized != null &&
+                        (acceptsVersion == null || repositoryAcceptsVersion(normalized, acceptsVersion, containingPom)) &&
+                        seen.put(normalized.getId(), normalized) == null) {
+                        return normalized;
+                    }
+                }
+                return null;
+            }
+
+            @Override
+            public boolean hasNext() {
+                if (next != null) {
+                    return true;
+                }
+                return (next = findNext()) != null;
+            }
+
+            @Override
+            public MavenRepository next() {
+                MavenRepository result = next;
+                if (result == null) {
+                    throw new NoSuchElementException();
+                }
+                next = null;
+                return result;
+            }
+        };
     }
 
     public @Nullable MavenRepository normalizeRepository(MavenRepository originalRepository, MavenExecutionContextView ctx, @Nullable ResolvedPom containingPom) {
@@ -806,6 +917,13 @@ public class MavenPomDownloader {
             repository = repository.withUri(containingPom.getValue(repository.getUri()));
         }
         repository = applyAuthenticationToRepository(applyMirrors(repository));
+
+        // Normalize file URIs early, before the knownToExist check, so that all
+        // downstream URI.create() calls receive a properly encoded file:// URI.
+        if (!repository.getUri().contains("${") && repository.getUri().regionMatches(true, 0, "file:", 0, 5)) {
+            repository = repository.withUri(normalizeFileUri(repository.getUri()));
+        }
+
         try {
             if (repository.isKnownToExist()) {
                 return repository;
@@ -918,7 +1036,7 @@ public class MavenPomDownloader {
     enum Reachability {
         SUCCESS,
         ERROR,
-        UNREACHABLE;
+        UNREACHABLE
     }
 
     private ReachabilityResult reachable(HttpSender.Request.Builder request) {
@@ -942,7 +1060,7 @@ public class MavenPomDownloader {
         try {
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
-                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(jarUrl)).build();
+                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.head(jarUrl)).build();
                     try (HttpSender.Response response = httpSender.send(authenticated)) {
                         return response.isSuccessful();
                     }
@@ -952,7 +1070,7 @@ public class MavenPomDownloader {
                 if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
                     ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
-                        HttpSender.Request unauthenticated = httpSender.get(jarUrl).build();
+                        HttpSender.Request unauthenticated = httpSender.head(jarUrl).build();
                         try (HttpSender.Response response = httpSender.send(unauthenticated)) {
                             return response.isSuccessful();
                         }
@@ -1135,4 +1253,32 @@ public class MavenPomDownloader {
         return null;
     }
 
+    /**
+     * Normalizes a file:// URI so that non-ASCII characters are percent-encoded
+     * and Windows backslashes are converted to forward slashes. Already-encoded
+     * URIs pass through unchanged (idempotent).
+     */
+    static String normalizeFileUri(String uri) {
+        String path;
+        try {
+            // getPath() decodes %C3%BC → ü, ensuring re-encoding is idempotent
+            path = URI.create(uri).getPath();
+        } catch (IllegalArgumentException e) {
+            // Malformed (e.g. Windows backslashes) — extract path manually
+            path = uri.substring(5).replaceFirst("^/+", "/");
+        }
+
+        path = path.replace('\\', '/');
+        boolean trailingSlash = path.endsWith("/");
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+
+        try {
+            String normalized = new URI("file", "", path, null).toASCIIString();
+            return trailingSlash && !normalized.endsWith("/") ? normalized + "/" : normalized;
+        } catch (URISyntaxException e) {
+            return uri;
+        }
+    }
 }

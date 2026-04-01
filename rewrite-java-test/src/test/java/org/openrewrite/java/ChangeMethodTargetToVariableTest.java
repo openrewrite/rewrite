@@ -16,18 +16,23 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodTargetToVariableTest implements RewriteTest {
 
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null));
+    }
+
     @Test
     void explicitStaticToVariable() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null)),
           java(
-            """ 
+            """
               package a;
               public class A {
                  public void foo() {}
@@ -45,7 +50,7 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
           java(
             """
               import a.*;
-                            
+
               import b.B;
               public class C {
                  A a;
@@ -70,7 +75,6 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
     @Test
     void staticImportToVariable() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null)),
           java(
             """
               package a;

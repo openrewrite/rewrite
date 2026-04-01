@@ -248,7 +248,8 @@ class MethodDeclarationTest implements RewriteTest {
               inline fun example (
                 crossinline block : ( ) -> Unit
               ) : Unit = Unit
-              """)
+              """
+          )
         );
     }
 
@@ -261,7 +262,8 @@ class MethodDeclarationTest implements RewriteTest {
               inline fun example (
                 noinline block : ( ) -> Unit
               ) : Unit = Unit
-              """)
+              """
+          )
         );
     }
 
@@ -302,17 +304,16 @@ class MethodDeclarationTest implements RewriteTest {
             "fun method() {}",
             spec -> spec.afterRecipe(cu -> {
                 for (Statement statement : cu.getStatements()) {
-                    if (statement instanceof J.MethodDeclaration) {
-                        J.Modifier.hasModifier(((J.MethodDeclaration) statement).getModifiers(), J.Modifier.Type.Final);
-                        assertThat(J.Modifier.hasModifier(((J.MethodDeclaration) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                    if (statement instanceof J.MethodDeclaration declaration) {
+                        assertThat(J.Modifier.hasModifier(declaration.getModifiers(), J.Modifier.Type.Final)).isTrue();
                     }
                 }
             }))
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/271")
+    @Test
     void negativeSingleExpression() {
         rewriteRun(
           kotlin(

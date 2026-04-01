@@ -23,8 +23,8 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class AnonymousFunctionTest implements RewriteTest {
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/287")
+    @Test
     void noArgs() {
         rewriteRun(
           kotlin(
@@ -35,8 +35,8 @@ class AnonymousFunctionTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/287")
+    @Test
     void singleArg() {
         rewriteRun(
           kotlin(

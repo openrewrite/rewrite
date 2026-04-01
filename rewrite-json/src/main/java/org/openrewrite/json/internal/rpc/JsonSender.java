@@ -34,19 +34,20 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, j2 -> asRef(j2.getPrefix()), space ->
                 visitSpace(Reference.getValueNonNull(space), q));
-        q.sendMarkers(j, Tree::getMarkers);
+        q.getAndSend(j, Tree::getMarkers);
         return j;
     }
 
     @Override
     public Json visitDocument(Json.Document document, RpcSendQueue q) {
-        q.getAndSend(document, (Json.Document d) -> d.getSourcePath().toString());
-        q.getAndSend(document, (Json.Document d) -> d.getCharset().name());
+        q.getAndSend(document, d -> d.getSourcePath().toString());
+        q.getAndSend(document, d -> d.getCharset().name());
         q.getAndSend(document, Json.Document::isCharsetBomMarked);
         q.getAndSend(document, Json.Document::getChecksum);
         q.getAndSend(document, Json.Document::getFileAttributes);
         q.getAndSend(document, Json.Document::getValue, j -> visit(j, q));
-        q.getAndSend(document, d -> asRef(d.getEof()));
+        q.getAndSend(document, d -> asRef(d.getEof()), space ->
+                visitSpace(Reference.getValueNonNull(space), q));
         return document;
     }
 
@@ -97,7 +98,7 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
             q.getAndSend(c, Comment::isMultiline);
             q.getAndSend(c, Comment::getText);
             q.getAndSend(c, Comment::getSuffix);
-            q.sendMarkers(c, Comment::getMarkers);
+            q.getAndSend(c, Comment::getMarkers);
         });
         q.getAndSend(space, Space::getWhitespace);
         return space;
@@ -105,10 +106,11 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     @Override
     public @Nullable <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, RpcSendQueue q) {
+        assert right != null;
         q.getAndSend(right, JsonRightPadded::getElement, j -> visit(j, q));
         q.getAndSend(right, j -> asRef(j.getAfter()),
                 space -> visitSpace(Reference.getValueNonNull(space), q));
-        q.sendMarkers(right, JsonRightPadded::getMarkers);
+        q.getAndSend(right, JsonRightPadded::getMarkers);
         return right;
     }
 }

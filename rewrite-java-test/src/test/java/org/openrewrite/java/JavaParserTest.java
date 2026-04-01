@@ -48,6 +48,69 @@ import static org.openrewrite.test.TypeValidation.all;
  */
 class JavaParserTest implements RewriteTest {
 
+    @DocumentExample
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Baz {
+                  -pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Baz {
+                  /*~~>*/-/*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void incompleteAssignment() {
         rewriteRun(
@@ -61,8 +124,8 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("RedundantSuppression")
     @Issue("https://github.com/openrewrite/rewrite/issues/2313")
+    @SuppressWarnings("RedundantSuppression")
     @Test
     void annotationCommentWithNoSpaceParsesCorrectly() {
         rewriteRun(
@@ -74,7 +137,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -91,7 +154,7 @@ class JavaParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+              assertThat(cu.getClasses().getFirst().getLeadingAnnotations()).hasSize(2))
           )
         );
     }
@@ -121,8 +184,8 @@ class JavaParserTest implements RewriteTest {
         assertThat(updatedTemp.toFile().exists()).isTrue();
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3222")
+    @Test
     void parseFromByteArray() {
         try (ScanResult scan = new ClassGraph().scan()) {
             byte[][] classes = scan.getResourcesMatchingWildcard("javaparser-byte-array-tests/**.class").stream()
@@ -145,7 +208,7 @@ class JavaParserTest implements RewriteTest {
               public class User implements InterfaceA, InterfaceB {
                 @Override
                 public void methodA() {}
-              
+
                 @Override
                public void methodB() {}
               }
@@ -175,8 +238,8 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1895")
+    @Test
     void moduleInfo() {
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
@@ -246,71 +309,8 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void erroneousVariableDeclarations() {
-        rewriteRun(
-          spec -> spec.recipe(new FindCompileErrors())
-            .typeValidationOptions(all().erroneous(false)),
-          java(
-            """
-              package com.example.demo;
-              class Foo {
-                  /pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Foo {
-                  /*~~>*///*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Bar {
-                  pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Bar {
-                  /*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              package com.example.demo;
-              class Baz {
-                  -pet
-                  public void test() {
-                  }
-              }
-              """,
-            """
-              package com.example.demo;
-              class Baz {
-                  /*~~>*/-/*~~>*/pet
-                  public void test() {
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4624")
+    @Test
     void shouldParseComments() {
         rewriteRun(
           java(
@@ -330,11 +330,11 @@ class JavaParserTest implements RewriteTest {
                    */
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().getFirst().getBody().getEnd().getComments())
               .extracting("text")
               .containsExactly(
                 """
-                  
+
                        * public Some getOther() { return other; }
                        *
                        \
@@ -348,7 +348,7 @@ class JavaParserTest implements RewriteTest {
                        \
                   """,
                 """
-                  
+
                        * public void setOther(Some value) { this.other =
                        * value; }
                        \
@@ -390,7 +390,71 @@ class JavaParserTest implements RewriteTest {
                 return null;
               }
             }
-            """));
+            """
+          )
+        );
     }
 
+    @Test
+    void multiLinePackageComment() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+              package com.abc;
+              public class Server {
+                /**
+                 * @see com.abc.Server#load(
+                 * java.lang.
+                 * String)
+                 */
+                public void load(String str) {
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5445")
+    @Test
+    void parseSwitchBlock() {
+        rewriteRun(
+          java(
+            """
+            public class Foo {
+              private String foo(final int i) {
+                return switch (i) {
+                  case 200:
+                    {
+                      yield "I'm in a block";
+                    }
+                  case 250, 300 -> {
+                      yield "another block";
+                  }
+                  case 400:
+                    yield "single line yield";
+                  default:
+                    yield "default";
+                };
+              }
+              private String mapFoo(final int i) {
+                String temp;
+                switch (i) {
+                  case 100: {
+                    temp = "value in block";
+                    break;
+                  }
+                  case 200, 300-> {
+                    temp = "another value in block";
+                  }
+                  default: temp = "default value";
+                }
+                return temp;
+              }
+            }
+            """
+          )
+        );
+    }
 }

@@ -42,12 +42,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.internal.StreamUtils.distinctBy;
 
 /**
@@ -97,7 +95,7 @@ public class ImportLayoutStyle implements KotlinStyle {
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
         Map<Boolean, List<Block>> blockGroups = layout.stream()
-                .collect(Collectors.partitioningBy(Block.AllOthers.class::isInstance));
+                .collect(partitioningBy(Block.AllOthers.class::isInstance));
         blocksNoCatchalls = blockGroups.get(false);
         blocksOnlyCatchalls = blockGroups.get(true);
 
@@ -679,7 +677,7 @@ public class ImportLayoutStyle implements KotlinStyle {
                         .collect(groupingBy(
                                 ImportLayoutStyle::packageOrOuterClassName,
                                 LinkedHashMap::new, // Use an ordered map to preserve sorting
-                                Collectors.toList()
+                                toList()
                         ));
 
                 List<JRightPadded<J.Import>> ordered = new ArrayList<>(imports.size());
@@ -688,7 +686,7 @@ public class ImportLayoutStyle implements KotlinStyle {
                     JRightPadded<J.Import> toStar = importGroup.get(0);
                     int threshold = toStar.getElement().isStatic() ? nameCountToUseStarImport : classCountToUseStarImport;
                     boolean starImportExists = importGroup.stream()
-                            .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
+                            .anyMatch(it -> "*".equals(it.getElement().getQualid().getSimpleName()));
 
                     // Disable folding imports in Kotlin due to https://github.com/openrewrite/rewrite-kotlin/issues/370
                     boolean disableFoldingImports = true;
@@ -701,7 +699,7 @@ public class ImportLayoutStyle implements KotlinStyle {
 
                         Set<String> typeNamesInThisGroup = importGroup.stream()
                                 .map(im -> im.getElement().getClassName())
-                                .collect(Collectors.toSet());
+                                .collect(toSet());
 
                         Optional<String> oneOfTheTypesIsInAnotherGroupToo = groupedImports.values().stream()
                                 .filter(group -> group != importGroup)

@@ -117,9 +117,9 @@ public class HttpUrlConnectionSender implements HttpSender {
             } else if (status < 400 && con.getInputStream() != null) {
                 is = con.getInputStream();
             } else {
-                return new Response(status, new ByteArrayInputStream(new byte[0]), onClose);
+                return new Response(status, new ByteArrayInputStream(new byte[0]), con.getHeaderFields(), onClose);
             }
-            return new Response(status, is, onClose);
+            return new Response(status, is, con.getHeaderFields(), onClose);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

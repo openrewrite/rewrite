@@ -28,6 +28,26 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class RemoveImportTest implements RewriteTest {
 
+    static Recipe removeTypeImportRecipe(String type) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeRemoveImport(type);
+                return cu;
+            }
+        });
+    }
+
+    static Recipe removeMemberImportRecipe(String type, String member) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeRemoveImport(type + '.' + member);
+                return cu;
+            }
+        });
+    }
+
     @DocumentExample
     @Test
     void jvmStaticMember() {
@@ -37,15 +57,15 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.lang.Integer
               import java.lang.Long
-              
+
               import java.lang.Integer.MAX_VALUE
-              
+
               class A
               """,
             """
               import java.lang.Integer
               import java.lang.Long
-              
+
               class A
               """
           )
@@ -55,18 +75,18 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void removeStarFoldPackage() {
         rewriteRun(
-          spec -> spec.recipe(removeTypeImportRecipe("java.io.OutputStream")).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipe(removeTypeImportRecipe("java.io.OutputStream")),
           kotlin(
             """
               import java.io.*
-              
+
               class A {
                   val f = File("foo")
               }
               """,
             """
               import java.io.File
-              
+
               class A {
                   val f = File("foo")
               }
@@ -82,7 +102,7 @@ class RemoveImportTest implements RewriteTest {
           kotlin(
             """
               import java.io.*
-              
+
               class A {
                   val c : Closeable? = null
                   val f : File? = null
@@ -102,7 +122,7 @@ class RemoveImportTest implements RewriteTest {
           kotlin(
             """
               import java.util.regex.Pattern.*
-              
+
               class A {
                   val i = CASE_INSENSITIVE
                   val x = COMMENTS
@@ -111,7 +131,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.regex.Pattern.CASE_INSENSITIVE
               import java.util.regex.Pattern.COMMENTS
-              
+
               class A {
                   val i = CASE_INSENSITIVE
                   val x = COMMENTS
@@ -128,7 +148,7 @@ class RemoveImportTest implements RewriteTest {
           kotlin(
             """
               import java.util.regex.Pattern.*
-              
+
               class A {
                   val i = CASE_INSENSITIVE
                   val x = COMMENTS
@@ -148,7 +168,7 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.regex.Pattern.CASE_INSENSITIVE as i
               import java.util.regex.Pattern.COMMENTS as x
-              
+
               class A {
                   val f = arrayOf(i, x)
               }
@@ -168,14 +188,14 @@ class RemoveImportTest implements RewriteTest {
             """
               import java.util.regex.Pattern.CASE_INSENSITIVE as i
               import java.util.regex.Pattern.COMMENTS as x
-              
+
               class A {
                   val f = arrayOf(i)
               }
               """,
             """
               import java.util.regex.Pattern.CASE_INSENSITIVE as i
-              
+
               class A {
                   val f = arrayOf(i)
               }
@@ -202,25 +222,5 @@ class RemoveImportTest implements RewriteTest {
               """
           )
         );
-    }
-
-    static Recipe removeTypeImportRecipe(String type) {
-        return toRecipe(() -> new KotlinIsoVisitor<>() {
-            @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                maybeRemoveImport(type);
-                return cu;
-            }
-        });
-    }
-
-    static Recipe removeMemberImportRecipe(String type, String member) {
-        return toRecipe(() -> new KotlinIsoVisitor<>() {
-            @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                maybeRemoveImport(type + '.' + member);
-                return cu;
-            }
-        });
     }
 }

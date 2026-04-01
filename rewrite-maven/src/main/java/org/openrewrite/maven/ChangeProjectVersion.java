@@ -38,7 +38,8 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class ChangeProjectVersion extends Recipe {
     // there are several implicitly defined version properties that we should never attempt to update
     private static final Collection<String> implicitlyDefinedVersionProperties = Arrays.asList(
-            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
+            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}",
+            "${revision}", "${sha1}", "${changelist}"
     );
 
     @Option(displayName = "Group",
@@ -62,21 +63,15 @@ public class ChangeProjectVersion extends Recipe {
     @Nullable
     Boolean overrideParentVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven Project Version";
-    }
+    String displayName = "Change Maven Project Version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the project version of a Maven pom.xml. Identifies the project to be changed by its groupId and artifactId. " +
+    String description = "Change the project version of a Maven pom.xml. Identifies the project to be changed by its groupId and artifactId. " +
                "If the version is defined as a property, this recipe will only change the property value if the property exists within the same pom.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -97,13 +92,16 @@ public class ChangeProjectVersion extends Recipe {
                             String oldVersion = resolvedPom.getValue(versionTagValue);
                             assert oldVersion != null;
 
-                            if (!oldVersion.equals(newVersion)) {
-                                if (versionTagValue.startsWith("${") && !implicitlyDefinedVersionProperties.contains(versionTagValue)) {
-                                    doAfterVisit(new ChangePropertyValue(versionTagValue.substring(2, versionTagValue.length() - 1), newVersion, false, false).getVisitor());
-                                } else {
-                                    doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                            // Skip if the current version tag value is already equal to the new version
+                            if (!versionTagValue.equals(newVersion)) {
+                                if (!oldVersion.equals(newVersion)) {
+                                    if (versionTagValue.startsWith("${") && !implicitlyDefinedVersionProperties.contains(versionTagValue)) {
+                                        doAfterVisit(new ChangePropertyValue(versionTagValue.substring(2, versionTagValue.length() - 1), newVersion, false, false).getVisitor());
+                                    } else {
+                                        doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                                    }
+                                    maybeUpdateModel();
                                 }
-                                maybeUpdateModel();
                             }
                         } else if (Boolean.TRUE.equals(overrideParentVersion)) {
                             // if the version is not present and the override parent version is set,

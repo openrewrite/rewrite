@@ -25,10 +25,10 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -69,10 +69,7 @@ public class AdHocRecipe extends Recipe {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
     }
 
-    @Override
-    public String getDescription() {
-        return "An ad hoc recipe used in RewriteTest.";
-    }
+    String description = "An ad hoc recipe used in RewriteTest.";
 
     @Override
     public String getName() {
@@ -91,7 +88,7 @@ public class AdHocRecipe extends Recipe {
 
     @Override
     public List<Maintainer> getMaintainers() {
-        return maintainers == null ? Collections.emptyList() : maintainers;
+        return maintainers == null ? emptyList() : maintainers;
     }
 
     @Override

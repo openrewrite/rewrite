@@ -28,7 +28,7 @@ public class ExactVersion extends LatestRelease {
     String version;
 
     public ExactVersion(String pattern) {
-        super(pattern);
+        super(null);
         if (pattern.startsWith("=")) {
             this.version = pattern.substring(1);
         } else {

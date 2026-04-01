@@ -33,8 +33,8 @@ import org.openrewrite.maven.tree.Version;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
@@ -90,7 +90,7 @@ public class VersionRequirement {
                 // for things like the profile activation block of where the range is unclosed but maven still handles it, e.g.
                 // https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.12.0-rc2/jackson-databind-2.12.0-rc2.pom
                 if (!(requested.contains("]") || requested.contains(")"))) {
-                    requested = requested + "]";
+                    requested += "]";
                 }
 
                 VersionRangeParser parser = new VersionRangeParser(new CommonTokenStream(new VersionRangeLexer(
@@ -204,7 +204,7 @@ public class VersionRequirement {
 
         @Override
         public String toString() {
-            return ranges.stream().map(Range::toString).collect(Collectors.joining(",", "RangeSet={", "}"));
+            return ranges.stream().map(Range::toString).collect(joining(",", "RangeSet={", "}"));
         }
     }
 

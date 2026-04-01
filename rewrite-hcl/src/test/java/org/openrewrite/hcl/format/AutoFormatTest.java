@@ -30,19 +30,6 @@ class AutoFormatTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
-    @Test
-    void forLoops() {
-        rewriteRun(
-          hcl(
-          """
-          a = [for v in ["a", "b"] : v]
-          b = [for i, v in ["a", "b"] : i]
-          c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
-          """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void objectValues() {
@@ -69,13 +56,26 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
+    void forLoops() {
+        rewriteRun(
+          hcl(
+          """
+          a = [for v in ["a", "b"] : v]
+          b = [for i, v in ["a", "b"] : i]
+          c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
+          """
+          )
+        );
+    }
+
+    @Test
     void objectValuesCommas() {
         rewriteRun(
           hcl(
             """
               locals {
                 object = {
-                       string_attr = "value1"   ,   
+                       string_attr = "value1"   ,
                        int_attr = 2,
                 }
               }
@@ -114,17 +114,55 @@ class AutoFormatTest implements RewriteTest {
             """
               r1 {
               }
-              
-              
-              
+
+
+
               r2 {
               }
               """,
             """
               r1 {
               }
-              
+
               r2 {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6514")
+    @Test
+    void multiLineTupleIndentation() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                list = [
+                       "one",
+                       "two"
+                ]
+              }
+              """,
+            """
+              locals {
+                list = [
+                  "one",
+                  "two"
+                ]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleLineTuple() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                list = ["one", "two", "three"]
               }
               """
           )

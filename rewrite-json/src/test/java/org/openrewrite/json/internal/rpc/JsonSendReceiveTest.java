@@ -15,19 +15,17 @@
  */
 package org.openrewrite.json.internal.rpc;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
@@ -38,9 +36,9 @@ import org.openrewrite.test.RewriteTest;
 import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
-import java.time.Duration;
 
 import static org.openrewrite.json.Assertions.json;
+import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JsonSendReceiveTest implements RewriteTest {
@@ -49,20 +47,20 @@ class JsonSendReceiveTest implements RewriteTest {
 
     @BeforeEach
     void before() throws IOException {
-        PipedOutputStream serverOut = new PipedOutputStream();
-        PipedOutputStream clientOut = new PipedOutputStream();
-        PipedInputStream serverIn = new PipedInputStream(clientOut);
-        PipedInputStream clientIn = new PipedInputStream(serverOut);
+        var serverOut = new PipedOutputStream();
+        var clientOut = new PipedOutputStream();
+        var serverIn = new PipedInputStream(clientOut);
+        var clientIn = new PipedInputStream(serverOut);
 
         Environment env = Environment.builder().build();
 
-        JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
-          new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
+        var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
 
-        JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
-          new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
+          .batchSize(1);
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
+          .batchSize(1);
     }
 
     @AfterEach
@@ -74,9 +72,9 @@ class JsonSendReceiveTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-            @SneakyThrows
             @Override
-            public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+            @SneakyThrows
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
                 return t;
@@ -109,7 +107,7 @@ class JsonSendReceiveTest implements RewriteTest {
     static class ChangeValue extends JsonVisitor<Integer> {
         @Override
         public Json visitLiteral(Json.Literal literal, Integer p) {
-            if (literal.getValue().equals("value")) {
+            if ("value".equals(literal.getValue())) {
                 return literal.withValue("changed").withSource("\"changed\"");
             }
             return literal;

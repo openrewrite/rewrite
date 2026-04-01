@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -26,15 +27,11 @@ import org.openrewrite.yaml.style.YamlDefaultStyles;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class Indents extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "YAML indent";
-    }
+    @Getter
+    final String displayName = "YAML indent";
 
-    @Override
-    public String getDescription() {
-        return "Format tabs and indents in YAML.";
-    }
+    @Getter
+    final String description = "Format tabs and indents in YAML.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

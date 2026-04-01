@@ -35,10 +35,6 @@ class TrailingCommaTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new TrailingCommaVisitor<>(IntelliJ.other().getUseTrailingComma())));
     }
 
-    private static Consumer<RecipeSpec> trailingCommaStyle(UnaryOperator<OtherStyle> with) {
-        return spec -> spec.recipe(toRecipe(() -> new TrailingCommaVisitor<>(with.apply(IntelliJ.other()).getUseTrailingComma())));
-    }
-
     @DocumentExample
     @Test
     void classPropertiesWithTrailingCommaOff() {
@@ -59,6 +55,10 @@ class TrailingCommaTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static Consumer<RecipeSpec> trailingCommaStyle(UnaryOperator<OtherStyle> with) {
+        return spec -> spec.recipe(toRecipe(() -> new TrailingCommaVisitor<>(with.apply(IntelliJ.other()).getUseTrailingComma())));
     }
 
     @Test

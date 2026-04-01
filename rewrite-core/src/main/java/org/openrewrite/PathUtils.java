@@ -20,7 +20,6 @@ import org.openrewrite.internal.StringUtils;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -33,8 +32,13 @@ public class PathUtils {
     }
 
     private static final char UNIX_SEPARATOR = '/';
-
     private static final char WINDOWS_SEPARATOR = '\\';
+
+    // Regular expression to match {...}
+    private static final Pattern ALTERNATIVES_PATTERN = Pattern.compile("\\{(.*?)}");
+
+    // Regular expression to match !(...)
+    private static final Pattern NEGATION_PATTERN = Pattern.compile("!\\((.*?)\\)");
 
     /**
      * Compare two paths, returning true if they indicate the same path, regardless of separators.
@@ -69,6 +73,10 @@ public class PathUtils {
     }
 
     public static boolean matchesGlob(@Nullable Path path, @Nullable String globPattern) {
+        return matchesGlob(path == null ? null : separatorsToUnix(path.toString()), globPattern);
+    }
+
+    public static boolean matchesGlob(@Nullable String path, @Nullable String globPattern) {
         if ("**".equals(globPattern)) {
             return true;
         }
@@ -76,18 +84,17 @@ public class PathUtils {
             return false;
         }
 
-        String relativePath = path.toString();
-        if (relativePath.isEmpty() && globPattern.isEmpty()) {
+        if (path.isEmpty() && globPattern.isEmpty()) {
             return true;
         }
 
         List<String> eitherOrPatterns = getEitherOrPatterns(globPattern);
         List<String> excludedPatterns = getExcludedPatterns(globPattern);
         if (eitherOrPatterns.isEmpty() && excludedPatterns.isEmpty()) {
-            return matchesGlob(globPattern, relativePath);
+            return matchesGlobPattern(globPattern, path);
         } else if (!eitherOrPatterns.isEmpty()) {
             for (String eitherOrPattern : eitherOrPatterns) {
-                if (matchesGlob(Paths.get(relativePath), eitherOrPattern)) {
+                if (matchesGlob(path, eitherOrPattern)) {
                     return true;
                 }
             }
@@ -95,11 +102,11 @@ public class PathUtils {
         } else {
             // When only a segment of a path is negated the other segments must still match
             String wildcard = convertNegationToWildcard(globPattern);
-            if (!matchesGlob(wildcard, relativePath)) {
+            if (!matchesGlobPattern(wildcard, path)) {
                 return false;
             }
             for (String excludedPattern : excludedPatterns) {
-                if (matchesGlob(excludedPattern, relativePath)) {
+                if (matchesGlobPattern(excludedPattern, path)) {
                     return false;
                 }
             }
@@ -107,7 +114,7 @@ public class PathUtils {
         return true;
     }
 
-    private static boolean matchesGlob(String pattern, String path) {
+    private static boolean matchesGlobPattern(String pattern, String path) {
         String[] pattTokens = tokenize(pattern);
         String[] pathTokens = tokenize(path);
         int pattIdxStart = 0;
@@ -131,11 +138,11 @@ public class PathUtils {
             if (pattIdxStart > pattIdxEnd) {
                 return !isFileSeparator(pattern.charAt(pattern.length() - 1));
             }
-            if (pattIdxStart == pattIdxEnd && pattTokens[pattIdxStart].equals("*") && isFileSeparator(path.charAt(path.length() - 1))) {
+            if (pattIdxStart == pattIdxEnd && "*".equals(pattTokens[pattIdxStart]) && isFileSeparator(path.charAt(path.length() - 1))) {
                 return true;
             }
             for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-                if (!pattTokens[i].equals("**")) {
+                if (!"**".equals(pattTokens[i])) {
                     return false;
                 }
             }
@@ -163,7 +170,7 @@ public class PathUtils {
         if (pathIdxStart > pathIdxEnd) {
             // Path exhausted
             for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-                if (!pattTokens[i].equals("**")) {
+                if (!"**".equals(pattTokens[i])) {
                     return false;
                 }
             }
@@ -173,7 +180,7 @@ public class PathUtils {
         while (pattIdxStart != pattIdxEnd && pathIdxStart <= pathIdxEnd) {
             int patIdxTmp = -1;
             for (int i = pattIdxStart + 1; i <= pattIdxEnd; i++) {
-                if (pattTokens[i].equals("**")) {
+                if ("**".equals(pattTokens[i])) {
                     patIdxTmp = i;
                     break;
                 }
@@ -207,7 +214,7 @@ public class PathUtils {
         }
 
         for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
-            if (!pattTokens[i].equals("**")) {
+            if (!"**".equals(pattTokens[i])) {
                 return false;
             }
         }
@@ -228,10 +235,7 @@ public class PathUtils {
 
         List<String> excludedPatterns = new ArrayList<>(3);
 
-        // Regular expression to match !(...)
-        String negationPattern = "!\\((.*?)\\)";
-        Pattern pattern = Pattern.compile(negationPattern);
-        Matcher matcher = pattern.matcher(globPattern);
+        Matcher matcher = NEGATION_PATTERN.matcher(globPattern);
 
         // Find all negation patterns and generate excluded patterns
         while (matcher.find()) {
@@ -252,10 +256,7 @@ public class PathUtils {
 
         List<String> eitherOrPatterns = new ArrayList<>(3);
 
-        // Regular expression to match {...}
-        String eitherOrPattern = "\\{(.*?)}";
-        Pattern pattern = Pattern.compile(eitherOrPattern);
-        Matcher matcher = pattern.matcher(globPattern);
+        Matcher matcher = ALTERNATIVES_PATTERN.matcher(globPattern);
 
         // Find all possible patterns and generate patterns
         while (matcher.find()) {

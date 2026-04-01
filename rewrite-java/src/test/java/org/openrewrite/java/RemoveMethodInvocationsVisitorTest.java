@@ -28,10 +28,6 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr", "RedundantThrows", "Convert2MethodRef", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock", "StringBufferReplaceableByString", "UnnecessaryLocalVariable"})
 class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
-    private Recipe createRemoveMethodsRecipe(String... methods) {
-        return toRecipe(() -> new RemoveMethodInvocationsVisitor(List.of(methods)));
-    }
-
     @DocumentExample
     @Test
     void removeFromEnd() {
@@ -71,6 +67,10 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private Recipe createRemoveMethodsRecipe(String... methods) {
+        return toRecipe(() -> new RemoveMethodInvocationsVisitor(List.of(methods)));
     }
 
     @Test
@@ -499,7 +499,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           java(
             """
               import static org.junit.jupiter.api.Assertions.assertTrue;
-              
+
               class Test {
                   void method() {
                       assertTrue(true);
@@ -524,9 +524,9 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              
+
               import static java.util.Collections.emptyList;
-              
+
               class Test {
                   void method() {
                       List<Object> emptyList = emptyList();
@@ -546,9 +546,9 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              
+
               import static java.util.Collections.emptyList;
-              
+
               class Test {
                   List<Object> emptyList = emptyList();
                   void method() {
@@ -568,7 +568,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           java(
             """
               import org.junit.jupiter.api.Assertions;
-              
+
               class Test {
                   void method() {
                       Assertions.assertTrue(true);
@@ -594,7 +594,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Collections;
-              
+
               class Test {
                   void method() {
                       List<Object> emptyList = Collections.emptyList();
@@ -615,7 +615,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
             """
               import java.util.List;
               import java.util.Collections;
-              
+
               class Test {
                   List<Object> emptyList = Collections.emptyList();
                   void method() {

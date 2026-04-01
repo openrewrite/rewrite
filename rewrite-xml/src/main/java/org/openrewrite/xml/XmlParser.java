@@ -47,6 +47,7 @@ public class XmlParser implements Parser {
             "xslt",
             "xmi",
             "tld",
+            "jxb",
             "xjb",
             "jsp",
             // Datastage file formats that are all xml under the hood
@@ -67,7 +68,11 @@ public class XmlParser implements Parser {
             // .NET project files
             "csproj",
             "vbproj",
-            "fsproj"));
+            "fsproj",
+            "props",
+            // JasperReports files
+            "jrxml"
+            ));
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -116,7 +121,8 @@ public class XmlParser implements Parser {
                 return true;
             }
         }
-        return path.endsWith("packages.config");
+        return path.endsWith("nuget.config") ||
+                path.endsWith("packages.config");
     }
 
     @Override

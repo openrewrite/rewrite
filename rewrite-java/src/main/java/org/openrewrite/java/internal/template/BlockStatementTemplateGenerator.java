@@ -33,9 +33,9 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 
@@ -51,6 +51,11 @@ public class BlockStatementTemplateGenerator {
 
     protected final Set<String> imports;
     private final boolean contextSensitive;
+    private final String bindType;
+
+    public BlockStatementTemplateGenerator(Set<String> imports, boolean contextSensitive) {
+        this(imports, contextSensitive, "Object");
+    }
 
     public String template(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -94,7 +99,7 @@ public class BlockStatementTemplateGenerator {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
                 if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile &&
-                    (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                    ("__P__".equals(classDecl.getSimpleName()) || "__M__".equals(classDecl.getSimpleName()))) {
                     // don't visit the __P__ and __M__ classes declaring stubs
                     return classDecl;
                 }
@@ -127,6 +132,17 @@ public class BlockStatementTemplateGenerator {
             @Override
             public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc,
                                                       Integer integer) {
+                if (left != null && blockEnclosingTemplateComment == null) {
+                    for (Comment comment : left.getBefore().getComments()) {
+                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
+                            // The __TEMPLATE__ comment is in the JLeftPadded padding (e.g., between '=' and
+                            // the RHS expression in an assignment). Set the enclosing block so the element
+                            // inside this padding will be collected by the visit() method.
+                            blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
+                            break;
+                        }
+                    }
+                }
                 left = super.visitLeftPadded(left, loc, integer);
                 if (left != null) {
                     for (Comment comment : left.getBefore().getComments()) {
@@ -204,25 +220,27 @@ public class BlockStatementTemplateGenerator {
     @SuppressWarnings("DataFlowIssue")
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
-                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(Collectors.joining(", ")) + ">";
-        if (j instanceof J.Lambda) {
+                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(joining(", ")) + ">";
+        if (j instanceof J.Lambda && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
-        } else if (j instanceof J.MemberReference) {
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
+                    "specify the type by calling JavaTemplate.Builder#bindType()");
+        } else if (j instanceof J.MemberReference && "Object".equals(bindType)) {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive() or " +
+                    "specify the type by calling JavaTemplate.Builder#bindType()");
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, String.format("class %s {{\n", classDeclaration));
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
             if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
-                before.append("Object o = ");
+                before.append(bindType).append(" o = ");
             }
             after.append(";\n}}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, String.format("class %s {\n", classDeclaration));
-            before.append("Object o = ");
+            before.append(bindType).append(" o = ");
             after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
                    cursor.getValue() instanceof J.Block &&
@@ -273,6 +291,9 @@ public class BlockStatementTemplateGenerator {
             if (parent instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = (J.ClassDeclaration) parent;
                 classDeclaration(prior, c, before, after, cursor, mode);
+            } else if (parent instanceof J.NewClass) {
+                J.NewClass n = (J.NewClass) parent;
+                anonymousClassDeclaration(prior, n, before, after, cursor, mode);
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
@@ -300,8 +321,9 @@ public class BlockStatementTemplateGenerator {
             }
 
             if (prior == insertionPoint && prior instanceof Expression) {
-                // the template represents an expression, so we need to wrap it in a statement
-                after.append(';');
+                // the template represents an expression, so we need to wrap it in a statement.
+                // Use insert(0, ...) so the semicolon comes before any "}\nreturn ...;" from non-void methods.
+                after.insert(0, ';');
             }
             after.append('}');
         } else if (j instanceof J.Annotation) {
@@ -363,7 +385,13 @@ public class BlockStatementTemplateGenerator {
             } else {
                 throw new IllegalStateException("Unable to template a J.NewClass instance having a null clazz and constructor type.");
             }
-            if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+            if (n.getBody() != null && referToSameElement(prior, n.getBody())) {
+                // prior is the body of this anonymous class - already handled by J.Block case
+                // just need to close the anonymous class properly
+                if (!(next(cursor).getValue() instanceof MethodCall)) {
+                    after.append(";");
+                }
+            } else if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 StringBuilder beforeSegments = new StringBuilder();
                 StringBuilder afterSegments = new StringBuilder();
                 beforeSegments.append(newClassString).append("(");
@@ -591,12 +619,12 @@ public class BlockStatementTemplateGenerator {
                 J.If iff = (J.If) statement;
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
                 if (condition != null) {
-                    boolean thenNeverCompletesNormally = PatternVariables.neverCompletesNormally(iff.getThenPart());
-                    boolean elseNeverCompletesNormally = iff.getElsePart() != null && PatternVariables.neverCompletesNormally(iff.getElsePart().getBody());
-                    if (thenNeverCompletesNormally || elseNeverCompletesNormally) {
+                    boolean thenAlwaysCompletesAbnormally = PatternVariables.alwaysCompletesAbnormally(iff.getThenPart());
+                    boolean elseAlwaysCompletesAbnormally = iff.getElsePart() != null && PatternVariables.alwaysCompletesAbnormally(iff.getElsePart().getBody());
+                    if (thenAlwaysCompletesAbnormally || elseAlwaysCompletesAbnormally) {
                         StringBuilder ifStatement = new StringBuilder("if (").append(condition).append(") {");
-                        ifStatement.append(thenNeverCompletesNormally ? " throw new RuntimeException(); }" : " }");
-                        ifStatement.append(elseNeverCompletesNormally ? " else { throw new RuntimeException(); }" : " else { }");
+                        ifStatement.append(thenAlwaysCompletesAbnormally ? " throw new RuntimeException(); }" : " }");
+                        ifStatement.append(elseAlwaysCompletesAbnormally ? " else { throw new RuntimeException(); }" : " else { }");
                         before.insert(0, ifStatement);
                     }
                 }
@@ -650,6 +678,65 @@ public class BlockStatementTemplateGenerator {
                 // setting prior to null will cause them all to be written.
                 classDeclaration(null, (J.ClassDeclaration) statement, before, appendBuffer, cursor, REPLACEMENT);
                 appendBuffer.append('}');
+            }
+        }
+
+        if (beforeBuffer != null) {
+            before.insert(0, beforeBuffer);
+        }
+    }
+
+    private void anonymousClassDeclaration(@Nullable J prior, J.NewClass nc, StringBuilder before, StringBuilder after, Cursor cursor, JavaCoordinates.Mode mode) {
+        StringBuilder beforeBuffer = prior == null ? null : new StringBuilder();
+        StringBuilder appendBuffer = prior == null ? after : beforeBuffer;
+
+        // Generate the anonymous class instantiation stub
+        String newClassString;
+        JavaType.Class constructorTypeClass = nc.getConstructorType() != null ? TypeUtils.asClass(nc.getConstructorType().getReturnType()) : null;
+        if (nc.getClazz() != null) {
+            newClassString = "new " + nc.getClazz().printTrimmed(cursor);
+        } else if (constructorTypeClass != null) {
+            newClassString = "new " + constructorTypeClass.getFullyQualifiedName();
+        } else {
+            throw new IllegalStateException("Unable to template inside a J.NewClass instance having a null clazz and constructor type.");
+        }
+
+        // Build stub arguments to make it parseable
+        StringBuilder stubArgs = new StringBuilder("(");
+        List<Expression> arguments = nc.getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            if (i > 0) {
+                stubArgs.append(", ");
+            }
+            stubArgs.append(valueOfType(arguments.get(i).getType()));
+        }
+        stubArgs.append(")");
+
+        appendBuffer.append(newClassString).append(stubArgs).append('{');
+
+        J.Block body = nc.getBody();
+        if (body != null) {
+            List<Statement> statements = body.getStatements();
+            for (Statement statement : statements) {
+                if (referToSameElement(statement, prior)) {
+                    if (mode != AFTER) {
+                        appendBuffer = after;
+                        if (mode == REPLACEMENT) {
+                            continue;
+                        }
+                    }
+                }
+
+                if (statement instanceof J.VariableDeclarations) {
+                    String variable = variable((J.VariableDeclarations) statement, false, cursor);
+                    appendBuffer.append(variable).append(";\n");
+                } else if (statement instanceof J.MethodDeclaration) {
+                    String m = method((J.MethodDeclaration) statement, cursor);
+                    appendBuffer.append(m);
+                } else if (statement instanceof J.ClassDeclaration) {
+                    classDeclaration(null, (J.ClassDeclaration) statement, before, appendBuffer, cursor, REPLACEMENT);
+                    appendBuffer.append('}');
+                }
             }
         }
 

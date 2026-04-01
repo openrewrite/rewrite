@@ -74,6 +74,21 @@ class FindAndReplaceTest implements RewriteTest {
     }
 
     @Test
+    void caseSensitiveStringReplacement() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace(".", "G", null, true, null, null, null, null)),
+          text(
+            """
+              This is text.
+              """,
+            """
+              This is textG
+              """
+          )
+        );
+    }
+
+    @Test
     void regexReplace() {
         rewriteRun(
           spec -> spec.recipe(new FindAndReplace(".", "G", true, null, null, null, null, null)),

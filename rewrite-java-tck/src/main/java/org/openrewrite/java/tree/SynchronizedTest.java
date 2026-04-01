@@ -31,7 +31,7 @@ class SynchronizedTest implements RewriteTest {
             """
               class Test {
                   void test() {
-                  
+
                       Integer n = 0;
                       synchronized(n) {
                       }

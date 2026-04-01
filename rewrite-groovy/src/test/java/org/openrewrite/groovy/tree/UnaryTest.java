@@ -58,8 +58,8 @@ class UnaryTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("GroovyPointlessBoolean")
     @Issue("https://github.com/openrewrite/rewrite/issues/1524")
+    @SuppressWarnings("GroovyPointlessBoolean")
     @Test
     void negation() {
         rewriteRun(

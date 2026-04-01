@@ -24,6 +24,7 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2ParserBaseVisitor;
+import org.openrewrite.protobuf.marker.ImplicitProto2Syntax;
 import org.openrewrite.protobuf.tree.*;
 
 import java.nio.charset.Charset;
@@ -44,7 +45,14 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
     private final Charset charset;
     private final boolean charsetBomMarked;
 
+    /**
+     * Track position within the file by character (UTF-16 code units)
+     */
     private int cursor = 0;
+    /**
+     * Track parsing position within the file by Unicode code point
+     */
+    private int codePointCursor = 0;
 
     public ProtoParserVisitor(Path path, @Nullable FileAttributes fileAttributes, String source, Charset charset, boolean charsetBomMarked) {
         this.path = path;
@@ -310,11 +318,26 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     @Override
     public Proto.Document visitProto(Protobuf2Parser.ProtoContext ctx) {
-        Proto.Syntax syntax = visitSyntax(ctx.syntax());
+        Proto.Syntax syntax;
+        int startIndex;
+        if (ctx.syntax() != null) {
+            syntax = visitSyntax(ctx.syntax());
+            startIndex = 1;
+        } else {
+            // Default to proto2 when syntax is omitted
+            syntax = new Proto.Syntax(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY.add(new ImplicitProto2Syntax(randomId())),
+                    Space.EMPTY,
+                    ProtoRightPadded.build(new Proto.Constant(randomId(), Space.EMPTY, Markers.EMPTY, "proto2", "\"proto2\"")));
+            startIndex = 0;
+        }
+
         List<ProtoRightPadded<Proto>> list = new ArrayList<>();
-        // The first element is the syntax, which we've already parsed
+        // The first element is the syntax (if present), which we've already parsed
         // The last element is a "TerminalNode" which we are uninterested in
-        for (int i = 1; i < ctx.children.size() - 1; i++) {
+        for (int i = startIndex; i < ctx.children.size() - 1; i++) {
             Proto s = visit(ctx.children.get(i));
             ProtoRightPadded<Proto> protoProtoRightPadded = ProtoRightPadded.build(s).withAfter(
                     (s instanceof Proto.Empty ||
@@ -429,12 +452,12 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     private Space prefix(Token token) {
         int start = token.getStartIndex();
-        if (start < cursor) {
+        if (start < codePointCursor) {
             return Space.EMPTY;
         }
-        String prefix = source.substring(cursor, start);
-        cursor = start;
-        return Space.format(prefix);
+        int oldCursor = cursor;
+        advanceCursor(start);
+        return Space.format(source.substring(oldCursor, cursor));
     }
 
     private <C extends ParserRuleContext, T> @Nullable T convert(C ctx, BiFunction<C, Space, T> conversion) {
@@ -445,7 +468,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
         T t = conversion.apply(ctx, prefix(ctx));
         if (ctx.getStop() != null) {
-            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+            advanceCursor(ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1));
         }
 
         return t;
@@ -453,7 +476,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
 
     private <T> T convert(TerminalNode node, BiFunction<TerminalNode, Space, T> conversion) {
         T t = conversion.apply(node, prefix(node));
-        cursor = node.getSymbol().getStopIndex() + 1;
+        advanceCursor(node.getSymbol().getStopIndex() + 1);
         return t;
     }
 
@@ -469,7 +492,9 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         }
 
         String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
+        int codePointsInPrefix = prefix.codePointCount(0, prefix.length());
+        // All Protobuf delimiters are ASCII, so length == code point count
+        advanceCursor(codePointCursor + codePointsInPrefix + untilDelim.length());
         return Space.format(prefix);
     }
 
@@ -514,5 +539,18 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         }
 
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
+    }
+
+    /**
+     * Advance both the cursor and the code point cursor
+     */
+    @SuppressWarnings("UnusedReturnValue")
+    private int advanceCursor(int newCodePointIndex) {
+        if (newCodePointIndex <= codePointCursor) {
+            return cursor;
+        }
+        cursor = source.offsetByCodePoints(cursor, newCodePointIndex - codePointCursor);
+        codePointCursor = newCodePointIndex;
+        return cursor;
     }
 }

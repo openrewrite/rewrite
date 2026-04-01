@@ -34,17 +34,22 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 @SuppressWarnings("UnusedReturnValue")
 @Getter
 public class RecipeSpec {
+    public static Supplier<RecipeSpec> DEFAULTS = RecipeSpec::new;
+
     public static RecipeSpec defaults() {
-        return new RecipeSpec();
+        return DEFAULTS.get();
     }
 
     @Nullable
@@ -145,7 +150,7 @@ public class RecipeSpec {
 
     private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, emptyList(),
                         mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
                 .build()
                 .activateRecipes(activeRecipes);
@@ -155,7 +160,7 @@ public class RecipeSpec {
         return String.join("-", s);
     }
 
-    private static final Map<String, Recipe> RECIPE_CACHE = new HashMap<>();
+    private static final Map<String, Recipe> RECIPE_CACHE = new ConcurrentHashMap<>();
 
     /**
      * @param parser The parser supplier to use when a matching source file is found.
@@ -204,10 +209,12 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E> RecipeSpec dataTable(Class<E> rowType, UncheckedConsumer<List<E>> extract) {
         return afterRecipe(run -> {
-            for (Map.Entry<DataTable<?>, List<?>> dataTableListEntry : run.getDataTables().entrySet()) {
-                if (dataTableListEntry.getKey().getType().equals(rowType)) {
-                    //noinspection unchecked
-                    List<E> rows = (List<E>) dataTableListEntry.getValue();
+            DataTableStore store = run.getDataTableStore();
+            for (DataTable<?> dt : store.getDataTables()) {
+                if (dt.getType().equals(rowType)) {
+                    @SuppressWarnings("unchecked")
+                    List<E> rows = (List<E>) store.getRows(dt.getName(), dt.getGroup())
+                            .collect(java.util.stream.Collectors.toList());
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
@@ -215,12 +222,13 @@ public class RecipeSpec {
                 }
             }
             String message = "No data table found with row type: " + rowType;
-            Set<DataTable<?>> tables = run.getDataTables().keySet();
+            Collection<DataTable<?>> tables = store.getDataTables();
             if (!tables.isEmpty()) {
                 message += "\nFound data tables row type(s): " + tables.stream()
                         .map(it -> it.getType().getName().replace("$", "."))
-                        .collect(Collectors.joining(","));
+                        .collect(joining(","));
             }
+            //noinspection ResultOfMethodCallIgnored
             fail(message);
         });
     }
@@ -233,9 +241,18 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E, V> RecipeSpec dataTableAsCsv(String name, String expect) {
         afterRecipe(run -> {
-            DataTable<?> dataTable = run.getDataTable(name);
+            DataTableStore store = run.getDataTableStore();
+            DataTable<?> dataTable = null;
+            for (DataTable<?> dt : store.getDataTables()) {
+                if (dt.getName().equals(name)) {
+                    dataTable = dt;
+                    break;
+                }
+            }
             assertThat(dataTable).isNotNull();
-            List<E> rows = run.getDataTableRows(name);
+            @SuppressWarnings("unchecked")
+            List<E> rows = (List<E>) store.getRows(dataTable.getName(), dataTable.getGroup())
+                    .collect(java.util.stream.Collectors.toList());
             StringWriter writer = new StringWriter();
             CsvMapper mapper = CsvMapper.builder()
                     .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)

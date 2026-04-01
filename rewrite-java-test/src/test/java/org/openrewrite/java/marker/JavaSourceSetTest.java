@@ -22,9 +22,9 @@ import org.openrewrite.java.tree.JavaType;
 
 import java.nio.file.Paths;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.marker.JavaSourceSet.gavFromPath;
 
@@ -35,7 +35,7 @@ class JavaSourceSetTest {
     @Test
     void buildJavaSourceSet() {
         var jss = JavaSourceSet.build("main", emptyList());
-        var typesBySignature = jss.getClasspath().stream().collect(Collectors.toMap(JavaType.FullyQualified::toString, Function.identity()));
+        var typesBySignature = jss.getClasspath().stream().collect(toMap(JavaType.FullyQualified::toString, Function.identity()));
         assertThat(typesBySignature.get("java.lang.Object")).isInstanceOf(JavaType.FullyQualified.class);
         assertThat(typesBySignature.get("java.util.List")).isInstanceOf(JavaType.FullyQualified.class);
     }
@@ -70,6 +70,12 @@ class JavaSourceSetTest {
     void gavCoordinateFromMaven() {
         assertThat(gavFromPath(Paths.get("C:/Users/Sam/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar")))
           .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
+    }
+
+    @Test
+    void gavCoordinateFromTypeTable() {
+        assertThat(gavFromPath(Paths.get("/home/tim/.rewrite/classpath/.tt/org/junit/jupiter/junit-jupiter-api/6.0.0-RC3")))
+          .isEqualTo("org.junit.jupiter:junit-jupiter-api:6.0.0-RC3");
     }
 
     @Test

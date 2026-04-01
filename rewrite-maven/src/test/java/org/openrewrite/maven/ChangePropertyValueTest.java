@@ -31,11 +31,11 @@ class ChangePropertyValueTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+
                 <properties>
                   <guava.version>28.2-jre</guava.version>
                 </properties>
-                
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -44,11 +44,11 @@ class ChangePropertyValueTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                 
+
                 <properties>
                   <guava.version>29.0-jre</guava.version>
                 </properties>
-                
+
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -68,7 +68,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -81,7 +81,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <properties>
                   <key>value</key>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -103,7 +103,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <properties>
                   <key>v</key>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -116,9 +116,142 @@ class ChangePropertyValueTest implements RewriteTest {
                 <properties>
                   <key>value</key>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePropertyInProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("sonar.host.url", "https://new-sonar.example.com", false, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <sonar.host.url>http://old-sonar.example.com</sonar.host.url>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <activation>
+                      <activeByDefault>true</activeByDefault>
+                    </activation>
+                    <properties>
+                      <sonar.host.url>https://new-sonar.example.com</sonar.host.url>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changePropertyInBothProjectAndProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("java.version", "21", false, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <java.version>17</java.version>
+                </properties>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <properties>
+                      <java.version>17</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <java.version>21</java.version>
+                </properties>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <properties>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeUnrelatedPropertyInProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("sonar.host.url", "https://new-sonar.example.com", false, false)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>sonar</id>
+                    <properties>
+                      <java.version>21</java.version>
+                    </properties>
+                  </profile>
+                </profiles>
               </project>
               """
           )
@@ -139,7 +272,7 @@ class ChangePropertyValueTest implements RewriteTest {
                   <abc>value</abc>
                   <other>value</other>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>
@@ -154,7 +287,7 @@ class ChangePropertyValueTest implements RewriteTest {
                   <key>value</key>
                   <other>value</other>
                 </properties>
-              
+
                 <dependencies>
                 </dependencies>
               </project>

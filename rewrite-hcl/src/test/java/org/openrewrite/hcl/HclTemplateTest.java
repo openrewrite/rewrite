@@ -148,7 +148,7 @@ class HclTemplateTest implements RewriteTest {
 
               @Override
               public Hcl visitBlock(Hcl.Block block, ExecutionContext p) {
-                  if (((Hcl.Literal) block.getLabels().get(0)).getValueSource().contains("aws")) {
+                  if (((Hcl.Literal) block.getLabels().getFirst()).getValueSource().contains("aws")) {
                       return HclTemplate.apply("""
                             resource "azure_storage_volume" {
                               size = 1

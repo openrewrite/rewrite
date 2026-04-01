@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
+// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 
@@ -34,6 +34,13 @@ public class TemplateParameterParserBaseVisitor<T> extends AbstractParseTreeVisi
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitGenericPattern(TemplateParameterParser.GenericPatternContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -83,6 +90,13 @@ public class TemplateParameterParserBaseVisitor<T> extends AbstractParseTreeVisi
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitParameterName(TemplateParameterParser.ParameterNameContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitGenericName(TemplateParameterParser.GenericNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *

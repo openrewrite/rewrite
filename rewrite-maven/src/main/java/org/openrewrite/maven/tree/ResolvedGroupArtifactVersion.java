@@ -21,7 +21,6 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.util.Objects;
 
 @Value
 @With
@@ -53,10 +52,20 @@ public class ResolvedGroupArtifactVersion implements Serializable {
         return new GroupArtifactVersion(groupId, artifactId, version);
     }
 
-    public ResolvedGroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
-        if (Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
-            return this;
+    public ResolvedGroupArtifactVersion withVersionMaybeSnapshot(String version) {
+        // Check if version is a dated snapshot (e.g., "2.1.0-20231201.123456-1")
+        String maybeSnapshotVersion;
+        String datedSnapshotVersion;
+        if (version.matches(".*-\\d{8}\\.\\d{6}-\\d+")) {
+            // Extract base snapshot version (e.g., "2.1.0-SNAPSHOT" from "2.1.0-20231201.123456-1")
+            datedSnapshotVersion = version;
+            int dashIndex = version.indexOf('-');
+            maybeSnapshotVersion = version.substring(0, dashIndex) + "-SNAPSHOT";
+        } else {
+            maybeSnapshotVersion = version;
+            datedSnapshotVersion = null;
         }
-        return new ResolvedGroupArtifactVersion(repository, ga.getGroupId(), ga.getArtifactId(), version, datedSnapshotVersion);
+        return new ResolvedGroupArtifactVersion(repository, groupId, artifactId,
+                maybeSnapshotVersion, datedSnapshotVersion);
     }
 }

@@ -19,11 +19,51 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"UnnecessaryCallToStringValueOf", "UnnecessaryBoxing", "RedundantTypeArguments", "rawtypes"})
 class UseStaticImportTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void junit5Assertions() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+            .recipe(new UseStaticImport("org.junit.jupiter.api.Assertions assert*(..)")),
+          java(
+            """
+              package org.openrewrite;
+
+              import org.junit.jupiter.api.Test;
+              import org.junit.jupiter.api.Assertions;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      Assertions.assertEquals(42, 21*2);
+                  }
+              }
+              """,
+            """
+              package org.openrewrite;
+
+              import org.junit.jupiter.api.Test;
+
+              import static org.junit.jupiter.api.Assertions.assertEquals;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      assertEquals(42, 21*2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void replaceWithStaticImports() {
         rewriteRun(
@@ -114,8 +154,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    @Test
     void sameMethodImportedNoStaticImport() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.lang.String valueOf(..)")),
@@ -136,8 +176,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4304")
+    @Test
     void sameMethodsNoStaticImport() {
         rewriteRun(
           spec -> spec.recipes(
@@ -200,44 +240,6 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void junit5Assertions() {
-        rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-            .recipe(new UseStaticImport("org.junit.jupiter.api.Assertions assert*(..)")),
-          java(
-            """
-              package org.openrewrite;
-
-              import org.junit.jupiter.api.Test;
-              import org.junit.jupiter.api.Assertions;
-
-              class SampleTest {
-                  @Test
-                  void sample() {
-                      Assertions.assertEquals(42, 21*2);
-                  }
-              }
-              """,
-            """
-              package org.openrewrite;
-
-              import org.junit.jupiter.api.Test;
-
-              import static org.junit.jupiter.api.Assertions.assertEquals;
-
-              class SampleTest {
-                  @Test
-                  void sample() {
-                      assertEquals(42, 21*2);
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/3663")
     @Test
     void javadocLinkUnchanged() {
@@ -276,8 +278,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    @Test
     void staticCall() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
@@ -308,8 +310,8 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    @Test
     void nonStaticCall() {
         rewriteRun(
           spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
@@ -340,6 +342,158 @@ class UseStaticImportTest implements RewriteTest {
               class A {
                   String s(String[] strings) {
                       return Arrays.toString(strings);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4776")
+    @Test
+    void shouldNotImportDuplicateMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("test.B *(..)")),
+          java(
+            """
+              package test;
+
+              public class A {
+                  public static void method() {}
+              }
+              """
+          ),
+          java(
+            """
+              package test;
+
+              public class B {
+                  public static void method() {}
+              }
+              """
+          ),
+          java(
+            """
+              package test;
+
+              import static test.A.method;
+
+              public class Test {
+                  public static void test() {
+                      method();
+                      test.B.method();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/5816")
+    @Test
+    void methodOverloads() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+            .recipes(
+              new UseStaticImport("org.junit.jupiter.api.Assertions fail()"),
+              new UseStaticImport("org.junit.jupiter.api.Assertions fail(String)")
+            ),
+          java(
+            """
+              import org.junit.jupiter.api.Test;
+              import org.junit.jupiter.api.Assertions;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      Assertions.fail();
+                      Assertions.fail("Test failed");
+                  }
+              }
+              """,
+            """
+              import org.junit.jupiter.api.Test;
+
+              import static org.junit.jupiter.api.Assertions.fail;
+
+              class SampleTest {
+                  @Test
+                  void sample() {
+                      fail();
+                      fail("Test failed");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6275")
+    @Test
+    void shouldNotRemoveUsedStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections *(..)"))
+            .typeValidationOptions(TypeValidation.all().identifiers(false).methodInvocations(false)),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.Set;
+
+              class Test extends TypeNotFound {
+                  void test() {
+                      Set<String> set = Collections.unmodifiableSet(newHashSetFromSuperType());
+                  }
+              }
+              """,
+            """
+              import java.util.Set;
+
+              import static java.util.Collections.unmodifiableSet;
+
+              class Test extends TypeNotFound {
+                  void test() {
+                      Set<String> set = unmodifiableSet(newHashSetFromSuperType());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/798")
+    @Test
+    void shouldAddStaticImportForSamePackageMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("de..* *(..)")),
+          java(
+            """
+              package de;
+
+              public class ClassB {
+                  public static String getSomething() {
+                      return "something";
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package de;
+
+              public class ClassA {
+                  static void methodA() {
+                      System.out.println(ClassB.getSomething());
+                  }
+              }
+              """,
+            """
+              package de;
+
+              import static de.ClassB.getSomething;
+
+              public class ClassA {
+                  static void methodA() {
+                      System.out.println(getSomething());
                   }
               }
               """

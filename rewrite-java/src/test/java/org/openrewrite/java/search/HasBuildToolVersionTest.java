@@ -18,7 +18,6 @@ package org.openrewrite.java.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
@@ -39,7 +38,6 @@ class HasBuildToolVersionTest implements RewriteTest {
       "3.6.1",
       "3.8.0"
     })
-    @DocumentExample
     void detectMavenVersionWithinRange(String version) {
         rewriteRun(
           java("class A {}", "/*~~>*/class A {}",
@@ -52,7 +50,8 @@ class HasBuildToolVersionTest implements RewriteTest {
       "3.5.4",
       "3.8.1",
       "4.0.0"
-    })    void doNotDetectVersionsOutsideRange() {
+    })
+    void doNotDetectVersionsOutsideRange() {
         rewriteRun(
           java("class A {}",
             spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.5.4")))

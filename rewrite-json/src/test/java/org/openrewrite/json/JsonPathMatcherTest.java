@@ -22,9 +22,9 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.Space;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class JsonPathMatcherTest {
@@ -558,6 +558,41 @@ class JsonPathMatcherTest {
         );
     }
 
+    @Test
+    void bracketOperatorByIndexesMultipleDigits() {
+        assertMatched(
+          "$.list[10]",
+          List.of(
+            //language=json5
+            """
+                  {
+                    "list": [
+                      {"item1": "index0"},
+                      {"item2": "index1"},
+                      {"item3": "index2"},
+                      {"item4": "index3"},
+                      {"item5": "index4"},
+                      {"item6": "index5"},
+                      {"item7": "index6"},
+                      {"item8": "index7"},
+                      {"item9": "index8"},
+                      {"item10": "index9"},
+                      {"item11": "index10"},
+                      {"item12": "index11"},
+                      {"item13": "index12"},
+                      {"item3": "index13"}
+                    ]
+                  }
+              """
+          ),
+        //language=json5
+          List.of(
+            """
+                  {"item11": "index10"}
+              """)
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1419")
     @Test
     void doesNotMatchWrongValue() {
@@ -820,8 +855,111 @@ class JsonPathMatcherTest {
                 }
               }
               """),
-          Collections.emptyList()
+          emptyList()
         );
+    }
+
+    @Test
+    void negateUnaryExistence() {
+        assertMatched(
+          "$.list[?(!@.item1)]",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Test
+    void negateUnaryExistenceMatchesNone() {
+        assertNotMatched(
+          "$.list[?(!@.property)]",
+          sliceList
+        );
+    }
+
+    @Test
+    void negateEqualityExpression() {
+        assertNotMatched(
+          "$.list[?(!(@.property == 'property'))]",
+          sliceList
+        );
+    }
+
+    @Test
+    void negateEqualityExpressionPartialMatch() {
+        assertMatched(
+          "$.list[?(!(@.item1 == 'index0'))]",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Test
+    void negateWithLogicalAnd() {
+        assertMatched(
+          "$.list[?(!@.item1 && @.property == 'property')]",
+          sliceList,
+          List.of(
+            //language=json5
+            """
+                  {
+                    "item2": "index1",
+                    "property": "property"
+                  }
+              """,
+            """
+                  {
+                    "item3": "index2",
+                    "property": "property"
+                  }
+              """)
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4937")
+    @Test
+    void dollarToMatchTheRoot() {
+        var matcher = new JsonPathMatcher("$");
+        var results = new JsonVisitor<List<Json.JsonObject>>() {
+            @Override
+            public Json visitObject(Json.JsonObject obj, List<Json.JsonObject> p) {
+                var e = super.visitObject(obj, p);
+                if (matcher.matches(getCursor())) {
+                    p.add(obj);
+                }
+                return e;
+            }
+        }.reduce(JsonParser.builder().build()
+            .parse(simple.toArray(new String[0]))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Could not parse as JSON")), new ArrayList<>());
+        // $ should match exactly one object - the root
+        assertThat(results).hasSize(1);
     }
 
     @Test

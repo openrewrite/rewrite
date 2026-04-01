@@ -76,9 +76,9 @@ public class ReflectionUtils {
             while (resources.hasMoreElements()) {
                 URL resource = resources.nextElement();
                 String path = PathUtils.separatorsToUnix(resource.getPath());
-                if (resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
+                if ("jar".equals(resource.getProtocol()) && resource.getPath().startsWith("file:")) {
                     classPathEntries.add(Paths.get(URI.create(path.substring(0, path.indexOf("!")))));
-                } else if (resource.getProtocol().equals("file")) {
+                } else if ("file".equals(resource.getProtocol())) {
                     path = PathUtils.separatorsToUnix(Paths.get(resource.toURI()).toString());
                     classPathEntries.add(Paths.get(path.substring(0, path.indexOf(resourceName))));
                 }

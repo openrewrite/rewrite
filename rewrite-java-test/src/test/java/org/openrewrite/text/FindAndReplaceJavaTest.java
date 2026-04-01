@@ -45,8 +45,8 @@ class FindAndReplaceJavaTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3532")
+    @Test
     void filePatternShouldLimitApplication() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""

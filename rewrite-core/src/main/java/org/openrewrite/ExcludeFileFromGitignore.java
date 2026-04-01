@@ -29,11 +29,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.lang.String.join;
+import static java.util.Collections.*;
 import static java.util.Comparator.comparingInt;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.join;
 import static org.openrewrite.ExcludeFileFromGitignore.Repository;
 import static org.openrewrite.PathUtils.separatorsToUnix;
 import static org.openrewrite.jgit.ignore.IgnoreNode.MatchResult.*;
@@ -45,17 +44,11 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
     @Option(displayName = "Paths", description = "The paths to find and remove from the gitignore files.", example = "/folder/file.txt")
     List<String> paths;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove ignoral of files or directories from .gitignore";
-    }
+    String displayName = "Remove ignoral of files or directories from .gitignore";
 
-    @Override
-    public String getDescription() {
-        return "This recipe will remove a file or directory from the .gitignore file. " +
+    String description = "This recipe will remove a file or directory from the .gitignore file. " +
                "If the file or directory is already in the .gitignore file, it will be removed or negated. " +
                "If the file or directory is not in the .gitignore file, no action will be taken.";
-    }
 
     @Override
     public Repository getInitialValue(ExecutionContext ctx) {
@@ -95,7 +88,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                     String separator = text.getText().contains("\r\n") ? "\r\n" : "\n";
                     List<String> newRules = ignoreNode.getRules().stream().map(IgnoreRule::getText).collect(toList());
                     String[] currentContent = text.getText().split(separator);
-                    text = text.withText(join(sortRules(currentContent, newRules), separator));
+                    text = text.withText(join(separator, sortRules(currentContent, newRules)));
                 }
                 return text;
             }
@@ -167,7 +160,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                         remainingRules.addAll(rule.negateIfNecessary(nestedPath));
                     }
                     ArrayList<FastIgnoreRule> ignoreRules = new ArrayList<>(remainingRules);
-                    Collections.reverse(ignoreRules);
+                    reverse(ignoreRules);
                     ignoreNode = new CustomIgnoreNode(ignoreRules, ignoreNode.getPath());
                     if (ignoreRules.size() == existingRules.size()) {
                         break;
@@ -245,7 +238,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             if (!isMatch(nestedPath) || !getResult()) {
                 // If this rule has nothing to do with the path to remove, we keep it.
                 // OR if this rule is a negation, we keep it.
-                return Collections.singletonList(rule);
+                return singletonList(rule);
             } else if (text.equals(nestedPath)) {
                 // If this rule is an exact match to the path to remove, we remove it.
                 return emptyList();
@@ -264,7 +257,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 return traversePaths(text, nestedPath, null, null);
             }
             // If we still have the rule, we keep it. --> not making changes to an unknown flow.
-            return Collections.singletonList(rule);
+            return singletonList(rule);
         }
 
         @Override
@@ -397,7 +390,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
                 traversedRemainingRules.add(new FastIgnoreRule("!" + rulePath + (j < splitPath.length - 1 || path.endsWith("/") ? "/" : "")));
                 rulePath.append("/");
             }
-            Collections.reverse(traversedRemainingRules);
+            reverse(traversedRemainingRules);
             return traversedRemainingRules;
         }
     }

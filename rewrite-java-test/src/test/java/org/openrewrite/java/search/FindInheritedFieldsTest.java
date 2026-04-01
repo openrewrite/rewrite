@@ -39,10 +39,10 @@ class FindInheritedFieldsTest implements RewriteTest {
           java(
             "public class B extends A { }",
             spec -> spec.afterRecipe(cu -> {
-                assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.util.List").stream()
+                assertThat(FindInheritedFields.find(cu.getClasses().getFirst(), "java.util.List").stream()
                   .map(JavaType.Variable::getName)).containsExactly("list");
                 // the Set field is not considered to be inherited because it is private
-                assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.util.Set")).isEmpty();
+                assertThat(FindInheritedFields.find(cu.getClasses().getFirst(), "java.util.Set")).isEmpty();
             })
           )
         );
@@ -61,7 +61,7 @@ class FindInheritedFieldsTest implements RewriteTest {
           java(
             "public class B extends A {}",
             spec -> spec.afterRecipe(cu -> {
-                assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.lang.String").stream()
+                assertThat(FindInheritedFields.find(cu.getClasses().getFirst(), "java.lang.String").stream()
                   .map(JavaType.Variable::getName)).containsExactly("s");
             })
           )

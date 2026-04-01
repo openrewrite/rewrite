@@ -17,7 +17,6 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -28,7 +27,6 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
 import java.util.Objects;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -38,18 +36,12 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = false)
 public class FindAndReplace extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Find and replace";
-    }
+    String displayName = "Find and replace";
 
-    @Override
-    public String getDescription() {
-        return "Textual find and replace, optionally interpreting the search query as a Regular Expression (regex). " +
+    String description = "Textual find and replace, optionally interpreting the search query as a Regular Expression (regex). " +
                "When operating on source files that are language-specific Lossless Semantic " +
                "Tree, such as Java or XML, this operation converts the source file to plain text for the rest of the recipe run. " +
                "So if you are combining this recipe with language-specific recipes in a single recipe run put all the language-specific recipes before this recipe.";
-    }
 
     @Option(displayName = "Find",
             description = "The text to find (and replace). This snippet can be multiline.",
@@ -122,49 +114,57 @@ public class FindAndReplace extends Recipe {
                         }
                     }
                 }
-                String searchStr = find;
-                if (!Boolean.TRUE.equals(regex)) {
-                    searchStr = Pattern.quote(searchStr);
-                }
-                int patternOptions = 0;
-                if (!Boolean.TRUE.equals(caseSensitive)) {
-                    patternOptions |= Pattern.CASE_INSENSITIVE;
-                }
-                if (Boolean.TRUE.equals(multiline)) {
-                    patternOptions |= Pattern.MULTILINE;
-                }
-                if (Boolean.TRUE.equals(dotAll)) {
-                    patternOptions |= Pattern.DOTALL;
-                }
-                PlainText plainText = PlainTextParser.convert(sourceFile);
-                Pattern pattern = Pattern.compile(searchStr, patternOptions);
-                Matcher matcher = pattern.matcher(plainText.getText());
 
-                if (!matcher.find()) {
-                    return sourceFile;
-                }
+                PlainText plainText = PlainTextParser.convert(sourceFile);
                 String replacement = replace == null ? "" : replace;
                 if (!Boolean.TRUE.equals(regex)) {
                     replacement = replacement.replace("$", "\\$");
                 }
-                String newText = matcher.replaceAll(replacement);
-                return plainText.withText(newText)
-                        .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
+
+                String newText;
+                if (!Boolean.TRUE.equals(regex) && Boolean.TRUE.equals(caseSensitive)) {
+                    // optimize the case when doing case-sensitive string replacements
+                    newText = plainText.getText().replace(find, replacement);
+                } else {
+                    int patternOptions = 0;
+                    if (!Boolean.TRUE.equals(regex)) {
+                        patternOptions |= Pattern.LITERAL;
+                    }
+                    if (!Boolean.TRUE.equals(caseSensitive)) {
+                        patternOptions |= Pattern.CASE_INSENSITIVE;
+                    }
+                    if (Boolean.TRUE.equals(multiline)) {
+                        patternOptions |= Pattern.MULTILINE;
+                    }
+                    if (Boolean.TRUE.equals(dotAll)) {
+                        patternOptions |= Pattern.DOTALL;
+                    }
+                    Pattern pattern = Pattern.compile(find, patternOptions);
+                    newText = pattern.matcher(plainText.getText()).replaceAll(replacement);
+                }
+
+                if (newText.equals(plainText.getText())) {
+                    return sourceFile;
+                }
+
+                return plainText
+                        .withText(newText)
+                        .withMarkers(plainText.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
         };
+
         if (filePattern != null) {
             visitor = Preconditions.check(new FindSourceFiles(filePattern), visitor);
         }
 
         if (Boolean.TRUE.equals(plaintextOnly)) {
-            visitor = Preconditions.check(new PlainTextVisitor<ExecutionContext>(){
+            visitor = Preconditions.check(new PlainTextVisitor<ExecutionContext>() {
                 @Override
-                public @NonNull PlainText visitText(@NonNull PlainText text, @NonNull ExecutionContext ctx) {
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     return SearchResult.found(text);
                 }
             }, visitor);
         }
         return visitor;
     }
-
 }

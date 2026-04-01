@@ -16,7 +16,6 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -190,6 +189,64 @@ class AppendToSequenceTest implements RewriteTest {
                 animals:
                   - cat
                   - dog
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultiLineYamlMapping() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.items",
+              "name: new-item\nversion: 1.0",
+              null,
+              null
+            )),
+          yaml(
+            """
+              things:
+                items:
+                  - name: existing
+                    version: 0.1
+              """,
+            """
+              things:
+                items:
+                  - name: existing
+                    version: 0.1
+                  - name: new-item
+                    version: 1.0
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendMultiLineYamlMappingWithIndentation() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.items",
+              "item:\n  name: new-item",
+              null,
+              null
+            )),
+          yaml(
+            """
+              things:
+                items:
+                  - item:
+                      name: existing
+              """,
+            """
+              things:
+                items:
+                  - item:
+                      name: existing
+                  - item:
+                      name: new-item
               """
           )
         );
@@ -395,16 +452,15 @@ class AppendToSequenceTest implements RewriteTest {
         );
     }
 
-    @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3215")
+    @Test
     void appendTwice() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
             type: specs.openrewrite.org/v1beta/recipe
             name: "com.demo.migration-not-working"
             displayName: "this recipe only add first entry"
-            description: "blabla"
+            description: "blabla."
             recipeList:
               - org.openrewrite.yaml.AppendToSequence:
                   sequencePath: $.envs
@@ -416,7 +472,7 @@ class AppendToSequenceTest implements RewriteTest {
                   fileMatcher: devops/deploy/dev-vars.yaml
             """, "com.demo.migration-not-working"),
           yaml(
-                """
+            """
               name_squad: "squad1"
               azure_keyvault: "yupiyouh2"
               replicas_plan:
@@ -443,5 +499,153 @@ class AppendToSequenceTest implements RewriteTest {
               other_attribute: "yesyupiyou"
               """,
             sourceSpec -> sourceSpec.path("devops/deploy/dev-vars.yaml")));
+    }
+
+    @Test
+    void appendWithJsonPathThatFiltersSequenceByAttributeValue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              //language=jsonpath
+              "$..[?(@.name == 'quick')].build",
+              "name: command 3",
+              null,
+              null
+            )),
+          yaml(
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 4
+                    - name: command 5
+              """,
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+                    - name: command 3
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 4
+                    - name: command 5
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendWithIndexedJsonPathThatFiltersSequenceByAttributeValue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              //language=jsonpath
+              "$.build_types.build_type[?(@.name == 'quick')][1].build",
+              "name: command 6",
+              null,
+              null
+            )),
+          yaml(
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+              """,
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendWithWildcardedJsonPathThatFiltersSequenceByAttributeValue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              //language=jsonpath
+              "$.build_types.build_type[?(@.name == 'quick')].build[*]",
+              "name: all commands",
+              null,
+              null
+            )),
+          yaml(
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+              """,
+            """
+              build_types:
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 1
+                    - name: command 2
+                    - name: all commands
+              - build_type:
+                  name: release
+                  build:
+                    - name: command 3
+                    - name: command 4
+              - build_type:
+                  name: quick
+                  build:
+                    - name: command 5
+                    - name: command 6
+                    - name: all commands
+              """
+          )
+        );
     }
 }

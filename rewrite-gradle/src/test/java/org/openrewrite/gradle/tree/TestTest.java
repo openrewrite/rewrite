@@ -30,7 +30,7 @@ class TestTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               test {
                  useJUnit()
                  useTestNG()

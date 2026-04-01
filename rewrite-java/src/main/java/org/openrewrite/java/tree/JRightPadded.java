@@ -24,6 +24,8 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
+
 /**
  * A Java element that could have trailing space.
  *
@@ -33,6 +35,7 @@ import java.util.function.UnaryOperator;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @With
 public class JRightPadded<T> {
+
     T element;
     Space after;
     Markers markers;
@@ -85,7 +88,8 @@ public class JRightPadded<T> {
         TRY_RESOURCE(Space.Location.TRY_RESOURCE_SUFFIX),
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
-        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX);
+        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX),
+        ANY(Space.Location.ANY);
 
         private final Space.Location afterLocation;
 
@@ -100,7 +104,7 @@ public class JRightPadded<T> {
 
     public static <T> List<T> getElements(@Nullable List<JRightPadded<T>> ls) {
         if (ls == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         List<T> list = new ArrayList<>(ls.size());
         for (JRightPadded<T> l : ls) {
@@ -124,27 +128,29 @@ public class JRightPadded<T> {
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> withElements(List<JRightPadded<J2>> before, List<J2> elements) {
-        // a cheaper check for the most common case when there are no changes
-        if (elements.size() == before.size()) {
-            boolean hasChanges = false;
-            for (int i = 0; i < before.size(); i++) {
-                if (before.get(i).getElement() != elements.get(i)) {
-                    hasChanges = true;
-                    break;
-                }
-            }
-            if (!hasChanges) {
-                return before;
-            }
-        } else if (elements.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
         Map<UUID, JRightPadded<J2>> beforeById = new HashMap<>((int) Math.ceil(elements.size() / 0.75));
-        for (JRightPadded<J2> j : before) {
-            if (beforeById.put(j.getElement().getId(), j) != null) {
-                throw new IllegalStateException("Duplicate key");
+        List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
+        if (before != null) {
+            // a cheaper check for the most common case when there are no changes
+            if (elements.size() == before.size()) {
+                boolean hasChanges = false;
+                for (int i = 0; i < before.size(); i++) {
+                    if (before.get(i).getElement() != elements.get(i)) {
+                        hasChanges = true;
+                        break;
+                    }
+                }
+                if (!hasChanges) {
+                    return before;
+                }
+            } else if (elements.isEmpty()) {
+                return emptyList();
+            }
+
+            for (JRightPadded<J2> j : before) {
+                if (beforeById.put(j.getElement().getId(), j) != null) {
+                    throw new IllegalStateException("Duplicate key");
+                }
             }
         }
 

@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.YamlVisitor;
+import org.openrewrite.yaml.marker.OmitColon;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.function.UnaryOperator;
@@ -29,6 +30,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitDocuments(Yaml.Documents documents, PrintOutputCapture<P> p) {
         visitMarkers(documents.getMarkers(), p);
         visit(documents.getDocuments(), p);
+        p.append(documents.getSuffix());
         afterSyntax(documents, p);
         return documents;
     }
@@ -36,6 +38,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitDocument(Yaml.Document document, PrintOutputCapture<P> p) {
         beforeSyntax(document, p);
+        visit(document.getDirectives(), p);
         if (document.isExplicit()) {
             p.append("---");
         }
@@ -43,6 +46,14 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         visit(document.getEnd(), p);
         afterSyntax(document, p);
         return document;
+    }
+
+    @Override
+    public Yaml visitDirective(Yaml.Directive directive, PrintOutputCapture<P> p) {
+        beforeSyntax(directive, p);
+        p.append('%').append(directive.getValue()).append(directive.getSuffix());
+        afterSyntax(directive, p);
+        return directive;
     }
 
     @Override
@@ -90,7 +101,10 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
         visit(entry.getKey(), p);
-        p.append(entry.getBeforeMappingValueIndicator()).append(':');
+        p.append(entry.getBeforeMappingValueIndicator());
+        if (!entry.getMarkers().findFirst(OmitColon.class).isPresent()) {
+            p.append(':');
+        }
         visit(entry.getValue(), p);
         afterSyntax(entry, p);
         return entry;

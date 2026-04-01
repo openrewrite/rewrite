@@ -37,6 +37,17 @@ class ChangePropertyKeyTest implements RewriteTest {
           null));
     }
 
+    @DocumentExample
+    @Test
+    void changeKey() {
+        rewriteRun(
+          properties(
+            "management.metrics.binders.files.enabled=true",
+            "management.metrics.enable.process.files=true"
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/575")
     @Test
     void preserveComment() {
@@ -54,24 +65,13 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void changeKey() {
-        rewriteRun(
-          properties(
-            "management.metrics.binders.files.enabled=true",
-            "management.metrics.enable.process.files=true"
-          )
-        );
-    }
-
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     @ParameterizedTest
     @ValueSource(strings = {
       "acme.my-project.person.first-name",
       "acme.myProject.person.firstName",
       "acme.my_project.person.first_name",
     })
-    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey(
@@ -92,8 +92,8 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    @Test
     void exactMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey(

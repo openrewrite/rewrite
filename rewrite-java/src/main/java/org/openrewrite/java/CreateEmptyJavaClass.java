@@ -27,10 +27,10 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -73,15 +73,9 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     String relativePath;
 
-    @Override
-    public String getDisplayName() {
-        return "Create Java class";
-    }
+    String displayName = "Create Java class";
 
-    @Override
-    public String getDescription() {
-        return "Create a new, empty Java class.";
-    }
+    String description = "Create a new, empty Java class.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {
@@ -96,7 +90,7 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return createEmptyClass().collect(Collectors.toList());
+            return createEmptyClass().collect(toList());
         }
         return emptyList();
     }
@@ -135,7 +129,7 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
         }
 
         if (!path.isEmpty() && !path.endsWith("/")) {
-            path = path + "/";
+            path += "/";
         }
 
         return Paths.get(String.format(

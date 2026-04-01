@@ -31,6 +31,27 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
         spec.recipe(new RemoveOwaspSuppressions(null));
     }
 
+    @DocumentExample
+    @Test
+    void provideExplicitDateRange() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveOwaspSuppressions("2023-02-01")),
+          xml("""
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                  <suppress until="2023-01-01">
+                      <notes>
+                      </notes>
+                  </suppress>
+              </suppressions>""",
+            """
+              <?xml version="1.0" encoding="UTF-8" ?>
+              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+              </suppressions>""",
+            spec -> spec.path("suppressions.xml"))
+        );
+    }
+
     @Test
     void removesSuppressionsAtLeastOneDayAgo() {
         LocalDate today = LocalDate.now();
@@ -158,27 +179,6 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                     </suppress>
                                 </suppressions>""",
                         spec -> spec.path("suppressions.xml"))
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void provideExplicitDateRange() {
-        rewriteRun(
-          spec -> spec.recipe(new RemoveOwaspSuppressions("2023-02-01")),
-          xml("""
-              <?xml version="1.0" encoding="UTF-8" ?>
-              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-                  <suppress until="2023-01-01">
-                      <notes>
-                      </notes>
-                  </suppress>
-              </suppressions>""",
-            """
-              <?xml version="1.0" encoding="UTF-8" ?>
-              <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
-              </suppressions>""",
-            spec -> spec.path("suppressions.xml"))
         );
     }
 

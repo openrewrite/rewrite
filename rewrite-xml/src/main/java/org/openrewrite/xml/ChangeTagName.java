@@ -36,20 +36,14 @@ public class ChangeTagName extends Recipe {
             example = "user")
     String newName;
 
-    @Override
-    public String getDisplayName() {
-        return "Change XML tag name";
-    }
+    String displayName = "Change XML tag name";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", elementName, newName);
     }
 
-    @Override
-    public String getDescription() {
-        return "Alters the name of XML tags matching the provided expression.";
-    }
+    String description = "Alters the name of XML tags matching the provided expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

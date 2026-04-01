@@ -26,23 +26,17 @@ import org.openrewrite.java.table.ClassHierarchy;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.stream.Collectors;
+import static java.util.stream.Collectors.joining;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindClassHierarchy extends Recipe {
     transient ClassHierarchy classHierarchy = new ClassHierarchy(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find class hierarchy";
-    }
+    String displayName = "Find class hierarchy";
 
-    @Override
-    public String getDescription() {
-        return "Discovers all class declarations within a project, recording which files they appear in, their superclasses, and interfaces. " +
+    String description = "Discovers all class declarations within a project, recording which files they appear in, their superclasses, and interfaces. " +
                "That information is then recorded in a data table.";
-    }
 
 
     @Override
@@ -61,7 +55,7 @@ public class FindClassHierarchy extends Recipe {
                         type.getSupertype() == null ? null : type.getSupertype().getFullyQualifiedName(),
                         type.getInterfaces().isEmpty() ? null : type.getInterfaces().stream()
                                 .map(JavaType.FullyQualified::getFullyQualifiedName)
-                                .collect(Collectors.joining(",")))
+                                .collect(joining(",")))
                 );
                 return cd;
             }

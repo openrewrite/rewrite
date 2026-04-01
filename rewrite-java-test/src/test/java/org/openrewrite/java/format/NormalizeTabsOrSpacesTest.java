@@ -35,20 +35,6 @@ import static org.openrewrite.java.Assertions.java;
 
 class NormalizeTabsOrSpacesTest implements RewriteTest {
 
-    private static Consumer<RecipeSpec> tabsAndIndents() {
-        return tabsAndIndents(style -> style);
-    }
-
-    private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
-        return spec -> spec.recipe(new NormalizeTabsOrSpaces())
-          .parser(JavaParser.fromJavaVersion().styles(singletonList(
-            new NamedStyles(
-              randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.tabsAndIndents()))
-            )
-          )));
-    }
-
     @DocumentExample
     @Test
     void mixedToTabs() {
@@ -71,6 +57,20 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               """
           )
         );
+    }
+
+    private static Consumer<RecipeSpec> tabsAndIndents() {
+        return tabsAndIndents(style -> style);
+    }
+
+    private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
+        return spec -> spec.recipe(new NormalizeTabsOrSpaces())
+          .parser(JavaParser.fromJavaVersion().styles(singletonList(
+            new NamedStyles(
+              randomId(), "test", "test", "test", emptySet(),
+              singletonList(with.apply(IntelliJ.tabsAndIndents()))
+            )
+          )));
     }
 
     @Test
@@ -107,14 +107,14 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	int b;
               	int c;
               	int d;
-              
+
               	/*
               	 *
               	 *
               	 *
               	 *
               	 */
-              
+
               	/**
               	 *
               	 *
@@ -131,14 +131,14 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
                   int b;
                   int c;
                   int d;
-              
+
                   /*
                    *
                    *
                    *
                    *
                    */
-              
+
                   /**
                    *
                    *

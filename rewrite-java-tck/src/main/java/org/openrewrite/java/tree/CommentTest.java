@@ -79,8 +79,8 @@ class CommentTest implements RewriteTest {
         );
     }
 
-    @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/5090")
+    @Test
     void multiLineCommentWithUrl() {
         rewriteRun(
           java(

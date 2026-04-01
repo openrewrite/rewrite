@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.utilities;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -28,18 +29,16 @@ import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.newSetFromMap;
+import static java.util.stream.Collectors.toList;
 
 public class PrintMavenAsDot extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Print Maven dependency hierarchy in DOT format";
-    }
+    @Getter
+    final String displayName = "Print Maven dependency hierarchy in DOT format";
 
-    @Override
-    public String getDescription() {
-        return "The DOT language format is specified [here](https://graphviz.org/doc/info/lang.html).";
-    }
+    @Getter
+    final String description = "The DOT language format is specified [here](https://graphviz.org/doc/info/lang.html).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -69,8 +68,16 @@ public class PrintMavenAsDot extends Recipe {
                 dotLabel(dot, 0, root);
                 index.put(root, 0);
 
-                for (List<ResolvedDependency> deps : mrr.getDependencies().values()) {
-                    for (ResolvedDependency dep : deps) {
+                // Build up index of all dependencies, so we can reference them by index in the DOT output
+                for (Scope scope : Scope.values()) {
+                    if (scope.ordinal() < Scope.Compile.ordinal() || Scope.Test.ordinal() < scope.ordinal()) {
+                        continue;
+                    }
+                    List<ResolvedDependency> resolvedDependencies = mrr.getDependencies().get(scope);
+                    if (resolvedDependencies == null) {
+                        continue;
+                    }
+                    for (ResolvedDependency dep : resolvedDependencies) {
                         if (!index.containsKey(dep.getGav())) {
                             dotLabel(dot, index.size(), dep.getGav());
                             index.put(dep.getGav(), index.size());
@@ -78,17 +85,18 @@ public class PrintMavenAsDot extends Recipe {
                     }
                 }
 
-                Set<ResolvedGroupArtifactVersion> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+                Set<ResolvedGroupArtifactVersion> seen = newSetFromMap(new IdentityHashMap<>());
                 for (Scope scope : Scope.values()) {
-                    if (scope.ordinal() >= Scope.Compile.ordinal() && scope.ordinal() <= Scope.Test.ordinal()) {
-                        dotEdges(
-                                dot, root, scope,
-                                mrr.getDependencies().get(scope).stream()
-                                        .filter(dep -> dep.getDepth() == 0 && seen.add(dep.getGav()))
-                                        .collect(Collectors.toList()),
-                                index
-                        );
+                    if (scope.ordinal() < Scope.Compile.ordinal() || Scope.Test.ordinal() < scope.ordinal()) {
+                        continue;
                     }
+                    dotEdges(
+                            dot, root, scope,
+                            mrr.getDependencies().get(scope).stream()
+                                    .filter(dep -> dep.isDirect() && seen.add(dep.getGav()))
+                                    .collect(toList()),
+                            index
+                    );
                 }
 
                 dot.append("}");

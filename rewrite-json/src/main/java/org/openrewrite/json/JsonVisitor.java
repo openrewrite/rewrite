@@ -71,8 +71,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
         Json.Array a = array;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withValues(ListUtils.map(a.getValues(), v -> (JsonValue) visit(v, p)));
-        return a;
+        return a.withValues(ListUtils.map(a.getValues(), v -> (JsonValue) visit(v, p)));
     }
 
     public Json visitDocument(Json.Document document, P p) {
@@ -80,29 +79,25 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withValue((JsonValue) visit(d.getValue(), p));
-        d = d.withEof(visitSpace(d.getEof(), p));
-        return d;
+        return d.withEof(visitSpace(d.getEof(), p));
     }
 
     public Json visitEmpty(Json.Empty empty, P p) {
         Json.Empty e = empty;
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
-        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        return e;
+        return e.withMarkers(visitMarkers(e.getMarkers(), p));
     }
 
     public Json visitIdentifier(Json.Identifier identifier, P p) {
         Json.Identifier i = identifier;
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
-        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
-        return i;
+        return i.withMarkers(visitMarkers(i.getMarkers(), p));
     }
 
     public Json visitLiteral(Json.Literal literal, P p) {
         Json.Literal l = literal;
         l = l.withPrefix(visitSpace(l.getPrefix(), p));
-        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
-        return l;
+        return l.withMarkers(visitMarkers(l.getMarkers(), p));
     }
 
     public Json visitMember(Json.Member member, P p) {
@@ -110,16 +105,14 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
         m = m.getPadding().withKey(visitRightPadded(m.getPadding().getKey(), p));
-        m = m.withValue((JsonValue) visit(m.getValue(), p));
-        return m;
+        return m.withValue((JsonValue) visit(m.getValue(), p));
     }
 
     public Json visitObject(Json.JsonObject obj, P p) {
         Json.JsonObject o = obj;
         o = o.withPrefix(visitSpace(o.getPrefix(), p));
         o = o.withMarkers(visitMarkers(o.getMarkers(), p));
-        o = o.withMembers(ListUtils.map(o.getMembers(), m -> visit(m, p)));
-        return o;
+        return o.withMembers(ListUtils.map(o.getMembers(), m -> visit(m, p)));
     }
 
     public Space visitSpace(Space space, P p) {

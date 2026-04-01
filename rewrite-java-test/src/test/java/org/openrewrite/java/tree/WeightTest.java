@@ -18,10 +18,10 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
+import static java.util.Collections.newSetFromMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -33,7 +33,7 @@ class WeightTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              
+
               /**
                * @author Jonathan
                */
@@ -47,7 +47,7 @@ class WeightTest implements RewriteTest {
             spec -> spec.beforeRecipe(cu -> {
                 // in performance sensitive situations, use a bloom filter or other
                 // probabilistic set membership data structure
-                Set<Object> uniqueTypes = Collections.newSetFromMap(new IdentityHashMap<>());
+                Set<Object> uniqueTypes = newSetFromMap(new IdentityHashMap<>());
                 assertThat(cu.getWeight(uniqueTypes::add)).isGreaterThan(10_000);
             })
           )

@@ -27,10 +27,10 @@ import org.openrewrite.table.DistinctCommitters;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -46,15 +46,9 @@ public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance
     @Nullable
     String fromDate;
 
-    @Override
-    public String getDisplayName() {
-        return "Find committers on repositories";
-    }
+    String displayName = "Find committers on repositories";
 
-    @Override
-    public String getDescription() {
-        return "List the committers on a repository.";
-    }
+    String description = "List the committers on a repository.";
 
     @Override
     public int maxCycles() {
@@ -106,7 +100,7 @@ public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance
                 )));
             }
         }
-        return Collections.emptyList();
+        return emptyList();
     }
 
     public static Collection<GitProvenance.Committer> findCommitters(GitProvenance gitProvenance, @Nullable LocalDate from) {

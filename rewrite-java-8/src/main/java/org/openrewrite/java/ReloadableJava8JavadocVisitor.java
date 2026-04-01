@@ -20,6 +20,7 @@ import com.sun.source.tree.ArrayTypeTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.PrimitiveTypeTree;
+import com.sun.source.tree.WildcardTree;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -36,11 +37,13 @@ import org.openrewrite.java.marker.LeadingBrace;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -289,6 +292,8 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             }
             if (docTree instanceof DCTree.DCText) {
                 body.addAll(visitText(((DCTree.DCText) docTree).getBody()));
+            } else if (docTree instanceof DCTree.DCComment) {
+                body.addAll(visitText(((DCTree.DCComment) docTree).getBody()));
             } else {
                 body.add((Javadoc) scan(docTree, body));
             }
@@ -364,7 +369,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     }
                     // Add trailing linebreaks if they exist.
                     if (!lineBreaks.isEmpty()) {
-                        int pos = Collections.min(lineBreaks.keySet());
+                        int pos = min(lineBreaks.keySet());
                         if (lineBreaks.containsKey(pos)) {
                             body.add(lineBreaks.get(pos));
                             lineBreaks.remove(pos);
@@ -619,11 +624,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         methodRefType
                 );
             } else {
+                if (qualifier == null) {
+                    return new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name.getSimpleName(), qualifierType, fieldRefType);
+                }
                 return new J.MemberReference(
                         randomId(),
-                        qualifier == null ? Space.EMPTY : qualifier.getPrefix(),
+                        qualifier.getPrefix(),
                         Markers.EMPTY,
-                        qualifier == null ? null : JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
+                        JRightPadded.build(qualifier.withPrefix(Space.EMPTY)),
                         JContainer.empty(),
                         JLeftPadded.build(name),
                         null,
@@ -700,7 +708,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private static boolean paramTypeMatches(JavaType parameterType, JavaType mappedJavadocType) {
         if (parameterType instanceof JavaType.Array && mappedJavadocType instanceof JavaType.Array) {
             if (((JavaType.Array) parameterType).getElemType() instanceof JavaType.Primitive) {
-                return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
+                return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
             }
             return paramTypeMatches(((JavaType.Array) parameterType).getElemType(), ((JavaType.Array) mappedJavadocType).getElemType());
         } else if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
@@ -710,7 +718,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         } else if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
             return paramTypeMatches(((JavaType.Parameterized) parameterType).getType(), mappedJavadocType);
         }
-        return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
+        return TypeUtils.isAssignableTo(parameterType, mappedJavadocType);
     }
 
     private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
@@ -1013,9 +1021,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         if (cursor < source.length()) {
             int tempCursor = cursor;
             List<Javadoc> end = whitespaceBefore();
-            if (cursor < source.length() && source.charAt(cursor) == '}') {
-                end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
-                cursor++;
+            if (cursor < source.length()) {
+                boolean containsEndLine = end.stream().anyMatch(p -> p instanceof Javadoc.LineBreak);
+                if (source.charAt(cursor) == '}') {
+                    end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, "}"));
+                    cursor++;
+                } else if (containsEndLine) {
+                    end = ListUtils.concat(end, new Javadoc.Text(randomId(), Markers.EMPTY, ""));
+                }
                 return end;
             } else {
                 cursor = tempCursor;
@@ -1064,12 +1077,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private List<Javadoc> lineBreaksInMultilineJReference() {
         List<Integer> linebreakIndexes = lineBreaks.keySet().stream()
                 .filter(o -> o <= cursor)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         List<Javadoc> referenceLineBreaks = linebreakIndexes.stream()
                 .sorted()
                 .map(lineBreaks::get)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         for (Integer key : linebreakIndexes) {
             lineBreaks.remove(key);
@@ -1083,14 +1096,20 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         public J visitMemberSelect(MemberSelectTree node, Space fmt) {
             JCTree.JCFieldAccess fieldAccess = (JCTree.JCFieldAccess) node;
             Expression selected = (Expression) scan(fieldAccess.selected, Space.EMPTY);
-            sourceBefore(".");
+            // Capture whitespace before the dot - this goes in JLeftPadded.before
+            String whitespaceBeforeDot = sourceBeforeAsString(".");
+            // Capture whitespace after the dot - this goes in Identifier.prefix
+            String whitespaceAfterDot = whitespaceBeforeAsString();
             cursor += fieldAccess.name.toString().length();
             return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                     selected,
-                    JLeftPadded.build(new J.Identifier(randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            emptyList(), fieldAccess.name.toString(), null, null)),
+                    new JLeftPadded<>(
+                            Space.build(whitespaceBeforeDot, emptyList()),
+                            new J.Identifier(randomId(),
+                                    Space.build(whitespaceAfterDot, emptyList()),
+                                    Markers.EMPTY,
+                                    emptyList(), fieldAccess.name.toString(), null, null),
+                            Markers.EMPTY),
                     typeMapping.type(node));
         }
 
@@ -1150,6 +1169,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
             NameTree id = (NameTree) javaVisitor.scan(node.getType(), Space.EMPTY);
             List<JRightPadded<Expression>> expressions = new ArrayList<>(node.getTypeArguments().size());
+            String spaceBeforeTypeParams = whitespaceBeforeAsString();
             cursor += 1; // skip '<', JavaDocVisitor does not interpret List <Integer> as Parameterized.
             int argsSize = node.getTypeArguments().size();
             for (int i = 0; i < argsSize; i++) {
@@ -1164,7 +1184,36 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 expression = expression.withAfter(after);
                 expressions.add(expression);
             }
-            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
+            JContainer<Expression> typeArgs = JContainer.build(expressions)
+                    .withBefore(Space.build(spaceBeforeTypeParams, emptyList()));
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, typeArgs, typeMapping.type(node));
+        }
+
+        @Override
+        public J visitWildcard(WildcardTree node, Space fmt) {
+            cursor++; // skip '?'
+
+            JCTree.JCWildcard wildcard = (JCTree.JCWildcard) node;
+            JLeftPadded<J.Wildcard.Bound> bound = null;
+            if (wildcard.kind.kind != null) {
+                switch (wildcard.kind.kind) {
+                    case EXTENDS:
+                        bound = JLeftPadded.build(J.Wildcard.Bound.Extends).withBefore(whitespace());
+                        cursor += "extends".length();
+                        break;
+                    case SUPER:
+                        bound = JLeftPadded.build(J.Wildcard.Bound.Super).withBefore(whitespace());
+                        cursor += "super".length();
+                        break;
+                }
+            }
+
+            NameTree boundedType = null;
+            if (wildcard.inner != null) {
+                boundedType = (NameTree) scan(wildcard.inner, whitespace());
+            }
+
+            return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, boundedType);
         }
     }
 }

@@ -42,15 +42,11 @@ public class NoStaticImport extends Recipe {
             example = "java.util.Collections emptyList()")
     String methodPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove static import";
-    }
+    @Getter
+    final String displayName = "Remove static import";
 
-    @Override
-    public String getDescription() {
-        return "Removes static imports and replaces them with qualified references. For example, `emptyList()` becomes `Collections.emptyList()`.";
-    }
+    @Getter
+    final String description = "Removes static imports and replaces them with qualified references. For example, `emptyList()` becomes `Collections.emptyList()`.";
 
     @Override
     public Validated<Object> validate() {
@@ -66,7 +62,7 @@ public class NoStaticImport extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(m) && m.getSelect() == null && m.getMethodType() != null) {
                     // Do not replace calls to super() in constructors
-                    if (m.getName().getSimpleName().equals("super")) {
+                    if ("super".equals(m.getName().getSimpleName())) {
                         return m;
                     }
 

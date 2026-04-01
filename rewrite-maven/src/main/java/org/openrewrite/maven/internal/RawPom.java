@@ -23,7 +23,6 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -98,10 +97,11 @@ public class RawPom {
     @Nullable
     String packaging;
 
-    @Nullable
     Dependencies dependencies;
 
     @Nullable
+    @NonFinal
+    @Setter(AccessLevel.PACKAGE)
     DependencyManagement dependencyManagement;
 
     @Nullable
@@ -128,6 +128,29 @@ public class RawPom {
     @Nullable
     SubProjects subprojects;
 
+    public RawPom(@Nullable String pomVersion, @Nullable Parent parent, @Nullable String groupId, String artifactId, @Nullable String version, @Nullable String currentVersion, @Nullable String name, @Nullable String description, @Nullable Prerequisites prerequisites, @Nullable String packaging, @Nullable Dependencies dependencies, @Nullable DependencyManagement dependencyManagement, @Nullable Map<String, String> properties, @Nullable Build build, @Nullable RawRepositories repositories, @Nullable RawPluginRepositories pluginRepositories, @Nullable Licenses licenses, @Nullable Profiles profiles, @Nullable Modules modules, @Nullable SubProjects subprojects) {
+        this.pomVersion = pomVersion;
+        this.parent = parent;
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.currentVersion = currentVersion;
+        this.name = name;
+        this.description = description;
+        this.prerequisites = prerequisites;
+        this.packaging = packaging;
+        this.dependencies = dependencies == null ? new Dependencies() : dependencies;
+        this.dependencyManagement = dependencyManagement;
+        this.properties = properties;
+        this.build = build;
+        this.repositories = repositories;
+        this.pluginRepositories = pluginRepositories;
+        this.licenses = licenses;
+        this.profiles = profiles;
+        this.modules = modules;
+        this.subprojects = subprojects;
+    }
+
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
         try {
             RawPom pom = MavenXmlMapper.readMapper().readValue(inputStream, RawPom.class);
@@ -136,7 +159,7 @@ public class RawPom {
             }
             return pom;
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to parse pom", e);
+            throw new UncheckedIOException("Failed to parse pom: " + e.getMessage(), e);
         }
     }
 
@@ -185,7 +208,7 @@ public class RawPom {
         private final List<Dependency> dependencies;
 
         public Dependencies() {
-            this.dependencies = emptyList();
+            this.dependencies = new ArrayList<>();
         }
 
         public Dependencies(@JacksonXmlProperty(localName = "dependency") List<Dependency> dependencies) {
@@ -424,7 +447,7 @@ public class RawPom {
                 .profiles(mapProfiles(getProfiles()))
                 .subprojects(mapSubProjects(getModules(), getSubprojects()));
         if (StringUtils.isBlank(pomVersion)) {
-            builder.dependencies(mapRequestedDependencies(getDependencies()))
+            builder = builder.dependencies(mapRequestedDependencies(getDependencies()))
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
                     .repositories(mapRepositories(getRepositories()))
                     .pluginRepositories(mapPluginRepositories(getPluginRepositories()))
@@ -476,7 +499,6 @@ public class RawPom {
         return profiles;
     }
 
-    @NonNull
     private List<MavenRepository> mapRepositories(@Nullable RawRepositories rawRepositories) {
         List<MavenRepository> pomRepositories = emptyList();
         if (rawRepositories != null) {
@@ -495,7 +517,6 @@ public class RawPom {
         return pomRepositories;
     }
 
-    @NonNull
     private List<MavenRepository> mapPluginRepositories(@Nullable RawPluginRepositories rawRepositories) {
         List<MavenRepository> pomRepositories = emptyList();
         if (rawRepositories != null) {
@@ -541,8 +562,15 @@ public class RawPom {
                 dependencies = new ArrayList<>(unmappedDependencies.size());
                 for (Dependency d : unmappedDependencies) {
                     GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
-                    dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
-                            d.getOptional()));
+                    dependencies.add(
+                            org.openrewrite.maven.tree.Dependency.builder()
+                                    .gav(dGav)
+                                    .classifier(d.getClassifier())
+                                    .type(d.getType())
+                                    .scope(d.getScope())
+                                    .exclusions(d.getExclusions())
+                                    .optional(d.getOptional())
+                                    .build());
                 }
             }
         }
@@ -555,8 +583,14 @@ public class RawPom {
             dependencies = new ArrayList<>(rawDependencies.size());
             for (Dependency d : rawDependencies) {
                 GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
-                dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
-                        d.getOptional()));
+                dependencies.add(org.openrewrite.maven.tree.Dependency.builder()
+                        .gav(dGav)
+                        .classifier(d.getClassifier())
+                        .type(d.getType())
+                        .scope(d.getScope())
+                        .exclusions(d.getExclusions())
+                        .optional(d.getOptional())
+                        .build());
             }
         }
         return dependencies;
@@ -620,5 +654,4 @@ public class RawPom {
         }
         return emptyList();
     }
-
 }

@@ -16,7 +16,6 @@
 package org.openrewrite.maven.internal;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.maven.MavenDownloadingException;
 
 import java.util.List;
 
@@ -28,40 +27,40 @@ class VersionRequirementTest {
     }
 
     @Test
-    void rangeSet() throws MavenDownloadingException {
+    void rangeSet() throws Exception {
         assertThat(VersionRequirement.fromVersion("[1,11)", 0).resolve(this::available))
           .isEqualTo("10");
     }
 
     @Test
-    void multipleSoftRequirements() throws MavenDownloadingException {
+    void multipleSoftRequirements() throws Exception {
         assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("2").resolve(this::available))
           .isEqualTo("1");
     }
 
     @Test
-    void softRequirementThenHardRequirement() throws MavenDownloadingException {
+    void softRequirementThenHardRequirement() throws Exception {
         assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("[1,11]")
           .resolve(this::available))
           .isEqualTo("10");
     }
 
     @Test
-    void hardRequirementThenSoftRequirement() throws MavenDownloadingException {
+    void hardRequirementThenSoftRequirement() throws Exception {
         assertThat(VersionRequirement.fromVersion("[1,11]", 1).addRequirement("1")
           .resolve(this::available))
           .isEqualTo("10");
     }
 
     @Test
-    void nearestRangeWins() throws MavenDownloadingException {
+    void nearestRangeWins() throws Exception {
         assertThat(VersionRequirement.fromVersion("[1,2]", 1).addRequirement("[9,10]")
           .resolve(this::available))
           .isEqualTo("2");
     }
 
     @Test
-    void emptyUnboundedRange() throws MavenDownloadingException {
+    void emptyUnboundedRange() throws Exception {
         assertThat(VersionRequirement.fromVersion("(,)", 0).resolve(this::available))
                 .isEqualTo("10");
     }

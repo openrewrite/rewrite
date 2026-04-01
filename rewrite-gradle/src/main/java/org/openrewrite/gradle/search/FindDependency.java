@@ -18,17 +18,15 @@ package org.openrewrite.gradle.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
-import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.groovy.GroovyVisitor;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.marker.SearchResult;
-
-import java.util.List;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.Validated;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -50,55 +48,56 @@ public class FindDependency extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle dependency";
-    }
+    @Option(displayName = "Version",
+            description = "An exact version number or node-style semver selector used to select the version number.",
+            example = "3.0.0",
+            required = false)
+    @Nullable
+    String version;
+
+    @Option(displayName = "Version pattern",
+            description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+            example = "-jre",
+            required = false)
+    @Nullable
+    String versionPattern;
+
+    String displayName = "Find Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s:%s`", groupId, artifactId);
+        String maybeVersionSuffix = version == null ? "" : String.format(":%s%s", version, versionPattern == null ? "" : versionPattern);
+        return String.format("`%s:%s%s`", groupId, artifactId, maybeVersionSuffix);
     }
 
-    @Override
-    public String getDescription() {
-        return "Finds dependencies declared in `build.gradle` files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use." +
-                " A project's compile and runtime classpath is based on these configurations.\n\n<img alt=\"Gradle compile classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png\" width=\"200px\"/>\n" +
-                " A project's test classpath is based on these configurations.\n\n<img alt=\"Gradle test classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png\" width=\"200px\"/>.";
-    }
+    String description = "Finds dependencies declared in gradle build files. See the [reference](https://docs.gradle.org/current/userguide/java_library_plugin.html#sec:java_library_configurations_graph) on Gradle configurations or the diagram below for a description of what configuration to use. " +
+                "A project's compile and runtime classpath is based on these configurations.\n\n<img alt=\"Gradle compile classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-main.png\" width=\"200px\"/>\n" +
+                "A project's test classpath is based on these configurations.\n\n<img alt=\"Gradle test classpath\" src=\"https://docs.gradle.org/current/userguide/img/java-library-ignore-deprecated-test.png\" width=\"200px\"/>.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
-            @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (dependency.matches(method)) {
-                    if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
-                        List<Expression> depArgs = method.getArguments();
-                        if (depArgs.get(0) instanceof J.Literal &&
-                                groupArtifactMatches((J.Literal) depArgs.get(0))) {
-                            return SearchResult.found(method);
-                        } else if (depArgs.get(0) instanceof G.GString &&
-                                groupArtifactMatches((J.Literal) ((G.GString) depArgs.get(0)).getStrings().get(0))) {
-                            return SearchResult.found(method);
-                        }
-                    }
-                }
-                return super.visitMethodInvocation(method, ctx);
-            }
-
-            boolean groupArtifactMatches(J.Literal gavValue) {
-                String gav = (String) gavValue.getValue();
-                assert gav != null;
-                String[] parts = gav.split(":");
-                if (parts.length >= 2) {
-                    return StringUtils.matchesGlob(parts[0], groupId) && StringUtils.matchesGlob(parts[1], artifactId);
-                }
-                return false;
-            }
-        });
+        return new GradleDependency.Matcher()
+                .groupId(groupId)
+                .artifactId(artifactId)
+                .configuration(configuration)
+                .asVisitor(gd -> versionIsValid(version, versionPattern, gd) ? SearchResult.found(gd.getTree()) : gd.getTree());
     }
 
-
+    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
+                                          GradleDependency gradleDependency) {
+        if (desiredVersion == null) {
+            return true;
+        }
+        String actualVersion = gradleDependency.getDeclaredVersion();
+        if (actualVersion == null) {
+            return false;
+        }
+        Validated<VersionComparator> validate = Semver.validate(desiredVersion, versionPattern);
+        if (validate.isInvalid()) {
+            return false;
+        }
+        assert(validate.getValue() != null);
+        return validate.getValue().isValid(actualVersion, actualVersion);
+    }
 }

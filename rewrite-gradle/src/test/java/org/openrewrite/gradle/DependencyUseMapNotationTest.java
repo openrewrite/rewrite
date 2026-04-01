@@ -22,6 +22,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class DependencyUseMapNotationTest implements RewriteTest {
@@ -41,11 +42,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api('org.openrewrite:rewrite-core:latest.release')
                   implementation "org.openrewrite:rewrite-core:latest.release"
@@ -55,14 +56,54 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinSupport() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val version = "latest.release"
+
+              dependencies {
+                  api("org.openrewrite:rewrite-core:latest.release:sources")
+                  implementation("org.openrewrite:rewrite-core:$version")
+              }
+              """,
+              """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val version = "latest.release"
+
+              dependencies {
+                  api(group = "org.openrewrite", name = "rewrite-core", version = "latest.release", classifier = "sources")
+                  implementation(group = "org.openrewrite", name = "rewrite-core", version = version)
               }
               """
           )
@@ -77,11 +118,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   api("org.openrewrite:rewrite-core:$version")
@@ -92,11 +133,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
@@ -115,11 +156,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release") {
                       exclude group: "org.openrewrite", module: "rewrite-gradle"
@@ -133,11 +174,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release') {
                       exclude group: "org.openrewrite", module: "rewrite-gradle"
@@ -159,11 +200,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   api("org.openrewrite:rewrite-core:$version") {
@@ -178,11 +219,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+
               repositories {
                   mavenCentral()
               }
-              
+
               def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version) {
@@ -277,11 +318,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+
               repositories {
                   mavenCentral()
               }
-                  
+
               testing {
                   suites {
                       test {
@@ -297,11 +338,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   id "java-library"
                   id 'jvm-test-suite'
               }
-                  
+
               repositories {
                   mavenCentral()
               }
-                  
+
               testing {
                   suites {
                       test {
@@ -353,7 +394,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {
@@ -365,7 +406,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   mavenLocal()
                   mavenCentral()
                   maven {
-                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                     url = uri("https://central.sonatype.com/repository/maven-snapshots")
                   }
               }
               dependencies {

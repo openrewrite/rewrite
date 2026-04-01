@@ -30,7 +30,9 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 
 /**
  * Finds matching method invocations.
@@ -38,14 +40,13 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class FindMethods extends Recipe {
-    transient MethodCalls methodCalls = new MethodCalls(this);
 
     /**
      * A method pattern that is used to find matching method invocations.
      * See {@link MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
+            description = MethodMatcher.METHOD_PATTERN_INVOCATIONS_DESCRIPTION,
             example = "java.util.List add(..)")
     String methodPattern;
 
@@ -55,15 +56,15 @@ public class FindMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Override
-    public String getDisplayName() {
-        return "Find method usages";
+    transient MethodCalls methodCalls = new MethodCalls(this);
+
+    private String dataTableInstanceName() {
+        return "Method calls matching `" + methodPattern + "`";
     }
 
-    @Override
-    public String getDescription() {
-        return "Find method calls by pattern.";
-    }
+    String displayName = "Find method usages";
+
+    String description = "Find method calls by pattern.";
 
     @Override
     public String getInstanceName() {
@@ -103,7 +104,7 @@ public class FindMethods extends Recipe {
                                 m.getName(),
                                 m.getParameterTypes().stream()
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
 
                         ));
                     }
@@ -126,7 +127,7 @@ public class FindMethods extends Recipe {
                                 method.getArguments().stream()
                                         .map(Expression::getType)
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
                         ));
                     }
                     m = SearchResult.found(m);
@@ -148,7 +149,7 @@ public class FindMethods extends Recipe {
                                 memberRef.getArguments().stream()
                                         .map(Expression::getType)
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
                         ));
                     }
                     m = m.withReference(SearchResult.found(m.getReference()));
@@ -170,7 +171,7 @@ public class FindMethods extends Recipe {
                                 newClass.getArguments().stream()
                                         .map(Expression::getType)
                                         .map(String::valueOf)
-                                        .collect(Collectors.joining(", "))
+                                        .collect(joining(", "))
                         ));
                     }
                     n = SearchResult.found(n);
@@ -201,7 +202,7 @@ public class FindMethods extends Recipe {
                 .stream()
                 .filter(t -> t instanceof J.MethodInvocation || t instanceof J.MemberReference || t instanceof J.NewClass)
                 .map(t -> (J) t)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 
     public static Set<J.MethodDeclaration> findDeclaration(J j, String methodPattern) {
@@ -230,6 +231,6 @@ public class FindMethods extends Recipe {
                 .stream()
                 .filter(J.MethodDeclaration.class::isInstance)
                 .map(J.MethodDeclaration.class::cast)
-                .collect(Collectors.toSet());
+                .collect(toSet());
     }
 }

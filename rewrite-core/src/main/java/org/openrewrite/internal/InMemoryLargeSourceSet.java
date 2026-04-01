@@ -26,6 +26,9 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
+
 public class InMemoryLargeSourceSet implements LargeSourceSet {
     /**
      * If null, then the initial state is this instance.
@@ -137,7 +140,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
                     }
                     changes.add(new Result(original, s));
                 } else {
-                    Collection<List<Recipe>> recipes = s.getMarkers().findFirst(RecipesThatMadeChanges.class).map(RecipesThatMadeChanges::getRecipes).orElse(Collections.emptyList());
+                    Collection<List<Recipe>> recipes = s.getMarkers().findFirst(RecipesThatMadeChanges.class).map(RecipesThatMadeChanges::getRecipes).orElse(emptyList());
                     changes.add(new Result(null, s, recipes));
                 }
             }
@@ -145,7 +148,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
         if (deletions != null) {
             for (Map.Entry<SourceFile, List<Recipe>> entry : deletions.entrySet()) {
-                changes.add(new Result(entry.getKey(), null, Collections.singleton(entry.getValue())));
+                changes.add(new Result(entry.getKey(), null, singleton(entry.getValue())));
             }
         }
 

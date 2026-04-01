@@ -17,6 +17,8 @@ package org.openrewrite.semver;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class LatestIntegrationTest {
@@ -44,5 +46,36 @@ public class LatestIntegrationTest {
 
         assertThat(latestIntegration.compare(null, "1.0", "1.1.a")).isLessThan(0);
         assertThat(latestIntegration.compare(null, "1.0", "1.1.1.1.a")).isLessThan(0);
+    }
+
+    @Test
+    void compare() {
+        assertThat(latestIntegration.compare(null, "1.0", "latest.integration")).isNegative();
+        assertThat(latestIntegration.compare(null, "latest.integration", "1.0")).isPositive();
+        assertThat(latestIntegration.compare(null, "1.0", "latest.snapshot")).isNegative();
+        assertThat(latestIntegration.compare(null, "latest.snapshot", "1.0")).isPositive();
+    }
+
+    @Test
+    void upgrade() {
+        assertThat(latestIntegration.upgrade("2.10.0", List.of("2.9.0"))).isNotPresent();
+
+        assertThat(latestIntegration.upgrade("2.10.0", List.of("2.10.1-SNAPSHOT"))).isPresent()
+          .get().isEqualTo("2.10.1-SNAPSHOT");
+
+        assertThat(latestIntegration.upgrade("2.10.0", List.of("2.10.1"))).isPresent()
+          .get().isEqualTo("2.10.1");
+
+        assertThat(latestIntegration.upgrade("2.10.0", List.of("2.11.0-SNAPSHOT"))).isPresent()
+          .get().isEqualTo("2.11.0-SNAPSHOT");
+
+        assertThat(latestIntegration.upgrade("2.10.0", List.of("2.11.0"))).isPresent()
+          .get().isEqualTo("2.11.0");
+
+        assertThat(latestIntegration.upgrade("2.10.0", List.of("3.0.0-SNAPSHOT"))).isPresent()
+          .get().isEqualTo("3.0.0-SNAPSHOT");
+
+        assertThat(latestIntegration.upgrade("2.10.0", List.of("3.0.0"))).isPresent()
+          .get().isEqualTo("3.0.0");
     }
 }

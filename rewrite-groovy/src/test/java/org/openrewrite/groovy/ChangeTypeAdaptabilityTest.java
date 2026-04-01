@@ -35,7 +35,29 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true, null));
+        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
+    }
+
+    @DocumentExample
+    @Test
+    void changeDefinition() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          groovy(
+            """
+              class file {
+              }
+              """,
+            """
+              class newFile {
+              }
+              """,
+            spec -> spec.path("file.groovy").afterRecipe(cu -> {
+                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().getFirst().getType(), "newFile")).isTrue();
+            })
+          )
+        );
     }
 
     @SuppressWarnings("GrPackage")
@@ -51,14 +73,14 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   Target type
               }
@@ -80,14 +102,14 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
           groovy(
             """
               import a.b.Original
-              
+
               class A {
                   Original type
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   Target type
               }
@@ -96,49 +118,27 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void changeDefinition() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false, null)),
-          groovy(
-            """
-              class file {
-              }
-              """,
-            """
-              class newFile {
-              }
-              """,
-            spec -> spec.path("file.groovy").afterRecipe(cu -> {
-                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
-            })
-          )
-        );
-    }
-
-    @SuppressWarnings("DataFlowIssue")
     @ExpectedToFail("fails because there's a reference change but no content diff but that's the point; would need to adjust RewriteTest")
     @Issue("https://github.com/openrewrite/rewrite/issues/3058")
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void changeTypeAttributionImplicitUsage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false, null)),
+          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false)),
           groovy(
             """
               import java.util.Collections
-                
+
               class Test {
                   int zero = Collections.emptyList().size()
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();
+                var varDecl = (J.VariableDeclarations) cu.getClasses().getFirst().getBody().getStatements().getFirst();
+                var sizeMi = (J.MethodInvocation) varDecl.getVariables().getFirst().getInitializer();
                 assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
                   "java.util.ArrayList")).isTrue();
-                J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();
+                var emptyListMi = (J.MethodInvocation) sizeMi.getSelect();
                 assertThat(TypeUtils.isOfClassType(emptyListMi.getMethodType().getReturnType(),
                   "java.util.ArrayList")).isTrue();
             })

@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -34,7 +33,6 @@ import static org.openrewrite.xml.SemanticallyEqual.areEqual;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddPluginDependency extends Recipe {
-    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project/build/plugins");
 
     @Option(displayName = "Plugin group",
             description = "Group ID of the plugin to which the dependency will be added. " +
@@ -64,36 +62,19 @@ public class AddPluginDependency extends Recipe {
     @Nullable
     String version;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven plugin dependencies";
-    }
+    String displayName = "Add Maven plugin dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
-    }
+    String description = "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);
-                if (!PLUGINS_MATCHER.matches(getCursor())) {
-                    return plugins;
+                Xml.Tag plugin = (Xml.Tag) super.visitTag(tag, ctx);
+                if (!isPluginTag(pluginGroupId, pluginArtifactId)) {
+                    return plugin;
                 }
-                Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
-                        .filter(plugin ->
-                                "plugin".equals(plugin.getName()) &&
-                                        pluginGroupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                        pluginArtifactId.equals(plugin.getChildValue("artifactId").orElse(null))
-                        )
-                        .findAny();
-                if (!maybePlugin.isPresent()) {
-                    return plugins;
-                }
-                Xml.Tag plugin = maybePlugin.get();
                 Optional<Xml.Tag> maybeDependencies = plugin.getChild("dependencies");
                 Xml.Tag dependencies;
                 boolean formatAllDependencies = false;
@@ -102,7 +83,7 @@ public class AddPluginDependency extends Recipe {
                 } else {
                     formatAllDependencies = true;
                     dependencies = Xml.Tag.build("<dependencies />").withPrefix("\n");
-                    plugins = addToTag(plugins, plugin, dependencies, getCursor().getParentOrThrow());
+                    plugin = addToTag(plugin, plugin, dependencies, getCursor().getParentOrThrow());
                 }
                 Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>" +
                                 artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
@@ -115,24 +96,24 @@ public class AddPluginDependency extends Recipe {
                                 artifactId.equals(it.getChildValue("artifactId").orElse(null)))
                         .findAny();
                 if (maybeExistingDependency.isPresent() && areEqual(newDependencyTag, maybeExistingDependency.get())) {
-                    return plugins;
+                    return plugin;
                 }
                 if (maybeExistingDependency.isPresent()) {
-                    plugins = mapTagChildren(plugins, dependencies, it -> {
+                    plugin = mapTagChildren(plugin, dependencies, it -> {
                         if (it == maybeExistingDependency.get()) {
                             return newDependencyTag;
                         }
                         return it;
                     });
                 } else {
-                    plugins = addToTag(plugins, dependencies, newDependencyTag, getCursor().getParentOrThrow());
+                    plugin = addToTag(plugin, dependencies, newDependencyTag, getCursor().getParentOrThrow());
                 }
                 if (formatAllDependencies) {
-                    plugins = autoFormat(plugins, dependencies, ctx, getCursor().getParentOrThrow());
+                    plugin = autoFormat(plugin, dependencies, ctx, getCursor().getParentOrThrow());
                 } else {
-                    plugins = autoFormat(plugins, newDependencyTag, ctx, getCursor().getParentOrThrow());
+                    plugin = autoFormat(plugin, newDependencyTag, ctx, getCursor().getParentOrThrow());
                 }
-                return plugins;
+                return plugin;
             }
         };
     }

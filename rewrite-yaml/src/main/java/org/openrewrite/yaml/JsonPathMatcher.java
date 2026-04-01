@@ -19,12 +19,14 @@ import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.openrewrite.yaml.internal.ThrowingErrorListener;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.Validated;
 import org.openrewrite.yaml.internal.grammar.JsonPathLexer;
 import org.openrewrite.yaml.internal.grammar.JsonPathParser;
 import org.openrewrite.yaml.internal.grammar.JsonPathParserBaseVisitor;
@@ -54,6 +56,24 @@ public class JsonPathMatcher {
         this.jsonPath = jsonPath;
     }
 
+    public static Validated<String> validate(String property, String jsonPath) {
+        // "$" is valid and means "root" - handled as special cases in recipes
+        if ("$".equals(jsonPath)) {
+            return Validated.valid(property, jsonPath);
+        }
+        try {
+            new JsonPathMatcher(jsonPath).parse();
+            return Validated.valid(property, jsonPath);
+        } catch (Throwable t) {
+            return Validated.invalid(
+                    property,
+                    jsonPath,
+                    "Invalid JsonPath expression. " + t.getMessage(),
+                    t
+            );
+        }
+    }
+
     public <T> Optional<T> find(Cursor cursor) {
         return find0(cursor, resolvedAncestors(cursor));
     }
@@ -71,7 +91,10 @@ public class JsonPathMatcher {
         }
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
-        JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
+        ParseTree lastChild = ctx.children.get(ctx.children.size() - 1);
+        JsonPathParser.ExpressionContext stop = lastChild instanceof JsonPathParser.ExpressionContext ?
+                (JsonPathParser.ExpressionContext) lastChild :
+                null;
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
@@ -132,13 +155,30 @@ public class JsonPathMatcher {
 
     private JsonPathParser.JsonPathContext parse() {
         if (parsed == null) {
-            parsed = jsonPath().jsonPath();
+            // "$" is a special case meaning "root" - handle like "$"
+            String pathToParse = "$".equals(jsonPath) ? "$" : jsonPath;
+            JsonPathParser parser = jsonPath(pathToParse);
+            parsed = parser.jsonPath();
+            // Ensure all input was consumed
+            if (parser.getCurrentToken().getType() != org.antlr.v4.runtime.Token.EOF) {
+                throw new IllegalArgumentException(
+                        "Syntax error at line 1:" + parser.getCurrentToken().getCharPositionInLine() +
+                        " extraneous input '" + parser.getCurrentToken().getText() +
+                        "' expecting EOF. Original input: '" + jsonPath + "'");
+            }
         }
         return parsed;
     }
 
-    private JsonPathParser jsonPath() {
-        return new JsonPathParser(new CommonTokenStream(new JsonPathLexer(CharStreams.fromString(this.jsonPath))));
+    private JsonPathParser jsonPath(String path) {
+        ThrowingErrorListener errorListener = new ThrowingErrorListener(this.jsonPath);
+        JsonPathLexer lexer = new JsonPathLexer(CharStreams.fromString(path));
+        lexer.removeErrorListeners();
+        lexer.addErrorListener(errorListener);
+        JsonPathParser parser = new JsonPathParser(new CommonTokenStream(lexer));
+        parser.removeErrorListeners();
+        parser.addErrorListener(errorListener);
+        return parser;
     }
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -209,7 +249,7 @@ public class JsonPathMatcher {
             // `$..foo` or `$.foo..bar[?($..buz == 'buz')]`
             List<ParseTree> previous = ctx.getParent().getParent().children;
             ParserRuleContext current = ctx.getParent();
-            if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
+            if (previous.indexOf(current) < 1 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
                     JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path, null, false);
@@ -314,7 +354,7 @@ public class JsonPathMatcher {
             List<Object> indexes = new ArrayList<>();
             for (TerminalNode terminalNode : ctx.PositiveNumber()) {
                 for (int i = 0; i < results.size(); i++) {
-                    if (terminalNode.getText().contains(String.valueOf(i))) {
+                    if (terminalNode.getText().equals(String.valueOf(i))) {
                         indexes.add(results.get(i));
                     }
                 }
@@ -453,7 +493,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
+        public @Nullable Object visitLiteralExpression(JsonPathParser.LiteralExpressionContext ctx) {
             String s = null;
             if (ctx.StringLiteral() != null) {
                 s = ctx.StringLiteral().getText();
@@ -602,6 +642,51 @@ public class JsonPathMatcher {
         }
 
         @Override
+        public @Nullable Object visitNegationExpression(JsonPathParser.NegationExpressionContext ctx) {
+            Object originalScope = scope;
+
+            // When scope contains multiple elements, iterate and collect
+            // elements where the inner expression does NOT match.
+            List<?> elements = null;
+            if (originalScope instanceof List) {
+                elements = (List<?>) originalScope;
+            } else if (originalScope instanceof Yaml.Sequence) {
+                elements = ((Yaml.Sequence) originalScope).getEntries();
+            } else if (originalScope instanceof Yaml.Mapping.Entry &&
+                       ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Sequence) {
+                elements = ((Yaml.Sequence) ((Yaml.Mapping.Entry) originalScope).getValue()).getEntries();
+            }
+
+            if (elements != null) {
+                List<Object> results = new ArrayList<>();
+                for (Object element : elements) {
+                    scope = element;
+                    Object result = ctx.filterExpression() != null ?
+                            visit(ctx.filterExpression()) :
+                            visitUnaryExpression(ctx.unaryExpression());
+                    boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+                    if (!matched) {
+                        if (element instanceof Yaml.Sequence.Entry) {
+                            results.add(((Yaml.Sequence.Entry) element).getBlock());
+                        } else {
+                            results.add(element);
+                        }
+                    }
+                }
+                scope = originalScope;
+                return getResultFromList(results);
+            }
+
+            // Non-list scope: simple boolean flip
+            Object result = ctx.filterExpression() != null ?
+                    visit(ctx.filterExpression()) :
+                    visitUnaryExpression(ctx.unaryExpression());
+            boolean matched = result != null && (!(result instanceof List) || !((List<?>) result).isEmpty());
+            scope = originalScope;
+            return matched ? null : originalScope;
+        }
+
+        @Override
         public @Nullable Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
             Object lhs = ctx.children.get(0);
             Object rhs = ctx.children.get(2);
@@ -673,6 +758,28 @@ public class JsonPathMatcher {
                     if (!matches.isEmpty() && originalScope instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Mapping) {
                         return originalScope;
                     }
+
+                    // The filterExpression matched a result inside a List.
+                    List<Object> matchedResults = new ArrayList<>();
+                    if (!matches.isEmpty()) {
+                        if (originalScope instanceof List) {
+                            for (Object originalScopeObject : ((List<Object>) originalScope)) {
+                                if (filterMatched(originalScopeObject, matches)) {
+                                    matchedResults.add(originalScopeObject);
+                                }
+                            }
+                        } else if (originalScope instanceof Yaml.Mapping) {
+                            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) originalScope).getEntries()) {
+                                if (filterMatched(entry, matches)) {
+                                    matchedResults.add(entry);
+                                }
+                            }
+                        }
+                    }
+
+                    if (!matchedResults.isEmpty()) {
+                        return getResultFromList(matchedResults);
+                    }
                     return matches;
                 } else {
                     if (originalScope instanceof Yaml.Mapping.Entry) {
@@ -702,6 +809,9 @@ public class JsonPathMatcher {
 
             } else if (ctx instanceof JsonPathParser.LiteralExpressionContext) {
                 ctx = visitLiteralExpression((JsonPathParser.LiteralExpressionContext) ctx);
+
+            } else if (ctx instanceof JsonPathParser.NegationExpressionContext) {
+                ctx = visitNegationExpression((JsonPathParser.NegationExpressionContext) ctx);
             }
             return ctx;
         }
@@ -813,6 +923,32 @@ public class JsonPathMatcher {
                 return literal.substring(1, literal.length() - 1);
             }
             return "null".equals(literal) ? null : literal;
+        }
+
+        private static boolean filterMatched(Object scope, List<Object> matches) {
+            return matches.stream().anyMatch(match -> filterMatched(scope, match));
+        }
+
+        private static boolean filterMatched(Object scope, Object match) {
+            if (!(scope instanceof Yaml && match instanceof Yaml)) {
+                return false;
+            }
+            Yaml matchedYaml = (Yaml) match;
+            Yaml scopedYaml = (Yaml) scope;
+            if (matchedYaml.getId().equals(scopedYaml.getId())) {
+                return true;
+            }
+            if (scope instanceof Yaml.Mapping.Entry) {
+                Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) scope;
+                return filterMatched(entry.getValue(), match);
+            } else if (scope instanceof Yaml.Mapping) {
+                Yaml.Mapping mapping = (Yaml.Mapping) scope;
+                return mapping.getEntries().stream().anyMatch(entry -> filterMatched(entry, match));
+            } else if (scope instanceof Yaml.Sequence) {
+                Yaml.Sequence sequence = (Yaml.Sequence) scope;
+                return sequence.getEntries().stream().anyMatch(entry -> filterMatched(entry, match));
+            }
+            return false;
         }
     }
 }

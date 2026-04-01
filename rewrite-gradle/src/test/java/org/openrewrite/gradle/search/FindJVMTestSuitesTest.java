@@ -36,7 +36,7 @@ class FindJVMTestSuitesTest implements RewriteTest {
         @Test
         void configNull() {
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(null, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(
                 withoutDependency,
                 withoutDependencyFound
@@ -47,19 +47,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
         @Test
         void configFalse() {
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(false, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(
                 withoutDependency,
                 withoutDependencyFound
               )
-            );
-        }
-
-        @Test
-        void configTrue() {
-            rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(true, null)),
-              buildGradle(withoutDependency)
             );
         }
     }
@@ -69,7 +61,7 @@ class FindJVMTestSuitesTest implements RewriteTest {
         @Test
         void configNull() {
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(null, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(
                 withDependency,
                 withDependencyFound
@@ -80,7 +72,7 @@ class FindJVMTestSuitesTest implements RewriteTest {
         @Test
         void configFalse() {
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(false, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(
                 withDependency,
                 withDependencyFound
@@ -91,7 +83,7 @@ class FindJVMTestSuitesTest implements RewriteTest {
         @Test
         void configTrue() {
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(true, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(
                 withDependency,
                 withDependencyFound
@@ -105,15 +97,15 @@ class FindJVMTestSuitesTest implements RewriteTest {
         @Test
         void noSuiteDefined() {
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(null, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(noSuiteDefined)
             );
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(false, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(noSuiteDefined)
             );
             rewriteRun(
-              spec -> spec.recipe(new FindJVMTestSuites(true, null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(noSuiteDefined)
             );
         }
@@ -125,11 +117,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               integrationTest(JvmTestSuite) {
@@ -145,11 +137,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               /*~~>*/integrationTest(JvmTestSuite) {
@@ -165,11 +157,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               integrationTest(JvmTestSuite) {
@@ -184,11 +176,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
               /*~~>*/integrationTest(JvmTestSuite) {
@@ -203,11 +195,11 @@ class FindJVMTestSuitesTest implements RewriteTest {
           id "java-library"
           id 'jvm-test-suite'
       }
-      
+
       repositories {
           mavenCentral()
       }
-      
+
       testing {
           suites {
           }

@@ -15,43 +15,89 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.IsBuildGradle;
-import org.openrewrite.gradle.IsSettingsGradle;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.gradle.RemoveExtension;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 
-import static org.openrewrite.Preconditions.or;
+import java.util.Arrays;
+import java.util.List;
+
+import static java.util.Collections.singletonList;
 
 public class RemoveDevelocityConfiguration extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove Develocity configuration";
-    }
 
-    @Override
-    public String getDescription() {
-        return "Remove Develocity configuration from a Gradle build.";
-    }
+    protected static final MethodMatcher BUILD_CACHE_MATCHER = new MethodMatcher("*..* buildCache(..)");
+
+    @Getter
+    final String displayName = "Remove Develocity configuration";
+
+    @Getter
+    final String description = "Remove the Develocity Gradle plugin and associated configuration.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
-                or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
-                new JavaIsoVisitor<ExecutionContext>() {
+                new UsesMethod<>(BUILD_CACHE_MATCHER),
+                new GroovyIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        if ("develocity".equals(method.getSimpleName()) ||
-                            "gradleEnterprise".equals(method.getSimpleName())) {
-                            return null;
+                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+
+                        if (BUILD_CACHE_MATCHER.matches(m) &&
+                                m.getArguments().size() == 1 &&
+                                m.getArguments().get(0) instanceof J.Lambda) {
+                            J.Lambda lambda = (J.Lambda) m.getArguments().get(0);
+                            J.Block body = (J.Block) lambda.getBody();
+
+                            List<Statement> filteredStatements = ListUtils.filter(body.getStatements(), this::retainStatement);
+                            if (filteredStatements.isEmpty()) {
+                                return null;
+                            }
+                            return m.withArguments(singletonList(lambda.withBody(body.withStatements(filteredStatements))));
                         }
-                        return super.visitMethodInvocation(method, ctx);
+
+                        return m;
                     }
-                }
-        );
+
+                    private boolean retainStatement(Statement stmt) {
+                        if (stmt instanceof J.Return && ((J.Return) stmt).getExpression() instanceof J.MethodInvocation) {
+                            // Unpack J.Return wrapping last statement in closure
+                            stmt = (J.MethodInvocation) ((J.Return) stmt).getExpression();
+                        }
+                        if (!(stmt instanceof J.MethodInvocation)) {
+                            return true;
+                        }
+                        J.MethodInvocation remote = (J.MethodInvocation) stmt;
+                        if (!"remote".equals(remote.getSimpleName())) {
+                            return true;
+                        }
+                        if (remote.getArguments().isEmpty() || !(remote.getArguments().get(0) instanceof J.FieldAccess)) {
+                            return true;
+                        }
+                        J.FieldAccess fieldAccess = (J.FieldAccess) remote.getArguments().get(0);
+                        if (!(fieldAccess.getTarget() instanceof J.Identifier)) {
+                            return true;
+                        }
+                        J.Identifier target = (J.Identifier) fieldAccess.getTarget();
+                        return !"develocity".equals(target.getSimpleName()) && !"gradleEnterprise".equals(target.getSimpleName());
+                    }
+                });
+    }
+
+    @Override
+    public List<Recipe> getRecipeList() {
+        return Arrays.asList(
+                new RemoveExtension("develocity"),
+                new RemoveExtension("gradleEnterprise"));
     }
 }

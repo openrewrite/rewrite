@@ -17,17 +17,23 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 class RemoveRepositoryTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveRepository("jcenter"));
+    }
 
     @DocumentExample
     @Test
     void removeJcenter() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository("jcenter")),
           buildGradle(
             """
               repositories {
@@ -37,6 +43,23 @@ class RemoveRepositoryTest implements RewriteTest {
             """
               repositories {
                  \s
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeJcenterKotlin() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              repositories {
+                  jcenter()
+              }
+              """,
+            """
+              repositories {
               }
               """
           )

@@ -19,7 +19,7 @@ bodyContent
     ;
 
 attribute
-    : Identifier ASSIGN expression
+    : (Identifier | NULL) ASSIGN expression
     ;
 
 block
@@ -87,7 +87,11 @@ object
     ;
 
 objectelem
-    : (Identifier | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
+    : (qualifiedIdentifier | NULL | LPAREN qualifiedIdentifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
+    ;
+
+qualifiedIdentifier
+    : Identifier (DOT Identifier)*
     ;
 
 // For Expressions
@@ -125,7 +129,10 @@ variableExpr
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#functions-and-function-calls
 
 functionCall
-    : Identifier LPAREN arguments? RPAREN;
+    : functionName LPAREN arguments? RPAREN;
+
+functionName
+    : Identifier (DOUBLE_COLON Identifier)*;
 
 arguments
     : expression (COMMA expression)* (COMMA | ELLIPSIS)?

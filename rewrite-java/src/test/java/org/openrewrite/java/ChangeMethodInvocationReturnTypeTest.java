@@ -29,8 +29,8 @@ class ChangeMethodInvocationReturnTypeTest implements RewriteTest {
         spec.recipe(new ChangeMethodInvocationReturnType("java.lang.Integer parseInt(String)", "long"));
     }
 
-    @Test
     @DocumentExample
+    @Test
     void replaceVariableAssignment() {
         rewriteRun(
           //language=java

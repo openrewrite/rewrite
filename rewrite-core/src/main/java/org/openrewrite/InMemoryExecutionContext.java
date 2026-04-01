@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 
 public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Nullable
-    private Map<String, Object> messages;
+    private volatile Map<String, Object> messages;
 
     private final Consumer<Throwable> onError;
     private final BiConsumer<Throwable, ExecutionContext> onTimeout;
@@ -53,8 +53,13 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Override
     public Map<String, @Nullable Object> getMessages() {
         if (messages == null) {
-            messages = new ConcurrentHashMap<>();
+            synchronized (this) {
+                if (messages == null) {
+                    messages = new ConcurrentHashMap<>();
+                }
+            }
         }
+        //noinspection DataFlowIssue
         return messages;
     }
 
@@ -95,9 +100,8 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Override
     public InMemoryExecutionContext clone() {
         InMemoryExecutionContext clone = new InMemoryExecutionContext();
-        clone.messages = new ConcurrentHashMap<>(messages);
-        clone.messages.computeIfPresent(DATA_TABLES, (key, dt) ->
-                new ConcurrentHashMap<>(((Map<?, ?>) dt)));
+        clone.messages = new ConcurrentHashMap<>(getMessages());
+        // DataTableStore is shared (thread-safe) — no need to deep-copy
         return clone;
     }
 }

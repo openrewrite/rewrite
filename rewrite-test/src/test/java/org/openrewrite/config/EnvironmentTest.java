@@ -23,9 +23,8 @@ import org.openrewrite.text.PlainText;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 
@@ -95,7 +94,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -201,7 +200,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -251,7 +250,7 @@ class EnvironmentTest implements RewriteTest {
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
+              .sourcePath(Path.of("test.txt"))
               .text("hello")
               .build())), new InMemoryExecutionContext())
           .getChangeset()
@@ -339,60 +338,24 @@ class EnvironmentTest implements RewriteTest {
     }
 
     @Test
-    void scanClasspath() {
-        var env = Environment.builder()
-          .scanRuntimeClasspath()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/attribution
-              recipeName: org.openrewrite.text.ChangeTextToJon
-              contributors:
-                - name: "Jonathan Schneider"
-                  email: "jon@moderne.io"
-                  lineCount: 5
-              """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
-          .build();
-
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSizeGreaterThanOrEqualTo(2)
-          .extracting("name")
-          .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon");
-
-        assertThat(env.listStyles()).hasSizeGreaterThanOrEqualTo(1)
-          .extracting("name")
-          .contains("org.openrewrite.SampleStyle");
-
-        //noinspection OptionalGetWithoutIsPresent
-        Recipe cttj = recipes.stream()
-          .filter(it -> "org.openrewrite.text.ChangeTextToJon".equals(it.getName()))
-          .findAny()
-          .get();
-
-        assertThat(cttj.getContributors())
-          .isNotEmpty();
-    }
-
-    @Test
     void listRecipeDescriptors() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.text.ChangeText"))
+        assertThat(recipeDescriptors).isNotEmpty();
+        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> "org.openrewrite.text.ChangeText".equals(rd.getName()))
           .findAny().orElse(null);
         assertThat(changeTextDescriptor).isNotNull();
         assertThat(changeTextDescriptor.getOptions()).hasSize(1);
-        assertThat(changeTextDescriptor.getOptions().get(0).getName()).isEqualTo("toText");
-        assertThat(changeTextDescriptor.getOptions().get(0).getType()).isEqualTo("String");
+        assertThat(changeTextDescriptor.getOptions().getFirst().getName()).isEqualTo("toText");
+        assertThat(changeTextDescriptor.getOptions().getFirst().getType()).isEqualTo("String");
     }
 
     @Test
     void listStyles() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var styles = env.listStyles();
-        assertThat(styles).isNotNull().isNotEmpty();
-        var sampleStyle = styles.stream().filter(s -> s.getName().equals("org.openrewrite.SampleStyle"))
+        assertThat(styles).isNotEmpty();
+        var sampleStyle = styles.stream().filter(s -> "org.openrewrite.SampleStyle".equals(s.getName()))
           .findAny().orElse(null);
         assertThat(sampleStyle).isNotNull();
         assertThat(sampleStyle.getDisplayName()).isEqualTo("Sample style");
@@ -420,11 +383,11 @@ class EnvironmentTest implements RewriteTest {
     void recipeDescriptorsFromCrossResources() {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var helloJon2 = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.HelloJon2"))
+        assertThat(recipeDescriptors).isNotEmpty();
+        var helloJon2 = recipeDescriptors.stream().filter(rd -> "org.openrewrite.HelloJon2".equals(rd.getName()))
           .findAny().orElseThrow();
         assertThat(helloJon2.getRecipeList()).hasSize(1);
-        assertThat(helloJon2.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.HelloJon");
+        assertThat(helloJon2.getRecipeList().getFirst().getName()).isEqualTo("org.openrewrite.HelloJon");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1789")
@@ -488,7 +451,7 @@ class EnvironmentTest implements RewriteTest {
           ))
           .build();
         var recipeList = env.activateRecipes("test.OrderPreserved").getRecipeList();
-        assertThat(recipeList.get(0).getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");
+        assertThat(recipeList.getFirst().getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");
         assertThat(recipeList.get(1).getName()).isEqualTo("test.FooOne");
         assertThat(recipeList.get(2).getName()).isEqualTo("org.openrewrite.config.RecipeAcceptingParameters");
         assertThat(recipeList.get(3).getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");
@@ -510,7 +473,7 @@ class EnvironmentTest implements RewriteTest {
                 causesAnotherCycle: true
                 recipeList:
                   - org.openrewrite.config.RecipeNoParameters
-                
+
                 """.getBytes()
             ),
             URI.create("rewrite.yml"),
@@ -555,5 +518,149 @@ class EnvironmentTest implements RewriteTest {
             ))).build();
         var recipe = env.activateRecipes("test.Foo");
         assertThat(recipe.validate().isValid()).isTrue();
+    }
+
+    @Test
+    void recipeReferencedMultipleTimesShouldNotBeReInitialized() {
+        // This test reproduces the issue where a child recipe referenced by multiple parents
+        // gets re-initialized each time, losing its recipe list
+
+        String childYaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.ChildRecipe
+          displayName: Child recipe
+          description: A child recipe.
+          recipeList:
+            - org.openrewrite.text.ChangeText:
+                toText: child-text
+          """;
+
+        String parent1Yaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.Parent1
+          displayName: Parent 1
+          description: First parent.
+          recipeList:
+            - org.openrewrite.ChildRecipe
+          """;
+
+        String parent2Yaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.Parent2
+          displayName: Parent 2
+          description: Second parent.
+          recipeList:
+            - org.openrewrite.ChildRecipe
+          """;
+
+        String grandparentYaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.Grandparent
+          displayName: Grandparent
+          description: Top-level recipe that references both parents.
+          recipeList:
+            - org.openrewrite.Parent1
+            - org.openrewrite.Parent2
+          """;
+
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(childYaml.getBytes()),
+            URI.create("child.yml"),
+            new Properties()))
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(parent1Yaml.getBytes()),
+            URI.create("parent1.yml"),
+            new Properties()))
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(parent2Yaml.getBytes()),
+            URI.create("parent2.yml"),
+            new Properties()))
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(grandparentYaml.getBytes()),
+            URI.create("grandparent.yml"),
+            new Properties()))
+          .build();
+
+        // Load the grandparent recipe - this will load both parents, which both reference the child
+        Recipe grandparent = env.activateRecipes("org.openrewrite.Grandparent");
+
+        assertThat(grandparent.getRecipeList())
+          .as("Grandparent should have 2 parent recipes")
+          .hasSize(2);
+
+        Recipe parent1 = grandparent.getRecipeList().getFirst();
+        assertThat(parent1.getRecipeList())
+          .as("Parent1 should have the child recipe")
+          .hasSize(1);
+
+        Recipe childFromParent1 = parent1.getRecipeList().getFirst();
+        assertThat(childFromParent1.getRecipeList())
+          .as("Child recipe (from Parent1) should have its ChangeText recipe")
+          .hasSize(1);
+
+        Recipe parent2 = grandparent.getRecipeList().get(1);
+        assertThat(parent2.getRecipeList())
+          .as("Parent2 should have the child recipe")
+          .hasSize(1);
+
+        Recipe childFromParent2 = parent2.getRecipeList().getFirst();
+        assertThat(childFromParent2.getRecipeList())
+          .as("Child recipe (from Parent2) should still have its ChangeText recipe")
+          .hasSize(1);
+
+        // If both child instances are the same object, verify it's properly initialized
+        if (childFromParent1 == childFromParent2) {
+            assertThat(childFromParent1.getRecipeList())
+              .as("Shared child recipe instance should have its ChangeText recipe")
+              .hasSize(1);
+        }
+    }
+
+    @Test
+    void recipeLoadedMultipleTimesViaActivateRecipesShouldRemainInitialized() {
+        // This test simulates what happens when activateRecipes() is called multiple times
+        // for the same recipe name, which is common in test scenarios
+
+        String recipeYaml = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.TestRecipe
+          displayName: Test recipe
+          description: A test recipe.
+          recipeList:
+            - org.openrewrite.text.ChangeText:
+                toText: test-text
+          """;
+
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(
+            new ByteArrayInputStream(recipeYaml.getBytes()),
+            URI.create("test.yml"),
+            new Properties()))
+          .build();
+
+        // Load the recipe the first time
+        Recipe recipe1 = env.activateRecipes("org.openrewrite.TestRecipe");
+        int initialSize1 = recipe1.getRecipeList().size();
+        assertThat(initialSize1)
+          .as("Recipe should have recipes after first activation")
+          .isGreaterThan(0);
+
+        // Load the same recipe a second time (simulating what might happen across different tests)
+        Recipe recipe2 = env.activateRecipes("org.openrewrite.TestRecipe");
+        assertThat(recipe2.getRecipeList())
+          .as("Recipe should still have recipes after second activation")
+          .hasSize(initialSize1);
+
+        // Load it a third time to be sure
+        Recipe recipe3 = env.activateRecipes("org.openrewrite.TestRecipe");
+        assertThat(recipe3.getRecipeList())
+          .as("Recipe should still have recipes after third activation")
+          .hasSize(initialSize1);
     }
 }

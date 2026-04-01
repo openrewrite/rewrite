@@ -2,15 +2,21 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
+recipeDependencies {
+    parserClasspath("jakarta.persistence:jakarta.persistence-api:3.1.0")
+}
+
 dependencies {
-    implementation("org.assertj:assertj-core:latest.release")
+    implementation("org.assertj:assertj-core:3.+") // CVE-2026-24400 in 4.0.0-M1 and no higher versions available
     implementation(project(":rewrite-java"))
+    implementation(project(":rewrite-kotlin"))
     implementation(project(":rewrite-groovy"))
     implementation(project(":rewrite-test"))
 
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly("jakarta.persistence:jakarta.persistence-api:3.1.0")
     testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
@@ -19,19 +25,18 @@ dependencies {
     testImplementation(project(":rewrite-xml"))
 }
 
-tasks.withType<Javadoc> {
+tasks.withType<Javadoc>().configureEach {
     isFailOnError = false
     exclude("org/openrewrite/java/**")
 }
 
-tasks.named<JavaCompile>("compileTestJava") {
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-    targetCompatibility = JavaVersion.VERSION_17.toString()
-
-    options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 }
 
-tasks.withType<Test> {
+tasks.withType<Test>().configureEach {
     systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
 }
 

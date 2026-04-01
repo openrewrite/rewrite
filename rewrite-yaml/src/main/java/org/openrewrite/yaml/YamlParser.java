@@ -19,12 +19,10 @@ import lombok.Getter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -39,6 +37,8 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
+import org.openrewrite.yaml.marker.OmitColon;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -47,12 +47,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
+    // Only match single-line Helm templates that don't span multiple lines
+    private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
+    // Match single-brace placeholder templates like {C App} that contain at least one space
+    // These are invalid YAML but used by some tools as placeholders
+    private static final Pattern SINGLE_BRACE_TEMPLATE_PATTERN = Pattern.compile("\\{[A-Za-z][^{}\\n\\r]*\\s[^{}\\n\\r]*}");
+    // Match placeholder values starting with multiple asterisks like "*** REMOVED ***"
+    // These are invalid YAML aliases but used as credential placeholders
+    private static final Pattern ASTERISK_PLACEHOLDER_PATTERN = Pattern.compile(":\\s+(\\*{2,}[^\n\r]*)");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -84,7 +91,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (docs.getDocuments().isEmpty()) {
                             Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
                             Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null);
-                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, emptyList(), false, mapping, end)));
                         }
                         return docs;
                     }
@@ -95,23 +102,75 @@ public class YamlParser implements org.openrewrite.Parser {
     private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
         String yamlSource = source.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
+        Map<String, String> helmTemplateByUuid = new HashMap<>();
+        Map<String, String> singleBraceTemplateByUuid = new HashMap<>();
 
-        StringBuilder yamlSourceWithVariablePlaceholders = new StringBuilder();
-        Matcher variableMatcher = VARIABLE_PATTERN.matcher(yamlSource);
+        // First, replace all Helm templates with UUIDs
+        String processedSource = yamlSource;
+        Matcher helmMatcher = HELM_TEMPLATE_PATTERN.matcher(processedSource);
+        StringBuffer helmBuffer = new StringBuffer();
+        while (helmMatcher.find()) {
+            String uuid = UUID.randomUUID().toString();
+            helmTemplateByUuid.put(uuid, helmMatcher.group());
+            helmMatcher.appendReplacement(helmBuffer, uuid);
+        }
+        helmMatcher.appendTail(helmBuffer);
+        processedSource = helmBuffer.toString();
+
+        // Convert standalone Helm template lines (lines where a UUID is the only content)
+        // to YAML comments so they don't create structurally invalid YAML
+        processedSource = convertStandaloneHelmLinesToComments(
+                processedSource, helmTemplateByUuid.keySet());
+
+        // Then, replace single-brace templates like {C App} with UUIDs
+        Matcher singleBraceMatcher = SINGLE_BRACE_TEMPLATE_PATTERN.matcher(processedSource);
+        StringBuffer singleBraceBuffer = new StringBuffer();
+        while (singleBraceMatcher.find()) {
+            String uuid = UUID.randomUUID().toString();
+            singleBraceTemplateByUuid.put(uuid, singleBraceMatcher.group());
+            singleBraceMatcher.appendReplacement(singleBraceBuffer, uuid);
+        }
+        singleBraceMatcher.appendTail(singleBraceBuffer);
+        processedSource = singleBraceBuffer.toString();
+
+        // Then, replace @variable@ patterns with UUIDs
+        StringBuilder yamlSourceWithPlaceholders = new StringBuilder();
+        Matcher variableMatcher = VARIABLE_PATTERN.matcher(processedSource);
         int pos = 0;
-        while (pos < yamlSource.length() && variableMatcher.find(pos)) {
-            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, variableMatcher.start(1));
+        while (pos < processedSource.length() && variableMatcher.find(pos)) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, variableMatcher.start(1));
             String uuid = UUID.randomUUID().toString();
             variableByUuid.put(uuid, variableMatcher.group(1));
-            yamlSourceWithVariablePlaceholders.append(uuid);
+            yamlSourceWithPlaceholders.append(uuid);
             pos = variableMatcher.end(1);
         }
 
-        if (pos < yamlSource.length() - 1) {
-            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
+        if (pos < processedSource.length()) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, processedSource.length());
         }
 
-        try (FormatPreservingReader reader = new FormatPreservingReader(yamlSourceWithVariablePlaceholders.toString())) {
+        // Then, replace asterisk placeholder patterns like "*** REMOVED ***" with UUIDs
+        processedSource = yamlSourceWithPlaceholders.toString();
+        yamlSourceWithPlaceholders = new StringBuilder();
+        Matcher asteriskMatcher = ASTERISK_PLACEHOLDER_PATTERN.matcher(processedSource);
+        pos = 0;
+        while (pos < processedSource.length() && asteriskMatcher.find(pos)) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, asteriskMatcher.start(1));
+            String uuid = UUID.randomUUID().toString();
+            variableByUuid.put(uuid, asteriskMatcher.group(1));
+            yamlSourceWithPlaceholders.append(uuid);
+            pos = asteriskMatcher.end(1);
+        }
+
+        if (pos < processedSource.length()) {
+            yamlSourceWithPlaceholders.append(processedSource, pos, processedSource.length());
+        }
+
+        // Pre-scan the source to extract directives, since SnakeYAML doesn't preserve exact directive text
+        String sourceText = yamlSourceWithPlaceholders.toString();
+        Queue<List<Yaml.Directive>> documentDirectives = preScanDirectives(sourceText);
+
+        try (FormatPreservingReader reader = new FormatPreservingReader(sourceText)) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
@@ -125,6 +184,7 @@ public class YamlParser implements org.openrewrite.Parser {
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
             String newLine = "";
+            String suffix = "";
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
                 switch (event.getEventId()) {
@@ -152,11 +212,25 @@ public class YamlParser implements org.openrewrite.Parser {
                     case DocumentStart: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
+                        DocumentStartEvent docStartEvent = (DocumentStartEvent) event;
+
+                        // Use pre-scanned directives if available, otherwise fall back to event-based extraction
+                        List<Yaml.Directive> directives = documentDirectives.poll();
+                        String documentPrefix;
+                        if (directives != null && !directives.isEmpty()) {
+                            // Directives were pre-scanned, document prefix is whatever remains after them
+                            documentPrefix = "";
+                        } else {
+                            directives = new ArrayList<>();
+                            documentPrefix = parseDirectives(fmt, directives, docStartEvent);
+                        }
+
                         document = new Yaml.Document(
                                 randomId(),
-                                fmt,
+                                documentPrefix,
                                 Markers.EMPTY,
-                                ((DocumentStartEvent) event).getExplicit(),
+                                directives != null ? directives : emptyList(),
+                                docStartEvent.getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
                                 new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
@@ -172,17 +246,11 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (mappingStartEvent.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
                             anchors.put(mappingStartEvent.getAnchor(), anchor);
-
                             lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
-                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
-                            if (dashPrefixIndex > -1) {
-                                fmt = fmt.substring(0, dashPrefixIndex);
-                            }
                         }
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
-                        int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                        int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
                         Yaml.Tag tag = null;
                         if (mappingStartEvent.getTag() != null) {
                             String prefixAfterColon = fullPrefix.substring(startIndex);
@@ -222,13 +290,13 @@ public class YamlParser implements org.openrewrite.Parser {
                         } else {
                             valueStart = lastEnd + fmt.length();
                         }
-                        valueStart = valueStart - newLine.length();
+                        valueStart -= newLine.length();
                         newLine = "";
 
                         Yaml.Tag tag = null;
                         if (scalar.getTag() != null) {
                             String potentialScalarValue = reader.readStringFromBuffer(valueStart, event.getEndMark().getIndex() - 1);
-                            assert(potentialScalarValue.contains("!"));
+                            assert (potentialScalarValue.contains("!"));
                             final int tagStartIndex = potentialScalarValue.indexOf('!');
                             String tagPrefix = potentialScalarValue.substring(0, tagStartIndex);
                             int indexOfTagName = tagStartIndex;
@@ -241,7 +309,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 indexOfSpaceAfterTag++;
                             }
                             String tagSuffix = potentialScalarValue.substring(indexOfTagName, indexOfSpaceAfterTag);
-                            valueStart = valueStart + indexOfSpaceAfterTag;
+                            valueStart += indexOfSpaceAfterTag;
                             tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
 
@@ -260,15 +328,24 @@ public class YamlParser implements org.openrewrite.Parser {
                             case FOLDED:
                             case LITERAL:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
-                                if (scalarValue.endsWith("\n")) {
-                                    newLine = "\n";
-                                    scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
-                                }
                                 break;
                             default:
                                 scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
                                 break;
                         }
+                        // First restore any Helm template UUIDs
+                        for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
+                            if (scalarValue.contains(entry.getKey())) {
+                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
+                            }
+                        }
+                        // Then restore any single-brace template UUIDs
+                        for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
+                            if (scalarValue.contains(entry.getKey())) {
+                                scalarValue = scalarValue.replace(entry.getKey(), entry.getValue());
+                            }
+                        }
+                        // Then check for variable UUIDs (these are exact matches)
                         if (variableByUuid.containsKey(scalarValue)) {
                             scalarValue = variableByUuid.get(scalarValue);
                         }
@@ -352,19 +429,24 @@ public class YamlParser implements org.openrewrite.Parser {
                         newLine = "";
 
                         SequenceStartEvent sse = (SequenceStartEvent) event;
+                        int nextLastEnd = event.getEndMark().getIndex();
+                        if (shouldUseYamlParserBugWorkaround(sse)) {
+                            nextLastEnd--;
+                        }
+
                         Yaml.Anchor anchor = null;
                         if (sse.getAnchor() != null) {
-                            anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), event.getEndMark().getIndex(), false);
+                            anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), nextLastEnd, false);
                             anchors.put(sse.getAnchor(), anchor);
 
                             lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
-                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
+                            fmt = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                             int dashPrefixIndex = commentAwareIndexOf('-', fmt);
                             if (dashPrefixIndex > -1) {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
                         }
-                        String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
+                        String fullPrefix = reader.readStringFromBuffer(lastEnd, nextLastEnd);
                         String startBracketPrefix = null;
                         int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
                         int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
@@ -372,7 +454,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
                         }
                         Yaml.Tag tag = null;
-                        if (sse.getTag() != null) {
+                        if (sse.getTag() != null && startBracketPrefix == null) {
                             String prefixAfterColon = fullPrefix.substring(startIndex);
                             final int tagStartIndex = prefixAfterColon.indexOf('!');
                             String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
@@ -385,10 +467,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
                             tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
-                        lastEnd = event.getEndMark().getIndex();
-                        if (shouldUseYamlParserBugWorkaround(sse)) {
-                            lastEnd--;
-                        }
+                        lastEnd = nextLastEnd;
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor, tag));
                         break;
                     }
@@ -407,14 +486,18 @@ public class YamlParser implements org.openrewrite.Parser {
                         break;
                     }
                     case StreamEnd: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        if (document == null && !fmt.isEmpty()) {
-                            documents.add(
-                                    new Yaml.Document(
-                                            randomId(), fmt, Markers.EMPTY, false,
-                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
-                                            new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
-                                    ));
+                        if (document == null) {
+                            String fmt = newLine + reader.prefix(lastEnd, event);
+                            if (!fmt.isEmpty()) {
+                                documents.add(
+                                        new Yaml.Document(
+                                                randomId(), fmt, Markers.EMPTY, emptyList(), false,
+                                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
+                                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
+                                        ));
+                            }
+                        } else {
+                            suffix = reader.prefix(lastEnd, event);
                         }
                         break;
                     }
@@ -423,14 +506,102 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
+            Yaml.Documents result = new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, suffix, documents);
+            if (helmTemplateByUuid.isEmpty() && variableByUuid.isEmpty() && singleBraceTemplateByUuid.isEmpty()) {
+                return result;
+            }
+
+            // Restore UUID placeholders in all prefixes and suffixes
+            return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
+                private String restoreUuidPlaceholders(String text) {
+                    if (StringUtils.isBlank(text)) {
+                        return text;
+                    }
+                    String result = text;
+                    for (Map.Entry<String, String> entry : helmTemplateByUuid.entrySet()) {
+                        // Check comment-wrapped form first (standalone Helm lines converted to #uuid)
+                        String commentKey = "#" + entry.getKey();
+                        if (result.contains(commentKey)) {
+                            result = result.replace(commentKey, entry.getValue());
+                        } else if (result.contains(entry.getKey())) {
+                            result = result.replace(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    for (Map.Entry<String, String> entry : singleBraceTemplateByUuid.entrySet()) {
+                        if (result.contains(entry.getKey())) {
+                            result = result.replace(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    for (Map.Entry<String, String> entry : variableByUuid.entrySet()) {
+                        if (result.contains(entry.getKey())) {
+                            result = result.replace(entry.getKey(), entry.getValue());
+                        }
+                    }
+                    return result;
+                }
+
+                @Override
+                public @Nullable Yaml visit(@Nullable Tree tree, Integer integer) {
+                    Yaml visit = super.visit(tree, integer);
+                    if (visit == null || StringUtils.isBlank(visit.getPrefix())) {
+                        return visit;
+                    }
+                    return visit.withPrefix(restoreUuidPlaceholders(visit.getPrefix()));
+                }
+
+                @Override
+                public Yaml.Documents visitDocuments(Yaml.Documents documents, Integer integer) {
+                    return unwrapPrefixedMappings(super.visitDocuments(documents, integer));
+                }
+
+                @Override
+                public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
+                    Yaml.Mapping m = super.visitMapping(mapping, p);
+                    String opening = m.getOpeningBracePrefix();
+                    if (!StringUtils.isBlank(opening)) {
+                        m = m.withOpeningBracePrefix((restoreUuidPlaceholders(opening)));
+                    }
+                    String closing = m.getClosingBracePrefix();
+                    if (!StringUtils.isBlank(closing)) {
+                        m = m.withClosingBracePrefix((restoreUuidPlaceholders(closing)));
+                    }
+                    return m;
+                }
+
+                @Override
+                public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, Integer p) {
+                    Yaml.Mapping.Entry e = super.visitMappingEntry(entry, p);
+                    return e.withBeforeMappingValueIndicator(restoreUuidPlaceholders(e.getBeforeMappingValueIndicator()));
+                }
+
+                @Override
+                public Yaml.Sequence visitSequence(Yaml.Sequence sequence, Integer p) {
+                    Yaml.Sequence s = super.visitSequence(sequence, p);
+                    String opening = s.getOpeningBracketPrefix();
+                    if (!StringUtils.isBlank(opening)) {
+                        s = s.withOpeningBracketPrefix((restoreUuidPlaceholders(opening)));
+                    }
+                    String closing = s.getClosingBracketPrefix();
+                    if (!StringUtils.isBlank(closing)) {
+                        s = s.withClosingBracketPrefix((restoreUuidPlaceholders(closing)));
+                    }
+                    return s;
+                }
+
+                @Override
+                public Yaml.Document.End visitDocumentEnd(Yaml.Document.End end, Integer integer) {
+                    return end.withPrefix(restoreUuidPlaceholders(end.getPrefix()));
+                }
+
+            }.visitNonNull(result, 0);
+
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     /*
-    The yaml-parser library unfortunately returns inconsistent marks.
+    The SnakeYAML parser library unfortunately returns inconsistent marks.
     If the dashes of the sequence have an indentation, the end mark and the start mark point to the dash.
     If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
     */
@@ -442,6 +613,9 @@ public class YamlParser implements org.openrewrite.Parser {
         }
         int startChar = event.getStartMark().getBuffer()[startCharIndex];
         int endChar = event.getEndMark().getBuffer()[endCharIndex];
+        if (startChar == '&') { // anchor
+            return event.getEndMark().getBuffer()[endCharIndex - 1] == '-' && endChar != '-';
+        }
         return startChar == '-' && endChar != '-';
     }
 
@@ -459,16 +633,19 @@ public class YamlParser implements org.openrewrite.Parser {
             postFix.append(c);
         }
 
-        int prefixStart = commentAwareIndexOf(':', eventPrefix);
         String prefix = "";
         if (!isForScalar) {
+            int prefixStart = commentAwareIndexOf(':', eventPrefix);
+            if (prefixStart == -1) {
+                prefixStart = commentAwareIndexOf('-', eventPrefix);
+            }
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
         }
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
 
     private static int commentAwareIndexOf(char target, String s) {
-        return commentAwareIndexOf(Collections.singleton(target), s);
+        return commentAwareIndexOf(singleton(target), s);
     }
 
     private static int commentAwareIndexOf(Collection<Character> anyOf, String s) {
@@ -488,6 +665,117 @@ public class YamlParser implements org.openrewrite.Parser {
             }
         }
         return -1;
+    }
+
+
+    /**
+     * After Helm templates have been replaced with UUIDs, lines consisting entirely
+     * of a UUID are standalone control flow directives. A bare UUID on its own line
+     * creates invalid YAML, so we prepend # to make it a YAML comment.
+     */
+    private static String convertStandaloneHelmLinesToComments(
+            String source,
+            Set<String> helmUuids) {
+        if (helmUuids.isEmpty()) {
+            return source;
+        }
+
+        StringBuilder result = new StringBuilder(source.length());
+
+        boolean inBlockScalar = false;
+        int blockScalarBaseIndent = -1;
+
+        int i = 0;
+        while (i < source.length()) {
+            int lineEnd = i;
+            while (lineEnd < source.length() && source.charAt(lineEnd) != '\n' && source.charAt(lineEnd) != '\r') {
+                lineEnd++;
+            }
+
+            String lineContent = source.substring(i, lineEnd);
+            String trimmed = lineContent.trim();
+            int indent = leadingSpaceCount(lineContent);
+
+            if (inBlockScalar) {
+                if (!trimmed.isEmpty() && indent <= blockScalarBaseIndent) {
+                    inBlockScalar = false;
+                } else {
+                    result.append(lineContent);
+                    i = appendNewline(source, lineEnd, result);
+                    continue;
+                }
+            }
+
+            if (helmUuids.contains(trimmed)) {
+                result.append(lineContent, 0, indent);
+                result.append('#');
+                result.append(trimmed);
+            } else {
+                result.append(lineContent);
+                if (isBlockScalarIndicator(trimmed)) {
+                    inBlockScalar = true;
+                    blockScalarBaseIndent = indent;
+                }
+            }
+
+            i = appendNewline(source, lineEnd, result);
+        }
+
+        return result.toString();
+    }
+
+    private static int appendNewline(String source, int lineEnd, StringBuilder result) {
+        if (lineEnd < source.length()) {
+            result.append(source.charAt(lineEnd));
+            lineEnd++;
+            if (lineEnd < source.length() && source.charAt(lineEnd - 1) == '\r' && source.charAt(lineEnd) == '\n') {
+                result.append(source.charAt(lineEnd));
+                lineEnd++;
+            }
+        }
+        return lineEnd;
+    }
+
+    private static boolean isBlockScalarIndicator(String trimmedLine) {
+        // A block scalar indicator line ends with | or > (optionally followed by
+        // chomp/indent modifiers like +, -, or a digit) after a colon
+        int colonIndex = trimmedLine.indexOf(':');
+        if (colonIndex == -1) {
+            return false;
+        }
+        String afterColon = trimmedLine.substring(colonIndex + 1).trim();
+        // Strip trailing comment
+        int commentIndex = afterColon.indexOf(" #");
+        if (commentIndex != -1) {
+            afterColon = afterColon.substring(0, commentIndex).trim();
+        }
+        if (afterColon.isEmpty()) {
+            return false;
+        }
+        char first = afterColon.charAt(0);
+        if (first != '|' && first != '>') {
+            return false;
+        }
+        // Check that remaining chars (if any) are valid block scalar modifiers
+        for (int j = 1; j < afterColon.length(); j++) {
+            char c = afterColon.charAt(j);
+            if (c != '+' && c != '-' && !Character.isDigit(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static int leadingSpaceCount(String line) {
+        int count = 0;
+        for (int j = 0; j < line.length(); j++) {
+            if (line.charAt(j) == ' ') {
+                count++;
+            } else {
+                break;
+            }
+        }
+        return count;
     }
 
     @Override
@@ -535,9 +823,22 @@ public class YamlParser implements org.openrewrite.Parser {
                 key = (Yaml.Scalar) block;
             } else if (key == null && block instanceof Yaml.Alias) {
                 key = (Yaml.Alias) block;
+            } else if (key == null) {
+                // Complex YAML key (mapping or sequence used as key).
+                // The YamlKey interface only supports Scalar and Alias, so convert
+                // the complex key to a placeholder Scalar. This won't round-trip
+                // and will become a ParseError, but prevents NPE/ClassCastException.
+                key = new Yaml.Scalar(randomId(), block.getPrefix(), Markers.EMPTY,
+                        Yaml.Scalar.Style.PLAIN, null, null, "");
             } else {
                 String keySuffix = block.getPrefix();
-                block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));
+                int colonIndex = commentAwareIndexOf(':', keySuffix);
+                // In flow mappings like { "MV7", "7J04" }, entries may lack explicit colons.
+                // Only omit colon when we're in a flow mapping (has opening brace)
+                // AND there's no colon in the keySuffix. For block mappings or when anchors
+                // consume the colon, we assume the colon was present.
+                boolean omitColon = colonIndex == -1 && startBracePrefix != null;
+                block = block.withPrefix(keySuffix.substring(colonIndex + 1));
 
                 // Begin moving whitespace from the key to the entry that contains the key
                 String originalKeyPrefix = key.getPrefix();
@@ -551,8 +852,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         commentAwareIndexOf(':', originalKeyPrefix)) + 1;
                 String entryPrefix = originalKeyPrefix.substring(entryPrefixStartIndex);
                 String beforeMappingValueIndicator = keySuffix.substring(0,
-                        Math.max(commentAwareIndexOf(':', keySuffix), 0));
-                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
+                        Math.max(colonIndex, 0));
+                Markers markers = omitColon ? Markers.EMPTY.addIfAbsent(new OmitColon(randomId())) : Markers.EMPTY;
+                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, markers, key, beforeMappingValueIndicator, block));
                 key = null;
             }
         }
@@ -634,10 +936,29 @@ public class YamlParser implements org.openrewrite.Parser {
             this.prefix = prefix;
         }
 
+        public MappingWithPrefix(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag, String prefix) {
+            super(id, markers, openingBracePrefix, entries, closingBracePrefix, anchor, tag);
+            this.prefix = prefix;
+        }
+
         @Override
         public Mapping withPrefix(String prefix) {
             this.prefix = prefix;
             return this;
+        }
+
+        @Override
+        public MappingWithPrefix withClosingBracePrefix(@Nullable String closingBracePrefix) {
+            return new MappingWithPrefix(
+                    getId(),
+                    getMarkers(),
+                    getOpeningBracePrefix(),
+                    getEntries(),
+                    closingBracePrefix,
+                    getAnchor(),
+                    getTag(),
+                    this.prefix
+            );
         }
     }
 
@@ -667,6 +988,30 @@ public class YamlParser implements org.openrewrite.Parser {
             return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), closingBracketPrefix, getAnchor(), getTag(), prefix);
         }
 
+        @Override
+        public SequenceWithPrefix withOpeningBracketPrefix(@Nullable String openingBracketPrefix) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), getMarkers(), openingBracketPrefix, getEntries(), getClosingBracketPrefix(), getAnchor(), getTag(), prefix);
+        }
+
+        @Override
+        public Sequence withTag(@Nullable Tag tag) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor(), tag, prefix);
+        }
+
+        @Override
+        public Sequence withEntries(List<Entry> entries) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), entries, getClosingBracketPrefix(), getAnchor(), getTag(), prefix);
+        }
+
+        @Override
+        public Sequence withMarkers(Markers markers) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), markers, getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor(), getTag(), prefix);
+        }
+
         public Sequence toSequence() {
             return new Yaml.Sequence(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor(), getTag());
         }
@@ -685,15 +1030,15 @@ public class YamlParser implements org.openrewrite.Parser {
                     } else {
                         // For normal sequence with dashes, the prefix of the sequence gets transferred to the first entry
                         return super.visitSequence(
-                            new Yaml.Sequence(
-                                    sequenceWithPrefix.getId(),
-                                    sequenceWithPrefix.getMarkers(),
-                                    sequenceWithPrefix.getOpeningBracketPrefix(),
-                                    ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
-                                    sequenceWithPrefix.getClosingBracketPrefix(),
-                                    sequenceWithPrefix.getAnchor(),
-                                    sequenceWithPrefix.getTag()
-                            ), p);
+                                new Yaml.Sequence(
+                                        sequenceWithPrefix.getId(),
+                                        sequenceWithPrefix.getMarkers(),
+                                        sequenceWithPrefix.getOpeningBracketPrefix(),
+                                        ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
+                                        sequenceWithPrefix.getClosingBracketPrefix(),
+                                        sequenceWithPrefix.getAnchor(),
+                                        sequenceWithPrefix.getTag()
+                                ), p);
                     }
                 }
                 return super.visitSequence(sequence, p);
@@ -704,7 +1049,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 if (mapping instanceof MappingWithPrefix) {
                     MappingWithPrefix mappingWithPrefix = (MappingWithPrefix) mapping;
                     return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(),
-                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), null, mappingWithPrefix.getAnchor(), mappingWithPrefix.getTag()), p);
+                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), mappingWithPrefix.getClosingBracePrefix(), mappingWithPrefix.getAnchor(), mappingWithPrefix.getTag()), p);
                 }
                 return super.visitMapping(mapping, p);
             }
@@ -732,6 +1077,205 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
+    private String parseDirectives(String input, List<Yaml.Directive> directives, DocumentStartEvent docStartEvent) {
+        // First try to parse directives from the input prefix
+        String remainingPrefix = parseDirectivesFromPrefix(input, directives);
+
+        // If no directives found in prefix but the event has version/tags, reconstruct them
+        if (directives.isEmpty()) {
+            String prefix = remainingPrefix;
+            if (docStartEvent.getVersion() != null) {
+                directives.add(new Yaml.Directive(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        "YAML " + docStartEvent.getVersion().major() + "." + docStartEvent.getVersion().minor(),
+                        "\n"
+                ));
+                prefix = "";
+            }
+            Map<String, String> tags = docStartEvent.getTags();
+            if (tags != null && !tags.isEmpty()) {
+                for (Map.Entry<String, String> tag : tags.entrySet()) {
+                    directives.add(new Yaml.Directive(
+                            randomId(),
+                            prefix,
+                            Markers.EMPTY,
+                            "TAG " + tag.getKey() + " " + tag.getValue(),
+                            "\n"
+                    ));
+                    prefix = "";
+                }
+            }
+            if (!directives.isEmpty()) {
+                return "";
+            }
+        }
+
+        return remainingPrefix;
+    }
+
+    private String parseDirectivesFromPrefix(String input, List<Yaml.Directive> directives) {
+        if (input.isEmpty()) {
+            return input;
+        }
+
+        StringBuilder currentPrefix = new StringBuilder();
+        StringBuilder currentValue = new StringBuilder();
+        boolean inDirective = false;
+        int i = 0;
+
+        while (i < input.length()) {
+            char c = input.charAt(i);
+
+            if (!inDirective) {
+                if (c == '%') {
+                    inDirective = true;
+                    i++;
+                } else {
+                    currentPrefix.append(c);
+                    i++;
+                }
+            } else {
+                if (c == '\n' || c == '\r') {
+                    StringBuilder suffix = new StringBuilder();
+                    suffix.append(c);
+                    i++;
+                    if (c == '\r' && i < input.length() && input.charAt(i) == '\n') {
+                        suffix.append('\n');
+                        i++;
+                    }
+                    directives.add(new Yaml.Directive(
+                            randomId(),
+                            currentPrefix.toString(),
+                            Markers.EMPTY,
+                            currentValue.toString(),
+                            suffix.toString()
+                    ));
+                    currentPrefix.setLength(0);
+                    currentValue.setLength(0);
+                    inDirective = false;
+                } else {
+                    currentValue.append(c);
+                    i++;
+                }
+            }
+        }
+
+        if (inDirective && currentValue.length() > 0) {
+            directives.add(new Yaml.Directive(
+                    randomId(),
+                    currentPrefix.toString(),
+                    Markers.EMPTY,
+                    currentValue.toString(),
+                    ""
+            ));
+            return "";
+        }
+
+        return currentPrefix.toString();
+    }
+
+    private Queue<List<Yaml.Directive>> preScanDirectives(String source) {
+        Queue<List<Yaml.Directive>> result = new LinkedList<>();
+        List<Yaml.Directive> currentDocDirectives = new ArrayList<>();
+
+        int i = 0;
+        StringBuilder prefix = new StringBuilder();
+        StringBuilder value = new StringBuilder();
+        boolean inDirective = false;
+
+        while (i < source.length()) {
+            char c = source.charAt(i);
+
+            if (c == '%' && (i == 0 || source.charAt(i - 1) == '\n' || source.charAt(i - 1) == '\r')) {
+                // Start of a directive
+                inDirective = true;
+                i++;
+            } else if (inDirective) {
+                if (c == '\n' || c == '\r') {
+                    // End of directive line
+                    StringBuilder suffix = new StringBuilder();
+                    suffix.append(c);
+                    i++;
+                    if (c == '\r' && i < source.length() && source.charAt(i) == '\n') {
+                        suffix.append('\n');
+                        i++;
+                    }
+                    currentDocDirectives.add(new Yaml.Directive(
+                            randomId(),
+                            prefix.toString(),
+                            Markers.EMPTY,
+                            value.toString(),
+                            suffix.toString()
+                    ));
+                    prefix.setLength(0);
+                    value.setLength(0);
+                    inDirective = false;
+                } else {
+                    value.append(c);
+                    i++;
+                }
+            } else if (c == '-' && i + 2 < source.length() &&
+                    source.charAt(i + 1) == '-' && source.charAt(i + 2) == '-') {
+                // Found document start marker, commit current directives
+                if (!currentDocDirectives.isEmpty()) {
+                    result.add(new ArrayList<>(currentDocDirectives));
+                    currentDocDirectives.clear();
+                } else {
+                    result.add(emptyList());
+                }
+                prefix.setLength(0);
+                // Skip past ---
+                i += 3;
+                // Skip to end of line
+                while (i < source.length() && source.charAt(i) != '\n') {
+                    i++;
+                }
+                if (i < source.length()) {
+                    i++; // skip newline
+                }
+            } else if (c == '\n' || c == '\r') {
+                // Accumulate newlines as potential prefix for next directive
+                prefix.append(c);
+                i++;
+                if (c == '\r' && i < source.length() && source.charAt(i) == '\n') {
+                    prefix.append('\n');
+                    i++;
+                }
+            } else {
+                // Not a directive or document marker, just content
+                // If we have pending directives and hit content, they belong to an implicit document start
+                if (!currentDocDirectives.isEmpty()) {
+                    result.add(new ArrayList<>(currentDocDirectives));
+                    currentDocDirectives.clear();
+                }
+                prefix.setLength(0);
+                // Skip to end of document or file
+                while (i < source.length()) {
+                    if (source.charAt(i) == '\n') {
+                        i++;
+                        // Check for document start/end markers on new line
+                        if (i + 2 < source.length() &&
+                                ((source.charAt(i) == '-' && source.charAt(i + 1) == '-' && source.charAt(i + 2) == '-') ||
+                                        (source.charAt(i) == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.'))) {
+                            break;
+                        }
+                    } else {
+                        i++;
+                    }
+                }
+            }
+        }
+
+        // Handle any remaining directives (for document without explicit start)
+        if (!currentDocDirectives.isEmpty()) {
+            result.add(currentDocDirectives);
+        }
+
+        return result;
+    }
+
     private Yaml.Tag createTag(String prefix, Markers markers, String text, String suffix) {
         final String name;
         final Yaml.Tag.Kind kind;
@@ -747,7 +1291,7 @@ public class YamlParser implements org.openrewrite.Parser {
         } else {
             throw new IllegalArgumentException("Invalid tag format: " + text);
         }
-        return new Yaml.Tag(randomId(),prefix, markers, name, suffix, kind);
+        return new Yaml.Tag(randomId(), prefix, markers, name, suffix, kind);
     }
 
 

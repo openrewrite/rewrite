@@ -207,6 +207,7 @@ public class Pom {
                 activeProfiles,
                 properties,
                 emptyList(),
+                true,
                 concatAll(initialRepositories, getEffectiveRepositories()),
                 repositories,
                 pluginRepositories,

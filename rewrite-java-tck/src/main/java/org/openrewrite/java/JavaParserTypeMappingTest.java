@@ -82,9 +82,9 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 JavaType.Class t = asClass(cu.getClasses().get(0).getAllAnnotations().get(0).getType());
-                assertThat(t.getMethods().stream().filter(m -> m.getName().equals("scalar"))
+                assertThat(t.getMethods().stream().filter(m -> "scalar".equals(m.getName()))
                   .map(JavaType.Method::getDefaultValue).map(dv -> dv.get(0))).containsExactly("1");
-                assertThat(t.getMethods().stream().filter(m -> m.getName().equals("array"))
+                assertThat(t.getMethods().stream().filter(m -> "array".equals(m.getName()))
                   .map(JavaType.Method::getDefaultValue).flatMap(dv -> dv.stream())).hasSize(2);
             })
           )
@@ -143,8 +143,8 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
-    @Test
     @MinimumJava11
+    @Test
     void methodInvocationWithUnknownTypeSymbol() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()),
@@ -153,13 +153,13 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               import java.util.ArrayList;
               import java.util.List;
               import java.util.stream.Collectors;
-                          
+
               class Test {
                   class Parent {
                   }
                   class Child extends Parent {
                   }
-                          
+
                   List<Parent> method(List<Parent> values) {
                       return values.stream()
                               .map(o -> {
@@ -219,7 +219,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
               @Override
               public J.Binary visitBinary(J.Binary binary, ExecutionContext executionContext) {
                   if (binary.getLeft() instanceof J.Identifier) {
-                      J.Identifier left = (J.Identifier) binary.getLeft();
+                      var left = (J.Identifier) binary.getLeft();
                       if ("i".equals(left.getSimpleName())) {
                           assertThat(left.getFieldType().getType().toString())
                             .isEqualTo("java.lang.Integer");
@@ -233,7 +233,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
 
               @Override
               public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
-                  if (variable.getSimpleName().equals("l")) {
+                  if ("l".equals(variable.getSimpleName())) {
                       assertThat(variable.getType().toString()).isEqualTo("java.lang.Long");
                   }
                   return super.visitVariable(variable, executionContext);
@@ -243,7 +243,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
             """
               import java.util.List;
               import java.util.stream.Collectors;
-                            
+
               @SuppressWarnings("ALL")
               class MakeEasyToFind {
                   void method(List<MultiMap> multiMaps) {
@@ -252,12 +252,12 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                           if (i != null) {
                           }
                       });
-                            
+
                       multiMaps.forEach(m -> {
                           if (m != null) {
                           }
                       });
-                            
+
                       while (true) {
                           if (multiMaps.isEmpty()) {
                               Long l;
@@ -265,13 +265,13 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                           }
                       }
                   }
-                            
+
                   static class MultiMap {
                       List<Inner> inners;
                       public List<Inner> getInners() {
                           return inners;
                       }
-                            
+
                       static class Inner {
                           List<Number> numbers;
                           public List<Number> getNumbers() {
@@ -285,8 +285,8 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
         );
     }
 
-    @SuppressWarnings("Convert2MethodRef")
     @Issue("https://github.com/openrewrite/rewrite/issues/2118")
+    @SuppressWarnings("Convert2MethodRef")
     @Test
     void multiMapWithSameLambdaParamNames() {
         rewriteRun(
@@ -308,7 +308,7 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
             """
               import java.util.List;
               import java.util.stream.Collectors;
-              
+
               @SuppressWarnings("ALL")
               class MakeEasyToFind {
                   void method(List<MultiMap> multiMaps) {
@@ -317,13 +317,13 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
                           .map(it2 -> it2.stream().map(i -> i.getNumbers()))
                           .collect(Collectors.toList());
                   }
-              
+
                   static class MultiMap {
                       List<Inner> inners;
                       public List<Inner> getInners() {
                           return inners;
                       }
-              
+
                       static class Inner {
                           List<Number> numbers;
                           public List<Number> getNumbers() {
@@ -345,54 +345,55 @@ class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-              
+
               class TypeAnnotationTest {
                   Integer @A1 [] @A2 [ ] annotatedArray;
-              
+
                   @Target(ElementType.TYPE_USE)
                   private @interface A1 {
                   }
-              
+
                   @Target(ElementType.TYPE_USE)
                   private @interface A2 {
                   }
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                  AtomicBoolean firstDimension = new AtomicBoolean(false);
-                  AtomicBoolean secondDimension = new AtomicBoolean(false);
-                  new JavaIsoVisitor<Integer>() {
-                      @Override
-                      public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer n) {
-                          assert arrayType.getType() instanceof JavaType.Array;
-                          JavaType.Array array = (JavaType.Array) arrayType.getType();
-                          if (arrayType.getElementType() instanceof J.ArrayType) {
-                              List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
-                              assertThat(annotations).satisfiesExactly(
-                                  ann1 -> assertThat(ann1.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A1"),
-                                  ann2 -> assertThat(ann2.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
-                              );
-                              firstDimension.set(true);
-                          } else {
-                              List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
-                              assertThat(annotations).satisfiesExactly(
-                                ann -> assertThat(ann.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
-                              );
-                              secondDimension.set(true);
-                          }
-                          return super.visitArrayType(arrayType, n);
-                      }
+              """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean firstDimension = new AtomicBoolean(false);
+                    AtomicBoolean secondDimension = new AtomicBoolean(false);
+                    new JavaIsoVisitor<Integer>() {
+                        @Override
+                        public J.ArrayType visitArrayType(J.ArrayType arrayType, Integer n) {
+                            assert arrayType.getType() instanceof JavaType.Array;
+                            var array = (JavaType.Array) arrayType.getType();
+                            if (arrayType.getElementType() instanceof J.ArrayType) {
+                                List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
+                                assertThat(annotations).satisfiesExactly(
+                                        ann1 -> assertThat(ann1.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A1"),
+                                        ann2 -> assertThat(ann2.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
+                                );
+                                firstDimension.set(true);
+                            } else {
+                                List<JavaType.FullyQualified> annotations = collectAnnotations(array, new ArrayList<>());
+                                assertThat(annotations).satisfiesExactly(
+                                        ann -> assertThat(ann.getFullyQualifiedName()).isEqualTo("TypeAnnotationTest$A2")
+                                );
+                                secondDimension.set(true);
+                            }
+                            return super.visitArrayType(arrayType, n);
+                        }
 
-                      private List<JavaType.FullyQualified> collectAnnotations(JavaType type, List<JavaType.FullyQualified> annotations) {
-                          if (type instanceof JavaType.Array) {
-                              annotations.addAll(((JavaType.Array) type).getAnnotations());
-                              collectAnnotations(((JavaType.Array) type).getElemType(), annotations);
-                          }
-                          return annotations;
-                      }
-                  }.visit(cu, 0);
-                  assertThat(firstDimension.get()).isTrue();
-                  assertThat(secondDimension.get()).isTrue();
-            })
+                        private List<JavaType.FullyQualified> collectAnnotations(JavaType type, List<JavaType.FullyQualified> annotations) {
+                            if (type instanceof JavaType.Array) {
+                                annotations.addAll(((JavaType.Array) type).getAnnotations());
+                                collectAnnotations(((JavaType.Array) type).getElemType(), annotations);
+                            }
+                            return annotations;
+                        }
+                    }.visit(cu, 0);
+                    assertThat(firstDimension.get()).isTrue();
+                    assertThat(secondDimension.get()).isTrue();
+                })
           )
         );
     }

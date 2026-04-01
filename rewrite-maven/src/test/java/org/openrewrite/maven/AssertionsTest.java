@@ -19,21 +19,65 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.openrewrite.*;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
 
+@Execution(ExecutionMode.SAME_THREAD)
 class AssertionsTest implements RewriteTest {
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1395")
+    @Test
+    void mavenSettingsPropagateToRecipeExecutionContext() {
+        // When a separate recipeExecutionContext is used, Maven settings should
+        // still be propagated from the parsing context customizations
+        var settingsChecked = new AtomicInteger();
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new MavenIsoVisitor<>() {
+                @Override
+                public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                    // Verify that Maven settings customization was applied to recipe execution context
+                    MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+                    // The customizeExecutionContext in Assertions.pomXml() should have been called
+                    // on both the parsing context AND the recipe execution context
+                    settingsChecked.incrementAndGet();
+                    return document;
+                }
+            }))
+            .recipeExecutionContext(new InMemoryExecutionContext()),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>test</artifactId>
+                  <version>1.0.0</version>
+              </project>
+              """
+          )
+        );
+        assertThat(settingsChecked.get()).isEqualTo(1);
+    }
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new MavenOnlyRecipe());
+    }
+
     private static final AtomicInteger xmlCount = new AtomicInteger();
 
     @BeforeEach
@@ -44,7 +88,6 @@ class AssertionsTest implements RewriteTest {
     @Test
     void xmlAndPomXmlUseCorrectParserWhenPomXmlIsFirst() {
         rewriteRun(
-          spec -> spec.recipe(new MavenOnlyRecipe()),
           pomXml(
             """
               <project>
@@ -73,7 +116,6 @@ class AssertionsTest implements RewriteTest {
     @Test
     void xmlAndPomXmlUseCorrectParserWhenPomXmlIsLast() {
         rewriteRun(
-          spec -> spec.recipe(new MavenOnlyRecipe()),
           xml("""
               <?xml version="1.0" encoding="UTF-8" ?>
               <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -114,7 +156,7 @@ class AssertionsTest implements RewriteTest {
 
         @Override
         public List<Recipe> getRecipeList() {
-            return Collections.singletonList(new NonMavenRecipe());
+            return singletonList(new NonMavenRecipe());
         }
 
         @Override
@@ -125,7 +167,7 @@ class AssertionsTest implements RewriteTest {
 
                 @Override
                 public Xml visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                    var sourceFile = (SourceFile) requireNonNull(tree);
                     filename = sourceFile.getSourcePath().getFileName().toString();
                     return (Xml) sourceFile;
                 }
@@ -155,7 +197,7 @@ class AssertionsTest implements RewriteTest {
             return new XmlIsoVisitor<>() {
                 @Override
                 public Xml visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                    var sourceFile = (SourceFile) requireNonNull(tree);
                     xmlCount.incrementAndGet();
                     return (Xml) sourceFile;
                 }

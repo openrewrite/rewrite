@@ -29,13 +29,13 @@ class CountLinesTest implements RewriteTest {
           groovy(
             """
               package com.whatever
-              
+
               import java.util.List
-              
+
               // comments don't count
               class A {
-                  
-                  
+
+
                   List<String> foo() {
                   }
               }

@@ -22,10 +22,8 @@ import org.openrewrite.internal.StringUtils;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.config.CategoryTree.PrintNameStyle.ID;
 
 /**
  * A hierarchical listing of recipe categories and the recipes that are contained inside them.
@@ -33,7 +31,10 @@ import static org.openrewrite.config.CategoryTree.PrintNameStyle.ID;
  * @param <G> A grouping key that can cross category boundaries. Must implement {@link Object#equals} and {@link Object#hashCode},
  *            but there is otherwise no restriction on the type. For example, a grouping key could be a {@link String} that represents
  *            a GAV coordinate of a recipe artifact that contributes recipes to multiple categories.
+ * @deprecated Use {@link org.openrewrite.marketplace.RecipeMarketplace}, which supports
+ * multiple bundle types rather than a single parameterized G.
  */
+@Deprecated
 public class CategoryTree<G> {
     /**
      * This is a synthetic category used so that a category's children are either all subcategories or all recipes,
@@ -328,7 +329,7 @@ public class CategoryTree<G> {
 
     void addRecipe(G group, RecipeDescriptor recipe) {
         if (recipe.getName() == null) {
-            throw new IllegalArgumentException("Expected recipe to have a name " + recipe.getSource());
+            throw new IllegalArgumentException("Expected recipe to have a name");
         }
         if (!recipe.getName().contains(".")) {
             throw new IllegalArgumentException("Expected recipe with name '" + recipe.getName() + "' to have " +
@@ -376,7 +377,7 @@ public class CategoryTree<G> {
     @SuppressWarnings("unused")
     public Map<G, Collection<RecipeDescriptor>> getRecipesByGroup() {
         synchronized (lock) {
-            return Collections.unmodifiableMap(new HashMap<>(recipesByGroup));
+            return unmodifiableMap(new HashMap<>(recipesByGroup));
         }
     }
 
@@ -542,7 +543,7 @@ public class CategoryTree<G> {
             private int maxDepth = Integer.MAX_VALUE;
             private boolean omitCategoryRoots = true;
             private boolean omitEmptyCategories = true;
-            private PrintNameStyle nameStyle = ID;
+            private PrintNameStyle nameStyle = PrintNameStyle.ID;
 
             public Builder maxDepth(int maxDepth) {
                 this.maxDepth = maxDepth;

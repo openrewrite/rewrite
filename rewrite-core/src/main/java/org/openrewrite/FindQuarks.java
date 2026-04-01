@@ -26,15 +26,9 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindQuarks extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Find instances of type `Quark`";
-    }
+    String displayName = "Find instances of type `Quark`";
 
-    @Override
-    public String getDescription() {
-        return "`Quark` source files are pointers to the existence of a file without capturing any of the contents of the file.";
-    }
+    String description = "`Quark` source files are pointers to the existence of a file without capturing any of the contents of the file.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

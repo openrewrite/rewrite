@@ -34,8 +34,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
@@ -91,10 +91,10 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         );
     }
 
-    @Test
     @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/2958")
     @SuppressWarnings({"ConstantValue", "IfStatementWithIdenticalBranches"})
+    @Test
     void referenceFromWithinLambdaInIfCondition() {
         rewriteRun(
           templatedJava17(
@@ -473,23 +473,16 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                    var mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                     if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
                         return mi;
                     }
 
                     List<Expression> arguments = mi.getArguments();
-                    mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                      .build()
-                      .apply(
-                        updateCursor(mi),
-                        mi.getCoordinates().replace(),
-                        arguments.toArray()
-                      );
+                    mi = JavaTemplate.apply("#{any(java.lang.String)}.formatted(#{any()})", updateCursor(mi), mi.getCoordinates().replace(), arguments.toArray());
 
-                    mi = maybeAutoFormat(mi, mi.withArguments(
+                    return maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);
-                    return mi;
                 }
             }
           )),
@@ -565,18 +558,18 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         if (!expectedMissing.isEmpty()) {
             fail("Expected missing types not found:\n" + expectedMissing.entrySet().stream()
               .map(e -> {
-                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(joining("->"));
                   return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
               })
-              .collect(Collectors.joining("\n")));
+              .collect(joining("\n")));
         }
         if (!actualMissing.isEmpty()) {
             fail("Unexpected missing types found:\n" + actualMissing.entrySet().stream()
               .map(e -> {
-                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(joining("->"));
                   return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
               })
-              .collect(Collectors.joining("\n")));
+              .collect(joining("\n")));
         }
 
     }

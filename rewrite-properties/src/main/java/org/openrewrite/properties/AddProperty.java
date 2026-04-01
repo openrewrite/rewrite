@@ -29,9 +29,10 @@ import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -61,17 +62,19 @@ public class AddProperty extends Recipe {
     @Nullable
     String delimiter;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a new property";
-    }
+    @Option(displayName = "Ordered property insertion",
+            description = "Whether to attempt adding the property in an order following alphabetic sorting. The default value is `true`.",
+            required = false,
+            example = "false"
+    )
+    @Nullable
+    Boolean orderedInsertion;
 
-    @Override
-    public String getDescription() {
-        return "Adds a new property to a property file. " +
+    String displayName = "Add a new property";
+
+    String description = "Adds a new property to a property file. " +
                "Attempts to place the new property in alphabetical order by the property keys. " +
                "Whitespace before and after the `=` must be included in the property and value.";
-    }
 
     @Override
     public Validated<Object> validate() {
@@ -98,11 +101,11 @@ public class AddProperty extends Recipe {
                 Properties.Entry.Delimiter delimitedBy = StringUtils.isNotEmpty(delimiter) ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
                 String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
                 Properties.Entry entry = new Properties.Entry(randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
-                int insertionIndex = sortedInsertionIndex(entry, p.getContent());
+
 
                 List<Properties.Content> newContents;
                 if(StringUtils.isBlank(comment)) {
-                    newContents = Collections.singletonList(entry);
+                    newContents = singletonList(entry);
                 } else {
                     newContents = Arrays.asList(
                             new Properties.Comment(
@@ -115,9 +118,17 @@ public class AddProperty extends Recipe {
                 }
 
                 List<Properties.Content> contentList = new ArrayList<>(p.getContent().size() + 1);
-                contentList.addAll(p.getContent().subList(0, insertionIndex));
-                contentList.addAll(newContents);
-                contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                if (orderedInsertion == null || orderedInsertion) {
+                    int insertionIndex = sortedInsertionIndex(entry, p.getContent());
+                    contentList.addAll(p.getContent().subList(0, insertionIndex));
+                    contentList.addAll(newContents);
+                    contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                }
+                else {
+                    contentList.addAll(p.getContent());
+                    contentList.addAll(newContents);
+                }
+
 
                 // First entry in the file does not need a newline, but every other entry does
                 contentList = ListUtils.map(contentList, (i, c) -> {
@@ -129,8 +140,7 @@ public class AddProperty extends Recipe {
                     return c;
                 });
 
-                p = p.withContent(contentList);
-                return p;
+                return p.withContent(contentList);
             }
         };
     }
@@ -146,7 +156,7 @@ public class AddProperty extends Recipe {
                                         .filter(Properties.Entry.class::isInstance)
                                         .map(Properties.Entry.class::cast))
                         .sorted(Comparator.comparing(Properties.Entry::getKey))
-                        .collect(Collectors.toList());
+                        .collect(toList());
         int indexInSorted = sorted.indexOf(entry);
         if (indexInSorted == 0) {
             return 0;

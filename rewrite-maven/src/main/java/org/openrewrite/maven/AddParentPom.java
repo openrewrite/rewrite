@@ -33,7 +33,8 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -69,20 +70,14 @@ public class AddParentPom extends Recipe {
     @Nullable
     String versionPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven parent";
-    }
+    String displayName = "Add Maven parent";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a parent pom to a Maven pom.xml. Does nothing if a parent pom is already present.";
-    }
+    String description = "Add a parent pom to a Maven pom.xml. Does nothing if a parent pom is already present.";
 
     @Override
     public Validated<Object> validate() {
@@ -154,7 +149,7 @@ public class AddParentPom extends Recipe {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(null, v))
-                            .collect(Collectors.toList());
+                            .collect(toList());
                 }
                 return availableVersions.stream().max(versionComparator);
             }

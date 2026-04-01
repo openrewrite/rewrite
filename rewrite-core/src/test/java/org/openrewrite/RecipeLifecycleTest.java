@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
@@ -35,8 +36,6 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -49,6 +48,23 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class RecipeLifecycleTest implements RewriteTest {
+
+    @DocumentExample
+    @Test
+    void generateFile() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe()
+              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Path.of("test.txt")).text("test").build()))
+              .withName("test.GeneratingRecipe")
+              .withMaxCycles(1)
+            )
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
+              .map(r -> r.getRecipeDescriptorsThatMadeChanges().getFirst().getName()))
+              .containsOnly("test.GeneratingRecipe")),
+          text(null, "test", spec -> spec.path("test.txt"))
+        );
+    }
 
     @Test
     void panic() {
@@ -65,23 +81,6 @@ class RecipeLifecycleTest implements RewriteTest {
               }
           })).executionContext(ctx),
           text("hello")
-        );
-    }
-
-    @DocumentExample
-    @Test
-    void generateFile() {
-        rewriteRun(
-          spec -> spec
-            .recipe(toRecipe()
-              .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
-              .withName("test.GeneratingRecipe")
-              .withMaxCycles(1)
-            )
-            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
-              .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-              .containsOnly("test.GeneratingRecipe")),
-          text(null, "test", spec -> spec.path("test.txt"))
         );
     }
 
@@ -119,13 +118,13 @@ class RecipeLifecycleTest implements RewriteTest {
               .isNotEmpty()
               .get()
               .as("Exception thrown in the scanning phase should record the responsible recipe")
-              .matches(m -> "org.openrewrite.RecipeLifecycleTest$ErrorDuringScanningPhase".equals(m.getRecipes().iterator().next().get(0).getDescriptor().getName()))
+              .matches(m -> "org.openrewrite.RecipeLifecycleTest$ErrorDuringScanningPhase".equals(m.getRecipes().iterator().next().getFirst().getDescriptor().getName()))
             )
           ));
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class ErrorDuringScanningPhase extends ScanningRecipe<Integer> {
 
         @Override
@@ -147,35 +146,23 @@ class RecipeLifecycleTest implements RewriteTest {
             };
         }
 
-        @Override
-        public String getDisplayName() {
-            return "Throw exception";
-        }
+        String displayName = "Throw exception";
 
-        @Override
-        public String getDescription() {
-            return "Throws an exception in the scanning phase.";
-        }
+        String description = "Throws an exception in the scanning phase.";
     }
 
-    @Value
     @EqualsAndHashCode(callSuper = false)
+    @Value
     static class DeleteFirst extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Delete a file";
-        }
+        String displayName = "Delete a file";
 
-        @Override
-        public String getDescription() {
-            return "Deletes a file early on in the recipe pipeline. " +
+        String description = "Deletes a file early on in the recipe pipeline. " +
                    "Subsequent recipes should not be passed a null source file.";
-        }
 
         @Override
         public List<Recipe> getRecipeList() {
-            return Arrays.asList(
+            return List.of(
               new DeleteSourceFiles("test.txt"),
               new FindAndReplace("test", "", null, null, null, null, null, null));
         }
@@ -302,21 +289,6 @@ class RecipeLifecycleTest implements RewriteTest {
         }
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/389")
-    @Test
-    void sourceFilesAcceptOnlyApplicableVisitors() {
-        var sources = List.of(new FooSource(), PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build());
-        var fooVisitor = new FooVisitor<ExecutionContext>();
-        var textVisitor = new PlainTextVisitor<ExecutionContext>();
-        var ctx = new InMemoryExecutionContext();
-
-        for (SourceFile source : sources) {
-            fooVisitor.visit(source, ctx);
-            textVisitor.visit(source, ctx);
-        }
-    }
-
-    @DocumentExample
     @Test
     void accurateReportingOfRecipesMakingChanges() {
         rewriteRun(
@@ -326,7 +298,7 @@ class RecipeLifecycleTest implements RewriteTest {
             .afterRecipe(run -> {
                 var changes = run.getChangeset().getAllResults();
                 assertThat(changes).hasSize(1);
-                assertThat(changes.get(0).getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
+                assertThat(changes.getFirst().getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
                   .containsExactlyInAnyOrder("Change1", "Change2");
             }),
           text(
@@ -334,6 +306,20 @@ class RecipeLifecycleTest implements RewriteTest {
             "Change2Change1Hello"
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/389")
+    @Test
+    void sourceFilesAcceptOnlyApplicableVisitors() {
+        var sources = List.of(new FooSource(), PlainText.builder().sourcePath(Path.of("test.txt")).text("test").build());
+        var fooVisitor = new FooVisitor<ExecutionContext>();
+        var textVisitor = new PlainTextVisitor<ExecutionContext>();
+        var ctx = new InMemoryExecutionContext();
+
+        for (SourceFile source : sources) {
+            fooVisitor.visit(source, ctx);
+            textVisitor.visit(source, ctx);
+        }
     }
 
     private Recipe testRecipe(@Language("markdown") String name) {
@@ -475,8 +461,8 @@ class RecipeLifecycleTest implements RewriteTest {
     @Test
     void declarativeRecipeChainFromResourcesIncludesImperativeRecipesInDescriptors() {
         rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a")
-            .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().get(0)
-              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0)
+            .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().getFirst()
+              .getRecipeDescriptorsThatMadeChanges().getFirst().getRecipeList().getFirst()
               .getDisplayName()).isEqualTo("Change text")),
           text("Hi", "after"));
     }
@@ -494,15 +480,11 @@ class RecipeLifecycleTest implements RewriteTest {
 
 @SuppressWarnings("unused") // referenced in yaml
 class DefaultConstructorRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "DefaultConstructorRecipe";
-    }
+    @Getter
+    final String displayName = "DefaultConstructorRecipe";
 
-    @Override
-    public String getDescription() {
-        return "DefaultConstructorRecipe.";
-    }
+    @Getter
+    final String description = "DefaultConstructorRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -518,18 +500,14 @@ class DefaultConstructorRecipe extends Recipe {
     }
 }
 
-@SuppressWarnings("unused") // referenced in yaml
-@NoArgsConstructor
+@NoArgsConstructor // referenced in yaml
+@SuppressWarnings("unused")
 class NoArgRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "NoArgRecipe";
-    }
+    @Getter
+    final String displayName = "NoArgRecipe";
 
-    @Override
-    public String getDescription() {
-        return "NoArgRecipe.";
-    }
+    @Getter
+    final String description = "NoArgRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
