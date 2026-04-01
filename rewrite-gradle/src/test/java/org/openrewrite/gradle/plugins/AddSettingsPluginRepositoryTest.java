@@ -710,7 +710,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     void skipWhenExistsGradlePluginPortalKtsWithEmptyClasspath() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
           settingsGradleKtsWithEmptyClasspath(
             """
               pluginManagement {
