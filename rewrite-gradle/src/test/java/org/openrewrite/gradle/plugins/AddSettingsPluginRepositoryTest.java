@@ -17,6 +17,10 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
@@ -580,6 +584,60 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
 
               rootProject.name = "demo"
               """
+          )
+        );
+    }
+
+    /**
+     * Simulate platform behavior where KTS-parsed settings.gradle.kts has incomplete type
+     * attribution — method types have a wrong declaring type instead of being null.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T extends SourceFile> T corruptMethodTypes(T sourceFile) {
+        JavaType.FullyQualified wrongType = JavaType.ShallowClass.build("kotlin.Unit");
+        return (T) new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer p) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                if (m.getMethodType() != null) {
+                    return m.withMethodType(m.getMethodType().withDeclaringType(wrongType));
+                }
+                return m;
+            }
+        }.visitNonNull(sourceFile, 0);
+    }
+
+    @Test
+    void skipWhenExistsGradlePluginPortalKtsWithoutTypeAttribution() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(AddSettingsPluginRepositoryTest::corruptMethodTypes)
+          )
+        );
+    }
+
+    @Test
+    void skipWhenExistsGradlePluginPortalWithOtherReposKtsWithoutTypeAttribution() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null)),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      mavenLocal()
+                      gradlePluginPortal()
+                  }
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(AddSettingsPluginRepositoryTest::corruptMethodTypes)
           )
         );
     }
