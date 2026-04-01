@@ -197,9 +197,10 @@ public class AddSettingsPluginRepository extends Recipe {
                 }
                 J.MethodInvocation repoToAdd = extractRepository(pluginManagement);
 
-                // Defensive check: FindRepository relies on MethodMatcher which requires correct
-                // declaring types. On the platform, KTS-parsed settings may have incomplete or
-                // incorrect type attribution, causing FindRepository to miss existing entries.
+                // Name-based fallback: FindRepository uses MethodMatcher which requires correct
+                // declaring types. When the Kotlin parser produces wrong types (e.g. kotlin.Unit
+                // instead of RepositoryHandler), MethodMatcher's strict path fails to match.
+                // Safe to keep even after parser is fixed — redundant but not conflicting.
                 if (repoAlreadyExists(repos, repoToAdd.getSimpleName())) {
                     return statement;
                 }
