@@ -944,7 +944,24 @@ export class JavaScriptTypeMapping {
             }
 
             methodName = node.name ? node.name.getText() : "<anonymous>";
-            declaringType = Type.unknownType as Type.FullyQualified;
+
+            // Derive declaring type from source file module path (like Go's type_mapper.go).
+            // Use the same relativization as getFullyQualifiedName() so that declarations
+            // and invocations produce matching FQNs.
+            let moduleFqn: string;
+            const fileName = node.getSourceFile().fileName;
+            if (this.sourceRoot && path.isAbsolute(fileName)) {
+                moduleFqn = path.relative(this.sourceRoot, fileName);
+            } else {
+                moduleFqn = fileName;
+            }
+            // Strip file extension to get the module name
+            moduleFqn = moduleFqn.replace(/\.[^/.]+$/, '');
+            declaringType = {
+                kind: Type.Kind.Class,
+                flags: 0,
+                fullyQualifiedName: moduleFqn
+            } as Type.FullyQualified;
 
             // Get type parameters from node
             if (node.typeParameters) {

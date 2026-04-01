@@ -52,6 +52,18 @@ func (n *CompilationUnit) WithStatements(statements []RightPadded[Statement]) *C
 	return &c
 }
 
+func (n *CompilationUnit) WithPackageDecl(pkg *RightPadded[*Identifier]) *CompilationUnit {
+	c := *n
+	c.PackageDecl = pkg
+	return &c
+}
+
+func (n *CompilationUnit) WithImports(imports *Container[*Import]) *CompilationUnit {
+	c := *n
+	c.Imports = imports
+	return &c
+}
+
 func (n *CompilationUnit) WithEOF(eof Space) *CompilationUnit {
 	c := *n
 	c.EOF = eof
@@ -461,6 +473,19 @@ type GroupedImport struct {
 }
 
 func (g GroupedImport) ID() uuid.UUID { return g.Ident }
+
+// ImportBlock is a marker on the first Import of a subsequent import block
+// (2nd, 3rd, etc.) in files with multiple import declarations. It carries
+// the information needed to print the block boundary.
+type ImportBlock struct {
+	Ident         uuid.UUID
+	ClosePrevious bool  // true if the previous block was grouped (need to print ")")
+	Before        Space // space before the "import" keyword
+	Grouped       bool  // true if this block uses import (...)
+	GroupedBefore Space // space between "import" and "(" (only if Grouped)
+}
+
+func (b ImportBlock) ID() uuid.UUID { return b.Ident }
 
 // MultiAssignment represents a multi-value assignment: `x, y = 1, 2` or `x, y := f()`.
 type MultiAssignment struct {

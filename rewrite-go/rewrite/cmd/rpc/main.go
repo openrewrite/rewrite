@@ -194,12 +194,17 @@ func (s *server) writeMessage(resp *jsonRPCResponse) error {
 }
 
 // safeHandleRequest wraps handleRequest with panic recovery.
-func (s *server) safeHandleRequest(req *jsonRPCRequest) *jsonRPCResponse {
+func (s *server) safeHandleRequest(req *jsonRPCRequest) (resp *jsonRPCResponse) {
 	defer func() {
 		if r := recover(); r != nil {
 			buf := make([]byte, 4096)
 			n := runtime.Stack(buf, false)
 			s.logger.Printf("PANIC in %s: %v\n%s", req.Method, r, buf[:n])
+			resp = &jsonRPCResponse{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error:   &rpcError{Code: -32603, Message: fmt.Sprintf("Internal error: %v", r)},
+			}
 		}
 	}()
 	return s.handleRequest(req)
@@ -264,10 +269,30 @@ type parseRequest struct {
 }
 
 // parseInput can be a path-based or text-based input.
+// It supports two JSON forms:
+//   - A bare string (treated as a file path)
+//   - A structured object with path, text, and sourcePath fields
 type parseInput struct {
 	Path       string `json:"path"`
 	Text       string `json:"text"`
 	SourcePath string `json:"sourcePath"`
+}
+
+func (p *parseInput) UnmarshalJSON(data []byte) error {
+	// Try bare string first (Java PathInput serializes as @JsonValue string)
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		p.Path = s
+		return nil
+	}
+	// Otherwise unmarshal as a structured object
+	type alias parseInput
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*p = parseInput(a)
+	return nil
 }
 
 // handleParse parses Go source files and returns their IDs.
@@ -310,10 +335,21 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			continue
 		}
 
-		cu, err := p.Parse(sourcePath, source)
-		if err != nil {
-			s.logger.Printf("Parse error for %s: %v", sourcePath, err)
-			return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Parse error: %v", err)}
+		cu, parseErr := func() (cu *tree.CompilationUnit, err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("panic: %v", r)
+				}
+			}()
+			return p.Parse(sourcePath, source)
+		}()
+		if parseErr != nil {
+			s.logger.Printf("Parse error for %s: %v", sourcePath, parseErr)
+			pe := tree.NewParseError(sourcePath, source, parseErr)
+			id := pe.Ident.String()
+			s.localObjects[id] = pe
+			ids = append(ids, id)
+			continue
 		}
 		id := cu.ID.String()
 		s.localObjects[id] = cu

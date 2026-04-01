@@ -48,3 +48,35 @@ func TestParseGroupedImports(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseMultipleImportBlocks(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import "fmt"
+			import "os"
+
+			func hello() {
+			}
+		`))
+}
+
+func TestParseMultipleGroupedImportBlocks(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				"fmt"
+			)
+
+			import (
+				"os"
+				"strings"
+			)
+
+			func hello() {
+			}
+		`))
+}

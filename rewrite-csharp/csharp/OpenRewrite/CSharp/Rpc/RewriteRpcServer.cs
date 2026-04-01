@@ -151,6 +151,26 @@ public class RewriteRpcServer
         RpcSendQueue.RegisterJavaTypeName(typeof(ImplicitTypeParameters),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters");
 
+        // DotNetProject marker
+        RpcSendQueue.RegisterJavaTypeName(typeof(DotNetProject),
+            "org.openrewrite.csharp.marker.DotNetProject");
+
+        // MSBuildProject marker and nested types
+        RpcSendQueue.RegisterJavaTypeName(typeof(MSBuildProject),
+            "org.openrewrite.csharp.marker.MSBuildProject");
+        RpcSendQueue.RegisterJavaTypeName(typeof(TargetFramework),
+            "org.openrewrite.csharp.marker.MSBuildProject$TargetFramework");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PackageReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageReference");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ResolvedPackage),
+            "org.openrewrite.csharp.marker.MSBuildProject$ResolvedPackage");
+        RpcSendQueue.RegisterJavaTypeName(typeof(ProjectReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$ProjectReference");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PropertyValue),
+            "org.openrewrite.csharp.marker.MSBuildProject$PropertyValue");
+        RpcSendQueue.RegisterJavaTypeName(typeof(PackageSource),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageSource");
+
         // LINQ types live in Linq$ not Cs$ on the Java side
         RpcSendQueue.RegisterJavaTypeName(typeof(QueryExpression),
             "org.openrewrite.csharp.tree.Linq$QueryExpression");
@@ -1465,6 +1485,27 @@ public class RewriteRpcServer
     }
 
     /// <summary>
+    /// Asks the Java peer to parse source content and returns the parsed tree.
+    /// The Java side selects the appropriate parser based on the file extension.
+    /// </summary>
+    public SourceFile ParseOnRemote(string sourcePath, string content, string? sourceFileType = null)
+    {
+        var response = _jsonRpc!.InvokeWithParameterObjectAsync<List<string>>(
+            "Parse",
+            new ParseRequest
+            {
+                Inputs = [new ParseInput { Text = content, SourcePath = sourcePath }]
+            }
+        ).GetAwaiter().GetResult();
+
+        if (response.Count == 0)
+            throw new InvalidOperationException($"Parse returned no results for {sourcePath}");
+
+        var id = response[0];
+        return (SourceFile)GetObjectFromRemoteAsync(id, sourceFileType).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
     /// Asks the Java peer to prepare a recipe by name and options.
     /// Returns a response containing the edit visitor name for use with VisitOnRemoteAsync.
     /// </summary>
@@ -1714,6 +1755,18 @@ public class GetObjectRequest
 {
     public string Id { get; set; } = "";
     public string? SourceFileType { get; set; }
+}
+
+public class ParseRequest
+{
+    public List<ParseInput> Inputs { get; set; } = new();
+    public string? RelativeTo { get; set; }
+}
+
+public class ParseInput
+{
+    public string Text { get; set; } = "";
+    public string SourcePath { get; set; } = "";
 }
 
 public class PrintRequest

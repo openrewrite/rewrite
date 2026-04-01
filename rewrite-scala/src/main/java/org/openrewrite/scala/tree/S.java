@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * The Scala language-specific AST types extend the J interface and its sub-types.
@@ -178,13 +179,15 @@ public interface S extends J {
 
         @Override
         public List<J.ClassDeclaration> getClasses() {
-            // TODO: Extract class declarations from statements
-            return Collections.emptyList();
+            return statements.stream()
+                    .filter(J.ClassDeclaration.class::isInstance)
+                    .map(J.ClassDeclaration.class::cast)
+                    .collect(Collectors.toList());
         }
 
         @Override
         public S.CompilationUnit withClasses(List<J.ClassDeclaration> classes) {
-            // TODO: Handle class updates
+            // Scala compilation units use statements, not a separate classes list
             return this;
         }
 

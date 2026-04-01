@@ -441,6 +441,7 @@ public class RpcReceiveQueue
         {
             "org.openrewrite.java.tree.Space" => typeof(Space),
             "org.openrewrite.java.tree.TextComment" => typeof(TextComment),
+            "org.openrewrite.csharp.tree.CsDocCommentRawComment" => typeof(XmlDocComment),
             "org.openrewrite.marker.Markers" => typeof(Markers),
             "org.openrewrite.marker.SearchResult" => typeof(SearchResult),
             "org.openrewrite.marker.RecipesThatMadeChanges" => typeof(RecipesThatMadeChanges),
@@ -484,6 +485,26 @@ public class RpcReceiveQueue
                 typeof(PointerMemberAccess),
             "org.openrewrite.csharp.marker.ImplicitTypeParameters" =>
                 typeof(ImplicitTypeParameters),
+
+            // DotNetProject marker
+            "org.openrewrite.csharp.marker.DotNetProject" =>
+                typeof(DotNetProject),
+
+            // MSBuildProject marker and nested types
+            "org.openrewrite.csharp.marker.MSBuildProject" =>
+                typeof(MSBuildProject),
+            "org.openrewrite.csharp.marker.MSBuildProject$TargetFramework" =>
+                typeof(TargetFramework),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageReference" =>
+                typeof(PackageReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$ResolvedPackage" =>
+                typeof(ResolvedPackage),
+            "org.openrewrite.csharp.marker.MSBuildProject$ProjectReference" =>
+                typeof(ProjectReference),
+            "org.openrewrite.csharp.marker.MSBuildProject$PropertyValue" =>
+                typeof(PropertyValue),
+            "org.openrewrite.csharp.marker.MSBuildProject$PackageSource" =>
+                typeof(PackageSource),
 
             "org.openrewrite.ParseExceptionResult" =>
                 typeof(ParseExceptionResult),

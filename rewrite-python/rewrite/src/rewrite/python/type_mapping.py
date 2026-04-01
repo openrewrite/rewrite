@@ -781,7 +781,7 @@ class PythonTypeMapping:
 
         return JavaType.Method(
             _flags_bit_map=0,
-            _declaring_type=None,
+            _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
@@ -1266,3 +1266,20 @@ class PythonTypeMapping:
     def module_to_fqn(module_path: str) -> str:
         """Convert a Python module path to a fully qualified name."""
         return module_path
+
+    def _get_declaration_declaring_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
+        """Get the declaring type for a function declaration.
+
+        Mirrors the invocation-side logic from _get_declaring_type() to ensure
+        declarations and invocations produce matching FQNs.
+        """
+        class_name = descriptor.get('className')
+        if class_name:
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                return self._create_class_type(f"{module_name}.{class_name}")
+            return self._create_class_type(class_name)
+        module_name = descriptor.get('moduleName')
+        if module_name and module_name != 'builtins':
+            return self._create_class_type(module_name)
+        return None

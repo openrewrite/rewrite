@@ -79,6 +79,9 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*tree.ControlParentheses)(nil)), "org.openrewrite.java.tree.J$ControlParentheses")
 	RegisterValueType(reflect.TypeOf((*tree.Import)(nil)), "org.openrewrite.java.tree.J$Import")
 
+	// ParseError
+	RegisterValueType(reflect.TypeOf((*tree.ParseError)(nil)), "org.openrewrite.tree.ParseError")
+
 	// Non-tree types that Java needs valueType for
 	RegisterValueType(reflect.TypeOf(tree.Space{}), "org.openrewrite.java.tree.Space")
 	RegisterValueType(reflect.TypeOf(tree.Markers{}), "org.openrewrite.marker.Markers")
@@ -86,6 +89,7 @@ func init() {
 
 	// Go-specific marker valueType registrations (for send-side type resolution)
 	RegisterValueType(reflect.TypeOf(tree.GroupedImport{}), "org.openrewrite.golang.marker.GroupedImport")
+	RegisterValueType(reflect.TypeOf(tree.ImportBlock{}), "org.openrewrite.golang.marker.ImportBlock")
 	RegisterValueType(reflect.TypeOf(tree.ShortVarDecl{}), "org.openrewrite.golang.marker.ShortVarDecl")
 	RegisterValueType(reflect.TypeOf(tree.VarKeyword{}), "org.openrewrite.golang.marker.VarKeyword")
 	RegisterValueType(reflect.TypeOf(tree.ConstDecl{}), "org.openrewrite.golang.marker.ConstDecl")
@@ -96,6 +100,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf(tree.StructTag{}), "org.openrewrite.golang.marker.StructTag")
 	RegisterValueType(reflect.TypeOf(tree.TrailingComma{}), "org.openrewrite.golang.marker.TrailingComma")
 	RegisterValueType(reflect.TypeOf(tree.SearchResult{}), "org.openrewrite.marker.SearchResult")
+	RegisterValueType(reflect.TypeOf(tree.ParseExceptionResult{}), "org.openrewrite.ParseExceptionResult")
 
 	// JavaType types
 	RegisterValueType(reflect.TypeOf((*tree.JavaTypeClass)(nil)), "org.openrewrite.java.tree.JavaType$Class")
@@ -164,17 +169,30 @@ func init() {
 	RegisterFactory("org.openrewrite.java.tree.J$ControlParentheses", func() any { return &tree.ControlParentheses{} })
 	RegisterFactory("org.openrewrite.java.tree.J$Import", func() any { return &tree.Import{} })
 
+	// ParseError
+	RegisterFactory("org.openrewrite.tree.ParseError", func() any { return &tree.ParseError{} })
+	RegisterFactory("org.openrewrite.ParseExceptionResult", func() any { return tree.ParseExceptionResult{} })
+
 	// SourceFile-level types that implement RpcCodec
 	RegisterFactory("org.openrewrite.Checksum", func() any { return tree.GenericMarker{} })
 	RegisterFactory("org.openrewrite.FileAttributes", func() any { return tree.GenericMarker{} })
 
-	// Java-side markers that may appear when recipes modify trees
-	// RecipesThatMadeChanges: NOT an RpcCodec, serialized as raw value
+	// Java-side markers that may appear when recipes modify trees or during LST writing.
+	// These markers do NOT implement RpcCodec and are serialized as raw values.
 	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.LstProvenance", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.BuildMetadata", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.GitTreeEntry", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.BuildTool", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.BuildToolFailure", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.Generated", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.DeserializationError", func() any { return tree.GenericMarker{} })
 	// SearchResult: IS an RpcCodec, sends 2 sub-fields (id, description)
 	RegisterFactory("org.openrewrite.marker.SearchResult", func() any { return tree.SearchResult{} })
 	// GroupedImport: IS an RpcCodec, sends 2 sub-fields (id, before whitespace)
 	RegisterFactory("org.openrewrite.golang.marker.GroupedImport", func() any { return tree.GroupedImport{} })
+	// ImportBlock: IS an RpcCodec, sends 5 sub-fields (id, closePrevious, before, grouped, groupedBefore)
+	RegisterFactory("org.openrewrite.golang.marker.ImportBlock", func() any { return tree.ImportBlock{} })
 	// Go-specific markers: all are RpcCodec
 	RegisterFactory("org.openrewrite.golang.marker.ShortVarDecl", func() any { return tree.ShortVarDecl{} })
 	RegisterFactory("org.openrewrite.golang.marker.VarKeyword", func() any { return tree.VarKeyword{} })

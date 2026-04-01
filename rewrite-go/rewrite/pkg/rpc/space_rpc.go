@@ -21,6 +21,14 @@ import (
 	"github.com/openrewrite/rewrite/pkg/tree"
 )
 
+// nilableString converts a *string to an any, returning nil if the pointer is nil.
+func nilableString(s *string) any {
+	if s == nil {
+		return nil
+	}
+	return *s
+}
+
 // sendSpace serializes a Space to the send queue.
 // Matches JavaSender.visitSpace field order: comments (list), whitespace.
 func sendSpace(s tree.Space, q *SendQueue) {
@@ -111,6 +119,13 @@ func SendMarkersCodec(m tree.Markers, q *SendQueue) {
 // This must match the field order in each marker's rpcSend method.
 func sendMarkerCodecFields(v any, q *SendQueue) {
 	switch m := v.(type) {
+	case tree.ParseExceptionResult:
+		// ParseExceptionResult.rpcSend sends: id, parserType, exceptionType, message, treeType
+		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).ParserType }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).ExceptionType }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ParseExceptionResult).Message }, nil)
+		q.GetAndSend(m, func(x any) any { return nilableString(x.(tree.ParseExceptionResult).TreeType) }, nil)
 	case tree.SearchResult:
 		// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 		q.GetAndSend(m, func(x any) any { return x.(tree.SearchResult).Ident.String() }, nil)
@@ -119,6 +134,13 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		// GroupedImport.rpcSend sends: id (UUID string), before whitespace (string)
 		q.GetAndSend(m, func(x any) any { return x.(tree.GroupedImport).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(tree.GroupedImport).Before.Whitespace }, nil)
+	case tree.ImportBlock:
+		// ImportBlock.rpcSend sends: id, closePrevious, before, grouped, groupedBefore
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Ident.String() }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).ClosePrevious }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Before.Whitespace }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).Grouped }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.ImportBlock).GroupedBefore.Whitespace }, nil)
 	case tree.ShortVarDecl:
 		q.GetAndSend(m, func(x any) any { return x.(tree.ShortVarDecl).Ident.String() }, nil)
 	case tree.VarKeyword:
@@ -169,6 +191,25 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 		// Markers that implement RpcCodec on the Java side send sub-fields.
 		// We dispatch based on the concrete Go type created by the factory.
 		switch m := v.(type) {
+		case tree.ParseExceptionResult:
+			// ParseExceptionResult.rpcReceive: id, parserType, exceptionType, message, treeType
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.ParserType = receiveScalar[string](q, m.ParserType)
+			m.ExceptionType = receiveScalar[string](q, m.ExceptionType)
+			m.Message = receiveScalar[string](q, m.Message)
+			treeTypeVal := q.Receive(nilableString(m.TreeType), nil)
+			if treeTypeVal != nil {
+				s := treeTypeVal.(string)
+				m.TreeType = &s
+			} else {
+				m.TreeType = nil
+			}
+			return m
 		case tree.SearchResult:
 			// SearchResult.rpcSend sends: id (UUID string), description (nullable string)
 			idStr := receiveScalar[string](q, m.Ident.String())
@@ -192,6 +233,21 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 			}
 			ws := receiveScalar[string](q, m.Before.Whitespace)
 			m.Before = tree.Space{Whitespace: ws}
+			return m
+		case tree.ImportBlock:
+			// ImportBlock.rpcReceive: id, closePrevious, before, grouped, groupedBefore
+			idStr := receiveScalar[string](q, m.Ident.String())
+			if idStr != "" {
+				if parsed, err := uuid.Parse(idStr); err == nil {
+					m.Ident = parsed
+				}
+			}
+			m.ClosePrevious = receiveScalar[bool](q, m.ClosePrevious)
+			ws := receiveScalar[string](q, m.Before.Whitespace)
+			m.Before = tree.Space{Whitespace: ws}
+			m.Grouped = receiveScalar[bool](q, m.Grouped)
+			gbWs := receiveScalar[string](q, m.GroupedBefore.Whitespace)
+			m.GroupedBefore = tree.Space{Whitespace: gbWs}
 			return m
 		case tree.ShortVarDecl:
 			idStr := receiveScalar[string](q, m.Ident.String())

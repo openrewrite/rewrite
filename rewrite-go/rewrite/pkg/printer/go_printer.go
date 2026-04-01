@@ -75,15 +75,29 @@ func (p *GoPrinter) VisitCompilationUnit(cu *tree.CompilationUnit, param any) tr
 		out.Append("import")
 
 		grouped := tree.FindMarker[tree.GroupedImport](cu.Imports.Markers)
-		if grouped != nil {
+		isGrouped := grouped != nil
+		if isGrouped {
 			p.visitSpace(grouped.Before, out)
 			out.Append("(")
 		}
 		for _, rp := range cu.Imports.Elements {
+			block := tree.FindMarker[tree.ImportBlock](rp.Element.Markers)
+			if block != nil {
+				if block.ClosePrevious {
+					out.Append(")")
+				}
+				p.visitSpace(block.Before, out)
+				out.Append("import")
+				if block.Grouped {
+					p.visitSpace(block.GroupedBefore, out)
+					out.Append("(")
+				}
+				isGrouped = block.Grouped
+			}
 			p.Visit(rp.Element, out)
 			p.visitSpace(rp.After, out)
 		}
-		if grouped != nil {
+		if isGrouped {
 			out.Append(")")
 		}
 	}

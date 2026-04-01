@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/pkg/tree"
 )
 
@@ -40,6 +41,12 @@ func NewGoReceiver() *GoReceiver {
 func (r *GoReceiver) Visit(node any, q *ReceiveQueue) any {
 	if node == nil {
 		return nil
+	}
+
+	// ParseError has its own codec — handle before preVisit (no prefix field)
+	if pe, ok := node.(*tree.ParseError); ok {
+		c := *pe
+		return r.receiveParseError(&c, q)
 	}
 
 	// preVisit: receive ID, prefix, markers
@@ -219,6 +226,25 @@ func (r *GoReceiver) preVisit(node any, q *ReceiveQueue) any {
 }
 
 // --- G nodes ---
+
+// receiveParseError deserializes a ParseError matching Java's ParseError.rpcReceive field order:
+// id, markers, sourcePath, charsetName, charsetBomMarked, checksum, fileAttributes, text
+func (r *GoReceiver) receiveParseError(pe *tree.ParseError, q *ReceiveQueue) *tree.ParseError {
+	idStr := receiveScalar[string](q, pe.Ident.String())
+	if idStr != "" {
+		if parsed, err := uuid.Parse(idStr); err == nil {
+			pe.Ident = parsed
+		}
+	}
+	pe.Markers = receiveMarkersCodec(q, pe.Markers)
+	pe.SourcePath = receiveScalar[string](q, pe.SourcePath)
+	pe.CharsetName = receiveScalar[string](q, pe.CharsetName)
+	pe.CharsetBomMarked = receiveScalar[bool](q, pe.CharsetBomMarked)
+	q.Receive(nil, nil) // checksum
+	q.Receive(nil, nil) // fileAttributes
+	pe.Text = receiveScalar[string](q, pe.Text)
+	return pe
+}
 
 func (r *GoReceiver) receiveCompilationUnit(cu *tree.CompilationUnit, q *ReceiveQueue) *tree.CompilationUnit {
 	c := *cu // shallow copy to avoid mutating remoteObjects baseline

@@ -26,6 +26,8 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
+    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 }
 
 // Configure Scala source sets and compilation order
