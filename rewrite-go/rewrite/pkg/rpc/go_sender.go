@@ -17,7 +17,7 @@
 package rpc
 
 import (
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // GoSender serializes Go AST nodes into the send queue.

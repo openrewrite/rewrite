@@ -16,7 +16,7 @@
 
 package golang
 
-import "github.com/openrewrite/rewrite/pkg/recipe"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 
 // FindTypes finds all references to a given type.
 // Delegates to the Java FindTypes recipe via RPC.

@@ -16,7 +16,7 @@
 
 package visitor
 
-import "github.com/openrewrite/rewrite/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 
 // JavaTypeVisitor traverses and optionally transforms JavaType instances.
 // Mirrors org.openrewrite.java.JavaTypeVisitor in Java.

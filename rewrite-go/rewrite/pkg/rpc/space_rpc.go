@@ -18,7 +18,7 @@ package rpc
 
 import (
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // nilableString converts a *string to an any, returning nil if the pointer is nil.

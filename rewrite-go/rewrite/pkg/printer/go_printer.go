@@ -17,8 +17,8 @@
 package printer
 
 import (
-	"github.com/openrewrite/rewrite/pkg/tree"
-	"github.com/openrewrite/rewrite/pkg/visitor"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // GoPrinter prints an OpenRewrite LST back to Go source code.
@@ -157,9 +157,12 @@ func (p *GoPrinter) VisitReturn(ret *tree.Return, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ret.Prefix, ret.Markers, out)
 	out.Append("return")
-	for _, rp := range ret.Expressions {
+	for i, rp := range ret.Expressions {
 		p.Visit(rp.Element, out)
 		p.visitSpace(rp.After, out)
+		if i < len(ret.Expressions)-1 {
+			out.Append(",")
+		}
 	}
 	p.afterSyntax(ret.Markers, out)
 	return ret

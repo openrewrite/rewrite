@@ -18,7 +18,7 @@ package rpc
 
 import (
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // Sender can serialize any AST node.

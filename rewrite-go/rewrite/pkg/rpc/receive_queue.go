@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // ReceiveQueue deserializes RpcObjectData messages from the RPC channel.

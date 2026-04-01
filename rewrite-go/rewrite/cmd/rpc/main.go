@@ -32,13 +32,13 @@ import (
 
 	"github.com/google/uuid"
 
-	goparser "github.com/openrewrite/rewrite/pkg/parser"
-	"github.com/openrewrite/rewrite/pkg/printer"
-	"github.com/openrewrite/rewrite/pkg/recipe"
-	"github.com/openrewrite/rewrite/pkg/recipe/golang"
-	"github.com/openrewrite/rewrite/pkg/recipe/installer"
-	"github.com/openrewrite/rewrite/pkg/rpc"
-	"github.com/openrewrite/rewrite/pkg/tree"
+	goparser "github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/golang"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe/installer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // jsonRPCRequest represents an incoming JSON-RPC 2.0 message (request or response).

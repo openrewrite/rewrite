@@ -17,8 +17,8 @@
 package rpc
 
 import (
-	"github.com/openrewrite/rewrite/pkg/tree"
-	"github.com/openrewrite/rewrite/pkg/visitor"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // JavaTypeReceiver deserializes JavaType objects from the receive queue.

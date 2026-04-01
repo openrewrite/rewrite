@@ -21,7 +21,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // typeMapper converts go/types.Type to OpenRewrite JavaType equivalents.

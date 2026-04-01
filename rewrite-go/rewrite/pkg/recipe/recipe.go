@@ -19,7 +19,7 @@ package recipe
 import (
 	"time"
 
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // TreeVisitor can visit and transform a tree node.

@@ -19,7 +19,7 @@ package rpc
 import (
 	"reflect"
 
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 func init() {
