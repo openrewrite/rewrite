@@ -31,7 +31,7 @@ import {
 import * as path from "path";
 import * as semver from "semver";
 import * as picomatch from "picomatch";
-import {markupWarn, replaceMarkerByKind} from "../../markers";
+import {replaceMarkerByKind} from "../../markers";
 import {TreePrinters} from "../../print";
 import {
     createDependencyRecipeAccumulator,
@@ -301,11 +301,7 @@ export class UpgradeDependencyVersion extends ScanningRecipe<Accumulator> {
                         );
                     if (failureMessage) {
                         const names = updateInfo.matchedDependencies.map(d => d.packageName).join(', ');
-                        return markupWarn(
-                            doc,
-                            `Failed to upgrade ${names} to ${recipe.newVersion}`,
-                            failureMessage
-                        );
+                        throw new Error(`Failed to upgrade ${names} to ${recipe.newVersion}: ${failureMessage}`);
                     }
 
                     let modifiedDoc = doc;

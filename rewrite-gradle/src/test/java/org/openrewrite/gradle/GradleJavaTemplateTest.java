@@ -34,9 +34,7 @@ class GradleJavaTemplateTest implements RewriteTest {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 if (block.getStatements().isEmpty()) {
-                    return JavaTemplate.builder("implementation(\"com.google.guava:guava:latest.release\")")
-                      .build()
-                      .apply(getCursor(), block.getCoordinates().lastStatement());
+                    return JavaTemplate.apply("implementation(\"com.google.guava:guava:latest.release\")", getCursor(), block.getCoordinates().lastStatement());
                 }
                 return super.visitBlock(block, ctx);
             }

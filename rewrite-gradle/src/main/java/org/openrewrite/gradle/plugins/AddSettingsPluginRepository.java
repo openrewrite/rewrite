@@ -138,6 +138,12 @@ public class AddSettingsPluginRepository extends Recipe {
                 if (mapped != statements) {
                     return mapped;
                 }
+                // Check if pluginManagement exists but no change was needed (repo already present)
+                for (Statement s : statements) {
+                    if (unwrapMethodCall(s, "pluginManagement") != null) {
+                        return statements;
+                    }
+                }
                 // No existing pluginManagement found — insert after any leading imports
                 Statement pluginManagementStatement = pluginManagement instanceof J.Block ?
                         ((J.Block) pluginManagement).getStatements().get(0) :
@@ -190,6 +196,11 @@ public class AddSettingsPluginRepository extends Recipe {
                     return statement;
                 }
                 J.MethodInvocation repoToAdd = extractRepository(pluginManagement);
+
+                if (repoAlreadyExists(repos, repoToAdd.getSimpleName())) {
+                    return statement;
+                }
+
                 J.MethodInvocation m2 = repos.withArguments(ListUtils.mapFirst(repos.getArguments(), arg2 -> {
                     if (!(arg2 instanceof J.Lambda) || !(((J.Lambda) arg2).getBody() instanceof J.Block)) {
                         return arg2;
@@ -206,6 +217,23 @@ public class AddSettingsPluginRepository extends Recipe {
                                     .withComments(emptyList()))));
                 }));
                 return rewrap(statement, m2);
+            }
+
+            // Name-based fallback for when MethodMatcher fails due to incorrect type attribution (e.g. rewrite-kotlin)
+            private boolean repoAlreadyExists(J.MethodInvocation repos, String repoName) {
+                if (repos.getArguments().isEmpty() || !(repos.getArguments().get(0) instanceof J.Lambda)) {
+                    return false;
+                }
+                J.Lambda lambda = (J.Lambda) repos.getArguments().get(0);
+                if (!(lambda.getBody() instanceof J.Block)) {
+                    return false;
+                }
+                for (Statement s : ((J.Block) lambda.getBody()).getStatements()) {
+                    if (unwrapMethodCall(s, repoName) != null) {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             private <T extends JavaSourceFile> J generatePluginManagementBlock(Class<T> compilationUnitClass, Function<T, J> methodExtractor, ExecutionContext ctx) {
