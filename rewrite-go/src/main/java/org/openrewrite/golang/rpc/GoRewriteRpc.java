@@ -164,7 +164,14 @@ public class GoRewriteRpc extends RewriteRpc {
             if (goBinaryPath != null) {
                 binaryPath = goBinaryPath.toString();
             } else {
-                binaryPath = "rewrite-go-rpc";
+                // Check for a custom binary with installed recipes
+                java.nio.file.Path customBin = java.nio.file.Paths.get(
+                        System.getProperty("user.home"), ".rewrite", "go-recipes", "rewrite-go-rpc");
+                if (java.nio.file.Files.isExecutable(customBin)) {
+                    binaryPath = customBin.toString();
+                } else {
+                    binaryPath = "rewrite-go-rpc";
+                }
             }
 
             Stream<@Nullable String> cmd = Stream.of(

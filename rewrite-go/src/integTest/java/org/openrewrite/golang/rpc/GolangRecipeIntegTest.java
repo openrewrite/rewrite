@@ -17,17 +17,21 @@ package org.openrewrite.golang.rpc;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.java.ChangeMethodName;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.golang.GolangParser;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -66,6 +70,118 @@ class GolangRecipeIntegTest implements RewriteTest {
           .identifiers(false)
           .methodInvocations(false)
           .build());
+    }
+
+    /**
+     * Rename a boolean variable — exercises modifying an identifier in a
+     * VariableDeclarations context with a boolean literal initializer.
+     * This is similar to what SimplifyBooleanExpression needs.
+     */
+    @Test
+    void renameBooleanVar() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("x".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("flag");
+                  }
+                  return ident;
+              }
+          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          go(
+            """
+              package main
+
+              func f() {
+              \tvar x = true
+              \t_ = x
+              }
+              """,
+            """
+              package main
+
+              func f() {
+              \tvar flag = true
+              \t_ = flag
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Tests Go-native recipe execution via the full RPC Visit path.
+     * The RenameXToFlag recipe has a real Go Editor() that visits identifiers.
+     * This exercises: PrepareRecipe → Visit → getObjectFromJava → Go visitor →
+     * modified tree sent back to Java via GetObject.
+     */
+    /**
+     * Tests Go-native recipe execution via the full RPC Visit path.
+     * Uses the RPC API directly: PrepareRecipe → Visit → GetObject round-trip.
+     */
+    @Test
+    void goNativeRecipeViaRpc() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
+        SourceFile cu = GolangParser.builder().build()
+                .parse(source).findFirst().orElseThrow();
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
+        assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
+        assertThat(result).isNotSameAs(cu);
+        String printed = GoRewriteRpc.getOrStart().print((SourceFile) result);
+        assertThat(printed).contains("var flag = true").contains("_ = flag");
+    }
+
+    /**
+     * Simulates the CLI path where the tree is loaded from a JAR (no RPC baseline).
+     * Forces the Visit RPC to use ADD (not CHANGE) by resetting the Go RPC state.
+     */
+    @Test
+    void goNativeRecipeViaRpcWithAddPath() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
+        SourceFile cu = GolangParser.builder().build()
+                .parse(source).findFirst().orElseThrow();
+
+        // Reset Go RPC state to simulate a fresh session (like CLI's mod run)
+        rpc.reset();
+
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
+        assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
+        assertThat(result).isNotSameAs(cu);
+        String printed = rpc.print((SourceFile) result);
+        assertThat(printed).contains("var flag = true").contains("_ = flag");
+    }
+
+    /**
+     * Simulates the CLI path where the tree has type information from Go's
+     * type checker. The tree is parsed (which populates type info), then
+     * reset + Visit forces the ADD path.
+     */
+    /**
+     * Simulates the full CLI path: parse → reset → installRecipes → prepareRecipe → visit.
+     * This matches what mod run does.
+     */
+    @Test
+    void goNativeRecipeViaRpcFullCliPath() {
+        GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
+        String source = "package main\n\nfunc f() {\n\tvar x = true\n\t_ = x\n}\n";
+        SourceFile cu = GolangParser.builder().build()
+                .parse(source).findFirst().orElseThrow();
+
+        // Reset to simulate fresh session, then install recipes (like CLI does)
+        rpc.reset();
+        rpc.installRecipes(
+                new java.io.File("/Users/jonathan/Projects/github/moderneinc/recipes-go/recipes-code-quality"));
+
+        var recipe = rpc.prepareRecipe("org.openrewrite.golang.test.RenameXToFlag");
+        Tree result = recipe.getVisitor().visit(cu, new InMemoryExecutionContext());
+        assertThat(result).isNotNull().isInstanceOf(SourceFile.class);
+        String printed = rpc.print((SourceFile) result);
+        assertThat(printed).contains("var flag = true").contains("_ = flag");
     }
 
     @Test

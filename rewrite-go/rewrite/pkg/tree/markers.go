@@ -33,8 +33,9 @@ type Markers struct {
 // doesn't have a native type for (e.g., RecipesThatMadeChanges, SearchResult).
 // It preserves the marker data as opaque fields during RPC round-trips.
 type GenericMarker struct {
-	Ident uuid.UUID
-	Data  map[string]any
+	Ident      uuid.UUID
+	JavaType   string         // Original Java class name for round-trip fidelity
+	Data       map[string]any
 }
 
 func (m GenericMarker) ID() uuid.UUID { return m.Ident }

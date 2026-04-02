@@ -123,7 +123,7 @@ func (n *Literal) WithSource(source string) *Literal {
 type BinaryOperator int
 
 const (
-	Add BinaryOperator = iota
+	Add BinaryOperator = iota + 1
 	Subtract
 	Multiply
 	Divide
@@ -232,7 +232,7 @@ func ParseBinaryOperator(s string) BinaryOperator {
 	case "GreaterThanOrEqual":
 		return GreaterThanOrEqual
 	default:
-		return Add
+		return 0 // Unknown
 	}
 }
 
@@ -447,7 +447,7 @@ type AssignmentOperation struct {
 type AssignmentOperator int
 
 const (
-	AddAssign    AssignmentOperator = iota // +=
+	AddAssign    AssignmentOperator = iota + 1 // +=
 	SubAssign                              // -=
 	MulAssign                              // *=
 	DivAssign                              // /=
@@ -514,7 +514,7 @@ func ParseAssignmentOperator(s string) AssignmentOperator {
 	case "RightShift":
 		return ShrAssign
 	default:
-		return AddAssign
+		return 0 // Unknown
 	}
 }
 
@@ -695,7 +695,7 @@ type ForEachControl struct {
 type AssignOp int
 
 const (
-	AssignOpEquals AssignOp = iota // =
+	AssignOpEquals AssignOp = iota + 1 // =
 	AssignOpDefine                 // :=
 )
 
@@ -717,7 +717,7 @@ func ParseAssignOp(s string) AssignOp {
 	case "Define":
 		return AssignOpDefine
 	default:
-		return AssignOpEquals
+		return 0 // Unknown
 	}
 }
 
@@ -897,7 +897,7 @@ type Unary struct {
 type UnaryOperator int
 
 const (
-	Negate        UnaryOperator = iota // -
+	Negate        UnaryOperator = iota + 1 // -
 	Not                               // !
 	BitwiseNot                        // ^
 	Deref                             // *
@@ -962,8 +962,20 @@ func ParseUnaryOperator(s string) UnaryOperator {
 		return BitwiseNot
 	case "Not":
 		return Not
+	case "Deref":
+		return Deref
+	case "Spread":
+		return Spread
+	case "SpreadPostfix":
+		return SpreadPostfix
+	case "BitwiseNot":
+		return BitwiseNot
+	case "LogicalNot":
+		return Not
+	case "Receive":
+		return Receive
 	default:
-		return Negate
+		return 0 // Unknown operator
 	}
 }
 

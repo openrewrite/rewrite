@@ -27,4 +27,5 @@ func Activate(r *recipe.Registry) {
 	r.Register(&ChangeMethodName{}, golangCategory)
 	r.Register(&FindTypes{}, golangCategory, searchCategory)
 	r.Register(&FindMethods{}, golangCategory, searchCategory)
+	r.Register(&RenameXToFlag{}, golangCategory)
 }

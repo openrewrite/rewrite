@@ -120,12 +120,8 @@ func receiveRightPadded(r Receiver, q *ReceiveQueue, before any) any {
 		m = markers.(tree.Markers)
 	}
 
-	// For factory-created fallback (RightPadded[tree.J]), create the result
-	// based on the element's type since we don't know the parent's expectation.
-	if _, ok := before.(tree.RightPadded[tree.J]); ok {
-		return rightPaddedFromElement(elem, after, m)
-	}
-	return updateRightPadded(before, elem, after, m)
+	// Always use element-type detection since Go lacks generic covariance.
+	return rightPaddedFromElement(elem, after, m)
 }
 
 // receiveLeftPadded deserializes a LeftPadded element.
@@ -153,6 +149,24 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 }
 
 // receiveContainer deserializes a Container.
+// ContainerType hints for empty container creation
+const (
+	ContainerStatement  = "statement"
+	ContainerExpression = "expression"
+	ContainerImport     = "import"
+)
+
+func receiveContainerAs(r Receiver, q *ReceiveQueue, before any, hint string) any {
+	result := receiveContainer(r, q, before)
+	// If the result is an empty Container[Expression] but the caller needs Statement, convert
+	if hint == ContainerStatement {
+		if c, ok := result.(tree.Container[tree.Expression]); ok && len(c.Elements) == 0 {
+			return tree.Container[tree.Statement]{Before: c.Before, Markers: c.Markers}
+		}
+	}
+	return result
+}
+
 func receiveContainer(r Receiver, q *ReceiveQueue, before any) any {
 	// Before space
 	beforeSpace := q.Receive(containerBefore(before), func(v any) any {
@@ -230,37 +244,18 @@ func rightPaddedMarkers(rp any) any {
 	}
 }
 
+// updateRightPadded creates a correctly-typed RightPadded from the element.
+// Always uses element-type detection since Go lacks generic covariance.
 func updateRightPadded(rp any, elem any, after tree.Space, markers tree.Markers) any {
-	switch rp.(type) {
-	case tree.RightPadded[tree.Statement]:
-		return tree.RightPadded[tree.Statement]{Element: elem.(tree.Statement), After: after, Markers: markers}
-	case tree.RightPadded[tree.Expression]:
-		return tree.RightPadded[tree.Expression]{Element: elem.(tree.Expression), After: after, Markers: markers}
-	case tree.RightPadded[tree.J]:
-		// Factory-created fallback: determine the correct RightPadded variant.
-		// This is called when Java sends ADD for a new RightPadded in the
-		// bidirectional direction. We need to create the exact generic variant
-		// that the parent container expects.
-		return rightPaddedFromElement(elem, after, markers)
-	case tree.RightPadded[*tree.Identifier]:
-		return tree.RightPadded[*tree.Identifier]{Element: elem.(*tree.Identifier), After: after, Markers: markers}
-	case tree.RightPadded[*tree.VariableDeclarator]:
-		return tree.RightPadded[*tree.VariableDeclarator]{Element: elem.(*tree.VariableDeclarator), After: after, Markers: markers}
-	case tree.RightPadded[*tree.Import]:
-		return tree.RightPadded[*tree.Import]{Element: elem.(*tree.Import), After: after, Markers: markers}
-	default:
-		return rp
-	}
+	return rightPaddedFromElement(elem, after, markers)
 }
 
 // rightPaddedFromElement creates the most specific RightPadded variant based on
 // the element's concrete type. This is needed for factory-created fallback instances
 // (RightPadded[tree.J]) where we don't know the desired variant until we see the element.
 func rightPaddedFromElement(elem any, after tree.Space, markers tree.Markers) any {
-	// Try concrete pointer types first (most specific)
+	// Types that are only J (not Statement or Expression) need explicit handling
 	switch e := elem.(type) {
-	case *tree.Identifier:
-		return tree.RightPadded[*tree.Identifier]{Element: e, After: after, Markers: markers}
 	case *tree.VariableDeclarator:
 		return tree.RightPadded[*tree.VariableDeclarator]{Element: e, After: after, Markers: markers}
 	case *tree.Import:
@@ -415,51 +410,49 @@ func leftPaddedMarkers(lp any) any {
 	}
 }
 
+// updateLeftPadded creates a correctly-typed LeftPadded from the element.
+// Uses the element's concrete type to determine the generic type parameter,
+// since Go lacks generic covariance (LeftPadded[J] != LeftPadded[Expression]).
 func updateLeftPadded(lp any, before tree.Space, elem any, markers tree.Markers) any {
-	switch lp.(type) {
-	case tree.LeftPadded[tree.J]:
-		// Factory-created fallback: determine the most specific type from the element
-		if expr, ok := elem.(tree.Expression); ok {
-			return tree.LeftPadded[tree.Expression]{Before: before, Element: expr, Markers: markers}
+	return leftPaddedFromElement(before, elem, markers)
+}
+
+// leftPaddedFromElement creates a LeftPadded with the correct generic type
+// based on the element's concrete type.
+func leftPaddedFromElement(before tree.Space, elem any, markers tree.Markers) any {
+	// String values may encode operator enums
+	if s, ok := elem.(string); ok {
+		if op := tree.ParseBinaryOperator(s); op != 0 {
+			return tree.LeftPadded[tree.BinaryOperator]{Before: before, Element: op, Markers: markers}
 		}
-		if j, ok := elem.(tree.J); ok {
-			return tree.LeftPadded[tree.J]{Before: before, Element: j, Markers: markers}
+		if op := tree.ParseAssignmentOperator(s); op != 0 {
+			return tree.LeftPadded[tree.AssignmentOperator]{Before: before, Element: op, Markers: markers}
 		}
-		return tree.LeftPadded[tree.J]{Before: before, Markers: markers}
-	case tree.LeftPadded[tree.Expression]:
-		return tree.LeftPadded[tree.Expression]{Before: before, Element: elem.(tree.Expression), Markers: markers}
-	case tree.LeftPadded[*tree.Identifier]:
-		return tree.LeftPadded[*tree.Identifier]{Before: before, Element: elem.(*tree.Identifier), Markers: markers}
-	case tree.LeftPadded[tree.BinaryOperator]:
-		// Java sends enum as string name; convert back to Go enum
-		if s, ok := elem.(string); ok {
-			return tree.LeftPadded[tree.BinaryOperator]{Before: before, Element: tree.ParseBinaryOperator(s), Markers: markers}
+		if op := tree.ParseUnaryOperator(s); op != 0 {
+			return tree.LeftPadded[tree.UnaryOperator]{Before: before, Element: op, Markers: markers}
 		}
-		return tree.LeftPadded[tree.BinaryOperator]{Before: before, Element: elem.(tree.BinaryOperator), Markers: markers}
-	case tree.LeftPadded[tree.AssignmentOperator]:
-		if s, ok := elem.(string); ok {
-			return tree.LeftPadded[tree.AssignmentOperator]{Before: before, Element: tree.ParseAssignmentOperator(s), Markers: markers}
+		if op := tree.ParseAssignOp(s); op != 0 {
+			return tree.LeftPadded[tree.AssignOp]{Before: before, Element: op, Markers: markers}
 		}
-		return tree.LeftPadded[tree.AssignmentOperator]{Before: before, Element: elem.(tree.AssignmentOperator), Markers: markers}
-	case tree.LeftPadded[tree.UnaryOperator]:
-		if s, ok := elem.(string); ok {
-			return tree.LeftPadded[tree.UnaryOperator]{Before: before, Element: tree.ParseUnaryOperator(s), Markers: markers}
-		}
-		return tree.LeftPadded[tree.UnaryOperator]{Before: before, Element: elem.(tree.UnaryOperator), Markers: markers}
-	case tree.LeftPadded[tree.Space]:
-		return tree.LeftPadded[tree.Space]{Before: before, Element: elem.(tree.Space), Markers: markers}
-	case tree.LeftPadded[tree.AssignOp]:
-		if s, ok := elem.(string); ok {
-			return tree.LeftPadded[tree.AssignOp]{Before: before, Element: tree.ParseAssignOp(s), Markers: markers}
-		}
-		return tree.LeftPadded[tree.AssignOp]{Before: before, Element: elem.(tree.AssignOp), Markers: markers}
-	case tree.LeftPadded[string]:
-		return tree.LeftPadded[string]{Before: before, Element: elem.(string), Markers: markers}
-	case tree.LeftPadded[bool]:
-		return tree.LeftPadded[bool]{Before: before, Element: elem.(bool), Markers: markers}
-	default:
-		return lp
+		return tree.LeftPadded[string]{Before: before, Element: s, Markers: markers}
 	}
+	if b, ok := elem.(bool); ok {
+		return tree.LeftPadded[bool]{Before: before, Element: b, Markers: markers}
+	}
+	if sp, ok := elem.(tree.Space); ok {
+		return tree.LeftPadded[tree.Space]{Before: before, Element: sp, Markers: markers}
+	}
+	// Interface types — prefer Expression over Statement
+	if expr, ok := elem.(tree.Expression); ok {
+		return tree.LeftPadded[tree.Expression]{Before: before, Element: expr, Markers: markers}
+	}
+	if stmt, ok := elem.(tree.Statement); ok {
+		return tree.LeftPadded[tree.Statement]{Before: before, Element: stmt, Markers: markers}
+	}
+	if j, ok := elem.(tree.J); ok {
+		return tree.LeftPadded[tree.J]{Before: before, Element: j, Markers: markers}
+	}
+	return tree.LeftPadded[tree.J]{Before: before, Markers: markers}
 }
 
 func containerBefore(c any) any {
@@ -542,62 +535,48 @@ func containerMarkers(c any) any {
 	}
 }
 
+// updateContainer creates a correctly-typed Container from the elements.
+// Always uses element-type detection since Go lacks generic covariance.
 func updateContainer(c any, before tree.Space, elements []any, markers tree.Markers) any {
-	switch c.(type) {
-	case tree.Container[tree.J]:
-		// Factory-created fallback: detect element type from first element
-		if len(elements) > 0 {
-			switch elements[0].(type) {
-			case tree.RightPadded[tree.Statement]:
-				elems := make([]tree.RightPadded[tree.Statement], len(elements))
-				for i, e := range elements {
-					elems[i] = e.(tree.RightPadded[tree.Statement])
-				}
-				return tree.Container[tree.Statement]{Before: before, Elements: elems, Markers: markers}
-			case tree.RightPadded[tree.Expression]:
-				elems := make([]tree.RightPadded[tree.Expression], len(elements))
-				for i, e := range elements {
-					elems[i] = e.(tree.RightPadded[tree.Expression])
-				}
-				return tree.Container[tree.Expression]{Before: before, Elements: elems, Markers: markers}
-			case tree.RightPadded[*tree.Import]:
-				elems := make([]tree.RightPadded[*tree.Import], len(elements))
-				for i, e := range elements {
-					elems[i] = e.(tree.RightPadded[*tree.Import])
-				}
-				return tree.Container[*tree.Import]{Before: before, Elements: elems, Markers: markers}
-			}
-		}
-		// Empty or unrecognized element type
-		return tree.Container[tree.J]{Before: before, Markers: markers}
-	case tree.Container[tree.Statement]:
-		elems := make([]tree.RightPadded[tree.Statement], len(elements))
-		for i, e := range elements {
-			if rp, ok := e.(tree.RightPadded[tree.Statement]); ok {
-				elems[i] = rp
-			} else {
-				elems[i] = coerceToStatementRP(e)
-			}
-		}
-		return tree.Container[tree.Statement]{Before: before, Elements: elems, Markers: markers}
-	case tree.Container[tree.Expression]:
-		elems := make([]tree.RightPadded[tree.Expression], len(elements))
-		for i, e := range elements {
-			if rp, ok := e.(tree.RightPadded[tree.Expression]); ok {
-				elems[i] = rp
-			} else {
-				// Coerce from RightPadded[Statement] or RightPadded[J] when element implements Expression
-				elems[i] = coerceToExpressionRP(e)
-			}
-		}
-		return tree.Container[tree.Expression]{Before: before, Elements: elems, Markers: markers}
-	case tree.Container[*tree.Import]:
+	return containerFromElements(before, elements, markers)
+}
+
+// containerFromElements creates a Container with the correct generic type
+// based on the elements' types.
+func containerFromElements(before tree.Space, elements []any, markers tree.Markers) any {
+	if len(elements) == 0 {
+		// Empty container — default to Expression since most containers
+		// (method arguments, type parameters) expect Expression.
+		return tree.Container[tree.Expression]{Before: before, Markers: markers}
+	}
+
+	// Detect from first element
+	switch elements[0].(type) {
+	case tree.RightPadded[*tree.Import]:
 		elems := make([]tree.RightPadded[*tree.Import], len(elements))
 		for i, e := range elements {
 			elems[i] = e.(tree.RightPadded[*tree.Import])
 		}
 		return tree.Container[*tree.Import]{Before: before, Elements: elems, Markers: markers}
+	case tree.RightPadded[tree.Expression]:
+		elems := make([]tree.RightPadded[tree.Expression], len(elements))
+		for i, e := range elements {
+			elems[i] = e.(tree.RightPadded[tree.Expression])
+		}
+		return tree.Container[tree.Expression]{Before: before, Elements: elems, Markers: markers}
+	case tree.RightPadded[tree.Statement]:
+		elems := make([]tree.RightPadded[tree.Statement], len(elements))
+		for i, e := range elements {
+			elems[i] = e.(tree.RightPadded[tree.Statement])
+		}
+		return tree.Container[tree.Statement]{Before: before, Elements: elems, Markers: markers}
 	default:
-		return c
+		// Coerce elements: try Expression first, then Statement
+		exprElems := make([]tree.RightPadded[tree.Expression], 0, len(elements))
+		for _, e := range elements {
+			rp := coerceToExpressionRP(e)
+			exprElems = append(exprElems, rp)
+		}
+		return tree.Container[tree.Expression]{Before: before, Elements: exprElems, Markers: markers}
 	}
 }
