@@ -20,13 +20,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@SuppressWarnings("DataFlowIssue")
 class DataTableStoreTest {
 
     static class TestTable extends DataTable<TestTable.Row> {
@@ -155,6 +159,7 @@ class DataTableStoreTest {
 
     @Test
     void noopStoreIsSingleton() {
+        //noinspection EqualsWithItself
         assertThat(DataTableStore.noop()).isSameAs(DataTableStore.noop());
     }
 
@@ -243,6 +248,146 @@ class DataTableStoreTest {
             assertThat(descriptor.getName()).isEqualTo(TestTable.class.getName());
             assertThat(descriptor.getInstanceName()).isEqualTo("Test table");
             assertThat(descriptor.getGroup()).isEqualTo("test-group");
+        }
+    }
+
+    // =========================================================================
+    // CsvDataTableStore.getRows
+    // =========================================================================
+
+    static class MultiColTable extends DataTable<MultiColTable.Row> {
+        public MultiColTable(Recipe recipe) {
+            super(recipe, "Multi-column table", "A table with multiple columns.");
+        }
+
+        @Value
+        public static class Row {
+            @Column(displayName = "Position", description = "The index position")
+            int position;
+
+            @Column(displayName = "Text", description = "The text value")
+            String text;
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsReadsBackWrittenData(@TempDir Path tempDir) {
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            TestTable table = new TestTable(Recipe.noop());
+            store.insertRow(table, ctx(), new TestTable.Row("alice"));
+            store.insertRow(table, ctx(), new TestTable.Row("bob"));
+
+            List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
+            assertThat(rows).hasSize(2);
+            assertThat((String[]) rows.get(0)).containsExactly("alice");
+            assertThat((String[]) rows.get(1)).containsExactly("bob");
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsMultipleColumns(@TempDir Path tempDir) {
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            MultiColTable table = new MultiColTable(Recipe.noop());
+            store.insertRow(table, ctx(), new MultiColTable.Row(1, "hello"));
+            store.insertRow(table, ctx(), new MultiColTable.Row(2, "world"));
+
+            List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
+            assertThat(rows).hasSize(2);
+            assertThat((String[]) rows.get(0)).containsExactly("1", "hello");
+            assertThat((String[]) rows.get(1)).containsExactly("2", "world");
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsReturnsEmptyForMissingTable(@TempDir Path tempDir) {
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            TestTable table = new TestTable(Recipe.noop());
+            store.insertRow(table, ctx(), new TestTable.Row("alice"));
+
+            List<?> rows = store.getRows("nonexistent.Table", null).collect(Collectors.toList());
+            assertThat(rows).isEmpty();
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsMatchesByGroup(@TempDir Path tempDir) {
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            TestTable grouped = new TestTable(Recipe.noop()).withGroup("group-a");
+            TestTable ungrouped = new TestTable(Recipe.noop());
+            store.insertRow(grouped, ctx(), new TestTable.Row("grouped-row"));
+            store.insertRow(ungrouped, ctx(), new TestTable.Row("ungrouped-row"));
+
+            List<?> groupedRows = store.getRows(grouped.getName(), "group-a").collect(Collectors.toList());
+            assertThat(groupedRows).hasSize(1);
+            assertThat((String[]) groupedRows.getFirst()).containsExactly("grouped-row");
+
+            List<?> ungroupedRows = store.getRows(ungrouped.getName(), null).collect(Collectors.toList());
+            assertThat(ungroupedRows).hasSize(1);
+            assertThat((String[]) ungroupedRows.getFirst()).containsExactly("ungrouped-row");
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsStripsPrefixAndSuffixColumns(@TempDir Path tempDir) {
+        Map<String, String> prefix = new LinkedHashMap<>();
+        prefix.put("repo", "my-repo");
+        Map<String, String> suffix = new LinkedHashMap<>();
+        suffix.put("org", "my-org");
+
+        try (CsvDataTableStore store = new CsvDataTableStore(
+                tempDir, (path) -> {
+            try {
+                return Files.newOutputStream(path);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }, (path) -> {
+            try {
+                return Files.newInputStream(path);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }, ".csv", prefix, suffix)) {
+            TestTable table = new TestTable(Recipe.noop());
+            store.insertRow(table, ctx(), new TestTable.Row("alice"));
+
+            List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
+            assertThat(rows).hasSize(1);
+            // Should only contain the data column, not prefix/suffix
+            assertThat((String[]) rows.getFirst()).containsExactly("alice");
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsAfterClose(@TempDir Path tempDir) {
+        TestTable table = new TestTable(Recipe.noop());
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            store.insertRow(table, ctx(), new TestTable.Row("alice"));
+            store.insertRow(table, ctx(), new TestTable.Row("bob"));
+        }
+
+        // Read back from a new store instance pointing at the same directory
+        try (CsvDataTableStore store2 = new CsvDataTableStore(tempDir)) {
+            List<?> rows = store2.getRows(table.getName(), null).collect(Collectors.toList());
+            assertThat(rows).hasSize(2);
+            assertThat((String[]) rows.get(0)).containsExactly("alice");
+            assertThat((String[]) rows.get(1)).containsExactly("bob");
+        }
+    }
+
+    @Test
+    void csvStoreGetRowsHandlesSpecialCharacters(@TempDir Path tempDir) {
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            TestTable table = new TestTable(Recipe.noop());
+            store.insertRow(table, ctx(), new TestTable.Row("value with, comma"));
+            store.insertRow(table, ctx(), new TestTable.Row("value with \"quotes\""));
+            store.insertRow(table, ctx(), new TestTable.Row("value with\nnewline"));
+
+            List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
+            assertThat(rows).hasSize(3);
+            assertThat((String[]) rows.get(0)).containsExactly("value with, comma");
+            assertThat((String[]) rows.get(1)).containsExactly("value with \"quotes\"");
+            assertThat((String[]) rows.get(2)).containsExactly("value with\nnewline");
         }
     }
 
