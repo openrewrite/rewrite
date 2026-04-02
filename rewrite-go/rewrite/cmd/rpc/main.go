@@ -308,11 +308,22 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		var sourcePath string
 		var source string
 
-		filePath := input.Path
-		if filePath == "" {
-			filePath = input.SourcePath
-		}
-		if filePath != "" {
+		if input.Text != "" {
+			// Text-based input (inline source from tests or recipe framework)
+			source = input.Text
+			sourcePath = input.SourcePath
+			if sourcePath == "" {
+				sourcePath = "<unknown>"
+			}
+		} else {
+			// File-path-based input (mod build sends file paths)
+			filePath := input.Path
+			if filePath == "" {
+				filePath = input.SourcePath
+			}
+			if filePath == "" {
+				continue
+			}
 			absPath := filePath
 			data, err := os.ReadFile(absPath)
 			if err != nil {
@@ -329,14 +340,6 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			} else {
 				sourcePath = absPath
 			}
-		} else if input.Text != "" {
-			source = input.Text
-			sourcePath = input.SourcePath
-			if sourcePath == "" {
-				sourcePath = "<unknown>"
-			}
-		} else {
-			continue
 		}
 
 		cu, parseErr := func() (cu *tree.CompilationUnit, err error) {

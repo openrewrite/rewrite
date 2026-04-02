@@ -155,6 +155,19 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitStatementExpression(Go.StatementExpression statementExpression, P p) {
+        Go.StatementExpression se = statementExpression;
+        se = se.withPrefix(visitSpace(se.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        Expression tempExpression = (Expression) visitExpression(se, p);
+        if (!(tempExpression instanceof Go.StatementExpression)) {
+            return tempExpression;
+        }
+        se = (Go.StatementExpression) tempExpression;
+        se = se.withMarkers(visitMarkers(se.getMarkers(), p));
+        se = se.withStatement((Statement) visitAndCast(se.getStatement(), p));
+        return se;
+    }
+
     public J visitPointerType(Go.PointerType pointerType, P p) {
         Go.PointerType pt = pointerType;
         pt = pt.withPrefix(visitSpace(pt.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

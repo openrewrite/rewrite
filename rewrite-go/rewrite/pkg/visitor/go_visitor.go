@@ -123,6 +123,8 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return v.self().VisitSlice(n, p)
 	case *tree.MapType:
 		return v.self().VisitMapType(n, p)
+	case *tree.StatementExpression:
+		return v.self().VisitStatementExpression(n, p)
 	case *tree.PointerType:
 		return v.self().VisitPointerType(n, p)
 	case *tree.Channel:
@@ -200,6 +202,7 @@ type VisitorI interface {
 	VisitKeyValue(kv *tree.KeyValue, p any) tree.J
 	VisitSlice(s *tree.Slice, p any) tree.J
 	VisitMapType(mt *tree.MapType, p any) tree.J
+	VisitStatementExpression(se *tree.StatementExpression, p any) tree.J
 	VisitPointerType(pt *tree.PointerType, p any) tree.J
 	VisitChannel(ch *tree.Channel, p any) tree.J
 	VisitFuncType(ft *tree.FuncType, p any) tree.J
@@ -536,6 +539,16 @@ func (v *GoVisitor) VisitMapType(mt *tree.MapType, p any) tree.J {
 	mt = mt.WithPrefix(v.self().VisitSpace(mt.Prefix, p))
 	mt = mt.WithMarkers(v.visitMarkers(mt.Markers, p))
 	return mt
+}
+
+func (v *GoVisitor) VisitStatementExpression(se *tree.StatementExpression, p any) tree.J {
+	se = se.WithPrefix(v.self().VisitSpace(se.Prefix, p))
+	se = se.WithMarkers(v.visitMarkers(se.Markers, p))
+	result := v.self().Visit(se.Statement, p)
+	if stmt, ok := result.(tree.Statement); ok {
+		se.Statement = stmt
+	}
+	return se
 }
 
 func (v *GoVisitor) VisitPointerType(pt *tree.PointerType, p any) tree.J {

@@ -127,6 +127,12 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitStatementExpression(Go.StatementExpression se, RpcReceiveQueue q) {
+        return se
+                .withStatement(q.receive(se.getStatement(), el -> (Statement) visitNonNull(el, q)));
+    }
+
+    @Override
     public J visitPointerType(Go.PointerType pointerType, RpcReceiveQueue q) {
         return pointerType
                 .withElem(q.receive(pointerType.getElem(), expr -> (Expression) visitNonNull(expr, q)));
@@ -284,145 +290,6 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
             return control
                     .getPadding().withVariable(varPadded)
                     .getPadding().withIterable(JRightPadded.build(iterable));
-        }
-
-        /**
-         * Sets a final field to a value whose type doesn't match the declared field type.
-         * Go's AST uses nodes (J.Unary for pointer types, J.MethodDeclaration for func
-         * literals) in positions where Java's model requires TypeTree or Expression.
-         */
-        private static void setFinalField(Object target, String fieldName, Object value) {
-            try {
-                java.lang.reflect.Field f = target.getClass().getDeclaredField(fieldName);
-                f.setAccessible(true);
-                f.set(target, value);
-            } catch (Exception ignored) {
-            }
-        }
-
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        private J receiveAsJ(@Nullable Object before, RpcReceiveQueue q) {
-            return (J) ((RpcReceiveQueue) q).receive(
-                    before,
-                    (java.util.function.UnaryOperator) t -> visitNonNull((J) t, q));
-        }
-
-        @Override
-        public J visitArrayType(J.ArrayType arrayType, RpcReceiveQueue q) {
-            // Go slice types like []*T have pointer element types (J.Unary) that
-            // don't implement TypeTree.
-            J elementType = receiveAsJ(arrayType.getElementType(), q);
-            if (elementType instanceof TypeTree) {
-                arrayType = arrayType.withElementType((TypeTree) elementType);
-            } else if (elementType != null) {
-                setFinalField(arrayType, "elementType", elementType);
-            }
-            return arrayType
-                    .withAnnotations(q.receiveList(arrayType.getAnnotations(), a -> (J.Annotation) visitNonNull(a, q)))
-                    .withDimension(q.receive(arrayType.getDimension(), d -> visitLeftPadded(d, q)))
-                    .withType(q.receive(arrayType.getType(), t -> visitType(t, q)));
-        }
-
-        @Override
-        public J visitLiteral(J.Literal literal, RpcReceiveQueue q) {
-            literal = literal
-                    .withValue(q.receive(literal.getValue()))
-                    .withValueSource(q.receive(literal.getValueSource()))
-                    .withUnicodeEscapes(q.receiveList(literal.getUnicodeEscapes(), s -> {
-                        int valueSourceIndex = q.receive(s != null ? s.getValueSourceIndex() : 0);
-                        String codePoint = q.receive(s != null ? s.getCodePoint() : null);
-                        return new J.Literal.UnicodeEscape(valueSourceIndex, codePoint);
-                    }));
-            // Go may send JavaType.Class for int/string literals where Java expects JavaType.Primitive
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            JavaType type = (JavaType) ((RpcReceiveQueue) q).receive(
-                    (Object) literal.getType(),
-                    (java.util.function.UnaryOperator) t -> visitType((JavaType) t, q));
-            if (type instanceof JavaType.Primitive) {
-                literal = literal.withType((JavaType.Primitive) type);
-            } else if (type != null) {
-                setFinalField(literal, "type", type);
-            }
-            return literal;
-        }
-
-        @Override
-        public J visitMethodDeclaration(J.MethodDeclaration method, RpcReceiveQueue q) {
-            if (method.getAnnotations().getName() == null) {
-                method = method.getAnnotations().withName(
-                        new J.MethodDeclaration.IdentifierWithAnnotations(null, null));
-            }
-            method = method
-                    .withLeadingAnnotations(q.receiveList(method.getLeadingAnnotations(),
-                            a -> (J.Annotation) visitNonNull(a, q)))
-                    .withModifiers(q.receiveList(method.getModifiers(),
-                            m -> (J.Modifier) visitNonNull(m, q)))
-                    .getPadding().withTypeParameters(q.receive(
-                            method.getPadding().getTypeParameters(),
-                            tp -> (J.TypeParameters) visitNonNull(tp, q)));
-
-            // Go return types can be pointer types (*T → J.Unary), slice types,
-            // or Go-specific nodes that don't implement TypeTree.
-            J returnType = receiveAsJ(method.getReturnTypeExpression(), q);
-            if (returnType instanceof TypeTree) {
-                method = method.withReturnTypeExpression((TypeTree) returnType);
-            } else if (returnType != null) {
-                setFinalField(method, "returnTypeExpression", returnType);
-            }
-
-            return method
-                    .getAnnotations().withName(method.getAnnotations().getName()
-                            .withAnnotations(q.receiveList(
-                                    method.getAnnotations().getName().getAnnotations(),
-                                    a -> (J.Annotation) visitNonNull(a, q))))
-                    .withName(q.receive(method.getName(),
-                            n -> (J.Identifier) visitNonNull(n, q)))
-                    .getPadding().withParameters(q.receive(
-                            method.getPadding().getParameters(), p -> visitContainer(p, q)))
-                    .getPadding().withThrows(q.receive(
-                            method.getPadding().getThrows(), t -> visitContainer(t, q)))
-                    .withBody(q.receive(method.getBody(),
-                            b -> (J.Block) visitNonNull(b, q)))
-                    .getPadding().withDefaultValue(q.receive(
-                            method.getPadding().getDefaultValue(),
-                            d -> visitLeftPadded(d, q)))
-                    .withMethodType(q.receive(method.getMethodType(),
-                            t -> (JavaType.Method) visitType(t, q)));
-        }
-
-        @Override
-        public J visitReturn(J.Return retrn, RpcReceiveQueue q) {
-            // Go function literals in return position are J.MethodDeclaration, not Expression
-            J expr = receiveAsJ(retrn.getExpression(), q);
-            if (expr instanceof Expression) {
-                return retrn.withExpression((Expression) expr);
-            } else if (expr != null) {
-                setFinalField(retrn, "expression", expr);
-            }
-            return retrn;
-        }
-
-        @Override
-        public J visitVariableDeclarations(J.VariableDeclarations variableDecls, RpcReceiveQueue q) {
-            variableDecls = variableDecls
-                    .withLeadingAnnotations(q.receiveList(variableDecls.getLeadingAnnotations(),
-                            a -> (J.Annotation) visitNonNull(a, q)))
-                    .withModifiers(q.receiveList(variableDecls.getModifiers(),
-                            m -> (J.Modifier) visitNonNull(m, q)));
-
-            // Go pointer/slice/map types don't always implement TypeTree
-            J typeExpr = receiveAsJ(variableDecls.getTypeExpression(), q);
-            if (typeExpr instanceof TypeTree) {
-                variableDecls = variableDecls.withTypeExpression((TypeTree) typeExpr);
-            } else if (typeExpr != null) {
-                setFinalField(variableDecls, "typeExpression", typeExpr);
-            }
-
-            variableDecls = variableDecls.withVarargs(
-                    q.receive(variableDecls.getVarargs(), v -> visitSpace(v, q)));
-            return variableDecls.getPadding().withVariables(
-                    q.receiveList(variableDecls.getPadding().getVariables(),
-                            v -> visitRightPadded(v, q)));
         }
 
         @Override
