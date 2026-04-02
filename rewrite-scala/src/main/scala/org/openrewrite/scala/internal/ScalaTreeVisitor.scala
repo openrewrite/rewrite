@@ -202,6 +202,8 @@ class ScalaTreeVisitor(
       case func: untpd.Function => visitFunction(func)
       case typed: Trees.Typed[?] => visitTyped(typed)
       case tuple: untpd.Tuple => visitTuple(tuple)
+      case tryTree: Trees.Try[?] => visitTryTree(tryTree)
+      case matchTree: Trees.Match[?] => visitMatchTree(matchTree)
       case _ => visitUnknown(tree)
     }
   }
@@ -4755,6 +4757,12 @@ class ScalaTreeVisitor(
               statements,
               Space.EMPTY
             )
+          case stmt: Statement =>
+            val statements = new util.ArrayList[JRightPadded[Statement]]()
+            statements.add(JRightPadded.build(stmt))
+            new J.Block(Tree.randomId(), Space.EMPTY,
+              Markers.build(Collections.singletonList(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))),
+              JRightPadded.build(false), statements, Space.EMPTY)
           case _ => null
         }
       case _ => null // Abstract method
@@ -4854,6 +4862,152 @@ class ScalaTreeVisitor(
     )
   }
   
+  private def visitTryTree(tryTree: Trees.Try[?]): J = {
+    val savedCursor = cursor
+    try { visitTryImpl(tryTree) } catch { case _: Exception => cursor = savedCursor; visitUnknown(tryTree) }
+  }
+
+  private def visitTryImpl(tryTree: Trees.Try[?]): J.Try = {
+    val prefix = extractPrefix(tryTree.span)
+    val tryStart = Math.max(0, tryTree.span.start - offsetAdjustment)
+    if (tryStart >= cursor && tryStart + 3 <= source.length) cursor = tryStart + 3
+
+    val body = visitTree(tryTree.expr) match {
+      case block: J.Block => block
+      case expr: Expression =>
+        val stmts = new util.ArrayList[JRightPadded[Statement]]()
+        stmts.add(JRightPadded.build(expr.asInstanceOf[Statement]))
+        new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), stmts, Space.EMPTY)
+      case _ => return visitUnknown(tryTree).asInstanceOf[J.Try]
+    }
+
+    val catches = new util.ArrayList[J.Try.Catch]()
+    if (tryTree.cases.nonEmpty) {
+      val catchSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 50, source.length)) else ""
+      val catchIdx = catchSearch.indexOf("catch")
+      if (catchIdx >= 0) cursor = cursor + catchIdx + 5
+      val braceSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+      val braceIdx = braceSearch.indexOf('{')
+      if (braceIdx >= 0) cursor = cursor + braceIdx + 1
+
+      for (caseDef <- tryTree.cases) {
+        val casePrefix = extractPrefix(caseDef.span)
+        val caseStart = Math.max(0, caseDef.span.start - offsetAdjustment)
+        if (caseStart >= cursor) cursor = caseStart
+        val caseSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+        val caseKwIdx = caseSearch.indexOf("case")
+        if (caseKwIdx >= 0) cursor = cursor + caseKwIdx + 4
+
+        val arrowSearch = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
+        val arrowIdx = arrowSearch.indexOf("=>")
+
+        val paramName = caseDef.pat match {
+          case bind: Trees.Bind[?] => bind.name.toString
+          case _ => "_"
+        }
+        val paramType = caseDef.pat match {
+          case bind: Trees.Bind[?] => bind.body match {
+            case typed: Trees.Typed[?] => visitTree(typed.tpt) match { case tt: TypeTree => tt; case id: J.Identifier => id; case _ => null }
+            case _ => null
+          }
+          case typed: Trees.Typed[?] => visitTree(typed.tpt) match { case tt: TypeTree => tt; case id: J.Identifier => id; case _ => null }
+          case _ => null
+        }
+        updateCursor(caseDef.pat.span.end)
+        if (arrowIdx >= 0) { val a = source.indexOf("=>", cursor); if (a >= 0) cursor = a + 2 }
+
+        val paramId = new J.Identifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, Collections.emptyList(), paramName, null, null)
+        val namedVar = new J.VariableDeclarations.NamedVariable(Tree.randomId(), Space.EMPTY, Markers.EMPTY, paramId, Collections.emptyList(), null, null)
+        val varDecl = new J.VariableDeclarations(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+          Collections.emptyList(), Collections.emptyList(), paramType, null, Collections.emptyList(),
+          Collections.singletonList(JRightPadded.build(namedVar)))
+        val controlParens = new J.ControlParentheses[J.VariableDeclarations](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(varDecl))
+
+        val caseBody = visitTree(caseDef.body) match {
+          case block: J.Block => block
+          case expr: Expression =>
+            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(expr.asInstanceOf[Statement]))
+            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+          case stmt: Statement =>
+            val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(stmt))
+            new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+          case _ => new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), new util.ArrayList(), Space.EMPTY)
+        }
+        updateCursor(caseDef.span.end)
+        catches.add(new J.Try.Catch(Tree.randomId(), casePrefix, Markers.EMPTY, controlParens, caseBody))
+      }
+      if (cursor < source.length) { val r = source.substring(cursor, Math.min(cursor + 50, source.length)); val ci = r.indexOf('}'); if (ci >= 0) cursor = cursor + ci + 1 }
+    }
+
+    val finallyBlock: JLeftPadded[J.Block] = if (!tryTree.finalizer.isEmpty && tryTree.finalizer.span.exists) {
+      val fs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 50, source.length)) else ""
+      val fi = fs.indexOf("finally"); val fSpace = if (fi > 0) Space.format(fs.substring(0, fi)) else Space.EMPTY
+      if (fi >= 0) cursor = cursor + fi + 7
+      val fb = visitTree(tryTree.finalizer) match {
+        case block: J.Block => block
+        case expr: Expression =>
+          val s = new util.ArrayList[JRightPadded[Statement]](); s.add(JRightPadded.build(expr.asInstanceOf[Statement]))
+          new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), s, Space.EMPTY)
+        case _ => null
+      }
+      if (fb != null) JLeftPadded.build(fb).withBefore(fSpace) else null
+    } else null
+
+    updateCursor(tryTree.span.end)
+    new J.Try(Tree.randomId(), prefix, Markers.EMPTY, null, body, catches, finallyBlock)
+  }
+
+  private def visitMatchTree(matchTree: Trees.Match[?]): J = {
+    val savedCursor = cursor
+    try { visitMatchImpl(matchTree) } catch { case _: Exception => cursor = savedCursor; visitUnknown(matchTree) }
+  }
+
+  private def visitMatchImpl(matchTree: Trees.Match[?]): J = {
+    val prefix = extractPrefix(matchTree.span)
+    val selector = visitTree(matchTree.selector) match { case expr: Expression => expr; case _ => return visitUnknown(matchTree) }
+
+    val ms = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 30, source.length)) else ""
+    val mi = ms.indexOf("match"); if (mi >= 0) cursor = cursor + mi + 5
+    val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+    val bi = bs.indexOf('{'); if (bi >= 0) cursor = cursor + bi + 1
+
+    val caseStatements = new util.ArrayList[JRightPadded[Statement]]()
+    for (caseDef <- matchTree.cases) {
+      val casePrefix = extractPrefix(caseDef.span)
+      val cs = Math.max(0, caseDef.span.start - offsetAdjustment); if (cs >= cursor) cursor = cs
+      val ck = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+      val cki = ck.indexOf("case"); if (cki >= 0) cursor = cursor + cki + 4
+
+      val patternJ = visitTree(caseDef.pat) match { case j: J => j; case _ => new J.Identifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, Collections.emptyList(), "_", null, null) }
+      val labels = new util.ArrayList[JRightPadded[J]](); labels.add(JRightPadded.build(patternJ))
+
+      val as = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
+      val ai = as.indexOf("=>"); if (ai >= 0) { val aa = source.indexOf("=>", cursor); if (aa >= 0) cursor = aa + 2 }
+
+      val caseBodyJ = visitTree(caseDef.body) match { case j: J => JRightPadded.build(j); case _ => null }
+      updateCursor(caseDef.span.end)
+
+      val jCase = new J.Case(Tree.randomId(), casePrefix, Markers.EMPTY, J.Case.Type.Rule,
+        null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), null, JContainer.empty(), caseBodyJ)
+      caseStatements.add(JRightPadded.build(jCase.asInstanceOf[Statement]))
+    }
+
+    // Extract space before closing brace of match block
+    val matchEnd = Math.max(0, matchTree.span.end - offsetAdjustment)
+    var matchEndSpace = Space.EMPTY
+    if (cursor < matchEnd && matchEnd <= source.length) {
+      val remaining = source.substring(cursor, matchEnd)
+      val closeIdx = remaining.lastIndexOf('}')
+      if (closeIdx > 0) {
+        matchEndSpace = Space.format(remaining.substring(0, closeIdx))
+      }
+    }
+    val casesBlock = new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), caseStatements, matchEndSpace)
+    updateCursor(matchTree.span.end)
+    val selectorParens = new J.ControlParentheses[Expression](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(selector))
+    new J.Switch(Tree.randomId(), prefix, Markers.EMPTY, selectorParens, casesBlock)
+  }
+
   private def visitUnknown(tree: Trees.Tree[?]): J.Unknown = {
     val prefix = extractPrefix(tree.span)
     val sourceText = extractSource(tree.span)
