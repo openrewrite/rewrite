@@ -330,6 +330,9 @@ func (m *typeMapper) mapObject(obj types.Object) tree.JavaType {
 	if obj == nil {
 		return nil
 	}
+	if fn, ok := obj.(*types.Func); ok {
+		return m.mapMethodObject(fn)
+	}
 	return m.mapType(obj.Type())
 }
 
