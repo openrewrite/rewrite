@@ -9,13 +9,24 @@ val antlrGeneration by configurations.creating {
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
+    val outputDir = "src/main/java/org/openrewrite/docker/internal/grammar"
     args = listOf(
-        "-o", "src/main/java/org/openrewrite/docker/internal/grammar",
+        "-o", outputDir,
         "-package", "org.openrewrite.docker.internal.grammar",
         "-visitor"
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = antlrGeneration
+
+    doLast {
+        val rootDir = project.rootProject.projectDir.absolutePath
+        fileTree(outputDir).matching { include("**/*.java") }.forEach { file ->
+            file.writeText(
+                file.readText().replace(rootDir + File.separator, "")
+                    .replace(rootDir.replace("\\", "/") + "/", "")
+            )
+        }
+    }
 
     finalizedBy("licenseFormat")
 }

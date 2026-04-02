@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from C:/Users/sambs/projects/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerLexer.g4 by ANTLR 4.13.2
+// Generated from rewrite-docker/src/main/antlr/DockerLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import java.util.LinkedList;
 import java.util.Queue;
