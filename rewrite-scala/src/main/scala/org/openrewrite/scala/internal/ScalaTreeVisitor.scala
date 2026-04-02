@@ -4533,16 +4533,14 @@ class ScalaTreeVisitor(
       }
     }
 
-    // Fall back for methods with complex types in parameters
-    // (cursor tracking for types like Map[String, Any], Int => Int is not yet reliable)
-    val hasComplexParams = dd.paramss.exists(_.exists {
+    // Fall back for methods with function types or annotated parameters
+    val hasUnsupportedParams = dd.paramss.exists(_.exists {
       case vd: Trees.ValDef[?] =>
-        vd.tpt.isInstanceOf[Trees.AppliedTypeTree[?]] ||
         vd.tpt.isInstanceOf[untpd.Function] ||
-        (vd.mods != null && vd.mods.annotations.nonEmpty) // parameter-level annotations
+        (vd.mods != null && vd.mods.annotations.nonEmpty)
       case _ => false
     })
-    if (hasComplexParams) {
+    if (hasUnsupportedParams) {
       return visitUnknown(dd)
     }
 
@@ -4789,7 +4787,10 @@ class ScalaTreeVisitor(
 
   private def visitMethodParameter(vd: Trees.ValDef[?]): J = {
     val prefix = extractPrefix(vd.span)
-    val paramSource = extractSource(vd.span)
+    // Check source for colon WITHOUT advancing cursor (extractSource would consume the text)
+    val paramStart = Math.max(0, vd.span.start - offsetAdjustment)
+    val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
+    val paramSource = if (paramStart < paramEnd && paramEnd <= source.length) source.substring(paramStart, paramEnd) else ""
     val hasExplicitType = paramSource.contains(":")
 
     val paramName = new J.Identifier(
