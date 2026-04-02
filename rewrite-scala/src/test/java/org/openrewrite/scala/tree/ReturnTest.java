@@ -126,10 +126,8 @@ class ReturnTest implements RewriteTest {
             """
             object Test {
               def getValue(): Int = {
-                {
-                  val x = 10
-                  return x * 2
-                }
+                val x = 10
+                return x * 2
               }
             }
             """

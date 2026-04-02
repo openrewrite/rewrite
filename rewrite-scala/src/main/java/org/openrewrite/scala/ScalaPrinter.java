@@ -287,24 +287,36 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
         visit(method.getLeadingAnnotations(), p);
+        boolean defAlreadyPrinted = false;
         for (J.Modifier m : method.getModifiers()) {
-            visit(m, p);
+            if ("def".equals(m.getKeyword()) && m.getType() == J.Modifier.Type.LanguageExtension) {
+                visitSpace(m.getPrefix(), Space.Location.MODIFIER_PREFIX, p);
+                p.append("def");
+                defAlreadyPrinted = true;
+            } else {
+                visit(m, p);
+            }
         }
-
-        if (!method.getModifiers().isEmpty()) {
-            p.append(" ");
+        if (!defAlreadyPrinted) {
+            if (!method.getModifiers().isEmpty()) {
+                p.append(" ");
+            }
+            p.append("def");
         }
-        p.append("def");
         visit(method.getName(), p);
 
         if (method.getPadding().getTypeParameters() != null) {
             visit(method.getPadding().getTypeParameters(), p);
         }
 
-        // Print parameters (name: Type)
+        // Print parameters — skip parens for parameterless methods (marked with OmitBraces)
         JContainer<Statement> params = method.getPadding().getParameters();
-        visitSpace(params.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
-        p.append('(');
+        boolean hasParens = !params.getMarkers().findFirst(
+                org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+        if (hasParens) {
+            visitSpace(params.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
+            p.append('(');
+        }
         List<JRightPadded<Statement>> paramList = params.getPadding().getElements();
         for (int i = 0; i < paramList.size(); i++) {
             JRightPadded<Statement> param = paramList.get(i);
@@ -312,6 +324,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (element instanceof J.VariableDeclarations) {
                 J.VariableDeclarations varDecl = (J.VariableDeclarations) element;
                 visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                // Print parameter annotations (@unchecked, etc.)
+                visit(varDecl.getLeadingAnnotations(), p);
                 if (!varDecl.getVariables().isEmpty()) {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
@@ -342,7 +356,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 p.append(',');
             }
         }
-        p.append(')');
+        if (hasParens) {
+            p.append(')');
+        }
 
         if (method.getReturnTypeExpression() != null) {
             p.append(':');
@@ -350,14 +366,18 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
 
         if (method.getBody() != null) {
-            J.Block body = method.getBody();
-            boolean omitBraces = body.getMarkers().findFirst(
+            // Procedure syntax (OmitBraces on method) — no " =" before body
+            boolean procedureSyntax = method.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
-            if (omitBraces && body.getStatements().size() == 1) {
+            J.Block body = method.getBody();
+            boolean omitBodyBraces = body.getMarkers().findFirst(
+                    org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+            if (!procedureSyntax) {
                 p.append(" =");
+            }
+            if (omitBodyBraces && body.getStatements().size() == 1) {
                 visit(body.getStatements().get(0), p);
             } else {
-                p.append(" =");
                 visit(body, p);
             }
         }
