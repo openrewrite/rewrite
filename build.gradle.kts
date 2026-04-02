@@ -20,7 +20,7 @@ subprojects {
             doLast {
                 val idx = args?.indexOf("-o") ?: return@doLast
                 if (idx < 0 || idx + 1 >= args!!.size) return@doLast
-                val rootPrefix = rootProject.projectDir.absolutePath + "/"
+                val rootPrefix = rootProject.projectDir.absolutePath.replace("\\", "/") + "/"
                 val year = Calendar.getInstance().get(Calendar.YEAR)
                 val licenseHeader = "/*\n" + rootProject.file("gradle/licenseHeader.txt")
                     .readText().trim()
