@@ -363,6 +363,22 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void pointerTypeVar() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func f() {
+                                \tvar x *int
+                                \t_ = x
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void compositeAndKeyValue() {
         rewriteRun(
                 go(
