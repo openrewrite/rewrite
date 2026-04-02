@@ -209,6 +209,164 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     @Override
+    public J visitTry(J.Try tryable, PrintOutputCapture<P> p) {
+        beforeSyntax(tryable, Space.Location.TRY_PREFIX, p);
+        p.append("try");
+        visit(tryable.getBody(), p);
+        if (!tryable.getCatches().isEmpty()) {
+            J.Try.Catch firstCatch = tryable.getCatches().get(0);
+            visitSpace(firstCatch.getPrefix(), Space.Location.CATCH_PREFIX, p);
+            p.append("catch {");
+            for (J.Try.Catch aCatch : tryable.getCatches()) {
+                J.VariableDeclarations varDecl = aCatch.getParameter().getTree();
+                p.append("\n  case");
+                if (!varDecl.getVariables().isEmpty()) {
+                    visit(varDecl.getVariables().get(0).getName(), p);
+                }
+                if (varDecl.getTypeExpression() != null) {
+                    p.append(":");
+                    visit(varDecl.getTypeExpression(), p);
+                }
+                p.append(" =>");
+                for (Statement stmt : aCatch.getBody().getStatements()) {
+                    visit(stmt, p);
+                }
+            }
+            p.append("\n}");
+        }
+        if (tryable.getPadding().getFinally() != null) {
+            visitSpace(tryable.getPadding().getFinally().getBefore(), Space.Location.TRY_FINALLY, p);
+            p.append("finally");
+            visit(tryable.getPadding().getFinally().getElement(), p);
+        }
+        afterSyntax(tryable, p);
+        return tryable;
+    }
+
+    @Override
+    public J visitSwitch(J.Switch switch_, PrintOutputCapture<P> p) {
+        beforeSyntax(switch_, Space.Location.SWITCH_PREFIX, p);
+        visit(switch_.getSelector().getTree(), p);
+        p.append(" match {");
+        // Print cases directly (not via visitBlock which adds { })
+        J.Block casesBlock = switch_.getCases();
+        for (int i = 0; i < casesBlock.getStatements().size(); i++) {
+            visit(casesBlock.getStatements().get(i), p);
+        }
+        visitSpace(casesBlock.getEnd(), Space.Location.BLOCK_END, p);
+        p.append("}");
+        afterSyntax(switch_, p);
+        return switch_;
+    }
+
+    @Override
+    public J visitCase(J.Case case_, PrintOutputCapture<P> p) {
+        beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
+        p.append("case");
+        for (J label : case_.getCaseLabels()) {
+            visit(label, p);
+        }
+        p.append(" =>");
+        if (case_.getPadding().getBody() != null) {
+            J bodyElement = case_.getPadding().getBody().getElement();
+            // For Scala match cases, unwrap single-statement blocks to avoid { }
+            if (bodyElement instanceof J.Block) {
+                J.Block block = (J.Block) bodyElement;
+                for (Statement stmt : block.getStatements()) {
+                    visit(stmt, p);
+                }
+            } else {
+                visit(bodyElement, p);
+            }
+        }
+        afterSyntax(case_, p);
+        return case_;
+    }
+
+    @Override
+    public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
+        beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
+        visit(method.getLeadingAnnotations(), p);
+        for (J.Modifier m : method.getModifiers()) {
+            visit(m, p);
+        }
+
+        if (!method.getModifiers().isEmpty()) {
+            p.append(" ");
+        }
+        p.append("def");
+        visit(method.getName(), p);
+
+        if (method.getPadding().getTypeParameters() != null) {
+            visit(method.getPadding().getTypeParameters(), p);
+        }
+
+        // Print parameters (name: Type)
+        JContainer<Statement> params = method.getPadding().getParameters();
+        visitSpace(params.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
+        p.append('(');
+        List<JRightPadded<Statement>> paramList = params.getPadding().getElements();
+        for (int i = 0; i < paramList.size(); i++) {
+            JRightPadded<Statement> param = paramList.get(i);
+            Statement element = param.getElement();
+            if (element instanceof J.VariableDeclarations) {
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) element;
+                visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                if (!varDecl.getVariables().isEmpty()) {
+                    visit(varDecl.getVariables().get(0).getName(), p);
+                }
+                if (varDecl.getTypeExpression() != null) {
+                    // The colon and space between name and type in Scala parameter syntax
+                    // Type prefix from parser may or may not include the space
+                    TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (typeExpr.getPrefix().isEmpty()) {
+                        p.append(": ");
+                    } else {
+                        p.append(":");
+                    }
+                    visit(typeExpr, p);
+                }
+                if (!varDecl.getVariables().isEmpty() &&
+                    varDecl.getVariables().get(0).getPadding().getInitializer() != null) {
+                    JLeftPadded<Expression> init = varDecl.getVariables().get(0).getPadding().getInitializer();
+                    if (init.getBefore().isEmpty()) {
+                        p.append(" ");
+                    }
+                    visitLeftPadded("=", init, JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                }
+            } else {
+                visit(element, p);
+            }
+            if (i < paramList.size() - 1) {
+                visitSpace(param.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
+                p.append(',');
+            }
+        }
+        p.append(')');
+
+        if (method.getReturnTypeExpression() != null) {
+            p.append(':');
+            visit(method.getReturnTypeExpression(), p);
+        }
+
+        if (method.getBody() != null) {
+            J.Block body = method.getBody();
+            boolean omitBraces = body.getMarkers().findFirst(
+                    org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+            if (omitBraces && body.getStatements().size() == 1) {
+                p.append(" =");
+                visit(body.getStatements().get(0), p);
+            } else {
+                p.append(" =");
+                visit(body, p);
+            }
+        }
+
+        afterSyntax(method, p);
+        return method;
+    }
+
+    @Override
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
         // In Scala, semicolons are optional and generally not used
         // Only print them if they were explicitly in the source

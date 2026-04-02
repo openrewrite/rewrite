@@ -262,7 +262,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var implements_ = q.Receive(classDecl.Implements, c => VisitContainer(c, q));
         var permits = q.Receive(classDecl.Permits, c => VisitContainer(c, q));
         var body = q.Receive((J)classDecl.Body, el => (J)VisitNonNull(el, q));
-        return classDecl.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithClassKind((ClassDeclaration.Kind)kind!).WithName((Identifier)name!).WithTypeParameters(typeParameters).WithPrimaryConstructor(primaryConstructor).WithExtends(extends_).WithImplements(implements_).WithPermits(permits).WithBody((Block)body!);
+        var type = q.Receive(classDecl.Type, t => (JavaType.FullyQualified?)VisitType(t, q));
+        return classDecl.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithClassKind((ClassDeclaration.Kind)kind!).WithName((Identifier)name!).WithTypeParameters(typeParameters).WithPrimaryConstructor(primaryConstructor).WithExtends(extends_).WithImplements(implements_).WithPermits(permits).WithBody((Block)body!).WithType(type);
     }
 
     private J VisitClassDeclarationKind(ClassDeclaration.Kind kind, RpcReceiveQueue q)

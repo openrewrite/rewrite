@@ -363,6 +363,37 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void lineComment() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                // hello is a function
+                                func hello() {
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void pointerTypeVar() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func f() {
+                                \tvar x *int
+                                \t_ = x
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void compositeAndKeyValue() {
         rewriteRun(
                 go(

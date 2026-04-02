@@ -19,6 +19,7 @@ package test
 import (
 	"testing"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
@@ -112,6 +113,44 @@ func TestParseGroupedConst(t *testing.T) {
 				b = "hello"
 			)
 		`))
+}
+
+func TestParseMultiVarWithCompositeLiterals(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				var a, b = []int{}, []int{}
+			}
+		`))
+}
+
+func TestParseVarPointerType(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		SourceSpec{
+			Before: "package main\n\nfunc f() {\n\tvar x *int\n\t_ = x\n}\n",
+			Path:   "test.go",
+			AfterRecipe: func(t *testing.T, cu *tree.CompilationUnit) {
+				fn := cu.Statements[0].Element.(*tree.MethodDeclaration)
+				varDecl := fn.Body.Statements[0].Element.(*tree.VariableDeclarations)
+
+				if varDecl.TypeExpr == nil {
+					t.Fatal("expected TypeExpr to be set for 'var x *int'")
+				}
+				pt, ok := varDecl.TypeExpr.(*tree.PointerType)
+				if !ok {
+					t.Fatalf("expected TypeExpr to be *tree.PointerType, got %T", varDecl.TypeExpr)
+				}
+				ident, ok := pt.Elem.(*tree.Identifier)
+				if !ok {
+					t.Fatalf("expected PointerType.Elem to be *tree.Identifier, got %T", pt.Elem)
+				}
+				if ident.Name != "int" {
+					t.Errorf("expected PointerType.Elem name to be 'int', got %q", ident.Name)
+				}
+			},
+		})
 }
 
 func TestParseGroupedVarWithInit(t *testing.T) {

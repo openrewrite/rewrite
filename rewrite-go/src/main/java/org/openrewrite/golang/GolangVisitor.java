@@ -155,6 +155,14 @@ public class GolangVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
+    public J visitPointerType(Go.PointerType pointerType, P p) {
+        Go.PointerType pt = pointerType;
+        pt = pt.withPrefix(visitSpace(pt.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        pt = pt.withMarkers(visitMarkers(pt.getMarkers(), p));
+        pt = pt.withElem((Expression) visitAndCast(pt.getElem(), p));
+        return pt;
+    }
+
     public J visitChannel(Go.Channel channel, P p) {
         Go.Channel c = channel;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));

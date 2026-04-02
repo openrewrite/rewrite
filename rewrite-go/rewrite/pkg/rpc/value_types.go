@@ -35,6 +35,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*tree.KeyValue)(nil)), "org.openrewrite.golang.tree.Go$KeyValue")
 	RegisterValueType(reflect.TypeOf((*tree.Slice)(nil)), "org.openrewrite.golang.tree.Go$SliceExpr")
 	RegisterValueType(reflect.TypeOf((*tree.MapType)(nil)), "org.openrewrite.golang.tree.Go$MapType")
+	RegisterValueType(reflect.TypeOf((*tree.PointerType)(nil)), "org.openrewrite.golang.tree.Go$PointerType")
 	RegisterValueType(reflect.TypeOf((*tree.Channel)(nil)), "org.openrewrite.golang.tree.Go$Channel")
 	RegisterValueType(reflect.TypeOf((*tree.FuncType)(nil)), "org.openrewrite.golang.tree.Go$FuncType")
 	RegisterValueType(reflect.TypeOf((*tree.StructType)(nil)), "org.openrewrite.golang.tree.Go$StructType")
@@ -85,7 +86,7 @@ func init() {
 	// Non-tree types that Java needs valueType for
 	RegisterValueType(reflect.TypeOf(tree.Space{}), "org.openrewrite.java.tree.Space")
 	RegisterValueType(reflect.TypeOf(tree.Markers{}), "org.openrewrite.marker.Markers")
-	RegisterValueType(reflect.TypeOf(tree.Comment{}), "org.openrewrite.java.tree.Comment")
+	RegisterValueType(reflect.TypeOf(tree.Comment{}), "org.openrewrite.java.tree.TextComment")
 
 	// Go-specific marker valueType registrations (for send-side type resolution)
 	RegisterValueType(reflect.TypeOf(tree.GroupedImport{}), "org.openrewrite.golang.marker.GroupedImport")
@@ -126,6 +127,7 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.tree.Go$KeyValue", func() any { return &tree.KeyValue{} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$SliceExpr", func() any { return &tree.Slice{} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$MapType", func() any { return &tree.MapType{} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$PointerType", func() any { return &tree.PointerType{} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$Channel", func() any { return &tree.Channel{} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$FuncType", func() any { return &tree.FuncType{} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$StructType", func() any { return &tree.StructType{} })
@@ -206,7 +208,7 @@ func init() {
 
 	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return tree.Space{} })
 	RegisterFactory("org.openrewrite.marker.Markers", func() any { return tree.Markers{} })
-	RegisterFactory("org.openrewrite.java.tree.Comment", func() any { return tree.Comment{} })
+	RegisterFactory("org.openrewrite.java.tree.TextComment", func() any { return tree.Comment{} })
 
 	// Padding types — needed when Java sends ADD messages for new padding
 	// wrappers during bidirectional tree transfer (e.g., after a recipe

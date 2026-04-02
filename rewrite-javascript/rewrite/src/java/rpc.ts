@@ -713,6 +713,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(cls, c => c.implements, impl => this.visitContainer(impl, q));
         await q.getAndSend(cls, c => c.permitting, perm => this.visitContainer(perm, q));
         await q.getAndSend(cls, c => c.body, body => this.visit(body, q));
+        await q.getAndSend(cls, c => asRef(c.type), type => this.visitType(type, q));
         return cls;
     }
 
@@ -1435,7 +1436,8 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             extends: await q.receive(cls.extends, ext => this.visitLeftPadded(ext, q)),
             implements: await q.receive(cls.implements, impl => this.visitContainer(impl, q)),
             permitting: await q.receive(cls.permitting, perm => this.visitContainer(perm, q)),
-            body: await q.receive(cls.body, body => this.visit(body, q))
+            body: await q.receive(cls.body, body => this.visit(body, q)),
+            type: await q.receive(cls.type, type => this.visitType(type, q)) as Type.Class
         };
         return updateIfChanged(cls, updates);
     }

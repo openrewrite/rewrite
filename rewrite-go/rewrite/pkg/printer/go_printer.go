@@ -332,10 +332,16 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, par
 		p.Visit(tag.Tag, out)
 	}
 	// Then initializers
+	firstInit := true
 	for _, v := range vd.Variables {
 		if v.Element.Initializer != nil {
 			p.visitSpace(v.Element.Initializer.Before, out)
-			out.Append("=")
+			if firstInit {
+				out.Append("=")
+				firstInit = false
+			} else {
+				out.Append(",")
+			}
 			p.Visit(v.Element.Initializer.Element, out)
 		}
 	}
@@ -743,6 +749,15 @@ func (p *GoPrinter) VisitMapType(mt *tree.MapType, param any) tree.J {
 	p.Visit(mt.Value, out)
 	p.afterSyntax(mt.Markers, out)
 	return mt
+}
+
+func (p *GoPrinter) VisitPointerType(pt *tree.PointerType, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(pt.Prefix, pt.Markers, out)
+	out.Append("*")
+	p.Visit(pt.Elem, out)
+	p.afterSyntax(pt.Markers, out)
+	return pt
 }
 
 func (p *GoPrinter) VisitChannel(ch *tree.Channel, param any) tree.J {
