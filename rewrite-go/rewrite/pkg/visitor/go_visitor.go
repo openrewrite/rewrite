@@ -123,6 +123,8 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return v.self().VisitSlice(n, p)
 	case *tree.MapType:
 		return v.self().VisitMapType(n, p)
+	case *tree.PointerType:
+		return v.self().VisitPointerType(n, p)
 	case *tree.Channel:
 		return v.self().VisitChannel(n, p)
 	case *tree.FuncType:
@@ -198,6 +200,7 @@ type VisitorI interface {
 	VisitKeyValue(kv *tree.KeyValue, p any) tree.J
 	VisitSlice(s *tree.Slice, p any) tree.J
 	VisitMapType(mt *tree.MapType, p any) tree.J
+	VisitPointerType(pt *tree.PointerType, p any) tree.J
 	VisitChannel(ch *tree.Channel, p any) tree.J
 	VisitFuncType(ft *tree.FuncType, p any) tree.J
 	VisitTypeList(tl *tree.TypeList, p any) tree.J
@@ -533,6 +536,12 @@ func (v *GoVisitor) VisitMapType(mt *tree.MapType, p any) tree.J {
 	mt = mt.WithPrefix(v.self().VisitSpace(mt.Prefix, p))
 	mt = mt.WithMarkers(v.visitMarkers(mt.Markers, p))
 	return mt
+}
+
+func (v *GoVisitor) VisitPointerType(pt *tree.PointerType, p any) tree.J {
+	pt = pt.WithPrefix(v.self().VisitSpace(pt.Prefix, p))
+	pt = pt.WithMarkers(v.visitMarkers(pt.Markers, p))
+	return pt
 }
 
 func (v *GoVisitor) VisitChannel(ch *tree.Channel, p any) tree.J {

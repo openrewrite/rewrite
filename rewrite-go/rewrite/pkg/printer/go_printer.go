@@ -751,6 +751,15 @@ func (p *GoPrinter) VisitMapType(mt *tree.MapType, param any) tree.J {
 	return mt
 }
 
+func (p *GoPrinter) VisitPointerType(pt *tree.PointerType, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(pt.Prefix, pt.Markers, out)
+	out.Append("*")
+	p.Visit(pt.Elem, out)
+	p.afterSyntax(pt.Markers, out)
+	return pt
+}
+
 func (p *GoPrinter) VisitChannel(ch *tree.Channel, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ch.Prefix, ch.Markers, out)

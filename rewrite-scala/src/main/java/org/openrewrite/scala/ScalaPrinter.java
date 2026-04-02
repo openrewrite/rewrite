@@ -209,6 +209,86 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     @Override
+    public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
+        beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
+        visit(method.getLeadingAnnotations(), p);
+        for (J.Modifier m : method.getModifiers()) {
+            visit(m, p);
+        }
+
+        p.append("def");
+        visit(method.getName(), p);
+
+        if (method.getPadding().getTypeParameters() != null) {
+            visit(method.getPadding().getTypeParameters(), p);
+        }
+
+        // Print parameters (name: Type)
+        JContainer<Statement> params = method.getPadding().getParameters();
+        visitSpace(params.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
+        p.append('(');
+        List<JRightPadded<Statement>> paramList = params.getPadding().getElements();
+        for (int i = 0; i < paramList.size(); i++) {
+            JRightPadded<Statement> param = paramList.get(i);
+            Statement element = param.getElement();
+            if (element instanceof J.VariableDeclarations) {
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) element;
+                visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                if (!varDecl.getVariables().isEmpty()) {
+                    visit(varDecl.getVariables().get(0).getName(), p);
+                }
+                if (varDecl.getTypeExpression() != null) {
+                    // The colon and space between name and type in Scala parameter syntax
+                    // Type prefix from parser may or may not include the space
+                    TypeTree typeExpr = varDecl.getTypeExpression();
+                    if (typeExpr.getPrefix().isEmpty()) {
+                        p.append(": ");
+                    } else {
+                        p.append(":");
+                    }
+                    visit(typeExpr, p);
+                }
+                if (!varDecl.getVariables().isEmpty() &&
+                    varDecl.getVariables().get(0).getPadding().getInitializer() != null) {
+                    JLeftPadded<Expression> init = varDecl.getVariables().get(0).getPadding().getInitializer();
+                    if (init.getBefore().isEmpty()) {
+                        p.append(" ");
+                    }
+                    visitLeftPadded("=", init, JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                }
+            } else {
+                visit(element, p);
+            }
+            if (i < paramList.size() - 1) {
+                visitSpace(param.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
+                p.append(',');
+            }
+        }
+        p.append(')');
+
+        if (method.getReturnTypeExpression() != null) {
+            p.append(':');
+            visit(method.getReturnTypeExpression(), p);
+        }
+
+        if (method.getBody() != null) {
+            J.Block body = method.getBody();
+            boolean omitBraces = body.getMarkers().findFirst(
+                    org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+            if (omitBraces && body.getStatements().size() == 1) {
+                p.append(" =");
+                visit(body.getStatements().get(0), p);
+            } else {
+                p.append(" =");
+                visit(body, p);
+            }
+        }
+
+        afterSyntax(method, p);
+        return method;
+    }
+
+    @Override
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
         // In Scala, semicolons are optional and generally not used
         // Only print them if they were explicitly in the source

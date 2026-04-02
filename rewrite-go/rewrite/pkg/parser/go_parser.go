@@ -389,7 +389,7 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix tree.Space, ke
 	// Then type (appears after name in source)
 	var typeExpr tree.Expression
 	if spec.Type != nil {
-		typeExpr = ctx.mapExpr(spec.Type)
+		typeExpr = ctx.mapTypeExpr(spec.Type)
 	}
 
 	// Then initializers (after type and `=` in source)
@@ -495,7 +495,7 @@ func (ctx *parseContext) mapTypeSpec(spec *ast.TypeSpec, prefix tree.Space) *tre
 		assign = &lp
 	}
 
-	def := ctx.mapExpr(spec.Type)
+	def := ctx.mapTypeExpr(spec.Type)
 
 	return &tree.TypeDecl{
 		ID:         uuid.New(),
@@ -563,7 +563,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 		for i, field := range results.List {
 			if len(field.Names) == 0 {
 				// Unnamed return: just a type expression
-				typeExpr := ctx.mapExpr(field.Type)
+				typeExpr := ctx.mapTypeExpr(field.Type)
 				vd := &tree.VariableDeclarations{
 					ID:       uuid.New(),
 					TypeExpr: typeExpr,
@@ -598,7 +598,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 						After:   nameAfter,
 					})
 				}
-				typeExpr := ctx.mapExpr(field.Type)
+				typeExpr := ctx.mapTypeExpr(field.Type)
 				vd := &tree.VariableDeclarations{
 					ID:        uuid.New(),
 					TypeExpr:  typeExpr,
@@ -630,7 +630,7 @@ func (ctx *parseContext) mapReturnType(results *ast.FieldList) tree.Expression {
 	}
 
 	// Single non-parenthesized return type
-	return ctx.mapExpr(results.List[0].Type)
+	return ctx.mapTypeExpr(results.List[0].Type)
 }
 
 // mapFieldListAsParams maps function parameters.
@@ -644,7 +644,7 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 	for i, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Unnamed parameter: just a type expression (e.g., `int` in `func(int)`)
-			typeExpr := ctx.mapExpr(field.Type)
+			typeExpr := ctx.mapTypeExpr(field.Type)
 			vd := &tree.VariableDeclarations{
 				ID:       uuid.New(),
 				TypeExpr: typeExpr,
@@ -681,7 +681,7 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 				})
 			}
 
-			typeExpr := ctx.mapExpr(field.Type)
+			typeExpr := ctx.mapTypeExpr(field.Type)
 			vd := &tree.VariableDeclarations{
 				ID:        uuid.New(),
 				TypeExpr:  typeExpr,
@@ -1737,7 +1737,7 @@ func (ctx *parseContext) mapUnaryExpr(expr *ast.UnaryExpr) tree.Expression {
 func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) tree.Expression {
 	var typeExpr tree.Expression
 	if expr.Type != nil {
-		typeExpr = ctx.mapExpr(expr.Type)
+		typeExpr = ctx.mapTypeExpr(expr.Type)
 	}
 	lbracePrefix := ctx.prefix(expr.Lbrace)
 	ctx.skip(1) // "{"
@@ -1820,6 +1820,28 @@ func (ctx *parseContext) mapStarExpr(expr *ast.StarExpr) tree.Expression {
 	}
 }
 
+// mapPointerType maps a star expression in a type context as a pointer type.
+func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) tree.Expression {
+	prefix := ctx.prefix(expr.Star)
+	ctx.skip(1) // "*"
+	elem := ctx.mapTypeExpr(expr.X)
+
+	return &tree.PointerType{
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Elem:    elem,
+	}
+}
+
+// mapTypeExpr maps an expression that is known to be in a type position.
+// It delegates to mapExpr but overrides StarExpr to produce PointerType.
+func (ctx *parseContext) mapTypeExpr(expr ast.Expr) tree.Expression {
+	if star, ok := expr.(*ast.StarExpr); ok {
+		return ctx.mapPointerType(star)
+	}
+	return ctx.mapExpr(expr)
+}
+
 // mapArrayType maps an array/slice type expression like `[]string` or `[5]int`.
 func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) tree.Expression {
 	prefix := ctx.prefix(expr.Lbrack)
@@ -1838,7 +1860,7 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) tree.Expression {
 		ctx.skip(1) // "]"
 	}
 
-	elt := ctx.mapExpr(expr.Elt)
+	elt := ctx.mapTypeExpr(expr.Elt)
 
 	return &tree.ArrayType{
 		ID:          uuid.New(),
@@ -1914,7 +1936,7 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) tree.Expres
 
 	var typeExpr tree.Expression
 	if expr.Type != nil {
-		typeExpr = ctx.mapExpr(expr.Type)
+		typeExpr = ctx.mapTypeExpr(expr.Type)
 	} else {
 		// type switch: x.(type)
 		typePrefix := ctx.prefix(expr.Lparen + 1)
@@ -2032,14 +2054,14 @@ func (ctx *parseContext) mapMapType(expr *ast.MapType) tree.Expression {
 	prefix := ctx.prefixAndSkip(expr.Map, len("map"))
 	lbrackPrefix := ctx.prefix(expr.Map + token.Pos(len("map")))
 	ctx.skip(1) // "["
-	key := ctx.mapExpr(expr.Key)
+	key := ctx.mapTypeExpr(expr.Key)
 	rbrackOff := ctx.findNext(']')
 	var rbrackPrefix tree.Space
 	if rbrackOff >= 0 {
 		rbrackPrefix = ctx.prefix(ctx.file.Pos(rbrackOff))
 		ctx.skip(1)
 	}
-	value := ctx.mapExpr(expr.Value)
+	value := ctx.mapTypeExpr(expr.Value)
 
 	return &tree.MapType{
 		ID:          uuid.New(),
@@ -2067,7 +2089,7 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) tree.Expression {
 		ctx.skip(len("chan"))
 	}
 
-	value := ctx.mapExpr(expr.Value)
+	value := ctx.mapTypeExpr(expr.Value)
 	return &tree.Channel{
 		ID:     uuid.New(),
 		Prefix: prefix,
@@ -2122,7 +2144,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *tree.Block
 	for _, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded type (e.g., `io.Reader` in struct)
-			typeExpr := ctx.mapExpr(field.Type)
+			typeExpr := ctx.mapTypeExpr(field.Type)
 			vd := &tree.VariableDeclarations{
 				ID:       uuid.New(),
 				TypeExpr: typeExpr,
@@ -2153,7 +2175,7 @@ func (ctx *parseContext) mapFieldListAsStructBody(fl *ast.FieldList) *tree.Block
 					After:   nameAfter,
 				})
 			}
-			typeExpr := ctx.mapExpr(field.Type)
+			typeExpr := ctx.mapTypeExpr(field.Type)
 			vd := &tree.VariableDeclarations{
 				ID:        uuid.New(),
 				TypeExpr:  typeExpr,
@@ -2193,7 +2215,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *tree.Bl
 	for _, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Embedded interface type (e.g., `io.Reader`)
-			typeExpr := ctx.mapExpr(field.Type)
+			typeExpr := ctx.mapTypeExpr(field.Type)
 			vd := &tree.VariableDeclarations{
 				ID:       uuid.New(),
 				TypeExpr: typeExpr,
@@ -2233,7 +2255,7 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *tree.Bl
 func (ctx *parseContext) mapEllipsis(expr *ast.Ellipsis) tree.Expression {
 	prefix := ctx.prefix(expr.Ellipsis)
 	ctx.skip(3) // "..."
-	elt := ctx.mapExpr(expr.Elt)
+	elt := ctx.mapTypeExpr(expr.Elt)
 	return &tree.Unary{
 		ID:       uuid.New(),
 		Prefix:   prefix,
