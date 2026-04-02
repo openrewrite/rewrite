@@ -70,6 +70,26 @@ public class AddProperty extends Recipe {
     @Nullable
     Boolean orderedInsertion;
 
+    @Option(displayName = "Before property",
+            description = "Insert the new property before the property with this key. " +
+                    "Takes precedence over `orderedInsertion`. " +
+                    "If the referenced property does not exist, falls back to default behavior. " +
+                    "Mutually exclusive with `afterProperty`.",
+            required = false,
+            example = "server.port")
+    @Nullable
+    String beforeProperty;
+
+    @Option(displayName = "After property",
+            description = "Insert the new property after the property with this key. " +
+                    "Takes precedence over `orderedInsertion`. " +
+                    "If the referenced property does not exist, falls back to default behavior. " +
+                    "Mutually exclusive with `beforeProperty`.",
+            required = false,
+            example = "server.port")
+    @Nullable
+    String afterProperty;
+
     String displayName = "Add a new property";
 
     String description = "Adds a new property to a property file. " +
@@ -80,7 +100,11 @@ public class AddProperty extends Recipe {
     public Validated<Object> validate() {
         return Validated.none()
                 .and(Validated.required("property", property))
-                .and(Validated.required("value", value));
+                .and(Validated.required("value", value))
+                .and(Validated.test("beforeProperty",
+                        "`beforeProperty` and `afterProperty` are mutually exclusive",
+                        this,
+                        r -> StringUtils.isBlank(r.beforeProperty) || StringUtils.isBlank(r.afterProperty)));
     }
 
     @Override
@@ -117,16 +141,39 @@ public class AddProperty extends Recipe {
                             entry);
                 }
 
-                List<Properties.Content> contentList = new ArrayList<>(p.getContent().size() + 1);
-                if (orderedInsertion == null || orderedInsertion) {
-                    int insertionIndex = sortedInsertionIndex(entry, p.getContent());
-                    contentList.addAll(p.getContent().subList(0, insertionIndex));
-                    contentList.addAll(newContents);
-                    contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                List<Properties.Content> contentList = new ArrayList<>(p.getContent().size() + newContents.size());
+                boolean inserted = false;
+
+                if (!StringUtils.isBlank(beforeProperty)) {
+                    int refIndex = findEntryIndex(p.getContent(), p, beforeProperty);
+                    if (refIndex >= 0) {
+                        int insertIndex = findCommentBlockStart(p.getContent(), refIndex);
+                        contentList.addAll(p.getContent().subList(0, insertIndex));
+                        contentList.addAll(newContents);
+                        contentList.addAll(p.getContent().subList(insertIndex, p.getContent().size()));
+                        inserted = true;
+                    }
+                } else if (!StringUtils.isBlank(afterProperty)) {
+                    int refIndex = findEntryIndex(p.getContent(), p, afterProperty);
+                    if (refIndex >= 0) {
+                        int insertIndex = refIndex + 1;
+                        contentList.addAll(p.getContent().subList(0, insertIndex));
+                        contentList.addAll(newContents);
+                        contentList.addAll(p.getContent().subList(insertIndex, p.getContent().size()));
+                        inserted = true;
+                    }
                 }
-                else {
-                    contentList.addAll(p.getContent());
-                    contentList.addAll(newContents);
+
+                if (!inserted) {
+                    if (orderedInsertion == null || orderedInsertion) {
+                        int insertionIndex = sortedInsertionIndex(entry, p.getContent());
+                        contentList.addAll(p.getContent().subList(0, insertionIndex));
+                        contentList.addAll(newContents);
+                        contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                    } else {
+                        contentList.addAll(p.getContent());
+                        contentList.addAll(newContents);
+                    }
                 }
 
 
@@ -143,6 +190,23 @@ public class AddProperty extends Recipe {
                 return p.withContent(contentList);
             }
         };
+    }
+
+    private static int findEntryIndex(List<Properties.Content> contentList, Properties.File file, String referenceKey) {
+        Set<Properties.Entry> matches = FindProperties.find(file, referenceKey, false);
+        if (matches.isEmpty()) {
+            return -1;
+        }
+        Properties.Entry matched = matches.iterator().next();
+        return contentList.indexOf(matched);
+    }
+
+    private static int findCommentBlockStart(List<Properties.Content> contentList, int entryIndex) {
+        int start = entryIndex;
+        while (start > 0 && contentList.get(start - 1) instanceof Properties.Comment) {
+            start--;
+        }
+        return start;
     }
 
     private static int sortedInsertionIndex(Properties.Entry entry, List<Properties.Content> contentsList) {

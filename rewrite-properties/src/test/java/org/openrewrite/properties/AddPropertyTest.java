@@ -18,6 +18,7 @@ package org.openrewrite.properties;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.RewriteTest;
 
@@ -34,6 +35,8 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
+            null,
             null,
             null,
             null
@@ -58,6 +61,8 @@ class AddPropertyTest implements RewriteTest {
             "true",
             null,
             null,
+            null,
+            null,
             null
           )),
           properties(
@@ -76,6 +81,8 @@ class AddPropertyTest implements RewriteTest {
             "",
             null,
             null,
+            null,
+            null,
             null
           )),
           properties(
@@ -92,6 +99,8 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
+            null,
             null,
             null,
             null
@@ -113,6 +122,8 @@ class AddPropertyTest implements RewriteTest {
             "true",
             null,
             ":",
+            null,
+            null,
             null
           )),
           properties(
@@ -136,6 +147,8 @@ class AddPropertyTest implements RewriteTest {
             "true",
             null,
             "    ",
+            null,
+            null,
             null
           )),
           properties(
@@ -158,6 +171,8 @@ class AddPropertyTest implements RewriteTest {
             "true",
             null,
             null,
+            null,
+            null,
             null
           )),
           properties(
@@ -176,6 +191,8 @@ class AddPropertyTest implements RewriteTest {
             "management.metrics.enable.process.files",
             "true",
             "Management metrics",
+            null,
+            null,
             null,
             null
           )),
@@ -197,6 +214,8 @@ class AddPropertyTest implements RewriteTest {
             "true",
             "Management metrics",
             null,
+            null,
+            null,
             null
           )),
           properties(
@@ -216,6 +235,8 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
+            null,
             null,
             null,
             null
@@ -247,6 +268,8 @@ class AddPropertyTest implements RewriteTest {
             "true",
             "sam",
             null,
+            null,
+            null,
             null
           )),
           properties(
@@ -269,6 +292,8 @@ class AddPropertyTest implements RewriteTest {
             "com.sam",
             "true",
             "sam",
+            null,
+            null,
             null,
             null
           )),
@@ -307,6 +332,8 @@ class AddPropertyTest implements RewriteTest {
             "true",
             "sam",
             null,
+            null,
+            null,
             null
           )),
           properties(
@@ -330,7 +357,9 @@ class AddPropertyTest implements RewriteTest {
             "true",
             "sam",
             null,
-            false
+            false,
+            null,
+            null
           )),
           properties(
             """
@@ -354,6 +383,268 @@ class AddPropertyTest implements RewriteTest {
               com.zoe=true
               # sam
               com.sam=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforePropertyBasic() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "new.prop",
+            "val",
+            null,
+            null,
+            null,
+            "com.bea",
+            null
+          )),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              new.prop=val
+              com.bea=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void afterPropertyBasic() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "new.prop",
+            "val",
+            null,
+            null,
+            null,
+            null,
+            "com.bea"
+          )),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.bea=true
+              new.prop=val
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforePropertyWithPrecedingComment() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "new.prop",
+            "val",
+            null,
+            null,
+            null,
+            "com.bea",
+            null
+          )),
+          properties(
+            """
+              com.amy=true
+              # bea comment
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              new.prop=val
+              # bea comment
+              com.bea=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforePropertyWithNewPropertyComment() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "new.prop",
+            "val",
+            "new property comment",
+            null,
+            null,
+            "com.bea",
+            null
+          )),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              # new property comment
+              new.prop=val
+              com.bea=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void afterPropertyWithNewPropertyComment() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "new.prop",
+            "val",
+            "new property comment",
+            null,
+            null,
+            null,
+            "com.bea"
+          )),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.bea=true
+              # new property comment
+              new.prop=val
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforePropertyNotFoundFallsBackToAlphabetical() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            null,
+            null,
+            null,
+            "nonexistent.key",
+            null
+          )),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.sam=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void afterPropertyNotFoundUnordered() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "com.sam",
+            "true",
+            null,
+            null,
+            false,
+            null,
+            "nonexistent.key"
+          )),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.zoe=true
+              com.sam=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void afterPropertyLastEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "zzz.last",
+            "val",
+            null,
+            null,
+            null,
+            null,
+            "com.zoe"
+          )),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.zoe=true
+              zzz.last=val
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforeAndAfterBothSetValidation() {
+        AddProperty recipe = new AddProperty(
+            "new.prop",
+            "val",
+            null,
+            null,
+            null,
+            "some.key",
+            "other.key"
+        );
+        assertThat(recipe.validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void beforePropertyOverridesOrderedInsertion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "zzz.prop",
+            "val",
+            null,
+            null,
+            true,
+            "com.amy",
+            null
+          )),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              zzz.prop=val
+              com.amy=true
+              com.zoe=true
               """
           )
         );
