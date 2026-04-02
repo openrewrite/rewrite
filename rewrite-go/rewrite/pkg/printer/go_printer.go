@@ -332,10 +332,16 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, par
 		p.Visit(tag.Tag, out)
 	}
 	// Then initializers
+	firstInit := true
 	for _, v := range vd.Variables {
 		if v.Element.Initializer != nil {
 			p.visitSpace(v.Element.Initializer.Before, out)
-			out.Append("=")
+			if firstInit {
+				out.Append("=")
+				firstInit = false
+			} else {
+				out.Append(",")
+			}
 			p.Visit(v.Element.Initializer.Element, out)
 		}
 	}

@@ -114,6 +114,17 @@ func TestParseGroupedConst(t *testing.T) {
 		`))
 }
 
+func TestParseMultiVarWithCompositeLiterals(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				var a, b = []int{}, []int{}
+			}
+		`))
+}
+
 func TestParseGroupedVarWithInit(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`
