@@ -119,12 +119,18 @@ func (r *Registry) Register(prototype Recipe, categories ...CategoryDescriptor) 
 // RegisterDescriptor registers a recipe from its descriptor (used for dynamically loaded recipes).
 // The constructor returns nil since the recipe implementation lives in the external module.
 func (r *Registry) RegisterDescriptor(desc RecipeDescriptor) {
+	r.RegisterWithCategories(desc, nil)
+}
+
+// RegisterWithCategories registers a recipe descriptor with its category path.
+func (r *Registry) RegisterWithCategories(desc RecipeDescriptor, categories []CategoryDescriptor) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	reg := &Registration{
 		Descriptor:  desc,
 		Constructor: func(options map[string]any) Recipe { return nil },
+		Categories:  categories,
 	}
 	r.byName[desc.Name] = reg
 }
@@ -144,6 +150,17 @@ func (r *Registry) AllRecipes() []RecipeDescriptor {
 	result := make([]RecipeDescriptor, 0, len(r.byName))
 	for _, reg := range r.byName {
 		result = append(result, reg.Descriptor)
+	}
+	return result
+}
+
+// AllRegistrations returns the full registrations (descriptor + categories) for all recipes.
+func (r *Registry) AllRegistrations() []Registration {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	result := make([]Registration, 0, len(r.byName))
+	for _, reg := range r.byName {
+		result = append(result, *reg)
 	}
 	return result
 }
