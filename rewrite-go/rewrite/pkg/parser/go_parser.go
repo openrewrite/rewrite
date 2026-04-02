@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/openrewrite/rewrite/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
 // GoParser parses Go source code into OpenRewrite LST nodes.
@@ -772,9 +772,17 @@ func (ctx *parseContext) mapReturnStmt(stmt *ast.ReturnStmt) *tree.Return {
 	prefix := ctx.prefixAndSkip(stmt.Pos(), len("return"))
 
 	var exprs []tree.RightPadded[tree.Expression]
-	for _, expr := range stmt.Results {
+	for i, expr := range stmt.Results {
 		mapped := ctx.mapExpr(expr)
-		exprs = append(exprs, tree.RightPadded[tree.Expression]{Element: mapped})
+		var after tree.Space
+		if i < len(stmt.Results)-1 {
+			commaOffset := ctx.findNext(',')
+			if commaOffset >= 0 {
+				after = ctx.prefix(ctx.file.Pos(commaOffset))
+				ctx.skip(1) // ","
+			}
+		}
+		exprs = append(exprs, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
 	}
 
 	return &tree.Return{ID: uuid.New(), Prefix: prefix, Expressions: exprs}

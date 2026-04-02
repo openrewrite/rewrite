@@ -1877,3 +1877,51 @@ class TestDeclarationDeclaringType:
             assert result._declaring_type._fully_qualified_name != "<unknown>"
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestCyclicTypeResolution:
+    """Tests that FQN-deduplicated types don't produce self-referential supertypes.
+
+    Python's namedtuple pattern ``class Pair(namedtuple('Pair', ...))`` creates
+    two types with the same FQN. The type mapping deduplicates by FQN, which can
+    cause the single JavaType.Class object to have itself as its own supertype.
+    """
+
+    def test_namedtuple_subclass_no_self_supertype(self):
+        """A class extending a namedtuple with the same name must not have
+        itself as its own supertype.
+
+        This is the pattern from importlib_metadata._collections.Pair that
+        caused StackOverflowError in TypeUtils.isAssignableTo() on Moderne.
+        """
+        source = 'x = 1'
+        mapping = PythonTypeMapping(source)
+
+        # Simulate what ty-types produces for:
+        #   class Pair(collections.namedtuple('Pair', 'name value')): ...
+        # Two classLiteral descriptors with the same FQN but different type_ids.
+        # type_id 1: the namedtuple-generated Pair (no supertypes of its own here)
+        # type_id 2: the class Pair, whose supertype is type_id 1
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [],
+        }
+        mapping._type_registry[2] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [1],
+        }
+
+        type_pair = mapping._resolve_type(2)
+
+        assert type_pair is not None
+        assert isinstance(type_pair, JavaType.FullyQualified)
+        assert type_pair.fully_qualified_name == 'mymodule.Pair'
+
+        # The supertype must NOT be itself
+        supertype = getattr(type_pair, '_supertype', None)
+        assert supertype is not type_pair, \
+            "Pair has itself as its own supertype — would cause StackOverflowError in Java"

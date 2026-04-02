@@ -22,11 +22,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openrewrite/rewrite/pkg/parser"
-	"github.com/openrewrite/rewrite/pkg/printer"
-	"github.com/openrewrite/rewrite/pkg/recipe"
-	"github.com/openrewrite/rewrite/pkg/tree"
-	"github.com/openrewrite/rewrite/pkg/visitor"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/parser"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // SourceSpec describes a Go source file for testing.
@@ -232,33 +232,52 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...SourceSpec) {
 
 		// Apply recipe if configured
 		if spec.Recipe != nil {
-			editor := spec.Recipe.Editor()
-			if editor != nil {
-				ctx := recipe.NewExecutionContext()
-				result := editor.Visit(cu, ctx)
-				if result == nil {
-					if src.After != nil {
-						t.Error("recipe returned nil (deleted source file) but expected an after state")
-					}
-					continue
-				}
-				actual := printer.Print(result)
+			result := runRecipe(spec.Recipe, cu)
+			if result == nil {
 				if src.After != nil {
-					if actual != *src.After {
-						t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)
-						showDiff(t, *src.After, actual)
-					}
-				} else {
-					// No after state: expect no changes
-					if actual != src.Before {
-						t.Errorf("recipe made unexpected changes\n\nexpected (no change):\n%s\n\nactual:\n%s", src.Before, actual)
-					}
+					t.Error("recipe returned nil (deleted source file) but expected an after state")
+				}
+				continue
+			}
+			actual := printer.Print(result)
+			if src.After != nil {
+				if actual != *src.After {
+					t.Errorf("recipe result mismatch\n\nexpected:\n%s\n\nactual:\n%s", *src.After, actual)
+					showDiff(t, *src.After, actual)
+				}
+			} else {
+				// No after state: expect no changes
+				if actual != src.Before {
+					t.Errorf("recipe made unexpected changes\n\nexpected (no change):\n%s\n\nactual:\n%s", src.Before, actual)
 				}
 			}
 		} else if src.After != nil {
 			t.Error("after state specified but no recipe configured")
 		}
 	}
+}
+
+// runRecipe applies a recipe (including composite recipes with sub-recipes) to a tree.
+func runRecipe(r recipe.Recipe, t tree.Tree) tree.Tree {
+	ctx := recipe.NewExecutionContext()
+
+	// Apply this recipe's own editor
+	if editor := r.Editor(); editor != nil {
+		result := editor.Visit(t, ctx)
+		if result != nil {
+			t = result
+		}
+	}
+
+	// Apply sub-recipes
+	for _, sub := range r.RecipeList() {
+		result := runRecipe(sub, t)
+		if result != nil {
+			t = result
+		}
+	}
+
+	return t
 }
 
 func showDiff(t *testing.T, expected, actual string) {

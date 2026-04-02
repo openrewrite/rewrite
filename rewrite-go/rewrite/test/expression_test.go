@@ -19,7 +19,7 @@ package test
 import (
 	"testing"
 
-	. "github.com/openrewrite/rewrite/pkg/test"
+	. "github.com/openrewrite/rewrite/rewrite-go/pkg/test"
 )
 
 func TestParseBinaryExpression(t *testing.T) {

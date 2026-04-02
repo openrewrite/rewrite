@@ -16,7 +16,7 @@
 
 package visitor
 
-import "github.com/openrewrite/rewrite/pkg/tree"
+import "github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 
 // GoVisitor traverses and optionally transforms an OpenRewrite LST.
 // Embed GoVisitor in a struct and override visit methods to customize behavior.
@@ -267,14 +267,27 @@ func (v *GoVisitor) VisitBlock(block *tree.Block, p any) tree.J {
 func (v *GoVisitor) VisitReturn(ret *tree.Return, p any) tree.J {
 	ret = ret.WithPrefix(v.self().VisitSpace(ret.Prefix, p))
 	ret = ret.WithMarkers(v.visitMarkers(ret.Markers, p))
+	ret.Expressions = visitRightPaddedExpressionList(v, ret.Expressions, p)
 	return ret
 }
 
 func (v *GoVisitor) VisitIf(ifStmt *tree.If, p any) tree.J {
 	ifStmt = ifStmt.WithPrefix(v.self().VisitSpace(ifStmt.Prefix, p))
 	ifStmt = ifStmt.WithMarkers(v.visitMarkers(ifStmt.Markers, p))
+	if ifStmt.Init != nil {
+		init := *ifStmt.Init
+		init.Element = v.self().Visit(init.Element, p).(tree.Statement)
+		init.After = v.self().VisitSpace(init.After, p)
+		ifStmt.Init = &init
+	}
 	ifStmt = ifStmt.WithCondition(visitExpression(v, ifStmt.Condition, p))
 	ifStmt = ifStmt.WithThen(visitAndCast[*tree.Block](v, ifStmt.Then, p))
+	if ifStmt.ElsePart != nil {
+		ep := *ifStmt.ElsePart
+		ep.Element = v.self().Visit(ep.Element, p).(tree.J)
+		ep.After = v.self().VisitSpace(ep.After, p)
+		ifStmt.ElsePart = &ep
+	}
 	return ifStmt
 }
 
@@ -282,6 +295,8 @@ func (v *GoVisitor) VisitAssignment(assign *tree.Assignment, p any) tree.J {
 	assign = assign.WithPrefix(v.self().VisitSpace(assign.Prefix, p))
 	assign = assign.WithMarkers(v.visitMarkers(assign.Markers, p))
 	assign = assign.WithVariable(visitExpression(v, assign.Variable, p))
+	assign.Value.Before = v.self().VisitSpace(assign.Value.Before, p)
+	assign.Value.Element = visitExpression(v, assign.Value.Element, p)
 	return assign
 }
 
@@ -305,13 +320,25 @@ func (v *GoVisitor) VisitFieldAccess(fa *tree.FieldAccess, p any) tree.J {
 func (v *GoVisitor) VisitMethodInvocation(mi *tree.MethodInvocation, p any) tree.J {
 	mi = mi.WithPrefix(v.self().VisitSpace(mi.Prefix, p))
 	mi = mi.WithMarkers(v.visitMarkers(mi.Markers, p))
+	if mi.Select != nil {
+		sel := *mi.Select
+		sel.Element = visitExpression(v, sel.Element, p)
+		sel.After = v.self().VisitSpace(sel.After, p)
+		mi.Select = &sel
+	}
 	mi = mi.WithName(visitAndCast[*tree.Identifier](v, mi.Name, p))
+	mi.Arguments.Before = v.self().VisitSpace(mi.Arguments.Before, p)
+	mi.Arguments.Elements = visitRightPaddedList(v, mi.Arguments.Elements, p)
 	return mi
 }
 
 func (v *GoVisitor) VisitVariableDeclarations(vd *tree.VariableDeclarations, p any) tree.J {
 	vd = vd.WithPrefix(v.self().VisitSpace(vd.Prefix, p))
 	vd = vd.WithMarkers(v.visitMarkers(vd.Markers, p))
+	if vd.TypeExpr != nil {
+		vd.TypeExpr = visitExpression(v, vd.TypeExpr, p)
+	}
+	vd.Variables = visitRightPaddedList(v, vd.Variables, p)
 	return vd
 }
 
@@ -319,6 +346,12 @@ func (v *GoVisitor) VisitVariableDeclarator(vd *tree.VariableDeclarator, p any) 
 	vd = vd.WithPrefix(v.self().VisitSpace(vd.Prefix, p))
 	vd = vd.WithMarkers(v.visitMarkers(vd.Markers, p))
 	vd = vd.WithName(visitAndCast[*tree.Identifier](v, vd.Name, p))
+	if vd.Initializer != nil {
+		init := *vd.Initializer
+		init.Before = v.self().VisitSpace(init.Before, p)
+		init.Element = visitExpression(v, init.Element, p)
+		vd.Initializer = &init
+	}
 	return vd
 }
 
@@ -339,6 +372,7 @@ func (v *GoVisitor) VisitAssignmentOperation(ao *tree.AssignmentOperation, p any
 	ao = ao.WithPrefix(v.self().VisitSpace(ao.Prefix, p))
 	ao = ao.WithMarkers(v.visitMarkers(ao.Markers, p))
 	ao = ao.WithVariable(visitExpression(v, ao.Variable, p))
+	ao.Assignment = visitExpression(v, ao.Assignment, p)
 	return ao
 }
 
@@ -578,6 +612,20 @@ func visitExpression(v *GoVisitor, expr tree.Expression, p any) tree.Expression 
 		return nil
 	}
 	return result.(tree.Expression)
+}
+
+func visitRightPaddedExpressionList(v *GoVisitor, list []tree.RightPadded[tree.Expression], p any) []tree.RightPadded[tree.Expression] {
+	result := make([]tree.RightPadded[tree.Expression], 0, len(list))
+	for _, rp := range list {
+		visited := v.self().Visit(rp.Element, p)
+		if visited == nil {
+			continue
+		}
+		rp.Element = visited.(tree.Expression)
+		rp.After = v.self().VisitSpace(rp.After, p)
+		result = append(result, rp)
+	}
+	return result
 }
 
 func visitRightPaddedList[T tree.J](v *GoVisitor, list []tree.RightPadded[T], p any) []tree.RightPadded[T] {

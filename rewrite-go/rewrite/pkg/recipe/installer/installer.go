@@ -25,7 +25,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/openrewrite/rewrite/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 )
 
 // RecipeModuleInfo holds information about an installed recipe module.
@@ -191,7 +191,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/openrewrite/rewrite/pkg/recipe"
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/recipe"
 	recipes "{{.ModulePath}}"
 )
 
