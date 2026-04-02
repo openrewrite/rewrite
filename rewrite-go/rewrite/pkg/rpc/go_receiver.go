@@ -74,6 +74,8 @@ func (r *GoReceiver) Visit(node any, q *ReceiveQueue) any {
 		return r.receiveSlice(v, q)
 	case *tree.MapType:
 		return r.receiveMapType(v, q)
+	case *tree.PointerType:
+		return r.receivePointerType(v, q)
 	case *tree.Channel:
 		return r.receiveChannel(v, q)
 	case *tree.FuncType:
@@ -122,6 +124,8 @@ func (r *GoReceiver) preVisit(node any, q *ReceiveQueue) any {
 	case *tree.Slice:
 		c := *n; node = &c
 	case *tree.MapType:
+		c := *n; node = &c
+	case *tree.PointerType:
 		c := *n; node = &c
 	case *tree.Channel:
 		c := *n; node = &c
@@ -398,6 +402,16 @@ func (r *GoReceiver) receiveMapType(mt *tree.MapType, q *ReceiveQueue) *tree.Map
 		mt.Value = result.(tree.Expression)
 	}
 	return mt
+}
+
+func (r *GoReceiver) receivePointerType(pt *tree.PointerType, q *ReceiveQueue) *tree.PointerType {
+	c := *pt
+	pt = &c
+	result := q.Receive(pt.Elem, func(v any) any { return r.Visit(v, q) })
+	if result != nil {
+		pt.Elem = result.(tree.Expression)
+	}
+	return pt
 }
 
 func (r *GoReceiver) receiveChannel(ch *tree.Channel, q *ReceiveQueue) *tree.Channel {

@@ -31,9 +31,10 @@ import (
 
 // SourceSpec describes a Go source file for testing.
 type SourceSpec struct {
-	Before string
-	After  *string // nil means no change expected (parse-print idempotence only)
-	Path   string
+	Before      string
+	After       *string // nil means no change expected (parse-print idempotence only)
+	Path        string
+	AfterRecipe func(t *testing.T, cu *tree.CompilationUnit) // optional post-parse assertion callback
 }
 
 // Golang creates a SourceSpec for Go source code.
@@ -220,6 +221,10 @@ func (spec *RecipeSpec) RewriteRun(t *testing.T, sources ...SourceSpec) {
 			for _, e := range errs {
 				t.Errorf("space validation: %s", e)
 			}
+		}
+
+		if src.AfterRecipe != nil {
+			src.AfterRecipe(t, cu)
 		}
 
 		if spec.CheckParsePrintIdempotence {
