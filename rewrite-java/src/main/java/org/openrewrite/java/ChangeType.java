@@ -221,6 +221,9 @@ public class ChangeType extends Recipe {
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 j = n.withConstructorType(updateType(n.getConstructorType()));
+            } else if (j instanceof MethodCall) {
+                MethodCall call = (MethodCall) j;
+                j = (J) call.withMethodType(updateType(call.getMethodType()));
             } else if (tree instanceof TypedTree) {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
