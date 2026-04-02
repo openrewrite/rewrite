@@ -76,55 +76,11 @@ public interface JavaType {
 
     @Deprecated
     default boolean isAssignableFrom(Pattern pattern) {
-        if (this instanceof FullyQualified) {
-            FullyQualified fq = (FullyQualified) this;
-            if (pattern.matcher(fq.getFullyQualifiedName()).matches()) {
-                return true;
-            }
-            if (fq.getSupertype() != null && fq.getSupertype().isAssignableFrom(pattern)) {
-                return true;
-            }
-            for (FullyQualified anInterface : fq.getInterfaces()) {
-                if (anInterface.isAssignableFrom(pattern)) {
-                    return true;
-                }
-            }
-            return false;
-        } else if (this instanceof GenericTypeVariable) {
-            GenericTypeVariable generic = (GenericTypeVariable) this;
-            for (JavaType bound : generic.getBounds()) {
-                if (bound.isAssignableFrom(pattern)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return TypeUtils.isAssignableFrom(this, pattern);
     }
 
     default boolean isAssignableFrom(TypeNameMatcher matcher) {
-        if (this instanceof FullyQualified) {
-            FullyQualified fq = (FullyQualified) this;
-            if (matcher.matches(fq.getFullyQualifiedName())) {
-                return true;
-            }
-            if (fq.getSupertype() != null && fq.getSupertype().isAssignableFrom(matcher)) {
-                return true;
-            }
-            for (FullyQualified anInterface : fq.getInterfaces()) {
-                if (anInterface.isAssignableFrom(matcher)) {
-                    return true;
-                }
-            }
-            return false;
-        } else if (this instanceof GenericTypeVariable) {
-            GenericTypeVariable generic = (GenericTypeVariable) this;
-            for (JavaType bound : generic.getBounds()) {
-                if (bound.isAssignableFrom(matcher)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return TypeUtils.isAssignableFrom(this, matcher);
     }
 
     class MultiCatch implements JavaType {
@@ -364,26 +320,11 @@ public interface JavaType {
         }
 
         public boolean isAssignableTo(String fullyQualifiedName) {
-            return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
-                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
-                   (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
+            return TypeUtils.isAssignableTo(fullyQualifiedName, this);
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
-            if (type instanceof FullyQualified) {
-                FullyQualified clazz = (FullyQualified) type;
-                return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), clazz.getFullyQualifiedName()) ||
-                       isAssignableFrom(clazz.getSupertype()) ||
-                       clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
-            } else if (type instanceof GenericTypeVariable) {
-                GenericTypeVariable generic = (GenericTypeVariable) type;
-                for (JavaType bound : generic.getBounds()) {
-                    if (isAssignableFrom(bound)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
+            return TypeUtils.isAssignableTo(this, type);
         }
 
         public enum Kind {

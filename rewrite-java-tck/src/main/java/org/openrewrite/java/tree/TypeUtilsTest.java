@@ -26,6 +26,7 @@ import org.openrewrite.test.SourceSpec;
 
 import java.util.EnumSet;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -1548,5 +1549,42 @@ class TypeUtilsTest implements RewriteTest {
             )
           )
         );
+    }
+
+    @Test
+    void isAssignableToWithCyclicTypeHierarchy() {
+        // Construct two types with a cyclic supertype chain: A extends B, B extends A
+        JavaType.ShallowClass typeA = JavaType.ShallowClass.build("com.example.A");
+        JavaType.ShallowClass typeB = JavaType.ShallowClass.build("com.example.B");
+        typeA.unsafeSet(null, typeB, null, emptyList(), emptyList(), null, null);
+        typeB.unsafeSet(null, typeA, null, emptyList(), emptyList(), null, null);
+
+        // These should return false without StackOverflowError
+        assertFalse(TypeUtils.isAssignableTo("com.example.C", typeA));
+        assertFalse(TypeUtils.isAssignableTo("com.example.C", typeB));
+
+        // Same for the JavaType overload
+        JavaType.ShallowClass typeC = JavaType.ShallowClass.build("com.example.C");
+        assertFalse(TypeUtils.isAssignableTo(typeC, typeA));
+        assertFalse(TypeUtils.isAssignableTo(typeC, typeB));
+
+        // Same for the Pattern overload
+        assertFalse(TypeUtils.isAssignableTo(Pattern.compile("com\\.example\\.C"), typeA));
+
+        // Positive cases: A is assignable to B and vice versa through their supertype chain
+        assertTrue(TypeUtils.isAssignableTo("com.example.B", typeA));
+        assertTrue(TypeUtils.isAssignableTo("com.example.A", typeB));
+    }
+
+    @Test
+    void isAssignableToWithCyclicInterfaceHierarchy() {
+        // Construct a type whose interface list contains a cycle
+        JavaType.ShallowClass typeA = JavaType.ShallowClass.build("com.example.A");
+        JavaType.ShallowClass typeB = JavaType.ShallowClass.build("com.example.B");
+        typeA.unsafeSet(null, null, null, emptyList(), singletonList(typeB), null, null);
+        typeB.unsafeSet(null, null, null, emptyList(), singletonList(typeA), null, null);
+
+        assertFalse(TypeUtils.isAssignableTo("com.example.C", typeA));
+        assertTrue(TypeUtils.isAssignableTo("com.example.B", typeA));
     }
 }

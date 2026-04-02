@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.java.TypeNameMatcher;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 
@@ -601,14 +602,21 @@ public class TypeUtils {
 
     // Contract, from is FullyQualified, Array or Primitive
     private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, ComparisonContext context) {
+        return isAssignableToFullyQualified(to, from, context, newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static boolean isAssignableToFullyQualified(JavaType.FullyQualified to, @Nullable JavaType from, ComparisonContext context, Set<JavaType> visited) {
         if (from instanceof JavaType.FullyQualified) {
+            if (!visited.add(from)) {
+                return false;
+            }
             JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
             if (!TypeUtils.fullyQualifiedNamesAreEqual(to.getFullyQualifiedName(), classFrom.getFullyQualifiedName())) {
-                if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, classFrom.getSupertype()), context)) {
+                if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, classFrom.getSupertype()), context, visited)) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
-                    if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, i), context)) {
+                    if (isAssignableToFullyQualified(to, maybeResolveParameters(classFrom, i), context, visited)) {
                         return true;
                     }
                 }
@@ -827,8 +835,15 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
+        return isAssignableTo(to, from, newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static boolean isAssignableTo(String to, @Nullable JavaType from, Set<JavaType> visited) {
         try {
             if (from instanceof JavaType.FullyQualified) {
+                if (!visited.add(from)) {
+                    return false;
+                }
                 if (from instanceof JavaType.Parameterized) {
                     int lessThanIndex = to.indexOf('<');
                     String fromRawType = ((JavaType.Parameterized) from).getType().getFullyQualifiedName();
@@ -838,11 +853,11 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                    isAssignableTo(to, classFrom.getSupertype())) {
+                    isAssignableTo(to, classFrom.getSupertype(), visited)) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
-                    if (isAssignableTo(to, i)) {
+                    if (isAssignableTo(to, i, visited)) {
                         return true;
                     }
                 }
@@ -850,7 +865,7 @@ public class TypeUtils {
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(to, bound, visited)) {
                         return true;
                     }
                 }
@@ -862,12 +877,12 @@ public class TypeUtils {
                     return isAssignableTo(JavaType.Primitive.String, from);
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+                return isAssignableTo(to, ((JavaType.Variable) from).getType(), visited);
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(to, ((JavaType.Method) from).getReturnType(), visited);
             } else if (from instanceof JavaType.Intersection) {
                 for (JavaType bound : ((JavaType.Intersection) from).getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(to, bound, visited)) {
                         return true;
                     }
                 }
@@ -890,15 +905,22 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from) {
+        return isAssignableTo(predicate, from, newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from, Set<JavaType> visited) {
         try {
             if (from instanceof JavaType.FullyQualified) {
+                if (!visited.add(from)) {
+                    return false;
+                }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype())) {
+                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype(), visited)) {
                     return true;
                 }
                 for (JavaType.FullyQualified anInterface : classFrom.getInterfaces()) {
-                    if (isAssignableTo(predicate, anInterface)) {
+                    if (isAssignableTo(predicate, anInterface, visited)) {
                         return true;
                     }
                 }
@@ -906,20 +928,88 @@ public class TypeUtils {
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(predicate, bound)) {
+                    if (isAssignableTo(predicate, bound, visited)) {
                         return true;
                     }
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(predicate, ((JavaType.Variable) from).getType());
+                return isAssignableTo(predicate, ((JavaType.Variable) from).getType(), visited);
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(predicate, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(predicate, ((JavaType.Method) from).getReturnType(), visited);
             } else if (from instanceof JavaType.Primitive) {
                 JavaType.Primitive primitive = (JavaType.Primitive) from;
                 return predicate.test(primitive);
             }
         } catch (Exception e) {
             return false;
+        }
+        return false;
+    }
+
+    @Deprecated
+    static boolean isAssignableFrom(JavaType type, Pattern pattern) {
+        return isAssignableFrom(type, pattern, newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    @Deprecated
+    private static boolean isAssignableFrom(JavaType type, Pattern pattern, Set<JavaType> visited) {
+        if (type instanceof JavaType.FullyQualified) {
+            if (!visited.add(type)) {
+                return false;
+            }
+            JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
+            if (pattern.matcher(fq.getFullyQualifiedName()).matches()) {
+                return true;
+            }
+            if (fq.getSupertype() != null && isAssignableFrom(fq.getSupertype(), pattern, visited)) {
+                return true;
+            }
+            for (JavaType.FullyQualified anInterface : fq.getInterfaces()) {
+                if (isAssignableFrom(anInterface, pattern, visited)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
+            for (JavaType bound : generic.getBounds()) {
+                if (isAssignableFrom(bound, pattern, visited)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    static boolean isAssignableFrom(JavaType type, TypeNameMatcher matcher) {
+        return isAssignableFrom(type, matcher, newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    private static boolean isAssignableFrom(JavaType type, TypeNameMatcher matcher, Set<JavaType> visited) {
+        if (type instanceof JavaType.FullyQualified) {
+            if (!visited.add(type)) {
+                return false;
+            }
+            JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
+            if (matcher.matches(fq.getFullyQualifiedName())) {
+                return true;
+            }
+            if (fq.getSupertype() != null && isAssignableFrom(fq.getSupertype(), matcher, visited)) {
+                return true;
+            }
+            for (JavaType.FullyQualified anInterface : fq.getInterfaces()) {
+                if (isAssignableFrom(anInterface, matcher, visited)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
+            for (JavaType bound : generic.getBounds()) {
+                if (isAssignableFrom(bound, matcher, visited)) {
+                    return true;
+                }
+            }
         }
         return false;
     }
