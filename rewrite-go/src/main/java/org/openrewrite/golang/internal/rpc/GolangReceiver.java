@@ -45,6 +45,9 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
 
     @Override
     public J preVisit(J j, RpcReceiveQueue q) {
+        if (j instanceof Go.StatementExpression) {
+            return j.withId(q.receiveAndGet(j.getId(), UUID::fromString));
+        }
         return ((J) j.withId(q.receiveAndGet(j.getId(), UUID::fromString)))
                 .withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)))
                 .withMarkers(q.receive(j.getMarkers()));
@@ -187,6 +190,12 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
                 .withComm(q.receive(commClause.getComm(), el -> (Statement) visitNonNull(el, q)))
                 .withColon(q.receive(commClause.getColon(), space -> visitSpace(space, q)))
                 .getPadding().withBody(q.receiveList(commClause.getPadding().getBody(), stmt -> visitRightPadded(stmt, q)));
+    }
+
+    @Override
+    public J visitStatementExpression(Go.StatementExpression stmtExpr, RpcReceiveQueue q) {
+        return stmtExpr
+                .withStatement(q.receive(stmtExpr.getStatement(), stmt -> (Statement) visitNonNull(stmt, q)));
     }
 
     @Override

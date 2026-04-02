@@ -49,6 +49,13 @@ func (r *GoReceiver) Visit(node any, q *ReceiveQueue) any {
 		return r.receiveParseError(&c, q)
 	}
 
+	// StatementExpression delegates prefix/markers to wrapped statement — only receive ID
+	if se, ok := node.(*tree.StatementExpression); ok {
+		c := *se
+		q.Receive(c.ID, nil)
+		return r.receiveStatementExpression(&c, q)
+	}
+
 	// preVisit: receive ID, prefix, markers
 	node = r.preVisit(node, q)
 
@@ -564,6 +571,14 @@ func (r *GoReceiver) receiveCommClause(cc *tree.CommClause, q *ReceiveQueue) *tr
 		}
 	}
 	return cc
+}
+
+func (r *GoReceiver) receiveStatementExpression(se *tree.StatementExpression, q *ReceiveQueue) *tree.StatementExpression {
+	result := q.Receive(se.Statement, func(v any) any { return r.Visit(v, q) })
+	if result != nil {
+		se.Statement = result.(tree.Statement)
+	}
+	return se
 }
 
 func (r *GoReceiver) receiveIndexList(il *tree.IndexList, q *ReceiveQueue) *tree.IndexList {

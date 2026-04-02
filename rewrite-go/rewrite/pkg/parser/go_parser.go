@@ -1964,19 +1964,25 @@ func (ctx *parseContext) mapTypeAssertExpr(expr *ast.TypeAssertExpr) tree.Expres
 }
 
 // mapFuncLit maps a function literal (closure).
+// Wraps the MethodDeclaration in StatementExpression so it can be used as an Expression,
+// since Java's J.MethodDeclaration does not implement Expression.
 func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) tree.Expression {
 	prefix := ctx.prefixAndSkip(expr.Type.Func, len("func"))
 	params := ctx.mapFieldListAsParams(expr.Type.Params)
 	returnType := ctx.mapReturnType(expr.Type.Results)
 	body := ctx.mapBlockStmt(expr.Body)
 
-	return &tree.MethodDeclaration{
+	md := &tree.MethodDeclaration{
 		ID:         uuid.New(),
 		Prefix:     prefix,
 		Name:       &tree.Identifier{ID: uuid.New(), Name: ""},
 		Parameters: params,
 		ReturnType: returnType,
 		Body:       body,
+	}
+	return &tree.StatementExpression{
+		ID:        uuid.New(),
+		Statement: md,
 	}
 }
 

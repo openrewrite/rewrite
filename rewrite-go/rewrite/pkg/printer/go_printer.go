@@ -909,6 +909,11 @@ func (p *GoPrinter) VisitTypeDecl(td *tree.TypeDecl, param any) tree.J {
 	return td
 }
 
+func (p *GoPrinter) VisitStatementExpression(se *tree.StatementExpression, param any) tree.J {
+	p.Visit(se.Statement, param)
+	return se
+}
+
 func (p *GoPrinter) VisitEmpty(empty *tree.Empty, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(empty.Prefix, empty.Markers, out)

@@ -48,6 +48,13 @@ func (s *GoSender) Visit(node any, q *SendQueue) {
 		return
 	}
 
+	// StatementExpression delegates prefix/markers to wrapped statement — only send ID
+	if se, ok := node.(*tree.StatementExpression); ok {
+		q.GetAndSend(se, nodeID, nil)
+		s.sendStatementExpression(se, q)
+		return
+	}
+
 	// preVisit: send ID, prefix, markers
 	s.preVisit(node, q)
 
@@ -331,6 +338,11 @@ func (s *GoSender) sendParseError(pe *tree.ParseError, q *SendQueue) {
 	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // checksum
 	q.GetAndSend(pe, func(_ any) any { return nil }, nil) // fileAttributes
 	q.GetAndSend(pe, func(v any) any { return v.(*tree.ParseError).Text }, nil)
+}
+
+func (s *GoSender) sendStatementExpression(se *tree.StatementExpression, q *SendQueue) {
+	q.GetAndSend(se, func(v any) any { return v.(*tree.StatementExpression).Statement },
+		func(v any) { s.Visit(v, q) })
 }
 
 func (s *GoSender) sendIndexList(il *tree.IndexList, q *SendQueue) {

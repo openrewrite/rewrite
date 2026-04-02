@@ -38,6 +38,10 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
 
     @Override
     public J preVisit(J j, RpcSendQueue q) {
+        if (j instanceof Go.StatementExpression) {
+            q.getAndSend(j, Tree::getId);
+            return j;
+        }
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
         q.getAndSend(j, Tree::getMarkers);
@@ -182,6 +186,12 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
         q.getAndSend(commClause, Go.CommClause::getColon, space -> visitSpace(space, q));
         q.getAndSendList(commClause, c -> c.getPadding().getBody(), stmt -> stmt.getElement().getId(), stmt -> visitRightPadded(stmt, q));
         return commClause;
+    }
+
+    @Override
+    public J visitStatementExpression(Go.StatementExpression stmtExpr, RpcSendQueue q) {
+        q.getAndSend(stmtExpr, Go.StatementExpression::getStatement, el -> visit(el, q));
+        return stmtExpr;
     }
 
     @Override

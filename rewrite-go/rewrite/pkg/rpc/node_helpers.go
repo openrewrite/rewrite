@@ -579,6 +579,8 @@ func extractID(v any) any {
 		return t.ID
 	case *tree.IndexList:
 		return t.ID
+	case *tree.StatementExpression:
+		return t.ID
 	// Additional J nodes
 	case *tree.AssignmentOperation:
 		return t.ID

@@ -1622,6 +1622,65 @@ public interface Go extends J {
     }
 
     // ---------------------------------------------------------------
+    // StatementExpression (wraps a Statement for use as an Expression)
+    // ---------------------------------------------------------------
+
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false)
+    @AllArgsConstructor
+    @SuppressWarnings("unchecked")
+    final class StatementExpression implements Go, Expression, Statement {
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Statement statement;
+
+        @Override
+        public <P> @Nullable J acceptGolang(GolangVisitor<P> v, P p) {
+            return v.visitStatementExpression(this, p);
+        }
+
+        @Override
+        public <P2 extends J> P2 withPrefix(Space space) {
+            return (P2) withStatement(statement.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return statement.getPrefix();
+        }
+
+        @Override
+        public <P2 extends Tree> P2 withMarkers(Markers markers) {
+            return (P2) withStatement(statement.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return statement.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    // ---------------------------------------------------------------
     // IndexList (Map[int, string] - multi-type-param generics)
     // ---------------------------------------------------------------
 

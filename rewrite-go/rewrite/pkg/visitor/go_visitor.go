@@ -141,6 +141,8 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return v.self().VisitMultiAssignment(n, p)
 	case *tree.CommClause:
 		return v.self().VisitCommClause(n, p)
+	case *tree.StatementExpression:
+		return v.self().VisitStatementExpression(n, p)
 	default:
 		return t
 	}
@@ -209,6 +211,7 @@ type VisitorI interface {
 	VisitInterfaceType(it *tree.InterfaceType, p any) tree.J
 	VisitMultiAssignment(ma *tree.MultiAssignment, p any) tree.J
 	VisitCommClause(cc *tree.CommClause, p any) tree.J
+	VisitStatementExpression(se *tree.StatementExpression, p any) tree.J
 	VisitSpace(space tree.Space, p any) tree.Space
 	VisitType(javaType tree.JavaType, p any) tree.JavaType
 }
@@ -590,6 +593,14 @@ func (v *GoVisitor) VisitCommClause(cc *tree.CommClause, p any) tree.J {
 	cc = cc.WithPrefix(v.self().VisitSpace(cc.Prefix, p))
 	cc = cc.WithMarkers(v.visitMarkers(cc.Markers, p))
 	return cc
+}
+
+func (v *GoVisitor) VisitStatementExpression(se *tree.StatementExpression, p any) tree.J {
+	result := v.self().Visit(se.Statement, p)
+	if stmt, ok := result.(tree.Statement); ok {
+		se.Statement = stmt
+	}
+	return se
 }
 
 func (v *GoVisitor) VisitSpace(space tree.Space, p any) tree.Space {

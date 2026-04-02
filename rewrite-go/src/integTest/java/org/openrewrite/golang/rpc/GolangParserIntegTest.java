@@ -379,6 +379,21 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void functionLiteralReturnedFromFunction() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func wrapper() func() {
+                                \treturn func() {}
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void compositeAndKeyValue() {
         rewriteRun(
                 go(

@@ -643,6 +643,19 @@ type VarKeyword struct {
 
 func (v VarKeyword) ID() uuid.UUID { return v.Ident }
 
+// StatementExpression wraps a Statement so it can be used as an Expression.
+// Used for Go function literals (mapped to MethodDeclaration) in expression context.
+// Prefix and markers are delegated to the wrapped statement.
+type StatementExpression struct {
+	ID        uuid.UUID
+	Statement Statement
+}
+
+func (*StatementExpression) isTree()       {}
+func (*StatementExpression) isJ()          {}
+func (*StatementExpression) isStatement()  {}
+func (*StatementExpression) isExpression() {}
+
 // TrailingComma is a marker indicating a trailing comma is present in a list.
 // The Before space is the space before the comma; After space is the space after
 // the comma (before the closing delimiter).
