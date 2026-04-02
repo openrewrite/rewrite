@@ -85,7 +85,7 @@ func init() {
 	// Non-tree types that Java needs valueType for
 	RegisterValueType(reflect.TypeOf(tree.Space{}), "org.openrewrite.java.tree.Space")
 	RegisterValueType(reflect.TypeOf(tree.Markers{}), "org.openrewrite.marker.Markers")
-	RegisterValueType(reflect.TypeOf(tree.Comment{}), "org.openrewrite.java.tree.Comment")
+	RegisterValueType(reflect.TypeOf(tree.Comment{}), "org.openrewrite.java.tree.TextComment")
 
 	// Go-specific marker valueType registrations (for send-side type resolution)
 	RegisterValueType(reflect.TypeOf(tree.GroupedImport{}), "org.openrewrite.golang.marker.GroupedImport")
@@ -206,7 +206,7 @@ func init() {
 
 	RegisterFactory("org.openrewrite.java.tree.Space", func() any { return tree.Space{} })
 	RegisterFactory("org.openrewrite.marker.Markers", func() any { return tree.Markers{} })
-	RegisterFactory("org.openrewrite.java.tree.Comment", func() any { return tree.Comment{} })
+	RegisterFactory("org.openrewrite.java.tree.TextComment", func() any { return tree.Comment{} })
 
 	// Padding types — needed when Java sends ADD messages for new padding
 	// wrappers during bidirectional tree transfer (e.g., after a recipe
