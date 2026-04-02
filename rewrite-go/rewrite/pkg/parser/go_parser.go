@@ -393,18 +393,28 @@ func (ctx *parseContext) mapValueSpec(spec *ast.ValueSpec, prefix tree.Space, ke
 	}
 
 	// Then initializers (after type and `=` in source)
+	// In Go, multi-value declarations use a single `=` followed by comma-separated values:
+	//   var a, b = val1, val2
 	var variables []tree.RightPadded[*tree.VariableDeclarator]
 	for i, nameIdent := range nameIdents {
 		var init *tree.LeftPadded[tree.Expression]
 		if i < len(spec.Values) {
-			eqOff := ctx.findNext('=')
-			var eqPrefix tree.Space
-			if eqOff >= 0 {
-				eqPrefix = ctx.prefix(ctx.file.Pos(eqOff))
-				ctx.skip(1) // "="
+			var sepPrefix tree.Space
+			if i == 0 {
+				eqOff := ctx.findNext('=')
+				if eqOff >= 0 {
+					sepPrefix = ctx.prefix(ctx.file.Pos(eqOff))
+					ctx.skip(1) // "="
+				}
+			} else {
+				commaOff := ctx.findNext(',')
+				if commaOff >= 0 {
+					sepPrefix = ctx.prefix(ctx.file.Pos(commaOff))
+					ctx.skip(1) // ","
+				}
 			}
 			val := ctx.mapExpr(spec.Values[i])
-			lp := tree.LeftPadded[tree.Expression]{Before: eqPrefix, Element: val}
+			lp := tree.LeftPadded[tree.Expression]{Before: sepPrefix, Element: val}
 			init = &lp
 		}
 
