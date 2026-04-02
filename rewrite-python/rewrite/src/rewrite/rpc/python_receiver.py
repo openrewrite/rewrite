@@ -727,10 +727,11 @@ class PythonRpcReceiver:
             lambda c: self._receive_container(c, q) if c else None
         )
         body = q.receive(class_decl.body)
+        type_ = q.receive(class_decl.type)
         return replace_if_changed(class_decl, leading_annotations=leading_annotations, modifiers=modifiers,
                                   kind=kind, name=name, type_parameters=type_parameters,
                                   primary_constructor=primary_constructor, extends=extends, implements=implements,
-                                  permits=permits, body=body)
+                                  permits=permits, body=body, type=type_)
 
     def _visit_j_class_declaration_kind(self, kind, q: RpcReceiveQueue):
         from rewrite.java.tree import ClassDeclaration
