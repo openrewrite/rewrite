@@ -46,6 +46,10 @@ tasks.named<ScalaCompile>("compileScala") {
     source(sourceSets.main.get().java)
     // Scala compiler will compile both Java and Scala files together
     classpath = sourceSets.main.get().compileClasspath
+    // Scala 3.8+ requires Java 17 as the minimum bytecode target
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    })
 }
 
 // Ensure Java compilation uses output from Scala compilation
