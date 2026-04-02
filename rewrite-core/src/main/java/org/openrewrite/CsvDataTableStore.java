@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import com.univocity.parsers.csv.CsvParser;
+import com.univocity.parsers.csv.CsvParserSettings;
 import com.univocity.parsers.csv.CsvWriter;
 import com.univocity.parsers.csv.CsvWriterSettings;
 import org.jspecify.annotations.Nullable;
@@ -46,18 +48,27 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
  * // Plain CSV
  * new CsvDataTableStore(outputDir)
  *
- * // GZIP compressed with repository columns
+ * // GZIP compressed with repository columns (write-only)
  * new CsvDataTableStore(outputDir,
  *     path -> new GZIPOutputStream(Files.newOutputStream(path)),
  *     ".csv.gz",
- *     List.of(Map.entry("repositoryOrigin", origin), Map.entry("repositoryPath", path)),
- *     List.of(Map.entry("org1", orgValue)))
+ *     Map.of("repositoryOrigin", origin, "repositoryPath", path),
+ *     Map.of("org1", orgValue))
+ *
+ * // GZIP compressed with read-back support
+ * new CsvDataTableStore(outputDir,
+ *     path -> new GZIPOutputStream(Files.newOutputStream(path)),
+ *     path -> new GZIPInputStream(Files.newInputStream(path)),
+ *     ".csv.gz",
+ *     Map.of("repositoryOrigin", origin, "repositoryPath", path),
+ *     Map.of("org1", orgValue))
  * }</pre>
  */
 public class CsvDataTableStore implements DataTableStore, AutoCloseable {
 
     private final Path outputDir;
     private final Function<Path, OutputStream> outputStreamFactory;
+    private final Function<Path, InputStream> inputStreamFactory;
     private final String fileExtension;
     private final Map<String, String> prefixColumns;
     private final Map<String, String> suffixColumns;
@@ -67,27 +78,55 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
      * Create a store that writes plain CSV files.
      */
     public CsvDataTableStore(Path outputDir) {
-        this(outputDir, CsvDataTableStore::defaultOutputStream, ".csv",
-                Collections.emptyMap(), Collections.emptyMap());
+        this(outputDir, CsvDataTableStore::defaultOutputStream, CsvDataTableStore::defaultInputStream,
+                ".csv", Collections.emptyMap(), Collections.emptyMap());
     }
 
     /**
-     * Create a store with full control over output stream creation, file extension,
+     * Create a store with control over output stream creation, file extension,
      * and additional static columns prepended/appended to each row.
+     * <p>
+     * {@link #getRows} will always return empty results from this constructor.
+     * Use the six-argument constructor to provide a matching input stream factory
+     * if read-back is needed.
      *
      * @param outputDir           directory to write files into
      * @param outputStreamFactory creates an output stream for each file path (e.g., wrapping with GZIPOutputStream)
      * @param fileExtension       file extension including dot (e.g., ".csv" or ".csv.gz")
      * @param prefixColumns       static columns prepended to each row, in insertion order
      * @param suffixColumns       static columns appended to each row, in insertion order
+     * @deprecated Use the six-argument constructor that accepts an {@code inputStreamFactory}
      */
+    @Deprecated
     public CsvDataTableStore(Path outputDir,
                              Function<Path, OutputStream> outputStreamFactory,
                              String fileExtension,
                              Map<String, String> prefixColumns,
                              Map<String, String> suffixColumns) {
+        this(outputDir, outputStreamFactory, path -> new ByteArrayInputStream(new byte[0]),
+                fileExtension, prefixColumns, suffixColumns);
+    }
+
+    /**
+     * Create a store with full control over output and input stream creation, file extension,
+     * and additional static columns prepended/appended to each row.
+     *
+     * @param outputDir           directory to write files into
+     * @param outputStreamFactory creates an output stream for each file path (e.g., wrapping with GZIPOutputStream)
+     * @param inputStreamFactory  creates an input stream for each file path (e.g., wrapping with GZIPInputStream)
+     * @param fileExtension       file extension including dot (e.g., ".csv" or ".csv.gz")
+     * @param prefixColumns       static columns prepended to each row, in insertion order
+     * @param suffixColumns       static columns appended to each row, in insertion order
+     */
+    public CsvDataTableStore(Path outputDir,
+                             Function<Path, OutputStream> outputStreamFactory,
+                             Function<Path, InputStream> inputStreamFactory,
+                             String fileExtension,
+                             Map<String, String> prefixColumns,
+                             Map<String, String> suffixColumns) {
         this.outputDir = outputDir;
         this.outputStreamFactory = outputStreamFactory;
+        this.inputStreamFactory = inputStreamFactory;
         this.fileExtension = fileExtension;
         this.prefixColumns = prefixColumns;
         this.suffixColumns = suffixColumns;
@@ -106,6 +145,14 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         }
     }
 
+    private static InputStream defaultInputStream(Path path) {
+        try {
+            return Files.newInputStream(path);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     @Override
     public <Row> void insertRow(DataTable<Row> dataTable, ExecutionContext ctx, Row row) {
         String fileKey = fileKey(dataTable);
@@ -115,7 +162,64 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
 
     @Override
     public Stream<?> getRows(String dataTableName, @Nullable String group) {
-        return Stream.empty();
+        // Flush any open writers for this data table so all rows are on disk
+        for (BucketWriter writer : writers.values()) {
+            if (writer.dataTable.getName().equals(dataTableName) &&
+                Objects.equals(writer.dataTable.getGroup(), group)) {
+                writer.flush();
+            }
+        }
+
+        List<String[]> allRows = new ArrayList<>();
+        //noinspection DataFlowIssue
+        File[] files = outputDir.toFile().listFiles((dir, name) -> name.endsWith(fileExtension));
+        if (files == null) {
+            return Stream.empty();
+        }
+
+        int prefixCount = prefixColumns.size();
+        int suffixCount = suffixColumns.size();
+
+        for (File file : files) {
+            try (InputStream is = inputStreamFactory.apply(file.toPath())) {
+                DataTableDescriptor descriptor = readDescriptor(is);
+                if (descriptor == null ||
+                    !descriptor.getName().equals(dataTableName) ||
+                    !Objects.equals(descriptor.getGroup(), group)) {
+                    continue;
+                }
+                // readDescriptor consumed comment lines; now parse the remaining CSV
+                // (header + data rows). Re-read the full file with CsvParser.
+            } catch (IOException e) {
+                continue;
+            }
+
+            try (InputStream is = inputStreamFactory.apply(file.toPath())) {
+                CsvParserSettings settings = new CsvParserSettings();
+                settings.setHeaderExtractionEnabled(true);
+                settings.getFormat().setComment('#');
+                CsvParser parser = new CsvParser(settings);
+                parser.beginParsing(new InputStreamReader(is, StandardCharsets.UTF_8));
+
+                String[] row;
+                while ((row = parser.parseNext()) != null) {
+                    // Strip prefix and suffix columns, returning only data table columns
+                    int dataCount = row.length - prefixCount - suffixCount;
+                    if (dataCount <= 0) {
+                        allRows.add(row);
+                    } else {
+                        String[] dataRow = new String[dataCount];
+                        System.arraycopy(row, prefixCount, dataRow, 0, dataCount);
+                        allRows.add(dataRow);
+                    }
+                }
+                parser.stopParsing();
+            } catch (IOException e) {
+                // Skip unreadable files
+            }
+        }
+
+        return allRows.stream();
     }
 
     @Override
@@ -146,8 +250,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         }
 
         // Build headers: prefix + data table columns + suffix
-        List<String> headers = new ArrayList<>();
-        headers.addAll(prefixColumns.keySet());
+        List<String> headers = new ArrayList<>(prefixColumns.keySet());
         for (ColumnDescriptor col : descriptor.getColumns()) {
             headers.add(col.getName());
         }
@@ -221,6 +324,14 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             }
 
             csvWriter.writeRow((Object[]) values);
+        }
+
+        synchronized void flush() {
+            csvWriter.flush();
+            try {
+                os.flush();
+            } catch (IOException ignored) {
+            }
         }
 
         void close() {
