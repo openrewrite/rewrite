@@ -127,6 +127,12 @@ public class GolangReceiver extends GolangVisitor<RpcReceiveQueue> {
     }
 
     @Override
+    public J visitStatementExpression(Go.StatementExpression se, RpcReceiveQueue q) {
+        return se
+                .withStatement(q.receive(se.getStatement(), el -> (Statement) visitNonNull(el, q)));
+    }
+
+    @Override
     public J visitPointerType(Go.PointerType pointerType, RpcReceiveQueue q) {
         return pointerType
                 .withElem(q.receive(pointerType.getElem(), expr -> (Expression) visitNonNull(expr, q)));

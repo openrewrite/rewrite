@@ -1970,13 +1970,20 @@ func (ctx *parseContext) mapFuncLit(expr *ast.FuncLit) tree.Expression {
 	returnType := ctx.mapReturnType(expr.Type.Results)
 	body := ctx.mapBlockStmt(expr.Body)
 
-	return &tree.MethodDeclaration{
+	md := &tree.MethodDeclaration{
 		ID:         uuid.New(),
-		Prefix:     prefix,
 		Name:       &tree.Identifier{ID: uuid.New(), Name: ""},
 		Parameters: params,
 		ReturnType: returnType,
 		Body:       body,
+	}
+	// Wrap in StatementExpression so the MethodDeclaration (a Statement) can
+	// appear in expression contexts like return statements, assignments, and
+	// call arguments.
+	return &tree.StatementExpression{
+		ID:        uuid.New(),
+		Prefix:    prefix,
+		Statement: md,
 	}
 }
 

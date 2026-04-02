@@ -751,6 +751,14 @@ func (p *GoPrinter) VisitMapType(mt *tree.MapType, param any) tree.J {
 	return mt
 }
 
+func (p *GoPrinter) VisitStatementExpression(se *tree.StatementExpression, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(se.Prefix, se.Markers, out)
+	p.Visit(se.Statement, out)
+	p.afterSyntax(se.Markers, out)
+	return se
+}
+
 func (p *GoPrinter) VisitPointerType(pt *tree.PointerType, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(pt.Prefix, pt.Markers, out)
