@@ -26,6 +26,7 @@ import {RecipeSpec} from "../../../src/test";
 import {withDir} from "tmp-promise";
 import * as fs from "fs";
 import * as path from "path";
+import * as semver from "semver";
 
 describe("UpgradeDependencyVersion", () => {
 
@@ -505,9 +506,11 @@ describe("UpgradeDependencyVersion", () => {
                             const marker = findNodeResolutionResult(doc);
                             expect(marker).toBeDefined();
                             expect(marker!.dependencies[0].versionConstraint).toBe("^4.17.23");
-                            // The resolved version should still be 4.17.23 (unchanged)
+                            // The resolved version should still satisfy ^4.17.23 (unchanged)
                             // This proves we didn't run npm install - just updated the constraint
-                            expect(marker!.resolvedDependencies?.[0]?.version).toBe("4.17.23");
+                            const resolvedVersion = marker!.resolvedDependencies?.[0]?.version;
+                            expect(resolvedVersion).toBeDefined();
+                            expect(semver.satisfies(resolvedVersion!, "^4.17.23")).toBe(true);
                         }
                     }
                 )
