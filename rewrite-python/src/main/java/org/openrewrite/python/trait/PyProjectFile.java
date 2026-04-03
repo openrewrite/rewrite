@@ -32,12 +32,12 @@ public class PyProjectFile implements PythonDependencyFile {
     PythonResolutionResult marker;
 
     @Override
-    public PyProjectFile withUpgradedVersions(Map<String, String> upgrades) {
+    public PyProjectFile withUpgradedVersions(Map<String, String> upgrades, @Nullable String scope, @Nullable String groupName) {
         Toml.Document doc = (Toml.Document) getTree();
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Map<String, String>>() {
             @Override
             public Toml.Literal visitLiteral(Toml.Literal literal, Map<String, String> u) {
-                if (!isInsideProjectDependencies(getCursor())) {
+                if (!isInsideTargetArray(getCursor(), scope, groupName)) {
                     return literal;
                 }
 
@@ -149,7 +149,7 @@ public class PyProjectFile implements PythonDependencyFile {
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Map<String, String>>() {
             @Override
             public Toml.Literal visitLiteral(Toml.Literal literal, Map<String, String> msgs) {
-                if (!isInsideProjectDependencies(getCursor())) {
+                if (!isInsideTargetArray(getCursor(), null, null)) {
                     return literal;
                 }
 
@@ -173,31 +173,15 @@ public class PyProjectFile implements PythonDependencyFile {
         return this;
     }
 
-    private static boolean isInsideProjectDependencies(Cursor cursor) {
+    private static boolean isInsideTargetArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {
         Cursor c = cursor;
-        boolean inArray = false;
-        boolean inDependencies = false;
-        boolean inProject = false;
         while (c != null) {
-            Object value = c.getValue();
-            if (value instanceof Toml.Array) {
-                inArray = true;
-            } else if (value instanceof Toml.KeyValue && inArray) {
-                Toml.KeyValue kv = (Toml.KeyValue) value;
-                if (kv.getKey() instanceof Toml.Identifier &&
-                        "dependencies".equals(((Toml.Identifier) kv.getKey()).getName())) {
-                    inDependencies = true;
-                }
-            } else if (value instanceof Toml.Table && inDependencies) {
-                Toml.Table table = (Toml.Table) value;
-                if (table.getName() != null && "project".equals(table.getName().getName())) {
-                    inProject = true;
-                    break;
-                }
+            if (c.getValue() instanceof Toml.Array) {
+                return PyProjectHelper.isInsideDependencyArray(c, scope, groupName);
             }
             c = c.getParent();
         }
-        return inProject;
+        return false;
     }
 
     public static class Matcher extends SimpleTraitMatcher<PyProjectFile> {

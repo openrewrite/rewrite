@@ -253,7 +253,7 @@ class PythonDependencyFileTest implements RewriteTest {
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades);
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             Toml.Document result = (Toml.Document) upgraded.getTree();
             String printed = result.printAll();
@@ -272,7 +272,7 @@ class PythonDependencyFileTest implements RewriteTest {
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades);
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String printed = ((Toml.Document) upgraded.getTree()).printAll();
             assertThat(printed).contains("\"requests[security]>=2.31.0\"");
@@ -289,7 +289,7 @@ class PythonDependencyFileTest implements RewriteTest {
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("nonexistent", "1.0.0");
-            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades);
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(upgraded).isSameAs(trait);
         }
@@ -305,7 +305,7 @@ class PythonDependencyFileTest implements RewriteTest {
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades);
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(upgraded.getMarker().getResolvedDependencies().get(0).getVersion()).isEqualTo("2.31.0");
         }
@@ -368,7 +368,7 @@ class PythonDependencyFileTest implements RewriteTest {
             Map<String, String> upgrades = new HashMap<>();
             upgrades.put("requests", "2.31.0");
             upgrades.put("flask", "3.0.0");
-            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades);
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String printed = ((Toml.Document) upgraded.getTree()).printAll();
             assertThat(printed).contains("\"requests>=2.31.0\"");
@@ -386,7 +386,7 @@ class PythonDependencyFileTest implements RewriteTest {
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("setuptools", "69.0");
-            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades);
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             // build-system is not inside [project], so it should not be upgraded
             assertThat(upgraded).isSameAs(trait);
@@ -406,7 +406,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             PlainText result = (PlainText) upgraded.getTree();
             assertThat(result.getText()).contains("requests>=2.31.0");
@@ -423,7 +423,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(((PlainText) upgraded.getTree()).getText()).isEqualTo("requests[security]>=2.31.0");
         }
@@ -438,7 +438,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("pywin32", "306");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(((PlainText) upgraded.getTree()).getText())
                     .isEqualTo("pywin32>=306; sys_platform=='win32'");
@@ -454,7 +454,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String text = ((PlainText) upgraded.getTree()).getText();
             assertThat(text).startsWith("# this is a comment\n");
@@ -471,7 +471,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String text = ((PlainText) upgraded.getTree()).getText();
             assertThat(text).startsWith("-r base.txt\n");
@@ -488,7 +488,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("nonexistent", "1.0.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(upgraded).isSameAs(trait);
         }
@@ -503,7 +503,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(upgraded.getMarker().getResolvedDependencies().get(0).getVersion()).isEqualTo("2.31.0");
         }
@@ -518,7 +518,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(((PlainText) upgraded.getTree()).getText()).isEqualTo("  requests>=2.31.0");
         }
@@ -588,7 +588,7 @@ class PythonDependencyFileTest implements RewriteTest {
             Map<String, String> upgrades = new HashMap<>();
             upgrades.put("requests", "2.31.0");
             upgrades.put("flask", "3.0.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String text = ((PlainText) upgraded.getTree()).getText();
             assertThat(text).contains("requests>=2.31.0");
@@ -605,7 +605,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades);
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String text = ((PlainText) upgraded.getTree()).getText();
             assertThat(text).isEqualTo("requests>=2.31.0\n\nflask>=2.0");

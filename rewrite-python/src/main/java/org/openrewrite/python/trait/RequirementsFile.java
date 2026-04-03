@@ -28,7 +28,7 @@ public class RequirementsFile implements PythonDependencyFile {
     PythonResolutionResult marker;
 
     @Override
-    public RequirementsFile withUpgradedVersions(Map<String, String> upgrades) {
+    public RequirementsFile withUpgradedVersions(Map<String, String> upgrades, @Nullable String scope, @Nullable String groupName) {
         PlainText pt = (PlainText) getTree();
         String text = pt.getText();
         String[] lines = text.split("\n", -1);

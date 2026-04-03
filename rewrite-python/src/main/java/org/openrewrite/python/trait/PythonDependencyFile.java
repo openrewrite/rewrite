@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
@@ -27,7 +28,14 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
 
     PythonResolutionResult getMarker();
 
-    PythonDependencyFile withUpgradedVersions(Map<String, String> upgrades);
+    /**
+     * Upgrade version constraints for dependencies in the specified scope.
+     *
+     * @param upgrades  normalized package name → new version
+     * @param scope     the TOML scope, or {@code null} for the default ({@code [project].dependencies})
+     * @param groupName required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
+     */
+    PythonDependencyFile withUpgradedVersions(Map<String, String> upgrades, @Nullable String scope, @Nullable String groupName);
 
     /**
      * Add dependencies to the specified scope.
@@ -49,8 +57,10 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
     PythonDependencyFile withDependencySearchMarkers(Map<String, String> packageMessages, ExecutionContext ctx);
 
     /**
-     * Rewrite a PEP 508 dependency spec to use a new minimum version.
-     * Preserves extras and environment markers.
+     * Rewrite a PEP 508 dependency spec with a new version constraint.
+     * Preserves extras and environment markers. The version is normalized
+     * via {@link PyProjectHelper#normalizeVersionConstraint(String)},
+     * so both {@code "2.31.0"} and {@code ">=2.31.0"} are accepted.
      */
     static String rewritePep508Spec(String spec, String packageName, String newVersion) {
         int nameEnd = packageName.length();
@@ -66,7 +76,7 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
             }
         }
 
-        sb.append(">=").append(newVersion);
+        sb.append(PyProjectHelper.normalizeVersionConstraint(newVersion));
 
         // Preserve environment markers (everything after ';')
         int semiIdx = spec.indexOf(';', nameEnd);

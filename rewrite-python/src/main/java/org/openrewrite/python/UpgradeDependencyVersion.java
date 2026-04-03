@@ -22,9 +22,9 @@ import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.trait.PyProjectFile;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlType;
 
 import java.util.*;
 
@@ -147,7 +147,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 String sourcePath = document.getSourcePath().toString();
 
                 if (sourcePath.endsWith("pyproject.toml") && acc.projectsToUpdate.contains(sourcePath)) {
-                    return changeVersionInPyproject(document, ctx, acc);
+                    PyProjectFile trait = new PyProjectFile.Matcher().get(getCursor()).orElse(null);
+                    if (trait != null) {
+                        Map<String, String> upgrades = Collections.singletonMap(
+                                PythonResolutionResult.normalizeName(packageName), newVersion);
+                        PyProjectFile updated = trait.withUpgradedVersions(upgrades, scope, groupName);
+                        Toml.Document result = (Toml.Document) updated.getTree();
+                        if (result != document) {
+                            return PyProjectHelper.regenerateLockAndRefreshMarker(result, ctx);
+                        }
+                    }
                 }
 
                 if (sourcePath.endsWith("uv.lock")) {
@@ -160,75 +169,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return document;
             }
         };
-    }
-
-    private Toml.Document changeVersionInPyproject(Toml.Document document, ExecutionContext ctx, Accumulator acc) {
-        String normalizedName = PythonResolutionResult.normalizeName(packageName);
-
-        Toml.Document updated = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
-            @Override
-            public Toml.Literal visitLiteral(Toml.Literal literal, ExecutionContext ctx) {
-                Toml.Literal l = super.visitLiteral(literal, ctx);
-                if (l.getType() != TomlType.Primitive.String) {
-                    return l;
-                }
-
-                Object val = l.getValue();
-                if (!(val instanceof String)) {
-                    return l;
-                }
-
-                // Check if we're inside the target dependency array
-                if (!isInsideTargetDependencies()) {
-                    return l;
-                }
-
-                // Check if this literal matches the package we're looking for
-                String spec = (String) val;
-                String depName = PyProjectHelper.extractPackageName(spec);
-                if (depName == null || !PythonResolutionResult.normalizeName(depName).equals(normalizedName)) {
-                    return l;
-                }
-
-                // Build new PEP 508 string preserving extras and markers
-                String newSpec = buildNewSpec(spec, depName);
-                return l.withSource("\"" + newSpec + "\"").withValue(newSpec);
-            }
-
-            private boolean isInsideTargetDependencies() {
-                // Walk up the cursor to find the enclosing array, then check scope
-                Cursor c = getCursor();
-                while (c != null) {
-                    if (c.getValue() instanceof Toml.Array) {
-                        return PyProjectHelper.isInsideDependencyArray(c, scope, groupName);
-                    }
-                    c = c.getParent();
-                }
-                return false;
-            }
-
-            private String buildNewSpec(String oldSpec, String depName) {
-                // Parse extras and markers from old spec
-                String extras = extractExtras(oldSpec);
-                String marker = extractMarker(oldSpec);
-
-                StringBuilder sb = new StringBuilder(depName);
-                if (extras != null) {
-                    sb.append('[').append(extras).append(']');
-                }
-                sb.append(PyProjectHelper.normalizeVersionConstraint(newVersion));
-                if (marker != null) {
-                    sb.append("; ").append(marker);
-                }
-                return sb.toString();
-            }
-        }.visitNonNull(document, ctx);
-
-        if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, ctx);
-        }
-
-        return updated;
     }
 
     static @Nullable String extractExtras(String pep508Spec) {
