@@ -185,11 +185,14 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 				k := key
 				q.GetAndSend(m, func(_ any) any { if d != nil { return d[k] }; return nil }, nil)
 			}
-		case "org.openrewrite.marker.BuildTool":
-			for _, key := range []string{"id", "type", "version"} {
-				k := key
-				q.GetAndSend(m, func(_ any) any { if d != nil { return d[k] }; return "" }, nil)
-			}
+		case "org.openrewrite.marker.Markup$Error",
+			"org.openrewrite.marker.Markup$Warn",
+			"org.openrewrite.marker.Markup$Info",
+			"org.openrewrite.marker.Markup$Debug":
+			// Markup inner classes implement RpcCodec: id, message, detail
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["id"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["message"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["detail"] }; return nil }, nil)
 		case "org.openrewrite.java.marker.OmitBraces",
 			"org.openrewrite.java.marker.OmitParentheses",
 			"org.openrewrite.java.marker.Semicolon":
@@ -385,11 +388,15 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 				for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
 					m.Data[key] = q.Receive(nil, nil)
 				}
-			case "org.openrewrite.marker.BuildTool":
+			case "org.openrewrite.marker.Markup$Error",
+				"org.openrewrite.marker.Markup$Warn",
+				"org.openrewrite.marker.Markup$Info",
+				"org.openrewrite.marker.Markup$Debug":
+				// Markup inner classes implement RpcCodec: id, message, detail
 				m.Data = map[string]any{
 					"id":      receiveScalar[string](q, ""),
-					"type":    receiveScalar[string](q, ""),
-					"version": receiveScalar[string](q, ""),
+					"message": receiveScalar[string](q, ""),
+					"detail":  q.Receive(nil, nil),
 				}
 			case "org.openrewrite.java.marker.OmitBraces",
 				"org.openrewrite.java.marker.OmitParentheses",

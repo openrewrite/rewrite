@@ -17,9 +17,6 @@
 package rpc
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -187,11 +184,6 @@ func convertTo[T any](v any) T {
 		if s, ok := v.(string); ok {
 			return any(s).(T)
 		}
-	}
-	// Debug: log type mismatch before panic
-	if f, err := os.OpenFile("/tmp/go-convert-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		fmt.Fprintf(f, "convertTo: expected %T, got %T: %+v\n", zero, v, v)
-		f.Close()
 	}
 	return v.(T)
 }
