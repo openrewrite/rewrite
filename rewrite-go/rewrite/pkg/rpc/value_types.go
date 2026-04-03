@@ -45,6 +45,7 @@ func init() {
 	RegisterValueType(reflect.TypeOf((*tree.MultiAssignment)(nil)), "org.openrewrite.golang.tree.Go$MultiAssignment")
 	RegisterValueType(reflect.TypeOf((*tree.CommClause)(nil)), "org.openrewrite.golang.tree.Go$CommClause")
 	RegisterValueType(reflect.TypeOf((*tree.IndexList)(nil)), "org.openrewrite.golang.tree.Go$IndexList")
+	RegisterValueType(reflect.TypeOf((*tree.StatementExpression)(nil)), "org.openrewrite.golang.tree.Go$StatementExpression")
 
 	// J (shared Java-like) node types
 	RegisterValueType(reflect.TypeOf((*tree.Identifier)(nil)), "org.openrewrite.java.tree.J$Identifier")
@@ -137,6 +138,7 @@ func init() {
 	RegisterFactory("org.openrewrite.golang.tree.Go$MultiAssignment", func() any { return &tree.MultiAssignment{} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$CommClause", func() any { return &tree.CommClause{} })
 	RegisterFactory("org.openrewrite.golang.tree.Go$IndexList", func() any { return &tree.IndexList{} })
+	RegisterFactory("org.openrewrite.golang.tree.Go$StatementExpression", func() any { return &tree.StatementExpression{} })
 
 	RegisterFactory("org.openrewrite.java.tree.J$Identifier", func() any { return &tree.Identifier{} })
 	RegisterFactory("org.openrewrite.java.tree.J$Literal", func() any { return &tree.Literal{} })
