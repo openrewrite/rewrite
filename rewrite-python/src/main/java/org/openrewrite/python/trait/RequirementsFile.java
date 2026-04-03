@@ -16,9 +16,7 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.trait.SimpleTraitMatcher;
 
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Value
 public class RequirementsFile implements PythonDependencyFile {
@@ -46,8 +44,7 @@ public class RequirementsFile implements PythonDependencyFile {
                 continue;
             }
 
-            String normalizedName = PythonResolutionResult.normalizeName(packageName);
-            String fixVersion = upgrades.get(normalizedName);
+            String fixVersion = PythonDependencyFile.getByNormalizedName(upgrades, packageName);
             if (fixVersion == null) {
                 continue;
             }
@@ -92,7 +89,7 @@ public class RequirementsFile implements PythonDependencyFile {
         StringBuilder sb = new StringBuilder(text);
         boolean changed = false;
         for (Map.Entry<String, String> entry : additions.entrySet()) {
-            if (!existingPackages.contains(entry.getKey())) {
+            if (!existingPackages.contains(PythonResolutionResult.normalizeName(entry.getKey()))) {
                 sb.append("\n").append(entry.getKey()).append(PyProjectHelper.normalizeVersionConstraint(entry.getValue()));
                 changed = true;
             }
@@ -105,6 +102,68 @@ public class RequirementsFile implements PythonDependencyFile {
                     .removeByType(PythonResolutionResult.class)
                     .addIfAbsent(updatedMarker));
             return new RequirementsFile(new Cursor(cursor.getParentOrThrow(), newPt), updatedMarker);
+        }
+        return this;
+    }
+
+    @Override
+    public RequirementsFile withRemovedDependencies(Set<String> packageNames, @Nullable String scope, @Nullable String groupName) {
+        Set<String> normalizedNames = new HashSet<>();
+        for (String name : packageNames) {
+            normalizedNames.add(PythonResolutionResult.normalizeName(name));
+        }
+        PlainText pt = (PlainText) getTree();
+        String[] lines = pt.getText().split("\n", -1);
+        List<String> kept = new ArrayList<>();
+        boolean changed = false;
+
+        for (String line : lines) {
+            String pkg = PyProjectHelper.extractPackageName(line.trim());
+            if (pkg != null && normalizedNames.contains(PythonResolutionResult.normalizeName(pkg))) {
+                changed = true;
+            } else {
+                kept.add(line);
+            }
+        }
+
+        if (changed) {
+            PlainText newPt = pt.withText(String.join("\n", kept));
+            return new RequirementsFile(new Cursor(cursor.getParentOrThrow(), newPt), marker);
+        }
+        return this;
+    }
+
+    @Override
+    public RequirementsFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion) {
+        PlainText pt = (PlainText) getTree();
+        String[] lines = pt.getText().split("\n", -1);
+        boolean changed = false;
+        String normalizedOld = PythonResolutionResult.normalizeName(oldPackageName);
+
+        for (int i = 0; i < lines.length; i++) {
+            String trimmed = lines[i].trim();
+            String pkg = PyProjectHelper.extractPackageName(trimmed);
+            if (pkg != null && PythonResolutionResult.normalizeName(pkg).equals(normalizedOld)) {
+                // Preserve leading whitespace
+                int leadingWs = 0;
+                while (leadingWs < lines[i].length() && Character.isWhitespace(lines[i].charAt(leadingWs))) {
+                    leadingWs++;
+                }
+                String newSpec;
+                if (newVersion != null) {
+                    newSpec = newPackageName + PyProjectHelper.normalizeVersionConstraint(newVersion);
+                } else {
+                    // Replace just the name, keep the rest
+                    newSpec = newPackageName + trimmed.substring(pkg.length());
+                }
+                lines[i] = lines[i].substring(0, leadingWs) + newSpec;
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            PlainText newPt = pt.withText(String.join("\n", lines));
+            return new RequirementsFile(new Cursor(cursor.getParentOrThrow(), newPt), marker);
         }
         return this;
     }

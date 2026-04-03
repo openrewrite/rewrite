@@ -14,9 +14,7 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Trait for Python dependency files (pyproject.toml, requirements.txt, etc.).
@@ -31,7 +29,7 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
     /**
      * Upgrade version constraints for dependencies in the specified scope.
      *
-     * @param upgrades  normalized package name → new version
+     * @param upgrades  package name → new version
      * @param scope     the TOML scope, or {@code null} for the default ({@code [project].dependencies})
      * @param groupName required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
      */
@@ -40,7 +38,7 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
     /**
      * Add dependencies to the specified scope.
      *
-     * @param additions normalized package name → version constraint (e.g. {@code "2.0"} or {@code ">=2.0"})
+     * @param additions package name → version constraint (e.g. {@code "2.0"} or {@code ">=2.0"})
      * @param scope     the TOML scope (e.g. {@code "project.optional-dependencies"},
      *                  {@code "dependency-groups"}), or {@code null} for the default
      *                  ({@code [project].dependencies})
@@ -55,14 +53,32 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
      * PDM uses {@code [tool.pdm.overrides]}, and other managers add a direct dependency.
      * For requirements.txt: appends the dependency.
      *
-     * @param pins normalized package name → version constraint
+     * @param pins package name → version constraint
      */
     PythonDependencyFile withPinnedTransitiveDependencies(Map<String, String> pins);
 
     /**
+     * Remove dependencies from the specified scope.
+     *
+     * @param packageNames package names to remove
+     * @param scope        the TOML scope, or {@code null} for the default ({@code [project].dependencies})
+     * @param groupName    required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
+     */
+    PythonDependencyFile withRemovedDependencies(Set<String> packageNames, @Nullable String scope, @Nullable String groupName);
+
+    /**
+     * Change a dependency to a different package, searching all scopes.
+     *
+     * @param oldPackageName the current package name
+     * @param newPackageName the new package name
+     * @param newVersion     optional new version constraint, or {@code null} to preserve the original
+     */
+    PythonDependencyFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion);
+
+    /**
      * Add search result markers for vulnerable dependencies.
      *
-     * @param packageMessages normalized package name → vulnerability description message
+     * @param packageMessages package name → vulnerability description message
      */
     PythonDependencyFile withDependencySearchMarkers(Map<String, String> packageMessages, ExecutionContext ctx);
 
@@ -95,6 +111,20 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Look up a value in a map by normalizing the lookup key per PEP 503.
+     * This allows callers to pass non-normalized package names.
+     */
+    static @Nullable String getByNormalizedName(Map<String, String> map, String name) {
+        String normalized = PythonResolutionResult.normalizeName(name);
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            if (PythonResolutionResult.normalizeName(entry.getKey()).equals(normalized)) {
+                return entry.getValue();
+            }
+        }
+        return null;
     }
 
     /**

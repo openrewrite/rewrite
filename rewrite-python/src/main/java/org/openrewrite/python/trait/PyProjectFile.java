@@ -45,8 +45,7 @@ public class PyProjectFile implements PythonDependencyFile {
                     return literal;
                 }
 
-                String normalizedName = PythonResolutionResult.normalizeName(packageName);
-                String fixVersion = u.get(normalizedName);
+                String fixVersion = PythonDependencyFile.getByNormalizedName(u, packageName);
                 if (fixVersion == null) {
                     return literal;
                 }
@@ -86,6 +85,134 @@ public class PyProjectFile implements PythonDependencyFile {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), doc), updatedMarker);
         }
         return this;
+    }
+
+    @Override
+    public PyProjectFile withRemovedDependencies(Set<String> packageNames, @Nullable String scope, @Nullable String groupName) {
+        Set<String> normalizedNames = new HashSet<>();
+        for (String name : packageNames) {
+            normalizedNames.add(PythonResolutionResult.normalizeName(name));
+        }
+        Toml.Document doc = (Toml.Document) getTree();
+        Toml.Document result = (Toml.Document) new TomlIsoVisitor<Set<String>>() {
+            @Override
+            public Toml.Array visitArray(Toml.Array array, Set<String> names) {
+                Toml.Array a = super.visitArray(array, names);
+                if (!PyProjectHelper.isInsideDependencyArray(getCursor(), scope, groupName)) {
+                    return a;
+                }
+
+                List<TomlRightPadded<Toml>> existingPadded = a.getPadding().getValues();
+                List<TomlRightPadded<Toml>> newPadded = new ArrayList<>();
+                boolean found = false;
+                int removedIdx = -1;
+
+                for (int i = 0; i < existingPadded.size(); i++) {
+                    TomlRightPadded<Toml> padded = existingPadded.get(i);
+                    Toml element = padded.getElement();
+
+                    if (element instanceof Toml.Literal) {
+                        Object val = ((Toml.Literal) element).getValue();
+                        if (val instanceof String) {
+                            String depName = PyProjectHelper.extractPackageName((String) val);
+                            if (depName != null && names.contains(PythonResolutionResult.normalizeName(depName))) {
+                                if (!found) {
+                                    removedIdx = i;
+                                }
+                                found = true;
+                                continue;
+                            }
+                        }
+                    }
+                    newPadded.add(padded);
+                }
+
+                if (!found) {
+                    return a;
+                }
+
+                if (removedIdx == 0 && !newPadded.isEmpty()) {
+                    TomlRightPadded<Toml> first = newPadded.get(0);
+                    if (!(first.getElement() instanceof Toml.Empty)) {
+                        Space originalPrefix = existingPadded.get(removedIdx).getElement().getPrefix();
+                        newPadded.set(0, first.map(el -> el.withPrefix(originalPrefix)));
+                    }
+                }
+
+                return a.getPadding().withValues(newPadded);
+            }
+        }.visitNonNull(doc, normalizedNames);
+        if (result != doc) {
+            return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
+        }
+        return this;
+    }
+
+    @Override
+    public PyProjectFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion) {
+        String normalizedOld = PythonResolutionResult.normalizeName(oldPackageName);
+        Toml.Document doc = (Toml.Document) getTree();
+        Toml.Document result = (Toml.Document) new TomlIsoVisitor<Integer>() {
+            @Override
+            public Toml.Literal visitLiteral(Toml.Literal literal, Integer p) {
+                if (literal.getType() != TomlType.Primitive.String) {
+                    return literal;
+                }
+                Object val = literal.getValue();
+                if (!(val instanceof String)) {
+                    return literal;
+                }
+                String spec = (String) val;
+                String depName = PyProjectHelper.extractPackageName(spec);
+                if (depName == null || !PythonResolutionResult.normalizeName(depName).equals(normalizedOld)) {
+                    return literal;
+                }
+
+                String newSpec = buildChangedSpec(spec, depName, newPackageName, newVersion);
+                return literal.withSource("\"" + newSpec + "\"").withValue(newSpec);
+            }
+        }.visitNonNull(doc, 0);
+        if (result != doc) {
+            return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
+        }
+        return this;
+    }
+
+    private static String buildChangedSpec(String oldSpec, String oldName, String newName, @Nullable String newVer) {
+        StringBuilder sb = new StringBuilder(newName);
+
+        // Preserve extras
+        int extrasStart = oldSpec.indexOf('[', oldName.length());
+        int extrasEnd = oldSpec.indexOf(']', oldName.length());
+        if (extrasStart >= 0 && extrasEnd > extrasStart) {
+            sb.append(oldSpec, extrasStart, extrasEnd + 1);
+        }
+
+        if (newVer != null) {
+            sb.append(PyProjectHelper.normalizeVersionConstraint(newVer));
+        } else {
+            // Preserve original version constraint
+            String remaining = oldSpec.substring(oldName.length()).trim();
+            if (remaining.startsWith("[")) {
+                int end = remaining.indexOf(']');
+                if (end >= 0) {
+                    remaining = remaining.substring(end + 1).trim();
+                }
+            }
+            int markerIdx = remaining.indexOf(';');
+            String versionPart = markerIdx >= 0 ? remaining.substring(0, markerIdx).trim() : remaining.trim();
+            if (!versionPart.isEmpty()) {
+                sb.append(versionPart);
+            }
+        }
+
+        // Preserve environment markers
+        int semiIdx = oldSpec.indexOf(';');
+        if (semiIdx >= 0) {
+            sb.append("; ").append(oldSpec.substring(semiIdx + 1).trim());
+        }
+
+        return sb.toString();
     }
 
     @Override
