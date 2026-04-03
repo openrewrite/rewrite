@@ -736,19 +736,39 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 		}
 	}
 
-	closeParen := ctx.prefix(fl.Closing)
-	ctx.skip(1) // ")"
-
+	var markers tree.Markers
 	if len(elements) > 0 {
-		elements[len(elements)-1].After = closeParen
-	} else if len(closeParen.Comments) > 0 {
-		elements = append(elements, tree.RightPadded[tree.Statement]{
-			Element: &tree.Empty{ID: uuid.New()},
-			After:   closeParen,
-		})
+		trailingCommaOff := ctx.findNextBefore(',', int(fl.Closing)-ctx.file.Base())
+		if trailingCommaOff >= 0 {
+			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
+			ctx.skip(1) // ","
+			commaAfter := ctx.prefix(fl.Closing)
+			ctx.skip(1) // ")"
+			markers = tree.Markers{
+				ID: uuid.New(),
+				Entries: []tree.Marker{tree.TrailingComma{
+					Ident:  uuid.New(),
+					Before: commaBefore,
+					After:  commaAfter,
+				}},
+			}
+		} else {
+			closePrefix := ctx.prefix(fl.Closing)
+			ctx.skip(1) // ")"
+			elements[len(elements)-1].After = closePrefix
+		}
+	} else {
+		closeParen := ctx.prefix(fl.Closing)
+		ctx.skip(1) // ")"
+		if len(closeParen.Comments) > 0 {
+			elements = append(elements, tree.RightPadded[tree.Statement]{
+				Element: &tree.Empty{ID: uuid.New()},
+				After:   closeParen,
+			})
+		}
 	}
 
-	return tree.Container[tree.Statement]{Before: before, Elements: elements}
+	return tree.Container[tree.Statement]{Before: before, Elements: elements, Markers: markers}
 }
 
 // mapBlockStmt maps a block statement.
