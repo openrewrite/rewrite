@@ -341,7 +341,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     String codePoint = q.receive(s != null ? s.getCodePoint() : null);
                     return new J.Literal.UnicodeEscape(valueSourceIndex, codePoint);
                 }))
-                .withType(q.receive(literal.getType(), t -> (JavaType.Primitive) visitType(t, q)));
+                .withType(q.receive((JavaType) literal.getType(), t -> visitType(t, q)));
     }
 
     @Override

@@ -430,4 +430,25 @@ class GolangParserIntegTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void literalWithNonPrimitiveType() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import (
+                                \t"time"
+
+                                \t"github.com/example/pkg"
+                                )
+
+                                var c = pkg.Config{
+                                \tTTL: 10 * time.Minute,
+                                }
+                                """
+                )
+        );
+    }
 }
