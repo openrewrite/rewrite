@@ -34,13 +34,27 @@ public class StructTag implements Marker, RpcCodec<StructTag> {
     @Override
     public void rpcSend(StructTag after, RpcSendQueue q) {
         q.getAndSend(after, Marker::getId);
-        q.getAndSend(after, StructTag::getTag);
+        // Send the tag literal's value as a simple string instead of a tree node.
+        // The tree node doesn't round-trip cleanly through the raw-value path.
+        q.getAndSend(after, st -> st.getTag() != null ? st.getTag().getValueSource() : null);
     }
 
     @Override
     public StructTag rpcReceive(StructTag before, RpcReceiveQueue q) {
         return before
                 .withId(q.receiveAndGet(before.getId(), UUID::fromString))
-                .withTag(q.receive(before.getTag()));
+                .withTag(q.<J.Literal, Object>receiveAndGet(before.getTag(), valueSource -> {
+                    if (valueSource == null) return null;
+                    String vs = valueSource.toString();
+                    return new J.Literal(
+                            before.getTag() != null ? before.getTag().getId() : java.util.UUID.randomUUID(),
+                            before.getTag() != null ? before.getTag().getPrefix() : org.openrewrite.java.tree.Space.EMPTY,
+                            before.getTag() != null ? before.getTag().getMarkers() : org.openrewrite.marker.Markers.EMPTY,
+                            vs,
+                            vs,
+                            null,
+                            org.openrewrite.java.tree.JavaType.Primitive.String
+                    );
+                }));
     }
 }

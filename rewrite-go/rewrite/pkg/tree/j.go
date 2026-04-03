@@ -1075,6 +1075,7 @@ type VariableDeclarations struct {
 	ID        uuid.UUID
 	Prefix    Space
 	Markers   Markers
+	Varargs   *Space                             // non-nil for variadic params; the `...` prefix space
 	TypeExpr  Expression                        // the declared type (nil if inferred)
 	Variables []RightPadded[*VariableDeclarator] // the declared variables
 	Specs     *Container[Statement]             // non-nil for grouped `var ( ... )`; Before = space before `(`

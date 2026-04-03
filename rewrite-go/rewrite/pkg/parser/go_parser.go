@@ -644,9 +644,10 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 	for i, field := range fl.List {
 		if len(field.Names) == 0 {
 			// Unnamed parameter: just a type expression (e.g., `int` in `func(int)`)
-			typeExpr := ctx.mapTypeExpr(field.Type)
+			typeExpr, varargs := ctx.mapTypeExprVariadic(field.Type)
 			vd := &tree.VariableDeclarations{
 				ID:       uuid.New(),
+				Varargs:  varargs,
 				TypeExpr: typeExpr,
 				Variables: []tree.RightPadded[*tree.VariableDeclarator]{
 					{Element: &tree.VariableDeclarator{ID: uuid.New(), Name: &tree.Identifier{ID: uuid.New()}}},
@@ -681,9 +682,10 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 				})
 			}
 
-			typeExpr := ctx.mapTypeExpr(field.Type)
+			typeExpr, varargs := ctx.mapTypeExprVariadic(field.Type)
 			vd := &tree.VariableDeclarations{
 				ID:        uuid.New(),
+				Varargs:   varargs,
 				TypeExpr:  typeExpr,
 				Variables: vars,
 			}
@@ -2256,6 +2258,18 @@ func (ctx *parseContext) mapFieldListAsInterfaceBody(fl *ast.FieldList) *tree.Bl
 	ctx.skip(1) // "}"
 
 	return &tree.Block{ID: uuid.New(), Prefix: blockPrefix, Statements: stmts, End: end}
+}
+
+// mapTypeExprVariadic maps a type expression, detecting variadic `...T` and
+// returning the element type plus a non-nil Varargs Space for the `...` prefix.
+func (ctx *parseContext) mapTypeExprVariadic(typ ast.Expr) (tree.Expression, *tree.Space) {
+	if ell, ok := typ.(*ast.Ellipsis); ok {
+		ellipsisPrefix := ctx.prefix(ell.Ellipsis)
+		ctx.skip(3) // "..."
+		elemType := ctx.mapTypeExpr(ell.Elt)
+		return elemType, &ellipsisPrefix
+	}
+	return ctx.mapTypeExpr(typ), nil
 }
 
 // mapEllipsis maps `...T` in function parameters.

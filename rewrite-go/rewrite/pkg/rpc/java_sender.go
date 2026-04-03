@@ -473,8 +473,12 @@ func (s *JavaSender) sendVariableDeclarations(vd *tree.VariableDeclarations, q *
 	// typeExpression
 	q.GetAndSend(vd, func(v any) any { return v.(*tree.VariableDeclarations).TypeExpr },
 		func(v any) { s.parent.Visit(v, q) })
-	// varargs (nil for Go)
-	q.GetAndSend(vd, func(_ any) any { return nil }, nil)
+	// varargs (Space for variadic params, nil otherwise)
+	q.GetAndSend(vd, func(v any) any {
+		va := v.(*tree.VariableDeclarations).Varargs
+		if va == nil { return nil }
+		return *va
+	}, func(v any) { sendSpace(v.(tree.Space), q) })
 	// variables (list of right-padded NamedVariable)
 	q.GetAndSendList(vd,
 		func(v any) []any {

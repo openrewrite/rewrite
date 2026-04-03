@@ -356,7 +356,14 @@ func (r *JavaReceiver) receiveVariableDeclarations(vd *tree.VariableDeclarations
 		vd.TypeExpr = result.(tree.Expression)
 	}
 	// varargs
-	q.Receive(nil, nil)
+	var vaBefore any
+	if vd.Varargs != nil { vaBefore = *vd.Varargs }
+	if vaResult := q.Receive(vaBefore, func(v any) any { return receiveSpace(v.(tree.Space), q) }); vaResult != nil {
+		va := vaResult.(tree.Space)
+		vd.Varargs = &va
+	} else {
+		vd.Varargs = nil
+	}
 	// variables
 	beforeVars := make([]any, len(vd.Variables))
 	for i, v := range vd.Variables {
