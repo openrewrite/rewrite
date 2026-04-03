@@ -50,6 +50,16 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
     PythonDependencyFile withAddedDependencies(Map<String, String> additions, @Nullable String scope, @Nullable String groupName);
 
     /**
+     * Pin transitive dependencies using the strategy appropriate for this file's
+     * package manager. For pyproject.toml: uv uses {@code [tool.uv].constraint-dependencies},
+     * PDM uses {@code [tool.pdm.overrides]}, and other managers add a direct dependency.
+     * For requirements.txt: appends the dependency.
+     *
+     * @param pins normalized package name → version constraint
+     */
+    PythonDependencyFile withPinnedTransitiveDependencies(Map<String, String> pins);
+
+    /**
      * Add search result markers for vulnerable dependencies.
      *
      * @param packageMessages normalized package name → vulnerability description message

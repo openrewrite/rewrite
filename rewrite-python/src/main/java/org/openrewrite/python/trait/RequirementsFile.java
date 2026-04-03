@@ -110,6 +110,11 @@ public class RequirementsFile implements PythonDependencyFile {
     }
 
     @Override
+    public RequirementsFile withPinnedTransitiveDependencies(Map<String, String> pins) {
+        return withAddedDependencies(pins, null, null);
+    }
+
+    @Override
     public RequirementsFile withDependencySearchMarkers(Map<String, String> packageMessages, ExecutionContext ctx) {
         PlainText result = (PlainText) getTree();
         for (Map.Entry<String, String> entry : packageMessages.entrySet()) {

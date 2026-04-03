@@ -21,9 +21,7 @@ import org.openrewrite.toml.tree.TomlRightPadded;
 import org.openrewrite.toml.tree.TomlType;
 import org.openrewrite.trait.SimpleTraitMatcher;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Value
 public class PyProjectFile implements PythonDependencyFile {
@@ -88,6 +86,115 @@ public class PyProjectFile implements PythonDependencyFile {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), doc), updatedMarker);
         }
         return this;
+    }
+
+    @Override
+    public PyProjectFile withPinnedTransitiveDependencies(Map<String, String> pins) {
+        PythonResolutionResult.PackageManager pm = marker.getPackageManager();
+        if (pm == PythonResolutionResult.PackageManager.Uv) {
+            return pinViaArrayScope(pins, "tool.uv.constraint-dependencies");
+        } else if (pm == PythonResolutionResult.PackageManager.Pdm) {
+            return pinViaPdmOverrides(pins);
+        } else {
+            // Fallback: add as direct dependency
+            return withAddedDependencies(pins, null, null);
+        }
+    }
+
+    private PyProjectFile pinViaArrayScope(Map<String, String> pins, String scope) {
+        PyProjectFile current = this;
+        for (Map.Entry<String, String> entry : pins.entrySet()) {
+            PythonResolutionResult.Dependency existing = PyProjectHelper.findDependencyInScope(
+                    current.marker, entry.getKey(), scope, null);
+            if (existing == null) {
+                current = current.withAddedDependencies(
+                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+            } else {
+                current = current.withUpgradedVersions(
+                        Collections.singletonMap(entry.getKey(), entry.getValue()), scope, null);
+            }
+        }
+        return current;
+    }
+
+    private PyProjectFile pinViaPdmOverrides(Map<String, String> pins) {
+        Toml.Document doc = (Toml.Document) getTree();
+        Toml.Document updated = doc;
+        for (Map.Entry<String, String> entry : pins.entrySet()) {
+            PythonResolutionResult.Dependency existing = PyProjectHelper.findDependencyInScope(
+                    marker, entry.getKey(), "tool.pdm.overrides", null);
+            if (existing == null) {
+                updated = addPdmOverride(updated, entry.getKey(), entry.getValue());
+            } else {
+                updated = upgradePdmOverride(updated, entry.getKey(), entry.getValue());
+            }
+        }
+        if (updated != doc) {
+            return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), updated), marker);
+        }
+        return this;
+    }
+
+    private static Toml.Document addPdmOverride(Toml.Document doc, String packageName, String version) {
+        String normalizedVersion = PyProjectHelper.normalizeVersionConstraint(version);
+        return (Toml.Document) new TomlIsoVisitor<Integer>() {
+            @Override
+            public Toml.Table visitTable(Toml.Table table, Integer p) {
+                Toml.Table t = super.visitTable(table, p);
+                if (t.getName() == null || !"tool.pdm.overrides".equals(t.getName().getName())) {
+                    return t;
+                }
+
+                Toml.Identifier key = new Toml.Identifier(
+                        Tree.randomId(), Space.EMPTY, Markers.EMPTY, packageName, packageName);
+                Toml.Literal value = new Toml.Literal(
+                        Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                        TomlType.Primitive.String, "\"" + normalizedVersion + "\"", normalizedVersion);
+                Toml.KeyValue newKv = new Toml.KeyValue(
+                        Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                        new TomlRightPadded<>(key, Space.SINGLE_SPACE, Markers.EMPTY),
+                        value);
+
+                List<Toml> values = t.getValues();
+                Space entryPrefix = !values.isEmpty()
+                        ? values.get(values.size() - 1).getPrefix()
+                        : Space.format("\n");
+                newKv = newKv.withPrefix(entryPrefix);
+
+                List<Toml> newValues = new ArrayList<>(values);
+                newValues.add(newKv);
+                return t.withValues(newValues);
+            }
+        }.visitNonNull(doc, 0);
+    }
+
+    private static Toml.Document upgradePdmOverride(Toml.Document doc, String packageName, String version) {
+        String normalizedName = PythonResolutionResult.normalizeName(packageName);
+        String normalizedVersion = PyProjectHelper.normalizeVersionConstraint(version);
+        return (Toml.Document) new TomlIsoVisitor<Integer>() {
+            @Override
+            public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, Integer p) {
+                Toml.KeyValue kv = super.visitKeyValue(keyValue, p);
+                if (!PyProjectHelper.isInsidePdmOverridesTable(getCursor())) {
+                    return kv;
+                }
+                if (!(kv.getKey() instanceof Toml.Identifier)) {
+                    return kv;
+                }
+                String keyName = ((Toml.Identifier) kv.getKey()).getName();
+                if (!PythonResolutionResult.normalizeName(keyName).equals(normalizedName)) {
+                    return kv;
+                }
+                if (!(kv.getValue() instanceof Toml.Literal)) {
+                    return kv;
+                }
+                Toml.Literal literal = (Toml.Literal) kv.getValue();
+                if (normalizedVersion.equals(literal.getValue())) {
+                    return kv;
+                }
+                return kv.withValue(literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
+            }
+        }.visitNonNull(doc, 0);
     }
 
     private static Toml.Document addDependencyToArray(Toml.Document d, String pep508,

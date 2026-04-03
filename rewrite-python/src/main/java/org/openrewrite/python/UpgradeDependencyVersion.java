@@ -22,7 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.trait.PyProjectFile;
+import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
 
@@ -98,75 +98,74 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        return new TomlIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                String sourcePath = document.getSourcePath().toString();
-
-                if (sourcePath.endsWith("uv.lock")) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                stopAfterPreVisit();
+                SourceFile sourceFile = (SourceFile) tree;
+                if (tree instanceof Toml.Document && sourceFile.getSourcePath().toString().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourcePath),
-                            document.printAll());
-                    return document;
+                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath().toString()),
+                            ((Toml.Document) tree).printAll());
+                    return tree;
                 }
-
-                if (!sourcePath.endsWith("pyproject.toml")) {
-                    return document;
+                PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
+                if (trait == null) {
+                    return tree;
                 }
-                Optional<PythonResolutionResult> resolution = document.getMarkers()
-                        .findFirst(PythonResolutionResult.class);
-                if (!resolution.isPresent()) {
-                    return document;
-                }
-
-                PythonResolutionResult marker = resolution.get();
-
-                // Check if the dependency exists in the target scope and has a different version
                 PythonResolutionResult.Dependency dep = PyProjectHelper.findDependencyInScope(
-                        marker, packageName, scope, groupName);
+                        trait.getMarker(), packageName, scope, groupName);
                 if (dep == null) {
-                    return document;
+                    return tree;
                 }
-
-                // Skip if the version constraint already matches
                 if (PyProjectHelper.normalizeVersionConstraint(newVersion).equals(dep.getVersionConstraint())) {
-                    return document;
+                    return tree;
                 }
-
-                acc.projectsToUpdate.add(sourcePath);
-                return document;
+                acc.projectsToUpdate.add(sourceFile.getSourcePath().toString());
+                return tree;
             }
         };
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        return new TomlIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                String sourcePath = document.getSourcePath().toString();
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                stopAfterPreVisit();
+                SourceFile sourceFile = (SourceFile) tree;
+                String sourcePath = sourceFile.getSourcePath().toString();
 
-                if (sourcePath.endsWith("pyproject.toml") && acc.projectsToUpdate.contains(sourcePath)) {
-                    PyProjectFile trait = new PyProjectFile.Matcher().get(getCursor()).orElse(null);
+                if (acc.projectsToUpdate.contains(sourcePath)) {
+                    PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
                     if (trait != null) {
                         Map<String, String> upgrades = Collections.singletonMap(
                                 PythonResolutionResult.normalizeName(packageName), newVersion);
-                        PyProjectFile updated = trait.withUpgradedVersions(upgrades, scope, groupName);
-                        Toml.Document result = (Toml.Document) updated.getTree();
-                        if (result != document) {
-                            return PyProjectHelper.regenerateLockAndRefreshMarker(result, ctx);
+                        PythonDependencyFile updated = trait.withUpgradedVersions(upgrades, scope, groupName);
+                        SourceFile result = (SourceFile) updated.getTree();
+                        if (result != tree) {
+                            if (result instanceof Toml.Document) {
+                                return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) result, ctx);
+                            }
+                            return result;
                         }
                     }
                 }
 
-                if (sourcePath.endsWith("uv.lock")) {
-                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock(document, ctx);
+                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock((Toml.Document) tree, ctx);
                     if (updatedLock != null) {
                         return updatedLock;
                     }
                 }
 
-                return document;
+                return tree;
             }
         };
     }
