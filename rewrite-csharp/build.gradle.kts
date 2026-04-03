@@ -17,6 +17,12 @@ plugins {
     id("publishing")
 }
 
+normalization {
+    runtimeClasspath {
+        ignore("META-INF/rewrite-csharp-version.txt")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
