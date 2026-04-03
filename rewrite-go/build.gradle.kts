@@ -1,3 +1,8 @@
+@file:Suppress("UnstableApiUsage")
+
+import com.gradle.develocity.agent.gradle.test.ImportJUnitXmlReports
+import com.gradle.develocity.agent.gradle.test.JUnitXmlDialect
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.moderne-source-available-license")
@@ -96,4 +101,34 @@ val generateTestClasspath by tasks.registering {
         outputFile.writeText(classpath)
         logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
     }
+}
+
+val junitXmlFile = file("rewrite/build/test-results/gotest/junit.xml")
+
+val goTest = tasks.register<Exec>("goTest") {
+    group = "verification"
+    description = "Run Go tests"
+
+    workingDir = file("rewrite")
+    commandLine("go", "run", "gotest.tools/gotestsum@latest",
+        "--junitfile", junitXmlFile.relativeTo(file("rewrite")).path,
+        "--format", "standard-verbose",
+        "--", "-count=1", "./test/...")
+
+    dependsOn(generateTestClasspath)
+
+    inputs.files(fileTree("rewrite") {
+        include("**/*.go")
+        include("go.mod")
+        include("go.sum")
+    }).withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.file(file("rewrite/test-classpath.txt"))
+    outputs.file(junitXmlFile)
+    outputs.cacheIf { true }
+}
+
+ImportJUnitXmlReports.register(tasks, goTest, JUnitXmlDialect.GENERIC)
+
+tasks.named("check") {
+    dependsOn(goTest)
 }
