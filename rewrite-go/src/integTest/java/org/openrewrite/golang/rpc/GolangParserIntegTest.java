@@ -451,4 +451,18 @@ class GolangParserIntegTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void variadicParameter() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func foo(args ...string) {
+                                }
+                                """
+                )
+        );
+    }
 }

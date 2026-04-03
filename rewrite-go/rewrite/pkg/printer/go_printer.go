@@ -323,7 +323,11 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, par
 			out.Append(",")
 		}
 	}
-	// Then type expression
+	// Then varargs + type expression
+	if vd.Varargs != nil {
+		p.visitSpace(*vd.Varargs, out)
+		out.Append("...")
+	}
 	if vd.TypeExpr != nil {
 		p.Visit(vd.TypeExpr, out)
 	}

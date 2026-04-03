@@ -669,9 +669,15 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 		if len(field.Names) == 0 {
 			// Unnamed parameter: just a type expression (e.g., `int` in `func(int)`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
+			var varargs *tree.Space
+			if u, ok := typeExpr.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
+				varargs = &u.Prefix
+				typeExpr = u.Operand
+			}
 			vd := &tree.VariableDeclarations{
 				ID:       uuid.New(),
 				TypeExpr: typeExpr,
+				Varargs:  varargs,
 				Variables: []tree.RightPadded[*tree.VariableDeclarator]{
 					{Element: &tree.VariableDeclarator{ID: uuid.New(), Name: &tree.Identifier{ID: uuid.New()}}},
 				},
@@ -706,9 +712,15 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 			}
 
 			typeExpr := ctx.mapTypeExpr(field.Type)
+			var varargs *tree.Space
+			if u, ok := typeExpr.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
+				varargs = &u.Prefix
+				typeExpr = u.Operand
+			}
 			vd := &tree.VariableDeclarations{
 				ID:        uuid.New(),
 				TypeExpr:  typeExpr,
+				Varargs:   varargs,
 				Variables: vars,
 			}
 

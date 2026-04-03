@@ -1076,6 +1076,7 @@ type VariableDeclarations struct {
 	Prefix    Space
 	Markers   Markers
 	TypeExpr  Expression                        // the declared type (nil if inferred)
+	Varargs   *Space                            // non-nil for variadic params (`...T`); holds prefix of `...`
 	Variables []RightPadded[*VariableDeclarator] // the declared variables
 	Specs     *Container[Statement]             // non-nil for grouped `var ( ... )`; Before = space before `(`
 }
