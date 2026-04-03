@@ -24,11 +24,12 @@ import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * Change a dependency to a different package in pyproject.toml.
- * Searches all dependency arrays in the document (no scope restriction).
+ * Change a dependency to a different package. Supports both {@code pyproject.toml}
+ * and {@code requirements.txt} files. Searches all dependency scopes.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -64,8 +65,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     @Override
     public String getDescription() {
-        return "Change a dependency to a different package in `pyproject.toml`. " +
-                "Searches all dependency arrays. When `uv` is available, the `uv.lock` file is regenerated.";
+        return "Change a dependency to a different package. Supports `pyproject.toml` " +
+                "and `requirements.txt` files. Searches all dependency scopes. " +
+                "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
     static class Accumulator {

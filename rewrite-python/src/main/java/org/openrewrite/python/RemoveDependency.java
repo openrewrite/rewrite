@@ -24,10 +24,13 @@ import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * Remove a dependency from the {@code [project].dependencies} array in pyproject.toml.
+ * Remove a dependency from a Python project. Supports both {@code pyproject.toml}
+ * (with scope and group targeting) and {@code requirements.txt} files.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -76,7 +79,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
     @Override
     public String getDescription() {
-        return "Remove a dependency from the `[project].dependencies` array in `pyproject.toml`. " +
+        return "Remove a dependency from a Python project. Supports `pyproject.toml` " +
+                "(with scope/group targeting) and `requirements.txt` files. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 

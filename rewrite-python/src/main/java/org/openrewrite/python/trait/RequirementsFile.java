@@ -17,16 +17,45 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Value
 public class RequirementsFile implements PythonDependencyFile {
     private static final RequirementsTxtParser PARSER = new RequirementsTxtParser();
+    private static final Pattern SCOPE_PATTERN = Pattern.compile("requirements(?:-([\\w-]+))?\\.(?:txt|in)");
 
     Cursor cursor;
     PythonResolutionResult marker;
 
+    /**
+     * Check whether this file matches the given scope.
+     * <ul>
+     *   <li>{@code null} → matches all requirements files</li>
+     *   <li>{@code ""} (empty) → matches only {@code requirements.txt} / {@code requirements.in}</li>
+     *   <li>{@code "dev"} → matches only {@code requirements-dev.txt} / {@code requirements-dev.in}</li>
+     * </ul>
+     */
+    private boolean matchesScope(@Nullable String scope) {
+        if (scope == null) {
+            return true;
+        }
+        String filename = getTree().getSourcePath().getFileName().toString();
+        java.util.regex.Matcher m = SCOPE_PATTERN.matcher(filename);
+        if (!m.matches()) {
+            return false;
+        }
+        String fileSuffix = m.group(1); // null for requirements.txt, "dev" for requirements-dev.txt
+        if (scope.isEmpty()) {
+            return fileSuffix == null;
+        }
+        return scope.equals(fileSuffix);
+    }
+
     @Override
     public RequirementsFile withUpgradedVersions(Map<String, String> upgrades, @Nullable String scope, @Nullable String groupName) {
+        if (!matchesScope(scope)) {
+            return this;
+        }
         PlainText pt = (PlainText) getTree();
         String text = pt.getText();
         String[] lines = text.split("\n", -1);
@@ -74,6 +103,9 @@ public class RequirementsFile implements PythonDependencyFile {
 
     @Override
     public RequirementsFile withAddedDependencies(Map<String, String> additions, @Nullable String scope, @Nullable String groupName) {
+        if (!matchesScope(scope)) {
+            return this;
+        }
         PlainText pt = (PlainText) getTree();
         String text = pt.getText();
         String[] lines = text.split("\n", -1);
@@ -108,6 +140,9 @@ public class RequirementsFile implements PythonDependencyFile {
 
     @Override
     public RequirementsFile withRemovedDependencies(Set<String> packageNames, @Nullable String scope, @Nullable String groupName) {
+        if (!matchesScope(scope)) {
+            return this;
+        }
         Set<String> normalizedNames = new HashSet<>();
         for (String name : packageNames) {
             normalizedNames.add(PythonResolutionResult.normalizeName(name));

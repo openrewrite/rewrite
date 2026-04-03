@@ -25,16 +25,17 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Pin a transitive dependency version by adding or upgrading a constraint in the
- * appropriate tool-specific section. The strategy depends on the detected package manager:
- * <ul>
- *   <li><b>uv</b>: uses {@code [tool.uv].constraint-dependencies}</li>
- *   <li><b>PDM</b>: uses {@code [tool.pdm.overrides]}</li>
- *   <li><b>Other/unknown</b>: adds as a direct dependency in {@code [project].dependencies}</li>
- * </ul>
+ * Pin a transitive dependency version using the strategy appropriate for the file type
+ * and package manager. For {@code pyproject.toml}: uv uses
+ * {@code [tool.uv].constraint-dependencies}, PDM uses {@code [tool.pdm.overrides]},
+ * and other managers add a direct dependency. For {@code requirements.txt}: appends
+ * the dependency. When uv is available, the uv.lock file is regenerated.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -62,9 +63,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     @Override
     public String getDescription() {
-        return "Pin a transitive dependency version using the appropriate strategy for the " +
-                "detected package manager: uv uses `[tool.uv].constraint-dependencies`, " +
-                "PDM uses `[tool.pdm.overrides]`, and other managers add a direct dependency.";
+        return "Pin a transitive dependency version using the strategy appropriate for the file type " +
+                "and package manager. For `pyproject.toml`: uv uses `[tool.uv].constraint-dependencies`, " +
+                "PDM uses `[tool.pdm.overrides]`, and other managers add a direct dependency. " +
+                "For `requirements.txt`: appends the dependency.";
     }
 
     static class Accumulator {
@@ -133,7 +135,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         String normalizedName = PythonResolutionResult.normalizeName(packageName);
                         Map<String, String> pins = Collections.singletonMap(normalizedName, version);
                         PythonDependencyFile updated = trait.withPinnedTransitiveDependencies(pins);
-                        SourceFile result = (SourceFile) updated.getTree();
+                        SourceFile result = updated.getTree();
                         if (result != tree) {
                             if (result instanceof Toml.Document) {
                                 return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) result, ctx);

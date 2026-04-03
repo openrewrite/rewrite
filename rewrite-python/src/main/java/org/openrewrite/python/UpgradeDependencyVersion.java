@@ -23,13 +23,16 @@ import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.trait.PythonDependencyFile;
-import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Upgrade the version constraint for a dependency in {@code [project].dependencies} in pyproject.toml.
+ * Upgrade the version constraint for a dependency. Supports both {@code pyproject.toml}
+ * (with scope and group targeting) and {@code requirements.txt} files.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -83,7 +86,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Override
     public String getDescription() {
-        return "Upgrade the version constraint for a dependency in `[project].dependencies` in `pyproject.toml`. " +
+        return "Upgrade the version constraint for a dependency. Supports `pyproject.toml` " +
+                "(with scope/group targeting) and `requirements.txt` files. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
@@ -169,23 +173,4 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
         };
     }
-
-    static @Nullable String extractExtras(String pep508Spec) {
-        int start = pep508Spec.indexOf('[');
-        int end = pep508Spec.indexOf(']');
-        if (start >= 0 && end > start) {
-            return pep508Spec.substring(start + 1, end);
-        }
-        return null;
-    }
-
-    static @Nullable String extractMarker(String pep508Spec) {
-        int idx = pep508Spec.indexOf(';');
-        if (idx >= 0) {
-            String marker = pep508Spec.substring(idx + 1).trim();
-            return marker.isEmpty() ? null : marker;
-        }
-        return null;
-    }
-
 }

@@ -21,15 +21,17 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
-import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.trait.PythonDependencyFile;
-import org.openrewrite.toml.TomlIsoVisitor;
 import org.openrewrite.toml.tree.Toml;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * Add a dependency to the {@code [project].dependencies} array in pyproject.toml.
+ * Add a dependency to a Python project. Supports both {@code pyproject.toml}
+ * (with scope and group targeting) and {@code requirements.txt} files.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -49,7 +51,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     String version;
 
     @Option(displayName = "Scope",
-            description = "The dependency scope to add to. Defaults to `project.dependencies`.",
+            description = "The dependency scope to add to. For pyproject.toml this targets a specific TOML section. " +
+                    "For requirements files, `null` matches all files, empty string matches only `requirements.txt`, " +
+                    "and a value like `dev` matches `requirements-dev.txt`. Defaults to `project.dependencies`.",
             valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups",
                     "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
             example = "project.dependencies",
@@ -85,7 +89,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
 
     @Override
     public String getDescription() {
-        return "Add a dependency to the `[project].dependencies` array in `pyproject.toml`. " +
+        return "Add a dependency to a Python project. Supports `pyproject.toml` " +
+                "(with scope/group targeting) and `requirements.txt` files. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
