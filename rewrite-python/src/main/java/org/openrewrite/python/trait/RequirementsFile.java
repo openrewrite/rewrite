@@ -76,7 +76,7 @@ public class RequirementsFile implements PythonDependencyFile {
     }
 
     @Override
-    public RequirementsFile withAddedDependencies(Map<String, String> additions) {
+    public RequirementsFile withAddedDependencies(Map<String, String> additions, @Nullable String scope, @Nullable String groupName) {
         PlainText pt = (PlainText) getTree();
         String text = pt.getText();
         String[] lines = text.split("\n", -1);
@@ -93,7 +93,7 @@ public class RequirementsFile implements PythonDependencyFile {
         boolean changed = false;
         for (Map.Entry<String, String> entry : additions.entrySet()) {
             if (!existingPackages.contains(entry.getKey())) {
-                sb.append("\n").append(entry.getKey()).append(">=").append(entry.getValue());
+                sb.append("\n").append(entry.getKey()).append(PyProjectHelper.normalizeVersionConstraint(entry.getValue()));
                 changed = true;
             }
         }

@@ -71,14 +71,13 @@ public class PyProjectFile implements PythonDependencyFile {
     }
 
     @Override
-    public PyProjectFile withAddedDependencies(Map<String, String> additions) {
+    public PyProjectFile withAddedDependencies(Map<String, String> additions, @Nullable String scope, @Nullable String groupName) {
         Toml.Document doc = (Toml.Document) getTree();
         Toml.Document original = doc;
-        String scope = transitiveConstraintScope();
         for (Map.Entry<String, String> entry : additions.entrySet()) {
-            if (PyProjectHelper.findDependencyInScope(marker, entry.getKey(), scope, null) == null) {
-                String pep508 = entry.getKey() + ">=" + entry.getValue();
-                doc = addDependencyToArray(doc, pep508, scope);
+            if (PyProjectHelper.findDependencyInScope(marker, entry.getKey(), scope, groupName) == null) {
+                String pep508 = entry.getKey() + PyProjectHelper.normalizeVersionConstraint(entry.getValue());
+                doc = addDependencyToArray(doc, pep508, scope, groupName);
             }
         }
         if (doc != original) {
@@ -91,25 +90,13 @@ public class PyProjectFile implements PythonDependencyFile {
         return this;
     }
 
-    /**
-     * Determine the TOML scope for transitive dependency constraints based on
-     * the package manager.
-     */
-    private @Nullable String transitiveConstraintScope() {
-        PythonResolutionResult.PackageManager pm = marker.getPackageManager();
-        if (pm == PythonResolutionResult.PackageManager.Uv) {
-            return "tool.uv.constraint-dependencies";
-        }
-        // TODO: PDM uses [tool.pdm.overrides] (key-value, not array) — needs separate handling
-        return null;
-    }
-
-    private static Toml.Document addDependencyToArray(Toml.Document d, String pep508, @Nullable String scope) {
+    private static Toml.Document addDependencyToArray(Toml.Document d, String pep508,
+                                                       @Nullable String scope, @Nullable String groupName) {
         return (Toml.Document) new TomlIsoVisitor<Integer>() {
             @Override
             public Toml.Array visitArray(Toml.Array array, Integer p) {
                 Toml.Array a = super.visitArray(array, p);
-                if (!PyProjectHelper.isInsideDependencyArray(getCursor(), scope, null)) {
+                if (!PyProjectHelper.isInsideDependencyArray(getCursor(), scope, groupName)) {
                     return a;
                 }
 

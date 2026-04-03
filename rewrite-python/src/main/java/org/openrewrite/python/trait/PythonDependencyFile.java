@@ -29,7 +29,17 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
 
     PythonDependencyFile withUpgradedVersions(Map<String, String> upgrades);
 
-    PythonDependencyFile withAddedDependencies(Map<String, String> additions);
+    /**
+     * Add dependencies to the specified scope.
+     *
+     * @param additions normalized package name → version constraint (e.g. {@code "2.0"} or {@code ">=2.0"})
+     * @param scope     the TOML scope (e.g. {@code "project.optional-dependencies"},
+     *                  {@code "dependency-groups"}), or {@code null} for the default
+     *                  ({@code [project].dependencies})
+     * @param groupName required when scope is {@code "project.optional-dependencies"}
+     *                  or {@code "dependency-groups"}, otherwise {@code null}
+     */
+    PythonDependencyFile withAddedDependencies(Map<String, String> additions, @Nullable String scope, @Nullable String groupName);
 
     /**
      * Add search result markers for vulnerable dependencies.

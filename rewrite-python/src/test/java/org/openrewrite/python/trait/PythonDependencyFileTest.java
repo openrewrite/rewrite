@@ -533,7 +533,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> additions = Collections.singletonMap("flask", "3.0.0");
-            RequirementsFile added = trait.withAddedDependencies(additions);
+            RequirementsFile added = trait.withAddedDependencies(additions, null, null);
 
             String text = ((PlainText) added.getTree()).getText();
             assertThat(text).isEqualTo("requests>=2.28.0\nflask>=3.0.0");
@@ -549,7 +549,7 @@ class PythonDependencyFileTest implements RewriteTest {
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             Map<String, String> additions = Collections.singletonMap("requests", "2.31.0");
-            RequirementsFile added = trait.withAddedDependencies(additions);
+            RequirementsFile added = trait.withAddedDependencies(additions, null, null);
 
             assertThat(added).isSameAs(trait);
         }
