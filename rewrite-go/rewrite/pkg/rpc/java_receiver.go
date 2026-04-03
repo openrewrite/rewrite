@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
@@ -355,8 +356,16 @@ func (r *JavaReceiver) receiveVariableDeclarations(vd *tree.VariableDeclarations
 	if result != nil {
 		vd.TypeExpr = result.(tree.Expression)
 	}
-	// varargs
-	q.Receive(nil, nil)
+	// varargs — if non-nil, reconstruct Unary(Spread) wrapping the type expression
+	varargsResult := q.Receive(nil, func(v any) any { return receiveSpace(v.(tree.Space), q) })
+	if varargsResult != nil && vd.TypeExpr != nil {
+		vd.TypeExpr = &tree.Unary{
+			ID:       uuid.New(),
+			Prefix:   varargsResult.(tree.Space),
+			Operator: tree.LeftPadded[tree.UnaryOperator]{Element: tree.Spread},
+			Operand:  vd.TypeExpr,
+		}
+	}
 	// variables
 	beforeVars := make([]any, len(vd.Variables))
 	for i, v := range vd.Variables {

@@ -470,11 +470,22 @@ func (s *JavaSender) sendVariableDeclarations(vd *tree.VariableDeclarations, q *
 	q.GetAndSendList(vd, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
 	// modifiers (empty -- Go has no modifiers)
 	q.GetAndSendList(vd, func(_ any) []any { return []any{} }, func(_ any) any { return nil }, nil)
-	// typeExpression
-	q.GetAndSend(vd, func(v any) any { return v.(*tree.VariableDeclarations).TypeExpr },
-		func(v any) { s.parent.Visit(v, q) })
-	// varargs (nil for Go)
-	q.GetAndSend(vd, func(_ any) any { return nil }, nil)
+	// typeExpression — unwrap Unary(Spread) for variadic params so Java sees a TypeTree
+	q.GetAndSend(vd, func(v any) any {
+		te := v.(*tree.VariableDeclarations).TypeExpr
+		if u, ok := te.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
+			return u.Operand
+		}
+		return te
+	}, func(v any) { s.parent.Visit(v, q) })
+	// varargs — send the ellipsis prefix space for variadic params
+	q.GetAndSend(vd, func(v any) any {
+		te := v.(*tree.VariableDeclarations).TypeExpr
+		if u, ok := te.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
+			return u.Prefix
+		}
+		return nil
+	}, func(v any) { sendSpace(v.(tree.Space), q) })
 	// variables (list of right-padded NamedVariable)
 	q.GetAndSendList(vd,
 		func(v any) []any {
