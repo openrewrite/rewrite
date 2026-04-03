@@ -33,7 +33,7 @@ import org.openrewrite.scala.marker.TypeProjection
 import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
-import org.openrewrite.scala.marker.CurriedParameters
+import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.tree.S
 
 import java.util
@@ -4843,15 +4843,14 @@ class ScalaTreeVisitor(
       } else null
     } else null
 
-    // Build a single parameter list container from ValDef nodes
-    def buildSingleParamList(params: List[Trees.ValDef[?]]): JContainer[Statement] = {
+    // Visit a parameter list from source, returning J.Lambda.Parameters and advancing cursor past `)`
+    def visitParamListAsLambdaParams(params: List[Trees.ValDef[?]]): J.Lambda.Parameters = {
       val searchEnd = Math.min(cursor + 50, source.length)
       val searchText = source.substring(cursor, searchEnd)
       val parenIdx = searchText.indexOf('(')
-      val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
       if (parenIdx >= 0) cursor = cursor + parenIdx + 1
 
-      val jParams = new util.ArrayList[JRightPadded[Statement]]()
+      val jParams = new util.ArrayList[JRightPadded[J]]()
       params.zipWithIndex.foreach { case (vd, idx) =>
         val param = visitMethodParameter(vd)
         val isLast = idx == params.size - 1
@@ -4869,7 +4868,7 @@ class ScalaTreeVisitor(
             } else Space.EMPTY
           } else Space.EMPTY
         } else Space.EMPTY
-        jParams.add(new JRightPadded(param.asInstanceOf[Statement], afterParam, Markers.EMPTY))
+        jParams.add(new JRightPadded(param.asInstanceOf[J], afterParam, Markers.EMPTY))
       }
 
       // Find closing paren
@@ -4881,23 +4880,59 @@ class ScalaTreeVisitor(
         if (closeParen >= 0) cursor = cursor + closeParen + 1
       }
 
-      JContainer.build(parenSpace, jParams, Markers.EMPTY)
+      new J.Lambda.Parameters(Tree.randomId(), Space.EMPTY, Markers.EMPTY, true, jParams)
     }
 
-    // Handle value parameters — support multiple (curried) parameter lists
-    val additionalParamLists = new util.ArrayList[JContainer[Statement]]()
+    // Handle value parameters — first list goes in J.MethodDeclaration.parameters,
+    // additional curried lists become nested J.Lambda nodes (built after the body is parsed)
+    val curriedParamLists = new util.ArrayList[J.Lambda.Parameters]()
     val parameters: JContainer[Statement] = if (valueParamLists.nonEmpty) {
       val firstList = valueParamLists.head.collect { case vd: Trees.ValDef[?] => vd }
       if (firstList.nonEmpty) {
-        val firstContainer = buildSingleParamList(firstList)
-        // Build additional param lists
+        // Build first list as JContainer for J.MethodDeclaration
+        val searchEnd = Math.min(cursor + 50, source.length)
+        val searchText = source.substring(cursor, searchEnd)
+        val parenIdx = searchText.indexOf('(')
+        val parenSpace = if (parenIdx > 0) Space.format(searchText.substring(0, parenIdx)) else Space.EMPTY
+        if (parenIdx >= 0) cursor = cursor + parenIdx + 1
+
+        val jParams = new util.ArrayList[JRightPadded[Statement]]()
+        firstList.zipWithIndex.foreach { case (vd, idx) =>
+          val param = visitMethodParameter(vd)
+          val isLast = idx == firstList.size - 1
+          val afterParam = if (!isLast) {
+            val paramEnd = Math.max(0, vd.span.end - offsetAdjustment)
+            cursor = Math.max(cursor, paramEnd)
+            val nextParamStart = Math.max(0, firstList(idx + 1).span.start - offsetAdjustment)
+            if (cursor < nextParamStart && nextParamStart <= source.length) {
+              val between = source.substring(cursor, nextParamStart)
+              val commaIdx = between.indexOf(',')
+              if (commaIdx >= 0) {
+                val beforeComma = Space.format(between.substring(0, commaIdx))
+                cursor = cursor + commaIdx + 1
+                beforeComma
+              } else Space.EMPTY
+            } else Space.EMPTY
+          } else Space.EMPTY
+          jParams.add(new JRightPadded(param.asInstanceOf[Statement], afterParam, Markers.EMPTY))
+        }
+        val lastParamEnd = if (firstList.nonEmpty) Math.max(0, firstList.last.span.end - offsetAdjustment) else cursor
+        cursor = Math.max(cursor, lastParamEnd)
+        if (cursor < source.length) {
+          val remaining = source.substring(cursor, Math.min(cursor + 50, source.length))
+          val closeParen = remaining.indexOf(')')
+          if (closeParen >= 0) cursor = cursor + closeParen + 1
+        }
+
+        // Build additional param lists as J.Lambda.Parameters for later wrapping
         for (extraList <- valueParamLists.tail) {
           val extraParams = extraList.collect { case vd: Trees.ValDef[?] => vd }
           if (extraParams.nonEmpty) {
-            additionalParamLists.add(buildSingleParamList(extraParams))
+            curriedParamLists.add(visitParamListAsLambdaParams(extraParams))
           }
         }
-        firstContainer
+
+        JContainer.build(parenSpace, jParams, Markers.EMPTY)
       } else if (hasParensInSource) {
         // Empty parameter list ()
         val searchEnd = Math.min(cursor + 50, source.length)
@@ -5002,15 +5037,43 @@ class ScalaTreeVisitor(
       updateCursor(dd.span.end)
     }
 
+    // If curried, wrap the body in a lambda chain: innermost lambda gets the actual body,
+    // each outer lambda wraps the next. The method body becomes a synthetic block with the chain.
+    val isCurried = !curriedParamLists.isEmpty
+    val finalBody: J.Block = if (isCurried) {
+      // Build lambda chain from inside out: last curried list wraps the actual body,
+      // each preceding list wraps the next lambda.
+      // For abstract methods (body == null), innermost lambda gets an empty block.
+      var innerBody: J = if (body != null) body.asInstanceOf[J]
+        else new J.Block(Tree.randomId(), Space.EMPTY,
+          Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+          JRightPadded.build(false), new util.ArrayList[JRightPadded[Statement]](), Space.EMPTY)
+      var i = curriedParamLists.size - 1
+      while (i >= 0) {
+        val lambdaParams = curriedParamLists.get(i)
+        // Intermediate lambdas (not the last) get Curried marker
+        val lambdaMarkers = if (i > 0) {
+          Markers.build(Collections.singletonList(new Curried(Tree.randomId())))
+        } else Markers.EMPTY
+        innerBody = new J.Lambda(Tree.randomId(), Space.EMPTY, lambdaMarkers,
+          lambdaParams, Space.EMPTY, innerBody, null)
+        i -= 1
+      }
+      // Wrap outermost lambda in a synthetic OmitBraces block (J.MethodDeclaration.body is J.Block)
+      val stmts = new util.ArrayList[JRightPadded[Statement]]()
+      stmts.add(JRightPadded.build(innerBody.asInstanceOf[Statement]))
+      new J.Block(Tree.randomId(), Space.EMPTY,
+        Markers.build(Collections.singletonList(new OmitBraces(Tree.randomId()))),
+        JRightPadded.build(false), stmts, Space.EMPTY)
+    } else body
+
     // Build method markers
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
-    // Use OmitBraces marker on procedure syntax methods to signal the printer to omit " ="
     if (isProcedureSyntax) {
-      markerList.add(new org.openrewrite.scala.marker.OmitBraces(Tree.randomId()))
+      markerList.add(new OmitBraces(Tree.randomId()))
     }
-    // Attach additional curried parameter lists
-    if (!additionalParamLists.isEmpty) {
-      markerList.add(new org.openrewrite.scala.marker.CurriedParameters(Tree.randomId(), additionalParamLists))
+    if (isCurried) {
+      markerList.add(new Curried(Tree.randomId()))
     }
     val methodMarkers = if (!markerList.isEmpty) Markers.build(markerList) else Markers.EMPTY
 
@@ -5025,7 +5088,7 @@ class ScalaTreeVisitor(
       new J.MethodDeclaration.IdentifierWithAnnotations(name, Collections.emptyList()),
       parameters,
       null, // throws
-      body,
+      finalBody,
       null, // defaultValue
       methodType
     )

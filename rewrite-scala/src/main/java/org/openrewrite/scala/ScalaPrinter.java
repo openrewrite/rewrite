@@ -364,42 +364,28 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append(')');
         }
 
-        // Print additional curried parameter lists: (fa: F[A])(f: A => B)
-        java.util.Optional<org.openrewrite.scala.marker.CurriedParameters> curriedOpt =
-                method.getMarkers().findFirst(org.openrewrite.scala.marker.CurriedParameters.class);
-        if (curriedOpt.isPresent()) {
-            for (JContainer<Statement> extraParams : curriedOpt.get().additionalLists()) {
-                visitSpace(extraParams.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
-                p.append('(');
-                List<JRightPadded<Statement>> extraList = extraParams.getPadding().getElements();
-                for (int j = 0; j < extraList.size(); j++) {
-                    JRightPadded<Statement> ep = extraList.get(j);
-                    Statement elem = ep.getElement();
-                    if (elem instanceof J.VariableDeclarations) {
-                        J.VariableDeclarations vd = (J.VariableDeclarations) elem;
-                        visitSpace(vd.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
-                        visit(vd.getLeadingAnnotations(), p);
-                        if (!vd.getVariables().isEmpty()) {
-                            visit(vd.getVariables().get(0).getName(), p);
-                        }
-                        if (vd.getTypeExpression() != null) {
-                            TypeTree te = vd.getTypeExpression();
-                            if (te.getPrefix().isEmpty()) {
-                                p.append(": ");
-                            } else {
-                                p.append(":");
-                            }
-                            visit(te, p);
-                        }
+        // For curried methods, walk the lambda chain in the body to print additional param lists
+        boolean isCurried = method.getMarkers().findFirst(
+                org.openrewrite.scala.marker.Curried.class).isPresent();
+        J actualBody = null;
+        if (isCurried && method.getBody() != null) {
+            // Body is an OmitBraces block containing the lambda chain
+            J.Block wrapperBlock = method.getBody();
+            if (!wrapperBlock.getStatements().isEmpty()) {
+                J current = wrapperBlock.getStatements().get(0);
+                // Walk the lambda chain, printing each lambda's params as curried param lists
+                while (current instanceof J.Lambda) {
+                    J.Lambda lambda = (J.Lambda) current;
+                    printLambdaParamsAsCurried(lambda.getParameters(), p);
+                    boolean lambdaCurried = lambda.getMarkers().findFirst(
+                            org.openrewrite.scala.marker.Curried.class).isPresent();
+                    if (lambdaCurried && lambda.getBody() instanceof J.Lambda) {
+                        current = lambda.getBody();
                     } else {
-                        visit(elem, p);
-                    }
-                    if (j < extraList.size() - 1) {
-                        visitSpace(ep.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
-                        p.append(',');
+                        actualBody = lambda.getBody();
+                        break;
                     }
                 }
-                p.append(')');
             }
         }
 
@@ -408,8 +394,23 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visit(method.getReturnTypeExpression(), p);
         }
 
-        if (method.getBody() != null) {
-            // Procedure syntax (OmitBraces on method) — no " =" before body
+        if (isCurried && actualBody != null) {
+            // Curried method: body comes from innermost lambda.
+            // If body is an empty OmitBraces block, it's an abstract method — skip body printing.
+            boolean isAbstract = (actualBody instanceof J.Block) &&
+                    ((J.Block) actualBody).getStatements().isEmpty() &&
+                    ((J.Block) actualBody).getMarkers().findFirst(
+                            org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+            if (!isAbstract) {
+                boolean procedureSyntax = method.getMarkers().findFirst(
+                        org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+                if (!procedureSyntax) {
+                    p.append(" =");
+                }
+                visit(actualBody, p);
+            }
+        } else if (method.getBody() != null) {
+            // Normal method body
             boolean procedureSyntax = method.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
             J.Block body = method.getBody();
@@ -438,6 +439,46 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return;
     }
     
+    /**
+     * Print a J.Lambda.Parameters as a curried parameter list: (param1, param2)
+     */
+    private void printLambdaParamsAsCurried(J.Lambda.Parameters lambdaParams, PrintOutputCapture<P> p) {
+        if (lambdaParams.isParenthesized()) {
+            p.append('(');
+        }
+        List<JRightPadded<J>> lps = lambdaParams.getPadding().getParameters();
+        for (int j = 0; j < lps.size(); j++) {
+            JRightPadded<J> lp = lps.get(j);
+            J elem = lp.getElement();
+            if (elem instanceof J.VariableDeclarations) {
+                J.VariableDeclarations vd = (J.VariableDeclarations) elem;
+                visitSpace(vd.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                visit(vd.getLeadingAnnotations(), p);
+                if (!vd.getVariables().isEmpty()) {
+                    visit(vd.getVariables().get(0).getName(), p);
+                }
+                if (vd.getTypeExpression() != null) {
+                    TypeTree te = vd.getTypeExpression();
+                    if (te.getPrefix().isEmpty()) {
+                        p.append(": ");
+                    } else {
+                        p.append(":");
+                    }
+                    visit(te, p);
+                }
+            } else {
+                visit(elem, p);
+            }
+            if (j < lps.size() - 1) {
+                visitSpace(lp.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
+                p.append(',');
+            }
+        }
+        if (lambdaParams.isParenthesized()) {
+            p.append(')');
+        }
+    }
+
     @Override
     public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
         if (tree instanceof S.CompilationUnit) {
