@@ -262,23 +262,14 @@ func rightPaddedFromElement(elem any, after tree.Space, markers tree.Markers) an
 		return tree.RightPadded[*tree.Import]{Element: e, After: after, Markers: markers}
 	}
 	// For types that implement both Statement and Expression (like MethodInvocation),
-	// we create BOTH variants and let the caller decide. In practice, the parent container
-	// determines which variant is needed. Since we can't know the parent's expectation here,
-	// we prefer Expression for most call-like expressions and Statement for block-level items.
-	//
-	// The key insight: Statement includes Block, Return, If, ForLoop, Switch, etc.
-	// Expression includes Identifier, Literal, Binary, MethodInvocation, FieldAccess, etc.
-	// Types implementing both: MethodInvocation, Assignment, Unary, MethodDeclaration, etc.
-	//
-	// For the bidirectional RPC, the container type determines which variant is needed.
-	// Since most containers in the RPC protocol use Expression (arguments, conditions),
-	// and Statement-only containers are mostly for block bodies, we check Statement FIRST
-	// and fall back to Expression. The caller (container update) will handle the type assertion.
-	if stmt, ok := elem.(tree.Statement); ok {
-		return tree.RightPadded[tree.Statement]{Element: stmt, After: after, Markers: markers}
-	}
+	// prefer Expression — most containers that hold ambiguous types are expression
+	// containers (arguments, conditions, type parameters). Block bodies use
+	// coerceToStatementRP explicitly.
 	if expr, ok := elem.(tree.Expression); ok {
 		return tree.RightPadded[tree.Expression]{Element: expr, After: after, Markers: markers}
+	}
+	if stmt, ok := elem.(tree.Statement); ok {
+		return tree.RightPadded[tree.Statement]{Element: stmt, After: after, Markers: markers}
 	}
 	if j, ok := elem.(tree.J); ok {
 		return tree.RightPadded[tree.J]{Element: j, After: after, Markers: markers}

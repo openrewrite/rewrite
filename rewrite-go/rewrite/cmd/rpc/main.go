@@ -371,6 +371,7 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 type getObjectRequest struct {
 	ID             string `json:"id"`
 	SourceFileType string `json:"sourceFileType"`
+	ForceFullSend  bool   `json:"forceFullSend,omitempty"`
 }
 
 // handleGetObject serializes a local object for transfer to Java.
@@ -476,17 +477,20 @@ func mapMarkerPrinter(mp *string) printer.MarkerPrinter {
 // Supports multi-batch transfers: each GetObject call returns one batch, and
 // subsequent calls are made until the END_OF_OBJECT marker is received.
 func (s *server) getObjectFromJava(id string, sourceFileType string) any {
-	// Use reverse-direction tracking if available; otherwise fall back to
-	// localObjects (the tree Go originally parsed and sent to Java via forward
-	// GetObject). This matches Java's remoteObjects baseline.
+	// Use reverse-direction tracking if available, then fall back to
+	// localObjects (the tree Go originally parsed). Only request a full
+	// send when Go has NO baseline at all — this avoids rebuilding trees
+	// from scratch when the original Go tree is available and the delta
+	// from Java would be NO_CHANGE (unmodified trees).
 	before := s.reverseRemoteObjects[id]
 	if before == nil {
 		before = s.localObjects[id]
 	}
+	forceFullSend := before == nil
 
 	// fetchBatch sends a GetObject request to Java and reads one batch of RpcObjectData.
 	fetchBatch := func() []rpc.RpcObjectData {
-		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType}
+		reqParams := getObjectRequest{ID: id, SourceFileType: sourceFileType, ForceFullSend: forceFullSend}
 		paramsJSON, _ := json.Marshal(reqParams)
 		rpcReq := map[string]any{
 			"jsonrpc": "2.0",
@@ -943,8 +947,10 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	// since tree nodes contain slices which are not comparable).
 	modified := !treeIdentical(before, after)
 
-	// Store the result — update both localObjects (for forward GetObject)
-	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
+	// Store the result in both localObjects (for forward GetObject) and
+	// reverseRemoteObjects. After Go sends the modified tree back to Java
+	// via the forward GetObject that follows Visit, Java's remoteObjects
+	// will also point to the modified tree, so both sides stay in sync.
 	if after != nil {
 		s.localObjects[req.TreeID] = after
 		s.reverseRemoteObjects[req.TreeID] = after

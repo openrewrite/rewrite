@@ -544,7 +544,7 @@ public class RewriteRpc {
 
         RpcReceiveQueue q = new RpcReceiveQueue(
                 remoteRefs,
-                () -> send("GetObject", new GetObject(id, sourceFileType), GetObjectResponse.class),
+                () -> send("GetObject", new GetObject(id, sourceFileType, false), GetObjectResponse.class),
                 sourceFileType,
                 log.get()
         );

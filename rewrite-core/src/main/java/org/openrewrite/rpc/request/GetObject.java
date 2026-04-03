@@ -42,6 +42,13 @@ public class GetObject implements RpcRequest {
     @Nullable
     String sourceFileType;
 
+    /**
+     * When true, the sender clears its baseline for this ID and sends the full
+     * tree as ADD operations instead of computing a delta. Used when the receiver
+     * has no matching baseline (e.g., first reverse GetObject after a forward send).
+     */
+    boolean forceFullSend;
+
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<GetObject> {
         // Dedicated pool for tree traversal so GetObject producers can't be starved
@@ -76,6 +83,15 @@ public class GetObject implements RpcRequest {
                 deleted.add(new RpcObjectData(DELETE, null, null, null, traceGetObject.get()));
                 deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null, traceGetObject.get()));
                 return deleted;
+            }
+
+            // When the remote requests a full send, clear our baseline so we
+            // send ADD operations instead of computing a delta against a
+            // potentially mismatched baseline (e.g., first reverse GetObject
+            // where the remote doesn't have the forward-direction tree).
+            if (request.isForceFullSend()) {
+                remoteObjects.remove(request.getId());
+                localRefs.clear();
             }
 
             BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {

@@ -330,6 +330,56 @@ class GolangRecipeIntegTest implements RewriteTest {
         );
     }
 
+    /**
+     * Exercises the Print round-trip on realistic Go code with grouped imports,
+     * method calls, and if/else — the patterns that previously caused
+     * Print-path queue alignment errors in the reverse GetObject direction.
+     */
+    @Test
+    void printRoundTripWithImportsAndIfElse() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier ident, org.openrewrite.ExecutionContext ctx) {
+                  if ("cfg".equals(ident.getSimpleName())) {
+                      return ident.withSimpleName("config");
+                  }
+                  return ident;
+              }
+          })).expectedCyclesThatMakeChanges(1).cycles(1),
+          go(
+            """
+              package cobra
+
+              import (
+              \t"os"
+              )
+
+              func GetActiveHelpConfig(name string) {
+              \tcfg := os.Getenv("COBRA_ACTIVE_HELP")
+              \tif cfg != "0" {
+              \t\tcfg = os.Getenv(name)
+              \t}
+              }
+              """,
+            """
+              package cobra
+
+              import (
+              \t"os"
+              )
+
+              func GetActiveHelpConfig(name string) {
+              \tconfig := os.Getenv("COBRA_ACTIVE_HELP")
+              \tif config != "0" {
+              \t\tconfig = os.Getenv(name)
+              \t}
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void addImportForCrossPackageType() {
         rewriteRun(
