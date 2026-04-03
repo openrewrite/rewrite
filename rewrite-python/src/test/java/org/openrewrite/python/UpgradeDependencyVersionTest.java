@@ -303,4 +303,23 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           requirementsTxt("requests>=2.28.0")
         );
     }
+
+    @Test
+    void changeVersionInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
+              click = ">=8.0"
+              """,
+            """
+              [packages]
+              requests = ">=2.31.0"
+              click = ">=8.0"
+              """
+          )
+        );
+    }
 }

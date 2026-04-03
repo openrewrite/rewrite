@@ -151,12 +151,20 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
 
     class Matcher extends SimpleTraitMatcher<PythonDependencyFile> {
         private final RequirementsFile.Matcher reqMatcher = new RequirementsFile.Matcher();
-        private final PyProjectFile.Matcher tomlMatcher = new PyProjectFile.Matcher();
+        private final PyProjectFile.Matcher pyprojectMatcher = new PyProjectFile.Matcher();
+        private final PipfileFile.Matcher pipfileMatcher = new PipfileFile.Matcher();
 
         @Override
         protected @Nullable PythonDependencyFile test(Cursor cursor) {
             PythonDependencyFile r = reqMatcher.test(cursor);
-            return r != null ? r : tomlMatcher.test(cursor);
+            if (r != null) {
+                return r;
+            }
+            r = pyprojectMatcher.test(cursor);
+            if (r != null) {
+                return r;
+            }
+            return pipfileMatcher.test(cursor);
         }
     }
 }

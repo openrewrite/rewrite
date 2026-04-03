@@ -201,4 +201,23 @@ class ChangeDependencyTest implements RewriteTest {
           requirementsTxt("requests>=2.28.0")
         );
     }
+
+    @Test
+    void renamePackageInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("requests", "httpx", ">=0.24.0")),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
+              click = ">=8.0"
+              """,
+            """
+              [packages]
+              httpx = ">=0.24.0"
+              click = ">=8.0"
+              """
+          )
+        );
+    }
 }

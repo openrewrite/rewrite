@@ -279,4 +279,22 @@ class RemoveDependencyTest implements RewriteTest {
           requirementsTxt("requests>=2.28.0")
         );
     }
+
+    @Test
+    void removeDependencyFromPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("click", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
+              click = ">=8.0"
+              """,
+            """
+              [packages]
+              requests = ">=2.28.0"
+              """
+          )
+        );
+    }
 }
