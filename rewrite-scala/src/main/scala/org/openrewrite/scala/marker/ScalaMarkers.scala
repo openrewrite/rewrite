@@ -16,6 +16,7 @@
 package org.openrewrite.scala.marker
 
 import org.openrewrite.marker.Marker
+import org.openrewrite.java.tree.{JContainer, Statement}
 import java.util.UUID
 
 /**
@@ -56,4 +57,14 @@ case class SObject(id: UUID, companion: Boolean) extends Marker {
 object SObject {
   def create(): SObject = SObject(UUID.randomUUID(), false)
   def companion(): SObject = SObject(UUID.randomUUID(), true)
+}
+
+/**
+ * Marks a J.MethodDeclaration that has multiple (curried) parameter lists.
+ * Scala supports curried definitions: `def map[A, B](fa: F[A])(f: A => B): F[B]`
+ * J.MethodDeclaration has a single parameters container; additional lists are stored here.
+ */
+case class CurriedParameters(id: UUID, additionalLists: java.util.List[JContainer[Statement]]) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
 }

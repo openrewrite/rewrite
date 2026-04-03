@@ -113,6 +113,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
+        // Skip compiler-synthetic _root_.scala.Predef.??? chain (from procedure syntax desugaring)
+        if (isSyntheticPredefChain(fieldAccess)) {
+            return fieldAccess;
+        }
         // Type projection: Foo#Bar uses # instead of .
         if (fieldAccess.getMarkers().findFirst(TypeProjection.class).isPresent()) {
             beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
@@ -287,24 +291,36 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
         visit(method.getLeadingAnnotations(), p);
+        boolean defAlreadyPrinted = false;
         for (J.Modifier m : method.getModifiers()) {
-            visit(m, p);
+            if ("def".equals(m.getKeyword()) && m.getType() == J.Modifier.Type.LanguageExtension) {
+                visitSpace(m.getPrefix(), Space.Location.MODIFIER_PREFIX, p);
+                p.append("def");
+                defAlreadyPrinted = true;
+            } else {
+                visit(m, p);
+            }
         }
-
-        if (!method.getModifiers().isEmpty()) {
-            p.append(" ");
+        if (!defAlreadyPrinted) {
+            if (!method.getModifiers().isEmpty()) {
+                p.append(" ");
+            }
+            p.append("def");
         }
-        p.append("def");
         visit(method.getName(), p);
 
         if (method.getPadding().getTypeParameters() != null) {
             visit(method.getPadding().getTypeParameters(), p);
         }
 
-        // Print parameters (name: Type)
+        // Print parameters — skip parens for parameterless methods (marked with OmitBraces)
         JContainer<Statement> params = method.getPadding().getParameters();
-        visitSpace(params.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
-        p.append('(');
+        boolean hasParens = !params.getMarkers().findFirst(
+                org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+        if (hasParens) {
+            visitSpace(params.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
+            p.append('(');
+        }
         List<JRightPadded<Statement>> paramList = params.getPadding().getElements();
         for (int i = 0; i < paramList.size(); i++) {
             JRightPadded<Statement> param = paramList.get(i);
@@ -312,6 +328,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             if (element instanceof J.VariableDeclarations) {
                 J.VariableDeclarations varDecl = (J.VariableDeclarations) element;
                 visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                // Print parameter annotations (@unchecked, etc.)
+                visit(varDecl.getLeadingAnnotations(), p);
                 if (!varDecl.getVariables().isEmpty()) {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
@@ -342,7 +360,48 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 p.append(',');
             }
         }
-        p.append(')');
+        if (hasParens) {
+            p.append(')');
+        }
+
+        // Print additional curried parameter lists: (fa: F[A])(f: A => B)
+        java.util.Optional<org.openrewrite.scala.marker.CurriedParameters> curriedOpt =
+                method.getMarkers().findFirst(org.openrewrite.scala.marker.CurriedParameters.class);
+        if (curriedOpt.isPresent()) {
+            for (JContainer<Statement> extraParams : curriedOpt.get().additionalLists()) {
+                visitSpace(extraParams.getBefore(), Space.Location.METHOD_DECLARATION_PARAMETERS, p);
+                p.append('(');
+                List<JRightPadded<Statement>> extraList = extraParams.getPadding().getElements();
+                for (int j = 0; j < extraList.size(); j++) {
+                    JRightPadded<Statement> ep = extraList.get(j);
+                    Statement elem = ep.getElement();
+                    if (elem instanceof J.VariableDeclarations) {
+                        J.VariableDeclarations vd = (J.VariableDeclarations) elem;
+                        visitSpace(vd.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                        visit(vd.getLeadingAnnotations(), p);
+                        if (!vd.getVariables().isEmpty()) {
+                            visit(vd.getVariables().get(0).getName(), p);
+                        }
+                        if (vd.getTypeExpression() != null) {
+                            TypeTree te = vd.getTypeExpression();
+                            if (te.getPrefix().isEmpty()) {
+                                p.append(": ");
+                            } else {
+                                p.append(":");
+                            }
+                            visit(te, p);
+                        }
+                    } else {
+                        visit(elem, p);
+                    }
+                    if (j < extraList.size() - 1) {
+                        visitSpace(ep.getAfter(), JRightPadded.Location.METHOD_DECLARATION_PARAMETER.getAfterLocation(), p);
+                        p.append(',');
+                    }
+                }
+                p.append(')');
+            }
+        }
 
         if (method.getReturnTypeExpression() != null) {
             p.append(':');
@@ -350,14 +409,18 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
 
         if (method.getBody() != null) {
-            J.Block body = method.getBody();
-            boolean omitBraces = body.getMarkers().findFirst(
+            // Procedure syntax (OmitBraces on method) — no " =" before body
+            boolean procedureSyntax = method.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
-            if (omitBraces && body.getStatements().size() == 1) {
+            J.Block body = method.getBody();
+            boolean omitBodyBraces = body.getMarkers().findFirst(
+                    org.openrewrite.scala.marker.OmitBraces.class).isPresent();
+            if (!procedureSyntax) {
                 p.append(" =");
+            }
+            if (omitBodyBraces && body.getStatements().size() == 1) {
                 visit(body.getStatements().get(0), p);
             } else {
-                p.append(" =");
                 visit(body, p);
             }
         }
@@ -466,6 +529,20 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         return import_;
     }
     
+    private boolean isSyntheticPredefChain(J.FieldAccess fa) {
+        // Detect _root_.scala.Predef.??? chains added by compiler for procedure syntax
+        if ("???".equals(fa.getSimpleName()) || "$qmark$qmark$qmark".equals(fa.getSimpleName())) {
+            return true;
+        }
+        if (fa.getTarget() instanceof J.FieldAccess) {
+            return isSyntheticPredefChain((J.FieldAccess) fa.getTarget());
+        }
+        if (fa.getTarget() instanceof J.Identifier) {
+            return "_root_".equals(((J.Identifier) fa.getTarget()).getSimpleName());
+        }
+        return false;
+    }
+
     private boolean isWildcardImport(J.FieldAccess qualid) {
         J.Identifier name = qualid.getName();
         return "*".equals(name.getSimpleName()) || "_".equals(name.getSimpleName());
