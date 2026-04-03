@@ -94,6 +94,11 @@ val rpcTestClasspath by tasks.registering {
     description = "Write the Java RPC test server classpath for C# integration tests"
     dependsOn(tasks.named("testClasses"))
 
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named<JavaCompile>("compileJava").flatMap { it.destinationDirectory })
+    inputs.files(tasks.named<JavaCompile>("compileTestJava").flatMap { it.destinationDirectory })
+
     val classpathFile = layout.buildDirectory.file("rpc-test-server-classpath.txt")
     outputs.file(classpathFile)
 
