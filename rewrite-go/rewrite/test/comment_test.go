@@ -84,6 +84,22 @@ func TestParseCommentOnImport(t *testing.T) {
 		`))
 }
 
+func TestParseCommentInsideEmptyArgList(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type Client struct{}
+
+			func (c *Client) Unsubscribe() {}
+
+			func main() {
+				c := &Client{}
+				c.Unsubscribe( /* all */ )
+			}
+		`))
+}
+
 func TestParseMultilineBlockComment(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`

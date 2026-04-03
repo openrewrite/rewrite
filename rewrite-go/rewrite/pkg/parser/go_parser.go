@@ -1635,8 +1635,14 @@ func (ctx *parseContext) mapCallExpr(expr *ast.CallExpr) tree.Expression {
 			argElements[len(argElements)-1].After = closePrefix
 		}
 	} else {
-		ctx.prefix(expr.Rparen) // consume space
-		ctx.skip(1)             // ")"
+		closePrefix := ctx.prefix(expr.Rparen)
+		ctx.skip(1) // ")"
+		if len(closePrefix.Comments) > 0 {
+			argElements = append(argElements, tree.RightPadded[tree.Expression]{
+				Element: &tree.Empty{ID: uuid.New()},
+				After:   closePrefix,
+			})
+		}
 	}
 
 	mi := &tree.MethodInvocation{
