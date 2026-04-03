@@ -382,7 +382,6 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 
 	obj := s.localObjects[req.ID]
 	if obj == nil {
-		s.logger.Printf("GetObject: %s not found in localObjects", req.ID)
 		return []rpc.RpcObjectData{
 			{State: rpc.Delete},
 			{State: rpc.EndOfObject},
@@ -393,7 +392,6 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	// Use a fresh ref map for each GetObject to avoid ref ID collisions
 	// between the reverse direction (Java→Go) and forward direction (Go→Java).
 	localRefs := make(map[uintptr]int)
-	s.logger.Printf("GetObject: id=%s obj=%T before=%T (before==nil: %v)", req.ID, obj, before, before == nil)
 
 	// Collect all batches into a single result
 	var result []rpc.RpcObjectData
@@ -407,13 +405,6 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	})
 	q.Put(rpc.RpcObjectData{State: rpc.EndOfObject})
 	q.Flush()
-
-	// Log first 20 messages for debugging
-	s.logger.Printf("GetObject: %d total messages, %d refs in localRefs", len(result), len(localRefs))
-	for i, msg := range result {
-		if i >= 20 { break }
-		s.logger.Printf("GetObject msg[%d]: state=%v valueType=%v ref=%v value=%v", i, msg.State, msg.ValueType, msg.Ref, msg.Value)
-	}
 
 	// Update remote tracking
 	s.remoteObjects[req.ID] = obj
@@ -920,10 +911,8 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	// Get the tree from Java via bidirectional RPC
 	treeObj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
 	if treeObj == nil {
-		s.logger.Printf("Visit: getObjectFromJava returned nil for %s", req.TreeID)
 		return &visitResponse{Modified: false}, nil
 	}
-	s.logger.Printf("Visit: got tree type %T for %s", treeObj, req.TreeID)
 
 	// Get the visitor based on phase
 	var v recipe.TreeVisitor
@@ -949,12 +938,10 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	}
 	before := treeNode
 	after := v.Visit(treeNode, ctx)
-	s.logger.Printf("Visit: visitor returned type %T (before was %T)", after, before)
 
 	// Check if modified by pointer identity (not value equality,
 	// since tree nodes contain slices which are not comparable).
 	modified := !treeIdentical(before, after)
-	s.logger.Printf("Visit: modified=%v", modified)
 
 	// Store the result — update both localObjects (for forward GetObject)
 	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
