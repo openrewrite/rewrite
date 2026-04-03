@@ -135,12 +135,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                         String normalizedName = PythonResolutionResult.normalizeName(packageName);
                         Map<String, String> pins = Collections.singletonMap(normalizedName, version);
                         PythonDependencyFile updated = trait.withPinnedTransitiveDependencies(pins);
-                        SourceFile result = updated.getTree();
-                        if (result != tree) {
-                            if (result instanceof Toml.Document) {
-                                return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) result, ctx);
-                            }
-                            return result;
+                        if (updated.getTree() != tree) {
+                            return updated.afterModification(ctx);
                         }
                     }
                 }

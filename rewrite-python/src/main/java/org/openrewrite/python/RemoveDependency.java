@@ -139,12 +139,8 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     if (trait != null) {
                         PythonDependencyFile updated = trait.withRemovedDependencies(
                                 Collections.singleton(packageName), scope, groupName);
-                        SourceFile result = (SourceFile) updated.getTree();
-                        if (result != tree) {
-                            if (result instanceof Toml.Document) {
-                                return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) result, ctx);
-                            }
-                            return result;
+                        if (updated.getTree() != tree) {
+                            return updated.afterModification(ctx);
                         }
                     }
                 }

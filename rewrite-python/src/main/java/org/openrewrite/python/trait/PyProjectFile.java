@@ -9,6 +9,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -405,6 +406,12 @@ public class PyProjectFile implements PythonDependencyFile {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
         return this;
+    }
+
+    @Override
+    public SourceFile afterModification(ExecutionContext ctx) {
+        Toml.Document doc = (Toml.Document) getTree();
+        return PyProjectHelper.regenerateLockAndRefreshMarker(doc, ctx);
     }
 
     private static boolean isInsideTargetArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {

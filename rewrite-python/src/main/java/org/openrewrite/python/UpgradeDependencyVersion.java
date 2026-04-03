@@ -152,12 +152,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         Map<String, String> upgrades = Collections.singletonMap(
                                 PythonResolutionResult.normalizeName(packageName), newVersion);
                         PythonDependencyFile updated = trait.withUpgradedVersions(upgrades, scope, groupName);
-                        SourceFile result = (SourceFile) updated.getTree();
-                        if (result != tree) {
-                            if (result instanceof Toml.Document) {
-                                return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) result, ctx);
-                            }
-                            return result;
+                        if (updated.getTree() != tree) {
+                            return updated.afterModification(ctx);
                         }
                     }
                 }

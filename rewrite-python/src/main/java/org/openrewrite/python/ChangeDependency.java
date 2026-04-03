@@ -123,12 +123,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
                     if (trait != null) {
                         PythonDependencyFile updated = trait.withChangedDependency(oldPackageName, newPackageName, newVersion);
-                        SourceFile result = (SourceFile) updated.getTree();
-                        if (result != tree) {
-                            if (result instanceof Toml.Document) {
-                                return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) result, ctx);
-                            }
-                            return result;
+                        if (updated.getTree() != tree) {
+                            return updated.afterModification(ctx);
                         }
                     }
                 }

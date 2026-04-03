@@ -150,12 +150,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                         String ver = version != null ? version : "";
                         Map<String, String> additions = Collections.singletonMap(packageName, ver);
                         PythonDependencyFile updated = trait.withAddedDependencies(additions, scope, groupName);
-                        SourceFile result = (SourceFile) updated.getTree();
-                        if (result != tree) {
-                            if (result instanceof Toml.Document) {
-                                return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) result, ctx);
-                            }
-                            return result;
+                        if (updated.getTree() != tree) {
+                            return updated.afterModification(ctx);
                         }
                     }
                 }
