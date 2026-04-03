@@ -342,6 +342,25 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyToRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          requirementsTxt(
+            "requests>=2.28.0",
+            "requests>=2.28.0\nflask>=2.0"
+          )
+        );
+    }
+
+    @Test
+    void skipWhenAlreadyPresentInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("requests", null, null, null)),
+          requirementsTxt("requests>=2.28.0")
+        );
+    }
+
+    @Test
     void validateRequiresGroupName() {
         var recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
         assertThat(recipe.validate().isValid()).isFalse();

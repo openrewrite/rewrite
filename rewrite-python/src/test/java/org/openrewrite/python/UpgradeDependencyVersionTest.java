@@ -21,8 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
-import static org.openrewrite.python.Assertions.pyproject;
-import static org.openrewrite.python.Assertions.uv;
+import static org.openrewrite.python.Assertions.*;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -283,6 +282,25 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               ]
               """
           )
+        );
+    }
+
+    @Test
+    void changeVersionInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("requests", ">=2.31.0", null, null)),
+          requirementsTxt(
+            "requests>=2.28.0\nclick>=8.0",
+            "requests>=2.31.0\nclick>=8.0"
+          )
+        );
+    }
+
+    @Test
+    void skipWhenNotPresentInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("flask", ">=3.0", null, null)),
+          requirementsTxt("requests>=2.28.0")
         );
     }
 }

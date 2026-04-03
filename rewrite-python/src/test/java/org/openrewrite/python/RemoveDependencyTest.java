@@ -21,8 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
-import static org.openrewrite.python.Assertions.pyproject;
-import static org.openrewrite.python.Assertions.uv;
+import static org.openrewrite.python.Assertions.*;
 
 class RemoveDependencyTest implements RewriteTest {
 
@@ -259,6 +258,25 @@ class RemoveDependencyTest implements RewriteTest {
               ]
               """
           )
+        );
+    }
+
+    @Test
+    void removeDependencyFromRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("click", null, null)),
+          requirementsTxt(
+            "requests>=2.28.0\nclick>=8.0",
+            "requests>=2.28.0"
+          )
+        );
+    }
+
+    @Test
+    void skipWhenNotPresentInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("flask", null, null)),
+          requirementsTxt("requests>=2.28.0")
         );
     }
 }

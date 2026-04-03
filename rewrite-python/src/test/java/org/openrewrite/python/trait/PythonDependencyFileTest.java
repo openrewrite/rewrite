@@ -658,4 +658,94 @@ class PythonDependencyFileTest implements RewriteTest {
             );
         }
     }
+
+    @Nested
+    class RequirementsScopeFilterTest {
+
+        @Test
+        void nullScopeMatchesAllFiles() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void emptyScopeMatchesRootRequirementsTxt() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(resolved));
+
+            // requirements.txt (no suffix) should match scope=""
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "", null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void emptyScopeDoesNotMatchScopedFile() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(resolved));
+
+            PlainText pt = new PlainText(
+                    randomId(), Paths.get("requirements-dev.txt"),
+                    Markers.EMPTY.addIfAbsent(marker),
+                    "UTF-8", false, null, null, "requests>=2.28.0", null
+            );
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "", null);
+
+            // scope="" should NOT match requirements-dev.txt
+            assertThat(upgraded).isSameAs(trait);
+        }
+
+        @Test
+        void devScopeMatchesDevFile() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(resolved));
+
+            PlainText pt = new PlainText(
+                    randomId(), Paths.get("requirements-dev.txt"),
+                    Markers.EMPTY.addIfAbsent(marker),
+                    "UTF-8", false, null, null, "requests>=2.28.0", null
+            );
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "dev", null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void devScopeDoesNotMatchRootFile() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "dev", null);
+
+            // scope="dev" should NOT match requirements.txt
+            assertThat(upgraded).isSameAs(trait);
+        }
+    }
 }
