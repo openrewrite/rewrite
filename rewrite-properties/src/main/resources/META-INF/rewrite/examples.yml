@@ -22,6 +22,8 @@ examples:
   - 'null'
   - 'null'
   - 'null'
+  - 'null'
+  - 'null'
   sources:
   - before: |
       management=true
