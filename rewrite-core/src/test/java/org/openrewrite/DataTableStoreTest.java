@@ -114,6 +114,23 @@ class DataTableStoreTest {
         assertThat(store.getDataTables()).hasSize(2);
     }
 
+    @Test
+    void getRowsAggregatesAcrossUngroupedBuckets() {
+        InMemoryDataTableStore store = new InMemoryDataTableStore();
+        ExecutionContext ctx = ctx();
+
+        // Two ungrouped tables with different instance names end up in separate buckets
+        TestTable table1 = new TestTable(Recipe.noop()).withInstanceName(() -> "instance-a");
+        TestTable table2 = new TestTable(Recipe.noop()).withInstanceName(() -> "instance-b");
+
+        store.insertRow(table1, ctx, new TestTable.Row("from-a"));
+        store.insertRow(table2, ctx, new TestTable.Row("from-b"));
+
+        // getRows should return rows from ALL matching buckets, not just the first
+        List<?> rows = store.getRows(TestTable.class.getName(), null).collect(Collectors.toList());
+        assertThat(rows).hasSize(2);
+    }
+
     // =========================================================================
     // DataTable identity
     // =========================================================================

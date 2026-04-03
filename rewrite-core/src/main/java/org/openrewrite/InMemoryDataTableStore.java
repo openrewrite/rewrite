@@ -60,22 +60,16 @@ public class InMemoryDataTableStore implements DataTableStore {
 
     @Override
     public Stream<?> getRows(String dataTableName, @Nullable String group) {
-        // Scan for matching bucket
+        List<Object> allRows = new ArrayList<>();
         for (Bucket bucket : buckets.values()) {
             if (bucket.dataTable.getName().equals(dataTableName) &&
                 java.util.Objects.equals(bucket.dataTable.getGroup(), group)) {
-                return snapshotRows(bucket);
+                synchronized (bucket.rows) {
+                    allRows.addAll(bucket.rows);
+                }
             }
         }
-        return Stream.empty();
-    }
-
-    private static Stream<Object> snapshotRows(Bucket bucket) {
-        List<Object> snapshot;
-        synchronized (bucket.rows) {
-            snapshot = new ArrayList<>(bucket.rows);
-        }
-        return snapshot.stream();
+        return allRows.stream();
     }
 
     @Override
