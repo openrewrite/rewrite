@@ -28,8 +28,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Change a dependency to a different package. Supports both {@code pyproject.toml}
- * and {@code requirements.txt} files. Searches all dependency scopes.
+ * Change a dependency to a different package. Supports {@code pyproject.toml},
+ * {@code requirements.txt}, and {@code Pipfile}. Searches all dependency scopes.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -65,8 +65,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     @Override
     public String getDescription() {
-        return "Change a dependency to a different package. Supports `pyproject.toml` " +
-                "and `requirements.txt` files. Searches all dependency scopes. " +
+        return "Change a dependency to a different package. Supports `pyproject.toml`, " +
+                "`requirements.txt`, and `Pipfile`. Searches all dependency scopes. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 

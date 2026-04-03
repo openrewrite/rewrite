@@ -31,8 +31,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Upgrade the version constraint for a dependency. Supports both {@code pyproject.toml}
- * (with scope and group targeting) and {@code requirements.txt} files.
+ * Upgrade the version constraint for a dependency. Supports {@code pyproject.toml}
+ * (with scope and group targeting), {@code requirements.txt}, and {@code Pipfile}.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -87,7 +87,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public String getDescription() {
         return "Upgrade the version constraint for a dependency. Supports `pyproject.toml` " +
-                "(with scope/group targeting) and `requirements.txt` files. " +
+                "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 

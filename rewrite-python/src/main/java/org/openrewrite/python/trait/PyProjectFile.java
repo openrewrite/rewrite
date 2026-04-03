@@ -410,8 +410,8 @@ public class PyProjectFile implements PythonDependencyFile {
 
     @Override
     public SourceFile afterModification(ExecutionContext ctx) {
-        Toml.Document doc = (Toml.Document) getTree();
-        return PyProjectHelper.regenerateLockAndRefreshMarker(doc, ctx);
+        // regenerateLockAndRefreshMarker already guards against missing lock content internally
+        return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) getTree(), ctx);
     }
 
     private static boolean isInsideTargetArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {

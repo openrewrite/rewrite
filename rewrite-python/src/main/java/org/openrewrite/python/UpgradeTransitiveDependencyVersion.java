@@ -34,8 +34,9 @@ import java.util.Set;
  * Pin a transitive dependency version using the strategy appropriate for the file type
  * and package manager. For {@code pyproject.toml}: uv uses
  * {@code [tool.uv].constraint-dependencies}, PDM uses {@code [tool.pdm.overrides]},
- * and other managers add a direct dependency. For {@code requirements.txt}: appends
- * the dependency. When uv is available, the uv.lock file is regenerated.
+ * and other managers add a direct dependency. For {@code requirements.txt} and
+ * {@code Pipfile}: appends the dependency. When uv is available, the uv.lock file
+ * is regenerated.
  */
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -66,7 +67,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return "Pin a transitive dependency version using the strategy appropriate for the file type " +
                 "and package manager. For `pyproject.toml`: uv uses `[tool.uv].constraint-dependencies`, " +
                 "PDM uses `[tool.pdm.overrides]`, and other managers add a direct dependency. " +
-                "For `requirements.txt`: appends the dependency.";
+                "For `requirements.txt` and `Pipfile`: appends the dependency.";
     }
 
     static class Accumulator {
