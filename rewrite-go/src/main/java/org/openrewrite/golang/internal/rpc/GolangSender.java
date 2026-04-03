@@ -122,6 +122,18 @@ public class GolangSender extends GolangVisitor<RpcSendQueue> {
     }
 
     @Override
+    public J visitStatementExpression(Go.StatementExpression se, RpcSendQueue q) {
+        q.getAndSend(se, Go.StatementExpression::getStatement, el -> visit(el, q));
+        return se;
+    }
+
+    @Override
+    public J visitPointerType(Go.PointerType pointerType, RpcSendQueue q) {
+        q.getAndSend(pointerType, Go.PointerType::getElem, el -> visit(el, q));
+        return pointerType;
+    }
+
+    @Override
     public J visitChannel(Go.Channel channel, RpcSendQueue q) {
         q.getAndSend(channel, c -> c.getDir().name());
         q.getAndSend(channel, Go.Channel::getValue, el -> visit(el, q));

@@ -58,6 +58,10 @@ func nodePrefix(v any) any {
 		return n.Prefix
 	case *tree.MapType:
 		return n.Prefix
+	case *tree.PointerType:
+		return n.Prefix
+	case *tree.StatementExpression:
+		return n.Prefix
 	case *tree.Channel:
 		return n.Prefix
 	case *tree.FuncType:
@@ -169,6 +173,10 @@ func nodeMarkers(v any) any {
 	case *tree.Slice:
 		return n.Markers
 	case *tree.MapType:
+		return n.Markers
+	case *tree.PointerType:
+		return n.Markers
+	case *tree.StatementExpression:
 		return n.Markers
 	case *tree.Channel:
 		return n.Markers
@@ -282,6 +290,10 @@ func setPrefix(v any, prefix tree.Space) {
 		n.Prefix = prefix
 	case *tree.MapType:
 		n.Prefix = prefix
+	case *tree.PointerType:
+		n.Prefix = prefix
+	case *tree.StatementExpression:
+		n.Prefix = prefix
 	case *tree.Channel:
 		n.Prefix = prefix
 	case *tree.FuncType:
@@ -391,6 +403,10 @@ func setMarkers(v any, markers tree.Markers) {
 	case *tree.Slice:
 		n.Markers = markers
 	case *tree.MapType:
+		n.Markers = markers
+	case *tree.PointerType:
+		n.Markers = markers
+	case *tree.StatementExpression:
 		n.Markers = markers
 	case *tree.Channel:
 		n.Markers = markers
@@ -550,6 +566,8 @@ func extractID(v any) any {
 	case *tree.Slice:
 		return t.ID
 	case *tree.MapType:
+		return t.ID
+	case *tree.PointerType:
 		return t.ID
 	case *tree.Channel:
 		return t.ID

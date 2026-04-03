@@ -23,6 +23,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
+var defaultReceiver = NewGoReceiver()
+
 // ReceiveQueue deserializes RpcObjectData messages from the RPC channel.
 type ReceiveQueue struct {
 	batch []RpcObjectData
@@ -90,7 +92,9 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		var after any
 		if onChange != nil {
 			after = onChange(before)
-		} else if msg.ValueType == nil && msg.Value != nil {
+		} else if !isNilValue(before) && getValueType(before) != nil {
+			after = defaultReceiver.Visit(before, q)
+		} else if msg.Value != nil {
 			after = msg.Value
 		} else {
 			after = before
@@ -133,7 +137,7 @@ func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
 		// Next message contains positions
 		posMsg := q.Take()
 		if posMsg.State != Change {
-			panic(fmt.Sprintf("expected CHANGE with positions, got %v", posMsg.State))
+			panic(fmt.Sprintf("expected CHANGE with positions, got %v (value=%v, valueType=%v)", posMsg.State, posMsg.Value, posMsg.ValueType))
 		}
 		positionsRaw, ok := posMsg.Value.([]any)
 		if !ok {
@@ -187,8 +191,9 @@ func newObj(javaClassName string) any {
 	if factory, ok := factories[javaClassName]; ok {
 		return factory()
 	}
-	if strings.HasPrefix(javaClassName, "org.openrewrite.marker.") {
-		return tree.GenericMarker{}
+	// Unknown marker types — create a GenericMarker with JavaType preserved.
+	if strings.Contains(javaClassName, "marker") || strings.Contains(javaClassName, "Marker") {
+		return tree.GenericMarker{JavaType: javaClassName}
 	}
 	panic(fmt.Sprintf("no factory registered for type: %s", javaClassName))
 }

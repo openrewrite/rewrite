@@ -146,7 +146,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withExtends(q.receive(classDecl.getPadding().getExtends(), e -> visitLeftPadded(e, q)))
                 .getPadding().withImplements(q.receive(classDecl.getPadding().getImplements(), i -> visitContainer(i, q)))
                 .getPadding().withPermits(q.receive(classDecl.getPadding().getPermits(), p -> visitContainer(p, q)))
-                .withBody(q.receive(classDecl.getBody(), b -> (J.Block) visitNonNull(b, q)));
+                .withBody(q.receive(classDecl.getBody(), b -> (J.Block) visitNonNull(b, q)))
+                .withType(q.receive(classDecl.getType(), t -> (JavaType.FullyQualified) visitType(t, q)));
     }
 
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
@@ -340,7 +341,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     String codePoint = q.receive(s != null ? s.getCodePoint() : null);
                     return new J.Literal.UnicodeEscape(valueSourceIndex, codePoint);
                 }))
-                .withType(q.receive(literal.getType(), t -> (JavaType.Primitive) visitType(t, q)));
+                .withType(q.receive((JavaType) literal.getType(), t -> visitType(t, q)));
     }
 
     @Override

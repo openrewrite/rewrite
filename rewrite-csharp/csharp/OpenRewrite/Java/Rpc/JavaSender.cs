@@ -234,6 +234,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSend(classDecl, c => c.Implements, impl => VisitContainer(impl, q));
         q.GetAndSend(classDecl, c => c.Permits, perm => VisitContainer(perm, q));
         q.GetAndSend(classDecl, c => (J)c.Body, j => Visit(j, q));
+        q.GetAndSend(classDecl, c => AsRef(c.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return classDecl;
     }
 

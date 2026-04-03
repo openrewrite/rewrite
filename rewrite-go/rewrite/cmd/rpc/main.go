@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -308,8 +309,23 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 		var sourcePath string
 		var source string
 
-		if input.Path != "" {
-			absPath := input.Path
+		if input.Text != "" {
+			// Text-based input (inline source from tests or recipe framework)
+			source = input.Text
+			sourcePath = input.SourcePath
+			if sourcePath == "" {
+				sourcePath = "<unknown>"
+			}
+		} else {
+			// File-path-based input (mod build sends file paths)
+			filePath := input.Path
+			if filePath == "" {
+				filePath = input.SourcePath
+			}
+			if filePath == "" {
+				continue
+			}
+			absPath := filePath
 			data, err := os.ReadFile(absPath)
 			if err != nil {
 				return nil, &rpcError{Code: -32603, Message: fmt.Sprintf("Failed to read file: %v", err)}
@@ -325,14 +341,6 @@ func (s *server) handleParse(params json.RawMessage) (any, *rpcError) {
 			} else {
 				sourcePath = absPath
 			}
-		} else if input.Text != "" {
-			source = input.Text
-			sourcePath = input.SourcePath
-			if sourcePath == "" {
-				sourcePath = "<unknown>"
-			}
-		} else {
-			continue
 		}
 
 		cu, parseErr := func() (cu *tree.CompilationUnit, err error) {
@@ -381,12 +389,15 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	}
 
 	before := s.remoteObjects[req.ID]
+	// Use a fresh ref map for each GetObject to avoid ref ID collisions
+	// between the reverse direction (Java→Go) and forward direction (Go→Java).
+	localRefs := make(map[uintptr]int)
 
 	// Collect all batches into a single result
 	var result []rpc.RpcObjectData
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		result = append(result, batch...)
-	}, s.localRefs)
+	}, localRefs)
 
 	sender := rpc.NewGoSender()
 	q.Send(obj, before, func(v any) {
@@ -617,33 +628,118 @@ func (s *server) handleReset() bool {
 	return true
 }
 
-// getMarketplaceRequest is the parameter type for GetMarketplace.
-type getMarketplaceRequest struct {
-	Bundle json.RawMessage `json:"bundle"`
+// marketplaceRow matches Java's GetMarketplaceResponse.Row.
+type marketplaceRow struct {
+	Descriptor    marketplaceDescriptor     `json:"descriptor"`
+	CategoryPaths [][]marketplaceCategory   `json:"categoryPaths"`
 }
 
-// getMarketplaceResponse contains available recipes.
-type getMarketplaceResponse struct {
-	Recipes []recipeListingResponse `json:"recipes"`
+// marketplaceDescriptor matches Java's RecipeDescriptor (minimal fields).
+type marketplaceDescriptor struct {
+	Name                         string                    `json:"name"`
+	DisplayName                  string                    `json:"displayName"`
+	InstanceName                 string                    `json:"instanceName"`
+	Description                  string                    `json:"description"`
+	Tags                         []string                  `json:"tags"`
+	EstimatedEffortPerOccurrence *string                   `json:"estimatedEffortPerOccurrence"`
+	Options                      []marketplaceOption       `json:"options"`
+	Preconditions                []marketplaceDescriptor   `json:"preconditions"`
+	RecipeList                   []marketplaceDescriptor   `json:"recipeList"`
+	DataTables                   []any                     `json:"dataTables"`
+	Maintainers                  []any                     `json:"maintainers"`
+	Contributors                 []any                     `json:"contributors"`
+	Examples                     []any                     `json:"examples"`
+	Source                       *string                   `json:"source"`
 }
 
-type recipeListingResponse struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
+type marketplaceOption struct {
+	Name        string  `json:"name"`
+	DisplayName string  `json:"displayName"`
+	Description string  `json:"description"`
+	Example     *string `json:"example"`
+	Required    bool    `json:"required"`
+	Type        string  `json:"type"`
+	Value       any     `json:"value"`
+	Valid       []any   `json:"valid"`
+}
+
+// marketplaceCategory matches Java's CategoryDescriptor.
+type marketplaceCategory struct {
+	DisplayName string   `json:"displayName"`
+	PackageName string   `json:"packageName"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	Root        bool     `json:"root"`
+	Priority    int      `json:"priority"`
 }
 
 // handleGetMarketplace returns available recipes from the Go registry.
+// The Java side expects a JSON array of Row{descriptor, categoryPaths}.
 func (s *server) handleGetMarketplace(params json.RawMessage) (any, *rpcError) {
-	var listings []recipeListingResponse
-	for _, desc := range s.registry.AllRecipes() {
-		listings = append(listings, recipeListingResponse{
-			Name:        desc.Name,
-			DisplayName: desc.DisplayName,
-			Description: desc.Description,
+	var rows []marketplaceRow
+	for _, reg := range s.registry.AllRegistrations() {
+		desc := reg.Descriptor
+
+		var options []marketplaceOption
+		for _, opt := range desc.Options {
+			var example *string
+			if opt.Example != "" {
+				example = &opt.Example
+			}
+			options = append(options, marketplaceOption{
+				Name:        opt.Name,
+				DisplayName: opt.DisplayName,
+				Description: opt.Description,
+				Example:     example,
+				Required:    opt.Required,
+				Type:        "String",
+			})
+		}
+		if options == nil {
+			options = []marketplaceOption{}
+		}
+
+		var categoryPath []marketplaceCategory
+		for _, cat := range reg.Categories {
+			categoryPath = append(categoryPath, marketplaceCategory{
+				DisplayName: cat.DisplayName,
+				PackageName: "",
+				Description: cat.Description,
+				Tags:        []string{},
+				Root:        false,
+				Priority:    0,
+			})
+		}
+
+		rows = append(rows, marketplaceRow{
+			Descriptor: marketplaceDescriptor{
+				Name:           desc.Name,
+				DisplayName:    desc.DisplayName,
+				InstanceName:   desc.DisplayName,
+				Description:    desc.Description,
+				Tags:           nonNil(desc.Tags),
+				Options:        options,
+				Preconditions:  []marketplaceDescriptor{},
+				RecipeList:     []marketplaceDescriptor{},
+				DataTables:     []any{},
+				Maintainers:    []any{},
+				Contributors:   []any{},
+				Examples:       []any{},
+			},
+			CategoryPaths: [][]marketplaceCategory{categoryPath},
 		})
 	}
-	return getMarketplaceResponse{Recipes: listings}, nil
+	if rows == nil {
+		rows = []marketplaceRow{}
+	}
+	return rows, nil
+}
+
+func nonNil(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
 }
 
 // prepareRecipeRequest is the parameter type for PrepareRecipe.
@@ -654,18 +750,30 @@ type prepareRecipeRequest struct {
 
 // prepareRecipeResponse contains the prepared recipe info.
 type prepareRecipeResponse struct {
-	ID          string               `json:"id"`
-	Descriptor  recipeDescResponse   `json:"descriptor"`
-	EditVisitor string               `json:"editVisitor"`
-	ScanVisitor *string              `json:"scanVisitor,omitempty"`
-	DelegatesTo *delegatesToResponse `json:"delegatesTo,omitempty"`
+	ID                  string               `json:"id"`
+	Descriptor          recipeDescResponse   `json:"descriptor"`
+	EditVisitor         string               `json:"editVisitor"`
+	EditPreconditions   []any                `json:"editPreconditions"`
+	ScanVisitor         *string              `json:"scanVisitor,omitempty"`
+	ScanPreconditions   []any                `json:"scanPreconditions"`
+	DelegatesTo         *delegatesToResponse `json:"delegatesTo,omitempty"`
 }
 
 type recipeDescResponse struct {
-	Name        string                   `json:"name"`
-	DisplayName string                   `json:"displayName"`
-	Description string                   `json:"description"`
-	Options     []optionDescResponse     `json:"options,omitempty"`
+	Name                         string               `json:"name"`
+	DisplayName                  string               `json:"displayName"`
+	InstanceName                 string               `json:"instanceName"`
+	Description                  string               `json:"description"`
+	Tags                         []string             `json:"tags"`
+	EstimatedEffortPerOccurrence *string              `json:"estimatedEffortPerOccurrence"`
+	Options                      []optionDescResponse `json:"options"`
+	Preconditions                []any                `json:"preconditions"`
+	RecipeList                   []any                `json:"recipeList"`
+	DataTables                   []any                `json:"dataTables"`
+	Maintainers                  []any                `json:"maintainers"`
+	Contributors                 []any                `json:"contributors"`
+	Examples                     []any                `json:"examples"`
+	Source                       *string              `json:"source"`
 }
 
 type optionDescResponse struct {
@@ -695,7 +803,14 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 
 	// Create recipe instance with options
 	instance := reg.Constructor(req.Options)
-	desc := recipe.Describe(instance)
+
+	var desc recipe.RecipeDescriptor
+	if instance != nil {
+		desc = recipe.Describe(instance)
+	} else {
+		// Installer-loaded recipes have no constructor; use stored descriptor
+		desc = reg.Descriptor
+	}
 
 	// Generate unique ID and store the prepared recipe
 	recipeID := uuid.New().String()
@@ -704,17 +819,30 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 	resp := prepareRecipeResponse{
 		ID: req.ID,
 		Descriptor: recipeDescResponse{
-			Name:        desc.Name,
-			DisplayName: desc.DisplayName,
-			Description: desc.Description,
+			Name:          desc.Name,
+			DisplayName:   desc.DisplayName,
+			InstanceName:  desc.DisplayName,
+			Description:   desc.Description,
+			Tags:          []string{},
+			Options:       []optionDescResponse{},
+			Preconditions: []any{},
+			RecipeList:    []any{},
+			DataTables:    []any{},
+			Maintainers:   []any{},
+			Contributors:  []any{},
+			Examples:      []any{},
 		},
-		EditVisitor: "edit:" + recipeID,
+		EditVisitor:       "edit:" + recipeID,
+		EditPreconditions: []any{},
+		ScanPreconditions: []any{},
 	}
 
 	// Check if this is a scanning recipe
-	if _, isScan := instance.(recipe.ScanningRecipe); isScan {
-		scanVis := "scan:" + recipeID
-		resp.ScanVisitor = &scanVis
+	if instance != nil {
+		if _, isScan := instance.(recipe.ScanningRecipe); isScan {
+			scanVis := "scan:" + recipeID
+			resp.ScanVisitor = &scanVis
+		}
 	}
 
 	// Map options
@@ -729,10 +857,12 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 	}
 
 	// Check for delegation
-	if del, ok := instance.(recipe.DelegatesTo); ok {
-		resp.DelegatesTo = &delegatesToResponse{
-			RecipeName: del.JavaRecipeName(),
-			Options:    del.JavaOptions(),
+	if instance != nil {
+		if del, ok := instance.(recipe.DelegatesTo); ok {
+			resp.DelegatesTo = &delegatesToResponse{
+				RecipeName: del.JavaRecipeName(),
+				Options:    del.JavaOptions(),
+			}
 		}
 	}
 
@@ -773,6 +903,10 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	if !ok {
 		return nil, &rpcError{Code: -32602, Message: "Unknown recipe: " + recipeID}
 	}
+	if r == nil {
+		// Installer-loaded recipes have no implementation in Go
+		return &visitResponse{Modified: false}, nil
+	}
 
 	// Get the tree from Java via bidirectional RPC
 	treeObj := s.getObjectFromJava(req.TreeID, req.SourceFileType)
@@ -805,12 +939,15 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	before := treeNode
 	after := v.Visit(treeNode, ctx)
 
-	// Check if modified
-	modified := before != after
+	// Check if modified by pointer identity (not value equality,
+	// since tree nodes contain slices which are not comparable).
+	modified := !treeIdentical(before, after)
 
-	// Store the result
+	// Store the result — update both localObjects (for forward GetObject)
+	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
 	if after != nil {
 		s.localObjects[req.TreeID] = after
+		s.reverseRemoteObjects[req.TreeID] = after
 	} else {
 		delete(s.localObjects, req.TreeID)
 	}
@@ -948,4 +1085,22 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 
 	s.logger.Printf("ParseProject: parsed %d files", len(items))
 	return items, nil
+}
+
+// treeIdentical compares two tree nodes by pointer identity.
+// Tree nodes contain slices (uncomparable in Go), so we compare
+// the underlying pointer addresses via reflect.
+func treeIdentical(a, b any) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	va := reflect.ValueOf(a)
+	vb := reflect.ValueOf(b)
+	if va.Kind() == reflect.Ptr && vb.Kind() == reflect.Ptr {
+		return va.Pointer() == vb.Pointer()
+	}
+	return false
 }

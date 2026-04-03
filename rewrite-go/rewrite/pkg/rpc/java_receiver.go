@@ -196,7 +196,11 @@ func (r *JavaReceiver) receiveBlock(b *tree.Block, q *ReceiveQueue) *tree.Block 
 		}
 	}
 	// end space
-	b.End = receiveSpace(b.End, q)
+	if result := q.Receive(b.End, func(v any) any {
+		return receiveSpace(v.(tree.Space), q)
+	}); result != nil {
+		b.End = result.(tree.Space)
+	}
 	return b
 }
 
@@ -317,7 +321,7 @@ func (r *JavaReceiver) receiveMethodDeclaration(md *tree.MethodDeclaration, q *R
 		md.Name = nameResult.(*tree.Identifier)
 	}
 	// parameters
-	if result := q.Receive(md.Parameters, func(v any) any { return receiveContainer(r.parent, q, v) }); result != nil {
+	if result := q.Receive(md.Parameters, func(v any) any { return receiveContainerAs(r.parent, q, v, ContainerStatement) }); result != nil {
 		md.Parameters = result.(tree.Container[tree.Statement])
 	}
 	// throws
@@ -352,7 +356,15 @@ func (r *JavaReceiver) receiveVariableDeclarations(vd *tree.VariableDeclarations
 		vd.TypeExpr = result.(tree.Expression)
 	}
 	// varargs
-	q.Receive(nil, nil)
+	var currentVarargs any
+	if vd.Varargs != nil {
+		currentVarargs = *vd.Varargs
+	}
+	varargsResult := q.Receive(currentVarargs, func(v any) any { return receiveSpace(v.(tree.Space), q) })
+	if varargsResult != nil {
+		sp := varargsResult.(tree.Space)
+		vd.Varargs = &sp
+	}
 	// variables
 	beforeVars := make([]any, len(vd.Variables))
 	for i, v := range vd.Variables {
@@ -589,7 +601,7 @@ func (r *JavaReceiver) receiveCase(cs *tree.Case, q *ReceiveQueue) *tree.Case {
 		cs.Expressions = result.(tree.Container[tree.Expression])
 	}
 	// statements - Java sends Container<RightPadded<Statement>>, extract to Go's []RightPadded[Statement]
-	if result := q.Receive(nil, func(v any) any { return receiveContainer(r.parent, q, v) }); result != nil {
+	if result := q.Receive(nil, func(v any) any { return receiveContainerAs(r.parent, q, v, ContainerStatement) }); result != nil {
 		cont := result.(tree.Container[tree.Statement])
 		cs.Body = cont.Elements
 	}

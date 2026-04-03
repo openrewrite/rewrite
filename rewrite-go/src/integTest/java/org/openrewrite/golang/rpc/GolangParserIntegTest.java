@@ -363,6 +363,52 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void lineComment() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                // hello is a function
+                                func hello() {
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void pointerTypeVar() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func f() {
+                                \tvar x *int
+                                \t_ = x
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void structTag() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Finding struct {
+                                \tLine string `json:"-"`
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void compositeAndKeyValue() {
         rewriteRun(
                 go(
@@ -379,6 +425,41 @@ class GolangParserIntegTest implements RewriteTest {
                                 \t\tName:    "default",
                                 \t\tTimeout: 30,
                                 \t}
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void literalWithNonPrimitiveType() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                import (
+                                \t"time"
+
+                                \t"github.com/example/pkg"
+                                )
+
+                                var c = pkg.Config{
+                                \tTTL: 10 * time.Minute,
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void variadicParameter() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                func foo(args ...string) {
                                 }
                                 """
                 )

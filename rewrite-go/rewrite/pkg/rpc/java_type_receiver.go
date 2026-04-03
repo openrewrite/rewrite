@@ -197,7 +197,12 @@ func receiveAsType[T tree.JavaType](r *JavaTypeReceiver, q *ReceiveQueue, before
 		var zero T
 		return zero
 	}
-	return result.(T)
+	if typed, ok := result.(T); ok {
+		return typed
+	}
+	// Incompatible type (e.g., JavaTypeUnknown where JavaTypeClass expected)
+	var zero T
+	return zero
 }
 
 // receiveTypeList receives a list of JavaTypes from the queue.
@@ -227,7 +232,10 @@ func receiveClassList(r *JavaTypeReceiver, q *ReceiveQueue, before []*tree.JavaT
 	}
 	result := make([]*tree.JavaTypeClass, len(afterAny))
 	for i, v := range afterAny {
-		result[i] = v.(*tree.JavaTypeClass)
+		if cls, ok := v.(*tree.JavaTypeClass); ok {
+			result[i] = cls
+		}
+		// Unknown types are skipped (nil in the list)
 	}
 	return result
 }

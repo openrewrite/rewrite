@@ -149,6 +149,18 @@ func TestParseTrailingCommaAnonymousStruct(t *testing.T) {
 		`))
 }
 
+func TestParseTrailingCommaFuncTypeParams(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			var f = map[string]func(
+				a int,
+				b int,
+			) error{}
+		`))
+}
+
 func TestParseTrailingCommaMapOfSlices(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`

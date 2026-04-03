@@ -73,6 +73,10 @@ func (s *GoSender) Visit(node any, q *SendQueue) {
 		s.sendSlice(v, q)
 	case *tree.MapType:
 		s.sendMapType(v, q)
+	case *tree.StatementExpression:
+		s.sendStatementExpression(v, q)
+	case *tree.PointerType:
+		s.sendPointerType(v, q)
 	case *tree.Channel:
 		s.sendChannel(v, q)
 	case *tree.FuncType:
@@ -206,6 +210,16 @@ func (s *GoSender) sendMapType(mt *tree.MapType, q *SendQueue) {
 	q.GetAndSend(mt, func(v any) any { return v.(*tree.MapType).Key },
 		func(v any) { sendRightPadded(s, v, q) })
 	q.GetAndSend(mt, func(v any) any { return v.(*tree.MapType).Value },
+		func(v any) { s.Visit(v, q) })
+}
+
+func (s *GoSender) sendStatementExpression(se *tree.StatementExpression, q *SendQueue) {
+	q.GetAndSend(se, func(v any) any { return v.(*tree.StatementExpression).Statement },
+		func(v any) { s.Visit(v, q) })
+}
+
+func (s *GoSender) sendPointerType(pt *tree.PointerType, q *SendQueue) {
+	q.GetAndSend(pt, func(v any) any { return v.(*tree.PointerType).Elem },
 		func(v any) { s.Visit(v, q) })
 }
 

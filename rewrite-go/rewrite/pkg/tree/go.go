@@ -304,6 +304,30 @@ const (
 	ChanRecvOnly                // <-chan T
 )
 
+// PointerType represents a pointer type expression: `*T`.
+type PointerType struct {
+	ID      uuid.UUID
+	Prefix  Space
+	Markers Markers
+	Elem    Expression
+}
+
+func (*PointerType) isTree()       {}
+func (*PointerType) isJ()          {}
+func (*PointerType) isExpression() {}
+
+func (n *PointerType) WithPrefix(prefix Space) *PointerType {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *PointerType) WithMarkers(markers Markers) *PointerType {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // Channel represents a channel type expression: `chan T`, `chan<- T`, `<-chan T`.
 type Channel struct {
 	ID      uuid.UUID
@@ -535,6 +559,32 @@ func (n *CommClause) WithPrefix(prefix Space) *CommClause {
 }
 
 func (n *CommClause) WithMarkers(markers Markers) *CommClause {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// StatementExpression wraps a Statement so it can appear in expression contexts.
+// Used for Go function literals which are parsed as MethodDeclaration (a Statement)
+// but can appear in return statements, assignments, and call arguments.
+type StatementExpression struct {
+	ID        uuid.UUID
+	Prefix    Space
+	Markers   Markers
+	Statement Statement
+}
+
+func (*StatementExpression) isTree()       {}
+func (*StatementExpression) isJ()          {}
+func (*StatementExpression) isExpression() {}
+
+func (n *StatementExpression) WithPrefix(prefix Space) *StatementExpression {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *StatementExpression) WithMarkers(markers Markers) *StatementExpression {
 	c := *n
 	c.Markers = markers
 	return &c

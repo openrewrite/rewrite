@@ -14,6 +14,12 @@ plugins {
     id("publishing")
 }
 
+normalization {
+    runtimeClasspath {
+        ignore("META-INF/rewrite-python-version.txt")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -380,6 +386,13 @@ val generateTestClasspath by tasks.registering {
     val outputFile = pythonDir.resolve("test-classpath.txt")
     outputs.file(outputFile)
 
+    inputs.files(configurations["runtimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named("compileJava").map { it.outputs.files })
+    inputs.files(tasks.named("processResources").map { it.outputs.files })
+
     // Depend on jar tasks to ensure jars exist
     dependsOn(tasks.named("testClasses"))
     dependsOn(tasks.named("jar"))
@@ -395,8 +408,6 @@ val generateTestClasspath by tasks.registering {
          .joinToString(File.pathSeparator) { it.absolutePath }
         outputFile.writeText(classpath)
         logger.lifecycle("Generated test classpath to ${outputFile.absolutePath}")
-
-
     }
 }
 

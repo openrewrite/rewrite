@@ -18,7 +18,11 @@ package rpc
 
 import (
 	"reflect"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
+
+var defaultSender = NewGoSender()
 
 // SendQueue serializes objects into RpcObjectData messages for RPC transmission.
 // It tracks refs for deduplication and maintains a "before" state for delta encoding.
@@ -105,7 +109,7 @@ func (q *SendQueue) Send(after, before any, onChange func(any)) {
 	} else {
 		vt := getValueType(afterVal)
 		var val any
-		if onChange == nil {
+		if onChange == nil && vt == nil {
 			val = afterVal
 		}
 		q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
@@ -186,19 +190,21 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 	var ref *int
 	if IsRef(after) {
 		ptr := ptrKey(afterVal)
-		if existingRef, ok := q.refs[ptr]; ok {
-			// Already sent - emit pure ref
-			q.Put(RpcObjectData{State: Add, Ref: &existingRef})
-			return
+		if ptr != 0 { // Only track refs for pointer types (value types all return 0)
+			if existingRef, ok := q.refs[ptr]; ok {
+				// Already sent - emit pure ref
+				q.Put(RpcObjectData{State: Add, Ref: &existingRef})
+				return
+			}
+			r := len(q.refs) + 1
+			q.refs[ptr] = r
+			ref = &r
 		}
-		r := len(q.refs) + 1
-		q.refs[ptr] = r
-		ref = &r
 	}
 
 	vt := getValueType(afterVal)
 	var val any
-	if onChange == nil {
+	if onChange == nil && vt == nil {
 		val = afterVal
 	}
 	q.Put(RpcObjectData{State: Add, ValueType: vt, Value: val, Ref: ref})
@@ -212,6 +218,8 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 
 	if onChange != nil && !isNilValue(after) {
 		onChange(after)
+	} else if onChange == nil && !isNilValue(after) && getValueType(after) != nil {
+		defaultSender.Visit(after, q)
 	}
 }
 
@@ -243,8 +251,17 @@ func sameIdentity(a, b any) bool {
 	if rv1.Kind() == reflect.Ptr && rv2.Kind() == reflect.Ptr {
 		return rv1.Pointer() == rv2.Pointer()
 	}
-	// For value types, fall back to ==
-	return a == b
+	// For non-pointer value types, use reflect to safely compare.
+	// Slices are compared by header identity (pointer + length), not content,
+	// because tree visitors always create new slices even for unchanged subtrees.
+	rv1 = reflect.ValueOf(a)
+	rv2 = reflect.ValueOf(b)
+	if rv1.Kind() == reflect.Slice && rv2.Kind() == reflect.Slice {
+		return rv1.Pointer() == rv2.Pointer() && rv1.Len() == rv2.Len()
+	}
+	// For structs with uncomparable fields (e.g., Space containing []Comment),
+	// use DeepEqual to avoid panics.
+	return reflect.DeepEqual(a, b)
 }
 
 // sameType checks if two values have the same concrete type.
@@ -280,6 +297,10 @@ func getValueType(v any) *string {
 	}
 	if vt, ok := valueTypeMap[t]; ok {
 		return &vt
+	}
+	// GenericMarker carries the original Java class name
+	if gm, ok := v.(tree.GenericMarker); ok && gm.JavaType != "" {
+		return &gm.JavaType
 	}
 	// Check padding types (Go generics have no reflect.Name())
 	return getValueTypeForPadding(v)

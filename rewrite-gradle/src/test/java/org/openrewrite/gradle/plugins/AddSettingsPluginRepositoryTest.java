@@ -643,6 +643,37 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     }
 
     @Test
+    void addSecondMavenRepoKts() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.spring.io"))
+            .expectedCyclesThatMakeChanges(1).cycles(3),
+          settingsGradleKts(
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/releases")
+                      }
+                  }
+              }
+              """,
+            """
+              pluginManagement {
+                  repositories {
+                      maven {
+                          url = uri("https://repo.example.com/releases")
+                      }
+                      maven {
+                          url = uri("https://repo.spring.io")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addToExistingPluginManagementWithPluginsBlockKts() {
         rewriteRun(
           spec -> spec.recipe(new AddSettingsPluginRepository("gradlePluginPortal", null))

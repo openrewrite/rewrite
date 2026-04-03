@@ -89,7 +89,7 @@ EQUALS     : '=' { if (!afterHealthcheck) atLineStart = false; };
 // Captures the entire flag as a single token, stopping at whitespace
 // This avoids the greedy flagValue+ parsing issue while keeping shell commands working
 // Flag values can contain quoted strings (which may include spaces)
-FLAG : '--' [a-zA-Z] [a-zA-Z0-9_-]* ('=' FLAG_VALUE_PART+)? { if (!afterHealthcheck) atLineStart = false; };
+FLAG : '--' [a-z] [a-z0-9_-]* ('=' FLAG_VALUE_PART+)? { if (!afterHealthcheck) atLineStart = false; };
 fragment FLAG_VALUE_PART
     : '"' ( '\\' ~[\r\n] | ~["\\\r\n] )* '"'   // Double-quoted string (with escapes)
     | '\'' ~['\r\n]* '\''                        // Single-quoted string (literal)

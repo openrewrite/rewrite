@@ -197,7 +197,7 @@ public class AddSettingsPluginRepository extends Recipe {
                 }
                 J.MethodInvocation repoToAdd = extractRepository(pluginManagement);
 
-                if (repoAlreadyExists(repos, repoToAdd.getSimpleName())) {
+                if (url == null && repoAlreadyExists(repos, repoToAdd.getSimpleName())) {
                     return statement;
                 }
 

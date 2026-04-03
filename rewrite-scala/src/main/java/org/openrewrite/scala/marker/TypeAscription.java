@@ -21,15 +21,16 @@ import org.openrewrite.marker.Marker;
 import java.util.UUID;
 
 /**
- * Marker indicating that a {@link org.openrewrite.java.tree.J.ForEachLoop} represents
- * a Scala for-comprehension. The printer uses this to emit Scala syntax
- * ({@code for (x <- iterable) body}) instead of Java syntax
- * ({@code for (Type x : iterable) body}).
+ * Marks a {@link org.openrewrite.java.tree.J.TypeCast} that represents a Scala type
+ * ascription ({@code expr: Type}) rather than a Java-style cast ({@code (Type) expr}).
+ * <p>
+ * When this marker is present, the printer emits {@code expr: Type} instead of
+ * {@code (Type) expr}.
  */
-public class ScalaForLoop implements Marker {
+public class TypeAscription implements Marker {
     private final UUID id;
 
-    public ScalaForLoop(UUID id) {
+    public TypeAscription(UUID id) {
         this.id = id;
     }
 
@@ -39,11 +40,11 @@ public class ScalaForLoop implements Marker {
     }
 
     @Override
-    public ScalaForLoop withId(UUID id) {
-        return new ScalaForLoop(id);
+    public TypeAscription withId(UUID id) {
+        return new TypeAscription(id);
     }
 
-    public static ScalaForLoop create() {
-        return new ScalaForLoop(Tree.randomId());
+    public static TypeAscription create() {
+        return new TypeAscription(Tree.randomId());
     }
 }
