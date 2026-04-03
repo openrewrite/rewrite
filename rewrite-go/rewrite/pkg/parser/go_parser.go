@@ -146,9 +146,7 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *tree.Compil
 
 	// Imports
 	var imports *tree.Container[*tree.Import]
-	if len(file.Imports) > 0 {
-		imports = ctx.mapImports(file)
-	}
+	imports = ctx.mapImports(file)
 
 	// Top-level declarations (functions, types, vars, consts - excluding imports)
 	var stmts []tree.RightPadded[tree.Statement]
@@ -224,6 +222,11 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 		ctx.skip(1) // skip ")"
 		if len(elements) > 0 {
 			elements[len(elements)-1].After = closeParen
+		} else if len(closeParen.Comments) > 0 {
+			elements = append(elements, tree.RightPadded[*tree.Import]{
+				Element: &tree.Import{ID: uuid.New(), Qualid: &tree.Empty{ID: uuid.New()}},
+				After:   closeParen,
+			})
 		}
 	}
 
@@ -237,19 +240,30 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 			ctx.skip(1) // skip "("
 		}
 
-		ctx.mapImportBlockSpecs(importDecl, &elements, tree.ImportBlock{
+		importBlockMarker := tree.ImportBlock{
 			Ident:         uuid.New(),
 			ClosePrevious: prevGrouped,
 			Before:        blockBefore,
 			Grouped:       grouped,
 			GroupedBefore: groupedBefore,
-		})
+		}
+		ctx.mapImportBlockSpecs(importDecl, &elements, importBlockMarker)
 
 		if grouped {
 			closeParen := ctx.prefix(importDecl.Rparen)
 			ctx.skip(1) // skip ")"
-			if len(elements) > 0 {
+			if len(importDecl.Specs) > 0 {
 				elements[len(elements)-1].After = closeParen
+			} else if len(closeParen.Comments) > 0 {
+				imp := &tree.Import{ID: uuid.New(), Qualid: &tree.Empty{ID: uuid.New()}}
+				imp.Markers = tree.Markers{
+					ID:      uuid.New(),
+					Entries: []tree.Marker{importBlockMarker},
+				}
+				elements = append(elements, tree.RightPadded[*tree.Import]{
+					Element: imp,
+					After:   closeParen,
+				})
 			}
 		}
 		prevGrouped = grouped
@@ -345,6 +359,11 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) tree.Statement {
 
 	if len(elements) > 0 {
 		elements[len(elements)-1].After = rparenPrefix
+	} else if len(rparenPrefix.Comments) > 0 {
+		elements = append(elements, tree.RightPadded[tree.Statement]{
+			Element: &tree.Empty{ID: uuid.New()},
+			After:   rparenPrefix,
+		})
 	}
 
 	var markerEntries []tree.Marker
@@ -473,6 +492,11 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
 
 	if len(elements) > 0 {
 		elements[len(elements)-1].After = rparenPrefix
+	} else if len(rparenPrefix.Comments) > 0 {
+		elements = append(elements, tree.RightPadded[tree.Statement]{
+			Element: &tree.Empty{ID: uuid.New()},
+			After:   rparenPrefix,
+		})
 	}
 
 	specs := &tree.Container[tree.Statement]{Before: lparenPrefix, Elements: elements}
@@ -705,6 +729,11 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 
 	if len(elements) > 0 {
 		elements[len(elements)-1].After = closeParen
+	} else if len(closeParen.Comments) > 0 {
+		elements = append(elements, tree.RightPadded[tree.Statement]{
+			Element: &tree.Empty{ID: uuid.New()},
+			After:   closeParen,
+		})
 	}
 
 	return tree.Container[tree.Statement]{Before: before, Elements: elements}
@@ -1785,8 +1814,14 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) tree.Expression
 			elements[len(elements)-1].After = rbracePrefix
 		}
 	} else {
-		ctx.prefix(expr.Rbrace) // consume space
-		ctx.skip(1)             // "}"
+		closePrefix := ctx.prefix(expr.Rbrace)
+		ctx.skip(1) // "}"
+		if len(closePrefix.Comments) > 0 {
+			elements = append(elements, tree.RightPadded[tree.Expression]{
+				Element: &tree.Empty{ID: uuid.New()},
+				After:   closePrefix,
+			})
+		}
 	}
 
 	return &tree.Composite{
