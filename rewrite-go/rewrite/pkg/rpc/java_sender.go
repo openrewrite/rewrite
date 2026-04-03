@@ -201,13 +201,19 @@ func (s *JavaSender) sendReturn(r *tree.Return, q *SendQueue) {
 }
 
 func (s *JavaSender) sendIf(i *tree.If, q *SendQueue) {
-	// ifCondition - wrap raw condition in ControlParentheses for Java's J.If model
+	// ifCondition - wrap raw condition in ControlParentheses for Java's J.If model.
+	// Reuse the cached CP (from a prior receive) for stable identity in delta encoding.
 	q.GetAndSend(i, func(v any) any {
-		cond := v.(*tree.If).Condition
+		ifNode := v.(*tree.If)
+		if ifNode.ConditionCP != nil {
+			cp := *ifNode.ConditionCP
+			cp.Tree = tree.RightPadded[tree.Expression]{Element: ifNode.Condition, After: cp.Tree.After}
+			return &cp
+		}
 		return &tree.ControlParentheses{
 			ID:      uuid.New(),
 			Markers: tree.Markers{ID: uuid.New()},
-			Tree:    tree.RightPadded[tree.Expression]{Element: cond, After: tree.EmptySpace},
+			Tree:    tree.RightPadded[tree.Expression]{Element: ifNode.Condition, After: tree.EmptySpace},
 		}
 	}, func(v any) { s.parent.Visit(v, q) })
 	// thenPart (right-padded)

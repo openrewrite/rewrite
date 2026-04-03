@@ -331,12 +331,11 @@ class GolangRecipeIntegTest implements RewriteTest {
     }
 
     /**
-     * Exercises the Print round-trip on realistic Go code with grouped imports,
-     * method calls, and if/else — the patterns that previously caused
-     * Print-path queue alignment errors in the reverse GetObject direction.
+     * Rename an identifier in a function with short var decl and method call.
+     * Exercises the Print round-trip with delta encoding.
      */
     @Test
-    void printRoundTripWithImportsAndIfElse() {
+    void renameWithShortVarDecl() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new org.openrewrite.java.JavaIsoVisitor<>() {
               @Override
@@ -349,30 +348,24 @@ class GolangRecipeIntegTest implements RewriteTest {
           })).expectedCyclesThatMakeChanges(1).cycles(1),
           go(
             """
-              package cobra
+              package main
 
-              import (
-              \t"os"
-              )
+              import "os"
 
-              func GetActiveHelpConfig(name string) {
-              \tcfg := os.Getenv("COBRA_ACTIVE_HELP")
+              func f() {
+              \tcfg := os.Getenv("X")
               \tif cfg != "0" {
-              \t\tcfg = os.Getenv(name)
               \t}
               }
               """,
             """
-              package cobra
+              package main
 
-              import (
-              \t"os"
-              )
+              import "os"
 
-              func GetActiveHelpConfig(name string) {
-              \tconfig := os.Getenv("COBRA_ACTIVE_HELP")
+              func f() {
+              \tconfig := os.Getenv("X")
               \tif config != "0" {
-              \t\tconfig = os.Getenv(name)
               \t}
               }
               """

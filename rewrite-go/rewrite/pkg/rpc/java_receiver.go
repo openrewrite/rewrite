@@ -17,6 +17,7 @@
 package rpc
 
 import (
+	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
@@ -409,18 +410,52 @@ func (r *JavaReceiver) receiveReturn(ret *tree.Return, q *ReceiveQueue) *tree.Re
 	c := *ret // shallow copy to avoid mutating remoteObjects baseline
 	ret = &c
 	// Java sends a single expression; Go Return stores []RightPadded[Expression]
-	// Pass through, result not stored since Go uses Expressions slice instead
-	q.Receive(nil, func(v any) any { return r.parent.Visit(v, q) })
+	var beforeExpr any
+	if len(ret.Expressions) > 0 {
+		beforeExpr = ret.Expressions[0].Element
+	}
+	result := q.Receive(beforeExpr, func(v any) any { return r.parent.Visit(v, q) })
+	if result != nil {
+		expr := result.(tree.Expression)
+		if len(ret.Expressions) > 0 {
+			ret.Expressions[0] = tree.RightPadded[tree.Expression]{
+				Element: expr,
+				After:   ret.Expressions[0].After,
+				Markers: ret.Expressions[0].Markers,
+			}
+		} else {
+			ret.Expressions = []tree.RightPadded[tree.Expression]{
+				{Element: expr},
+			}
+		}
+	} else if beforeExpr != nil {
+		// Expression was deleted
+		ret.Expressions = nil
+	}
 	return ret
 }
 
 func (r *JavaReceiver) receiveIf(i *tree.If, q *ReceiveQueue) *tree.If {
 	c := *i // shallow copy to avoid mutating remoteObjects baseline
 	i = &c
-	// ifCondition - Java sends ControlParentheses, extract inner Expression
-	cpResult := q.Receive(nil, func(v any) any { return r.parent.Visit(v, q) })
+	// ifCondition - Java sends ControlParentheses wrapping the condition.
+	// Use the cached CP from a prior receive for correct delta encoding.
+	// On the first receive, ConditionCP is nil — create a placeholder so
+	// that NO_CHANGE returns something valid rather than nil.
+	var beforeCP any
+	if i.ConditionCP != nil {
+		beforeCP = i.ConditionCP
+	} else if i.Condition != nil {
+		beforeCP = &tree.ControlParentheses{
+			ID:      uuid.New(),
+			Markers: tree.Markers{ID: uuid.New()},
+			Tree:    tree.RightPadded[tree.Expression]{Element: i.Condition},
+		}
+	}
+	cpResult := q.Receive(beforeCP, func(v any) any { return r.parent.Visit(v, q) })
 	if cpResult != nil {
 		if cp, ok := cpResult.(*tree.ControlParentheses); ok {
+			i.ConditionCP = cp
 			i.Condition = cp.Tree.Element
 		} else {
 			i.Condition = cpResult.(tree.Expression)
