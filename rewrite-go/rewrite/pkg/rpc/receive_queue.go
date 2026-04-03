@@ -23,6 +23,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
+var defaultReceiver = NewGoReceiver()
+
 // ReceiveQueue deserializes RpcObjectData messages from the RPC channel.
 type ReceiveQueue struct {
 	batch []RpcObjectData
@@ -90,7 +92,9 @@ func (q *ReceiveQueue) Receive(before any, onChange func(any) any) any {
 		var after any
 		if onChange != nil {
 			after = onChange(before)
-		} else if msg.ValueType == nil && msg.Value != nil {
+		} else if !isNilValue(before) && getValueType(before) != nil {
+			after = defaultReceiver.Visit(before, q)
+		} else if msg.Value != nil {
 			after = msg.Value
 		} else {
 			after = before

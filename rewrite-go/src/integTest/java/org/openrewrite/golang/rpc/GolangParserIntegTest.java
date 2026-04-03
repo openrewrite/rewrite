@@ -394,6 +394,21 @@ class GolangParserIntegTest implements RewriteTest {
     }
 
     @Test
+    void structTag() {
+        rewriteRun(
+                go(
+                        """
+                                package main
+
+                                type Finding struct {
+                                \tLine string `json:"-"`
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void compositeAndKeyValue() {
         rewriteRun(
                 go(

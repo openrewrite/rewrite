@@ -22,6 +22,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 )
 
+var defaultSender = NewGoSender()
+
 // SendQueue serializes objects into RpcObjectData messages for RPC transmission.
 // It tracks refs for deduplication and maintains a "before" state for delta encoding.
 type SendQueue struct {
@@ -107,7 +109,7 @@ func (q *SendQueue) Send(after, before any, onChange func(any)) {
 	} else {
 		vt := getValueType(afterVal)
 		var val any
-		if onChange == nil {
+		if onChange == nil && vt == nil {
 			val = afterVal
 		}
 		q.Put(RpcObjectData{State: Change, ValueType: vt, Value: val})
@@ -202,7 +204,7 @@ func (q *SendQueue) add(after any, onChange func(any)) {
 
 	vt := getValueType(afterVal)
 	var val any
-	if onChange == nil {
+	if onChange == nil && vt == nil {
 		val = afterVal
 	}
 	q.Put(RpcObjectData{State: Add, ValueType: vt, Value: val, Ref: ref})
@@ -216,6 +218,8 @@ func (q *SendQueue) doChange(after, before any, onChange func(any)) {
 
 	if onChange != nil && !isNilValue(after) {
 		onChange(after)
+	} else if onChange == nil && !isNilValue(after) && getValueType(after) != nil {
+		defaultSender.Visit(after, q)
 	}
 }
 
