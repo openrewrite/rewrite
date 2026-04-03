@@ -176,19 +176,19 @@ func init() {
 	RegisterFactory("org.openrewrite.ParseExceptionResult", func() any { return tree.ParseExceptionResult{} })
 
 	// SourceFile-level types that implement RpcCodec
-	RegisterFactory("org.openrewrite.Checksum", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.FileAttributes", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.Checksum", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.Checksum"} })
+	RegisterFactory("org.openrewrite.FileAttributes", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.FileAttributes"} })
 
 	// Java-side markers that may appear when recipes modify trees or during LST writing.
 	// These markers do NOT implement RpcCodec and are serialized as raw values.
-	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.marker.LstProvenance", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.marker.BuildMetadata", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.marker.GitTreeEntry", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.marker.BuildTool", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.marker.BuildToolFailure", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.marker.Generated", func() any { return tree.GenericMarker{} })
-	RegisterFactory("org.openrewrite.marker.DeserializationError", func() any { return tree.GenericMarker{} })
+	RegisterFactory("org.openrewrite.marker.RecipesThatMadeChanges", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.RecipesThatMadeChanges"} })
+	RegisterFactory("org.openrewrite.marker.LstProvenance", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.LstProvenance"} })
+	RegisterFactory("org.openrewrite.marker.BuildMetadata", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.BuildMetadata"} })
+	RegisterFactory("org.openrewrite.marker.GitTreeEntry", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.GitTreeEntry"} })
+	RegisterFactory("org.openrewrite.marker.BuildTool", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.BuildTool"} })
+	RegisterFactory("org.openrewrite.marker.BuildToolFailure", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.BuildToolFailure"} })
+	RegisterFactory("org.openrewrite.marker.Generated", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.Generated"} })
+	RegisterFactory("org.openrewrite.marker.DeserializationError", func() any { return tree.GenericMarker{JavaType: "org.openrewrite.marker.DeserializationError"} })
 	// SearchResult: IS an RpcCodec, sends 2 sub-fields (id, description)
 	RegisterFactory("org.openrewrite.marker.SearchResult", func() any { return tree.SearchResult{} })
 	// GroupedImport: IS an RpcCodec, sends 2 sub-fields (id, before whitespace)

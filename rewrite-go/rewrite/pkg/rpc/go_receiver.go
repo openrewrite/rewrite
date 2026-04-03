@@ -260,8 +260,23 @@ func (r *GoReceiver) receiveCompilationUnit(cu *tree.CompilationUnit, q *Receive
 	cu.SourcePath = receiveScalar[string](q, cu.SourcePath)
 	q.Receive(nil, nil) // charset
 	q.Receive(nil, nil) // charsetBomMarked
-	q.Receive(nil, nil) // checksum
-	q.Receive(nil, nil) // fileAttributes
+	// checksum — Checksum.rpcSend sends: algorithm (string), value (byte[])
+	q.Receive(nil, func(v any) any {
+		receiveScalar[string](q, "") // algorithm
+		q.Receive(nil, nil)          // value
+		return nil
+	})
+	// fileAttributes — FileAttributes.rpcSend sends 7 sub-fields
+	q.Receive(nil, func(v any) any {
+		q.Receive(nil, nil) // creationTime
+		q.Receive(nil, nil) // lastModifiedTime
+		q.Receive(nil, nil) // lastAccessTime
+		q.Receive(nil, nil) // isReadable
+		q.Receive(nil, nil) // isWritable
+		q.Receive(nil, nil) // isExecutable
+		q.Receive(nil, nil) // size
+		return nil
+	})
 	// packageDecl
 	var beforePkgDecl any
 	if cu.PackageDecl != nil {
@@ -299,7 +314,9 @@ func (r *GoReceiver) receiveCompilationUnit(cu *tree.CompilationUnit, q *Receive
 		}
 	}
 	// EOF
-	cu.EOF = receiveSpace(cu.EOF, q)
+	if result := q.Receive(cu.EOF, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
+		cu.EOF = result.(tree.Space)
+	}
 	return cu
 }
 
@@ -379,7 +396,9 @@ func (r *GoReceiver) receiveSlice(sl *tree.Slice, q *ReceiveQueue) *tree.Slice {
 	if result != nil {
 		sl.Indexed = result.(tree.Expression)
 	}
-	sl.OpenBracket = receiveSpace(sl.OpenBracket, q)
+	if result := q.Receive(sl.OpenBracket, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
+		sl.OpenBracket = result.(tree.Space)
+	}
 	if result := q.Receive(sl.Low, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		sl.Low = coerceToExpressionRP(result)
 	}
@@ -390,14 +409,18 @@ func (r *GoReceiver) receiveSlice(sl *tree.Slice, q *ReceiveQueue) *tree.Slice {
 	if max != nil {
 		sl.Max = max.(tree.Expression)
 	}
-	sl.CloseBracket = receiveSpace(sl.CloseBracket, q)
+	if result := q.Receive(sl.CloseBracket, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
+		sl.CloseBracket = result.(tree.Space)
+	}
 	return sl
 }
 
 func (r *GoReceiver) receiveMapType(mt *tree.MapType, q *ReceiveQueue) *tree.MapType {
 	c := *mt // shallow copy to avoid mutating remoteObjects baseline
 	mt = &c
-	mt.OpenBracket = receiveSpace(mt.OpenBracket, q)
+	if result := q.Receive(mt.OpenBracket, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
+		mt.OpenBracket = result.(tree.Space)
+	}
 	if result := q.Receive(mt.Key, func(v any) any { return receiveRightPadded(r, q, v) }); result != nil {
 		mt.Key = coerceToExpressionRP(result)
 	}
@@ -450,7 +473,7 @@ func (r *GoReceiver) receiveChannel(ch *tree.Channel, q *ReceiveQueue) *tree.Cha
 func (r *GoReceiver) receiveFuncType(ft *tree.FuncType, q *ReceiveQueue) *tree.FuncType {
 	c := *ft // shallow copy to avoid mutating remoteObjects baseline
 	ft = &c
-	if result := q.Receive(ft.Parameters, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+	if result := q.Receive(ft.Parameters, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
 		ft.Parameters = result.(tree.Container[tree.Statement])
 	}
 	result := q.Receive(ft.ReturnType, func(v any) any { return r.Visit(v, q) })
@@ -483,7 +506,7 @@ func (r *GoReceiver) receiveInterfaceType(it *tree.InterfaceType, q *ReceiveQueu
 func (r *GoReceiver) receiveTypeList(tl *tree.TypeList, q *ReceiveQueue) *tree.TypeList {
 	c := *tl // shallow copy to avoid mutating remoteObjects baseline
 	tl = &c
-	if result := q.Receive(tl.Types, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+	if result := q.Receive(tl.Types, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
 		tl.Types = result.(tree.Container[tree.Statement])
 	}
 	return tl
@@ -514,7 +537,7 @@ func (r *GoReceiver) receiveTypeDecl(td *tree.TypeDecl, q *ReceiveQueue) *tree.T
 	if td.Specs != nil {
 		beforeSpecs = *td.Specs
 	}
-	if result := q.Receive(beforeSpecs, func(v any) any { return receiveContainer(r, q, v) }); result != nil {
+	if result := q.Receive(beforeSpecs, func(v any) any { return receiveContainerAs(r, q, v, ContainerStatement) }); result != nil {
 		c := result.(tree.Container[tree.Statement])
 		td.Specs = &c
 	} else {
@@ -564,7 +587,9 @@ func (r *GoReceiver) receiveCommClause(cc *tree.CommClause, q *ReceiveQueue) *tr
 	if result != nil {
 		cc.Comm = result.(tree.Statement)
 	}
-	cc.Colon = receiveSpace(cc.Colon, q)
+	if result := q.Receive(cc.Colon, func(v any) any { return receiveSpace(v.(tree.Space), q) }); result != nil {
+		cc.Colon = result.(tree.Space)
+	}
 	// Body
 	beforeBody := make([]any, len(cc.Body))
 	for i, s := range cc.Body {

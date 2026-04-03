@@ -133,7 +133,7 @@ func (q *ReceiveQueue) ReceiveList(before []any, onChange func(any) any) []any {
 		// Next message contains positions
 		posMsg := q.Take()
 		if posMsg.State != Change {
-			panic(fmt.Sprintf("expected CHANGE with positions, got %v", posMsg.State))
+			panic(fmt.Sprintf("expected CHANGE with positions, got %v (value=%v, valueType=%v)", posMsg.State, posMsg.Value, posMsg.ValueType))
 		}
 		positionsRaw, ok := posMsg.Value.([]any)
 		if !ok {
@@ -187,8 +187,9 @@ func newObj(javaClassName string) any {
 	if factory, ok := factories[javaClassName]; ok {
 		return factory()
 	}
-	if strings.HasPrefix(javaClassName, "org.openrewrite.marker.") {
-		return tree.GenericMarker{}
+	// Unknown marker types — create a GenericMarker with JavaType preserved.
+	if strings.Contains(javaClassName, "marker") || strings.Contains(javaClassName, "Marker") {
+		return tree.GenericMarker{JavaType: javaClassName}
 	}
 	panic(fmt.Sprintf("no factory registered for type: %s", javaClassName))
 }

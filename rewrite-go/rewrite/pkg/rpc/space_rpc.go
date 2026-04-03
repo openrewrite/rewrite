@@ -71,11 +71,20 @@ func receiveSpace(before tree.Space, q *ReceiveQueue) tree.Space {
 		commentsAny[i] = c
 	}
 	afterComments := q.ReceiveList(commentsAny, func(v any) any {
+		if v == nil {
+			return nil
+		}
 		c := v.(tree.Comment)
 		c.Multiline = receiveScalar[bool](q, c.Multiline)
 		c.Text = receiveScalar[string](q, c.Text)
 		c.Suffix = receiveScalar[string](q, c.Suffix)
-		c.Markers = receiveMarkersCodec(q, c.Markers)
+		// Markers is sent by Java as a codec-wrapped field (state + sub-fields).
+		// Use q.Receive to consume the state message first.
+		if result := q.Receive(c.Markers, func(v any) any {
+			return receiveMarkersCodec(q, v.(tree.Markers))
+		}); result != nil {
+			c.Markers = result.(tree.Markers)
+		}
 		return c
 	})
 
@@ -96,7 +105,7 @@ func receiveSpace(before tree.Space, q *ReceiveQueue) tree.Space {
 func SendMarkersCodec(m tree.Markers, q *SendQueue) {
 	// ID
 	q.GetAndSend(m, func(v any) any { return v.(tree.Markers).ID.String() }, nil)
-	// Entries list (as ref) - always send non-nil slice to match Java behavior
+	// Entries list (as ref) — matches Java's Markers.rpcSend protocol.
 	q.GetAndSendListAsRef(m,
 		func(v any) []any {
 			markers := v.(tree.Markers)
@@ -164,8 +173,39 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).Ident.String() }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).Before.Whitespace }, nil)
 		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).After.Whitespace }, nil)
+	case tree.GenericMarker:
+		// Send codec sub-fields matching what Java expects
+		d := m.Data
+		switch m.JavaType {
+		case "org.openrewrite.Checksum":
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["algorithm"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["value"] }; return nil }, nil)
+		case "org.openrewrite.FileAttributes":
+			for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+				k := key
+				q.GetAndSend(m, func(_ any) any { if d != nil { return d[k] }; return nil }, nil)
+			}
+		case "org.openrewrite.marker.Markup$Error",
+			"org.openrewrite.marker.Markup$Warn",
+			"org.openrewrite.marker.Markup$Info",
+			"org.openrewrite.marker.Markup$Debug":
+			// Markup inner classes implement RpcCodec: id, message, detail
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["id"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["message"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["detail"] }; return nil }, nil)
+		case "org.openrewrite.java.marker.OmitBraces",
+			"org.openrewrite.java.marker.OmitParentheses",
+			"org.openrewrite.java.marker.Semicolon":
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["id"] }; return "" }, nil)
+		case "org.openrewrite.java.marker.NullSafe",
+			"org.openrewrite.java.marker.TrailingComma":
+			q.GetAndSend(m, func(_ any) any { if d != nil { return d["id"] }; return "" }, nil)
+			q.GetAndSend(m, func(_ any) any { return nil }, nil) // Space
+		default:
+			// Unknown marker type — no sub-fields to send
+		}
 	default:
-		// GenericMarker and other non-RpcCodec markers have no sub-fields
+		// Non-Go, non-Generic markers have no sub-fields
 	}
 }
 
@@ -312,7 +352,15 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 					m.Ident = parsed
 				}
 			}
-			m.Tag = q.Receive(m.Tag, nil).(*tree.Literal)
+			// Tag is a J.Literal — Java sends it as an inline value (no codec).
+			// Read the value and convert from JSON map to Literal if needed.
+			tagResult := q.Receive(m.Tag, nil)
+			if tagResult != nil {
+				if lit, ok := tagResult.(*tree.Literal); ok {
+					m.Tag = lit
+				}
+				// If it's a map or other type from JSON, leave Tag as is
+			}
 			return m
 		case tree.TrailingComma:
 			idStr := receiveScalar[string](q, m.Ident.String())
@@ -326,8 +374,51 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 			afterWs := receiveScalar[string](q, m.After.Whitespace)
 			m.After = tree.Space{Whitespace: afterWs}
 			return m
+		case tree.GenericMarker:
+			// Read codec sub-fields based on the original Java marker type.
+			// Each Java marker's rpcSend sends specific sub-fields that we must consume.
+			switch m.JavaType {
+			case "org.openrewrite.Checksum":
+				m.Data = map[string]any{
+					"algorithm": receiveScalar[string](q, ""),
+					"value":     q.Receive(nil, nil),
+				}
+			case "org.openrewrite.FileAttributes":
+				m.Data = map[string]any{}
+				for _, key := range []string{"creationTime", "lastModifiedTime", "lastAccessTime", "isReadable", "isWritable", "isExecutable", "size"} {
+					m.Data[key] = q.Receive(nil, nil)
+				}
+			case "org.openrewrite.marker.Markup$Error",
+				"org.openrewrite.marker.Markup$Warn",
+				"org.openrewrite.marker.Markup$Info",
+				"org.openrewrite.marker.Markup$Debug":
+				// Markup inner classes implement RpcCodec: id, message, detail
+				m.Data = map[string]any{
+					"id":      receiveScalar[string](q, ""),
+					"message": receiveScalar[string](q, ""),
+					"detail":  q.Receive(nil, nil),
+				}
+			case "org.openrewrite.java.marker.OmitBraces",
+				"org.openrewrite.java.marker.OmitParentheses",
+				"org.openrewrite.java.marker.Semicolon":
+				// These markers send only id
+				m.Data = map[string]any{
+					"id": receiveScalar[string](q, ""),
+				}
+			case "org.openrewrite.java.marker.NullSafe",
+				"org.openrewrite.java.marker.TrailingComma":
+				// These send id + a Space
+				m.Data = map[string]any{
+					"id": receiveScalar[string](q, ""),
+				}
+				q.Receive(nil, func(v any) any { return receiveSpace(v.(tree.Space), q) })
+			default:
+				// Unknown marker type — no sub-fields to read.
+				// If this causes queue misalignment, the marker type needs
+				// to be added to the cases above.
+			}
+			return m
 		default:
-			// Non-RpcCodec markers (GenericMarker, etc.) have no sub-fields
 			return v
 		}
 	})

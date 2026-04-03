@@ -127,6 +127,20 @@ func (r *Registry) RegisterWithCategories(desc RecipeDescriptor, categories []Ca
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Don't overwrite an existing registration that has a real constructor
+	// (e.g., registered via Activate in the custom binary) with a nil
+	// constructor from the installer's descriptor-only registration.
+	if existing, ok := r.byName[desc.Name]; ok && existing.Constructor != nil {
+		testInstance := existing.Constructor(nil)
+		if testInstance != nil {
+			// Existing registration has a real implementation — keep it,
+			// just update categories if provided.
+			if len(categories) > 0 {
+				existing.Categories = categories
+			}
+			return
+		}
+	}
 	reg := &Registration{
 		Descriptor:  desc,
 		Constructor: func(options map[string]any) Recipe { return nil },

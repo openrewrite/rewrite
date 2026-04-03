@@ -26,6 +26,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -388,12 +389,15 @@ func (s *server) handleGetObject(params json.RawMessage) (any, *rpcError) {
 	}
 
 	before := s.remoteObjects[req.ID]
+	// Use a fresh ref map for each GetObject to avoid ref ID collisions
+	// between the reverse direction (Java→Go) and forward direction (Go→Java).
+	localRefs := make(map[uintptr]int)
 
 	// Collect all batches into a single result
 	var result []rpc.RpcObjectData
 	q := rpc.NewSendQueue(s.batchSize, func(batch []rpc.RpcObjectData) {
 		result = append(result, batch...)
-	}, s.localRefs)
+	}, localRefs)
 
 	sender := rpc.NewGoSender()
 	q.Send(obj, before, func(v any) {
@@ -935,12 +939,15 @@ func (s *server) handleVisit(params json.RawMessage) (any, *rpcError) {
 	before := treeNode
 	after := v.Visit(treeNode, ctx)
 
-	// Check if modified
-	modified := before != after
+	// Check if modified by pointer identity (not value equality,
+	// since tree nodes contain slices which are not comparable).
+	modified := !treeIdentical(before, after)
 
-	// Store the result
+	// Store the result — update both localObjects (for forward GetObject)
+	// and reverseRemoteObjects (baseline for reverse getObjectFromJava in Print)
 	if after != nil {
 		s.localObjects[req.TreeID] = after
+		s.reverseRemoteObjects[req.TreeID] = after
 	} else {
 		delete(s.localObjects, req.TreeID)
 	}
@@ -1078,4 +1085,22 @@ func (s *server) handleParseProject(params json.RawMessage) (any, *rpcError) {
 
 	s.logger.Printf("ParseProject: parsed %d files", len(items))
 	return items, nil
+}
+
+// treeIdentical compares two tree nodes by pointer identity.
+// Tree nodes contain slices (uncomparable in Go), so we compare
+// the underlying pointer addresses via reflect.
+func treeIdentical(a, b any) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	va := reflect.ValueOf(a)
+	vb := reflect.ValueOf(b)
+	if va.Kind() == reflect.Ptr && vb.Kind() == reflect.Ptr {
+		return va.Pointer() == vb.Pointer()
+	}
+	return false
 }
