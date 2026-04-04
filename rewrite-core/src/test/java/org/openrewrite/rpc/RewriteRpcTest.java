@@ -181,9 +181,14 @@ class RewriteRpcTest implements RewriteTest {
         }
 
         // Step 4: verify the sender cleaned up its stale remoteObjects entry
+        // and rolled back any refs assigned during the failed exchange
         assertThat(server.remoteObjects)
           .describedAs("Sender should remove stale remoteObjects entry after send failure")
           .doesNotContainKey(id);
+        int refsAfterFailure = server.localRefs.size();
+        assertThat(refsAfterFailure)
+          .describedAs("Sender should roll back localRefs assigned during failed exchange")
+          .isEqualTo(0);
 
         // Step 5: put back a valid tree and retry — should succeed via full ADD
         PlainText fixed = original.withText("Fixed");
