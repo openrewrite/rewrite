@@ -15,6 +15,9 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
 import com.univocity.parsers.csv.CsvWriter;
@@ -382,71 +385,44 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     }
 
     /**
-     * Holds the row class and its @Column-annotated fields so that
-     * String[] rows read from CSV can be converted back to typed objects.
+     * Holds the row class and its @Column field names so that
+     * String[] rows read from CSV can be deserialized back to typed objects
+     * via Jackson's {@link ObjectMapper#convertValue}.
      */
     private static class RowMetadata {
-        final Class<?> rowClass;
-        final List<Field> fields;
-        final java.lang.reflect.Constructor<?> constructor;
+        private static final ObjectMapper MAPPER = new ObjectMapper()
+                .registerModule(new ParameterNamesModule())
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        RowMetadata(Class<?> rowClass, List<Field> fields, java.lang.reflect.Constructor<?> constructor) {
-            this.rowClass = rowClass;
-            this.fields = fields;
-            this.constructor = constructor;
+        final String rowClassName;
+        final List<String> fieldNames;
+
+        RowMetadata(String rowClassName, List<String> fieldNames) {
+            this.rowClassName = rowClassName;
+            this.fieldNames = fieldNames;
         }
 
         static RowMetadata from(DataTable<?> dataTable) {
             Class<?> rowClass = dataTable.getType();
-            List<Field> fields = new ArrayList<>();
+            List<String> names = new ArrayList<>();
             for (Field f : rowClass.getDeclaredFields()) {
                 if (f.isAnnotationPresent(Column.class)) {
-                    f.setAccessible(true);
-                    fields.add(f);
+                    names.add(f.getName());
                 }
             }
-            // Lombok @Value classes generate an all-args constructor matching field declaration order
-            Class<?>[] paramTypes = fields.stream().map(Field::getType).toArray(Class<?>[]::new);
-            try {
-                java.lang.reflect.Constructor<?> ctor = rowClass.getDeclaredConstructor(paramTypes);
-                ctor.setAccessible(true);
-                return new RowMetadata(rowClass, fields, ctor);
-            } catch (NoSuchMethodException e) {
-                throw new IllegalStateException(
-                        "Row class " + rowClass.getName() + " has no constructor matching its @Column fields", e);
-            }
+            return new RowMetadata(rowClass.getName(), names);
         }
 
         Object toRow(String[] values) {
-            Object[] args = new Object[fields.size()];
-            for (int i = 0; i < fields.size(); i++) {
-                String val = i < values.length ? values[i] : "";
-                args[i] = coerce(val, fields.get(i).getType());
+            Map<String, String> map = new LinkedHashMap<>();
+            for (int i = 0; i < fieldNames.size(); i++) {
+                map.put(fieldNames.get(i), i < values.length ? values[i] : "");
             }
             try {
-                return constructor.newInstance(args);
-            } catch (Exception e) {
-                throw new IllegalStateException("Failed to construct row of type " + rowClass.getName(), e);
+                return MAPPER.convertValue(map, Class.forName(rowClassName));
+            } catch (ClassNotFoundException e) {
+                throw new IllegalStateException("Row class not found: " + rowClassName, e);
             }
-        }
-
-        private static Object coerce(String value, Class<?> type) {
-            if (value == null || value.isEmpty()) {
-                if (type == int.class) return 0;
-                if (type == long.class) return 0L;
-                if (type == double.class) return 0.0;
-                if (type == float.class) return 0.0f;
-                if (type == boolean.class) return false;
-                if (type.isPrimitive()) return 0;
-                return null;
-            }
-            if (type == String.class) return value;
-            if (type == int.class || type == Integer.class) return Integer.parseInt(value);
-            if (type == long.class || type == Long.class) return Long.parseLong(value);
-            if (type == double.class || type == Double.class) return Double.parseDouble(value);
-            if (type == float.class || type == Float.class) return Float.parseFloat(value);
-            if (type == boolean.class || type == Boolean.class) return Boolean.parseBoolean(value);
-            return value;
         }
     }
 
