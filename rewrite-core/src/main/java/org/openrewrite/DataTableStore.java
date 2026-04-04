@@ -64,6 +64,17 @@ public interface DataTableStore {
     Stream<?> getRows(String dataTableName, @Nullable String group);
 
     /**
+     * Stream all rows for a given data table name, merging across all
+     * groups and instance names.
+     *
+     * @param dataTableName the fully qualified class name of the data table
+     * @return a stream of all rows across all buckets with this name
+     */
+    default Stream<?> getAllRows(String dataTableName) {
+        return getRows(dataTableName, null);
+    }
+
+    /**
      * Get the set of {@link DataTable} instances that have received rows.
      *
      * @return the data tables that have been written to

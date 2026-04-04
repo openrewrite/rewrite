@@ -79,6 +79,19 @@ public class InMemoryDataTableStore implements DataTableStore {
     }
 
     @Override
+    public Stream<?> getAllRows(String dataTableName) {
+        List<Object> allRows = new ArrayList<>();
+        for (Bucket bucket : buckets.values()) {
+            if (bucket.dataTable.getName().equals(dataTableName)) {
+                synchronized (bucket.rows) {
+                    allRows.addAll(bucket.rows);
+                }
+            }
+        }
+        return allRows.stream();
+    }
+
+    @Override
     public Collection<DataTable<?>> getDataTables() {
         List<DataTable<?>> result = new ArrayList<>(buckets.size());
         for (Bucket bucket : buckets.values()) {
