@@ -712,4 +712,63 @@ class XmlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3188")
+    @Test
+    void nonTagAngleBracketInTextContent() {
+        rewriteRun(
+          xml(
+            """
+              <foo>
+                <bar>
+                  <baz>some element value <other></baz>
+                </bar>
+              </foo>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3188")
+    @Test
+    void multipleNonTagAngleBracketsInTextContent() {
+        rewriteRun(
+          xml(
+            """
+              <root>
+                <item>text <fake1> middle <fake2> end</item>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3188")
+    @Test
+    void nonTagAngleBracketWithClosingBracket() {
+        rewriteRun(
+          xml(
+            """
+              <root>
+                <item>value <other> more text</item>
+              </root>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3188")
+    @Test
+    void mixedRealAndNonTagElements() {
+        rewriteRun(
+          xml(
+            """
+              <root>
+                <real>text <notreal> more</real>
+                <another>normal</another>
+              </root>
+              """
+          )
+        );
+    }
 }

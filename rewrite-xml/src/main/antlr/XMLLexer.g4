@@ -58,7 +58,8 @@ JSP_DECLARATION   :  '<%!' .*? '%>' ;
 JSP_EXPRESSION    :  '<%=' .*? '%>' ;
 JSP_SCRIPTLET     :  '<%' ~[@=!-] .*? '%>' ;  // Matches <% but not <%@, <%=, <%!, or <%--
 
-TEXT              :  ~[<&]+ ;  // match any 16 bit char other than < and &
+TEXT              :  ~[<&\uFDD0]* '\uFDD0' ~[<&]* // non-tag '<' replaced with sentinel by XmlPreprocessor
+                  |  ~[<&]+ ;  // match any 16 bit char other than < and &
 
 fragment
 UTF_8_BOM_CHARS   : '\u00EF''\u00BB''\u00BF' ; // chars for UTF-8 read from a byte array.

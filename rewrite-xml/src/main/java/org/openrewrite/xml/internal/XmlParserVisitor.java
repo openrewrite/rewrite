@@ -24,6 +24,8 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
+
+import static org.openrewrite.xml.internal.XmlPreprocessor.SENTINEL;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
@@ -180,14 +182,26 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         String valueStr = value.toString();
         valueStr = valueStr.substring(0, valueStr.length() - suffix.length());
 
+        String finalValue = cdata ?
+                valueStr.substring("<![CDATA[".length(), text.length() - "]]>".length()) :
+                valueStr;
+
+        // Restore sentinel characters back to '<'
+        finalValue = restoreSentinels(finalValue);
+
         return new Xml.CharData(randomId(),
                 newPrefix.toString(),
                 Markers.EMPTY,
                 cdata,
-                cdata ?
-                        valueStr.substring("<![CDATA[".length(), text.length() - "]]>".length()) :
-                        valueStr,
+                finalValue,
                 suffix.toString());
+    }
+
+    private static String restoreSentinels(String text) {
+        if (text.indexOf(SENTINEL) < 0) {
+            return text;
+        }
+        return text.replace(SENTINEL, '<');
     }
 
     @Override
