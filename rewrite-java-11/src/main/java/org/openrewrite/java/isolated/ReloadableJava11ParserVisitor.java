@@ -1357,7 +1357,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
         List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         Space prefix = whitespace();
-        TypeTree elemType = convert(typeIdent);
+        TypeTree elemType;
+        if (!annotationPosTable.isEmpty() && typeIdent instanceof JCFieldAccess) {
+            elemType = annotatedTypeTree(typeIdent, annotationPosTable);
+        } else {
+            elemType = convert(typeIdent);
+        }
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
         JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         assert arrayTypeTree != null;
