@@ -269,7 +269,7 @@ public class JavaSourceSet implements SourceSet {
 
     // Worth caching as there is typically substantial overlap in dependencies in use within the same repository
     // Even a single module project will typically have at least two source sets, main and test
-    private static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
+    public static List<JavaType.FullyQualified> typesFromPath(Path path, @Nullable String acceptPackage) {
         List<JavaType.FullyQualified> types = new ArrayList<>();
         try {
             // Paths will be to either directories of class files or jar files

@@ -26,9 +26,11 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.HashMap;
@@ -69,7 +71,7 @@ public class RemoveDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> gradleVisitor = Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             final GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                     .configuration(configuration)
                     .groupId(groupId)
@@ -157,5 +159,34 @@ public class RemoveDependency extends Recipe {
                 return gp;
             }
         });
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return gradleVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sf = (SourceFile) tree;
+                if (gradleVisitor.isAcceptable(sf, ctx)) {
+                    return gradleVisitor.visit(tree, ctx);
+                }
+                if (sf instanceof JavaSourceFile) {
+                    Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                    if (maybeSourceSet.isPresent()) {
+                        JavaSourceSet updated = JavaSourceSetUpdater.removeTypesMatching(
+                                maybeSourceSet.get(), groupId, artifactId);
+                        if (updated != maybeSourceSet.get()) {
+                            return sf.withMarkers(sf.getMarkers().setByType(updated));
+                        }
+                    }
+                }
+                return tree;
+            }
+        };
     }
 }

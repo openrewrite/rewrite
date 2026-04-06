@@ -26,10 +26,8 @@ import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
@@ -162,6 +160,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         boolean usingType;
         Map<JavaProject, String> scopeByProject = new HashMap<>();
         Set<ResolvedGroupArtifactVersion> pomsDefinedInCurrentRepository = new HashSet<>();
+        @Nullable
+        String resolvedVersion;
     }
 
     @Override
@@ -199,6 +199,24 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         return sourceFile;
                     }
                     acc.pomsDefinedInCurrentRepository.add(mrr.getPom().getGav());
+                    // Resolve the version once for JavaSourceSet updates
+                    if (acc.resolvedVersion == null && version != null) {
+                        try {
+                            VersionComparator vc = requireNonNull(Semver.validate(version, versionPattern).getValue());
+                            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+                            org.openrewrite.maven.internal.MavenPomDownloader downloader = new org.openrewrite.maven.internal.MavenPomDownloader(
+                                    Collections.emptyMap(), ctx, mctx.getSettings(), null);
+                            MavenMetadata metadata = downloader.downloadMetadata(
+                                    new GroupArtifact(groupId, artifactId), null,
+                                    mrr.getPom().getRepositories());
+                            acc.resolvedVersion = metadata.getVersioning().getVersions().stream()
+                                    .filter(v -> vc.isValid(null, v))
+                                    .max((v1, v2) -> vc.compare(null, v1, v2))
+                                    .orElse(null);
+                        } catch (Exception e) {
+                            // Version resolution failed; JavaSourceSet won't be updated
+                        }
+                    }
                 }
                 return sourceFile;
             }
@@ -207,7 +225,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(onlyIfUsing == null || acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> mavenVisitor = Preconditions.check(onlyIfUsing == null || acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
             @Nullable
             final Pattern familyPatternCompiled = familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
@@ -284,6 +302,63 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             }
 
         });
+
+        if (acc.scopeByProject.isEmpty() || acc.resolvedVersion == null) {
+            return mavenVisitor;
+        }
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Nullable
+            private JavaSourceSetUpdater updater;
+
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return mavenVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sf = (SourceFile) tree;
+                if (sf instanceof Xml.Document) {
+                    return mavenVisitor.visit(tree, ctx);
+                }
+                if (sf instanceof JavaSourceFile) {
+                    return updateJavaSourceSet(sf, ctx);
+                }
+                return tree;
+            }
+
+            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
+                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
+                if (!maybeJp.isPresent() || !acc.scopeByProject.containsKey(maybeJp.get())) {
+                    return sf;
+                }
+                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                if (!maybeSourceSet.isPresent() || maybeSourceSet.get().getGavToTypes().isEmpty()) {
+                    return sf;
+                }
+                if (updater == null) {
+                    updater = new JavaSourceSetUpdater(ctx);
+                }
+                ResolvedGroupArtifactVersion gav = new ResolvedGroupArtifactVersion(
+                        null, groupId, artifactId, acc.resolvedVersion, null);
+                ResolvedDependency syntheticDep = ResolvedDependency.builder()
+                        .gav(gav)
+                        .repository(MavenRepository.MAVEN_CENTRAL)
+                        .requested(Dependency.builder()
+                                .gav(new GroupArtifactVersion(groupId, artifactId, acc.resolvedVersion))
+                                .build())
+                        .build();
+                JavaSourceSet updated = updater.addDependency(maybeSourceSet.get(), syntheticDep);
+                if (updated != maybeSourceSet.get()) {
+                    return sf.withMarkers(sf.getMarkers().setByType(updated));
+                }
+                return sf;
+            }
+        };
     }
 
     private boolean hasAcceptableTransitivity(ResolvedDependency d, Scanned acc) {

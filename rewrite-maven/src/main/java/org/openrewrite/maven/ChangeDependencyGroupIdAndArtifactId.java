@@ -20,8 +20,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -151,6 +156,68 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        TreeVisitor<?, ExecutionContext> mavenScanner = getMavenScanner(acc);
+        @Nullable VersionComparator scannerVersionComparator = newVersion != null ?
+                Semver.validate(newVersion, versionPattern).getValue() : null;
+
+        // Wrap to also scan pom.xml files for modules that have the old dependency
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof Xml.Document || sourceFile instanceof JavaSourceFile;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sf = (SourceFile) tree;
+                if (sf instanceof Xml.Document && mavenScanner.isAcceptable(sf, ctx)) {
+                    mavenScanner.visit(tree, ctx);
+                    // Also check if this pom has the old dependency
+                    sf.getMarkers().findFirst(MavenResolutionResult.class).ifPresent(mrr -> {
+                        List<ResolvedDependency> deps = mrr.findDependencies(oldGroupId, oldArtifactId, null);
+                        if (!deps.isEmpty()) {
+                            sf.getMarkers().findFirst(JavaProject.class).ifPresent(jp -> {
+                                acc.getModulesWithOldDependency().put(jp, deps.get(0));
+                                acc.getModuleRepositories().put(jp, mrr.getPom().getRepositories());
+                                // Resolve the new version for JavaSourceSet updates
+                                if (newVersion != null) {
+                                    String effectiveGroupId = newGroupId != null ? newGroupId : deps.get(0).getGroupId();
+                                    String effectiveArtifactId = newArtifactId != null ? newArtifactId : deps.get(0).getArtifactId();
+                                    try {
+                                        MavenMetadata metadata = metadataFailures.insertRows(ctx, () ->
+                                                new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles())
+                                                        .downloadMetadata(new GroupArtifactVersion(effectiveGroupId, effectiveArtifactId, null), null, mrr.getPom().getRepositories()));
+                                        String resolved = newVersion;
+                                        if (scannerVersionComparator != null) {
+                                            List<String> available = new ArrayList<>();
+                                            for (String v : metadata.getVersioning().getVersions()) {
+                                                if (scannerVersionComparator.isValid(deps.get(0).getVersion(), v)) {
+                                                    available.add(v);
+                                                }
+                                            }
+                                            if (!available.isEmpty()) {
+                                                resolved = max(available, scannerVersionComparator);
+                                            }
+                                        }
+                                        acc.getResolvedNewVersions().put(jp, resolved);
+                                    } catch (Exception e) {
+                                        // Version resolution failure is not fatal for JavaSourceSet updates
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+                // Java files are no-op in scanner
+                return tree;
+            }
+        };
+    }
+
+    private TreeVisitor<?, ExecutionContext> getMavenScanner(Accumulator acc) {
         if (newVersion == null) {
             return TreeVisitor.noop();
         }
@@ -249,6 +316,89 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        MavenVisitor<ExecutionContext> mavenVisitor = getMavenVisitor(acc);
+
+        if (acc.getModulesWithOldDependency().isEmpty()) {
+            // No modules have the old dependency; skip Java file processing
+            return mavenVisitor;
+        }
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Nullable
+            private JavaSourceSetUpdater updater;
+
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return mavenVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sf = (SourceFile) tree;
+                if (mavenVisitor.isAcceptable(sf, ctx)) {
+                    return mavenVisitor.visit(tree, ctx);
+                }
+                if (sf instanceof JavaSourceFile) {
+                    return updateJavaSourceSet(sf, ctx);
+                }
+                return tree;
+            }
+
+            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
+                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
+                if (!maybeJp.isPresent()) {
+                    return sf;
+                }
+                ResolvedDependency oldDep = acc.getModulesWithOldDependency().get(maybeJp.get());
+                if (oldDep == null) {
+                    return sf;
+                }
+                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                if (!maybeSourceSet.isPresent()) {
+                    return sf;
+                }
+                if (updater == null) {
+                    updater = new JavaSourceSetUpdater(ctx);
+                }
+                // Build a synthetic ResolvedDependency for the new coordinates
+                String effectiveNewGroupId = newGroupId != null ? newGroupId : oldDep.getGroupId();
+                String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldDep.getArtifactId();
+                // Use the resolved new version if available, otherwise fall back to old version
+                String resolvedVersion = acc.getResolvedNewVersions().get(maybeJp.get());
+                String effectiveVersion = resolvedVersion != null ? resolvedVersion : oldDep.getVersion();
+                ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
+                        oldDep.getGav().getRepository(),
+                        effectiveNewGroupId, effectiveNewArtifactId, effectiveVersion, null);
+                // Use a remote repository for downloading (local file:// repos won't have the new artifact)
+                ResolvedDependency newDep = oldDep
+                        .withGav(newGav)
+                        .withRepository(findRemoteRepository(maybeJp.get()));
+                JavaSourceSet updated = updater.changeDependency(maybeSourceSet.get(), oldDep, newDep);
+                if (updated != maybeSourceSet.get()) {
+                    return sf.withMarkers(sf.getMarkers().setByType(updated));
+                }
+                return sf;
+            }
+
+            private MavenRepository findRemoteRepository(JavaProject jp) {
+                List<MavenRepository> repos = acc.getModuleRepositories().get(jp);
+                if (repos != null) {
+                    for (MavenRepository repo : repos) {
+                        String uri = repo.getUri();
+                        if (uri != null && (uri.startsWith("http://") || uri.startsWith("https://"))) {
+                            return repo;
+                        }
+                    }
+                }
+                return MavenRepository.MAVEN_CENTRAL;
+            }
+        };
+    }
+
+    private MavenVisitor<ExecutionContext> getMavenVisitor(Accumulator acc) {
         return new MavenVisitor<ExecutionContext>() {
             @Nullable
             final VersionComparator versionComparator = newVersion != null ? Semver.validate(newVersion, versionPattern).getValue() : null;
@@ -489,6 +639,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
     @Value
     public static class Accumulator {
         Set<PomProperty> pomProperties = new HashSet<>();
+        Map<JavaProject, ResolvedDependency> modulesWithOldDependency = new HashMap<>();
+        Map<JavaProject, List<MavenRepository>> moduleRepositories = new HashMap<>();
+        Map<JavaProject, String> resolvedNewVersions = new HashMap<>();
     }
 
     @Value

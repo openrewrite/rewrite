@@ -20,11 +20,16 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
@@ -3530,6 +3535,183 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                             <groupId>org.junit.jupiter</groupId>
                             <artifactId>junit-jupiter-api</artifactId>
                             <version>${project.parent.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void updatesJavaSourceSetMarkerOnJavaFiles() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.0.1",
+            null,
+            false,
+            false
+          )),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                "class A {}",
+                "class A {}",
+                s -> s.afterRecipe(cu -> {
+                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
+                    Map<String, List<JavaType.FullyQualified>> gavToTypes = jss.getGavToTypes();
+                    // Old dependency types should be removed
+                    assertThat(gavToTypes.keySet())
+                      .noneMatch(k -> k.startsWith("javax.activation:javax.activation-api:"));
+                    // New dependency types should be present
+                    assertThat(gavToTypes.keySet())
+                      .anyMatch(k -> k.startsWith("jakarta.activation:jakarta.activation-api:"));
+                    // Classpath should contain types from the new dependency
+                    assertThat(jss.getClasspath())
+                      .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                      .anyMatch(fqn -> fqn.startsWith("jakarta.activation."));
+                })
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>2.0.1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void javaSourceSetUnchangedWhenModuleDoesNotHaveDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "2.0.1",
+            null,
+            false,
+            false
+          )),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                "class A {}",
+                s -> s.afterRecipe(cu -> {
+                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
+                    // Module doesn't have the dependency, so no jakarta types should appear
+                    assertThat(jss.getGavToTypes().keySet())
+                      .noneMatch(k -> k.contains("jakarta.activation"));
+                })
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void javaSourceSetGracefulWhenDownloadFails() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "com.doesnotexist",
+            "doesnotexist",
+            null,
+            null,
+            false,
+            false
+          )),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                "class A {}",
+                s -> s.afterRecipe(cu -> {
+                    // Should not throw even though the new dependency JAR can't be downloaded
+                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
+                    assertThat(jss).isNotNull();
+                })
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <!--~~(Unable to download POM: com.doesnotexist:doesnotexist:1.2.0. Tried repositories:
+                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+                            <groupId>com.doesnotexist</groupId>
+                            <artifactId>doesnotexist</artifactId>
+                            <version>1.2.0</version>
                         </dependency>
                     </dependencies>
                 </project>
