@@ -514,6 +514,30 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2567")
+    @Test
+    void dtdEntityWithAngleBracketsInQuotedValue() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!DOCTYPE rules [
+              <!ENTITY ambiguous_date '
+                      <token regexp="yes">0?[1-9]|1[0-2]</token>
+                      <token>/</token>
+                      <token regexp="yes">0?[1-9]|1[0-2]</token>
+                      <token>/</token>
+                      <token regexp="yes">\\d\\d\\d\\d</token>
+                  '>
+              ]>
+              <rules>
+                  <rule>&ambiguous_date;</rule>
+              </rules>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1243")
     @Test
     void processingInstructions() {
