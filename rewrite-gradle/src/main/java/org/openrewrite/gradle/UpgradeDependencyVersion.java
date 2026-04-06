@@ -583,6 +583,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                         }
                                         selectedVersion = dependencyVersionSelector.select(ga, "classpath", newVersion, versionPattern, execCtx);
                                     }
+                                    VersionComparator versionComparator = getVersionComparator();
+                                    if (versionComparator != null) {
+                                        Optional<String> finalVersion = versionComparator.upgrade(prop.getValue(), singletonList(selectedVersion));
+                                        if (!finalVersion.isPresent()) {
+                                            return prop.getTree();
+                                        }
+                                        selectedVersion = finalVersion.get();
+                                    }
                                     return prop.withValue(selectedVersion).getTree();
                                 } catch (MavenDownloadingException e) {
                                     // No change on error
