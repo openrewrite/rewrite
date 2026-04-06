@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 
@@ -107,6 +108,11 @@ public class ChangePackage extends Recipe {
                                 return SearchResult.found(cu);
                             }
                         }
+                    }
+                    // Fully qualified javadoc references are excluded from TypesInUse
+                    // (they don't affect imports), but they still need package renaming.
+                    if (hasJavadocReferenceToPackage(cu, oldPackageName, recursive, recursivePackageNamePrefix)) {
+                        return SearchResult.found(cu);
                     }
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
@@ -389,6 +395,33 @@ public class ChangePackage extends Recipe {
                    !packageName.startsWith(newPackageName);
         }
 
+    }
+
+    private static boolean hasJavadocReferenceToPackage(JavaSourceFile cu, String packageName, boolean recursive, String recursivePrefix) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean f) {
+                if (f.get()) {
+                    return fieldAccess;
+                }
+                for (Object o : getCursor().getPathAsStream().toArray()) {
+                    if (o instanceof Javadoc.Reference) {
+                        JavaType type = fieldAccess.getType();
+                        if (type instanceof JavaType.FullyQualified) {
+                            String pkg = ((JavaType.FullyQualified) type).getPackageName();
+                            if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
+                                f.set(true);
+                            }
+                        }
+                        break;
+                    }
+                    if (o instanceof J.Block) {
+                        break;
+                    }
+                }
+                return fieldAccess;
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
     }
 
     @Value
