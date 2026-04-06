@@ -234,15 +234,32 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
                     // Get comment from next element in same mapping block
+                    boolean foundDirectSibling = false;
                     for (int i = 0; i < entries.size() - 1; i++) {
                         if (entries.get(i).getValue().equals(getCursor().getValue())) {
                             comment = substringOfBeforeFirstLineBreak(entries.get(i + 1).getPrefix());
+                            foundDirectSibling = true;
                             break;
                         }
                     }
                     // OR retrieve it for last item from next element (could potentially be much higher in the tree).
                     if (comment == null && hasLineBreak(entries.get(entries.size() - 1).getPrefix())) {
                         comment = substringOfBeforeFirstLineBreak(entries.get(entries.size() - 1).getPrefix());
+                    }
+
+                    // If the current mapping is not a direct child of the found parent mapping,
+                    // fall back to the Document.End prefix. This handles the case where the mapping
+                    // being merged is deeply nested (e.g., inside a sequence entry) and the inline
+                    // comment is stored on the Document.End node.
+                    if (!foundDirectSibling && !isNotEmpty(comment)) {
+                        Cursor docCursor = c.dropParentUntil(it -> ROOT_VALUE.equals(it) || it instanceof Yaml.Document);
+                        if (docCursor.getValue() instanceof Yaml.Document) {
+                            Yaml.Document doc = docCursor.getValue();
+                            if (!preserveDocumentSeparator(doc)) {
+                                comment = doc.getEnd().getPrefix();
+                                c = docCursor;
+                            }
+                        }
                     }
                 }
 
@@ -293,9 +310,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
 
-            String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
-            String currentIndent = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
-            List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(currentIndent));
+            boolean isFlowStyle = s1.getOpeningBracketPrefix() != null;
+            String newEntryPrefix;
+            if (isFlowStyle) {
+                newEntryPrefix = ", ";
+            } else {
+                String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
+                newEntryPrefix = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
+            }
+            List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(newEntryPrefix));
             List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> {
                 if (it.getBlock() instanceof Yaml.Scalar) {
                     return ((Yaml.Scalar) it.getBlock()).getValue();
