@@ -1914,6 +1914,87 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2537")
+    @Test
+    void javadocLinkFullyQualifiedReferenceUpdated() {
+        rewriteRun(
+          java(testClassBefore, testClassAfter),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.Test} for details.
+               */
+              public class Bar {}
+              """,
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.test.Test} for details.
+               */
+              public class Bar {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2537")
+    @Test
+    void javadocLinkRecursivePackageReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
+          java(
+            """
+              package org.openrewrite.internal;
+              public class Baz {}
+              """,
+            """
+              package org.openrewrite.test.internal;
+              public class Baz {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.internal.Baz}
+               */
+              public class Qux {}
+              """,
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.test.internal.Baz}
+               */
+              public class Qux {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2537")
+    @Test
+    void javadocLinkAlreadyUsingNewPackageUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
+          java(
+            """
+              package org.openrewrite.test;
+              public class Existing {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.test.Existing} for details.
+               */
+              public class Ref {}
+              """
+          )
+        );
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2482")
     void changePackageInServiceProviderFile() {

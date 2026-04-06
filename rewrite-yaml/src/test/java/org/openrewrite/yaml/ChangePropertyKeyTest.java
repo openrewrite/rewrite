@@ -51,6 +51,53 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2608")
+    @Test
+    void moveSubpropertyOut() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("foo.bar", "bar", null, null, null)),
+          yaml(
+            """
+              foo:
+                bar:
+                  prop: val
+                other: other-val
+              """,
+            """
+              foo:
+                other: other-val
+              bar:
+                prop: val
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2608")
+    @Test
+    void multiDocument() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("foo.bar", "bar", null, null, null)),
+          yaml(
+            """
+              a: b
+              ---
+              foo:
+                bar:
+                  prop: val
+              other: other-val
+              """,
+            """
+              a: b
+              ---
+              other: other-val
+              bar:
+                prop: val
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1873")
     @Test
     void shorterNewKeyWithIndentedConfig() {
