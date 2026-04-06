@@ -3646,6 +3646,58 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2834")
     @Test
+    void mergeFlowStyleSequenceMultipleIncoming() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[17, 18]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 18]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequenceNewBeforeExisting() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[16, 17]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 16]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
     void mergeFlowStyleSequenceNoDuplicate() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(

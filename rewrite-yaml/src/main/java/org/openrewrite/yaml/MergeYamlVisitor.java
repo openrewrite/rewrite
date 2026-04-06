@@ -311,14 +311,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
 
             boolean isFlowStyle = s1.getOpeningBracketPrefix() != null;
-            String newEntryPrefix;
+            List<Yaml.Sequence.Entry> newEntries;
             if (isFlowStyle) {
-                newEntryPrefix = ", ";
+                newEntries = ListUtils.map(incomingEntries, it ->
+                        it.withPrefix("").withBlock(it.getBlock().withPrefix(" ")).withTrailingCommaPrefix(null));
             } else {
                 String existingEntryPrefix = s1.getEntries().get(0).getPrefix();
-                newEntryPrefix = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
+                String newEntryPrefix = existingEntryPrefix.substring(existingEntryPrefix.lastIndexOf('\n'));
+                newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(newEntryPrefix));
             }
-            List<Yaml.Sequence.Entry> newEntries = ListUtils.map(incomingEntries, it -> it.withPrefix(newEntryPrefix));
             List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> {
                 if (it.getBlock() instanceof Yaml.Scalar) {
                     return ((Yaml.Scalar) it.getBlock()).getValue();
@@ -328,6 +329,15 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
                 return "";
             }).ls;
+
+            // For flow-style sequences, ensure commas are correct: add a trailing comma
+            // on the entry before the first new entry, and remove any trailing comma from the last entry
+            if (isFlowStyle && !newEntries.isEmpty() && mutatedEntries.size() > s1.getEntries().size()) {
+                int lastExistingIdx = s1.getEntries().size() - 1;
+                mutatedEntries.set(lastExistingIdx, mutatedEntries.get(lastExistingIdx).withTrailingCommaPrefix(""));
+                int lastIdx = mutatedEntries.size() - 1;
+                mutatedEntries.set(lastIdx, mutatedEntries.get(lastIdx).withTrailingCommaPrefix(null));
+            }
 
             return s1.withEntries(mutatedEntries);
         }
