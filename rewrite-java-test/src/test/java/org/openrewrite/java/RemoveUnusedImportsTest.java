@@ -2412,4 +2412,42 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void retainTypeUseAnnotationOnQualifiedArrayType() {
+        rewriteRun(
+          java(
+            """
+              package ann;
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE_USE)
+              public @interface Nullable {
+              }
+              """
+          ),
+          java(
+            """
+              package foo;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """
+          ),
+          java(
+            """
+              import ann.Nullable;
+              import foo.Outer;
+
+              class Test {
+                  Outer.@Nullable Inner[] items;
+              }
+              """
+          )
+        );
+    }
 }
