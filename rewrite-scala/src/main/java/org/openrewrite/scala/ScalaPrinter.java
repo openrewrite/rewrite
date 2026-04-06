@@ -204,7 +204,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append("catch {");
             for (J.Try.Catch aCatch : tryable.getCatches()) {
                 J.VariableDeclarations varDecl = aCatch.getParameter().getTree();
-                p.append("\n  case");
+                visitSpace(aCatch.getParameter().getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+                p.append("case");
                 if (!varDecl.getVariables().isEmpty()) {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
@@ -217,7 +218,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visit(stmt, p);
                 }
             }
-            p.append("\n}");
+            visitSpace(firstCatch.getBody().getEnd(), Space.Location.BLOCK_END, p);
+            p.append("}");
         }
         if (tryable.getPadding().getFinally() != null) {
             visitSpace(tryable.getPadding().getFinally().getBefore(), Space.Location.TRY_FINALLY, p);
