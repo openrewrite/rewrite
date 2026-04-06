@@ -19,7 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -3503,4 +3506,250 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3950")
+    @Test
+    void deleteKeyFollowedByMergeYamlCompletesInTwoCycles() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(2)
+            .recipe(
+              new CompositeRecipe(
+                List.of(
+                  new DeleteKey("$.*", null),
+                  new MergeYaml("$", "foo: bar", null, null, "test.yml", null, null, null)
+                )
+              )
+            ),
+          yaml(
+            """
+              x: y
+              """,
+            """
+              foo: bar
+              """,
+            spec -> spec.path("test.yml")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3539")
+    @Test
+    void mergeExistingKeyInMultiDocumentYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              app:
+                core:
+                  key2: value02
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              app:
+                app.key: app
+              ---
+              com:
+                key1: value1
+              app:
+                core:
+                  key1: value01
+              """,
+            """
+              app:
+                app.key: app
+                core:
+                  key2: value02
+              ---
+              com:
+                key1: value1
+              app:
+                core:
+                  key1: value01
+                  key2: value02
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3310")
+    @Test
+    void wildcardMatchesEachChildMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.list.services.*",
+            //language=yaml
+            "beta: fixedValue",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              list:
+                services:
+                  foo:
+                    alpha: randomValue1
+                  bar:
+                    alpha: randomValue2
+              """,
+            """
+              list:
+                services:
+                  foo:
+                    alpha: randomValue1
+                    beta: fixedValue
+                  bar:
+                    alpha: randomValue2
+                    beta: fixedValue
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[18]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 18]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequenceMultipleIncoming() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[17, 18]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 18]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequenceNewBeforeExisting() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[16, 17]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 16]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequenceNoDuplicate() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[17]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5135")
+    @Test
+    void mergeYamlPreservesInlineCommentOnDocumentEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$..containers",
+            //language=yaml
+            "imagePullPolicy: Always",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>  # comment
+              """,
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>  # comment
+                    imagePullPolicy: Always
+              """
+          )
+        );
+    }
+
 }
