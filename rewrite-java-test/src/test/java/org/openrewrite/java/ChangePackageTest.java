@@ -1970,4 +1970,27 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2537")
+    @Test
+    void javadocLinkAlreadyUsingNewPackageUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
+          java(
+            """
+              package org.openrewrite.test;
+              public class Existing {}
+              """
+          ),
+          java(
+            """
+              package com.example;
+              /**
+               * See {@link org.openrewrite.test.Existing} for details.
+               */
+              public class Ref {}
+              """
+          )
+        );
+    }
 }
