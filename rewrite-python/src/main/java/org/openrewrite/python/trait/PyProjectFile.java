@@ -384,11 +384,15 @@ public class PyProjectFile implements PythonDependencyFile {
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Map<String, String>>() {
             @Override
             public Toml.Literal visitLiteral(Toml.Literal literal, Map<String, String> msgs) {
-                if (!isInsideTargetArray(getCursor(), null, null)) {
+                if (literal.getType() != TomlType.Primitive.String) {
+                    return literal;
+                }
+                Object val = literal.getValue();
+                if (!(val instanceof String)) {
                     return literal;
                 }
 
-                String spec = literal.getValue().toString();
+                String spec = (String) val;
                 String packageName = PyProjectHelper.extractPackageName(spec);
                 if (packageName == null) {
                     return literal;

@@ -123,13 +123,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 }
                 PythonResolutionResult.Dependency dep = PyProjectHelper.findDependencyInScope(
                         trait.getMarker(), packageName, scope, groupName);
-                if (dep == null) {
-                    return tree;
+                if (dep != null && !PyProjectHelper.normalizeVersionConstraint(newVersion).equals(dep.getVersionConstraint())) {
+                    acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 }
-                if (PyProjectHelper.normalizeVersionConstraint(newVersion).equals(dep.getVersionConstraint())) {
-                    return tree;
-                }
-                acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 return tree;
             }
         };

@@ -111,13 +111,9 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                     return tree;
                 }
                 PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
-                if (trait == null) {
-                    return tree;
+                if (trait != null && PyProjectHelper.findDependencyInScope(trait.getMarker(), packageName, scope, groupName) != null) {
+                    acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 }
-                if (PyProjectHelper.findDependencyInScope(trait.getMarker(), packageName, scope, groupName) == null) {
-                    return tree;
-                }
-                acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 return tree;
             }
         };
