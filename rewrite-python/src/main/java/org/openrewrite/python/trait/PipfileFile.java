@@ -290,32 +290,24 @@ public class PipfileFile implements PythonDependencyFile {
         String normalizedVersion = PyProjectHelper.normalizeVersionConstraint(newVersion);
         if (kv.getValue() instanceof Toml.Literal) {
             Toml.Literal literal = (Toml.Literal) kv.getValue();
-            if (normalizedVersion.equals(literal.getValue())) {
-                return kv;
-            }
             return kv.withValue(literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
         }
         if (kv.getValue() instanceof Toml.Table) {
             // Inline table: update the "version" key inside
             Toml.Table inlineTable = (Toml.Table) kv.getValue();
-            List<Toml> newValues = map(inlineTable.getValues(), inner -> {
+            return kv.withValue(inlineTable.withValues(map(inlineTable.getValues(), inner -> {
                 if (inner instanceof Toml.KeyValue) {
                     Toml.KeyValue innerKv = (Toml.KeyValue) inner;
                     if (innerKv.getKey() instanceof Toml.Identifier &&
                             "version".equals(((Toml.Identifier) innerKv.getKey()).getName()) &&
                             innerKv.getValue() instanceof Toml.Literal) {
                         Toml.Literal literal = (Toml.Literal) innerKv.getValue();
-                        if (!normalizedVersion.equals(literal.getValue())) {
-                            return innerKv.withValue(
-                                    literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
-                        }
+                        return innerKv.withValue(
+                                literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
                     }
                 }
                 return inner;
-            });
-            if (newValues != inlineTable.getValues()) {
-                return kv.withValue(inlineTable.withValues(newValues));
-            }
+            })));
         }
         return kv;
     }

@@ -317,9 +317,6 @@ public class PyProjectFile implements PythonDependencyFile {
                     return kv;
                 }
                 Toml.Literal literal = (Toml.Literal) kv.getValue();
-                if (normalizedVersion.equals(literal.getValue())) {
-                    return kv;
-                }
                 return kv.withValue(literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
             }
         }.visitNonNull(doc, 0);
