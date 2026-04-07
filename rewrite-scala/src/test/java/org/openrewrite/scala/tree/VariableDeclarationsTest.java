@@ -111,4 +111,17 @@ class VariableDeclarationsTest implements RewriteTest {
           scala("var x: Int = _")
         );
     }
+
+    @Test
+    void variableDeclarationWithAnnotationAndNonStandardTypeWhitespace() {
+        rewriteRun(
+          scala(
+            """
+            class Test {
+              @volatile var flag:  Boolean =/*init*/ false
+            }
+            """
+          )
+        );
+    }
 }

@@ -233,14 +233,10 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitSwitch(J.Switch switch_, PrintOutputCapture<P> p) {
         beforeSyntax(switch_, Space.Location.SWITCH_PREFIX, p);
         visit(switch_.getSelector().getTree(), p);
-        p.append(" match {");
-        // Print cases directly (not via visitBlock which adds { })
-        J.Block casesBlock = switch_.getCases();
-        for (int i = 0; i < casesBlock.getStatements().size(); i++) {
-            visit(casesBlock.getStatements().get(i), p);
-        }
-        visitSpace(casesBlock.getEnd(), Space.Location.BLOCK_END, p);
-        p.append("}");
+        visitSpace(Space.SINGLE_SPACE, Space.Location.BLOCK_PREFIX, p);
+        p.append("match");
+        J.Block cases = switch_.getCases();
+        visit(cases.getPrefix().isEmpty() ? cases.withPrefix(Space.SINGLE_SPACE) : cases, p);
         afterSyntax(switch_, p);
         return switch_;
     }
@@ -258,7 +254,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             p.append("if");
             visit(case_.getGuard(), p);
         }
-        p.append(" =>");
+        Space caseArrowPrefix = case_.getPadding().getStatements().getBefore();
+        visitSpace(caseArrowPrefix.isEmpty() ? Space.SINGLE_SPACE : caseArrowPrefix, Space.Location.CASE, p);
+        p.append("=>");
         if (case_.getPadding().getBody() != null) {
             J bodyElement = case_.getPadding().getBody().getElement();
             // For Scala match cases, unwrap blocks to avoid printing { }
@@ -297,7 +295,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         }
         if (!defAlreadyPrinted) {
             if (!method.getModifiers().isEmpty()) {
-                p.append(" ");
+                visitSpace(Space.SINGLE_SPACE, Space.Location.MODIFIER_PREFIX, p);
             }
             p.append("def");
         }
@@ -328,23 +326,15 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                     visit(varDecl.getVariables().get(0).getName(), p);
                 }
                 if (varDecl.getTypeExpression() != null) {
-                    // The colon and space between name and type in Scala parameter syntax
-                    // Type prefix from parser may or may not include the space
                     TypeTree typeExpr = varDecl.getTypeExpression();
-                    if (typeExpr.getPrefix().isEmpty()) {
-                        p.append(": ");
-                    } else {
-                        p.append(":");
-                    }
-                    visit(typeExpr, p);
+                    p.append(':');
+                    visit(typeExpr.getPrefix().isEmpty() ? typeExpr.withPrefix(Space.SINGLE_SPACE) : typeExpr, p);
                 }
                 if (!varDecl.getVariables().isEmpty() &&
                     varDecl.getVariables().get(0).getPadding().getInitializer() != null) {
                     JLeftPadded<Expression> init = varDecl.getVariables().get(0).getPadding().getInitializer();
-                    if (init.getBefore().isEmpty()) {
-                        p.append(" ");
-                    }
-                    visitLeftPadded("=", init, JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                    visitLeftPadded("=", init.getBefore().isEmpty() ? init.withBefore(Space.SINGLE_SPACE) : init,
+                            JLeftPadded.Location.VARIABLE_INITIALIZER, p);
                 }
             } else {
                 visit(element, p);
@@ -399,7 +389,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 boolean procedureSyntax = method.getMarkers().findFirst(
                         org.openrewrite.scala.marker.OmitBraces.class).isPresent();
                 if (!procedureSyntax) {
-                    p.append(" =");
+                    visitSpace(Space.SINGLE_SPACE, Space.Location.BLOCK_PREFIX, p);
+                    p.append('=');
                 }
                 visit(actualBody, p);
             }
@@ -411,7 +402,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             boolean omitBodyBraces = body.getMarkers().findFirst(
                     org.openrewrite.scala.marker.OmitBraces.class).isPresent();
             if (!procedureSyntax) {
-                p.append(" =");
+                visitSpace(Space.SINGLE_SPACE, Space.Location.BLOCK_PREFIX, p);
+                p.append('=');
             }
             if (omitBodyBraces && body.getStatements().size() == 1) {
                 visit(body.getStatements().get(0), p);
@@ -453,12 +445,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
                 }
                 if (vd.getTypeExpression() != null) {
                     TypeTree te = vd.getTypeExpression();
-                    if (te.getPrefix().isEmpty()) {
-                        p.append(": ");
-                    } else {
-                        p.append(":");
-                    }
-                    visit(te, p);
+                    p.append(':');
+                    visit(te.getPrefix().isEmpty() ? te.withPrefix(Space.SINGLE_SPACE) : te, p);
                 }
             } else {
                 visit(elem, p);
@@ -904,7 +892,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         
         // If we have annotations, ensure space after them before modifiers/val/var
         if (!multiVariable.getLeadingAnnotations().isEmpty()) {
-            p.append(" ");
+            visitSpace(Space.SINGLE_SPACE, Space.Location.MODIFIER_PREFIX, p);
         }
         
         // Check if this is a lambda parameter - if so, don't print val/var
@@ -942,7 +930,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         // Print val/var/given (unless it's a lambda parameter)
         if (!isLambdaParam) {
             if (hasVisibleModifier) {
-                p.append(" ");
+                visitSpace(Space.SINGLE_SPACE, Space.Location.MODIFIER_PREFIX, p);
             }
             p.append(valVarKeyword);
         }
@@ -989,11 +977,9 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
         }
         p.append("new");
-        // Ensure space between "new" and the class name
-        if (newClass.getClazz() != null && newClass.getClazz().getPrefix().isEmpty()) {
-            p.append(" ");
-        }
-        visit(newClass.getClazz(), p);
+        visit(newClass.getClazz() != null && newClass.getClazz().getPrefix().isEmpty() ?
+                newClass.getClazz().withPrefix(Space.SINGLE_SPACE) :
+                newClass.getClazz(), p);
         // In Scala, constructors can be called without parentheses
         if (newClass.getPadding().getArguments() != null) {
             visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);

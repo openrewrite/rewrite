@@ -125,4 +125,30 @@ class MethodDeclarationTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void methodWithCommentSeparatedSignatureTokens() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def greet(name:/*name*/ String =/*default*/ "World"):/*return*/ Unit =/*body*/ println(s"Hello, $name")
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void privateMethodWithCommentBeforeBody() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  private def answer(): Int =/*body*/ 42
+                }
+                """
+            )
+        );
+    }
 }

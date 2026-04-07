@@ -167,4 +167,17 @@ class ParameterizedTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void higherKindedTypesWithCommentedCurriedParameter() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def transform[F[_], A, B](fa: F[A])(f:/*curried*/ A => B): F[B] = ???
+            }
+            """
+          )
+        );
+    }
 }

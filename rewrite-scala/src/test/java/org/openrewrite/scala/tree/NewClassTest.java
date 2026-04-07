@@ -142,4 +142,17 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void newClassWithCommentAfterNew() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val p = new/*new*/ Person()
+            }
+            """
+          )
+        );
+    }
 }
