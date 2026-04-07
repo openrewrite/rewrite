@@ -28,6 +28,7 @@ import org.openrewrite.config.DataTableDescriptor;
 
 import java.io.*;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -90,6 +91,10 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     private final String fileExtension;
     private final Map<String, String> prefixColumns;
     private final Map<String, String> suffixColumns;
+    private static final ObjectMapper ROW_MAPPER = new ObjectMapper()
+            .registerModule(new ParameterNamesModule())
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
     private final ConcurrentHashMap<String, BucketWriter> writers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, RowMetadata> rowMetadata = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, DataTable<?>> knownTables = new ConcurrentHashMap<>();
@@ -180,15 +185,30 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     @Override
     public <Row> void insertRow(DataTable<Row> dataTable, ExecutionContext ctx, Row row) {
         String metaKey = metaKey(dataTable.getName(), dataTable.getGroup());
-        rowMetadata.computeIfAbsent(metaKey, k -> RowMetadata.from(dataTable));
+        rowMetadata.computeIfAbsent(metaKey, k -> RowMetadata.of(dataTable.getType()));
         knownTables.putIfAbsent(fileKey(dataTable), dataTable);
         String fileKey = fileKey(dataTable);
         BucketWriter writer = writers.computeIfAbsent(fileKey, k -> createBucketWriter(dataTable));
         writer.writeRow(row);
     }
 
+    @Deprecated
     @Override
     public Stream<?> getRows(String dataTableName, @Nullable String group) {
+        RowMetadata meta = rowMetadata.get(metaKey(dataTableName, group));
+        return readRows(dataTableName, group, meta);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass, @Nullable String group) {
+        Class<Row> rowType = (Class<Row>) ((ParameterizedType) dataTableClass.getGenericSuperclass())
+                .getActualTypeArguments()[0];
+        return readRows(dataTableClass.getName(), group, RowMetadata.of(rowType));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Stream<T> readRows(String dataTableName, @Nullable String group, @Nullable RowMetadata meta) {
         // Close (not just flush) matching writers so that compression trailers
         // (e.g., GZIP footer) are written, making the files fully readable.
         // Removed writers will be lazily re-created in append mode on the next insertRow().
@@ -202,8 +222,6 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
                 it.remove();
             }
         }
-
-        RowMetadata meta = rowMetadata.get(metaKey(dataTableName, group));
 
         List<Object> allRows = new ArrayList<>();
         //noinspection DataFlowIssue
@@ -241,6 +259,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
 
             try (InputStream is = inputStreamFactory.apply(file.toPath())) {
                 CsvParserSettings settings = new CsvParserSettings();
+                settings.setMaxCharsPerColumn(-1);
                 settings.setHeaderExtractionEnabled(true);
                 settings.getFormat().setComment('#');
                 CsvParser parser = new CsvParser(settings);
@@ -265,7 +284,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             }
         }
 
-        return allRows.stream();
+        return (Stream<T>) allRows.stream();
     }
 
     @Override
@@ -385,32 +404,27 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     }
 
     /**
-     * Holds the row class and its @Column field names so that
-     * String[] rows read from CSV can be deserialized back to typed objects
-     * via Jackson's {@link ObjectMapper#convertValue}.
+     * Caches the {@link Column @Column} field names for a row class so they
+     * are only computed once, and converts CSV {@code String[]} rows back to
+     * typed objects via Jackson.
      */
     private static class RowMetadata {
-        private static final ObjectMapper MAPPER = new ObjectMapper()
-                .registerModule(new ParameterNamesModule())
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-        final String rowClassName;
+        final Class<?> rowClass;
         final List<String> fieldNames;
 
-        RowMetadata(String rowClassName, List<String> fieldNames) {
-            this.rowClassName = rowClassName;
+        private RowMetadata(Class<?> rowClass, List<String> fieldNames) {
+            this.rowClass = rowClass;
             this.fieldNames = fieldNames;
         }
 
-        static RowMetadata from(DataTable<?> dataTable) {
-            Class<?> rowClass = dataTable.getType();
+        static RowMetadata of(Class<?> rowClass) {
             List<String> names = new ArrayList<>();
             for (Field f : rowClass.getDeclaredFields()) {
                 if (f.isAnnotationPresent(Column.class)) {
                     names.add(f.getName());
                 }
             }
-            return new RowMetadata(rowClass.getName(), names);
+            return new RowMetadata(rowClass, names);
         }
 
         Object toRow(String[] values) {
@@ -418,11 +432,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             for (int i = 0; i < fieldNames.size(); i++) {
                 map.put(fieldNames.get(i), i < values.length ? values[i] : "");
             }
-            try {
-                return MAPPER.convertValue(map, Class.forName(rowClassName));
-            } catch (ClassNotFoundException e) {
-                throw new IllegalStateException("Row class not found: " + rowClassName, e);
-            }
+            return ROW_MAPPER.convertValue(map, rowClass);
         }
     }
 
@@ -486,7 +496,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
                 prefix = prefix.substring(0, lastDash);
             }
         }
-        String hash = sha256Prefix(value, 4);
+        String hash = sha256Prefix(value);
         return prefix + "-" + hash;
     }
 
@@ -528,18 +538,18 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         return new DataTableDescriptor(name, name, instanceName, "", group, Collections.emptyList());
     }
 
-    private static String sha256Prefix(String input, int hexChars) {
+    private static String sha256Prefix(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             StringBuilder hex = new StringBuilder();
             for (byte b : hash) {
                 hex.append(String.format("%02x", b));
-                if (hex.length() >= hexChars) {
+                if (hex.length() >= 4) {
                     break;
                 }
             }
-            return hex.substring(0, Math.min(hexChars, hex.length()));
+            return hex.substring(0, Math.min(4, hex.length()));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
