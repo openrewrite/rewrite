@@ -2850,6 +2850,7 @@ class ScalaTreeVisitor(
           if (stat.span.exists && !isSynth && visitedSpans.add(stat.span.start)) {
             visitTree(stat) match {
               case stmt: Statement => statements.add(JRightPadded.build(stmt))
+              case expr: Expression => statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
               case _ =>
             }
           }
@@ -3520,9 +3521,13 @@ class ScalaTreeVisitor(
     for (i <- block.stats.indices) {
       val stat = block.stats(i)
       val visitResult = visitTree(stat)
-      visitResult match {
-        case null => // Skip null statements (e.g., package declarations)
-        case stmt: Statement => 
+      val stmtOrNull: Statement = visitResult match {
+        case null => null
+        case stmt: Statement => stmt
+        case expr: Expression => new S.ExpressionStatement(Tree.randomId(), expr)
+        case _ => null
+      }
+      if (stmtOrNull != null) {
           // Extract trailing space after this statement
           val statEnd = Math.max(0, stat.span.end - offsetAdjustment)
           val nextStart = if (i < block.stats.length - 1) {
@@ -3533,16 +3538,15 @@ class ScalaTreeVisitor(
             // Last statement - look for closing brace
             Math.max(0, block.span.end - offsetAdjustment) - 1
           }
-          
+
           var trailingSpace = Space.EMPTY
           val trailStart = Math.max(statEnd, cursor)
           if (trailStart < nextStart && nextStart <= source.length) {
             trailingSpace = Space.format(source.substring(trailStart, nextStart))
             cursor = nextStart
           }
-          
-          statements.add(JRightPadded.build(stmt).withAfter(trailingSpace))
-        case _ => // Skip non-statement nodes
+
+          statements.add(JRightPadded.build(stmtOrNull).withAfter(trailingSpace))
       }
     }
     
@@ -4132,6 +4136,8 @@ class ScalaTreeVisitor(
                   case null =>
                   case stmt: Statement =>
                     statements.add(JRightPadded.build(stmt))
+                  case expr: Expression =>
+                    statements.add(JRightPadded.build(new S.ExpressionStatement(Tree.randomId(), expr)))
                   case _ =>
                 }
               }
