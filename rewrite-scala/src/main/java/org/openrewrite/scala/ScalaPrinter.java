@@ -260,11 +260,17 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append(" =>");
         if (case_.getPadding().getBody() != null) {
             J bodyElement = case_.getPadding().getBody().getElement();
-            // For Scala match cases, unwrap single-statement blocks to avoid { }
+            // For Scala match cases, unwrap blocks to avoid printing { }
             if (bodyElement instanceof J.Block) {
                 J.Block block = (J.Block) bodyElement;
-                for (Statement stmt : block.getStatements()) {
-                    visit(stmt, p);
+                visitSpace(block.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+                List<JRightPadded<Statement>> paddedStatements = block.getPadding().getStatements();
+                for (int i = 0; i < paddedStatements.size(); i++) {
+                    JRightPadded<Statement> paddedStmt = paddedStatements.get(i);
+                    visit(paddedStmt.getElement(), p);
+                    if (i < paddedStatements.size() - 1) {
+                        visitSpace(paddedStmt.getAfter(), Space.Location.BLOCK_STATEMENT_SUFFIX, p);
+                    }
                 }
             } else {
                 visit(bodyElement, p);
