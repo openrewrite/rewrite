@@ -35,6 +35,7 @@ import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.Curried
+import org.openrewrite.scala.marker.AsInstanceOfPrefix
 import org.openrewrite.scala.tree.S
 
 import java.util
@@ -4285,11 +4286,17 @@ class ScalaTreeVisitor(
             case e: Expression => e
             case _ => return visitUnknown(ta)
           }
-          
-          // Update cursor past ".asInstanceOf"
+
+          // Capture whitespace before ".asInstanceOf" (e.g., newline + indentation)
           val asInstanceOfEnd = sel.span.end
-          if (asInstanceOfEnd > cursor) {
+          val selectPrefix = if (asInstanceOfEnd > cursor) {
+            val between = source.substring(cursor, asInstanceOfEnd)
+            val dotPos = between.indexOf('.')
+            val sp = if (dotPos > 0) Space.format(between.substring(0, dotPos)) else Space.EMPTY
             cursor = asInstanceOfEnd
+            sp
+          } else {
+            Space.EMPTY
           }
           
           // Now handle the type argument in brackets
@@ -4320,10 +4327,16 @@ class ScalaTreeVisitor(
             cursor = ta.span.end
           }
           
+          val markers = if (selectPrefix != Space.EMPTY) {
+            Markers.EMPTY.addIfAbsent(AsInstanceOfPrefix.create(selectPrefix))
+          } else {
+            Markers.EMPTY
+          }
+
           return new J.TypeCast(
             Tree.randomId(),
-            Space.EMPTY,  // TypeCast itself has no prefix - the space is handled by the variable initializer
-            Markers.EMPTY,
+            Space.EMPTY,
+            markers,
             new J.ControlParentheses[TypeTree](
               Tree.randomId(),
               spaceBeforeBracket,
@@ -4337,7 +4350,7 @@ class ScalaTreeVisitor(
         // Check if this is isInstanceOf
         if (sel.name.toString == "isInstanceOf" && ta.args.size == 1) {
           // This is a type check operation: obj.isInstanceOf[Type]
-          
+
           // Extract prefix
           val startPos = Math.max(0, ta.span.start - offsetAdjustment)
           val prefix = if (startPos > cursor && startPos <= source.length) {
@@ -4345,33 +4358,43 @@ class ScalaTreeVisitor(
           } else {
             Space.EMPTY
           }
-          
+
           // Update cursor to start of the expression (sel.qualifier)
           cursor = Math.max(0, sel.qualifier.span.start - offsetAdjustment)
-          
+
           // Visit the expression being checked
           val expr = visitTree(sel.qualifier) match {
             case e: Expression => e
             case _ => return visitUnknown(ta)
           }
-          
+
+          // Capture whitespace before ".isInstanceOf" (e.g., newline + indentation)
+          val isInstanceOfEnd = sel.span.end - offsetAdjustment
+          val exprAsInstanceOfPrefix = if (isInstanceOfEnd > cursor) {
+            val between = source.substring(cursor, isInstanceOfEnd)
+            val dotPos = between.indexOf('.')
+            if (dotPos > 0) Space.format(between.substring(0, dotPos)) else Space.EMPTY
+          } else {
+            Space.EMPTY
+          }
+
           // Update cursor to start of type argument
           cursor = Math.max(0, ta.args.head.span.start - offsetAdjustment)
-          
+
           // Visit the target type
           val clazz = visitTree(ta.args.head) match {
             case tt: TypeTree => tt
             case _ => return visitUnknown(ta)
           }
-          
+
           // Update cursor to the end of the TypeApply
           updateCursor(ta.span.end)
-          
+
           return new J.InstanceOf(
             Tree.randomId(),
             prefix,
             Markers.EMPTY,
-            JRightPadded.build(expr),
+            new JRightPadded(expr, exprAsInstanceOfPrefix, Markers.EMPTY),
             clazz,
             null, // pattern (not used in Scala)
             null  // type

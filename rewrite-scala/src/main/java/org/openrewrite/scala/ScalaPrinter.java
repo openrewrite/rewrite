@@ -34,6 +34,7 @@ import org.openrewrite.scala.marker.IndentedBlock;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
+import org.openrewrite.scala.marker.AsInstanceOfPrefix;
 import org.openrewrite.scala.marker.TypeAscription;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.tree.S;
@@ -882,6 +883,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         // Existing asInstanceOf handling
         beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
         visit(typeCast.getExpression(), p);
+        typeCast.getMarkers().findFirst(AsInstanceOfPrefix.class)
+                .ifPresent(sp -> visitSpace(sp.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
         p.append(".asInstanceOf");
         if (typeCast.getClazz() instanceof J.ControlParentheses) {
             J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();
