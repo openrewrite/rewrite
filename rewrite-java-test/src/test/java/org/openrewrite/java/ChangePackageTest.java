@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -1990,6 +1991,71 @@ class ChangePackageTest implements RewriteTest {
                */
               public class Ref {}
               """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", true)),
+          text(
+            "org.foo.MyImpl\n",
+            "org.bar.MyImpl\n",
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.MyInterface"))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFileMultipleEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", true)),
+          text(
+            """
+              # Service provider implementations
+              org.foo.MyImplA
+              org.foo.sub.MyImplB
+              org.other.Unrelated
+              """,
+            """
+              # Service provider implementations
+              org.bar.MyImplA
+              org.bar.sub.MyImplB
+              org.other.Unrelated
+              """,
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.MyInterface"))
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFileNonRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", false)),
+          text(
+            "org.foo.MyImpl\n",
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changePackageInServiceProviderFileContentOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.bar", true)),
+          text(
+            "org.foo.MyImpl\n",
+            "org.bar.MyImpl\n",
+            spec -> spec.path("META-INF/services/org.other.SomeInterface")
           )
         );
     }
