@@ -57,7 +57,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 }
                 return literal;
             }
-        }.visitNonNull(doc, upgrades);
+        }.visitNonNull(doc, upgrades, cursor);
         if (result != doc) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
             result = result.withMarkers(result.getMarkers()
@@ -142,7 +142,7 @@ public class PyProjectFile implements PythonDependencyFile {
 
                 return a.getPadding().withValues(newPadded);
             }
-        }.visitNonNull(doc, normalizedNames);
+        }.visitNonNull(doc, normalizedNames, cursor);
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -172,7 +172,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 String newSpec = buildChangedSpec(spec, depName, newPackageName, newVersion);
                 return literal.withSource("\"" + newSpec + "\"").withValue(newSpec);
             }
-        }.visitNonNull(doc, 0);
+        }.visitNonNull(doc, 0, cursor);
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
@@ -405,7 +405,7 @@ public class PyProjectFile implements PythonDependencyFile {
                 }
                 return literal;
             }
-        }.visitNonNull(doc, packageMessages);
+        }.visitNonNull(doc, packageMessages, cursor);
         if (result != doc) {
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), marker);
         }
