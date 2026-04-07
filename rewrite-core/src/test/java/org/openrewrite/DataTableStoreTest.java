@@ -486,14 +486,8 @@ class DataTableStoreTest {
             // On cycle 2+, the store already contains rows written in cycle 1
             List<String> readBack = new ArrayList<>();
             DataTableStore store = DataTableExecutionContextView.view(ctx).getDataTableStore();
-            try (Stream<?> rows = store.getRows(table.getName(), null)) {
-                rows.forEach(row -> {
-                    if (row instanceof TestTable.Row) {
-                        readBack.add(((TestTable.Row) row).getName());
-                    } else {
-                        readBack.add(((String[]) row)[0]);
-                    }
-                });
+            try (Stream<TestTable.Row> rows = store.getRows(TestTable.class)) {
+                rows.forEach(row -> readBack.add(row.getName()));
             }
             return readBack;
         }

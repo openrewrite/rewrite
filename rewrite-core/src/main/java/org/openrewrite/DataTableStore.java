@@ -60,8 +60,35 @@ public interface DataTableStore {
      * @param dataTableName the fully qualified class name of the data table
      * @param group         the group identifying the bucket, or null for ungrouped
      * @return a stream of rows, or an empty stream if no rows exist
+     * @deprecated Use {@link #getRows(Class)} or {@link #getRows(Class, String)} for type-safe deserialization.
      */
+    @Deprecated
     Stream<?> getRows(String dataTableName, @Nullable String group);
+
+    /**
+     * Stream typed rows for a specific data table class and group.
+     * The row type is inferred from the data table's generic parameter.
+     *
+     * @param dataTableClass the data table class (e.g., {@code ServiceEndpoints.class})
+     * @param group          the group identifying the bucket, or null for ungrouped
+     * @param <Row>          the row type
+     * @return a stream of typed rows, or an empty stream if no rows exist
+     */
+    @SuppressWarnings("unchecked")
+    default <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass, @Nullable String group) {
+        return (Stream<Row>) getRows(dataTableClass.getName(), group);
+    }
+
+    /**
+     * Stream typed rows for a specific data table class (ungrouped).
+     *
+     * @param dataTableClass the data table class (e.g., {@code ServiceEndpoints.class})
+     * @param <Row>          the row type
+     * @return a stream of typed rows, or an empty stream if no rows exist
+     */
+    default <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass) {
+        return getRows(dataTableClass, null);
+    }
 
     /**
      * Get the set of {@link DataTable} instances that have received rows.
