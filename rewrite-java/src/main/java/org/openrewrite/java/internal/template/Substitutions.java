@@ -166,6 +166,17 @@ public class Substitutions {
                 return TypeUtils.toString(genericType.getBounds().get(0));
             }
         }
+        if (type instanceof JavaType.FullyQualified) {
+            JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
+            String fqn = fq.getFullyQualifiedName();
+            for (int i = 0; i < fqn.length(); i++) {
+                if (fqn.charAt(i) == '$' && i + 1 < fqn.length() && Character.isDigit(fqn.charAt(i + 1))) {
+                    // Anonymous classes and types declared inside them (e.g., "Foo$1" or "Foo$1$Bar")
+                    // cannot be expressed as valid Java source code; use the supertype instead
+                    return getTypeName(fq.getSupertype());
+                }
+            }
+        }
         return TypeUtils.toString(type).replace("$", ".");
     }
 
