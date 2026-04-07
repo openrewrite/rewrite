@@ -256,8 +256,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         if (docCursor.getValue() instanceof Yaml.Document) {
                             Yaml.Document doc = docCursor.getValue();
                             if (!preserveDocumentSeparator(doc)) {
-                                comment = doc.getEnd().getPrefix();
-                                c = docCursor;
+                                String endPrefix = doc.getEnd().getPrefix();
+                                // Only use Document.End prefix if it contains a comment;
+                                // plain trailing whitespace should not be copied as a comment
+                                if (endPrefix != null && endPrefix.contains("#")) {
+                                    comment = endPrefix;
+                                    c = docCursor;
+                                }
                             }
                         }
                     }
