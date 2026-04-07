@@ -3539,7 +3539,6 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/moderneinc/customer-requests/issues/1522")
     @Test
     void childModuleWithUnversionedDependencyOnParentManagedDep() {
         rewriteRun(
