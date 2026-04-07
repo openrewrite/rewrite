@@ -1907,12 +1907,17 @@ func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) tree.Expression {
 }
 
 // mapTypeExpr maps an expression that is known to be in a type position.
-// It delegates to mapExpr but overrides StarExpr to produce PointerType.
+// It delegates to mapExpr but overrides StarExpr to produce PointerType
+// and IndexExpr to produce ParameterizedType (generic instantiation).
 func (ctx *parseContext) mapTypeExpr(expr ast.Expr) tree.Expression {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		return ctx.mapPointerType(star)
+	switch e := expr.(type) {
+	case *ast.StarExpr:
+		return ctx.mapPointerType(e)
+	case *ast.IndexExpr:
+		return ctx.mapParameterizedType(e)
+	default:
+		return ctx.mapExpr(expr)
 	}
-	return ctx.mapExpr(expr)
 }
 
 // mapArrayType maps an array/slice type expression like `[]string` or `[5]int`.
@@ -1941,6 +1946,26 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) tree.Expression {
 		Dimension:   tree.LeftPadded[tree.Space]{Element: closePrefix},
 		Length:      length,
 		ElementType: elt,
+	}
+}
+
+// mapParameterizedType maps a single-type-arg generic instantiation in a type position,
+// e.g. `JSONArray[string]`, producing a J.ParameterizedType.
+func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) tree.Expression {
+	target := ctx.mapExpr(expr.X)
+	lbrackPrefix := ctx.prefix(expr.Lbrack)
+	ctx.skip(1) // "["
+	typeArg := ctx.mapTypeExpr(expr.Index)
+	rbrackPrefix := ctx.prefix(expr.Rbrack)
+	ctx.skip(1) // "]"
+
+	return &tree.ParameterizedType{
+		ID:    uuid.New(),
+		Clazz: target,
+		TypeParameters: &tree.Container[tree.Expression]{
+			Before:   lbrackPrefix,
+			Elements: []tree.RightPadded[tree.Expression]{{Element: typeArg, After: rbrackPrefix}},
+		},
 	}
 }
 

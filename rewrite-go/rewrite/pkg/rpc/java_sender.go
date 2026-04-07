@@ -90,6 +90,8 @@ func (s *JavaSender) visitJ(node any, q *SendQueue) {
 		s.sendArrayType(v, q)
 	case *tree.ArrayAccess:
 		s.sendArrayAccess(v, q)
+	case *tree.ParameterizedType:
+		s.sendParameterizedType(v, q)
 	case *tree.ArrayDimension:
 		s.sendArrayDimension(v, q)
 	case *tree.Parentheses:
@@ -530,6 +532,15 @@ func (s *JavaSender) sendArrayAccess(aa *tree.ArrayAccess, q *SendQueue) {
 		func(v any) { s.parent.Visit(v, q) })
 	q.GetAndSend(aa, func(v any) any { return v.(*tree.ArrayAccess).Dimension },
 		func(v any) { s.parent.Visit(v, q) })
+}
+
+func (s *JavaSender) sendParameterizedType(pt *tree.ParameterizedType, q *SendQueue) {
+	q.GetAndSend(pt, func(v any) any { return v.(*tree.ParameterizedType).Clazz },
+		func(v any) { s.parent.Visit(v, q) })
+	q.GetAndSend(pt, func(v any) any { return v.(*tree.ParameterizedType).TypeParameters },
+		func(v any) { sendContainer(s.parent, v, q) })
+	q.GetAndSend(pt, func(v any) any { return AsRef(v.(*tree.ParameterizedType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(tree.JavaType), q) })
 }
 
 func (s *JavaSender) sendArrayDimension(ad *tree.ArrayDimension, q *SendQueue) {

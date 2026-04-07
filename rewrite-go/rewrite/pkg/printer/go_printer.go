@@ -687,6 +687,26 @@ func (p *GoPrinter) VisitIndexList(il *tree.IndexList, param any) tree.J {
 	return il
 }
 
+func (p *GoPrinter) VisitParameterizedType(pt *tree.ParameterizedType, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(pt.Prefix, pt.Markers, out)
+	p.Visit(pt.Clazz, out)
+	if pt.TypeParameters != nil {
+		p.visitSpace(pt.TypeParameters.Before, out)
+		out.Append("[")
+		for i, rp := range pt.TypeParameters.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+			if i < len(pt.TypeParameters.Elements)-1 {
+				out.Append(",")
+			}
+		}
+		out.Append("]")
+	}
+	p.afterSyntax(pt.Markers, out)
+	return pt
+}
+
 func (p *GoPrinter) VisitComposite(c *tree.Composite, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(c.Prefix, c.Markers, out)
