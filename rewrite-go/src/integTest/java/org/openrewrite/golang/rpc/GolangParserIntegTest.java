@@ -475,6 +475,7 @@ class GolangParserIntegTest implements RewriteTest {
 
                                 type baseCollection struct {
                                 \tIndexes JSONArray[string]
+                                \tData    Store[string, any]
                                 }
                                 """
                 )

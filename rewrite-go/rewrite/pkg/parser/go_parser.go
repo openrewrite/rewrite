@@ -1915,6 +1915,8 @@ func (ctx *parseContext) mapTypeExpr(expr ast.Expr) tree.Expression {
 		return ctx.mapPointerType(e)
 	case *ast.IndexExpr:
 		return ctx.mapParameterizedType(e)
+	case *ast.IndexListExpr:
+		return ctx.mapParameterizedTypeMulti(e)
 	default:
 		return ctx.mapExpr(expr)
 	}
@@ -1965,6 +1967,40 @@ func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) tree.Expressi
 		TypeParameters: &tree.Container[tree.Expression]{
 			Before:   lbrackPrefix,
 			Elements: []tree.RightPadded[tree.Expression]{{Element: typeArg, After: rbrackPrefix}},
+		},
+	}
+}
+
+// mapParameterizedTypeMulti maps a multi-type-arg generic instantiation in a type position,
+// e.g. `Store[string, any]`, producing a J.ParameterizedType.
+func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) tree.Expression {
+	target := ctx.mapExpr(expr.X)
+	lbrackPrefix := ctx.prefix(expr.Lbrack)
+	ctx.skip(1) // "["
+
+	var elements []tree.RightPadded[tree.Expression]
+	for i, idx := range expr.Indices {
+		mapped := ctx.mapTypeExpr(idx)
+		var after tree.Space
+		if i < len(expr.Indices)-1 {
+			commaOffset := ctx.findNext(',')
+			if commaOffset >= 0 {
+				after = ctx.prefix(ctx.file.Pos(commaOffset))
+				ctx.skip(1) // ","
+			}
+		} else {
+			after = ctx.prefix(expr.Rbrack)
+		}
+		elements = append(elements, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+	}
+	ctx.skip(1) // "]"
+
+	return &tree.ParameterizedType{
+		ID:    uuid.New(),
+		Clazz: target,
+		TypeParameters: &tree.Container[tree.Expression]{
+			Before:   lbrackPrefix,
+			Elements: elements,
 		},
 	}
 }
