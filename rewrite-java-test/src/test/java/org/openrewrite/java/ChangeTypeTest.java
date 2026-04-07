@@ -19,24 +19,19 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.UncheckedConsumer;
-
-import java.util.ArrayList;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
@@ -2657,34 +2652,4 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    private static UncheckedConsumer<java.util.List<SourceFile>> withSourceTypesOnClasspath() {
-        return sourceFiles -> {
-            java.util.List<JavaType.FullyQualified> sourceTypes = new ArrayList<>();
-            for (SourceFile sf : sourceFiles) {
-                if (sf instanceof JavaSourceFile) {
-                    for (J.ClassDeclaration classDecl : ((JavaSourceFile) sf).getClasses()) {
-                        JavaType.FullyQualified type = classDecl.getType();
-                        if (type != null) {
-                            sourceTypes.add(type);
-                        }
-                    }
-                }
-            }
-            for (int i = 0; i < sourceFiles.size(); i++) {
-                SourceFile sf = sourceFiles.get(i);
-                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-                JavaSourceSet ss;
-                if (maybeSourceSet.isPresent()) {
-                    ss = maybeSourceSet.get();
-                    java.util.List<JavaType.FullyQualified> enriched = new ArrayList<>(ss.getClasspath());
-                    enriched.addAll(sourceTypes);
-                    ss = ss.withClasspath(enriched);
-                } else {
-                    ss = new JavaSourceSet(java.util.UUID.randomUUID(), "main", sourceTypes, java.util.Collections.emptyMap());
-                }
-                sourceFiles.set(i, sf.withMarkers(
-                  sf.getMarkers().computeByType(ss, (orig, upd) -> upd)));
-            }
-        };
-    }
 }

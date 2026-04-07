@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Validated;
+import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
@@ -3712,6 +3713,88 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                             <groupId>com.doesnotexist</groupId>
                             <artifactId>doesnotexist</artifactId>
                             <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void composedWithChangePackageUpdatesImports() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeDependencyGroupIdAndArtifactId(
+              "javax.activation",
+              "javax.activation-api",
+              "jakarta.activation",
+              "jakarta.activation-api",
+              "2.0.1",
+              null,
+              false,
+              false
+            ),
+            new ChangePackage("javax.activation", "jakarta.activation", true)
+          ),
+          mavenProject("project",
+            srcMainJava(
+              java(
+                """
+                  import javax.activation.DataHandler;
+                  import javax.activation.MimeType;
+
+                  class A {
+                      DataHandler handler;
+                      MimeType type;
+                  }
+                  """,
+                """
+                  import jakarta.activation.DataHandler;
+                  import jakarta.activation.MimeType;
+
+                  class A {
+                      DataHandler handler;
+                      MimeType type;
+                  }
+                  """,
+                s -> s.afterRecipe(cu -> {
+                    JavaSourceSet jss = cu.getMarkers().findFirst(JavaSourceSet.class).orElseThrow();
+                    // New dependency types should be present on classpath
+                    assertThat(jss.getClasspath())
+                      .extracting(JavaType.FullyQualified::getFullyQualifiedName)
+                      .anyMatch(fqn -> fqn.startsWith("jakarta.activation."));
+                })
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.activation</groupId>
+                            <artifactId>javax.activation-api</artifactId>
+                            <version>1.2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.activation</groupId>
+                            <artifactId>jakarta.activation-api</artifactId>
+                            <version>2.0.1</version>
                         </dependency>
                     </dependencies>
                 </project>

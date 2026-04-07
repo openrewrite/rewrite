@@ -28,6 +28,7 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
@@ -263,6 +264,42 @@ public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName) {
         return addTypesToSourceSet(sourceSetName, emptyList(), emptyList());
+    }
+
+    /**
+     * Enrich each source file's JavaSourceSet marker with types declared in other source files,
+     * so that classpath-based ambiguity detection works in tests where types come from source
+     * files rather than JARs.
+     */
+    public static UncheckedConsumer<List<SourceFile>> withSourceTypesOnClasspath() {
+        return sourceFiles -> {
+            List<JavaType.FullyQualified> sourceTypes = new ArrayList<>();
+            for (SourceFile sf : sourceFiles) {
+                if (sf instanceof JavaSourceFile) {
+                    for (J.ClassDeclaration classDecl : ((JavaSourceFile) sf).getClasses()) {
+                        JavaType.FullyQualified type = classDecl.getType();
+                        if (type != null) {
+                            sourceTypes.add(type);
+                        }
+                    }
+                }
+            }
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sf = sourceFiles.get(i);
+                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+                JavaSourceSet ss;
+                if (maybeSourceSet.isPresent()) {
+                    ss = maybeSourceSet.get();
+                    List<JavaType.FullyQualified> enriched = new ArrayList<>(ss.getClasspath());
+                    enriched.addAll(sourceTypes);
+                    ss = ss.withClasspath(enriched);
+                } else {
+                    ss = new JavaSourceSet(Tree.randomId(), "main", sourceTypes, emptyMap());
+                }
+                sourceFiles.set(i, sf.withMarkers(
+                  sf.getMarkers().computeByType(ss, (orig, upd) -> upd)));
+            }
+        };
     }
 
     public static JavaVersion javaVersion(int version) {
