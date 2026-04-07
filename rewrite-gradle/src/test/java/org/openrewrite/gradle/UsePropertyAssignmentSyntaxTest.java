@@ -158,12 +158,12 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
     }
 
     @Test
-    void kotlinDslUnchanged() {
+    void kotlinDslMethodCallUnchanged() {
         rewriteRun(
           buildGradleKts(
             """
               tasks.register<JavaExec>("runLogic") {
-                  description = "My precious logic"
+                  description("My precious logic")
               }
               """
           )

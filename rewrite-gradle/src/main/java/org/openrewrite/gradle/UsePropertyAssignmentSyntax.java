@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -55,6 +56,12 @@ public class UsePropertyAssignmentSyntax extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+
+                // Only apply to Groovy DSL files; Kotlin DSL does not have this deprecation
+                JavaSourceFile sourceFile = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+                if (sourceFile.getSourcePath().toString().endsWith(".kts")) {
+                    return m;
+                }
 
                 if (m.getArguments().size() != 1 || m.getArguments().get(0) instanceof J.Empty) {
                     return m;
