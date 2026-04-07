@@ -1278,6 +1278,32 @@ func (n *ArrayDimension) WithMarkers(markers Markers) *ArrayDimension {
 	return &c
 }
 
+// ParameterizedType represents a generic type instantiation like `List[string]`.
+type ParameterizedType struct {
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Clazz          Expression            // the base type being parameterized
+	TypeParameters *Container[Expression] // the type arguments (nullable)
+	Type           JavaType              // resolved type (nullable)
+}
+
+func (*ParameterizedType) isTree()       {}
+func (*ParameterizedType) isJ()          {}
+func (*ParameterizedType) isExpression() {}
+
+func (n *ParameterizedType) WithPrefix(prefix Space) *ParameterizedType {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ParameterizedType) WithMarkers(markers Markers) *ParameterizedType {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 // Import represents a single import declaration.
 type Import struct {
 	ID      uuid.UUID

@@ -89,6 +89,8 @@ func (r *JavaReceiver) visitJ(node any, q *ReceiveQueue) any {
 		return r.receiveArrayType(v, q)
 	case *tree.ArrayAccess:
 		return r.receiveArrayAccess(v, q)
+	case *tree.ParameterizedType:
+		return r.receiveParameterizedType(v, q)
 	case *tree.ArrayDimension:
 		return r.receiveArrayDimension(v, q)
 	case *tree.Parentheses:
@@ -656,6 +658,20 @@ func (r *JavaReceiver) receiveArrayType(at *tree.ArrayType, q *ReceiveQueue) *tr
 	}
 	at.Type = r.receiveType(at.Type, q)
 	return at
+}
+
+func (r *JavaReceiver) receiveParameterizedType(pt *tree.ParameterizedType, q *ReceiveQueue) *tree.ParameterizedType {
+	c := *pt
+	pt = &c
+	if result := q.Receive(pt.Clazz, func(v any) any { return r.parent.Visit(v, q) }); result != nil {
+		pt.Clazz = result.(tree.Expression)
+	}
+	if result := q.Receive(pt.TypeParameters, func(v any) any { return receiveContainer(r.parent, q, v) }); result != nil {
+		container := result.(tree.Container[tree.Expression])
+		pt.TypeParameters = &container
+	}
+	pt.Type = r.receiveType(pt.Type, q)
+	return pt
 }
 
 func (r *JavaReceiver) receiveArrayAccess(aa *tree.ArrayAccess, q *ReceiveQueue) *tree.ArrayAccess {

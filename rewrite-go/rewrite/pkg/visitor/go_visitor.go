@@ -111,6 +111,8 @@ func (v *GoVisitor) Visit(t tree.Tree, p any) tree.Tree {
 		return v.self().VisitControlParentheses(n, p)
 	case *tree.ArrayAccess:
 		return v.self().VisitArrayAccess(n, p)
+	case *tree.ParameterizedType:
+		return v.self().VisitParameterizedType(n, p)
 	case *tree.IndexList:
 		return v.self().VisitIndexList(n, p)
 	case *tree.ArrayDimension:
@@ -196,6 +198,7 @@ type VisitorI interface {
 	VisitTypeCast(tc *tree.TypeCast, p any) tree.J
 	VisitControlParentheses(cp *tree.ControlParentheses, p any) tree.J
 	VisitArrayAccess(aa *tree.ArrayAccess, p any) tree.J
+	VisitParameterizedType(pt *tree.ParameterizedType, p any) tree.J
 	VisitIndexList(il *tree.IndexList, p any) tree.J
 	VisitArrayDimension(ad *tree.ArrayDimension, p any) tree.J
 	VisitComposite(c *tree.Composite, p any) tree.J
@@ -503,6 +506,12 @@ func (v *GoVisitor) VisitArrayAccess(aa *tree.ArrayAccess, p any) tree.J {
 	aa = aa.WithPrefix(v.self().VisitSpace(aa.Prefix, p))
 	aa = aa.WithMarkers(v.visitMarkers(aa.Markers, p))
 	return aa
+}
+
+func (v *GoVisitor) VisitParameterizedType(pt *tree.ParameterizedType, p any) tree.J {
+	pt = pt.WithPrefix(v.self().VisitSpace(pt.Prefix, p))
+	pt = pt.WithMarkers(v.visitMarkers(pt.Markers, p))
+	return pt
 }
 
 func (v *GoVisitor) VisitIndexList(il *tree.IndexList, p any) tree.J {
