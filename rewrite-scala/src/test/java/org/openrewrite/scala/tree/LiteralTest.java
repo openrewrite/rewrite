@@ -120,4 +120,18 @@ class LiteralTest implements RewriteTest {
           scala("((42))")
         );
     }
+
+    @Test
+    void literalExpressionStatementInClassBody() {
+        rewriteRun(
+          scala(
+            """
+            class A {
+              "hello"
+              val x = 1
+            }
+            """
+          )
+        );
+    }
 }

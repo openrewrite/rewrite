@@ -470,6 +470,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitTuplePattern((S.TuplePattern) tree, p);
         } else if (tree instanceof S.BlockExpression) {
             return visitBlockExpression((S.BlockExpression) tree, p);
+        } else if (tree instanceof S.ExpressionStatement) {
+            return visitExpressionStatement((S.ExpressionStatement) tree, p);
         }
         return super.visit(tree, p);
     }
@@ -1210,6 +1212,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append('_');
         afterSyntax(wildcard, p);
         return wildcard;
+    }
+
+    public J visitExpressionStatement(S.ExpressionStatement expressionStatement, PrintOutputCapture<P> p) {
+        visit(expressionStatement.getExpression(), p);
+        return expressionStatement;
     }
 
     public J visitBlockExpression(S.BlockExpression blockExpression, PrintOutputCapture<P> p) {
