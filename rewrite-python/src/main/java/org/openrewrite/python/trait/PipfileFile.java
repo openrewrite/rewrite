@@ -23,6 +23,7 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
 
+import static org.openrewrite.internal.ListUtils.concat;
 import static org.openrewrite.internal.ListUtils.map;
 
 /**
@@ -224,15 +225,8 @@ public class PipfileFile implements PythonDependencyFile {
      * When scope is null, matches both "packages" and "dev-packages".
      */
     private static boolean isInsideTargetTable(Cursor cursor, @Nullable String scope) {
-        Cursor c = cursor;
-        while (c != null) {
-            Object val = c.getValue();
-            if (val instanceof Toml.Table) {
-                return isTargetTable((Toml.Table) val, scope);
-            }
-            c = c.getParent();
-        }
-        return false;
+        Toml.Table table = cursor.firstEnclosing(Toml.Table.class);
+        return table != null && isTargetTable(table, scope);
     }
 
     private static boolean hasDependencyInTable(Toml.Document doc, String tableName, String normalizedName) {
@@ -282,9 +276,7 @@ public class PipfileFile implements PythonDependencyFile {
                         : Space.format("\n");
                 newKv = newKv.withPrefix(entryPrefix);
 
-                List<Toml> newValues = new ArrayList<>(values);
-                newValues.add(newKv);
-                return t.withValues(newValues);
+                return t.withValues(concat(values, newKv));
             }
         }.visitNonNull(doc, 0);
     }

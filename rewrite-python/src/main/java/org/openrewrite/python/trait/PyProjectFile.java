@@ -24,6 +24,8 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
 
+import static org.openrewrite.internal.ListUtils.concat;
+
 @Value
 public class PyProjectFile implements PythonDependencyFile {
 
@@ -289,9 +291,7 @@ public class PyProjectFile implements PythonDependencyFile {
                         : Space.format("\n");
                 newKv = newKv.withPrefix(entryPrefix);
 
-                List<Toml> newValues = new ArrayList<>(values);
-                newValues.add(newKv);
-                return t.withValues(newValues);
+                return t.withValues(concat(values, newKv));
             }
         }.visitNonNull(doc, 0);
     }
@@ -419,14 +419,12 @@ public class PyProjectFile implements PythonDependencyFile {
     }
 
     private static boolean isInsideTargetArray(Cursor cursor, @Nullable String scope, @Nullable String groupName) {
-        Cursor c = cursor;
-        while (c != null) {
-            if (c.getValue() instanceof Toml.Array) {
-                return PyProjectHelper.isInsideDependencyArray(c, scope, groupName);
-            }
-            c = c.getParent();
+        try {
+            Cursor arrayCursor = cursor.dropParentUntil(v -> v instanceof Toml.Array);
+            return PyProjectHelper.isInsideDependencyArray(arrayCursor, scope, groupName);
+        } catch (IllegalStateException e) {
+            return false;
         }
-        return false;
     }
 
     public static class Matcher extends SimpleTraitMatcher<PyProjectFile> {

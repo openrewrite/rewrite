@@ -323,18 +323,9 @@ public class PyProjectHelper {
      * {@code [tool.pdm.overrides]} table in a pyproject.toml.
      */
     public static boolean isInsidePdmOverridesTable(Cursor cursor) {
-        Cursor c = cursor;
-        while (c != null) {
-            Object val = c.getValue();
-            if (val instanceof Toml.Table) {
-                Toml.Table table = (Toml.Table) val;
-                if (table.getName() != null && "tool.pdm.overrides".equals(table.getName().getName())) {
-                    return true;
-                }
-            }
-            c = c.getParent();
-        }
-        return false;
+        Toml.Table table = cursor.firstEnclosing(Toml.Table.class);
+        return table != null && table.getName() != null &&
+                "tool.pdm.overrides".equals(table.getName().getName());
     }
 
     private static @Nullable Dependency findInList(List<Dependency> deps, String packageName) {
