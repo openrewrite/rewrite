@@ -177,8 +177,7 @@ public class PyProjectHelper {
             PythonResolutionResult newMarker = PythonDependencyParser.createMarker(updated, null);
             if (newMarker != null) {
                 updated = updated.withMarkers(updated.getMarkers()
-                        .removeByType(PythonResolutionResult.class)
-                        .addIfAbsent(newMarker.withId(marker.getId())));
+                        .setByType(newMarker.withId(marker.getId())));
             }
         }
 

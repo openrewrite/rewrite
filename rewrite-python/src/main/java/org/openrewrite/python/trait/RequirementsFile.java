@@ -94,8 +94,7 @@ public class RequirementsFile implements PythonDependencyFile {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
             PlainText newPt = pt.withText(String.join("\n", lines));
             newPt = newPt.withMarkers(newPt.getMarkers()
-                    .removeByType(PythonResolutionResult.class)
-                    .addIfAbsent(updatedMarker));
+                    .setByType(updatedMarker));
             return new RequirementsFile(new Cursor(cursor.getParentOrThrow(), newPt), updatedMarker);
         }
         return this;
@@ -131,8 +130,7 @@ public class RequirementsFile implements PythonDependencyFile {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, additions);
             PlainText newPt = pt.withText(sb.toString());
             newPt = newPt.withMarkers(newPt.getMarkers()
-                    .removeByType(PythonResolutionResult.class)
-                    .addIfAbsent(updatedMarker));
+                    .setByType(updatedMarker));
             return new RequirementsFile(new Cursor(cursor.getParentOrThrow(), newPt), updatedMarker);
         }
         return this;
