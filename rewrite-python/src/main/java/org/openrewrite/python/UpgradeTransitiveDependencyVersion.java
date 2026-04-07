@@ -84,10 +84,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
-                stopAfterPreVisit();
                 SourceFile sourceFile = (SourceFile) tree;
                 if (tree instanceof Toml.Document && sourceFile.getSourcePath().toString().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
@@ -123,10 +123,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
-                stopAfterPreVisit();
                 SourceFile sourceFile = (SourceFile) tree;
                 String sourcePath = sourceFile.getSourcePath().toString();
 

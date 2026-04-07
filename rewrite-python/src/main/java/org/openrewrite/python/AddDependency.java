@@ -107,11 +107,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
-                stopAfterPreVisit();
                 SourceFile sourceFile = (SourceFile) tree;
                 if (tree instanceof Toml.Document && sourceFile.getSourcePath().toString().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
@@ -136,11 +136,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public  Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
-                stopAfterPreVisit();
                 SourceFile sourceFile = (SourceFile) tree;
                 String sourcePath = sourceFile.getSourcePath().toString();
 
