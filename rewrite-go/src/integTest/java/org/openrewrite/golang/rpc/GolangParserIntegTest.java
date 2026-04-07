@@ -465,4 +465,19 @@ class GolangParserIntegTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void genericTypeInStructField() {
+        rewriteRun(
+                go(
+                        """
+                                package core
+
+                                type baseCollection struct {
+                                \tIndexes JSONArray[string]
+                                }
+                                """
+                )
+        );
+    }
 }
