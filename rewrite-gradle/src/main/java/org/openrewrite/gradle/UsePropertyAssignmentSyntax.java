@@ -18,16 +18,9 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.marker.Markers;
-
-import static java.util.Collections.emptyList;
-import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.tree.Space.EMPTY;
-import static org.openrewrite.java.tree.Space.SINGLE_SPACE;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -71,46 +64,15 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return m;
                 }
 
-                return replaceMethodInvocationWithAssignment(m);
+                if (m.getSelect() != null) {
+                    return GroovyTemplate.apply("#{any()}." + propertyName + " = #{any()}",
+                            getCursor(), m.getCoordinates().replace(),
+                            m.getSelect(), m.getArguments().get(0));
+                }
+                return GroovyTemplate.apply(propertyName + " = #{any()}",
+                        getCursor(), m.getCoordinates().replace(),
+                        m.getArguments().get(0));
             }
         });
-    }
-
-    private static J.Assignment replaceMethodInvocationWithAssignment(J.MethodInvocation method) {
-        J.Identifier id = new J.Identifier(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                emptyList(),
-                method.getSimpleName(),
-                null,
-                null
-        );
-        Expression variable;
-        Expression select = method.getSelect();
-        if (select == null) {
-            variable = id;
-        } else {
-            variable = new J.FieldAccess(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    select,
-                    new JLeftPadded<>(EMPTY, id, Markers.EMPTY),
-                    null
-            );
-        }
-        return new J.Assignment(
-                randomId(),
-                method.getPrefix(),
-                Markers.EMPTY,
-                variable,
-                new JLeftPadded<>(
-                        SINGLE_SPACE,
-                        method.getArguments().get(0).withPrefix(SINGLE_SPACE),
-                        Markers.EMPTY
-                ),
-                null
-        );
     }
 }
