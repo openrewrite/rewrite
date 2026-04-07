@@ -17,11 +17,14 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.SearchResult;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -52,16 +55,10 @@ public class UsePropertyAssignmentSyntax extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsGroovyBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-
-                // Only apply to Groovy DSL files; Kotlin DSL does not have this deprecation
-                JavaSourceFile sourceFile = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-                if (sourceFile.getSourcePath().toString().endsWith(".kts")) {
-                    return m;
-                }
 
                 if (m.getArguments().size() != 1 || m.getArguments().get(0) instanceof J.Empty) {
                     return m;
@@ -81,5 +78,23 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                         m.getArguments().get(0));
             }
         });
+    }
+
+    /**
+     * Matches Groovy build scripts ({@code .gradle}), excluding Kotlin DSL ({@code .gradle.kts}).
+     */
+    private static class IsGroovyBuildGradle<P> extends TreeVisitor<Tree, P> {
+        @Override
+        public @Nullable Tree preVisit(@NonNull Tree tree, P p) {
+            stopAfterPreVisit();
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile sourceFile = (JavaSourceFile) tree;
+                String path = sourceFile.getSourcePath().toString();
+                if (path.endsWith(".gradle") && !path.endsWith(".kts")) {
+                    return SearchResult.found(sourceFile);
+                }
+            }
+            return tree;
+        }
     }
 }
