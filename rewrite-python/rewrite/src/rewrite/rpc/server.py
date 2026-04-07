@@ -396,7 +396,7 @@ def handle_parse(params: dict) -> List[str]:
             elif 'path' in input_item:
                 result = parse_python_file(input_item['path'], relative_to, ty_client)
             elif 'text' in input_item or 'source' in input_item:
-                source = input_item.get('text') or input_item.get('source')
+                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
                 path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
                 # For relative paths, write the source under the project root
                 # (tmpdir or relative_to) so ty-types can resolve imports from
