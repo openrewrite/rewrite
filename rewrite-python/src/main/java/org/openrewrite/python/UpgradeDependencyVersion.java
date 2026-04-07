@@ -25,6 +25,7 @@ import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -92,7 +93,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     }
 
     static class Accumulator {
-        final Set<String> projectsToUpdate = new HashSet<>();
+        final Set<Path> projectsToUpdate = new HashSet<>();
     }
 
     @Override
@@ -128,7 +129,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (PyProjectHelper.normalizeVersionConstraint(newVersion).equals(dep.getVersionConstraint())) {
                     return tree;
                 }
-                acc.projectsToUpdate.add(sourceFile.getSourcePath().toString());
+                acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 return tree;
             }
         };
@@ -144,7 +145,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                String sourcePath = sourceFile.getSourcePath().toString();
+                Path sourcePath = sourceFile.getSourcePath();
 
                 if (acc.projectsToUpdate.contains(sourcePath)) {
                     PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
