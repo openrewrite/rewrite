@@ -168,4 +168,49 @@ class MatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchCaseWithMultipleStatements() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val x: Any = "hello"
+              x match {
+                case s: String =>
+                  val y = s.length
+                  val z = y + 1
+                  println(z)
+                case i: Int =>
+                  val doubled = i * 2
+                  println(doubled)
+                case _ =>
+                  val msg = "unknown"
+                  println(msg)
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void matchCaseWithMultipleStatementsAndMatch() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              def process(x: Any): Unit = x match {
+                case 1 =>
+                  val y = 10
+                  val z = y + 1
+                  println(z)
+                case _ =>
+                  println("other")
+              }
+            }
+            """
+          )
+        );
+    }
 }
