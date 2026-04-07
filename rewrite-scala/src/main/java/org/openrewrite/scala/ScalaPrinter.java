@@ -34,6 +34,7 @@ import org.openrewrite.scala.marker.IndentedBlock;
 import org.openrewrite.scala.marker.SObject;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
+import org.openrewrite.scala.marker.TypeAscription;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.tree.S;
 
@@ -191,27 +192,7 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         afterSyntax(assignOp, p);
         return assignOp;
     }
-    
-    @Override
-    public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
-        beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
-        // In Scala, type casts are written as expression.asInstanceOf[Type]
-        visit(typeCast.getExpression(), p);
-        p.append(".asInstanceOf");
-        
-        // Extract the type from the control parentheses
-        if (typeCast.getClazz() instanceof J.ControlParentheses) {
-            J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();
-            visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
-            p.append('[');
-            visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, "", p);
-            p.append(']');
-        }
-        
-        afterSyntax(typeCast, p);
-        return typeCast;
-    }
-    
+
     @Override
     public J visitTry(J.Try tryable, PrintOutputCapture<P> p) {
         beforeSyntax(tryable, Space.Location.TRY_PREFIX, p);
@@ -267,17 +248,29 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitCase(J.Case case_, PrintOutputCapture<P> p) {
         beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
         p.append("case");
-        for (J label : case_.getCaseLabels()) {
-            visit(label, p);
+        List<JRightPadded<J>> labels = case_.getPadding().getCaseLabels().getPadding().getElements();
+        for (JRightPadded<J> label : labels) {
+            visit(label.getElement(), p);
+            visitSpace(label.getAfter(), Space.Location.CASE_LABEL, p);
+        }
+        if (case_.getGuard() != null) {
+            p.append("if");
+            visit(case_.getGuard(), p);
         }
         p.append(" =>");
         if (case_.getPadding().getBody() != null) {
             J bodyElement = case_.getPadding().getBody().getElement();
-            // For Scala match cases, unwrap single-statement blocks to avoid { }
+            // For Scala match cases, unwrap blocks to avoid printing { }
             if (bodyElement instanceof J.Block) {
                 J.Block block = (J.Block) bodyElement;
-                for (Statement stmt : block.getStatements()) {
-                    visit(stmt, p);
+                visitSpace(block.getPrefix(), Space.Location.BLOCK_PREFIX, p);
+                List<JRightPadded<Statement>> paddedStatements = block.getPadding().getStatements();
+                for (int i = 0; i < paddedStatements.size(); i++) {
+                    JRightPadded<Statement> paddedStmt = paddedStatements.get(i);
+                    visit(paddedStmt.getElement(), p);
+                    if (i < paddedStatements.size() - 1) {
+                        visitSpace(paddedStmt.getAfter(), Space.Location.BLOCK_STATEMENT_SUFFIX, p);
+                    }
                 }
             } else {
                 visit(bodyElement, p);
@@ -489,6 +482,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitTuplePattern((S.TuplePattern) tree, p);
         } else if (tree instanceof S.BlockExpression) {
             return visitBlockExpression((S.BlockExpression) tree, p);
+        } else if (tree instanceof S.ExpressionStatement) {
+            return visitExpressionStatement((S.ExpressionStatement) tree, p);
         }
         return super.visit(tree, p);
     }
@@ -829,21 +824,75 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     }
     
     @Override
-    public J visitForLoop(J.ForLoop forLoop, PrintOutputCapture<P> p) {
-        // Check if this is a Scala range-based for loop
-        ScalaForLoop marker = forLoop.getMarkers().findFirst(ScalaForLoop.class).orElse(null);
-        if (marker != null && marker.getOriginalSource() != null && !marker.getOriginalSource().isEmpty()) {
-            // Print the original Scala syntax
-            beforeSyntax(forLoop, Space.Location.FOR_PREFIX, p);
-            p.append(marker.getOriginalSource());
-            afterSyntax(forLoop, p);
-            return forLoop;
+    public J visitForEachLoop(J.ForEachLoop forEachLoop, PrintOutputCapture<P> p) {
+        if (forEachLoop.getMarkers().findFirst(ScalaForLoop.class).isPresent()) {
+            // Scala for-comprehension: for (x <- iterable) body
+            beforeSyntax(forEachLoop, Space.Location.FOR_EACH_LOOP_PREFIX, p);
+            p.append("for");
+            J.ForEachLoop.Control ctrl = forEachLoop.getControl();
+            visitSpace(ctrl.getPrefix(), Space.Location.FOR_EACH_CONTROL_PREFIX, p);
+            p.append('(');
+
+            // Print the variable (just the name, no type)
+            JRightPadded<Statement> variable = ctrl.getPadding().getVariable();
+            Statement varStmt = variable.getElement();
+            if (varStmt instanceof J.VariableDeclarations) {
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) varStmt;
+                visitSpace(varDecl.getPrefix(), Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+                if (!varDecl.getVariables().isEmpty()) {
+                    visit(varDecl.getVariables().get(0).getName(), p);
+                }
+            } else {
+                visit(varStmt, p);
+            }
+
+            // Print "<-" with spaces from the padding
+            visitSpace(variable.getAfter(), JRightPadded.Location.FOREACH_VARIABLE.getAfterLocation(), p);
+            p.append("<-");
+
+            // Print the iterable
+            JRightPadded<Expression> iterable = ctrl.getPadding().getIterable();
+            visit(iterable.getElement(), p);
+            visitSpace(iterable.getAfter(), JRightPadded.Location.FOREACH_ITERABLE.getAfterLocation(), p);
+            p.append(')');
+
+            // Print the body
+            visitStatement(forEachLoop.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p);
+            afterSyntax(forEachLoop, p);
+            return forEachLoop;
         }
-        // Otherwise use Java syntax
-        return super.visitForLoop(forLoop, p);
+        return super.visitForEachLoop(forEachLoop, p);
     }
-    
-    // Override additional methods here for Scala-specific syntax as needed
+
+    @Override
+    public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
+        if (typeCast.getMarkers().findFirst(TypeAscription.class).isPresent()) {
+            // Scala type ascription: expr: Type
+            beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
+            visit(typeCast.getExpression(), p);
+            if (typeCast.getClazz() instanceof J.ControlParentheses) {
+                J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();
+                visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+                p.append(':');
+                visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, "", p);
+            }
+            afterSyntax(typeCast, p);
+            return typeCast;
+        }
+        // Existing asInstanceOf handling
+        beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
+        visit(typeCast.getExpression(), p);
+        p.append(".asInstanceOf");
+        if (typeCast.getClazz() instanceof J.ControlParentheses) {
+            J.ControlParentheses<?> controlParens = (J.ControlParentheses<?>) typeCast.getClazz();
+            visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+            p.append('[');
+            visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, "", p);
+            p.append(']');
+        }
+        afterSyntax(typeCast, p);
+        return typeCast;
+    }
 
     @Override
     public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
@@ -1175,6 +1224,11 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         p.append('_');
         afterSyntax(wildcard, p);
         return wildcard;
+    }
+
+    public J visitExpressionStatement(S.ExpressionStatement expressionStatement, PrintOutputCapture<P> p) {
+        visit(expressionStatement.getExpression(), p);
+        return expressionStatement;
     }
 
     public J visitBlockExpression(S.BlockExpression blockExpression, PrintOutputCapture<P> p) {

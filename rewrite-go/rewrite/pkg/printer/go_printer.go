@@ -230,11 +230,16 @@ func (p *GoPrinter) VisitMethodDeclaration(md *tree.MethodDeclaration, param any
 func (p *GoPrinter) printParamList(params tree.Container[tree.Statement], out *PrintOutputCapture) {
 	p.visitSpace(params.Before, out)
 	out.Append("(")
+	tc := tree.FindMarker[tree.TrailingComma](params.Markers)
 	for i, rp := range params.Elements {
 		p.Visit(rp.Element, out)
 		if i < len(params.Elements)-1 {
 			p.visitSpace(rp.After, out)
 			out.Append(",")
+		} else if tc != nil {
+			p.visitSpace(tc.Before, out)
+			out.Append(",")
+			p.visitSpace(tc.After, out)
 		} else {
 			p.visitSpace(rp.After, out)
 		}
@@ -323,7 +328,11 @@ func (p *GoPrinter) VisitVariableDeclarations(vd *tree.VariableDeclarations, par
 			out.Append(",")
 		}
 	}
-	// Then type expression
+	// Then varargs + type expression
+	if vd.Varargs != nil {
+		p.visitSpace(*vd.Varargs, out)
+		out.Append("...")
+	}
 	if vd.TypeExpr != nil {
 		p.Visit(vd.TypeExpr, out)
 	}
@@ -678,6 +687,26 @@ func (p *GoPrinter) VisitIndexList(il *tree.IndexList, param any) tree.J {
 	return il
 }
 
+func (p *GoPrinter) VisitParameterizedType(pt *tree.ParameterizedType, param any) tree.J {
+	out := param.(*PrintOutputCapture)
+	p.beforeSyntax(pt.Prefix, pt.Markers, out)
+	p.Visit(pt.Clazz, out)
+	if pt.TypeParameters != nil {
+		p.visitSpace(pt.TypeParameters.Before, out)
+		out.Append("[")
+		for i, rp := range pt.TypeParameters.Elements {
+			p.Visit(rp.Element, out)
+			p.visitSpace(rp.After, out)
+			if i < len(pt.TypeParameters.Elements)-1 {
+				out.Append(",")
+			}
+		}
+		out.Append("]")
+	}
+	p.afterSyntax(pt.Markers, out)
+	return pt
+}
+
 func (p *GoPrinter) VisitComposite(c *tree.Composite, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(c.Prefix, c.Markers, out)
@@ -788,16 +817,7 @@ func (p *GoPrinter) VisitFuncType(ft *tree.FuncType, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ft.Prefix, ft.Markers, out)
 	out.Append("func")
-	p.visitSpace(ft.Parameters.Before, out)
-	out.Append("(")
-	for i, rp := range ft.Parameters.Elements {
-		p.Visit(rp.Element, out)
-		if i < len(ft.Parameters.Elements)-1 {
-			p.visitSpace(rp.After, out)
-			out.Append(",")
-		}
-	}
-	out.Append(")")
+	p.printParamList(ft.Parameters, out)
 	if ft.ReturnType != nil {
 		p.Visit(ft.ReturnType, out)
 	}

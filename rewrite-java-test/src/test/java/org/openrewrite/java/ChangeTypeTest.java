@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -2558,6 +2559,40 @@ class ChangeTypeTest implements RewriteTest {
                 .extracting(NameTree::getType)
                 .matches(type -> TypeUtils.isAssignableTo("com.demo.After", type), "Assignable to updated type")
             )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileContent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldImpl", "org.bar.NewImpl", false)),
+          text(
+            """
+              org.foo.OldImpl
+              org.other.Unrelated
+              """,
+            """
+              org.bar.NewImpl
+              org.other.Unrelated
+              """,
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldInterface", "org.bar.NewInterface", false)),
+          text(
+            "org.foo.SomeImpl\n",
+            "org.foo.SomeImpl\n",
+            spec -> spec.path("META-INF/services/org.foo.OldInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.NewInterface"))
           )
         );
     }

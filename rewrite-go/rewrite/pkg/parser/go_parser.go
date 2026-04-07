@@ -146,9 +146,7 @@ func (ctx *parseContext) mapFile(file *ast.File, sourcePath string) *tree.Compil
 
 	// Imports
 	var imports *tree.Container[*tree.Import]
-	if len(file.Imports) > 0 {
-		imports = ctx.mapImports(file)
-	}
+	imports = ctx.mapImports(file)
 
 	// Top-level declarations (functions, types, vars, consts - excluding imports)
 	var stmts []tree.RightPadded[tree.Statement]
@@ -224,6 +222,11 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 		ctx.skip(1) // skip ")"
 		if len(elements) > 0 {
 			elements[len(elements)-1].After = closeParen
+		} else if len(closeParen.Comments) > 0 {
+			elements = append(elements, tree.RightPadded[*tree.Import]{
+				Element: &tree.Import{ID: uuid.New(), Qualid: &tree.Empty{ID: uuid.New()}},
+				After:   closeParen,
+			})
 		}
 	}
 
@@ -237,19 +240,30 @@ func (ctx *parseContext) mapImports(file *ast.File) *tree.Container[*tree.Import
 			ctx.skip(1) // skip "("
 		}
 
-		ctx.mapImportBlockSpecs(importDecl, &elements, tree.ImportBlock{
+		importBlockMarker := tree.ImportBlock{
 			Ident:         uuid.New(),
 			ClosePrevious: prevGrouped,
 			Before:        blockBefore,
 			Grouped:       grouped,
 			GroupedBefore: groupedBefore,
-		})
+		}
+		ctx.mapImportBlockSpecs(importDecl, &elements, importBlockMarker)
 
 		if grouped {
 			closeParen := ctx.prefix(importDecl.Rparen)
 			ctx.skip(1) // skip ")"
-			if len(elements) > 0 {
+			if len(importDecl.Specs) > 0 {
 				elements[len(elements)-1].After = closeParen
+			} else if len(closeParen.Comments) > 0 {
+				imp := &tree.Import{ID: uuid.New(), Qualid: &tree.Empty{ID: uuid.New()}}
+				imp.Markers = tree.Markers{
+					ID:      uuid.New(),
+					Entries: []tree.Marker{importBlockMarker},
+				}
+				elements = append(elements, tree.RightPadded[*tree.Import]{
+					Element: imp,
+					After:   closeParen,
+				})
 			}
 		}
 		prevGrouped = grouped
@@ -345,6 +359,11 @@ func (ctx *parseContext) mapVarConstDecl(decl *ast.GenDecl) tree.Statement {
 
 	if len(elements) > 0 {
 		elements[len(elements)-1].After = rparenPrefix
+	} else if len(rparenPrefix.Comments) > 0 {
+		elements = append(elements, tree.RightPadded[tree.Statement]{
+			Element: &tree.Empty{ID: uuid.New()},
+			After:   rparenPrefix,
+		})
 	}
 
 	var markerEntries []tree.Marker
@@ -473,6 +492,11 @@ func (ctx *parseContext) mapTypeDecl(decl *ast.GenDecl) tree.Statement {
 
 	if len(elements) > 0 {
 		elements[len(elements)-1].After = rparenPrefix
+	} else if len(rparenPrefix.Comments) > 0 {
+		elements = append(elements, tree.RightPadded[tree.Statement]{
+			Element: &tree.Empty{ID: uuid.New()},
+			After:   rparenPrefix,
+		})
 	}
 
 	specs := &tree.Container[tree.Statement]{Before: lparenPrefix, Elements: elements}
@@ -645,9 +669,15 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 		if len(field.Names) == 0 {
 			// Unnamed parameter: just a type expression (e.g., `int` in `func(int)`)
 			typeExpr := ctx.mapTypeExpr(field.Type)
+			var varargs *tree.Space
+			if u, ok := typeExpr.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
+				varargs = &u.Prefix
+				typeExpr = u.Operand
+			}
 			vd := &tree.VariableDeclarations{
 				ID:       uuid.New(),
 				TypeExpr: typeExpr,
+				Varargs:  varargs,
 				Variables: []tree.RightPadded[*tree.VariableDeclarator]{
 					{Element: &tree.VariableDeclarator{ID: uuid.New(), Name: &tree.Identifier{ID: uuid.New()}}},
 				},
@@ -682,9 +712,15 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 			}
 
 			typeExpr := ctx.mapTypeExpr(field.Type)
+			var varargs *tree.Space
+			if u, ok := typeExpr.(*tree.Unary); ok && u.Operator.Element == tree.Spread {
+				varargs = &u.Prefix
+				typeExpr = u.Operand
+			}
 			vd := &tree.VariableDeclarations{
 				ID:        uuid.New(),
 				TypeExpr:  typeExpr,
+				Varargs:   varargs,
 				Variables: vars,
 			}
 
@@ -700,14 +736,39 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 		}
 	}
 
-	closeParen := ctx.prefix(fl.Closing)
-	ctx.skip(1) // ")"
-
+	var markers tree.Markers
 	if len(elements) > 0 {
-		elements[len(elements)-1].After = closeParen
+		trailingCommaOff := ctx.findNextBefore(',', int(fl.Closing)-ctx.file.Base())
+		if trailingCommaOff >= 0 {
+			commaBefore := ctx.prefix(ctx.file.Pos(trailingCommaOff))
+			ctx.skip(1) // ","
+			commaAfter := ctx.prefix(fl.Closing)
+			ctx.skip(1) // ")"
+			markers = tree.Markers{
+				ID: uuid.New(),
+				Entries: []tree.Marker{tree.TrailingComma{
+					Ident:  uuid.New(),
+					Before: commaBefore,
+					After:  commaAfter,
+				}},
+			}
+		} else {
+			closePrefix := ctx.prefix(fl.Closing)
+			ctx.skip(1) // ")"
+			elements[len(elements)-1].After = closePrefix
+		}
+	} else {
+		closeParen := ctx.prefix(fl.Closing)
+		ctx.skip(1) // ")"
+		if len(closeParen.Comments) > 0 {
+			elements = append(elements, tree.RightPadded[tree.Statement]{
+				Element: &tree.Empty{ID: uuid.New()},
+				After:   closeParen,
+			})
+		}
 	}
 
-	return tree.Container[tree.Statement]{Before: before, Elements: elements}
+	return tree.Container[tree.Statement]{Before: before, Elements: elements, Markers: markers}
 }
 
 // mapBlockStmt maps a block statement.
@@ -1785,8 +1846,14 @@ func (ctx *parseContext) mapCompositeLit(expr *ast.CompositeLit) tree.Expression
 			elements[len(elements)-1].After = rbracePrefix
 		}
 	} else {
-		ctx.prefix(expr.Rbrace) // consume space
-		ctx.skip(1)             // "}"
+		closePrefix := ctx.prefix(expr.Rbrace)
+		ctx.skip(1) // "}"
+		if len(closePrefix.Comments) > 0 {
+			elements = append(elements, tree.RightPadded[tree.Expression]{
+				Element: &tree.Empty{ID: uuid.New()},
+				After:   closePrefix,
+			})
+		}
 	}
 
 	return &tree.Composite{
@@ -1840,12 +1907,19 @@ func (ctx *parseContext) mapPointerType(expr *ast.StarExpr) tree.Expression {
 }
 
 // mapTypeExpr maps an expression that is known to be in a type position.
-// It delegates to mapExpr but overrides StarExpr to produce PointerType.
+// It delegates to mapExpr but overrides StarExpr to produce PointerType
+// and IndexExpr to produce ParameterizedType (generic instantiation).
 func (ctx *parseContext) mapTypeExpr(expr ast.Expr) tree.Expression {
-	if star, ok := expr.(*ast.StarExpr); ok {
-		return ctx.mapPointerType(star)
+	switch e := expr.(type) {
+	case *ast.StarExpr:
+		return ctx.mapPointerType(e)
+	case *ast.IndexExpr:
+		return ctx.mapParameterizedType(e)
+	case *ast.IndexListExpr:
+		return ctx.mapParameterizedTypeMulti(e)
+	default:
+		return ctx.mapExpr(expr)
 	}
-	return ctx.mapExpr(expr)
 }
 
 // mapArrayType maps an array/slice type expression like `[]string` or `[5]int`.
@@ -1874,6 +1948,60 @@ func (ctx *parseContext) mapArrayType(expr *ast.ArrayType) tree.Expression {
 		Dimension:   tree.LeftPadded[tree.Space]{Element: closePrefix},
 		Length:      length,
 		ElementType: elt,
+	}
+}
+
+// mapParameterizedType maps a single-type-arg generic instantiation in a type position,
+// e.g. `JSONArray[string]`, producing a J.ParameterizedType.
+func (ctx *parseContext) mapParameterizedType(expr *ast.IndexExpr) tree.Expression {
+	target := ctx.mapExpr(expr.X)
+	lbrackPrefix := ctx.prefix(expr.Lbrack)
+	ctx.skip(1) // "["
+	typeArg := ctx.mapTypeExpr(expr.Index)
+	rbrackPrefix := ctx.prefix(expr.Rbrack)
+	ctx.skip(1) // "]"
+
+	return &tree.ParameterizedType{
+		ID:    uuid.New(),
+		Clazz: target,
+		TypeParameters: &tree.Container[tree.Expression]{
+			Before:   lbrackPrefix,
+			Elements: []tree.RightPadded[tree.Expression]{{Element: typeArg, After: rbrackPrefix}},
+		},
+	}
+}
+
+// mapParameterizedTypeMulti maps a multi-type-arg generic instantiation in a type position,
+// e.g. `Store[string, any]`, producing a J.ParameterizedType.
+func (ctx *parseContext) mapParameterizedTypeMulti(expr *ast.IndexListExpr) tree.Expression {
+	target := ctx.mapExpr(expr.X)
+	lbrackPrefix := ctx.prefix(expr.Lbrack)
+	ctx.skip(1) // "["
+
+	var elements []tree.RightPadded[tree.Expression]
+	for i, idx := range expr.Indices {
+		mapped := ctx.mapTypeExpr(idx)
+		var after tree.Space
+		if i < len(expr.Indices)-1 {
+			commaOffset := ctx.findNext(',')
+			if commaOffset >= 0 {
+				after = ctx.prefix(ctx.file.Pos(commaOffset))
+				ctx.skip(1) // ","
+			}
+		} else {
+			after = ctx.prefix(expr.Rbrack)
+		}
+		elements = append(elements, tree.RightPadded[tree.Expression]{Element: mapped, After: after})
+	}
+	ctx.skip(1) // "]"
+
+	return &tree.ParameterizedType{
+		ID:    uuid.New(),
+		Clazz: target,
+		TypeParameters: &tree.Container[tree.Expression]{
+			Before:   lbrackPrefix,
+			Elements: elements,
+		},
 	}
 }
 

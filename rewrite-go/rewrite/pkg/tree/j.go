@@ -1076,6 +1076,7 @@ type VariableDeclarations struct {
 	Prefix    Space
 	Markers   Markers
 	TypeExpr  Expression                        // the declared type (nil if inferred)
+	Varargs   *Space                            // non-nil for variadic params (`...T`); holds prefix of `...`
 	Variables []RightPadded[*VariableDeclarator] // the declared variables
 	Specs     *Container[Statement]             // non-nil for grouped `var ( ... )`; Before = space before `(`
 }
@@ -1272,6 +1273,32 @@ func (n *ArrayDimension) WithPrefix(prefix Space) *ArrayDimension {
 }
 
 func (n *ArrayDimension) WithMarkers(markers Markers) *ArrayDimension {
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// ParameterizedType represents a generic type instantiation like `List[string]`.
+type ParameterizedType struct {
+	ID             uuid.UUID
+	Prefix         Space
+	Markers        Markers
+	Clazz          Expression            // the base type being parameterized
+	TypeParameters *Container[Expression] // the type arguments (nullable)
+	Type           JavaType              // resolved type (nullable)
+}
+
+func (*ParameterizedType) isTree()       {}
+func (*ParameterizedType) isJ()          {}
+func (*ParameterizedType) isExpression() {}
+
+func (n *ParameterizedType) WithPrefix(prefix Space) *ParameterizedType {
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ParameterizedType) WithMarkers(markers Markers) *ParameterizedType {
 	c := *n
 	c.Markers = markers
 	return &c

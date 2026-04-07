@@ -15,6 +15,9 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.univocity.parsers.csv.CsvParser;
 import com.univocity.parsers.csv.CsvParserSettings;
 import com.univocity.parsers.csv.CsvWriter;
@@ -25,9 +28,11 @@ import org.openrewrite.config.DataTableDescriptor;
 
 import java.io.*;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -44,20 +49,34 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
  * Supports configurable output stream creation (e.g., for GZIP compression)
  * and static prefix/suffix columns (e.g., repository metadata).
  *
+ * <p>
+ * When {@link #getRows} is called, open writers for the requested table are
+ * <em>closed</em> (not merely flushed) so that compression trailers such as
+ * the GZIP footer are written, producing a fully valid file on disk.  If
+ * {@link #insertRow} is called again for the same table, a new writer is
+ * created in append mode. For this reason the {@code outputStreamFactory}
+ * <strong>must</strong> open the stream with {@link java.nio.file.StandardOpenOption#CREATE
+ * CREATE} and {@link java.nio.file.StandardOpenOption#APPEND APPEND} semantics
+ * so that data written before the close is preserved. For compressed streams
+ * this produces a multi-member archive (e.g., concatenated GZIP members),
+ * which {@link java.util.zip.GZIPInputStream} handles transparently.
+ *
  * <pre>{@code
  * // Plain CSV
  * new CsvDataTableStore(outputDir)
  *
  * // GZIP compressed with repository columns (write-only)
  * new CsvDataTableStore(outputDir,
- *     path -> new GZIPOutputStream(Files.newOutputStream(path)),
+ *     path -> new GZIPOutputStream(Files.newOutputStream(path,
+ *         StandardOpenOption.CREATE, StandardOpenOption.APPEND)),
  *     ".csv.gz",
  *     Map.of("repositoryOrigin", origin, "repositoryPath", path),
  *     Map.of("org1", orgValue))
  *
  * // GZIP compressed with read-back support
  * new CsvDataTableStore(outputDir,
- *     path -> new GZIPOutputStream(Files.newOutputStream(path)),
+ *     path -> new GZIPOutputStream(Files.newOutputStream(path,
+ *         StandardOpenOption.CREATE, StandardOpenOption.APPEND)),
  *     path -> new GZIPInputStream(Files.newInputStream(path)),
  *     ".csv.gz",
  *     Map.of("repositoryOrigin", origin, "repositoryPath", path),
@@ -72,7 +91,13 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     private final String fileExtension;
     private final Map<String, String> prefixColumns;
     private final Map<String, String> suffixColumns;
+    private static final ObjectMapper ROW_MAPPER = new ObjectMapper()
+            .registerModule(new ParameterNamesModule())
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
     private final ConcurrentHashMap<String, BucketWriter> writers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RowMetadata> rowMetadata = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, DataTable<?>> knownTables = new ConcurrentHashMap<>();
 
     /**
      * Create a store that writes plain CSV files.
@@ -112,7 +137,11 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
      * and additional static columns prepended/appended to each row.
      *
      * @param outputDir           directory to write files into
-     * @param outputStreamFactory creates an output stream for each file path (e.g., wrapping with GZIPOutputStream)
+     * @param outputStreamFactory creates an output stream for each file path. <strong>Must</strong> use
+     *                            {@link java.nio.file.StandardOpenOption#CREATE CREATE} and
+     *                            {@link java.nio.file.StandardOpenOption#APPEND APPEND} so that
+     *                            rows written before a mid-run {@link #getRows} call are preserved
+     *                            when the writer is re-opened for subsequent inserts.
      * @param inputStreamFactory  creates an input stream for each file path (e.g., wrapping with GZIPInputStream)
      * @param fileExtension       file extension including dot (e.g., ".csv" or ".csv.gz")
      * @param prefixColumns       static columns prepended to each row, in insertion order
@@ -139,7 +168,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
 
     private static OutputStream defaultOutputStream(Path path) {
         try {
-            return Files.newOutputStream(path);
+            return Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -155,32 +184,66 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
 
     @Override
     public <Row> void insertRow(DataTable<Row> dataTable, ExecutionContext ctx, Row row) {
+        String metaKey = metaKey(dataTable.getName(), dataTable.getGroup());
+        rowMetadata.computeIfAbsent(metaKey, k -> RowMetadata.of(dataTable.getType()));
+        knownTables.putIfAbsent(fileKey(dataTable), dataTable);
         String fileKey = fileKey(dataTable);
         BucketWriter writer = writers.computeIfAbsent(fileKey, k -> createBucketWriter(dataTable));
         writer.writeRow(row);
     }
 
+    @Deprecated
     @Override
     public Stream<?> getRows(String dataTableName, @Nullable String group) {
-        // Flush any open writers for this data table so all rows are on disk
-        for (BucketWriter writer : writers.values()) {
+        RowMetadata meta = rowMetadata.get(metaKey(dataTableName, group));
+        return readRows(dataTableName, group, meta);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <Row> Stream<Row> getRows(Class<? extends DataTable<Row>> dataTableClass, @Nullable String group) {
+        Class<Row> rowType = (Class<Row>) ((ParameterizedType) dataTableClass.getGenericSuperclass())
+                .getActualTypeArguments()[0];
+        return readRows(dataTableClass.getName(), group, RowMetadata.of(rowType));
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Stream<T> readRows(String dataTableName, @Nullable String group, @Nullable RowMetadata meta) {
+        // Close (not just flush) matching writers so that compression trailers
+        // (e.g., GZIP footer) are written, making the files fully readable.
+        // Removed writers will be lazily re-created in append mode on the next insertRow().
+        Iterator<Map.Entry<String, BucketWriter>> it = writers.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, BucketWriter> entry = it.next();
+            BucketWriter writer = entry.getValue();
             if (writer.dataTable.getName().equals(dataTableName) &&
                 Objects.equals(writer.dataTable.getGroup(), group)) {
-                writer.flush();
+                writer.close();
+                it.remove();
             }
         }
 
-        List<String[]> allRows = new ArrayList<>();
+        List<Object> allRows = new ArrayList<>();
         //noinspection DataFlowIssue
         File[] files = outputDir.toFile().listFiles((dir, name) -> name.endsWith(fileExtension));
         if (files == null) {
             return Stream.empty();
         }
 
+        // Build set of file paths with still-open writers (other tables).
+        // These files have incomplete compression trailers and cannot be read.
+        Set<Path> activeWriterPaths = new HashSet<>();
+        for (Map.Entry<String, BucketWriter> entry : writers.entrySet()) {
+            activeWriterPaths.add(outputDir.resolve(entry.getKey() + fileExtension));
+        }
+
         int prefixCount = prefixColumns.size();
         int suffixCount = suffixColumns.size();
 
         for (File file : files) {
+            if (activeWriterPaths.contains(file.toPath())) {
+                continue;
+            }
             try (InputStream is = inputStreamFactory.apply(file.toPath())) {
                 DataTableDescriptor descriptor = readDescriptor(is);
                 if (descriptor == null ||
@@ -191,11 +254,12 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
                 // readDescriptor consumed comment lines; now parse the remaining CSV
                 // (header + data rows). Re-read the full file with CsvParser.
             } catch (IOException e) {
-                continue;
+                throw new UncheckedIOException(e);
             }
 
             try (InputStream is = inputStreamFactory.apply(file.toPath())) {
                 CsvParserSettings settings = new CsvParserSettings();
+                settings.setMaxCharsPerColumn(-1);
                 settings.setHeaderExtractionEnabled(true);
                 settings.getFormat().setComment('#');
                 CsvParser parser = new CsvParser(settings);
@@ -205,13 +269,14 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
                 while ((row = parser.parseNext()) != null) {
                     // Strip prefix and suffix columns, returning only data table columns
                     int dataCount = row.length - prefixCount - suffixCount;
+                    String[] dataRow;
                     if (dataCount <= 0) {
-                        allRows.add(row);
+                        dataRow = row;
                     } else {
-                        String[] dataRow = new String[dataCount];
+                        dataRow = new String[dataCount];
                         System.arraycopy(row, prefixCount, dataRow, 0, dataCount);
-                        allRows.add(dataRow);
                     }
+                    allRows.add(meta != null ? meta.toRow(dataRow) : dataRow);
                 }
                 parser.stopParsing();
             } catch (IOException e) {
@@ -219,16 +284,12 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             }
         }
 
-        return allRows.stream();
+        return (Stream<T>) allRows.stream();
     }
 
     @Override
     public Collection<DataTable<?>> getDataTables() {
-        List<DataTable<?>> result = new ArrayList<>(writers.size());
-        for (BucketWriter writer : writers.values()) {
-            result.add(writer.dataTable);
-        }
-        return Collections.unmodifiableCollection(result);
+        return Collections.unmodifiableCollection(knownTables.values());
     }
 
     @Override
@@ -242,6 +303,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
     private BucketWriter createBucketWriter(DataTable<?> dataTable) {
         String fileKey = fileKey(dataTable);
         Path path = outputDir.resolve(fileKey + fileExtension);
+        boolean append = Files.exists(path);
 
         DataTableDescriptor descriptor = dataTableDescriptorFromDataTable(dataTable);
         List<String> fieldNames = new ArrayList<>();
@@ -259,15 +321,17 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         OutputStream os = outputStreamFactory.apply(path);
         try {
             CsvWriterSettings settings = new CsvWriterSettings();
-            settings.setHeaderWritingEnabled(true);
+            settings.setHeaderWritingEnabled(!append);
             settings.getFormat().setComment('#');
             CsvWriter csvWriter = new CsvWriter(os, settings);
 
-            // Write metadata as comments
-            csvWriter.commentRow(" @name " + dataTable.getName());
-            csvWriter.commentRow(" @instanceName " + dataTable.getInstanceName());
-            csvWriter.commentRow(" @group " + (dataTable.getGroup() != null ? dataTable.getGroup() : ""));
-            csvWriter.writeHeaders(headers);
+            if (!append) {
+                // Write metadata as comments only for new files
+                csvWriter.commentRow(" @name " + dataTable.getName());
+                csvWriter.commentRow(" @instanceName " + dataTable.getInstanceName());
+                csvWriter.commentRow(" @group " + (dataTable.getGroup() != null ? dataTable.getGroup() : ""));
+                csvWriter.writeHeaders(headers);
+            }
 
             return new BucketWriter(dataTable, csvWriter, os, fieldNames, headers.size());
         } catch (Exception e) {
@@ -326,20 +390,49 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
             csvWriter.writeRow((Object[]) values);
         }
 
-        synchronized void flush() {
-            csvWriter.flush();
-            try {
-                os.flush();
-            } catch (IOException ignored) {
-            }
-        }
-
         void close() {
             csvWriter.close();
             try {
                 os.close();
             } catch (IOException ignored) {
             }
+        }
+    }
+
+    private static String metaKey(String dataTableName, @Nullable String group) {
+        return dataTableName + "\0" + (group != null ? group : "");
+    }
+
+    /**
+     * Caches the {@link Column @Column} field names for a row class so they
+     * are only computed once, and converts CSV {@code String[]} rows back to
+     * typed objects via Jackson.
+     */
+    private static class RowMetadata {
+        final Class<?> rowClass;
+        final List<String> fieldNames;
+
+        private RowMetadata(Class<?> rowClass, List<String> fieldNames) {
+            this.rowClass = rowClass;
+            this.fieldNames = fieldNames;
+        }
+
+        static RowMetadata of(Class<?> rowClass) {
+            List<String> names = new ArrayList<>();
+            for (Field f : rowClass.getDeclaredFields()) {
+                if (f.isAnnotationPresent(Column.class)) {
+                    names.add(f.getName());
+                }
+            }
+            return new RowMetadata(rowClass, names);
+        }
+
+        Object toRow(String[] values) {
+            Map<String, String> map = new LinkedHashMap<>();
+            for (int i = 0; i < fieldNames.size(); i++) {
+                map.put(fieldNames.get(i), i < values.length ? values[i] : "");
+            }
+            return ROW_MAPPER.convertValue(map, rowClass);
         }
     }
 
@@ -403,7 +496,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
                 prefix = prefix.substring(0, lastDash);
             }
         }
-        String hash = sha256Prefix(value, 4);
+        String hash = sha256Prefix(value);
         return prefix + "-" + hash;
     }
 
@@ -445,18 +538,18 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         return new DataTableDescriptor(name, name, instanceName, "", group, Collections.emptyList());
     }
 
-    private static String sha256Prefix(String input, int hexChars) {
+    private static String sha256Prefix(String input) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
             StringBuilder hex = new StringBuilder();
             for (byte b : hash) {
                 hex.append(String.format("%02x", b));
-                if (hex.length() >= hexChars) {
+                if (hex.length() >= 4) {
                     break;
                 }
             }
-            return hex.substring(0, Math.min(hexChars, hex.length()));
+            return hex.substring(0, Math.min(4, hex.length()));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

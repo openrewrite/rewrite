@@ -23,10 +23,16 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.openrewrite.internal.InMemoryLargeSourceSet;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -279,8 +285,8 @@ class DataTableStoreTest {
 
             List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
             assertThat(rows).hasSize(2);
-            assertThat((String[]) rows.get(0)).containsExactly("alice");
-            assertThat((String[]) rows.get(1)).containsExactly("bob");
+            assertThat(rows.get(0)).isEqualTo(new TestTable.Row("alice"));
+            assertThat(rows.get(1)).isEqualTo(new TestTable.Row("bob"));
         }
     }
 
@@ -293,8 +299,8 @@ class DataTableStoreTest {
 
             List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
             assertThat(rows).hasSize(2);
-            assertThat((String[]) rows.get(0)).containsExactly("1", "hello");
-            assertThat((String[]) rows.get(1)).containsExactly("2", "world");
+            assertThat(rows.get(0)).isEqualTo(new MultiColTable.Row(1, "hello"));
+            assertThat(rows.get(1)).isEqualTo(new MultiColTable.Row(2, "world"));
         }
     }
 
@@ -319,11 +325,11 @@ class DataTableStoreTest {
 
             List<?> groupedRows = store.getRows(grouped.getName(), "group-a").collect(Collectors.toList());
             assertThat(groupedRows).hasSize(1);
-            assertThat((String[]) groupedRows.getFirst()).containsExactly("grouped-row");
+            assertThat(groupedRows.getFirst()).isEqualTo(new TestTable.Row("grouped-row"));
 
             List<?> ungroupedRows = store.getRows(ungrouped.getName(), null).collect(Collectors.toList());
             assertThat(ungroupedRows).hasSize(1);
-            assertThat((String[]) ungroupedRows.getFirst()).containsExactly("ungrouped-row");
+            assertThat(ungroupedRows.getFirst()).isEqualTo(new TestTable.Row("ungrouped-row"));
         }
     }
 
@@ -354,7 +360,7 @@ class DataTableStoreTest {
             List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
             assertThat(rows).hasSize(1);
             // Should only contain the data column, not prefix/suffix
-            assertThat((String[]) rows.getFirst()).containsExactly("alice");
+            assertThat(rows.getFirst()).isEqualTo(new TestTable.Row("alice"));
         }
     }
 
@@ -385,9 +391,9 @@ class DataTableStoreTest {
 
             List<?> rows = store.getRows(table.getName(), null).collect(Collectors.toList());
             assertThat(rows).hasSize(3);
-            assertThat((String[]) rows.get(0)).containsExactly("value with, comma");
-            assertThat((String[]) rows.get(1)).containsExactly("value with \"quotes\"");
-            assertThat((String[]) rows.get(2)).containsExactly("value with\nnewline");
+            assertThat(rows.get(0)).isEqualTo(new TestTable.Row("value with, comma"));
+            assertThat(rows.get(1)).isEqualTo(new TestTable.Row("value with \"quotes\""));
+            assertThat(rows.get(2)).isEqualTo(new TestTable.Row("value with\nnewline"));
         }
     }
 
@@ -447,5 +453,120 @@ class DataTableStoreTest {
         String a = CsvDataTableStore.sanitize("Find methods 'add(..)'");
         String b = CsvDataTableStore.sanitize("Find methods 'delete(..)'");
         assertThat(a).isNotEqualTo(b);
+    }
+
+    // =========================================================================
+    // CsvDataTableStore: write in cycle 1, read back in cycle 2
+    // =========================================================================
+
+    /**
+     * A scanning recipe that writes to a data table during cycle 1's scanner,
+     * then reads rows back from the DataTableStore in cycle 2's getInitialValue.
+     */
+    static class WriteThenReadRecipe extends ScanningRecipe<List<String>> {
+        transient TestTable table = new TestTable(this);
+
+        @Override
+        public String getDisplayName() {
+            return "Write then read";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Writes data table rows in cycle 1, reads them back in cycle 2.";
+        }
+
+        @Override
+        public boolean causesAnotherCycle() {
+            return true;
+        }
+
+        @Override
+        public List<String> getInitialValue(ExecutionContext ctx) {
+            // On cycle 2+, the store already contains rows written in cycle 1
+            List<String> readBack = new ArrayList<>();
+            DataTableStore store = DataTableExecutionContextView.view(ctx).getDataTableStore();
+            try (Stream<TestTable.Row> rows = store.getRows(TestTable.class)) {
+                rows.forEach(row -> readBack.add(row.getName()));
+            }
+            return readBack;
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(List<String> acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    // DataTable.insertRow only writes during cycle 1
+                    table.insertRow(ctx, new TestTable.Row(text.getText()));
+                    return text;
+                }
+            };
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(List<String> acc) {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    if (acc.isEmpty()) {
+                        // Cycle 1: no read-back data yet; make a change to trigger cycle 2
+                        return text.withText(text.getText() + "-scanned");
+                    }
+                    // Cycle 2: append the data read back from the store
+                    return text.withText(text.getText() + "-read:" + String.join(",", acc));
+                }
+            };
+        }
+    }
+
+    @Test
+    void csvStoreIntermixedWritesAndReads(@TempDir Path tempDir) {
+        try (CsvDataTableStore store = new CsvDataTableStore(tempDir)) {
+            TestTable table = new TestTable(Recipe.noop());
+
+            // First batch of writes
+            store.insertRow(table, ctx(), new TestTable.Row("alice"));
+            store.insertRow(table, ctx(), new TestTable.Row("bob"));
+
+            // Mid-run read (closes the writer internally)
+            List<?> firstRead = store.getRows(table.getName(), null).collect(Collectors.toList());
+            assertThat(firstRead).hasSize(2);
+            assertThat(firstRead.get(0)).isEqualTo(new TestTable.Row("alice"));
+            assertThat(firstRead.get(1)).isEqualTo(new TestTable.Row("bob"));
+
+            // Second batch of writes (writer re-created in append mode)
+            store.insertRow(table, ctx(), new TestTable.Row("charlie"));
+
+            // Second read should see all three rows
+            List<?> secondRead = store.getRows(table.getName(), null).collect(Collectors.toList());
+            assertThat(secondRead).hasSize(3);
+            assertThat(secondRead.get(0)).isEqualTo(new TestTable.Row("alice"));
+            assertThat(secondRead.get(1)).isEqualTo(new TestTable.Row("bob"));
+            assertThat(secondRead.get(2)).isEqualTo(new TestTable.Row("charlie"));
+        }
+    }
+
+    @Test
+    void csvStoreWriteInCycle1ReadBackInCycle2(@TempDir Path tempDir) {
+        ExecutionContext ctx = ctx();
+        DataTableExecutionContextView.view(ctx).setDataTableStore(new CsvDataTableStore(tempDir));
+
+        List<SourceFile> sources = List.of(
+                PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build()
+        );
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+                new WriteThenReadRecipe(),
+                new InMemoryLargeSourceSet(sources),
+                ctx, 2, 1
+        );
+
+        // The recipe should have run 2 cycles:
+        //   Cycle 1: scanner writes "hello" to data table, visitor appends "-scanned"
+        //   Cycle 2: getInitialValue reads back ["hello"], visitor appends "-read:hello"
+        PlainText after = (PlainText) run.getChangeset().getAllResults().getFirst().getAfter();
+        assertThat(after).isNotNull();
+        assertThat(after.getText()).isEqualTo("hello-scanned-read:hello");
     }
 }

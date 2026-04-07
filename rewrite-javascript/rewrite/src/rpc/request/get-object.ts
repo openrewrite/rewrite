@@ -63,11 +63,20 @@ export class GetObject {
                         const after = obj;
                         const before = remoteObjects.get(objId);
 
-                        allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
-                            .generate(after, before);
-                        pendingData.set(objId, allData);
-
-                        remoteObjects.set(objId, after);
+                        // Snapshot ref count so we can roll back on failure.
+                        // Ref IDs are assigned sequentially, so any ref >= savedRefCount
+                        // was added during this exchange.
+                        const savedRefCount = localRefs.snapshot();
+                        try {
+                            allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                                .generate(after, before);
+                            pendingData.set(objId, allData);
+                            remoteObjects.set(objId, after);
+                        } catch (e) {
+                            remoteObjects.delete(objId);
+                            localRefs.rollbackTo(savedRefCount);
+                            throw e;
+                        }
                     }
 
                     const batch = allData.splice(0, batchSize);

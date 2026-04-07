@@ -84,18 +84,31 @@ func TestParseCommentOnImport(t *testing.T) {
 		`))
 }
 
-func TestParseCommentInsideEmptyArgList(t *testing.T) {
+func TestParseCommentInsideEmptyDelimiters(t *testing.T) {
 	NewRecipeSpec().RewriteRun(t,
 		Golang(`
 			package main
+
+			import ( /* unused */ )
+
+			type ( /* placeholder */ )
+
+			var ( /* placeholder */ )
 
 			type Client struct{}
 
 			func (c *Client) Unsubscribe() {}
 
+			type Migration struct {
+				File string
+			}
+
+			func foo( /* deprecated */ ) {}
+
 			func main() {
 				c := &Client{}
 				c.Unsubscribe( /* all */ )
+				_ = &Migration{ /* auto detect file name */ }
 			}
 		`))
 }

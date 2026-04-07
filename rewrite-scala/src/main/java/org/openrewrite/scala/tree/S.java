@@ -434,6 +434,72 @@ public interface S extends J {
     }
 
     /**
+     * Wraps an {@link Expression} so it can appear where a {@link Statement} is required.
+     * Scala allows arbitrary expressions (including literals) as statements in class bodies
+     * and blocks. This wrapper bridges the J model's Expression/Statement distinction.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class ExpressionStatement implements S, Expression, Statement {
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Expression expression;
+
+        public ExpressionStatement(UUID id, Expression expression) {
+            this.id = id;
+            this.expression = expression;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withExpression(expression.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return expression.getPrefix();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withExpression(expression.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withExpression(expression.withType(type));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitExpressionStatement(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
      * Represents a block used as an expression in Scala.
      * In Scala, blocks are expressions that return the value of their last statement.
      * For example: val x = { val temp = 10; temp * 2 }

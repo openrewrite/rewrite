@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
@@ -867,6 +868,35 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public void visitSpace(Space space, RpcSendQueue q) {
+            q.getAndSendList(space, Space::getComments,
+                    c -> {
+                        if (c instanceof TextComment) {
+                            return ((TextComment) c).getText() + c.getSuffix();
+                        } else if (c instanceof CsDocCommentRawComment) {
+                            return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
+                        }
+                        throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                    },
+                    c -> {
+                        if (c instanceof TextComment) {
+                            TextComment tc = (TextComment) c;
+                            q.getAndSend(tc, TextComment::isMultiline);
+                            q.getAndSend(tc, TextComment::getText);
+                        } else if (c instanceof CsDocCommentRawComment) {
+                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
+                            q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
+                            q.getAndSend(dc, CsDocCommentRawComment::getText);
+                        } else {
+                            throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
+                        }
+                        q.getAndSend(c, Comment::getSuffix);
+                        q.getAndSend(c, Comment::getMarkers);
+                    });
+            q.getAndSend(space, Space::getWhitespace);
         }
     }
 }
