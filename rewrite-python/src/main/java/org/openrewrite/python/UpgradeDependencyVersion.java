@@ -104,6 +104,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -111,13 +113,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (tree instanceof Toml.Document && sourceFile.getSourcePath().toString().endsWith("uv.lock")) {
+                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
                             PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath().toString()),
                             ((Toml.Document) tree).printAll());
                     return tree;
                 }
-                PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
+                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait == null) {
                     return tree;
                 }
@@ -134,6 +136,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -144,7 +148,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 Path sourcePath = sourceFile.getSourcePath();
 
                 if (acc.projectsToUpdate.contains(sourcePath)) {
-                    PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
+                    PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
                         Map<String, String> upgrades = Collections.singletonMap(
                                 PythonResolutionResult.normalizeName(packageName), newVersion);

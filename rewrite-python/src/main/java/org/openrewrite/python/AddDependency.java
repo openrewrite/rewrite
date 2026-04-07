@@ -107,6 +107,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -114,13 +116,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (tree instanceof Toml.Document && sourceFile.getSourcePath().toString().endsWith("uv.lock")) {
+                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
                             PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath().toString()),
                             ((Toml.Document) tree).printAll());
                     return tree;
                 }
-                PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
+                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null && PyProjectHelper.findDependencyInScope(trait.getMarker(), packageName, scope, groupName) == null) {
                     acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 }
@@ -132,8 +134,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
-            public  Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) {
                     return tree;
@@ -142,7 +146,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 Path sourcePath = sourceFile.getSourcePath();
 
                 if (acc.projectsToUpdate.contains(sourcePath)) {
-                    PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
+                    PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
                         String ver = version != null ? version : "";
                         Map<String, String> additions = Collections.singletonMap(packageName, ver);

@@ -60,8 +60,7 @@ public class PipfileFile implements PythonDependencyFile {
         }.visitNonNull(doc, upgrades, cursor);
         if (result != doc) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
-            result = result.withMarkers(result.getMarkers()
-                    .setByType(updatedMarker));
+            result = result.withMarkers(result.getMarkers().setByType(updatedMarker));
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), result), updatedMarker);
         }
         return this;
@@ -80,8 +79,7 @@ public class PipfileFile implements PythonDependencyFile {
         }
         if (doc != original) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, additions);
-            doc = doc.withMarkers(doc.getMarkers()
-                    .setByType(updatedMarker));
+            doc = doc.withMarkers(doc.getMarkers().setByType(updatedMarker));
             return new PipfileFile(new Cursor(cursor.getParentOrThrow(), doc), updatedMarker);
         }
         return this;

@@ -62,8 +62,7 @@ public class PyProjectFile implements PythonDependencyFile {
         }.visitNonNull(doc, upgrades, cursor);
         if (result != doc) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, upgrades);
-            result = result.withMarkers(result.getMarkers()
-                    .setByType(updatedMarker));
+            result = result.withMarkers(result.getMarkers().setByType(updatedMarker));
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), result), updatedMarker);
         }
         return this;
@@ -81,8 +80,7 @@ public class PyProjectFile implements PythonDependencyFile {
         }
         if (doc != original) {
             PythonResolutionResult updatedMarker = PythonDependencyFile.updateResolvedVersions(marker, additions);
-            doc = doc.withMarkers(doc.getMarkers()
-                    .setByType(updatedMarker));
+            doc = doc.withMarkers(doc.getMarkers().setByType(updatedMarker));
             return new PyProjectFile(new Cursor(cursor.getParentOrThrow(), doc), updatedMarker);
         }
         return this;
@@ -409,7 +407,6 @@ public class PyProjectFile implements PythonDependencyFile {
 
     @Override
     public SourceFile afterModification(ExecutionContext ctx) {
-        // regenerateLockAndRefreshMarker already guards against missing lock content internally
         return PyProjectHelper.regenerateLockAndRefreshMarker((Toml.Document) getTree(), ctx);
     }
 
@@ -428,7 +425,7 @@ public class PyProjectFile implements PythonDependencyFile {
             Object value = cursor.getValue();
             if (value instanceof Toml.Document) {
                 Toml.Document doc = (Toml.Document) value;
-                if (doc.getSourcePath().toString().endsWith("pyproject.toml")) {
+                if (doc.getSourcePath().endsWith("pyproject.toml")) {
                     PythonResolutionResult marker = doc.getMarkers()
                             .findFirst(PythonResolutionResult.class).orElse(null);
                     if (marker != null) {

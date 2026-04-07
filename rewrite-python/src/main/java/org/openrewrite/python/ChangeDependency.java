@@ -83,6 +83,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -90,13 +92,13 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                if (tree instanceof Toml.Document && sourceFile.getSourcePath().toString().endsWith("uv.lock")) {
+                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
                             PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath().toString()),
                             ((Toml.Document) tree).printAll());
                     return tree;
                 }
-                PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
+                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                 if (trait != null && trait.getMarker().findDependencyInAnyScope(oldPackageName) != null) {
                     acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 }
@@ -108,6 +110,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
             public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -118,7 +122,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 Path sourcePath = sourceFile.getSourcePath();
 
                 if (acc.projectsToUpdate.contains(sourcePath)) {
-                    PythonDependencyFile trait = new PythonDependencyFile.Matcher().get(getCursor()).orElse(null);
+                    PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
                         PythonDependencyFile updated = trait.withChangedDependency(oldPackageName, newPackageName, newVersion);
                         if (updated.getTree() != tree) {
