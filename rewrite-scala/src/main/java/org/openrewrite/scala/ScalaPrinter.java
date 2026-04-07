@@ -248,8 +248,14 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     public J visitCase(J.Case case_, PrintOutputCapture<P> p) {
         beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
         p.append("case");
-        for (J label : case_.getCaseLabels()) {
-            visit(label, p);
+        List<JRightPadded<J>> labels = case_.getPadding().getCaseLabels().getPadding().getElements();
+        for (JRightPadded<J> label : labels) {
+            visit(label.getElement(), p);
+            visitSpace(label.getAfter(), Space.Location.CASE_LABEL, p);
+        }
+        if (case_.getGuard() != null) {
+            p.append("if");
+            visit(case_.getGuard(), p);
         }
         p.append(" =>");
         if (case_.getPadding().getBody() != null) {

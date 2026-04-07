@@ -5285,7 +5285,19 @@ class ScalaTreeVisitor(
       val cki = ck.indexOf("case"); if (cki >= 0) cursor = cursor + cki + 4
 
       val patternJ = visitTree(caseDef.pat) match { case j: J => j; case _ => new J.Identifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, Collections.emptyList(), "_", null, null) }
-      val labels = new util.ArrayList[JRightPadded[J]](); labels.add(JRightPadded.build(patternJ))
+      val labels = new util.ArrayList[JRightPadded[J]]()
+
+      val guardJ: Expression = if (!caseDef.guard.isEmpty) {
+        val gs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
+        val gi = gs.indexOf("if")
+        val labelAfter = if (gi > 0) Space.format(gs.substring(0, gi)) else Space.EMPTY
+        labels.add(JRightPadded.build(patternJ).withAfter(labelAfter))
+        if (gi >= 0) cursor = cursor + gi + 2
+        visitTree(caseDef.guard) match { case e: Expression => e; case _ => null }
+      } else {
+        labels.add(JRightPadded.build(patternJ))
+        null
+      }
 
       val as = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 200, source.length)) else ""
       val ai = as.indexOf("=>"); if (ai >= 0) { val aa = source.indexOf("=>", cursor); if (aa >= 0) cursor = aa + 2 }
@@ -5294,7 +5306,7 @@ class ScalaTreeVisitor(
       updateCursor(caseDef.span.end)
 
       val jCase = new J.Case(Tree.randomId(), casePrefix, Markers.EMPTY, J.Case.Type.Rule,
-        null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), null, JContainer.empty(), caseBodyJ)
+        null, null, JContainer.build(Space.EMPTY, labels, Markers.EMPTY), guardJ, JContainer.empty(), caseBodyJ)
       caseStatements.add(JRightPadded.build(jCase.asInstanceOf[Statement]))
     }
 
