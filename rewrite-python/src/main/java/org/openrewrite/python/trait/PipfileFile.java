@@ -23,6 +23,8 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
 
+import static org.openrewrite.internal.ListUtils.map;
+
 /**
  * Trait implementation for Pipfile dependency files.
  * Pipfile uses key-value tables: {@code [packages]} for production and
@@ -100,22 +102,19 @@ public class PipfileFile implements PythonDependencyFile {
                 if (!isTargetTable(t, scope)) {
                     return t;
                 }
-                List<Toml> newValues = new ArrayList<>();
-                boolean changed = false;
-                for (Toml value : t.getValues()) {
+                List<Toml> newValues = map(t.getValues(), value -> {
                     if (value instanceof Toml.KeyValue) {
                         Toml.KeyValue kv = (Toml.KeyValue) value;
                         if (kv.getKey() instanceof Toml.Identifier) {
                             String keyName = ((Toml.Identifier) kv.getKey()).getName();
                             if (names.contains(PythonResolutionResult.normalizeName(keyName))) {
-                                changed = true;
-                                continue;
+                                return null;
                             }
                         }
                     }
-                    newValues.add(value);
-                }
-                return changed ? t.withValues(newValues) : t;
+                    return value;
+                });
+                return t.withValues(newValues);
             }
         }.visitNonNull(doc, normalizedNames, cursor);
         if (result != doc) {
@@ -307,9 +306,7 @@ public class PipfileFile implements PythonDependencyFile {
         if (kv.getValue() instanceof Toml.Table) {
             // Inline table: update the "version" key inside
             Toml.Table inlineTable = (Toml.Table) kv.getValue();
-            List<Toml> newValues = new ArrayList<>();
-            boolean changed = false;
-            for (Toml inner : inlineTable.getValues()) {
+            List<Toml> newValues = map(inlineTable.getValues(), inner -> {
                 if (inner instanceof Toml.KeyValue) {
                     Toml.KeyValue innerKv = (Toml.KeyValue) inner;
                     if (innerKv.getKey() instanceof Toml.Identifier &&
@@ -317,16 +314,14 @@ public class PipfileFile implements PythonDependencyFile {
                             innerKv.getValue() instanceof Toml.Literal) {
                         Toml.Literal literal = (Toml.Literal) innerKv.getValue();
                         if (!normalizedVersion.equals(literal.getValue())) {
-                            newValues.add(innerKv.withValue(
-                                    literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion)));
-                            changed = true;
-                            continue;
+                            return innerKv.withValue(
+                                    literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
                         }
                     }
                 }
-                newValues.add(inner);
-            }
-            if (changed) {
+                return inner;
+            });
+            if (newValues != inlineTable.getValues()) {
                 return kv.withValue(inlineTable.withValues(newValues));
             }
         }

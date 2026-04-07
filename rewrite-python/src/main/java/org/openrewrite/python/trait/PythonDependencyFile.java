@@ -16,6 +16,8 @@ import org.openrewrite.trait.Trait;
 
 import java.util.*;
 
+import static org.openrewrite.internal.ListUtils.map;
+
 /**
  * Trait for Python dependency files (pyproject.toml, requirements.txt, etc.).
  * Use {@link org.openrewrite.python.internal.PyProjectHelper#extractPackageName(String)}
@@ -146,19 +148,15 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
     static PythonResolutionResult updateResolvedVersions(
             PythonResolutionResult marker, Map<String, String> versionUpdates) {
         List<PythonResolutionResult.ResolvedDependency> resolved = marker.getResolvedDependencies();
-        List<PythonResolutionResult.ResolvedDependency> updated = new ArrayList<>(resolved.size());
-        boolean changed = false;
-        for (PythonResolutionResult.ResolvedDependency dep : resolved) {
+        List<PythonResolutionResult.ResolvedDependency> updated = map(resolved, dep -> {
             String normalizedName = PythonResolutionResult.normalizeName(dep.getName());
             String newVersion = versionUpdates.get(normalizedName);
             if (newVersion != null && !newVersion.equals(dep.getVersion())) {
-                updated.add(dep.withVersion(newVersion));
-                changed = true;
-            } else {
-                updated.add(dep);
+                return dep.withVersion(newVersion);
             }
-        }
-        return changed ? marker.withResolvedDependencies(updated) : marker;
+            return dep;
+        });
+        return updated == resolved ? marker : marker.withResolvedDependencies(updated);
     }
 
     class Matcher extends SimpleTraitMatcher<PythonDependencyFile> {
