@@ -286,6 +286,9 @@ public class PipfileFile implements PythonDependencyFile {
         String normalizedVersion = PyProjectHelper.normalizeVersionConstraint(newVersion);
         if (kv.getValue() instanceof Toml.Literal) {
             Toml.Literal literal = (Toml.Literal) kv.getValue();
+            if (normalizedVersion.equals(literal.getValue())) {
+                return kv;
+            }
             return kv.withValue(literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
         }
         if (kv.getValue() instanceof Toml.Table) {
@@ -298,8 +301,10 @@ public class PipfileFile implements PythonDependencyFile {
                             "version".equals(((Toml.Identifier) innerKv.getKey()).getName()) &&
                             innerKv.getValue() instanceof Toml.Literal) {
                         Toml.Literal literal = (Toml.Literal) innerKv.getValue();
-                        return innerKv.withValue(
-                                literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
+                        if (!normalizedVersion.equals(literal.getValue())) {
+                            return innerKv.withValue(
+                                    literal.withSource("\"" + normalizedVersion + "\"").withValue(normalizedVersion));
+                        }
                     }
                 }
                 return inner;
