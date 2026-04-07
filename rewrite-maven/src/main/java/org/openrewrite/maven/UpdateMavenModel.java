@@ -23,16 +23,14 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
+    static final String UPDATED_MODULES_KEY = "org.openrewrite.maven.UpdateMavenModel.updatedModules";
 
     @Override
     public Xml visitDocument(Xml.Document document, P p) {
@@ -145,11 +143,28 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 projectPoms.put(sourcePath, requested);
             }
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    projectPoms);
+                    projectPoms, false);
+            storeModuleResults(ctx, updated);
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
             return e.warn(document);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void storeModuleResults(ExecutionContext ctx, MavenResolutionResult result) {
+        Map<Path, MavenResolutionResult> map = ctx.getMessage(UPDATED_MODULES_KEY);
+        if (map == null) {
+            map = new HashMap<>();
+            ctx.putMessage(UPDATED_MODULES_KEY, map);
+        }
+        for (MavenResolutionResult module : result.getModules()) {
+            Path modulePath = module.getPom().getRequested().getSourcePath();
+            if (modulePath != null) {
+                map.put(modulePath, module);
+            }
+            storeModuleResults(ctx, module);
         }
     }
 
@@ -169,7 +184,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 .orElse(null);
     }
 
-    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
+    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult,
+                                               Map<Path, Pom> projectPoms, boolean isChildModule) throws MavenDownloadingExceptions {
         MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
                 getResolutionResult().getActiveProfiles());
 
@@ -180,13 +196,24 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     .withPom(resolved)
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
                         try {
-                            return updateResult(ctx, module, projectPoms);
+                            return updateResult(ctx, module, projectPoms, true);
                         } catch (MavenDownloadingExceptions e) {
                             exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
                             return module;
                         }
-                    }))
-                    .resolveDependencies(downloader, ctx);
+                    }));
+            try {
+                mrr = mrr.resolveDependencies(downloader, ctx);
+            } catch (MavenDownloadingExceptions e) {
+                if (isChildModule) {
+                    // Store the resolved POM model before rethrowing so that this
+                    // child module's model updates (e.g., updated dependency management
+                    // inherited from the parent) can be picked up when the recipe
+                    // visits this child's document
+                    storeSelfResult(ctx, mrr);
+                }
+                throw MavenDownloadingExceptions.append(exceptions.get(), e);
+            }
             if (exceptions.get() != null) {
                 throw exceptions.get();
             }
@@ -195,6 +222,19 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             throw MavenDownloadingExceptions.append(exceptions.get(), e);
         } catch (MavenDownloadingException e) {
             throw MavenDownloadingExceptions.append(exceptions.get(), e);
+        }
+    }
+
+    private static void storeSelfResult(ExecutionContext ctx, MavenResolutionResult result) {
+        Path path = result.getPom().getRequested().getSourcePath();
+        if (path != null) {
+            @SuppressWarnings("unchecked")
+            Map<Path, MavenResolutionResult> map = ctx.getMessage(UPDATED_MODULES_KEY);
+            if (map == null) {
+                map = new HashMap<>();
+                ctx.putMessage(UPDATED_MODULES_KEY, map);
+            }
+            map.put(path, result);
         }
     }
 }
