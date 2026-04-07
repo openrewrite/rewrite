@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.buildGradleKts;
 
 class UsePropertyAssignmentSyntaxTest implements RewriteTest {
 
@@ -150,6 +151,19 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
               }
               tasks.register('b', JavaExec) {
                   description = 'Second'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslUnchanged() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              tasks.register<JavaExec>("runLogic") {
+                  description = "My precious logic"
               }
               """
           )
