@@ -246,6 +246,26 @@ class CSharpParseProjectTest implements RewriteTest {
         );
     }
 
+    @Test
+    void xmlDocComment() {
+        rewriteRun(
+          csharp(
+            """
+              namespace Test
+              {
+                  public class Foo
+                  {
+                      /// <inheritdoc />
+                      public void Bar()
+                      {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     // ---- Full working set sweep ----
 
     @Tag("workingSet-full")

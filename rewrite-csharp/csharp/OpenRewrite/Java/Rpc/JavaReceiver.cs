@@ -709,16 +709,16 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var comments = q.ReceiveList(space.Comments, c =>
         {
-            if (c is TextComment tc)
+            var multiline = q.Receive(c.Multiline);
+            var text = q.Receive(c.Text);
+            var suffix = q.Receive(c.Suffix);
+            // C# Comment doesn't have Markers; consume and discard
+            q.Receive<Markers>(Markers.Empty);
+            if (c is XmlDocComment)
             {
-                var multiline = q.Receive(tc.Multiline);
-                var text = q.Receive(tc.Text);
-                var suffix = q.Receive(tc.Suffix);
-                // C# Comment doesn't have Markers; consume and discard
-                q.Receive<Markers>(Markers.Empty);
-                return new TextComment(text!, suffix!, multiline);
+                return new XmlDocComment(text!, suffix!, multiline);
             }
-            throw new ArgumentException($"Unexpected comment type {c.GetType().Name}");
+            return new TextComment(text!, suffix!, multiline);
         });
         var whitespace = q.Receive(space.Whitespace);
         return space.WithComments(comments!).WithWhitespace(whitespace!);
