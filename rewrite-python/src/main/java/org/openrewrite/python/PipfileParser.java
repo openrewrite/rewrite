@@ -161,7 +161,7 @@ public class PipfileParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return "Pipfile".equals(path.getFileName().toString());
+        return path.endsWith("Pipfile");
     }
 
     @Override

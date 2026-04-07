@@ -144,7 +144,7 @@ public class PyProjectTomlParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return "pyproject.toml".equals(path.getFileName().toString());
+        return path.endsWith("pyproject.toml");
     }
 
     @Override

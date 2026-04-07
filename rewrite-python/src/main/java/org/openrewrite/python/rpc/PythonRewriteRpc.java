@@ -248,7 +248,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 final PythonResolutionResult finalMarker = marker;
                 rpcStream = rpcStream.map(sf -> {
                     if (sf instanceof Py.CompilationUnit &&
-                            sf.getSourcePath().getFileName().toString().equals("setup.py")) {
+                            sf.getSourcePath().endsWith("setup.py")) {
                         return sf.withMarkers(sf.getMarkers().addIfAbsent(finalMarker));
                     }
                     return sf;

@@ -341,7 +341,7 @@ public class PipfileFile implements PythonDependencyFile {
             Object value = cursor.getValue();
             if (value instanceof Toml.Document) {
                 Toml.Document doc = (Toml.Document) value;
-                if ("Pipfile".equals(doc.getSourcePath().getFileName().toString())) {
+                if (doc.getSourcePath().endsWith("Pipfile")) {
                     PythonResolutionResult marker = doc.getMarkers()
                             .findFirst(PythonResolutionResult.class).orElse(null);
                     if (marker != null) {

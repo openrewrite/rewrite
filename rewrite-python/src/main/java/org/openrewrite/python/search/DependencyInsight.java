@@ -113,7 +113,7 @@ public class DependencyInsight extends Recipe {
                             new SetupCfgParser().accept(sourceFile.getSourcePath());
                 }
                 if (sourceFile instanceof Py.CompilationUnit) {
-                    return "setup.py".equals(sourceFile.getSourcePath().getFileName().toString());
+                    return sourceFile.getSourcePath().endsWith("setup.py");
                 }
                 return false;
             }
