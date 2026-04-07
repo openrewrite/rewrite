@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /home/tim/Documents/workspace/openrewrite/rewrite/rewrite-docker/src/main/antlr/DockerParser.g4 by ANTLR 4.13.2
+// Generated from rewrite-docker/src/main/antlr/DockerParser.g4 by ANTLR 4.13.2
 package org.openrewrite.docker.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -32,52 +32,52 @@ public class DockerParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		PARSER_DIRECTIVE=1, COMMENT=2, FROM=3, RUN=4, CMD=5, NONE=6, LABEL=7, 
-		EXPOSE=8, ENV=9, ADD=10, COPY=11, ENTRYPOINT=12, VOLUME=13, USER=14, WORKDIR=15, 
-		ARG=16, ONBUILD=17, STOPSIGNAL=18, HEALTHCHECK=19, SHELL=20, MAINTAINER=21, 
-		AS=22, HEREDOC_START=23, LINE_CONTINUATION=24, LBRACKET=25, RBRACKET=26, 
-		COMMA=27, EQUALS=28, FLAG=29, DASH_DASH=30, DOUBLE_QUOTED_STRING=31, SINGLE_QUOTED_STRING=32, 
-		ENV_VAR=33, SPECIAL_VAR=34, COMMAND_SUBST=35, BACKTICK_SUBST=36, UNQUOTED_TEXT=37, 
-		WS=38, NEWLINE=39, HP_LINE_CONTINUATION=40, HP_WS=41, HP_COMMENT=42, HP_LINE_COMMENT=43, 
+		PARSER_DIRECTIVE=1, COMMENT=2, FROM=3, RUN=4, CMD=5, NONE=6, LABEL=7,
+		EXPOSE=8, ENV=9, ADD=10, COPY=11, ENTRYPOINT=12, VOLUME=13, USER=14, WORKDIR=15,
+		ARG=16, ONBUILD=17, STOPSIGNAL=18, HEALTHCHECK=19, SHELL=20, MAINTAINER=21,
+		AS=22, HEREDOC_START=23, LINE_CONTINUATION=24, LBRACKET=25, RBRACKET=26,
+		COMMA=27, EQUALS=28, FLAG=29, DASH_DASH=30, DOUBLE_QUOTED_STRING=31, SINGLE_QUOTED_STRING=32,
+		ENV_VAR=33, SPECIAL_VAR=34, COMMAND_SUBST=35, BACKTICK_SUBST=36, UNQUOTED_TEXT=37,
+		WS=38, NEWLINE=39, HP_LINE_CONTINUATION=40, HP_WS=41, HP_COMMENT=42, HP_LINE_COMMENT=43,
 		HEREDOC_CONTENT=44, H_NEWLINE=45;
 	public static final int
-		RULE_dockerfile = 0, RULE_parserDirective = 1, RULE_globalArgs = 2, RULE_stage = 3, 
-		RULE_stageInstruction = 4, RULE_instruction = 5, RULE_fromInstruction = 6, 
-		RULE_runInstruction = 7, RULE_cmdInstruction = 8, RULE_labelInstruction = 9, 
-		RULE_exposeInstruction = 10, RULE_envInstruction = 11, RULE_addInstruction = 12, 
-		RULE_copyInstruction = 13, RULE_entrypointInstruction = 14, RULE_volumeInstruction = 15, 
-		RULE_userInstruction = 16, RULE_workdirInstruction = 17, RULE_argInstruction = 18, 
-		RULE_onbuildInstruction = 19, RULE_stopsignalInstruction = 20, RULE_healthcheckInstruction = 21, 
-		RULE_healthcheckOptions = 22, RULE_healthcheckOption = 23, RULE_shellInstruction = 24, 
-		RULE_maintainerInstruction = 25, RULE_flags = 26, RULE_flag = 27, RULE_execForm = 28, 
-		RULE_shellForm = 29, RULE_shellFormText = 30, RULE_shellFormTextElement = 31, 
-		RULE_heredoc = 32, RULE_heredocPreamble = 33, RULE_preambleElement = 34, 
-		RULE_heredocBody = 35, RULE_heredocContent = 36, RULE_heredocEnd = 37, 
-		RULE_jsonArray = 38, RULE_jsonArrayElements = 39, RULE_jsonString = 40, 
-		RULE_imageName = 41, RULE_stageName = 42, RULE_labelPairs = 43, RULE_labelPair = 44, 
-		RULE_labelKey = 45, RULE_labelValue = 46, RULE_labelOldValue = 47, RULE_labelOldValueElement = 48, 
-		RULE_portList = 49, RULE_port = 50, RULE_envPairs = 51, RULE_envPair = 52, 
-		RULE_envKey = 53, RULE_envValueEquals = 54, RULE_envValueSpace = 55, RULE_envTextEquals = 56, 
-		RULE_envTextElementEquals = 57, RULE_sourceList = 58, RULE_sourcePath = 59, 
-		RULE_destination = 60, RULE_destinationPath = 61, RULE_path = 62, RULE_pathList = 63, 
-		RULE_volumePath = 64, RULE_userSpec = 65, RULE_argName = 66, RULE_argValue = 67, 
+		RULE_dockerfile = 0, RULE_parserDirective = 1, RULE_globalArgs = 2, RULE_stage = 3,
+		RULE_stageInstruction = 4, RULE_instruction = 5, RULE_fromInstruction = 6,
+		RULE_runInstruction = 7, RULE_cmdInstruction = 8, RULE_labelInstruction = 9,
+		RULE_exposeInstruction = 10, RULE_envInstruction = 11, RULE_addInstruction = 12,
+		RULE_copyInstruction = 13, RULE_entrypointInstruction = 14, RULE_volumeInstruction = 15,
+		RULE_userInstruction = 16, RULE_workdirInstruction = 17, RULE_argInstruction = 18,
+		RULE_onbuildInstruction = 19, RULE_stopsignalInstruction = 20, RULE_healthcheckInstruction = 21,
+		RULE_healthcheckOptions = 22, RULE_healthcheckOption = 23, RULE_shellInstruction = 24,
+		RULE_maintainerInstruction = 25, RULE_flags = 26, RULE_flag = 27, RULE_execForm = 28,
+		RULE_shellForm = 29, RULE_shellFormText = 30, RULE_shellFormTextElement = 31,
+		RULE_heredoc = 32, RULE_heredocPreamble = 33, RULE_preambleElement = 34,
+		RULE_heredocBody = 35, RULE_heredocContent = 36, RULE_heredocEnd = 37,
+		RULE_jsonArray = 38, RULE_jsonArrayElements = 39, RULE_jsonString = 40,
+		RULE_imageName = 41, RULE_stageName = 42, RULE_labelPairs = 43, RULE_labelPair = 44,
+		RULE_labelKey = 45, RULE_labelValue = 46, RULE_labelOldValue = 47, RULE_labelOldValueElement = 48,
+		RULE_portList = 49, RULE_port = 50, RULE_envPairs = 51, RULE_envPair = 52,
+		RULE_envKey = 53, RULE_envValueEquals = 54, RULE_envValueSpace = 55, RULE_envTextEquals = 56,
+		RULE_envTextElementEquals = 57, RULE_sourceList = 58, RULE_sourcePath = 59,
+		RULE_destination = 60, RULE_destinationPath = 61, RULE_path = 62, RULE_pathList = 63,
+		RULE_volumePath = 64, RULE_userSpec = 65, RULE_argName = 66, RULE_argValue = 67,
 		RULE_signal = 68, RULE_text = 69, RULE_textElement = 70;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"dockerfile", "parserDirective", "globalArgs", "stage", "stageInstruction", 
-			"instruction", "fromInstruction", "runInstruction", "cmdInstruction", 
-			"labelInstruction", "exposeInstruction", "envInstruction", "addInstruction", 
-			"copyInstruction", "entrypointInstruction", "volumeInstruction", "userInstruction", 
-			"workdirInstruction", "argInstruction", "onbuildInstruction", "stopsignalInstruction", 
-			"healthcheckInstruction", "healthcheckOptions", "healthcheckOption", 
-			"shellInstruction", "maintainerInstruction", "flags", "flag", "execForm", 
-			"shellForm", "shellFormText", "shellFormTextElement", "heredoc", "heredocPreamble", 
-			"preambleElement", "heredocBody", "heredocContent", "heredocEnd", "jsonArray", 
-			"jsonArrayElements", "jsonString", "imageName", "stageName", "labelPairs", 
-			"labelPair", "labelKey", "labelValue", "labelOldValue", "labelOldValueElement", 
-			"portList", "port", "envPairs", "envPair", "envKey", "envValueEquals", 
-			"envValueSpace", "envTextEquals", "envTextElementEquals", "sourceList", 
-			"sourcePath", "destination", "destinationPath", "path", "pathList", "volumePath", 
+			"dockerfile", "parserDirective", "globalArgs", "stage", "stageInstruction",
+			"instruction", "fromInstruction", "runInstruction", "cmdInstruction",
+			"labelInstruction", "exposeInstruction", "envInstruction", "addInstruction",
+			"copyInstruction", "entrypointInstruction", "volumeInstruction", "userInstruction",
+			"workdirInstruction", "argInstruction", "onbuildInstruction", "stopsignalInstruction",
+			"healthcheckInstruction", "healthcheckOptions", "healthcheckOption",
+			"shellInstruction", "maintainerInstruction", "flags", "flag", "execForm",
+			"shellForm", "shellFormText", "shellFormTextElement", "heredoc", "heredocPreamble",
+			"preambleElement", "heredocBody", "heredocContent", "heredocEnd", "jsonArray",
+			"jsonArrayElements", "jsonString", "imageName", "stageName", "labelPairs",
+			"labelPair", "labelKey", "labelValue", "labelOldValue", "labelOldValueElement",
+			"portList", "port", "envPairs", "envPair", "envKey", "envValueEquals",
+			"envValueSpace", "envTextEquals", "envTextElementEquals", "sourceList",
+			"sourcePath", "destination", "destinationPath", "path", "pathList", "volumePath",
 			"userSpec", "argName", "argValue", "signal", "text", "textElement"
 		};
 	}
@@ -85,24 +85,24 @@ public class DockerParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, "'FROM'", "'RUN'", "'CMD'", "'NONE'", "'LABEL'", "'EXPOSE'", 
-			"'ENV'", "'ADD'", "'COPY'", "'ENTRYPOINT'", "'VOLUME'", "'USER'", "'WORKDIR'", 
-			"'ARG'", "'ONBUILD'", "'STOPSIGNAL'", "'HEALTHCHECK'", "'SHELL'", "'MAINTAINER'", 
-			"'AS'", null, null, "'['", "']'", "','", "'='", null, "'--'", null, null, 
-			null, null, null, null, null, null, null, null, null, null, null, null, 
+			null, null, null, "'FROM'", "'RUN'", "'CMD'", "'NONE'", "'LABEL'", "'EXPOSE'",
+			"'ENV'", "'ADD'", "'COPY'", "'ENTRYPOINT'", "'VOLUME'", "'USER'", "'WORKDIR'",
+			"'ARG'", "'ONBUILD'", "'STOPSIGNAL'", "'HEALTHCHECK'", "'SHELL'", "'MAINTAINER'",
+			"'AS'", null, null, "'['", "']'", "','", "'='", null, "'--'", null, null,
+			null, null, null, null, null, null, null, null, null, null, null, null,
 			"'\\n'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "PARSER_DIRECTIVE", "COMMENT", "FROM", "RUN", "CMD", "NONE", "LABEL", 
-			"EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME", "USER", "WORKDIR", 
-			"ARG", "ONBUILD", "STOPSIGNAL", "HEALTHCHECK", "SHELL", "MAINTAINER", 
-			"AS", "HEREDOC_START", "LINE_CONTINUATION", "LBRACKET", "RBRACKET", "COMMA", 
-			"EQUALS", "FLAG", "DASH_DASH", "DOUBLE_QUOTED_STRING", "SINGLE_QUOTED_STRING", 
-			"ENV_VAR", "SPECIAL_VAR", "COMMAND_SUBST", "BACKTICK_SUBST", "UNQUOTED_TEXT", 
-			"WS", "NEWLINE", "HP_LINE_CONTINUATION", "HP_WS", "HP_COMMENT", "HP_LINE_COMMENT", 
+			null, "PARSER_DIRECTIVE", "COMMENT", "FROM", "RUN", "CMD", "NONE", "LABEL",
+			"EXPOSE", "ENV", "ADD", "COPY", "ENTRYPOINT", "VOLUME", "USER", "WORKDIR",
+			"ARG", "ONBUILD", "STOPSIGNAL", "HEALTHCHECK", "SHELL", "MAINTAINER",
+			"AS", "HEREDOC_START", "LINE_CONTINUATION", "LBRACKET", "RBRACKET", "COMMA",
+			"EQUALS", "FLAG", "DASH_DASH", "DOUBLE_QUOTED_STRING", "SINGLE_QUOTED_STRING",
+			"ENV_VAR", "SPECIAL_VAR", "COMMAND_SUBST", "BACKTICK_SUBST", "UNQUOTED_TEXT",
+			"WS", "NEWLINE", "HP_LINE_CONTINUATION", "HP_WS", "HP_COMMENT", "HP_LINE_COMMENT",
 			"HEREDOC_CONTENT", "H_NEWLINE"
 		};
 	}
@@ -217,7 +217,7 @@ public class DockerParser extends Parser {
 			}
 			setState(148);
 			globalArgs();
-			setState(150); 
+			setState(150);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -227,7 +227,7 @@ public class DockerParser extends Parser {
 				stage();
 				}
 				}
-				setState(152); 
+				setState(152);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==FROM );
@@ -1811,7 +1811,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(290); 
+			setState(290);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -1821,7 +1821,7 @@ public class DockerParser extends Parser {
 				healthcheckOption();
 				}
 				}
-				setState(292); 
+				setState(292);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==FLAG );
@@ -2011,7 +2011,7 @@ public class DockerParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(303); 
+			setState(303);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -2027,7 +2027,7 @@ public class DockerParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(305); 
+				setState(305);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,22,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -2211,7 +2211,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(314); 
+			setState(314);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -2221,7 +2221,7 @@ public class DockerParser extends Parser {
 				shellFormTextElement();
 				}
 				}
-				setState(316); 
+				setState(316);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 274844352512L) != 0) );
@@ -2344,7 +2344,7 @@ public class DockerParser extends Parser {
 			heredocPreamble();
 			setState(321);
 			match(NEWLINE);
-			setState(323); 
+			setState(323);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -2354,7 +2354,7 @@ public class DockerParser extends Parser {
 				heredocBody();
 				}
 				}
-				setState(325); 
+				setState(325);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 18279380811776L) != 0) );
@@ -2988,7 +2988,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(380); 
+			setState(380);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -2998,7 +2998,7 @@ public class DockerParser extends Parser {
 				labelPair();
 				}
 				}
-				setState(382); 
+				setState(382);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 143881404416L) != 0) );
@@ -3228,7 +3228,7 @@ public class DockerParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(398); 
+			setState(398);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -3244,7 +3244,7 @@ public class DockerParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(400); 
+				setState(400);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,33,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -3359,7 +3359,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(405); 
+			setState(405);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -3369,7 +3369,7 @@ public class DockerParser extends Parser {
 				port();
 				}
 				}
-				setState(407); 
+				setState(407);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 266287972352L) != 0) );
@@ -3476,7 +3476,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(412); 
+			setState(412);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -3486,7 +3486,7 @@ public class DockerParser extends Parser {
 				envPair();
 				}
 				}
-				setState(414); 
+				setState(414);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==UNQUOTED_TEXT );
@@ -3741,7 +3741,7 @@ public class DockerParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(432); 
+			setState(432);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -3757,7 +3757,7 @@ public class DockerParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(434); 
+				setState(434);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,37,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -3866,7 +3866,7 @@ public class DockerParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(439); 
+			setState(439);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -3882,7 +3882,7 @@ public class DockerParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(441); 
+				setState(441);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,38,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -4139,7 +4139,7 @@ public class DockerParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(452); 
+			setState(452);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -4149,7 +4149,7 @@ public class DockerParser extends Parser {
 				volumePath();
 				}
 				}
-				setState(454); 
+				setState(454);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( (((_la) & ~0x3f) == 0 && ((1L << _la) & 272730423296L) != 0) );
@@ -4434,7 +4434,7 @@ public class DockerParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(467); 
+			setState(467);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -4450,7 +4450,7 @@ public class DockerParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(469); 
+				setState(469);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,40,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
