@@ -127,6 +127,29 @@ class RequirementsTxtParserTest {
     }
 
     @Test
+    void declaredPackagesAreDirectAndUndeclaredTransitivesAreExcluded() {
+        // urllib3 and charset-normalizer are resolved (from freeze) but NOT in requirements.txt
+        // requests and certifi ARE in requirements.txt
+        // requests depends on certifi, urllib3, and charset-normalizer
+        ResolvedDependency urllib3 = new ResolvedDependency("urllib3", "2.2.1", null, null);
+        ResolvedDependency charsetNormalizer = new ResolvedDependency("charset-normalizer", "3.3.2", null, null);
+        ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
+        ResolvedDependency requests = new ResolvedDependency("requests", "2.31.0", null,
+                List.of(certifi, urllib3, charsetNormalizer));
+
+        List<ResolvedDependency> resolved = List.of(urllib3, charsetNormalizer, certifi, requests);
+        Set<String> declared = RequirementsTxtParser.parseDeclaredPackageNames(
+                "requests==2.31.0\ncertifi==2024.2.2\n");
+        List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolved, declared);
+
+        // requests and certifi are declared in the file -> direct
+        // urllib3 and charset-normalizer are NOT declared and only appear as transitives -> excluded
+        assertThat(deps).hasSize(2);
+        assertThat(deps.stream().map(Dependency::getName))
+                .containsExactly("certifi", "requests");
+    }
+
+    @Test
     void parseDeclaredPackageNamesExtractsNames() {
         Set<String> names = RequirementsTxtParser.parseDeclaredPackageNames("""
                 # This is a comment
