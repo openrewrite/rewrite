@@ -121,22 +121,21 @@ public class PipfileFile implements PythonDependencyFile {
     }
 
     @Override
-    public PipfileFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion) {
+    public PipfileFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion, @Nullable String scope, @Nullable String groupName) {
         String normalizedOld = PythonResolutionResult.normalizeName(oldPackageName);
         Toml.Document doc = (Toml.Document) getTree();
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Integer>() {
             @Override
             public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, Integer p) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, p);
+                if (!isInsideTargetTable(getCursor(), scope)) {
+                    return kv;
+                }
                 if (!(kv.getKey() instanceof Toml.Identifier)) {
                     return kv;
                 }
                 String keyName = ((Toml.Identifier) kv.getKey()).getName();
                 if (!PythonResolutionResult.normalizeName(keyName).equals(normalizedOld)) {
-                    return kv;
-                }
-                // Check we're inside [packages] or [dev-packages]
-                if (!isInsideTargetTable(getCursor(), null)) {
                     return kv;
                 }
                 Toml.Identifier newKey = ((Toml.Identifier) kv.getKey())
@@ -156,19 +155,19 @@ public class PipfileFile implements PythonDependencyFile {
     }
 
     @Override
-    public PipfileFile withPinnedTransitiveDependencies(Map<String, String> pins) {
-        // Pipfile has no constraint mechanism — add to [packages]
-        return withAddedDependencies(pins, "packages", null);
+    public PipfileFile withPinnedTransitiveDependencies(Map<String, String> pins, @Nullable String scope, @Nullable String groupName) {
+        // Pipfile has no constraint mechanism — add to target scope or default to [packages]
+        return withAddedDependencies(pins, scope != null ? scope : "packages", null);
     }
 
     @Override
-    public PipfileFile withDependencySearchMarkers(Map<String, String> packageMessages, ExecutionContext ctx) {
+    public PipfileFile withDependencySearchMarkers(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName, ExecutionContext ctx) {
         Toml.Document doc = (Toml.Document) getTree();
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Map<String, String>>() {
             @Override
             public Toml.KeyValue visitKeyValue(Toml.KeyValue keyValue, Map<String, String> msgs) {
                 Toml.KeyValue kv = super.visitKeyValue(keyValue, msgs);
-                if (!isInsideTargetTable(getCursor(), null)) {
+                if (!isInsideTargetTable(getCursor(), scope)) {
                     return kv;
                 }
                 if (!(kv.getKey() instanceof Toml.Identifier)) {

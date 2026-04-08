@@ -165,7 +165,10 @@ public class RequirementsFile implements PythonDependencyFile {
     }
 
     @Override
-    public RequirementsFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion) {
+    public RequirementsFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion, @Nullable String scope, @Nullable String groupName) {
+        if (!matchesScope(scope)) {
+            return this;
+        }
         PlainText pt = (PlainText) getTree();
         String[] lines = pt.getText().split("\n", -1);
         boolean changed = false;
@@ -200,12 +203,15 @@ public class RequirementsFile implements PythonDependencyFile {
     }
 
     @Override
-    public RequirementsFile withPinnedTransitiveDependencies(Map<String, String> pins) {
-        return withAddedDependencies(pins, null, null);
+    public RequirementsFile withPinnedTransitiveDependencies(Map<String, String> pins, @Nullable String scope, @Nullable String groupName) {
+        return withAddedDependencies(pins, scope, groupName);
     }
 
     @Override
-    public RequirementsFile withDependencySearchMarkers(Map<String, String> packageMessages, ExecutionContext ctx) {
+    public RequirementsFile withDependencySearchMarkers(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName, ExecutionContext ctx) {
+        if (!matchesScope(scope)) {
+            return this;
+        }
         PlainText result = (PlainText) getTree();
         for (Map.Entry<String, String> entry : packageMessages.entrySet()) {
             Find find = new Find(entry.getKey(), null, false, null, null, null, null, null);

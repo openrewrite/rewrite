@@ -55,8 +55,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
             description = "The dependency scope to add to. For pyproject.toml this targets a specific TOML section. " +
                     "For requirements files, `null` matches all files, empty string matches only `requirements.txt`, " +
                     "and a value like `dev` matches `requirements-dev.txt`. Defaults to `project.dependencies`.",
-            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups",
-                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
             example = "project.dependencies",
             required = false)
     @Nullable

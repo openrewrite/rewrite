@@ -140,7 +140,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     if (trait != null) {
                         String normalizedName = PythonResolutionResult.normalizeName(packageName);
                         Map<String, String> pins = Collections.singletonMap(normalizedName, version);
-                        PythonDependencyFile updated = trait.withPinnedTransitiveDependencies(pins);
+                        PythonDependencyFile updated = trait.withPinnedTransitiveDependencies(pins, null, null);
                         if (updated.getTree() != tree) {
                             return updated.afterModification(ctx);
                         }

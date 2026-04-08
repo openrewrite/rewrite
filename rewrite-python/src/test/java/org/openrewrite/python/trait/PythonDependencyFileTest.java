@@ -15,6 +15,7 @@
  */
 package org.openrewrite.python.trait;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
@@ -88,6 +89,10 @@ class PythonDependencyFileTest implements RewriteTest {
      * A recipe that applies {@link PythonDependencyFile#withDependencySearchMarkers} via the trait matcher.
      */
     private static Recipe searchMarkersRecipe(Map<String, String> packageMessages) {
+        return searchMarkersRecipe(packageMessages, null, null);
+    }
+
+    private static Recipe searchMarkersRecipe(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName) {
         return RewriteTest.toRecipe(() -> new TreeVisitor<Tree, ExecutionContext>() {
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
@@ -95,7 +100,7 @@ class PythonDependencyFileTest implements RewriteTest {
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 PythonDependencyFile trait = matcher.test(getCursor());
                 if (trait != null) {
-                    return trait.withDependencySearchMarkers(packageMessages, ctx).getTree();
+                    return trait.withDependencySearchMarkers(packageMessages, scope, groupName, ctx).getTree();
                 }
                 return tree;
             }
@@ -322,7 +327,7 @@ class PythonDependencyFileTest implements RewriteTest {
 
             Map<String, String> vulnerabilities = Collections.singletonMap("requests", "CVE-2023-1234");
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
-            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, ctx);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
 
             Toml.Document result = (Toml.Document) marked.getTree();
             new org.openrewrite.toml.TomlVisitor<Integer>() {
@@ -349,9 +354,92 @@ class PythonDependencyFileTest implements RewriteTest {
 
             Map<String, String> vulnerabilities = Collections.singletonMap("nonexistent", "CVE-2023-9999");
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
-            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, ctx);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
 
             assertThat(marked).isSameAs(trait);
+        }
+
+        @Test
+        void searchMarkersFilteredByMatchingScope() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = Collections.singletonMap("requests", "CVE-2023-1234");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, "project.dependencies", null, ctx);
+
+            Toml.Document result = (Toml.Document) marked.getTree();
+            assertThat(result).isNotSameAs(doc);
+            new org.openrewrite.toml.TomlVisitor<Integer>() {
+                @Override
+                public Toml visitLiteral(Toml.Literal literal, Integer p) {
+                    if (literal.getValue().toString().contains("requests")) {
+                        assertThat(literal.getMarkers().findFirst(SearchResult.class)).isPresent();
+                    }
+                    return literal;
+                }
+            }.visit(result, 0);
+        }
+
+        @Test
+        void searchMarkersNoOpWhenScopeDoesNotMatch() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = Collections.singletonMap("requests", "CVE-2023-1234");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, "build-system.requires", null, ctx);
+
+            assertThat(marked).isSameAs(trait);
+        }
+
+        @Test
+        void searchMarkersNullScopeMatchesAllSections() {
+            ResolvedDependency setuptools = new ResolvedDependency("setuptools", "68.0", null, null);
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Arrays.asList(setuptools, requests));
+
+            String toml = "[build-system]\nrequires = [\"setuptools>=67.0\"]\n\n[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = new HashMap<>();
+            vulnerabilities.put("setuptools", "CVE-2023-0001");
+            vulnerabilities.put("requests", "CVE-2023-1234");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
+
+            Toml.Document result = (Toml.Document) marked.getTree();
+            assertThat(result).isNotSameAs(doc);
+            boolean[] foundSetuptools = {false};
+            boolean[] foundRequests = {false};
+            new org.openrewrite.toml.TomlVisitor<Integer>() {
+                @Override
+                public Toml visitLiteral(Toml.Literal literal, Integer p) {
+                    if (literal.getValue().toString().contains("setuptools") &&
+                            literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                        foundSetuptools[0] = true;
+                    }
+                    if (literal.getValue().toString().contains("requests") &&
+                            literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                        foundRequests[0] = true;
+                    }
+                    return literal;
+                }
+            }.visit(result, 0);
+            assertThat(foundSetuptools[0]).as("setuptools in build-system should be marked").isTrue();
+            assertThat(foundRequests[0]).as("requests in project.dependencies should be marked").isTrue();
         }
 
         @Test
@@ -376,7 +464,7 @@ class PythonDependencyFileTest implements RewriteTest {
         }
 
         @Test
-        void doesNotUpgradeDependenciesOutsideProjectSection() {
+        void doesNotUpgradeDependenciesOutsideTargetScope() {
             ResolvedDependency resolved = new ResolvedDependency("setuptools", "68.0", null, null);
             PythonResolutionResult marker = createMarker(Collections.emptyList(),
                     Collections.singletonList(resolved));
@@ -386,9 +474,9 @@ class PythonDependencyFileTest implements RewriteTest {
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
             Map<String, String> upgrades = Collections.singletonMap("setuptools", "69.0");
-            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, "project.dependencies", null);
 
-            // build-system is not inside [project], so it should not be upgraded
+            // build-system is not inside project.dependencies, so it should not be upgraded
             assertThat(upgraded).isSameAs(trait);
         }
     }
@@ -609,6 +697,46 @@ class PythonDependencyFileTest implements RewriteTest {
 
             String text = ((PlainText) upgraded.getTree()).getText();
             assertThat(text).isEqualTo("requests>=2.31.0\n\nflask>=2.0");
+        }
+
+        @Test
+        void searchMarkersNullScopeMatchesAllFiles() {
+            rewriteRun(
+                    spec -> spec.recipe(searchMarkersRecipe(
+                            Collections.singletonMap("requests", "CVE-2023-1234"), null, null)),
+                    requirementsTxt(
+                            "requests>=2.28.0",
+                            "~~>requests>=2.28.0",
+                            s -> s.path("requirements-dev.txt")
+                    )
+            );
+        }
+
+        @Test
+        void searchMarkersMatchingScopeMarksFile() {
+            rewriteRun(
+                    spec -> spec.recipe(searchMarkersRecipe(
+                            Collections.singletonMap("requests", "CVE-2023-1234"), "", null)),
+                    requirementsTxt(
+                            "requests>=2.28.0",
+                            "~~>requests>=2.28.0"
+                    )
+            );
+        }
+
+        @Test
+        void searchMarkersNoOpWhenScopeDoesNotMatch() {
+            PythonResolutionResult marker = createMarker(Collections.emptyList(),
+                    Collections.singletonList(new ResolvedDependency("requests", "2.28.0", null, null)));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            RequirementsFile marked = trait.withDependencySearchMarkers(
+                    Collections.singletonMap("requests", "CVE-2023-1234"), "dev", null, ctx);
+
+            assertThat(marked).isSameAs(trait);
         }
     }
 

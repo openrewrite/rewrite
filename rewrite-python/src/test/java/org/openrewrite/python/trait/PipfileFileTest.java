@@ -232,7 +232,7 @@ class PipfileFileTest implements RewriteTest {
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
-            PipfileFile changed = t.withChangedDependency("requests", "httpx", null);
+            PipfileFile changed = t.withChangedDependency("requests", "httpx", null, null, null);
 
             String printed = ((Toml.Document) changed.getTree()).printAll();
             assertThat(printed).contains("httpx = \">=2.28.0\"");
@@ -245,7 +245,7 @@ class PipfileFileTest implements RewriteTest {
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
-            PipfileFile changed = t.withChangedDependency("requests", "httpx", ">=0.24.0");
+            PipfileFile changed = t.withChangedDependency("requests", "httpx", ">=0.24.0", null, null);
 
             String printed = ((Toml.Document) changed.getTree()).printAll();
             assertThat(printed).contains("httpx = \">=0.24.0\"");
@@ -263,7 +263,7 @@ class PipfileFileTest implements RewriteTest {
 
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PipfileFile marked = t.withDependencySearchMarkers(
-                    Collections.singletonMap("requests", "CVE-2023-1234"), ctx);
+                    Collections.singletonMap("requests", "CVE-2023-1234"), null, null, ctx);
 
             Toml.Document result = (Toml.Document) marked.getTree();
             boolean[] found = {false};
@@ -289,7 +289,48 @@ class PipfileFileTest implements RewriteTest {
 
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PipfileFile marked = t.withDependencySearchMarkers(
-                    Collections.singletonMap("nonexistent", "CVE-2023-9999"), ctx);
+                    Collections.singletonMap("nonexistent", "CVE-2023-9999"), null, null, ctx);
+
+            assertThat(marked).isSameAs(t);
+        }
+
+        @Test
+        void searchMarkersFilteredByMatchingScope() {
+            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            Toml.Document doc = parsePipfile(
+                    "[packages]\nrequests = \">=2.28.0\"\n\n[dev-packages]\npytest = \"*\"", marker);
+            PipfileFile t = trait(doc, marker);
+
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PipfileFile marked = t.withDependencySearchMarkers(
+                    Collections.singletonMap("requests", "CVE-2023-1234"), "packages", null, ctx);
+
+            Toml.Document result = (Toml.Document) marked.getTree();
+            boolean[] found = {false};
+            new org.openrewrite.toml.TomlVisitor<Integer>() {
+                @Override
+                public Toml visitKeyValue(Toml.KeyValue keyValue, Integer p) {
+                    if (keyValue.getKey() instanceof Toml.Identifier &&
+                            "requests".equals(((Toml.Identifier) keyValue.getKey()).getName()) &&
+                            keyValue.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                        found[0] = true;
+                    }
+                    return keyValue;
+                }
+            }.visit(result, 0);
+            assertThat(found[0]).as("requests should have SearchResult marker").isTrue();
+        }
+
+        @Test
+        void searchMarkersNoOpWhenScopeDoesNotMatch() {
+            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            Toml.Document doc = parsePipfile(
+                    "[packages]\nrequests = \">=2.28.0\"\n\n[dev-packages]\npytest = \"*\"", marker);
+            PipfileFile t = trait(doc, marker);
+
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PipfileFile marked = t.withDependencySearchMarkers(
+                    Collections.singletonMap("requests", "CVE-2023-1234"), "dev-packages", null, ctx);
 
             assertThat(marked).isSameAs(t);
         }

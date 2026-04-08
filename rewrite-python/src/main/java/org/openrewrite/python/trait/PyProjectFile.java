@@ -38,7 +38,7 @@ public class PyProjectFile implements PythonDependencyFile {
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Map<String, String>>() {
             @Override
             public Toml.Literal visitLiteral(Toml.Literal literal, Map<String, String> u) {
-                if (!isInsideTargetArray(getCursor(), scope, groupName)) {
+                if (scope != null && !isInsideTargetArray(getCursor(), scope, groupName)) {
                     return literal;
                 }
 
@@ -97,7 +97,7 @@ public class PyProjectFile implements PythonDependencyFile {
             @Override
             public Toml.Array visitArray(Toml.Array array, Set<String> names) {
                 Toml.Array a = super.visitArray(array, names);
-                if (!PyProjectHelper.isInsideDependencyArray(getCursor(), scope, groupName)) {
+                if (scope != null && !PyProjectHelper.isInsideDependencyArray(getCursor(), scope, groupName)) {
                     return a;
                 }
 
@@ -148,12 +148,15 @@ public class PyProjectFile implements PythonDependencyFile {
     }
 
     @Override
-    public PyProjectFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion) {
+    public PyProjectFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion, @Nullable String scope, @Nullable String groupName) {
         String normalizedOld = PythonResolutionResult.normalizeName(oldPackageName);
         Toml.Document doc = (Toml.Document) getTree();
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Integer>() {
             @Override
             public Toml.Literal visitLiteral(Toml.Literal literal, Integer p) {
+                if (scope != null && !isInsideTargetArray(getCursor(), scope, groupName)) {
+                    return literal;
+                }
                 if (literal.getType() != TomlType.Primitive.String) {
                     return literal;
                 }
@@ -215,7 +218,7 @@ public class PyProjectFile implements PythonDependencyFile {
     }
 
     @Override
-    public PyProjectFile withPinnedTransitiveDependencies(Map<String, String> pins) {
+    public PyProjectFile withPinnedTransitiveDependencies(Map<String, String> pins, @Nullable String scope, @Nullable String groupName) {
         PythonResolutionResult.PackageManager pm = marker.getPackageManager();
         if (pm == PythonResolutionResult.PackageManager.Uv) {
             return pinViaArrayScope(pins, "tool.uv.constraint-dependencies");
@@ -223,7 +226,7 @@ public class PyProjectFile implements PythonDependencyFile {
             return pinViaPdmOverrides(pins);
         } else {
             // Fallback: add as direct dependency
-            return withAddedDependencies(pins, null, null);
+            return withAddedDependencies(pins, scope, groupName);
         }
     }
 
@@ -375,11 +378,14 @@ public class PyProjectFile implements PythonDependencyFile {
     }
 
     @Override
-    public PyProjectFile withDependencySearchMarkers(Map<String, String> packageMessages, ExecutionContext ctx) {
+    public PyProjectFile withDependencySearchMarkers(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName, ExecutionContext ctx) {
         Toml.Document doc = (Toml.Document) getTree();
         Toml.Document result = (Toml.Document) new TomlIsoVisitor<Map<String, String>>() {
             @Override
             public Toml.Literal visitLiteral(Toml.Literal literal, Map<String, String> msgs) {
+                if (scope != null && !isInsideTargetArray(getCursor(), scope, groupName)) {
+                    return literal;
+                }
                 if (literal.getType() != TomlType.Primitive.String) {
                     return literal;
                 }

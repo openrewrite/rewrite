@@ -124,7 +124,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 if (acc.projectsToUpdate.contains(sourcePath)) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null) {
-                        PythonDependencyFile updated = trait.withChangedDependency(oldPackageName, newPackageName, newVersion);
+                        PythonDependencyFile updated = trait.withChangedDependency(oldPackageName, newPackageName, newVersion, null, null);
                         if (updated.getTree() != tree) {
                             return updated.afterModification(ctx);
                         }

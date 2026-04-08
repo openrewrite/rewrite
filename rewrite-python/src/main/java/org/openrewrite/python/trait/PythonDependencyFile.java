@@ -32,7 +32,7 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
      * Upgrade version constraints for dependencies in the specified scope.
      *
      * @param upgrades  package name → new version
-     * @param scope     the TOML scope, or {@code null} for the default ({@code [project].dependencies})
+     * @param scope     the scope to upgrade in, or {@code null} to upgrade in all scopes
      * @param groupName required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
      */
     PythonDependencyFile withUpgradedVersions(Map<String, String> upgrades, @Nullable String scope, @Nullable String groupName);
@@ -55,34 +55,40 @@ public interface PythonDependencyFile extends Trait<SourceFile> {
      * PDM uses {@code [tool.pdm.overrides]}, and other managers add a direct dependency.
      * For requirements.txt: appends the dependency.
      *
-     * @param pins package name → version constraint
+     * @param pins      package name → version constraint
+     * @param scope     the scope to look for transitive dependencies in, or {@code null} to search all scopes
+     * @param groupName required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
      */
-    PythonDependencyFile withPinnedTransitiveDependencies(Map<String, String> pins);
+    PythonDependencyFile withPinnedTransitiveDependencies(Map<String, String> pins, @Nullable String scope, @Nullable String groupName);
 
     /**
      * Remove dependencies from the specified scope.
      *
      * @param packageNames package names to remove
-     * @param scope        the TOML scope, or {@code null} for the default ({@code [project].dependencies})
+     * @param scope        the scope to remove from, or {@code null} to remove from all scopes
      * @param groupName    required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
      */
     PythonDependencyFile withRemovedDependencies(Set<String> packageNames, @Nullable String scope, @Nullable String groupName);
 
     /**
-     * Change a dependency to a different package, searching all scopes.
+     * Change a dependency to a different package.
      *
      * @param oldPackageName the current package name
      * @param newPackageName the new package name
      * @param newVersion     optional new version constraint, or {@code null} to preserve the original
+     * @param scope          the scope to change in, or {@code null} to change in all scopes
+     * @param groupName      required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
      */
-    PythonDependencyFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion);
+    PythonDependencyFile withChangedDependency(String oldPackageName, String newPackageName, @Nullable String newVersion, @Nullable String scope, @Nullable String groupName);
 
     /**
      * Add search result markers for vulnerable dependencies.
      *
      * @param packageMessages package name → vulnerability description message
+     * @param scope           the scope to search in, or {@code null} to search all scopes
+     * @param groupName       required for {@code "project.optional-dependencies"} or {@code "dependency-groups"}
      */
-    PythonDependencyFile withDependencySearchMarkers(Map<String, String> packageMessages, ExecutionContext ctx);
+    PythonDependencyFile withDependencySearchMarkers(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName, ExecutionContext ctx);
 
     /**
      * Post-process the modified source file, e.g. regenerate lock files.
