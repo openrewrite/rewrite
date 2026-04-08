@@ -314,7 +314,7 @@ class CSharpParseProjectTest implements RewriteTest {
             });
 
             try {
-                List<SourceFile> sourceFiles = rpc.parseSolution(solutionPath, rootDir, ctx).sourceFiles().toList();
+                List<SourceFile> sourceFiles = rpc.parseSolution(solutionPath, rootDir, ctx).toList();
 
                 int parseErrors = 0;
                 for (SourceFile sf : sourceFiles) {

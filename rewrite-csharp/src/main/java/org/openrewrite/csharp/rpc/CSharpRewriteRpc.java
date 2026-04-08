@@ -119,29 +119,30 @@ public class CSharpRewriteRpc extends RewriteRpc {
      * @param ctx     Execution context for parsing
      * @return Stream of parsed source files
      */
-    public ParseSolutionResult parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
+    public Stream<SourceFile> parseSolution(Path path, Path rootDir, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         Map<String, Object> options = new HashMap<>();
         options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
                 ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true));
 
-        // Phase 1: Eager RPC call to get lightweight response (IDs + metadata)
-        parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
-        ParseSolutionResponse response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
-        parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.itemCount()));
-
-        // Phase 2: Lazy stream that retrieves full ASTs one at a time via getObject()
-        Stream<SourceFile> sourceFiles = StreamSupport.stream(new Spliterator<SourceFile>() {
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
+            private @Nullable ParseSolutionResponse response;
 
             @Override
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
-                if (index >= response.itemCount()) {
+                if (response == null) {
+                    parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
+                    response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
+                    parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.getItems().size()));
+                }
+
+                if (index >= response.getItems().size()) {
                     return false;
                 }
 
-                ParseSolutionResponse.Item item = response.getItem(index);
+                ParseSolutionResponse.Item item = response.getItems().get(index);
                 index++;
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
@@ -158,16 +159,16 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
             @Override
             public long estimateSize() {
-                return response.itemCount() - index;
+                return response == null ? Long.MAX_VALUE : response.getItems().size() - index;
             }
 
             @Override
             public int characteristics() {
-                return ORDERED | SIZED | SUBSIZED;
+                // Don't report SIZED until response is available, as estimateSize()
+                // returns Long.MAX_VALUE before the RPC call completes
+                return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
-
-        return new ParseSolutionResult(sourceFiles, response.projects);
     }
 
     public static Builder builder() {

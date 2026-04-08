@@ -13,23 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using OpenRewrite.Core;
+using OpenRewrite.Xml;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
-namespace OpenRewrite.Core;
+namespace OpenRewrite.CSharp;
 
 /// <summary>
-/// Language-agnostic precondition utilities.
+/// A reusable scanner visitor that captures build-related XML documents
+/// (csproj, props, targets, nuget.config, etc.) as raw LSTs into a
+/// <see cref="DotNetBuildContext"/> stored in the <see cref="ExecutionContext"/>.
+///
+/// Used automatically by <see cref="Recipes.CsProjRecipe"/> in its scan phase.
+/// Can also be composed into custom scanners for recipes that extend
+/// <see cref="ScanningRecipe{T}"/> directly.
 /// </summary>
-public static class Preconditions
+public class BuildContextScanner : XmlVisitor<ExecutionContext>
 {
-    /// <summary>
-    /// Wraps a visitor with a precondition check. The inner visitor only runs
-    /// on files where the precondition matches.
-    /// </summary>
-    public static ITreeVisitor<ExecutionContext> Check(
-        ITreeVisitor<ExecutionContext> precondition,
-        ITreeVisitor<ExecutionContext> visitor)
+    public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
     {
-        return new Check(precondition, visitor);
+        DotNetBuildContext.GetOrCreate(ctx).CaptureIfBuildFile(document);
+        return document;
     }
 }

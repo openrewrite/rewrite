@@ -55,6 +55,7 @@ public class RewriteRpcServer
     private readonly ConcurrentDictionary<string, ExecutionContext> _executionContexts = new();
     private string? _recipesProjectDir;
     private JsonRpc? _jsonRpc;
+    private DotNetBuildContext? _buildContext;
 
     /// <summary>
     /// Objects that have been parsed locally and are available for remote access.
@@ -262,296 +263,42 @@ public class RewriteRpcServer
                 response.Items.Add(new ParseSolutionResponseItem
                 {
                     Id = id,
-                    SourceFileType = sourceFileType,
-                    ProjectPath = project.FilePath!
+                    SourceFileType = sourceFileType
                 });
             }
 
-            // Extract MSBuild project metadata from .csproj
+            // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker
+            // Files are already on disk and restore happened during solution loading,
+            // so we parse XML directly and create the marker from project.assets.json.
             try
             {
-                var metadata = ExtractProjectMetadata(project.FilePath!, rootDir);
-                response.Projects.Add(metadata);
+                var content = File.ReadAllText(project.FilePath!);
+                var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
+                var xmlParser = new OpenRewrite.Xml.XmlParser();
+                var csprojDoc = xmlParser.Parse(content, relativePath);
+                var marker = MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                if (marker != null)
+                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
+                _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
+                response.Items.Add(new ParseSolutionResponseItem
+                {
+                    Id = csprojDoc.Id.ToString(),
+                    SourceFileType = "org.openrewrite.xml.tree.Xml$Document"
+                });
             }
             catch (Exception ex)
             {
-                Log.Debug("RPC ParseSolution: failed to extract metadata for {ProjectPath}: {ExType}: {ExMessage}",
+                Log.Debug("RPC ParseSolution: failed to parse csproj for {ProjectPath}: {ExType}: {ExMessage}",
                     project.FilePath, ex.GetType().Name, ex.Message);
             }
         }
 
-        Log.Debug("RPC ParseSolution: completed, {ItemCount} source files, {ProjectCount} project metadata",
-            response.Items.Count, response.Projects.Count);
+        // Capture build context files from disk for reattestation
+        _buildContext = new DotNetBuildContext();
+        _buildContext.CaptureFromDisk(rootDir);
+
+        Log.Debug("RPC ParseSolution: completed, {ItemCount} source files", response.Items.Count);
         return response;
-    }
-
-    /// <summary>
-    /// Extracts MSBuild project metadata from a .csproj file by parsing its XML
-    /// and reading the resolved dependency tree from project.assets.json.
-    /// </summary>
-    private static ProjectMetadata ExtractProjectMetadata(string projectPath, string rootDir)
-    {
-        var doc = XDocument.Load(projectPath);
-        var root = doc.Root!;
-        var ns = root.Name.Namespace;
-
-        var relativePath = Path.GetRelativePath(rootDir, projectPath);
-
-        var metadata = new ProjectMetadata
-        {
-            ProjectPath = relativePath,
-            Sdk = root.Attribute("Sdk")?.Value
-        };
-
-        // Extract TargetFramework(s)
-        var tfmElement = root.Descendants(ns + "TargetFramework").FirstOrDefault();
-        var tfmsElement = root.Descendants(ns + "TargetFrameworks").FirstOrDefault();
-
-        var frameworks = new List<string>();
-        if (tfmsElement != null)
-        {
-            foreach (var tfm in tfmsElement.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                frameworks.Add(tfm);
-        }
-        else if (tfmElement != null)
-        {
-            frameworks.Add(tfmElement.Value.Trim());
-        }
-
-        // Extract PackageReferences
-        var packageRefs = root.Descendants(ns + "PackageReference")
-            .Select(e => new PackageReferenceEntry
-            {
-                Include = e.Attribute("Include")?.Value ?? "",
-                RequestedVersion = e.Attribute("Version")?.Value,
-                ResolvedVersion = e.Attribute("Version")?.Value // raw = resolved in XML context
-            })
-            .Where(r => !string.IsNullOrEmpty(r.Include))
-            .ToList();
-
-        // Extract ProjectReferences
-        var projectRefs = root.Descendants(ns + "ProjectReference")
-            .Select(e => new ProjectReferenceEntry
-            {
-                Include = e.Attribute("Include")?.Value ?? ""
-            })
-            .Where(r => !string.IsNullOrEmpty(r.Include))
-            .ToList();
-
-        // Read resolved packages from project.assets.json
-        var assetsPath = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json");
-        var resolvedByTfm = new Dictionary<string, List<ResolvedPackageEntry>>();
-        if (File.Exists(assetsPath))
-        {
-            try
-            {
-                resolvedByTfm = ReadResolvedPackages(assetsPath);
-            }
-            catch (Exception ex)
-            {
-                Log.Debug("Failed to read project.assets.json at {Path}: {Ex}", assetsPath, ex.Message);
-            }
-        }
-
-        // Extract properties with provenance
-        foreach (var propGroup in root.Descendants(ns + "PropertyGroup"))
-        {
-            foreach (var prop in propGroup.Elements())
-            {
-                var propName = prop.Name.LocalName;
-                if (!metadata.Properties.ContainsKey(propName))
-                {
-                    metadata.Properties[propName] = new PropertyEntry
-                    {
-                        Value = prop.Value,
-                        DefinedIn = relativePath
-                    };
-                }
-            }
-        }
-
-        // Discover NuGet package sources from nuget.config files
-        metadata.PackageSources = FindNuGetPackageSources(projectPath, rootDir);
-
-        // Build per-TFM metadata
-        foreach (var tfm in frameworks)
-        {
-            resolvedByTfm.TryGetValue(tfm, out var resolved);
-            metadata.TargetFrameworks.Add(new TargetFrameworkEntry
-            {
-                TargetFramework = tfm,
-                PackageReferences = packageRefs,
-                ResolvedPackages = resolved ?? new List<ResolvedPackageEntry>(),
-                ProjectReferences = projectRefs
-            });
-        }
-
-        // If no frameworks found, still include a default entry
-        if (frameworks.Count == 0)
-        {
-            metadata.TargetFrameworks.Add(new TargetFrameworkEntry
-            {
-                PackageReferences = packageRefs,
-                ProjectReferences = projectRefs
-            });
-        }
-
-        return metadata;
-    }
-
-    /// <summary>
-    /// Discovers NuGet package sources by walking up from the project directory
-    /// to the repository root looking for nuget.config files.
-    /// NuGet resolves sources hierarchically — closest config wins.
-    /// </summary>
-    private static List<PackageSourceEntry> FindNuGetPackageSources(string projectPath, string rootDir)
-    {
-        var sources = new List<PackageSourceEntry>();
-        var dir = Path.GetDirectoryName(projectPath);
-
-        while (dir != null && dir.StartsWith(rootDir, StringComparison.OrdinalIgnoreCase))
-        {
-            var configPath = Path.Combine(dir, "nuget.config");
-            // Case-insensitive check (NuGet.Config, nuget.config, NuGet.config all valid)
-            if (!File.Exists(configPath))
-            {
-                configPath = Path.Combine(dir, "NuGet.Config");
-                if (!File.Exists(configPath))
-                {
-                    configPath = Path.Combine(dir, "NuGet.config");
-                }
-            }
-
-            if (File.Exists(configPath))
-            {
-                try
-                {
-                    var configDoc = XDocument.Load(configPath);
-                    var packageSources = configDoc.Root?
-                        .Element("packageSources")?
-                        .Elements("add");
-
-                    if (packageSources != null)
-                    {
-                        foreach (var source in packageSources)
-                        {
-                            var key = source.Attribute("key")?.Value;
-                            var url = source.Attribute("value")?.Value;
-                            if (key != null && url != null &&
-                                !sources.Any(s => s.Key == key))
-                            {
-                                sources.Add(new PackageSourceEntry
-                                {
-                                    Key = key,
-                                    Url = url
-                                });
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log.Debug("Failed to parse nuget.config at {Path}: {Ex}", configPath, ex.Message);
-                }
-                // NuGet uses the closest config — stop walking up once we find one
-                break;
-            }
-
-            if (dir == rootDir) break;
-            dir = Path.GetDirectoryName(dir);
-        }
-
-        // Default to nuget.org if no sources found
-        if (sources.Count == 0)
-        {
-            sources.Add(new PackageSourceEntry
-            {
-                Key = "nuget.org",
-                Url = "https://api.nuget.org/v3/index.json"
-            });
-        }
-
-        return sources;
-    }
-
-    /// <summary>
-    /// Reads the resolved dependency tree from project.assets.json.
-    /// Returns a dictionary keyed by target framework moniker.
-    /// </summary>
-    private static Dictionary<string, List<ResolvedPackageEntry>> ReadResolvedPackages(string assetsPath)
-    {
-        var result = new Dictionary<string, List<ResolvedPackageEntry>>();
-        var json = JObject.Parse(File.ReadAllText(assetsPath));
-        var targets = json["targets"] as JObject;
-        if (targets == null) return result;
-
-        foreach (var (tfmKey, tfmValue) in targets)
-        {
-            // tfmKey is like "net8.0" or ".NETCoreApp,Version=v8.0"
-            var tfm = tfmKey.Contains(',')
-                ? NormalizeTfm(tfmKey)
-                : tfmKey;
-
-            var packages = new List<ResolvedPackageEntry>();
-            if (tfmValue is JObject tfmObj)
-            {
-                foreach (var (pkgKey, pkgValue) in tfmObj)
-                {
-                    // pkgKey is "PackageName/Version"
-                    var parts = pkgKey.Split('/', 2);
-                    if (parts.Length != 2) continue;
-
-                    var type = pkgValue?["type"]?.Value<string>();
-                    if (type != "package") continue;
-
-                    var deps = new List<ResolvedPackageEntry>();
-                    var dependencies = pkgValue?["dependencies"] as JObject;
-                    if (dependencies != null)
-                    {
-                        foreach (var (depName, depVersion) in dependencies)
-                        {
-                            deps.Add(new ResolvedPackageEntry
-                            {
-                                Name = depName,
-                                ResolvedVersion = depVersion?.Value<string>() ?? "",
-                                Depth = 1
-                            });
-                        }
-                    }
-
-                    packages.Add(new ResolvedPackageEntry
-                    {
-                        Name = parts[0],
-                        ResolvedVersion = parts[1],
-                        Dependencies = deps,
-                        Depth = 0
-                    });
-                }
-            }
-
-            result[tfm] = packages;
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Normalizes a full framework identifier like ".NETCoreApp,Version=v8.0" to "net8.0".
-    /// </summary>
-    private static string NormalizeTfm(string fullTfm)
-    {
-        // Simple heuristic: extract the version part
-        if (fullTfm.StartsWith(".NETCoreApp,Version=v") || fullTfm.StartsWith(".NETCoreApp,Version=V"))
-        {
-            var version = fullTfm.Substring(".NETCoreApp,Version=v".Length);
-            return "net" + version;
-        }
-        if (fullTfm.StartsWith(".NETStandard,Version=v") || fullTfm.StartsWith(".NETStandard,Version=V"))
-        {
-            var version = fullTfm.Substring(".NETStandard,Version=v".Length);
-            return "netstandard" + version;
-        }
-        return fullTfm;
     }
 
     /// <summary>
@@ -1073,16 +820,12 @@ public class RewriteRpcServer
 
         var response = new GenerateResponse();
 
-        var scanningBase = GetScanningRecipeBase(recipe.GetType());
-        if (scanningBase != null)
+        if (recipe is IScanningRecipe scanning)
         {
             var ctx = GetOrCreateExecutionContext(request.P);
-            var acc = GetOrCreateAccumulator(request.Id, recipe, scanningBase, ctx);
+            var acc = GetOrCreateAccumulator(request.Id, scanning, ctx);
 
-            var generateMethod = scanningBase.GetMethod("Generate")
-                ?? throw new InvalidOperationException(
-                    $"Could not find Generate method on {scanningBase.Name}");
-            var generated = (IEnumerable<SourceFile>)generateMethod.Invoke(recipe, [acc, ctx])!;
+            var generated = scanning.Generate(acc, ctx);
 
             foreach (var g in generated)
             {
@@ -1133,7 +876,7 @@ public class RewriteRpcServer
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
-            ScanVisitor = GetScanningRecipeBase(recipe.GetType()) != null ? $"scan:{id}" : null
+            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null
         };
 
         if (recipe is IDelegatesTo del)
@@ -1237,25 +980,10 @@ public class RewriteRpcServer
         var ctx = GetOrCreateExecutionContext(request.PId);
         ITreeVisitor<ExecutionContext> visitor;
 
-        var scanningBase = GetScanningRecipeBase(recipe.GetType());
-        if (scanningBase != null)
+        if (recipe is IScanningRecipe scanning)
         {
-            var acc = GetOrCreateAccumulator(recipeId, recipe, scanningBase, ctx);
-            if (phase == "scan")
-            {
-                var getScannerMethod = scanningBase.GetMethod("GetScanner")
-                    ?? throw new InvalidOperationException(
-                        $"Could not find GetScanner method on {scanningBase.Name}");
-                visitor = (ITreeVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
-            }
-            else
-            {
-                var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
-                    [scanningBase.GetGenericArguments()[0]])
-                    ?? throw new InvalidOperationException(
-                        $"Could not find GetVisitor(T) method on {scanningBase.Name}");
-                visitor = (ITreeVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
-            }
+            var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
+            visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
         }
         else
         {
@@ -1321,23 +1049,10 @@ public class RewriteRpcServer
                 throw new InvalidOperationException($"Prepared recipe not found: {recipeId}");
 
             ITreeVisitor<ExecutionContext> visitor;
-            var scanningBase = GetScanningRecipeBase(recipe.GetType());
-            if (scanningBase != null)
+            if (recipe is IScanningRecipe scanning)
             {
-                var acc = GetOrCreateAccumulator(recipeId, recipe, scanningBase, ctx);
-                if (phase == "scan")
-                {
-                    var getScannerMethod = scanningBase.GetMethod("GetScanner")
-                        ?? throw new InvalidOperationException($"Could not find GetScanner on {scanningBase.Name}");
-                    visitor = (ITreeVisitor<ExecutionContext>)getScannerMethod.Invoke(recipe, [acc])!;
-                }
-                else
-                {
-                    var getVisitorMethod = scanningBase.GetMethod("GetVisitor",
-                        [scanningBase.GetGenericArguments()[0]])
-                        ?? throw new InvalidOperationException($"Could not find GetVisitor on {scanningBase.Name}");
-                    visitor = (ITreeVisitor<ExecutionContext>)getVisitorMethod.Invoke(recipe, [acc])!;
-                }
+                var acc = GetOrCreateAccumulator(recipeId, scanning, ctx);
+                visitor = phase == "scan" ? scanning.Scanner(acc) : scanning.Editor(acc);
             }
             else
             {
@@ -1485,11 +1200,20 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Asks the Java peer to parse source content and returns the parsed tree.
-    /// The Java side selects the appropriate parser based on the file extension.
+    /// Parses source content, handling .csproj files locally and delegating others to Java.
     /// </summary>
     public SourceFile ParseOnRemote(string sourcePath, string content, string? sourceFileType = null)
     {
+        // Parse .csproj files locally using C# XmlParser + MSBuildProject marker
+        var csprojParser = new Xml.CsprojParser();
+        if (csprojParser.Accept(sourcePath))
+        {
+            var doc = csprojParser.Parse(content, sourcePath);
+            var id = doc.Id.ToString();
+            _localObjects[id] = doc;
+            return doc;
+        }
+
         var response = _jsonRpc!.InvokeWithParameterObjectAsync<List<string>>(
             "Parse",
             new ParseRequest
@@ -1501,8 +1225,8 @@ public class RewriteRpcServer
         if (response.Count == 0)
             throw new InvalidOperationException($"Parse returned no results for {sourcePath}");
 
-        var id = response[0];
-        return (SourceFile)GetObjectFromRemoteAsync(id, sourceFileType).GetAwaiter().GetResult();
+        var id2 = response[0];
+        return (SourceFile)GetObjectFromRemoteAsync(id2, sourceFileType).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -1586,21 +1310,6 @@ public class RewriteRpcServer
     internal void StoreLocalObject(string id, object obj) => _localObjects[id] = obj;
 
     /// <summary>
-    /// Finds the closed generic ScanningRecipe&lt;T&gt; base type, or null if the recipe is not a scanning recipe.
-    /// </summary>
-    private static Type? GetScanningRecipeBase(Type recipeType)
-    {
-        var type = recipeType;
-        while (type != null)
-        {
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ScanningRecipe<>))
-                return type;
-            type = type.BaseType;
-        }
-        return null;
-    }
-
-    /// <summary>
     /// Gets or creates an ExecutionContext by ID, caching it for reuse across phases.
     /// </summary>
     private ExecutionContext GetOrCreateExecutionContext(string? pId)
@@ -1609,6 +1318,10 @@ public class RewriteRpcServer
             return existing;
 
         var ctx = new ExecutionContext();
+        // Inject the build context captured during ParseSolution so that
+        // reattestation (MSBuildProjectHelper) can materialize build files
+        _buildContext?.StoreIn(ctx);
+
         if (pId != null)
         {
             _executionContexts[pId] = ctx;
@@ -1620,15 +1333,12 @@ public class RewriteRpcServer
     /// <summary>
     /// Gets or creates the accumulator for a scanning recipe, storing it for reuse across scan/generate/edit phases.
     /// </summary>
-    private object? GetOrCreateAccumulator(string recipeId, Recipe recipe, Type scanningBase, ExecutionContext ctx)
+    private object? GetOrCreateAccumulator(string recipeId, IScanningRecipe recipe, ExecutionContext ctx)
     {
         if (_recipeAccumulators.TryGetValue(recipeId, out var acc))
             return acc;
-
-        var getInitialValue = scanningBase.GetMethod("GetInitialValue")
-            ?? throw new InvalidOperationException(
-                $"Could not find GetInitialValue method on {scanningBase.Name}");
-        acc = getInitialValue.Invoke(recipe, [ctx]);
+        
+        acc = recipe.InitialValue(ctx);
         _recipeAccumulators[recipeId] = acc;
         return acc;
     }
@@ -1692,63 +1402,12 @@ public class ParseSolutionRequest
 public class ParseSolutionResponse
 {
     public List<ParseSolutionResponseItem> Items { get; set; } = new();
-    public List<ProjectMetadata> Projects { get; set; } = new();
 }
 
 public class ParseSolutionResponseItem
 {
     public string Id { get; set; } = "";
     public string SourceFileType { get; set; } = "";
-    public string ProjectPath { get; set; } = "";
-}
-
-public class ProjectMetadata
-{
-    public string ProjectPath { get; set; } = "";
-    public string? Sdk { get; set; }
-    public Dictionary<string, PropertyEntry> Properties { get; set; } = new();
-    public List<TargetFrameworkEntry> TargetFrameworks { get; set; } = new();
-    public List<PackageSourceEntry> PackageSources { get; set; } = new();
-}
-
-public class PackageSourceEntry
-{
-    public string Key { get; set; } = "";
-    public string Url { get; set; } = "";
-}
-
-public class PropertyEntry
-{
-    public string Value { get; set; } = "";
-    public string? DefinedIn { get; set; }
-}
-
-public class TargetFrameworkEntry
-{
-    public string TargetFramework { get; set; } = "";
-    public List<PackageReferenceEntry> PackageReferences { get; set; } = new();
-    public List<ResolvedPackageEntry> ResolvedPackages { get; set; } = new();
-    public List<ProjectReferenceEntry> ProjectReferences { get; set; } = new();
-}
-
-public class PackageReferenceEntry
-{
-    public string Include { get; set; } = "";
-    public string? RequestedVersion { get; set; }
-    public string? ResolvedVersion { get; set; }
-}
-
-public class ResolvedPackageEntry
-{
-    public string Name { get; set; } = "";
-    public string ResolvedVersion { get; set; } = "";
-    public List<ResolvedPackageEntry> Dependencies { get; set; } = new();
-    public int Depth { get; set; }
-}
-
-public class ProjectReferenceEntry
-{
-    public string Include { get; set; } = "";
 }
 
 public class GetObjectRequest

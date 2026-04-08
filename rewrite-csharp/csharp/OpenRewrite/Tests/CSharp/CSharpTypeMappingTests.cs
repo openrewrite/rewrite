@@ -71,7 +71,7 @@ public class CSharpTypeMappingTests : RewriteTest
     {
         public VariableDeclarations? Found { get; private set; }
 
-        public override J? VisitVariableDeclarations(VariableDeclarations multiVariable, int p)
+        public override J VisitVariableDeclarations(VariableDeclarations multiVariable, int p)
         {
             if (multiVariable.Variables.Any(v => v.Element.Name.SimpleName == name))
                 Found = multiVariable;
