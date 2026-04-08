@@ -82,8 +82,11 @@ class CSharpRecipeTest implements RewriteTest {
         List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
           "Newtonsoft.Json", "13.0.1");
 
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
+        List<SourceFile> csFiles = sourceFiles.stream()
+          .filter(sf -> sf instanceof Cs.CompilationUnit)
+          .toList();
+        assertThat(csFiles).hasSize(1);
+        SourceFile sf = csFiles.getFirst();
         assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
 
         // Find the method invocation
@@ -122,7 +125,7 @@ class CSharpRecipeTest implements RewriteTest {
         try (OutputStream os = Files.newOutputStream(csproj)) {
             os.write(csprojContent.getBytes(StandardCharsets.UTF_8));
         }
-        return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).sourceFiles().toList();
+        return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).toList();
     }
 
     private static J.MethodInvocation findFirstMethodInvocation(Object tree) {
@@ -182,8 +185,11 @@ class CSharpRecipeTest implements RewriteTest {
         List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
           "Newtonsoft.Json", "13.0.1");
 
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
+        List<SourceFile> csFiles = sourceFiles.stream()
+          .filter(f -> f instanceof Cs.CompilationUnit)
+          .toList();
+        assertThat(csFiles).hasSize(1);
+        SourceFile sf = csFiles.getFirst();
 
         // Apply ChangeMethodName recipe directly via visitor
         var recipe = new ChangeMethodName(
