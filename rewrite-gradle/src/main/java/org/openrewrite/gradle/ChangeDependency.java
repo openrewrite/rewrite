@@ -232,7 +232,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         acc.versionVariableUpdates.put(varName, resolvedVersion);
                     }
                 } catch (MavenDownloadingException e) {
-                    acc.versionVariableUpdates.put(varName, e);
+                    // Don't overwrite a successful resolution with a failure from a different artifact
+                    // sharing the same version variable (e.g. hibernate-core resolved but hibernate-validator didn't)
+                    acc.versionVariableUpdates.putIfAbsent(varName, e);
                 }
             }
         };
@@ -360,7 +362,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 if (varName != null && !canUpdateVariable(varName)) {
                     Object scanResult = acc.versionVariableUpdates.get(varName);
                     if (scanResult instanceof Exception) {
-                        return ((MavenDownloadingException) scanResult).warn(m);
+                        // New coordinates can't be resolved — leave this dependency unchanged
+                        return m;
                     }
                     if (scanResult instanceof String) {
                         updated = updated.withDeclaredVersion((String) scanResult);
@@ -381,6 +384,22 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         if (resolvedVersion != null && !resolvedVersion.equals(declaredVersion)) {
                             updated = updated.withDeclaredVersion(resolvedVersion);
                         }
+                    }
+                } else if (!StringUtils.isBlank(newVersion)) {
+                    // varName != null && canUpdateVariable — verify the new coordinates actually resolve
+                    // before applying groupId/artifactId changes (glob patterns may match artifacts
+                    // that don't exist under the new coordinates)
+                    try {
+                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                .select(new GroupArtifact(
+                                                !StringUtils.isBlank(newGroupId) ? newGroupId : dep.getGroupId(),
+                                                !StringUtils.isBlank(newArtifactId) ? newArtifactId : dep.getArtifactId()),
+                                        dep.getConfigurationName(), newVersion, versionPattern, ctx);
+                        if (resolvedVersion == null) {
+                            return m;
+                        }
+                    } catch (MavenDownloadingException e) {
+                        return m;
                     }
                 }
 
