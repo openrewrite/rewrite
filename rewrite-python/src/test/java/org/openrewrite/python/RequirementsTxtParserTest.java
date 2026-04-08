@@ -110,8 +110,6 @@ class RequirementsTxtParserTest {
 
     @Test
     void dependenciesFromResolvedTreatsDeclaredPackagesAsDirect() {
-        // Simulate a linked graph: requests depends on certifi
-        // But both are declared in the requirements.txt, so both should be direct
         ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
         ResolvedDependency requests = new ResolvedDependency("requests", "2.31.0", null, List.of(certifi));
 
@@ -120,7 +118,6 @@ class RequirementsTxtParserTest {
                 "certifi==2024.2.2\nrequests==2.31.0\n");
         List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolved, declared);
 
-        // Both should be direct because both are declared in the requirements.txt
         assertThat(deps).hasSize(2);
         assertThat(deps.get(0).getName()).isEqualTo("certifi");
         assertThat(deps.get(1).getName()).isEqualTo("requests");
@@ -128,9 +125,6 @@ class RequirementsTxtParserTest {
 
     @Test
     void declaredPackagesAreDirectAndUndeclaredTransitivesAreExcluded() {
-        // urllib3 and charset-normalizer are resolved (from freeze) but NOT in requirements.txt
-        // requests and certifi ARE in requirements.txt
-        // requests depends on certifi, urllib3, and charset-normalizer
         ResolvedDependency urllib3 = new ResolvedDependency("urllib3", "2.2.1", null, null);
         ResolvedDependency charsetNormalizer = new ResolvedDependency("charset-normalizer", "3.3.2", null, null);
         ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
@@ -142,8 +136,6 @@ class RequirementsTxtParserTest {
                 "requests==2.31.0\ncertifi==2024.2.2\n");
         List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolved, declared);
 
-        // requests and certifi are declared in the file -> direct
-        // urllib3 and charset-normalizer are NOT declared and only appear as transitives -> excluded
         assertThat(deps).hasSize(2);
         assertThat(deps.stream().map(Dependency::getName))
                 .containsExactly("certifi", "requests");

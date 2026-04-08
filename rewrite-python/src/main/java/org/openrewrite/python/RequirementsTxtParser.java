@@ -146,16 +146,8 @@ public class RequirementsTxtParser implements Parser {
         return dependenciesFromResolved(resolved, Collections.emptySet());
     }
 
-    /**
-     * Convert resolved dependencies into declared (direct) dependencies.
-     * Packages whose normalized names appear in {@code declaredPackageNames} are always
-     * treated as direct, even when they also appear as transitive dependencies of other packages.
-     * This is the correct behavior for requirements.txt files where every listed package is
-     * explicitly declared by the user.
-     */
     public static List<Dependency> dependenciesFromResolved(List<ResolvedDependency> resolved,
                                                             Set<String> declaredPackageNames) {
-        // Collect all packages that appear as a transitive dependency of another package
         Set<String> transitive = new HashSet<>();
         for (ResolvedDependency r : resolved) {
             if (r.getDependencies() != null) {
@@ -177,9 +169,6 @@ public class RequirementsTxtParser implements Parser {
         return deps;
     }
 
-    /**
-     * Parse a requirements.txt file content and extract the normalized names of all declared packages.
-     */
     static Set<String> parseDeclaredPackageNames(String requirementsTxtContent) {
         Set<String> names = new HashSet<>();
         for (String line : requirementsTxtContent.split("\n")) {
@@ -187,7 +176,6 @@ public class RequirementsTxtParser implements Parser {
             if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("-")) {
                 continue;
             }
-            // Extract package name: everything before the first version specifier, marker, or extra
             int end = trimmed.length();
             for (int i = 0; i < trimmed.length(); i++) {
                 char c = trimmed.charAt(i);
