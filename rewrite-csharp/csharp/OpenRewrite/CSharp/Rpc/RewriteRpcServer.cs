@@ -268,12 +268,17 @@ public class RewriteRpcServer
             }
 
             // Parse the .csproj file itself as an Xml.Document LST with MSBuildProject marker
+            // Files are already on disk and restore happened during solution loading,
+            // so we parse XML directly and create the marker from project.assets.json.
             try
             {
                 var content = File.ReadAllText(project.FilePath!);
                 var relativePath = Path.GetRelativePath(rootDir, project.FilePath!);
-                var csprojParser = new OpenRewrite.Xml.CsprojParser();
-                var csprojDoc = csprojParser.Parse(content, relativePath, rootDir);
+                var xmlParser = new OpenRewrite.Xml.XmlParser();
+                var csprojDoc = xmlParser.Parse(content, relativePath);
+                var marker = MSBuildProjectHelper.CreateMarker(csprojDoc, rootDir);
+                if (marker != null)
+                    csprojDoc = csprojDoc.WithMarkers(csprojDoc.Markers.Add(marker));
                 _localObjects[csprojDoc.Id.ToString()] = csprojDoc;
                 response.Items.Add(new ParseSolutionResponseItem
                 {

@@ -122,6 +122,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                   </ItemGroup>
@@ -129,6 +132,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                     <PackageReference Include="Serilog" />
@@ -151,6 +157,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                   </ItemGroup>
@@ -158,6 +167,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                     <PackageReference Include="Serilog" Version="3.0.0" />
@@ -169,6 +181,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="FluentAssertions" Version="6.0.0" />
                   </ItemGroup>
@@ -176,6 +191,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="FluentAssertions" Version="6.0.0" />
                     <PackageReference Include="Serilog" Version="3.0.0" />
@@ -199,6 +217,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                   </ItemGroup>
@@ -206,6 +227,9 @@ public class AddNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                     <PackageReference Include="Serilog" Version="3.0.0" />

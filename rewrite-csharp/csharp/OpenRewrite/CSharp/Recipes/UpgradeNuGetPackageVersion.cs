@@ -114,24 +114,11 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
             {
                 anyMarker ??= marker;
 
+                // Resolve target versions from marker (which has MSBuild-resolved values)
                 foreach (var tfm in marker.TargetFrameworks)
                 {
                     foreach (var pkgRef in tfm.PackageReferences)
                     {
-                        // Track property usage for ALL packages (before glob filter)
-                        var requested = pkgRef.RequestedVersion;
-                        if (requested != null && IsPropertyReference(requested))
-                        {
-                            var propName = ExtractPropertyName(requested);
-                            if (!packagesByProperty.TryGetValue(propName, out var users))
-                            {
-                                users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                                packagesByProperty[propName] = users;
-                            }
-                            users.Add(pkgRef.Include);
-                        }
-
-                        // Only resolve versions for targeted packages
                         if (!GlobMatcher.Matches(pkgRef.Include, PackageName))
                             continue;
 
@@ -143,6 +130,11 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
                 }
             }
 
+            // Scan raw XML for property references in PackageReference Version attributes.
+            // The marker has MSBuild-resolved values; the XML has the actual "program" text
+            // (e.g., $(PropertyName)) which we need to detect property-based versioning.
+            ScanPackageReferencePropertyUsage(doc, packagesByProperty);
+
             // Scan this document's XML for property definitions
             ScanPropertyDefinitions(doc, sourcePath, propertyDefinitions);
         }
@@ -151,6 +143,30 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
         foreach (var (sourcePath, doc) in acc.BuildContext.Documents)
         {
             ScanPackageVersionElements(doc, acc, anyMarker);
+        }
+
+        // For packages that use property references and weren't resolved from the marker
+        // (e.g., cross-file property definitions where the property wasn't available during
+        // standalone restore), resolve using the property's defined value as the current version.
+        foreach (var (propName, users) in packagesByProperty)
+        {
+            if (!propertyDefinitions.TryGetValue(propName, out var propDefs) || propDefs.Count != 1)
+                continue;
+            var (_, currentValue) = propDefs[0];
+            if (IsPropertyReference(currentValue))
+                continue;
+
+            foreach (var pkgName in users)
+            {
+                if (acc.ResolvedVersions.ContainsKey(pkgName))
+                    continue;
+                if (!GlobMatcher.Matches(pkgName, PackageName))
+                    continue;
+
+                var targetVersion = ResolveTargetVersion(pkgName, currentValue, anyMarker, NewVersion, IncludePrerelease);
+                if (targetVersion != null)
+                    acc.ResolvedVersions.TryAdd(pkgName, targetVersion);
+            }
         }
 
         // Determine which properties are safe to update
@@ -202,6 +218,42 @@ public class UpgradeNuGetPackageVersion : ScanningRecipe<UpgradeNuGetPackageVers
                 acc.PropertyUpdates[defSourcePath] = props;
             }
             props[propName] = targetVersion;
+        }
+    }
+
+    /// <summary>
+    /// Scans raw XML for PackageReference elements whose Version attribute contains a
+    /// property reference like $(PropertyName). The marker has MSBuild-resolved values,
+    /// so we read the XML directly to discover property-based versioning.
+    /// </summary>
+    private static void ScanPackageReferencePropertyUsage(Document doc,
+        Dictionary<string, HashSet<string>> packagesByProperty)
+    {
+        var root = doc.Root;
+        if (root.ContentList == null) return;
+
+        foreach (var content in root.ContentList)
+        {
+            if (content is not Tag child || child.Name != "ItemGroup" || child.ContentList == null)
+                continue;
+
+            foreach (var item in child.ContentList)
+            {
+                if (item is not Tag itemTag || itemTag.Name != "PackageReference") continue;
+
+                var include = itemTag.GetAttributeValue("Include");
+                var version = itemTag.GetAttributeValue("Version");
+                if (include == null || version == null || !IsPropertyReference(version))
+                    continue;
+
+                var propName = ExtractPropertyName(version);
+                if (!packagesByProperty.TryGetValue(propName, out var users))
+                {
+                    users = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    packagesByProperty[propName] = users;
+                }
+                users.Add(include);
+            }
         }
     }
 

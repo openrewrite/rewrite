@@ -32,6 +32,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                   </ItemGroup>
@@ -39,6 +42,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                   </ItemGroup>
@@ -61,6 +67,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <NewtonsoftVersion>13.0.3</NewtonsoftVersion>
                   </PropertyGroup>
                   <ItemGroup>
@@ -71,6 +78,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <NewtonsoftVersion>14.0.1</NewtonsoftVersion>
                   </PropertyGroup>
                   <ItemGroup>
@@ -94,6 +102,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                   </ItemGroup>
@@ -115,6 +126,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="[13.0.0,14.0.0)" />
                   </ItemGroup>
@@ -122,6 +136,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                   </ItemGroup>
@@ -143,6 +160,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                     <PackageReference Include="Newtonsoft.Json.Bson" Version="1.0.2" />
@@ -151,6 +171,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                     <PackageReference Include="Newtonsoft.Json.Bson" Version="14.0.1" />
@@ -173,6 +196,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                   </ItemGroup>
@@ -180,6 +206,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                   </ItemGroup>
@@ -190,6 +219,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="12.0.0" />
                   </ItemGroup>
@@ -197,6 +229,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                   </ItemGroup>
@@ -219,6 +254,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json">
                       <Version>13.0.3</Version>
@@ -228,6 +266,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json">
                       <Version>14.0.1</Version>
@@ -251,6 +292,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json">
                       <Version>14.0.1</Version>
@@ -303,6 +347,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                   </ItemGroup>
@@ -310,6 +357,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                   </ItemGroup>
@@ -331,6 +381,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.*" />
                   </ItemGroup>
@@ -338,6 +391,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" />
                   </ItemGroup>
@@ -359,6 +415,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" PrivateAssets="all" ExcludeAssets="runtime" />
                   </ItemGroup>
@@ -366,6 +425,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="14.0.1" PrivateAssets="all" ExcludeAssets="runtime" />
                   </ItemGroup>
@@ -387,6 +449,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="newtonsoft.json" Version="13.0.3" />
                   </ItemGroup>
@@ -394,6 +459,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="newtonsoft.json" Version="14.0.1" />
                   </ItemGroup>
@@ -415,6 +483,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
                     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
@@ -424,6 +495,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
                     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
@@ -447,6 +521,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
                     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
@@ -456,6 +533,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
                     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
@@ -479,6 +559,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
                     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
@@ -487,6 +570,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
                     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
@@ -510,6 +596,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <NewtonsoftVersion>13.0.3</NewtonsoftVersion>
                   </PropertyGroup>
                   <ItemGroup>
@@ -520,6 +607,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <NewtonsoftVersion>14.0.1</NewtonsoftVersion>
                   </PropertyGroup>
                   <ItemGroup>
@@ -562,6 +650,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftVersion)" />
                   </ItemGroup>
@@ -609,6 +700,9 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" />
                   </ItemGroup>
@@ -645,6 +739,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <NewtonsoftVersion>13.0.3</NewtonsoftVersion>
                   </PropertyGroup>
                   <ItemGroup>
@@ -671,6 +766,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <SharedVersion>13.0.3</SharedVersion>
                   </PropertyGroup>
                   <ItemGroup>
@@ -697,6 +793,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <BaseVersion>13.0.3</BaseVersion>
                     <NewtonsoftVersion>$(BaseVersion)</NewtonsoftVersion>
                   </PropertyGroup>
@@ -723,6 +820,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <EfCoreVersion>8.0.0</EfCoreVersion>
                   </PropertyGroup>
                   <ItemGroup>
@@ -735,6 +833,7 @@ public class UpgradeNuGetPackageVersionTests : RewriteTest
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
                     <EfCoreVersion>10.0.0</EfCoreVersion>
                   </PropertyGroup>
                   <ItemGroup>

@@ -31,6 +31,9 @@ public class FindNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
                     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.0" />
@@ -39,6 +42,9 @@ public class FindNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <!--~~>--><Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
                     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="7.0.0" />
@@ -60,6 +66,9 @@ public class FindNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk.Worker">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
                   </ItemGroup>
@@ -80,6 +89,9 @@ public class FindNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.4.0" />
                   </ItemGroup>
@@ -87,6 +99,9 @@ public class FindNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <!--~~>--><Project Sdk="Microsoft.NET.Sdk.Web">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="6.4.0" />
                   </ItemGroup>

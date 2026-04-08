@@ -65,6 +65,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Serilog" Version="3.0.0" />
                   </ItemGroup>
@@ -119,6 +122,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                     <PackageReference Include="Serilog" Version="3.0.0" />
@@ -127,6 +133,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
                     <PackageReference Include="Serilog" Version="3.0.0" />
                   </ItemGroup>
@@ -147,6 +156,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json">
                       <Version>13.0.3</Version>
@@ -157,6 +169,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Serilog" Version="3.0.0" />
                   </ItemGroup>
@@ -177,6 +192,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                     <PackageReference Include="Serilog" Version="3.0.0" />
@@ -185,6 +203,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Serilog" Version="3.0.0" />
                   </ItemGroup>
@@ -195,6 +216,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
             CsProj(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
                     <PackageReference Include="AutoMapper" Version="12.0.0" />
@@ -203,6 +227,9 @@ public class RemoveNuGetPackageReferenceTests : RewriteTest
                 """,
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net8.0</TargetFramework>
+                  </PropertyGroup>
                   <ItemGroup>
                     <PackageReference Include="AutoMapper" Version="12.0.0" />
                   </ItemGroup>

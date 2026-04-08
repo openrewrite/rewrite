@@ -21,7 +21,7 @@ namespace OpenRewrite.Tests.Xml;
 public class CsprojParserTests
 {
     [Fact]
-    public void CsprojParserAttachesMarkerWithSdkOnly()
+    public void CsprojParserRunsRestoreAndAttachesFullMarker()
     {
         var parser = new CsprojParser();
         var doc = parser.Parse(
@@ -39,14 +39,22 @@ public class CsprojParserTests
         var marker = doc.Markers.FindFirst<MSBuildProject>();
         Assert.NotNull(marker);
         Assert.Equal("Microsoft.NET.Sdk", marker.Sdk);
-        // Without rootDir/project.assets.json, only Sdk is populated
-        Assert.Empty(marker.TargetFrameworks);
+        // Without rootDir, CsprojParser runs dotnet restore in a temp dir to generate
+        // project.assets.json, so the marker has full metadata
+        Assert.Single(marker.TargetFrameworks);
+        Assert.Equal("net8.0", marker.TargetFrameworks[0].TargetFrameworkMoniker);
+        Assert.Single(marker.TargetFrameworks[0].PackageReferences);
+        var pkgRef = marker.TargetFrameworks[0].PackageReferences[0];
+        Assert.Equal("Newtonsoft.Json", pkgRef.Include);
+        Assert.Equal("13.0.3", pkgRef.RequestedVersion);
+        Assert.Equal("13.0.3", pkgRef.ResolvedVersion);
     }
 
     [Fact]
-    public void CsprojParserWithAssetsJson()
+    public void MarkerCreatedFromAssetsJson()
     {
-        // Set up a temp directory with a project.assets.json
+        // Set up a temp directory with a hand-crafted project.assets.json
+        // to test MSBuildProjectHelper.CreateMarker directly
         var tempDir = Path.Combine(Path.GetTempPath(), "openrewrite-test-" + Guid.NewGuid().ToString("N")[..8]);
         var projectDir = Path.Combine(tempDir, "src");
         var objDir = Path.Combine(projectDir, "obj");
@@ -102,8 +110,8 @@ public class CsprojParserTests
                 """;
             File.WriteAllText(Path.Combine(objDir, "project.assets.json"), assetsJson);
 
-            var parser = new CsprojParser();
-            var doc = parser.Parse(
+            var xmlParser = new XmlParser();
+            var doc = xmlParser.Parse(
                 """
                 <Project Sdk="Microsoft.NET.Sdk">
                   <PropertyGroup>
@@ -114,10 +122,9 @@ public class CsprojParserTests
                   </ItemGroup>
                 </Project>
                 """,
-                sourcePath: "src/TestProject.csproj",
-                rootDir: tempDir);
+                sourcePath: "src/TestProject.csproj");
 
-            var marker = doc.Markers.FindFirst<MSBuildProject>();
+            var marker = MSBuildProjectHelper.CreateMarker(doc, tempDir);
             Assert.NotNull(marker);
             Assert.Equal("Microsoft.NET.Sdk", marker.Sdk);
             Assert.Single(marker.TargetFrameworks);
