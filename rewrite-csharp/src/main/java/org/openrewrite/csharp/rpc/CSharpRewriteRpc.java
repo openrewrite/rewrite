@@ -179,7 +179,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
     public static class Builder implements Supplier<CSharpRewriteRpc> {
         private static final String TOOL_COMMAND = "rewrite-csharp";
         private static final String NUGET_PACKAGE_ID = "OpenRewrite.CSharp.Tool";
-        private static final String REWRITE_SOURCE_PATH_ENV = "REWRITE_SOURCE_PATH";
+
 
         private RecipeMarketplace marketplace = new RecipeMarketplace();
         private List<RecipeBundleResolver> resolvers = new ArrayList<>();
@@ -222,7 +222,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
          * Explicit entry point for the C# RPC server, primarily for tests.
          * When set, the server is launched via {@code dotnet run --project <path>}
          * (for {@code .csproj}) or {@code dotnet <path>} (for DLLs), bypassing
-         * both {@code REWRITE_SOURCE_PATH} and global tool auto-install.
+         * global tool auto-install.
          */
         public Builder csharpServerEntry(Path csharpServerEntry) {
             this.csharpServerEntry = csharpServerEntry;
@@ -295,23 +295,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     );
                 }
             } else {
-                // If REWRITE_SOURCE_PATH is set, launch from source via dotnet run
-                String rewriteSourcePath = System.getenv(REWRITE_SOURCE_PATH_ENV);
-                if (rewriteSourcePath != null && !rewriteSourcePath.isEmpty()) {
-                    Path csproj = Paths.get(rewriteSourcePath)
-                            .resolve("rewrite-csharp/csharp/OpenRewrite.Tool/OpenRewrite.Tool.csproj");
-                    if (!Files.exists(csproj)) {
-                        throw new IllegalStateException(
-                                REWRITE_SOURCE_PATH_ENV + " is set to " + rewriteSourcePath +
-                                " but " + csproj + " does not exist");
-                    }
-                    cmd = buildCsprojCommand(csproj);
-                } else {
-                    // Run via dotnet tool exec with the pinned version from the build
-                    String version = StringUtils.readFully(
-                            CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
-                    cmd = buildToolExecCommand(version);
-                }
+                // Run via dotnet tool exec with the pinned version from the build
+                String version = StringUtils.readFully(
+                        CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
+                cmd = buildToolExecCommand(version);
             }
 
             return startProcess(cmd);
