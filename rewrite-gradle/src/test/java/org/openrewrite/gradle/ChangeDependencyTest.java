@@ -1134,9 +1134,9 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def hibernateVersion = '6.0.2.Final'
+              def hibernateVersion = '5.6.15.Final'
               dependencies {
-                  implementation "org.hibernate.orm:hibernate-core:${hibernateVersion}"
+                  implementation "org.hibernate.orm:hibernate-core:6.0.2.Final"
                   implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
               }
               """
