@@ -177,7 +177,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 }
                             }
                         } catch (MavenDownloadingException e) {
-                            return e.warn(t);
+                            // New coordinates can't be resolved — leave this dependency unchanged
+                            return tag;
                         }
                     }
                     if (t != tag) {

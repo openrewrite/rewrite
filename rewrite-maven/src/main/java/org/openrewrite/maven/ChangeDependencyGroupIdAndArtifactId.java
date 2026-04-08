@@ -391,7 +391,8 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                 deferUpdate = true;
                             }
                         } catch (MavenDownloadingException e) {
-                            return e.warn(tag);
+                            // New coordinates can't be resolved — leave this dependency unchanged
+                            return tag;
                         }
                     }
 
