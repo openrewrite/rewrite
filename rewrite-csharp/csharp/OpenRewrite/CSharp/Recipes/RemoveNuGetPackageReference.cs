@@ -43,35 +43,6 @@ public class RemoveNuGetPackageReference : ScanningRecipe<DotNetBuildContext>
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new RemoveNuGetVisitor(PackageName));
-    }
-
-    private class RemoveNuGetVisitor(string packageName) : XmlVisitor<ExecutionContext>
-    {
-        private bool _modified;
-
-        public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
-        {
-            _modified = false;
-            var d = (Document)base.VisitDocument(document, ctx);
-            if (_modified)
-                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
-            return d;
-        }
-
-        public override Xml.Xml VisitTag(Tag tag, ExecutionContext ctx)
-        {
-            var t = (Tag)base.VisitTag(tag, ctx);
-            if (t.Name == "PackageReference")
-            {
-                var include = t.GetAttributeValue("Include");
-                if (include != null && GlobMatcher.Matches(include, packageName))
-                {
-                    _modified = true;
-                    DoAfterVisit(new RemoveContentVisitor<ExecutionContext>(t, true, false));
-                }
-            }
-            return t;
-        }
+            new RemoveNuGetPackageReferenceVisitor(PackageName));
     }
 }

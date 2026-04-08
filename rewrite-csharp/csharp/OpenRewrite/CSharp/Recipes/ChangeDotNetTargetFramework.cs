@@ -49,62 +49,6 @@ public class ChangeDotNetTargetFramework : ScanningRecipe<DotNetBuildContext>
     {
         return Preconditions.Check(
             new IsProjectFile(),
-            new ChangeTfmVisitor(OldTargetFramework, NewTargetFramework));
-    }
-
-    private class ChangeTfmVisitor(string oldTfm, string newTfm) : XmlVisitor<ExecutionContext>
-    {
-        private bool _modified;
-
-        public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
-        {
-            _modified = false;
-            var d = (Document)base.VisitDocument(document, ctx);
-            if (_modified)
-                DoAfterVisit(MSBuildProjectHelper.RegenerateMarkerVisitor());
-            return d;
-        }
-
-        public override Xml.Xml VisitTag(Tag tag, ExecutionContext ctx)
-        {
-            var t = (Tag)base.VisitTag(tag, ctx);
-
-            if (t.Name == "TargetFramework")
-            {
-                var value = t.GetValue() ?? "";
-                if (oldTfm == value)
-                {
-                    _modified = true;
-                    DoAfterVisit(new ChangeTagValueVisitor<ExecutionContext>(t, newTfm));
-                }
-            }
-            else if (t.Name == "TargetFrameworks")
-            {
-                var value = t.GetValue() ?? "";
-                var frameworks = value.Split(';');
-                var changed = false;
-                var seen = new LinkedList<string>();
-                foreach (var framework in frameworks)
-                {
-                    var fw = framework.Trim();
-                    if (oldTfm == fw)
-                    {
-                        changed = true;
-                        fw = newTfm;
-                    }
-                    if (!seen.Contains(fw))
-                        seen.AddLast(fw);
-                }
-
-                if (changed)
-                {
-                    _modified = true;
-                    DoAfterVisit(new ChangeTagValueVisitor<ExecutionContext>(
-                        t, string.Join(";", seen)));
-                }
-            }
-
-            return t;
-        }
+            new ChangeDotNetTargetFrameworkVisitor(OldTargetFramework, NewTargetFramework));
     }
 }
