@@ -53,7 +53,7 @@ public class PythonDependencyExecutionContextView extends DelegatingExecutionCon
      */
     @SuppressWarnings("unchecked")
     public Map<Path, String> getUpdatedLockFiles() {
-        return computeMessageIfAbsent(UPDATED_LOCK_FILES, k -> new HashMap<Path, String>());
+        return computeMessageIfAbsent(UPDATED_LOCK_FILES, k -> new HashMap<>());
     }
 
     /**
@@ -64,6 +64,6 @@ public class PythonDependencyExecutionContextView extends DelegatingExecutionCon
      */
     @SuppressWarnings("unchecked")
     public Map<Path, String> getExistingLockContents() {
-        return computeMessageIfAbsent(EXISTING_LOCK_CONTENTS, k -> new HashMap<Path, String>());
+        return computeMessageIfAbsent(EXISTING_LOCK_CONTENTS, k -> new HashMap<>());
     }
 }

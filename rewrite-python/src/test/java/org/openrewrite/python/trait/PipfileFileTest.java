@@ -18,19 +18,21 @@ package org.openrewrite.python.trait;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
-import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.TomlVisitor;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Collections;
+import java.util.List;
 
+import static java.util.Collections.*;
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
@@ -40,10 +42,10 @@ class PipfileFileTest implements RewriteTest {
         return new PythonResolutionResult(
                 randomId(), null, null, null, null,
                 "Pipfile", null, null,
-                Collections.emptyList(), dependencies,
-                Collections.emptyMap(), Collections.emptyMap(),
-                Collections.emptyList(), Collections.emptyList(),
-                Collections.emptyList(), PythonResolutionResult.PackageManager.Pipenv, null
+                emptyList(), dependencies,
+                emptyMap(), emptyMap(),
+                emptyList(), emptyList(),
+                emptyList(), PythonResolutionResult.PackageManager.Pipenv, null
         );
     }
 
@@ -51,10 +53,10 @@ class PipfileFileTest implements RewriteTest {
         TomlParser parser = new TomlParser();
         Parser.Input input = Parser.Input.fromString(Paths.get("Pipfile"), content);
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input), null,
+                singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
-        Toml.Document doc = (Toml.Document) parsed.get(0);
+        ).toList();
+        Toml.Document doc = (Toml.Document) parsed.getFirst();
         return doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
     }
 
@@ -70,13 +72,12 @@ class PipfileFileTest implements RewriteTest {
     class MatcherTest {
         @Test
         void matchesPipfile() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
 
             PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
             PythonDependencyFile result = matcher.test(rootCursor(doc));
 
-            assertThat(result).isNotNull();
             assertThat(result).isInstanceOf(PipfileFile.class);
         }
 
@@ -85,9 +86,9 @@ class PipfileFileTest implements RewriteTest {
             TomlParser parser = new TomlParser();
             Parser.Input input = Parser.Input.fromString(Paths.get("Pipfile"), "[packages]\nrequests = \"*\"");
             Toml.Document doc = (Toml.Document) parser.parseInputs(
-                    Collections.singletonList(input), null,
+                    singletonList(input), null,
                     new InMemoryExecutionContext(Throwable::printStackTrace)
-            ).collect(Collectors.toList()).get(0);
+            ).toList().getFirst();
 
             PipfileFile.Matcher matcher = new PipfileFile.Matcher();
             assertThat(matcher.test(rootCursor(doc))).isNull();
@@ -95,13 +96,13 @@ class PipfileFileTest implements RewriteTest {
 
         @Test
         void doesNotMatchPyprojectToml() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             TomlParser parser = new TomlParser();
             Parser.Input input = Parser.Input.fromString(Paths.get("pyproject.toml"), "[project]\nname = \"test\"");
             Toml.Document doc = (Toml.Document) parser.parseInputs(
-                    Collections.singletonList(input), null,
+                    singletonList(input), null,
                     new InMemoryExecutionContext(Throwable::printStackTrace)
-            ).collect(Collectors.toList()).get(0);
+            ).toList().getFirst();
             doc = doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
 
             PipfileFile.Matcher matcher = new PipfileFile.Matcher();
@@ -113,40 +114,40 @@ class PipfileFileTest implements RewriteTest {
     class UpgradeVersionTest {
         @Test
         void upgradeSimpleVersion() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile upgraded = t.withUpgradedVersions(
-                    Collections.singletonMap("requests", ">=2.31.0"), null, null);
+                    singletonMap("requests", ">=2.31.0"), null, null);
 
-            String printed = ((Toml.Document) upgraded.getTree()).printAll();
+            String printed = upgraded.getTree().printAll();
             assertThat(printed).contains("requests = \">=2.31.0\"");
         }
 
         @Test
         void upgradeInDevPackages() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile(
                     "[packages]\nflask = \"*\"\n\n[dev-packages]\npytest = \">=7.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile upgraded = t.withUpgradedVersions(
-                    Collections.singletonMap("pytest", ">=8.0"), "dev-packages", null);
+                    singletonMap("pytest", ">=8.0"), "dev-packages", null);
 
-            String printed = ((Toml.Document) upgraded.getTree()).printAll();
+            String printed = upgraded.getTree().printAll();
             assertThat(printed).contains("pytest = \">=8.0\"");
             assertThat(printed).contains("flask = \"*\"");
         }
 
         @Test
         void noOpWhenNotFound() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile upgraded = t.withUpgradedVersions(
-                    Collections.singletonMap("nonexistent", ">=1.0"), null, null);
+                    singletonMap("nonexistent", ">=1.0"), null, null);
 
             assertThat(upgraded).isSameAs(t);
         }
@@ -156,40 +157,40 @@ class PipfileFileTest implements RewriteTest {
     class AddDependencyTest {
         @Test
         void addToPackages() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile added = t.withAddedDependencies(
-                    Collections.singletonMap("flask", ">=2.0"), "packages", null);
+                    singletonMap("flask", ">=2.0"), "packages", null);
 
-            String printed = ((Toml.Document) added.getTree()).printAll();
+            String printed = added.getTree().printAll();
             assertThat(printed).contains("flask = \">=2.0\"");
             assertThat(printed).contains("requests = \">=2.28.0\"");
         }
 
         @Test
         void addToDevPackages() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile(
                     "[packages]\nrequests = \"*\"\n\n[dev-packages]\npytest = \">=7.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile added = t.withAddedDependencies(
-                    Collections.singletonMap("mypy", ">=1.0"), "dev-packages", null);
+                    singletonMap("mypy", ">=1.0"), "dev-packages", null);
 
-            String printed = ((Toml.Document) added.getTree()).printAll();
+            String printed = added.getTree().printAll();
             assertThat(printed).contains("mypy = \">=1.0\"");
         }
 
         @Test
         void noOpWhenAlreadyPresent() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile added = t.withAddedDependencies(
-                    Collections.singletonMap("requests", ">=2.31.0"), "packages", null);
+                    singletonMap("requests", ">=2.31.0"), "packages", null);
 
             assertThat(added).isSameAs(t);
         }
@@ -199,26 +200,26 @@ class PipfileFileTest implements RewriteTest {
     class RemoveDependencyTest {
         @Test
         void removeFromPackages() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"\nflask = \"*\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile removed = t.withRemovedDependencies(
-                    Collections.singleton("flask"), "packages", null);
+                    singleton("flask"), "packages", null);
 
-            String printed = ((Toml.Document) removed.getTree()).printAll();
+            String printed = removed.getTree().printAll();
             assertThat(printed).contains("requests = \">=2.28.0\"");
             assertThat(printed).doesNotContain("flask");
         }
 
         @Test
         void noOpWhenNotFound() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile removed = t.withRemovedDependencies(
-                    Collections.singleton("nonexistent"), "packages", null);
+                    singleton("nonexistent"), "packages", null);
 
             assertThat(removed).isSameAs(t);
         }
@@ -228,27 +229,28 @@ class PipfileFileTest implements RewriteTest {
     class ChangeDependencyTest {
         @Test
         void renamePackage() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile changed = t.withChangedDependency("requests", "httpx", null, null, null);
 
-            String printed = ((Toml.Document) changed.getTree()).printAll();
+            String printed = changed.getTree().printAll();
             assertThat(printed).contains("httpx = \">=2.28.0\"");
             assertThat(printed).doesNotContain("requests");
         }
 
         @Test
         void renameWithNewVersion() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             PipfileFile changed = t.withChangedDependency("requests", "httpx", ">=0.24.0", null, null);
 
-            String printed = ((Toml.Document) changed.getTree()).printAll();
+            String printed = changed.getTree().printAll();
             assertThat(printed).contains("httpx = \">=0.24.0\"");
+            assertThat(printed).doesNotContain("requests");
         }
     }
 
@@ -256,18 +258,18 @@ class PipfileFileTest implements RewriteTest {
     class SearchMarkersTest {
         @Test
         void markVulnerableDependency() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile(
                     "[packages]\nrequests = \">=2.28.0\"\nflask = \"*\"", marker);
             PipfileFile t = trait(doc, marker);
 
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PipfileFile marked = t.withDependencySearchMarkers(
-                    Collections.singletonMap("requests", "CVE-2023-1234"), null, null, ctx);
+                    singletonMap("requests", "CVE-2023-1234"), null, null, ctx);
 
             Toml.Document result = (Toml.Document) marked.getTree();
             boolean[] found = {false};
-            new org.openrewrite.toml.TomlVisitor<Integer>() {
+            new TomlVisitor<Integer>() {
                 @Override
                 public Toml visitKeyValue(Toml.KeyValue keyValue, Integer p) {
                     if (keyValue.getKey() instanceof Toml.Identifier &&
@@ -283,31 +285,31 @@ class PipfileFileTest implements RewriteTest {
 
         @Test
         void noOpWhenNoMatch() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile("[packages]\nrequests = \">=2.28.0\"", marker);
             PipfileFile t = trait(doc, marker);
 
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PipfileFile marked = t.withDependencySearchMarkers(
-                    Collections.singletonMap("nonexistent", "CVE-2023-9999"), null, null, ctx);
+                    singletonMap("nonexistent", "CVE-2023-9999"), null, null, ctx);
 
             assertThat(marked).isSameAs(t);
         }
 
         @Test
         void searchMarkersFilteredByMatchingScope() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile(
                     "[packages]\nrequests = \">=2.28.0\"\n\n[dev-packages]\npytest = \"*\"", marker);
             PipfileFile t = trait(doc, marker);
 
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PipfileFile marked = t.withDependencySearchMarkers(
-                    Collections.singletonMap("requests", "CVE-2023-1234"), "packages", null, ctx);
+                    singletonMap("requests", "CVE-2023-1234"), "packages", null, ctx);
 
             Toml.Document result = (Toml.Document) marked.getTree();
             boolean[] found = {false};
-            new org.openrewrite.toml.TomlVisitor<Integer>() {
+            new TomlVisitor<Integer>() {
                 @Override
                 public Toml visitKeyValue(Toml.KeyValue keyValue, Integer p) {
                     if (keyValue.getKey() instanceof Toml.Identifier &&
@@ -323,14 +325,14 @@ class PipfileFileTest implements RewriteTest {
 
         @Test
         void searchMarkersNoOpWhenScopeDoesNotMatch() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList());
+            PythonResolutionResult marker = createMarker(emptyList());
             Toml.Document doc = parsePipfile(
                     "[packages]\nrequests = \">=2.28.0\"\n\n[dev-packages]\npytest = \"*\"", marker);
             PipfileFile t = trait(doc, marker);
 
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PipfileFile marked = t.withDependencySearchMarkers(
-                    Collections.singletonMap("requests", "CVE-2023-1234"), "dev-packages", null, ctx);
+                    singletonMap("requests", "CVE-2023-1234"), "dev-packages", null, ctx);
 
             assertThat(marked).isSameAs(t);
         }

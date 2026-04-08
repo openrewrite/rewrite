@@ -27,12 +27,14 @@ import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.TomlVisitor;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.python.Assertions.pyproject;
@@ -45,12 +47,12 @@ class PythonDependencyFileTest implements RewriteTest {
     private static PythonResolutionResult createMarker(List<Dependency> dependencies,
                                                        List<ResolvedDependency> resolved) {
         return new PythonResolutionResult(
-                randomId(), "test-project", "1.0.0", null, null,
-                ".", null, null,
-                Collections.emptyList(), dependencies,
-                Collections.emptyMap(), Collections.emptyMap(),
-                Collections.emptyList(), Collections.emptyList(),
-                resolved, null, null
+          randomId(), "test-project", "1.0.0", null, null,
+          ".", null, null,
+          emptyList(), dependencies,
+          Collections.emptyMap(), Collections.emptyMap(),
+          emptyList(), emptyList(),
+          resolved, null, null
         );
     }
 
@@ -58,18 +60,18 @@ class PythonDependencyFileTest implements RewriteTest {
         TomlParser parser = new TomlParser();
         Parser.Input input = Parser.Input.fromString(Paths.get("pyproject.toml"), content);
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input), null,
-                new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
-        Toml.Document doc = (Toml.Document) parsed.get(0);
+          singletonList(input), null,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).toList();
+        Toml.Document doc = (Toml.Document) parsed.getFirst();
         return doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
     }
 
     private static PlainText createRequirementsTxt(String content, PythonResolutionResult marker) {
         return new PlainText(
-                randomId(), Paths.get("requirements.txt"),
-                Markers.EMPTY.addIfAbsent(marker),
-                "UTF-8", false, null, null, content, null
+          randomId(), Paths.get("requirements.txt"),
+          Markers.EMPTY.addIfAbsent(marker),
+          "UTF-8", false, null, null, content, null
         );
     }
 
@@ -93,7 +95,7 @@ class PythonDependencyFileTest implements RewriteTest {
     }
 
     private static Recipe searchMarkersRecipe(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName) {
-        return RewriteTest.toRecipe(() -> new TreeVisitor<Tree, ExecutionContext>() {
+        return RewriteTest.toRecipe(() -> new TreeVisitor<>() {
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
             @Override
@@ -126,14 +128,14 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void preservesEnvironmentMarker() {
             String result = PythonDependencyFile.rewritePep508Spec(
-                    "pywin32>=300; sys_platform=='win32'", "pywin32", "306");
+              "pywin32>=300; sys_platform=='win32'", "pywin32", "306");
             assertThat(result).isEqualTo("pywin32>=306; sys_platform=='win32'");
         }
 
         @Test
         void preservesExtrasAndMarker() {
             String result = PythonDependencyFile.rewritePep508Spec(
-                    "requests[security]>=2.28.0; python_version>='3.8'", "requests", "2.31.0");
+              "requests[security]>=2.28.0; python_version>='3.8'", "requests", "2.31.0");
             assertThat(result).isEqualTo("requests[security]>=2.31.0; python_version>='3.8'");
         }
 
@@ -150,11 +152,9 @@ class PythonDependencyFileTest implements RewriteTest {
         void updatesMatchingVersions() {
             ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
             ResolvedDependency flask = new ResolvedDependency("flask", "2.0.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(), Arrays.asList(requests, flask));
+            PythonResolutionResult marker = createMarker(emptyList(), Arrays.asList(requests, flask));
 
-            Map<String, String> updates = new HashMap<>();
-            updates.put("requests", "2.31.0");
-
+            Map<String, String> updates = Map.of("requests", "2.31.0");
             PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
 
             assertThat(updated.getResolvedDependencies()).hasSize(2);
@@ -165,11 +165,9 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void returnsOriginalWhenNoChanges() {
             ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(), Collections.singletonList(requests));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(requests));
 
-            Map<String, String> updates = new HashMap<>();
-            updates.put("nonexistent", "1.0.0");
-
+            Map<String, String> updates = Map.of("nonexistent", "1.0.0");
             PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
 
             assertThat(updated).isSameAs(marker);
@@ -178,11 +176,9 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void returnsOriginalWhenVersionUnchanged() {
             ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(), Collections.singletonList(requests));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(requests));
 
-            Map<String, String> updates = new HashMap<>();
-            updates.put("requests", "2.28.0");
-
+            Map<String, String> updates = Map.of("requests", "2.28.0");
             PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
 
             assertThat(updated).isSameAs(marker);
@@ -191,29 +187,27 @@ class PythonDependencyFileTest implements RewriteTest {
 
     @Nested
     class MatcherTest {
+        PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
         @Test
         void matchesPyProjectToml() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.31.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(), Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
             Toml.Document doc = parseToml("[project]\nname = \"test\"\ndependencies = [\"requests>=2.28.0\"]", marker);
 
-            PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
             PythonDependencyFile result = matcher.test(rootCursor(doc));
 
-            assertThat(result).isNotNull();
             assertThat(result).isInstanceOf(PyProjectFile.class);
         }
 
         @Test
         void matchesRequirementsTxt() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.31.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(), Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
 
-            PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
             PythonDependencyFile result = matcher.test(rootCursor(pt));
 
-            assertThat(result).isNotNull();
             assertThat(result).isInstanceOf(RequirementsFile.class);
         }
 
@@ -221,24 +215,22 @@ class PythonDependencyFileTest implements RewriteTest {
         void doesNotMatchWithoutMarker() {
             TomlParser parser = new TomlParser();
             Parser.Input input = Parser.Input.fromString(Paths.get("pyproject.toml"),
-                    "[project]\nname = \"test\"");
+              "[project]\nname = \"test\"");
             Toml.Document doc = (Toml.Document) parser.parseInputs(
-                    Collections.singletonList(input), null,
-                    new InMemoryExecutionContext(Throwable::printStackTrace)
-            ).collect(Collectors.toList()).get(0);
+              singletonList(input), null,
+              new InMemoryExecutionContext(Throwable::printStackTrace)
+            ).toList().getFirst();
 
-            PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
             assertThat(matcher.test(rootCursor(doc))).isNull();
         }
 
         @Test
         void doesNotMatchNonPythonFile() {
             PlainText pt = new PlainText(
-                    randomId(), Paths.get("readme.txt"),
-                    Markers.EMPTY, "UTF-8", false, null, null, "hello", null
+              randomId(), Paths.get("readme.txt"),
+              Markers.EMPTY, "UTF-8", false, null, null, "hello", null
             );
 
-            PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
             assertThat(matcher.test(rootCursor(pt))).isNull();
         }
     }
@@ -250,14 +242,13 @@ class PythonDependencyFileTest implements RewriteTest {
         void upgradesDependencyVersion() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
             Dependency dep = new Dependency("requests", ">=2.28.0", null, null, resolved);
-            PythonResolutionResult marker = createMarker(Collections.singletonList(dep),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(singletonList(dep), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             Toml.Document result = (Toml.Document) upgraded.getTree();
@@ -269,31 +260,29 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradePreservesExtras() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests[security]>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
-            String printed = ((Toml.Document) upgraded.getTree()).printAll();
+            String printed = upgraded.getTree().printAll();
             assertThat(printed).contains("\"requests[security]>=2.31.0\"");
         }
 
         @Test
         void upgradeNoOpWhenPackageNotFound() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("nonexistent", "1.0.0");
+            Map<String, String> upgrades = singletonMap("nonexistent", "1.0.0");
             PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(upgraded).isSameAs(trait);
@@ -302,35 +291,33 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradeUpdatesResolvedVersionsInMarker() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
-            assertThat(upgraded.getMarker().getResolvedDependencies().get(0).getVersion()).isEqualTo("2.31.0");
+            assertThat(upgraded.getMarker().getResolvedDependencies().getFirst().getVersion()).isEqualTo("2.31.0");
         }
 
         @Test
         void searchMarkersOnVulnerableDependency() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n    \"flask>=2.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> vulnerabilities = Collections.singletonMap("requests", "CVE-2023-1234");
+            Map<String, String> vulnerabilities = singletonMap("requests", "CVE-2023-1234");
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
 
             Toml.Document result = (Toml.Document) marked.getTree();
-            new org.openrewrite.toml.TomlVisitor<Integer>() {
+            new TomlVisitor<Integer>() {
                 @Override
                 public Toml visitLiteral(Toml.Literal literal, Integer p) {
                     if (literal.getValue().toString().contains("requests")) {
@@ -345,14 +332,13 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void searchMarkersNoOpWhenNoMatch() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> vulnerabilities = Collections.singletonMap("nonexistent", "CVE-2023-9999");
+            Map<String, String> vulnerabilities = singletonMap("nonexistent", "CVE-2023-9999");
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
 
@@ -362,20 +348,19 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void searchMarkersFilteredByMatchingScope() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> vulnerabilities = Collections.singletonMap("requests", "CVE-2023-1234");
+            Map<String, String> vulnerabilities = singletonMap("requests", "CVE-2023-1234");
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, "project.dependencies", null, ctx);
 
             Toml.Document result = (Toml.Document) marked.getTree();
             assertThat(result).isNotSameAs(doc);
-            new org.openrewrite.toml.TomlVisitor<Integer>() {
+            new TomlVisitor<Integer>() {
                 @Override
                 public Toml visitLiteral(Toml.Literal literal, Integer p) {
                     if (literal.getValue().toString().contains("requests")) {
@@ -389,14 +374,13 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void searchMarkersNoOpWhenScopeDoesNotMatch() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> vulnerabilities = Collections.singletonMap("requests", "CVE-2023-1234");
+            Map<String, String> vulnerabilities = singletonMap("requests", "CVE-2023-1234");
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, "build-system.requires", null, ctx);
 
@@ -407,8 +391,7 @@ class PythonDependencyFileTest implements RewriteTest {
         void searchMarkersNullScopeMatchesAllSections() {
             ResolvedDependency setuptools = new ResolvedDependency("setuptools", "68.0", null, null);
             ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Arrays.asList(setuptools, requests));
+            PythonResolutionResult marker = createMarker(emptyList(), List.of(setuptools, requests));
 
             String toml = "[build-system]\nrequires = [\"setuptools>=67.0\"]\n\n[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
@@ -424,15 +407,15 @@ class PythonDependencyFileTest implements RewriteTest {
             assertThat(result).isNotSameAs(doc);
             boolean[] foundSetuptools = {false};
             boolean[] foundRequests = {false};
-            new org.openrewrite.toml.TomlVisitor<Integer>() {
+            new TomlVisitor<Integer>() {
                 @Override
                 public Toml visitLiteral(Toml.Literal literal, Integer p) {
                     if (literal.getValue().toString().contains("setuptools") &&
-                            literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                      literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
                         foundSetuptools[0] = true;
                     }
                     if (literal.getValue().toString().contains("requests") &&
-                            literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                      literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
                         foundRequests[0] = true;
                     }
                     return literal;
@@ -446,8 +429,7 @@ class PythonDependencyFileTest implements RewriteTest {
         void upgradeMultipleDependencies() {
             ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
             ResolvedDependency flask = new ResolvedDependency("flask", "2.0.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Arrays.asList(requests, flask));
+            PythonResolutionResult marker = createMarker(emptyList(), List.of(requests, flask));
 
             String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n    \"flask>=2.0.0\",\n]";
             Toml.Document doc = parseToml(toml, marker);
@@ -458,7 +440,7 @@ class PythonDependencyFileTest implements RewriteTest {
             upgrades.put("flask", "3.0.0");
             PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
-            String printed = ((Toml.Document) upgraded.getTree()).printAll();
+            String printed = upgraded.getTree().printAll();
             assertThat(printed).contains("\"requests>=2.31.0\"");
             assertThat(printed).contains("\"flask>=3.0.0\"");
         }
@@ -466,14 +448,13 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void doesNotUpgradeDependenciesOutsideTargetScope() {
             ResolvedDependency resolved = new ResolvedDependency("setuptools", "68.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             String toml = "[build-system]\nrequires = [\"setuptools>=67.0\"]\n\n[project]\nname = \"test\"\ndependencies = []";
             Toml.Document doc = parseToml(toml, marker);
             PyProjectFile trait = pyProjectTrait(doc, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("setuptools", "69.0");
+            Map<String, String> upgrades = singletonMap("setuptools", "69.0");
             PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, "project.dependencies", null);
 
             // build-system is not inside project.dependencies, so it should not be upgraded
@@ -487,13 +468,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradesDependencyVersion() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0\nflask>=2.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             PlainText result = (PlainText) upgraded.getTree();
@@ -504,13 +484,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradePreservesExtras() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests[security]>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(((PlainText) upgraded.getTree()).getText()).isEqualTo("requests[security]>=2.31.0");
@@ -519,29 +498,27 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradePreservesEnvironmentMarkers() {
             ResolvedDependency resolved = new ResolvedDependency("pywin32", "300", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("pywin32>=300; sys_platform=='win32'", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("pywin32", "306");
+            Map<String, String> upgrades = singletonMap("pywin32", "306");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(((PlainText) upgraded.getTree()).getText())
-                    .isEqualTo("pywin32>=306; sys_platform=='win32'");
+              .isEqualTo("pywin32>=306; sys_platform=='win32'");
         }
 
         @Test
         void upgradeSkipsComments() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("# this is a comment\nrequests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String text = ((PlainText) upgraded.getTree()).getText();
@@ -552,13 +529,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradeSkipsFlags() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("-r base.txt\nrequests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String text = ((PlainText) upgraded.getTree()).getText();
@@ -569,13 +545,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradeNoOpWhenPackageNotFound() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("nonexistent", "1.0.0");
+            Map<String, String> upgrades = singletonMap("nonexistent", "1.0.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(upgraded).isSameAs(trait);
@@ -584,28 +559,26 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradeUpdatesResolvedVersionsInMarker() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
-            assertThat(upgraded.getMarker().getResolvedDependencies().get(0).getVersion()).isEqualTo("2.31.0");
+            assertThat(upgraded.getMarker().getResolvedDependencies().getFirst().getVersion()).isEqualTo("2.31.0");
         }
 
         @Test
         void upgradePreservesLeadingWhitespace() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("  requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(((PlainText) upgraded.getTree()).getText()).isEqualTo("  requests>=2.31.0");
@@ -614,13 +587,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void addsDependencyToEnd() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> additions = Collections.singletonMap("flask", "3.0.0");
+            Map<String, String> additions = singletonMap("flask", "3.0.0");
             RequirementsFile added = trait.withAddedDependencies(additions, null, null);
 
             String text = ((PlainText) added.getTree()).getText();
@@ -630,13 +602,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void addDependencyNoOpWhenAlreadyPresent() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> additions = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> additions = singletonMap("requests", "2.31.0");
             RequirementsFile added = trait.withAddedDependencies(additions, null, null);
 
             assertThat(added).isSameAs(trait);
@@ -645,21 +616,21 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void searchMarkersOnVulnerableDependency() {
             rewriteRun(
-                    spec -> spec.recipe(searchMarkersRecipe(
-                            Collections.singletonMap("requests", "CVE-2023-1234"))),
-                    requirementsTxt(
-                            "requests>=2.28.0\nflask>=2.0",
-                            "~~>requests>=2.28.0\nflask>=2.0"
-                    )
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"))),
+              requirementsTxt(
+                "requests>=2.28.0\nflask>=2.0",
+                "~~>requests>=2.28.0\nflask>=2.0"
+              )
             );
         }
 
         @Test
         void searchMarkersNoOpWhenNoMatch() {
             rewriteRun(
-                    spec -> spec.recipe(searchMarkersRecipe(
-                            Collections.singletonMap("nonexistent", "CVE-2023-9999"))),
-                    requirementsTxt("requests>=2.28.0")
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("nonexistent", "CVE-2023-9999"))),
+              requirementsTxt("requests>=2.28.0")
             );
         }
 
@@ -667,8 +638,7 @@ class PythonDependencyFileTest implements RewriteTest {
         void upgradeMultipleDependencies() {
             ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
             ResolvedDependency flask = new ResolvedDependency("flask", "2.0.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Arrays.asList(requests, flask));
+            PythonResolutionResult marker = createMarker(emptyList(), List.of(requests, flask));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0\nflask>=2.0.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
@@ -686,13 +656,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void upgradeHandlesEmptyLines() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0\n\nflask>=2.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             String text = ((PlainText) upgraded.getTree()).getText();
@@ -702,39 +671,38 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void searchMarkersNullScopeMatchesAllFiles() {
             rewriteRun(
-                    spec -> spec.recipe(searchMarkersRecipe(
-                            Collections.singletonMap("requests", "CVE-2023-1234"), null, null)),
-                    requirementsTxt(
-                            "requests>=2.28.0",
-                            "~~>requests>=2.28.0",
-                            s -> s.path("requirements-dev.txt")
-                    )
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"), null, null)),
+              requirementsTxt(
+                "requests>=2.28.0",
+                "~~>requests>=2.28.0",
+                s -> s.path("requirements-dev.txt")
+              )
             );
         }
 
         @Test
         void searchMarkersMatchingScopeMarksFile() {
             rewriteRun(
-                    spec -> spec.recipe(searchMarkersRecipe(
-                            Collections.singletonMap("requests", "CVE-2023-1234"), "", null)),
-                    requirementsTxt(
-                            "requests>=2.28.0",
-                            "~~>requests>=2.28.0"
-                    )
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"), "", null)),
+              requirementsTxt(
+                "requests>=2.28.0",
+                "~~>requests>=2.28.0"
+              )
             );
         }
 
         @Test
         void searchMarkersNoOpWhenScopeDoesNotMatch() {
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(new ResolvedDependency("requests", "2.28.0", null, null)));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(new ResolvedDependency("requests", "2.28.0", null, null)));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
             ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
             RequirementsFile marked = trait.withDependencySearchMarkers(
-                    Collections.singletonMap("requests", "CVE-2023-1234"), "dev", null, ctx);
+              singletonMap("requests", "CVE-2023-1234"), "dev", null, ctx);
 
             assertThat(marked).isSameAs(trait);
         }
@@ -746,43 +714,43 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void searchMarkersViaMatcher() {
             rewriteRun(
-                    spec -> spec.recipe(searchMarkersRecipe(
-                            Collections.singletonMap("requests", "CVE-2023-1234"))),
-                    pyproject(
-                            """
-                                [project]
-                                name = "test"
-                                dependencies = [
-                                    "requests>=2.28.0",
-                                    "flask>=2.0",
-                                ]
-                                """,
-                            """
-                                [project]
-                                name = "test"
-                                dependencies = [
-                                    ~~(CVE-2023-1234)~~>"requests>=2.28.0",
-                                    "flask>=2.0",
-                                ]
-                                """
-                    )
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"))),
+              pyproject(
+                """
+                  [project]
+                  name = "test"
+                  dependencies = [
+                      "requests>=2.28.0",
+                      "flask>=2.0",
+                  ]
+                  """,
+                """
+                  [project]
+                  name = "test"
+                  dependencies = [
+                      ~~(CVE-2023-1234)~~>"requests>=2.28.0",
+                      "flask>=2.0",
+                  ]
+                  """
+              )
             );
         }
 
         @Test
         void searchMarkersNoOpViaMatcher() {
             rewriteRun(
-                    spec -> spec.recipe(searchMarkersRecipe(
-                            Collections.singletonMap("nonexistent", "CVE-2023-9999"))),
-                    pyproject(
-                            """
-                                [project]
-                                name = "test"
-                                dependencies = [
-                                    "requests>=2.28.0",
-                                ]
-                                """
-                    )
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("nonexistent", "CVE-2023-9999"))),
+              pyproject(
+                """
+                  [project]
+                  name = "test"
+                  dependencies = [
+                      "requests>=2.28.0",
+                  ]
+                  """
+              )
             );
         }
     }
@@ -793,13 +761,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void nullScopeMatchesAllFiles() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
 
             assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
@@ -808,14 +775,13 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void emptyScopeMatchesRootRequirementsTxt() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             // requirements.txt (no suffix) should match scope=""
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "", null);
 
             assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
@@ -824,17 +790,16 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void emptyScopeDoesNotMatchScopedFile() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = new PlainText(
-                    randomId(), Paths.get("requirements-dev.txt"),
-                    Markers.EMPTY.addIfAbsent(marker),
-                    "UTF-8", false, null, null, "requests>=2.28.0", null
+              randomId(), Paths.get("requirements-dev.txt"),
+              Markers.EMPTY.addIfAbsent(marker),
+              "UTF-8", false, null, null, "requests>=2.28.0", null
             );
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "", null);
 
             // scope="" should NOT match requirements-dev.txt
@@ -844,17 +809,16 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void devScopeMatchesDevFile() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = new PlainText(
-                    randomId(), Paths.get("requirements-dev.txt"),
-                    Markers.EMPTY.addIfAbsent(marker),
-                    "UTF-8", false, null, null, "requests>=2.28.0", null
+              randomId(), Paths.get("requirements-dev.txt"),
+              Markers.EMPTY.addIfAbsent(marker),
+              "UTF-8", false, null, null, "requests>=2.28.0", null
             );
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "dev", null);
 
             assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
@@ -863,13 +827,12 @@ class PythonDependencyFileTest implements RewriteTest {
         @Test
         void devScopeDoesNotMatchRootFile() {
             ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
-            PythonResolutionResult marker = createMarker(Collections.emptyList(),
-                    Collections.singletonList(resolved));
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
 
             PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
             RequirementsFile trait = requirementsTrait(pt, marker);
 
-            Map<String, String> upgrades = Collections.singletonMap("requests", "2.31.0");
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
             RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "dev", null);
 
             // scope="dev" should NOT match requirements.txt
