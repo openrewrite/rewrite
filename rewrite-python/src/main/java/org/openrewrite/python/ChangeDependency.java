@@ -109,6 +109,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        if (acc.projectsToUpdate.isEmpty()) {
+            return TreeVisitor.noop();
+        }
         return new TreeVisitor<Tree, ExecutionContext>() {
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
