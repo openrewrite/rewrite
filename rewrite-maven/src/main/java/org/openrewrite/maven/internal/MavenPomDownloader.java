@@ -558,6 +558,16 @@ public class MavenPomDownloader {
         gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         gav = handleSnapshotTimestampVersion(gav);
+
+        // If the version still contains unresolved property placeholders (e.g. ${revision}),
+        // downloading from any repository will never succeed and would cause URISyntaxException
+        // due to illegal '{' / '}' characters in the constructed URI.
+        //noinspection DataFlowIssue
+        if (gav.getVersion().contains("${")) {
+            throw new MavenDownloadingException("Unable to download POM " + gav +
+                    ". Version contains unresolved property placeholder.", null, originalGav);
+        }
+
         Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
