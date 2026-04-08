@@ -20,6 +20,7 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.HasSourceSet;
@@ -163,6 +164,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         @Nullable
         String resolvedVersion;
         List<MavenRepository> repositories = new ArrayList<>();
+        @Nullable
+        Exception versionResolutionFailure;
     }
 
     @Override
@@ -218,7 +221,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                                 acc.repositories = repos;
                             }
                         } catch (Exception e) {
-                            // Version resolution failed; JavaSourceSet won't be updated
+                            acc.versionResolutionFailure = e;
                         }
                     }
                 }
@@ -278,9 +281,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return maven;
                 }
 
-                return new AddDependencyVisitor(
+                Xml result = new AddDependencyVisitor(
                         groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
                         type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
+                if (result != document && acc.versionResolutionFailure != null) {
+                    result = Markup.warn(result, acc.versionResolutionFailure);
+                }
+                return result;
             }
 
             private boolean isSubprojectOfParentInRepository(Scanned acc) {

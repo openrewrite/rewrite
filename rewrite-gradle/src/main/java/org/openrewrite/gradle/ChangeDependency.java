@@ -502,6 +502,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Nullable
             private JavaSourceSetUpdater updater;
+            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -543,9 +544,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                     return tree;
                 }
-                // For non-Gradle Java source files, update JavaSourceSet marker
-                if (hasModulesWithOldDep && tree instanceof JavaSourceFile &&
-                    !(tree instanceof G.CompilationUnit) && !(tree instanceof K.CompilationUnit)) {
+                // For Java source files, update JavaSourceSet marker
+                if (hasModulesWithOldDep && tree instanceof JavaSourceFile) {
                     return updateJavaSourceSet((SourceFile) tree, ctx);
                 }
                 return gradleVisitor.visit(tree, ctx);
@@ -564,6 +564,11 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 if (!maybeSourceSet.isPresent()) {
                     return sf;
                 }
+                String cacheKey = maybeJp.get().getId().toString() + ":" + maybeSourceSet.get().getName();
+                JavaSourceSet cached = updatedSourceSets.get(cacheKey);
+                if (cached != null) {
+                    return sf.withMarkers(sf.getMarkers().setByType(cached));
+                }
                 if (updater == null) {
                     updater = new JavaSourceSetUpdater(ctx);
                 }
@@ -577,6 +582,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         .withRepository(MavenRepository.MAVEN_CENTRAL);
                 JavaSourceSet updated = updater.changeDependency(maybeSourceSet.get(), oldDep, newDep);
                 if (updated != maybeSourceSet.get()) {
+                    updatedSourceSets.put(cacheKey, updated);
                     return sf.withMarkers(sf.getMarkers().setByType(updated));
                 }
                 return sf;

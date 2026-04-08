@@ -331,6 +331,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Nullable
             private JavaSourceSetUpdater updater;
+            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -365,6 +366,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 if (!maybeSourceSet.isPresent()) {
                     return sf;
                 }
+                String cacheKey = maybeJp.get().getId().toString() + ":" + maybeSourceSet.get().getName();
+                JavaSourceSet cached = updatedSourceSets.get(cacheKey);
+                if (cached != null) {
+                    return sf.withMarkers(sf.getMarkers().setByType(cached));
+                }
                 if (updater == null) {
                     updater = new JavaSourceSetUpdater(ctx);
                 }
@@ -383,6 +389,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                         .withRepository(findRemoteRepository(maybeJp.get()));
                 JavaSourceSet updated = updater.changeDependency(maybeSourceSet.get(), oldDep, newDep);
                 if (updated != maybeSourceSet.get()) {
+                    updatedSourceSets.put(cacheKey, updated);
                     return sf.withMarkers(sf.getMarkers().setByType(updated));
                 }
                 return sf;

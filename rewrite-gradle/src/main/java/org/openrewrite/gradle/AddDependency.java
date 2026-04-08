@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
 import org.openrewrite.gradle.trait.JvmTestSuite;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
@@ -31,7 +30,7 @@ import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -148,6 +147,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         @Nullable
         String resolvedVersion;
         List<MavenRepository> repositories = new ArrayList<>();
+        @Nullable
+        Exception versionResolutionFailure;
     }
 
     @Override
@@ -186,7 +187,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
                     return tree;
                 }
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
+                Optional<JavaProject> maybeJavaProject = sourceFile.getMarkers().findFirst(JavaProject.class);
+                if (maybeJavaProject.isPresent()) {
+                    JavaProject javaProject = maybeJavaProject.get();
                     boolean uses = usesType(sourceFile, ctx);
                     acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);
 
@@ -209,11 +212,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                                     acc.repositories = maybeGp.get().getMavenRepositories();
                                 }
                             } catch (MavenDownloadingException e) {
-                                // Version resolution failed
+                                acc.versionResolutionFailure = e;
                             }
                         }
                     }
-                });
+                }
                 return tree;
             }
         };
@@ -310,6 +313,24 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         );
 
         if (acc.configurationsByProject.isEmpty() || acc.resolvedVersion == null) {
+            if (acc.versionResolutionFailure != null) {
+                Exception failure = acc.versionResolutionFailure;
+                return new TreeVisitor<Tree, ExecutionContext>() {
+                    @Override
+                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                        return gradleVisitor.isAcceptable(sourceFile, ctx);
+                    }
+
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        Tree result = gradleVisitor.visit(tree, ctx);
+                        if (result != tree) {
+                            result = Markup.warn(result, failure);
+                        }
+                        return result;
+                    }
+                };
+            }
             return gradleVisitor;
         }
 
@@ -331,8 +352,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (gradleVisitor.isAcceptable(sf, ctx)) {
                     return gradleVisitor.visit(tree, ctx);
                 }
-                if (sf instanceof JavaSourceFile
-                        && !(sf instanceof G.CompilationUnit) && !(sf instanceof K.CompilationUnit)) {
+                if (sf instanceof JavaSourceFile) {
                     return updateJavaSourceSet(sf, ctx);
                 }
                 return tree;
