@@ -18,6 +18,7 @@ package org.openrewrite.python.internal;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,8 +52,8 @@ public class PythonDependencyExecutionContextView extends DelegatingExecutionCon
      * recipes seed with the latest lock content.
      */
     @SuppressWarnings("unchecked")
-    public Map<String, String> getUpdatedLockFiles() {
-        return computeMessageIfAbsent(UPDATED_LOCK_FILES, k -> new HashMap<String, String>());
+    public Map<Path, String> getUpdatedLockFiles() {
+        return computeMessageIfAbsent(UPDATED_LOCK_FILES, k -> new HashMap<Path, String>());
     }
 
     /**
@@ -62,7 +63,7 @@ public class PythonDependencyExecutionContextView extends DelegatingExecutionCon
      * latest lock content.
      */
     @SuppressWarnings("unchecked")
-    public Map<String, String> getExistingLockContents() {
-        return computeMessageIfAbsent(EXISTING_LOCK_CONTENTS, k -> new HashMap<String, String>());
+    public Map<Path, String> getExistingLockContents() {
+        return computeMessageIfAbsent(EXISTING_LOCK_CONTENTS, k -> new HashMap<Path, String>());
     }
 }

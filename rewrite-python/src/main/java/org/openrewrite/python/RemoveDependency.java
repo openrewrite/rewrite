@@ -106,7 +106,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
                 SourceFile sourceFile = (SourceFile) tree;
                 if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath().toString()),
+                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath()),
                             ((Toml.Document) tree).printAll());
                     return tree;
                 }

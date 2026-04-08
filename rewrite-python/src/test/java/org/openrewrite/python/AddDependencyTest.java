@@ -77,7 +77,7 @@ class AddDependencyTest implements RewriteTest {
             new AddDependency("click", ">=8.0", null, null)
           ))).afterRecipe(run -> {
               // Verify lock was regenerated with both new dependencies
-              Map<String, String> updatedLocks = PythonDependencyExecutionContextView.view(ctx).getUpdatedLockFiles();
+              Map<Path, String> updatedLocks = PythonDependencyExecutionContextView.view(ctx).getUpdatedLockFiles();
               assertThat(updatedLocks).isNotEmpty();
               String lockContent = updatedLocks.values().iterator().next();
               assertThat(lockContent).contains("name = \"flask\"");
