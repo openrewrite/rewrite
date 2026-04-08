@@ -391,8 +391,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                 deferUpdate = true;
                             }
                         } catch (MavenDownloadingException e) {
-                            // New coordinates can't be resolved — leave this dependency unchanged
-                            return tag;
+                            if (oldGroupId.contains("*") || oldGroupId.contains("?") ||
+                                oldArtifactId.contains("*") || oldArtifactId.contains("?")) {
+                                // Glob matched an artifact that doesn't exist under the new coordinates
+                                return tag;
+                            }
+                            return e.warn(tag);
                         }
                     }
 

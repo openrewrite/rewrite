@@ -162,6 +162,11 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         ));
     }
 
+    private boolean isGlobPattern() {
+        return oldGroupId.contains("*") || oldGroupId.contains("?") ||
+               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+    }
+
     public static class Accumulator {
         Map<String, Object> versionVariableUpdates = new HashMap<>();
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
@@ -233,10 +238,14 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         acc.versionVariableUpdates.put(varName, resolvedVersion);
                     }
                 } catch (MavenDownloadingException e) {
-                    acc.failedResolutions.add(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
-                    // Don't overwrite a successful resolution with a failure from a different artifact
-                    // sharing the same version variable (e.g. hibernate-core resolved but hibernate-validator didn't)
-                    acc.versionVariableUpdates.putIfAbsent(varName, e);
+                    if (isGlobPattern()) {
+                        acc.failedResolutions.add(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                        // Don't overwrite a successful resolution with a failure from a different artifact
+                        // sharing the same version variable (e.g. hibernate-core resolved but hibernate-validator didn't)
+                        acc.versionVariableUpdates.putIfAbsent(varName, e);
+                    } else {
+                        acc.versionVariableUpdates.put(varName, e);
+                    }
                 }
             }
         };
@@ -368,7 +377,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 if (varName != null && !canUpdateVariable(varName)) {
                     Object scanResult = acc.versionVariableUpdates.get(varName);
                     if (scanResult instanceof Exception) {
-                        return m;
+                        return ((MavenDownloadingException) scanResult).warn(m);
                     }
                     if (scanResult instanceof String) {
                         updated = updated.withDeclaredVersion((String) scanResult);
