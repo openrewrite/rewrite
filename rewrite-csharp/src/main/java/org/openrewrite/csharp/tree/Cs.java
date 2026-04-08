@@ -7212,26 +7212,14 @@ public interface Cs extends J {
         @Getter
         Expression expression;
 
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
         @Override
         public <P> J acceptCSharp(CSharpVisitor<P> v, P p) {
             return v.visitPointerDereference(this, p);
-        }
-
-        @Override
-        public JavaType getType() {
-            return expression == null ? null : expression.getType();
-        }
-
-        @Override
-        public PointerDereference withType(@Nullable JavaType type) {
-            if (expression == null) {
-                return this;
-            }
-            if (expression instanceof J.MethodInvocation) {
-                return withExpression(((J.MethodInvocation) expression)
-                        .withMethodType(type instanceof JavaType.Method ? (JavaType.Method) type : null));
-            }
-            return withExpression(expression.withType(type));
         }
 
         @Override
