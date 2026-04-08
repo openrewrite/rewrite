@@ -340,14 +340,11 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
         try (Stream<Path> entries = Files.list(projectPath)) {
-            List<Path> reqsPaths = new ArrayList<>();
+            List<Parser.Input> reqInputs = new ArrayList<>();
             entries.filter(p -> reqsParser.accept(p.getFileName()))
                     .sorted()
-                    .forEach(reqsPaths::add);
-            List<Parser.Input> reqInputs = new ArrayList<>(reqsPaths.size());
-            for (Path p : reqsPaths) {
-                reqInputs.add(Parser.Input.fromFile(p));
-            }
+                    .map(Parser.Input::fromFile)
+                    .forEach(reqInputs::add);
             if (!reqInputs.isEmpty()) {
                 return reqsParser.parseInputs(reqInputs, effectiveRelativeTo, ctx);
             }
