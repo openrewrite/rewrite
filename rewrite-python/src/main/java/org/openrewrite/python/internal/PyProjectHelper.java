@@ -65,7 +65,7 @@ public class PyProjectHelper {
         int end = 0;
         while (end < trimmed.length()) {
             char c = trimmed.charAt(end);
-            if (c == '[' || c == '>' || c == '<' || c == '=' || c == '!' || c == '~' || c == ';' || c == ' ') {
+            if (c == '[' || c == '>' || c == '<' || c == '=' || c == '!' || c == '~' || c == ';' || c == ' ' || c == '@') {
                 break;
             }
             end++;
