@@ -686,7 +686,9 @@ class XmlParserTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {
       "foo.xml",
+      "foo.XML",
       "proj.csproj",
+      "proj.Csproj",
       "/foo/bar/baz.jsp",
       "packages.config",
       "Packages.config",
