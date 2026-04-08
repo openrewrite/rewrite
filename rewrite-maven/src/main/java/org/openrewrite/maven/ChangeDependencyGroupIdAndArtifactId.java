@@ -114,6 +114,11 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
         this.changeManagedDependency = changeManagedDependency;
     }
 
+    private boolean isGlobPattern() {
+        return oldGroupId.contains("*") || oldGroupId.contains("?") ||
+               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+    }
+
     String displayName = "Change Maven dependency";
 
     @Override
@@ -391,9 +396,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                                 deferUpdate = true;
                             }
                         } catch (MavenDownloadingException e) {
-                            if (oldGroupId.contains("*") || oldGroupId.contains("?") ||
-                                oldArtifactId.contains("*") || oldArtifactId.contains("?")) {
-                                // Glob matched an artifact that doesn't exist under the new coordinates
+                            if (isGlobPattern()) {
                                 return tag;
                             }
                             return e.warn(tag);

@@ -342,8 +342,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return v;
                 }
                 Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
-                if (scanResult instanceof Exception) {
-                    return Markup.warn(v, (Exception) scanResult);
+                if (scanResult instanceof MavenDownloadingException) {
+                    return Markup.warn(v, (MavenDownloadingException) scanResult);
                 }
                 if (scanResult instanceof String && v.getInitializer() instanceof J.Literal) {
                     String resolvedVersion = (String) scanResult;
@@ -376,7 +376,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 String varName = dep.getVersionVariable();
                 if (varName != null && !canUpdateVariable(varName)) {
                     Object scanResult = acc.versionVariableUpdates.get(varName);
-                    if (scanResult instanceof Exception) {
+                    if (scanResult instanceof MavenDownloadingException) {
                         return ((MavenDownloadingException) scanResult).warn(m);
                     }
                     if (scanResult instanceof String) {
@@ -502,8 +502,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                     return entry;
                                 }
                                 Object scanResult = acc.versionVariableUpdates.get(entry.getKey());
-                                if (scanResult instanceof Exception) {
-                                    return Markup.warn(entry, (Exception) scanResult);
+                                if (scanResult instanceof MavenDownloadingException) {
+                                    return Markup.warn(entry, (MavenDownloadingException) scanResult);
                                 }
                                 if (scanResult instanceof String) {
                                     String resolvedVersion = (String) scanResult;

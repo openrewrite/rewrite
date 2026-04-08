@@ -101,6 +101,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         this.versionPattern = versionPattern;
     }
 
+    private boolean isGlobPattern() {
+        return oldGroupId.contains("*") || oldGroupId.contains("?") ||
+               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+    }
+
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
@@ -177,9 +182,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 }
                             }
                         } catch (MavenDownloadingException e) {
-                            if (oldGroupId.contains("*") || oldGroupId.contains("?") ||
-                                oldArtifactId.contains("*") || oldArtifactId.contains("?")) {
-                                // Glob matched an artifact that doesn't exist under the new coordinates
+                            if (isGlobPattern()) {
                                 return tag;
                             }
                             return e.warn(t);
