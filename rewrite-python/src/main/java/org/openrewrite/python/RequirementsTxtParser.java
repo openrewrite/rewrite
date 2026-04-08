@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -176,16 +177,8 @@ public class RequirementsTxtParser implements Parser {
             if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("-")) {
                 continue;
             }
-            int end = trimmed.length();
-            for (int i = 0; i < trimmed.length(); i++) {
-                char c = trimmed.charAt(i);
-                if (c == '<' || c == '>' || c == '=' || c == '!' || c == '~' || c == ';' || c == '[' || c == ' ' || c == '@') {
-                    end = i;
-                    break;
-                }
-            }
-            String name = trimmed.substring(0, end).trim();
-            if (!name.isEmpty()) {
+            String name = PyProjectHelper.extractPackageName(trimmed);
+            if (name != null) {
                 names.add(PythonResolutionResult.normalizeName(name));
             }
         }
