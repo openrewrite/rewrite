@@ -175,6 +175,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
         Set<GroupArtifact> failedResolutions = new HashSet<>();
         Map<JavaProject, ResolvedDependency> modulesWithOldDependency = new HashMap<>();
+        Map<JavaProject, List<MavenRepository>> moduleRepositories = new HashMap<>();
     }
 
     @Override
@@ -210,6 +211,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                 if (StringUtils.matchesGlob(resolved.getGroupId(), oldGroupId) &&
                                     StringUtils.matchesGlob(resolved.getArtifactId(), oldArtifactId)) {
                                     acc.modulesWithOldDependency.put(maybeJp.get(), resolved);
+                                    acc.moduleRepositories.put(maybeJp.get(), gradleProject.getMavenRepositories());
                                     break outer;
                                 }
                             }
@@ -579,13 +581,26 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         effectiveNewGroupId, effectiveNewArtifactId, oldDep.getVersion(), null);
                 ResolvedDependency newDep = oldDep
                         .withGav(newGav)
-                        .withRepository(MavenRepository.MAVEN_CENTRAL);
+                        .withRepository(findRemoteRepository(maybeJp.get()));
                 JavaSourceSet updated = updater.changeDependency(maybeSourceSet.get(), oldDep, newDep);
                 if (updated != maybeSourceSet.get()) {
                     updatedSourceSets.put(cacheKey, updated);
                     return sf.withMarkers(sf.getMarkers().setByType(updated));
                 }
                 return sf;
+            }
+
+            private MavenRepository findRemoteRepository(JavaProject jp) {
+                List<MavenRepository> repos = acc.moduleRepositories.get(jp);
+                if (repos != null) {
+                    for (MavenRepository repo : repos) {
+                        String uri = repo.getUri();
+                        if (uri != null && (uri.startsWith("http://") || uri.startsWith("https://"))) {
+                            return repo;
+                        }
+                    }
+                }
+                return MavenRepository.MAVEN_CENTRAL;
             }
         };
     }
