@@ -340,14 +340,16 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
         try (Stream<Path> entries = Files.list(projectPath)) {
-            Path reqsPath = entries
-                    .filter(p -> reqsParser.accept(p.getFileName()))
-                    .findFirst()
-                    .orElse(null);
-            if (reqsPath != null) {
-                Parser.Input input = Parser.Input.fromFile(reqsPath);
-                return reqsParser.parseInputs(
-                        Collections.singletonList(input), effectiveRelativeTo, ctx);
+            List<Path> reqsPaths = new ArrayList<>();
+            entries.filter(p -> reqsParser.accept(p.getFileName()))
+                    .sorted()
+                    .forEach(reqsPaths::add);
+            List<Parser.Input> reqInputs = new ArrayList<>(reqsPaths.size());
+            for (Path p : reqsPaths) {
+                reqInputs.add(Parser.Input.fromFile(p));
+            }
+            if (!reqInputs.isEmpty()) {
+                return reqsParser.parseInputs(reqInputs, effectiveRelativeTo, ctx);
             }
         } catch (IOException e) {
             // Silently skip manifest parsing if we can't list the directory
