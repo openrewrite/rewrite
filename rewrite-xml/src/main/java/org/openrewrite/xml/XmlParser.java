@@ -121,8 +121,9 @@ public class XmlParser implements Parser {
                 return true;
             }
         }
-        return path.endsWith("nuget.config") ||
-                path.endsWith("packages.config");
+        String fileName = path.getFileName().toString();
+        return fileName.equalsIgnoreCase("nuget.config") ||
+                fileName.equalsIgnoreCase("packages.config");
     }
 
     @Override
