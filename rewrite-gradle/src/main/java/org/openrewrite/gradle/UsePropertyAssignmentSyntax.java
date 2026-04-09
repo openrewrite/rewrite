@@ -54,6 +54,10 @@ public class UsePropertyAssignmentSyntax extends Recipe {
         return Preconditions.check(new FindSourceFiles("**/*.gradle"), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if ("plugins".equals(method.getSimpleName())) {
+                    return method;
+                }
+
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (m.getArguments().size() != 1 || m.getArguments().get(0) instanceof J.Empty) {
@@ -61,10 +65,6 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                 }
 
                 if (!propertyName.equals(m.getSimpleName())) {
-                    return m;
-                }
-
-                if (withinPlugins(getCursor())) {
                     return m;
                 }
 
@@ -76,11 +76,6 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                 return GroovyTemplate.apply(propertyName + " = #{any()}",
                         getCursor(), m.getCoordinates().replace(),
                         m.getArguments().get(0));
-            }
-
-            private boolean withinPlugins(Cursor cursor) {
-                Cursor parent = cursor.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
-                return !parent.isRoot() && "plugins".equals(((J.MethodInvocation) parent.getValue()).getSimpleName());
             }
         });
     }
