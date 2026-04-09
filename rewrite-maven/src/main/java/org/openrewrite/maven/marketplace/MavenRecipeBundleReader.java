@@ -208,14 +208,36 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private void setVersionRecursive(RecipeMarketplace.Category category) {
         for (RecipeListing recipe : category.getRecipes()) {
             RecipeBundle recipeBundle = recipe.getBundle();
-            // Only update bundles from the same package as the bundle we're reading
             if (bundle.getPackageName().equals(recipeBundle.getPackageName())) {
+                // Same package as the JAR we're reading -- use the JAR's version
                 recipeBundle.setVersion(bundle.getVersion());
                 recipeBundle.setRequestedVersion(bundle.getRequestedVersion());
+            } else if (recipeBundle.getVersion() == null) {
+                // Different package -- resolve the version from the dependency tree
+                resolveVersionFromDependencies(recipeBundle);
             }
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {
             setVersionRecursive(child);
+        }
+    }
+
+    private void resolveVersionFromDependencies(RecipeBundle recipeBundle) {
+        if (mrr == null) {
+            return;
+        }
+        String[] ga = recipeBundle.getPackageName().split(":");
+        if (ga.length != 2) {
+            return;
+        }
+        for (ResolvedDependency dep : mrr.getDependencies().get(Scope.Runtime)) {
+            if (dep.getGroupId().equals(ga[0]) && dep.getArtifactId().equals(ga[1])) {
+                String version = dep.getDatedSnapshotVersion() != null ?
+                        dep.getDatedSnapshotVersion() : dep.getVersion();
+                recipeBundle.setVersion(version);
+                recipeBundle.setRequestedVersion(version);
+                return;
+            }
         }
     }
 }

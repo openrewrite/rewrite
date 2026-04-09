@@ -34,11 +34,14 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
+import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -131,6 +134,81 @@ class MavenRecipeBundleReaderTest {
             if ("org.openrewrite:rewrite-core".equals(recipeBundle.getPackageName())) {
                 assertThat(recipeBundle.getVersion()).isEqualTo("8.70.0");
             }
+        }
+    }
+
+    @Test
+    void crossPackageRecipeVersionResolvedFromDependencyTree() throws Exception {
+        // Simulate the scenario where a recipe JAR's recipes.csv contains a recipe
+        // from a dependency JAR (different packageName). The version for the cross-package
+        // recipe should be resolved from the dependency tree.
+        //
+        // rewrite-static-analysis:2.32.0 has a recipes.csv and depends on
+        // org.openrewrite:rewrite-java:8.79.0
+        RecipeBundle staticAnalysisBundle = new RecipeBundle("maven",
+                "org.openrewrite.recipe:rewrite-static-analysis", "2.32.0", null, null);
+
+        MavenRecipeBundleReader reader = (MavenRecipeBundleReader) resolver.resolve(staticAnalysisBundle);
+
+        // Download the JAR and resolve the full classpath/dependency tree
+        List<Path> classpath = reader.classpath();
+        Path originalJar = reader.recipeJar;
+        assertThat(originalJar).isNotNull().exists();
+
+        // Extract the original JAR
+        Path classesDir = tempDir.resolve("modified-classes");
+        Files.createDirectories(classesDir);
+        MavenRecipeMarketplaceGeneratorTest.extractJar(originalJar, classesDir);
+
+        // Modify recipes.csv to add a cross-package recipe referencing rewrite-java
+        // (which is a dependency of rewrite-static-analysis)
+        Path recipesCsv = classesDir.resolve("META-INF/rewrite/recipes.csv");
+        assertThat(recipesCsv).exists();
+        String csvContent = Files.readString(recipesCsv);
+        // Match the 11-column header: ecosystem,packageName,name,displayName,description,
+        //   recipeCount,category1,category2,category1Description,category2Description,options
+        String crossPackageRow = "\nmaven,org.openrewrite:rewrite-java,org.openrewrite.java.CrossPackageTestRecipe,Cross Package Test,A test recipe from a dependency,1,,,,," ;
+        Files.writeString(recipesCsv, csvContent + crossPackageRow);
+
+        // Repackage as a new JAR, overwriting the cached artifact in-place
+        repackageAsJar(classesDir, originalJar);
+
+        // Reset recipeJar so read() re-enters the download path. The downloader's
+        // artifact cache will return the same path (now containing our modified JAR).
+        reader.recipeJar = null;
+
+        RecipeMarketplace marketplace = reader.read();
+
+        // Find the cross-package recipe and verify its version was resolved
+        RecipeListing crossPackageRecipe = marketplace.getAllRecipes().stream()
+                .filter(r -> r.getName().equals("org.openrewrite.java.CrossPackageTestRecipe"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Cross-package recipe not found in marketplace"));
+
+        assertThat(crossPackageRecipe.getBundle().getPackageName())
+                .isEqualTo("org.openrewrite:rewrite-java");
+        assertThat(crossPackageRecipe.getBundle().getVersion())
+                .as("Cross-package recipe version should be resolved from the dependency tree")
+                .isNotBlank()
+                .isEqualTo("8.79.0");
+
+        reader.close();
+    }
+
+    private void repackageAsJar(Path classesDir, Path jarPath) throws Exception {
+        try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jarPath.toFile()))) {
+            Files.walk(classesDir).forEach(path -> {
+                if (Files.isRegularFile(path)) {
+                    String entryName = classesDir.relativize(path).toString();
+                    try {
+                        jos.putNextEntry(new JarEntry(entryName));
+                        Files.copy(path, jos);
+                        jos.closeEntry();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
         }
     }
 
