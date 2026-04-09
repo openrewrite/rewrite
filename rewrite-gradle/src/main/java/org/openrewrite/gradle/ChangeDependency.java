@@ -162,9 +162,15 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         ));
     }
 
+    private boolean isGlobPattern() {
+        return oldGroupId.contains("*") || oldGroupId.contains("?") ||
+               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+    }
+
     public static class Accumulator {
         Map<String, Object> versionVariableUpdates = new HashMap<>();
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
+        Set<GroupArtifact> failedResolutions = new HashSet<>();
     }
 
     @Override
@@ -232,7 +238,14 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         acc.versionVariableUpdates.put(varName, resolvedVersion);
                     }
                 } catch (MavenDownloadingException e) {
-                    acc.versionVariableUpdates.put(varName, e);
+                    if (isGlobPattern()) {
+                        acc.failedResolutions.add(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
+                        // Don't overwrite a successful resolution with a failure from a different artifact
+                        // sharing the same version variable (e.g. hibernate-core resolved but hibernate-validator didn't)
+                        acc.versionVariableUpdates.putIfAbsent(varName, e);
+                    } else {
+                        acc.versionVariableUpdates.put(varName, e);
+                    }
                 }
             }
         };
@@ -329,8 +342,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     return v;
                 }
                 Object scanResult = acc.versionVariableUpdates.get(v.getSimpleName());
-                if (scanResult instanceof Exception) {
-                    return Markup.warn(v, (Exception) scanResult);
+                if (scanResult instanceof MavenDownloadingException) {
+                    return Markup.warn(v, (MavenDownloadingException) scanResult);
                 }
                 if (scanResult instanceof String && v.getInitializer() instanceof J.Literal) {
                     String resolvedVersion = (String) scanResult;
@@ -347,6 +360,10 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
             }
 
             private J.MethodInvocation updateDependency(J.MethodInvocation m, GradleDependency dep, ExecutionContext ctx) {
+                if (acc.failedResolutions.contains(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()))) {
+                    return m;
+                }
+
                 GradleDependency updated = dep;
 
                 if (!StringUtils.isBlank(newGroupId)) {
@@ -359,7 +376,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                 String varName = dep.getVersionVariable();
                 if (varName != null && !canUpdateVariable(varName)) {
                     Object scanResult = acc.versionVariableUpdates.get(varName);
-                    if (scanResult instanceof Exception) {
+                    if (scanResult instanceof MavenDownloadingException) {
                         return ((MavenDownloadingException) scanResult).warn(m);
                     }
                     if (scanResult instanceof String) {
@@ -485,8 +502,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                                     return entry;
                                 }
                                 Object scanResult = acc.versionVariableUpdates.get(entry.getKey());
-                                if (scanResult instanceof Exception) {
-                                    return Markup.warn(entry, (Exception) scanResult);
+                                if (scanResult instanceof MavenDownloadingException) {
+                                    return Markup.warn(entry, (MavenDownloadingException) scanResult);
                                 }
                                 if (scanResult instanceof String) {
                                     String resolvedVersion = (String) scanResult;
@@ -512,6 +529,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         }
         for (GroupArtifact ga : usages) {
             if (!depMatcher.matches(ga.getGroupId(), ga.getArtifactId())) {
+                return false;
+            }
+            if (acc.failedResolutions.contains(ga)) {
                 return false;
             }
         }

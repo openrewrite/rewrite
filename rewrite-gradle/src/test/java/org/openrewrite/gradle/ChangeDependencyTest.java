@@ -1104,4 +1104,43 @@ class ChangeDependencyTest implements RewriteTest {
                                 .build())));
         assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
     }
+
+    @Test
+    void doesNotChangeGroupIdWhenNewCoordinatesDontResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("org.hibernate", "hibernate-*", "org.hibernate.orm", null, "6.0.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate:hibernate-core:${hibernateVersion}"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate.orm:hibernate-core:6.0.2.Final"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """
+          )
+        );
+    }
 }
