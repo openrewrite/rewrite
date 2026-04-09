@@ -994,6 +994,309 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replacesTestSourceAndTestTargetWithTestRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(11)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                        <testSource>17</testSource>
+                        <testTarget>17</testTarget>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <release>11</release>
+                        <testRelease>17</testRelease>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesTestSourceTargetWhenSameAsRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(11)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                        <testSource>1.8</testSource>
+                        <testTarget>1.8</testTarget>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <release>11</release>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesCustomPropertyRefInTestRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(11)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <properties>
+                  <test.java.version>17</test.java.version>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                        <testSource>${test.java.version}</testSource>
+                        <testTarget>${test.java.version}</testTarget>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <properties>
+                  <test.java.version>17</test.java.version>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <release>11</release>
+                        <testRelease>${test.java.version}</testRelease>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/668")
+    @Test
+    void removesStaleTestSourceTargetProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(21))
+            .cycles(2).expectedCyclesThatMakeChanges(2),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <properties>
+                  <maven.compiler.source>8</maven.compiler.source>
+                  <maven.compiler.target>8</maven.compiler.target>
+                  <maven.compiler.testSource>11</maven.compiler.testSource>
+                  <maven.compiler.testTarget>11</maven.compiler.testTarget>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <source>${maven.compiler.source}</source>
+                        <target>${maven.compiler.target}</target>
+                        <testSource>${maven.compiler.testSource}</testSource>
+                        <testTarget>${maven.compiler.testTarget}</testTarget>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <release>21</release>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesRedundantTestReleaseWhenCoveredByRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(21)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <source>8</source>
+                        <target>8</target>
+                        <testRelease>11</testRelease>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <version>3.8.0</version>
+                      <configuration>
+                        <release>21</release>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+
+              </project>
+              """
+          )
+        );
+    }
+
     private static Stream<Arguments> mavenCompilerPluginConfig() {
         return Stream.of(
           Arguments.of("""
