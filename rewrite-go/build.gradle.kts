@@ -31,14 +31,15 @@ tasks.withType<Javadoc>().configureEach {
 }
 
 val goBuild = tasks.register<Exec>("goBuild") {
-    workingDir = file("rewrite")
+    workingDir = projectDir
     // Use relative path to avoid absolute paths in cache key (Exec args are cache inputs)
-    commandLine("go", "build", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(file("rewrite")).path, "./cmd/rpc")
+    commandLine("go", "build", "-o", layout.buildDirectory.file("rewrite-go-rpc").get().asFile.relativeTo(projectDir).path, "./cmd/rpc")
 
-    inputs.files(fileTree("rewrite") {
+    inputs.files(fileTree(projectDir) {
         include("**/*.go")
         include("go.mod")
         include("go.sum")
+        exclude("build/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(layout.buildDirectory.file("rewrite-go-rpc"))
 }
@@ -86,7 +87,7 @@ val generateTestClasspath by tasks.registering {
     group = "golang"
     description = "Generate classpath file for Java RPC server (used by Go tests)"
 
-    val outputFile = file("rewrite/test-classpath.txt")
+    val outputFile = file("test-classpath.txt")
     outputs.file(outputFile)
 
     dependsOn(tasks.named("compileJava"))
@@ -103,26 +104,27 @@ val generateTestClasspath by tasks.registering {
     }
 }
 
-val junitXmlFile = file("rewrite/build/test-results/gotest/junit.xml")
+val junitXmlFile = file("build/test-results/gotest/junit.xml")
 
 val goTest = tasks.register<Exec>("goTest") {
     group = "verification"
     description = "Run Go tests"
 
-    workingDir = file("rewrite")
+    workingDir = projectDir
     commandLine("go", "run", "gotest.tools/gotestsum@latest",
-        "--junitfile", junitXmlFile.relativeTo(file("rewrite")).path,
+        "--junitfile", junitXmlFile.relativeTo(projectDir).path,
         "--format", "standard-verbose",
         "--", "-count=1", "./test/...")
 
     dependsOn(generateTestClasspath)
 
-    inputs.files(fileTree("rewrite") {
+    inputs.files(fileTree(projectDir) {
         include("**/*.go")
         include("go.mod")
         include("go.sum")
+        exclude("build/**")
     }).withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.file(file("rewrite/test-classpath.txt"))
+    inputs.file(file("test-classpath.txt"))
     outputs.file(junitXmlFile)
     outputs.cacheIf { true }
 }
