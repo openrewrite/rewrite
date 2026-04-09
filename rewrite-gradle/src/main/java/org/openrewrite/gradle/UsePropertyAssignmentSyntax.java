@@ -64,6 +64,10 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                     return m;
                 }
 
+                if (withinPlugins(getCursor())) {
+                    return m;
+                }
+
                 if (m.getSelect() != null) {
                     return GroovyTemplate.apply("#{any()}." + propertyName + " = #{any()}",
                             getCursor(), m.getCoordinates().replace(),
@@ -72,6 +76,11 @@ public class UsePropertyAssignmentSyntax extends Recipe {
                 return GroovyTemplate.apply(propertyName + " = #{any()}",
                         getCursor(), m.getCoordinates().replace(),
                         m.getArguments().get(0));
+            }
+
+            private boolean withinPlugins(Cursor cursor) {
+                Cursor parent = cursor.dropParentUntil(value -> value instanceof J.MethodInvocation || value == Cursor.ROOT_VALUE);
+                return !parent.isRoot() && "plugins".equals(((J.MethodInvocation) parent.getValue()).getSimpleName());
             }
         });
     }
