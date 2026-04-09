@@ -167,7 +167,7 @@ class MavenRecipeBundleReaderTest {
         String csvContent = Files.readString(recipesCsv);
         // Match the 11-column header: ecosystem,packageName,name,displayName,description,
         //   recipeCount,category1,category2,category1Description,category2Description,options
-        String crossPackageRow = "\nmaven,org.openrewrite:rewrite-java,org.openrewrite.java.CrossPackageTestRecipe,Cross Package Test,A test recipe from a dependency,1,,,,," ;
+        String crossPackageRow = "\nmaven,org.openrewrite.recipe:rewrite-static-analysis,org.openrewrite.java.CrossPackageTestRecipe,Cross Package Test,A test recipe from a dependency,1,,,,," ;
         Files.writeString(recipesCsv, csvContent + crossPackageRow);
 
         // Repackage as a new JAR, overwriting the cached artifact in-place
