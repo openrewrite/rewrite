@@ -18,6 +18,7 @@ package org.openrewrite.python;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.UvExecutor;
@@ -261,6 +262,29 @@ class RequirementsTxtParserTest {
                 .contains("certifi", "urllib3");
 
         assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
+    }
+
+    @Test
+    void unresolvableRequirementsAttachesParseExceptionMarker() {
+        // A non-existent package will fail to install regardless of whether uv is present
+        // (without uv, workspace creation fails; with uv, the install itself fails).
+        String requirements = "this-package-definitely-does-not-exist-zzz==9.9.9\n";
+
+        RequirementsTxtParser parser = new RequirementsTxtParser();
+        Parser.Input input = Parser.Input.fromString(Paths.get("requirements.txt"), requirements);
+        List<SourceFile> parsed = parser.parseInputs(
+                Collections.singletonList(input),
+                null,
+                new InMemoryExecutionContext(t -> {})
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        SourceFile sf = parsed.get(0);
+        ParseExceptionResult marker = sf.getMarkers().findFirst(ParseExceptionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getMessage()).contains("PythonResolutionResult");
+        // Should not have a successful resolution marker
+        assertThat(sf.getMarkers().findFirst(PythonResolutionResult.class)).isEmpty();
     }
 
     @Test

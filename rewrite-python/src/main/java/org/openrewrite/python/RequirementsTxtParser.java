@@ -17,6 +17,7 @@ package org.openrewrite.python;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.PyProjectHelper;
@@ -37,7 +38,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyMap;
-
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -67,7 +67,7 @@ public class RequirementsTxtParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return plainTextParser.parseInputs(sources, relativeTo, ctx).map(sf -> {
             if (!(sf instanceof PlainText)) {
-                return sf;
+                return sf.withMarkers(sf.getMarkers().add(ParseExceptionResult.build(this, new UnsupportedOperationException(), "Creating a PythonResolutionResult can only be done for PlainText LST elements.")));
             }
             PlainText text = (PlainText) sf;
 
@@ -78,12 +78,15 @@ public class RequirementsTxtParser implements Parser {
             Path workspace = DependencyWorkspace.getOrCreateRequirementsWorkspace(
                     text.getText(), originalFilePath, subprocessEnvironment);
             if (workspace == null) {
-                return sf;
+                return sf.withMarkers(sf.getMarkers().add(ParseExceptionResult.build(this, new UnsupportedOperationException(),
+                        "Failed to create the PythonResolutionResult due to a failure to install the requirement file. " +
+                                "Perhaps you are missing `uv` in the environment or trying to build a requirement text file containing dependencies which are not available?")));
             }
 
             List<ResolvedDependency> resolvedDeps = parseFreezeOutput(workspace);
             if (resolvedDeps.isEmpty()) {
-                return sf;
+                return sf.withMarkers(sf.getMarkers().add(ParseExceptionResult.build(this, new UnsupportedOperationException(),
+                        "Failed to create the PythonResolutionResult: no resolved dependencies.")));
             }
 
             List<Dependency> deps = dependenciesFromResolved(resolvedDeps,
