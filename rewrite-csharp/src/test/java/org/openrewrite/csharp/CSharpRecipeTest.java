@@ -15,6 +15,7 @@
  */
 package org.openrewrite.csharp;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,11 @@ class CSharpRecipeTest implements RewriteTest {
 
     @AfterEach
     void tearDown() {
+        CSharpRewriteRpc.resetCurrent();
+    }
+
+    @AfterAll
+    static void shutDown() {
         CSharpRewriteRpc.shutdownCurrent();
     }
 
