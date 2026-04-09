@@ -85,14 +85,33 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 }
 
                 // Track POMs that have <release> in the compiler plugin configuration
+                // (including per-execution configurations)
                 if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
-                    Optional<Xml.Tag> config = t.getChild("configuration");
-                    if (config.isPresent() && config.get().getChildValue("release").isPresent()) {
+                    if (hasReleaseInConfiguration(t)) {
                         acc.pomsWithRelease.add(getResolutionResult().getPom().getGav());
                     }
                 }
 
                 return t;
+            }
+
+            private boolean hasReleaseInConfiguration(Xml.Tag pluginTag) {
+                // Check top-level <configuration>
+                Optional<Xml.Tag> config = pluginTag.getChild("configuration");
+                if (config.isPresent() && config.get().getChildValue("release").isPresent()) {
+                    return true;
+                }
+                // Check <executions>/<execution>/<configuration>
+                Optional<Xml.Tag> executions = pluginTag.getChild("executions");
+                if (executions.isPresent()) {
+                    for (Xml.Tag execution : executions.get().getChildren("execution")) {
+                        Optional<Xml.Tag> execConfig = execution.getChild("configuration");
+                        if (execConfig.isPresent() && execConfig.get().getChildValue("release").isPresent()) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
             }
         };
     }
