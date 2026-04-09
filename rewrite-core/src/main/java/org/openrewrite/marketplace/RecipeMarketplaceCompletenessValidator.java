@@ -15,7 +15,6 @@
  */
 package org.openrewrite.marketplace;
 
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
@@ -40,32 +39,11 @@ public class RecipeMarketplaceCompletenessValidator {
      * @return A validation result containing all errors found.
      */
     public Validated<RecipeMarketplace> validate(RecipeMarketplace csv, Environment env) {
-        return validate(csv, env, null);
-    }
-
-    /**
-     * Validate that the CSV marketplace is complete and in sync with the JAR environment.
-     * When a project package name is provided, recipes from other packages are excluded from
-     * the phantom recipe check, since they intentionally reference recipes from dependency JARs.
-     *
-     * @param csv                The recipe marketplace loaded from CSV.
-     * @param env                The environment to validate against.
-     * @param projectPackageName The package name of the project being validated (e.g. "org.example:my-recipes"),
-     *                           or null to validate all recipes regardless of package.
-     * @return A validation result containing all errors found.
-     */
-    public Validated<RecipeMarketplace> validate(RecipeMarketplace csv, Environment env,
-                                                 @Nullable String projectPackageName) {
         Validated<RecipeMarketplace> validation = Validated.none();
 
         Set<String> csvRecipeNames = new HashSet<>();
-        Set<String> csvOwnPackageRecipeNames = new HashSet<>();
         for (RecipeListing recipe : csv.getAllRecipes()) {
             csvRecipeNames.add(recipe.getName());
-            if (projectPackageName == null ||
-                    projectPackageName.equals(recipe.getBundle().getPackageName())) {
-                csvOwnPackageRecipeNames.add(recipe.getName());
-            }
         }
 
         // Get all recipe names from JAR
@@ -74,10 +52,8 @@ public class RecipeMarketplaceCompletenessValidator {
             jarRecipeNames.add(descriptor.getName());
         }
 
-        // Find recipes in CSV that don't exist in the environment (phantom recipes).
-        // Only check recipes from the project's own package, since cross-package recipes
-        // intentionally reference recipes from dependency JARs that aren't scanned.
-        for (String csvRecipeName : csvOwnPackageRecipeNames) {
+        // Find recipes in CSV that don't exist in the environment (phantom recipes)
+        for (String csvRecipeName : csvRecipeNames) {
             if (!jarRecipeNames.contains(csvRecipeName)) {
                 validation = validation.and(Validated.invalid(csvRecipeName, csvRecipeName,
                         "Recipe listed in CSV must exist in the environment; " +
