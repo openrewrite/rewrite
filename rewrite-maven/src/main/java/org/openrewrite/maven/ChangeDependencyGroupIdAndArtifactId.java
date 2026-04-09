@@ -362,37 +362,23 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 if (oldDep == null) {
                     return sf;
                 }
-                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-                if (!maybeSourceSet.isPresent()) {
-                    return sf;
-                }
-                String cacheKey = maybeJp.get().getId().toString() + ":" + maybeSourceSet.get().getName();
-                JavaSourceSet cached = updatedSourceSets.get(cacheKey);
-                if (cached != null) {
-                    return sf.withMarkers(sf.getMarkers().setByType(cached));
-                }
                 if (updater == null) {
                     updater = new JavaSourceSetUpdater(ctx);
                 }
-                // Build a synthetic ResolvedDependency for the new coordinates
-                String effectiveNewGroupId = newGroupId != null ? newGroupId : oldDep.getGroupId();
-                String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldDep.getArtifactId();
-                // Use the resolved new version if available, otherwise fall back to old version
-                String resolvedVersion = acc.getResolvedNewVersions().get(maybeJp.get());
-                String effectiveVersion = resolvedVersion != null ? resolvedVersion : oldDep.getVersion();
-                ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
-                        oldDep.getGav().getRepository(),
-                        effectiveNewGroupId, effectiveNewArtifactId, effectiveVersion, null);
-                // Use a remote repository for downloading (local file:// repos won't have the new artifact)
-                ResolvedDependency newDep = oldDep
-                        .withGav(newGav)
-                        .withRepository(findRemoteRepository(maybeJp.get()));
-                JavaSourceSet updated = updater.changeDependency(maybeSourceSet.get(), oldDep, newDep);
-                if (updated != maybeSourceSet.get()) {
-                    updatedSourceSets.put(cacheKey, updated);
-                    return sf.withMarkers(sf.getMarkers().setByType(updated));
-                }
-                return sf;
+                JavaProject jp = maybeJp.get();
+                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
+                    String effectiveNewGroupId = newGroupId != null ? newGroupId : oldDep.getGroupId();
+                    String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldDep.getArtifactId();
+                    String resolvedVersion = acc.getResolvedNewVersions().get(jp);
+                    String effectiveVersion = resolvedVersion != null ? resolvedVersion : oldDep.getVersion();
+                    ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
+                            oldDep.getGav().getRepository(),
+                            effectiveNewGroupId, effectiveNewArtifactId, effectiveVersion, null);
+                    ResolvedDependency newDep = oldDep
+                            .withGav(newGav)
+                            .withRepository(findRemoteRepository(jp));
+                    return updater.changeDependency(sourceSet, oldDep, newDep);
+                });
             }
 
             private MavenRepository findRemoteRepository(JavaProject jp) {

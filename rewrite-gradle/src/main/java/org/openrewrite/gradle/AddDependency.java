@@ -363,19 +363,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (!maybeJp.isPresent() || !acc.configurationsByProject.containsKey(maybeJp.get())) {
                     return sf;
                 }
-                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-                if (!maybeSourceSet.isPresent() || maybeSourceSet.get().getGavToTypes().isEmpty()) {
-                    return sf;
-                }
                 if (updater == null) {
                     updater = new JavaSourceSetUpdater(ctx);
                 }
-                JavaSourceSet updated = updater.addDependency(maybeSourceSet.get(),
-                        groupId, artifactId, acc.resolvedVersion, acc.repositories);
-                if (updated != maybeSourceSet.get()) {
-                    return sf.withMarkers(sf.getMarkers().setByType(updated));
-                }
-                return sf;
+                return JavaSourceSet.updateOnSourceFile(sf, sourceSet ->
+                        sourceSet.getGavToTypes().isEmpty() ? sourceSet :
+                                updater.addDependency(sourceSet, groupId, artifactId, acc.resolvedVersion, acc.repositories));
             }
         };
     }

@@ -23,11 +23,8 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
-import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -96,14 +93,8 @@ public class RemoveDependency extends Recipe {
                     return mavenVisitor.visit(tree, ctx);
                 }
                 if (sf instanceof JavaSourceFile) {
-                    Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-                    if (maybeSourceSet.isPresent()) {
-                        JavaSourceSet updated = JavaSourceSetUpdater.removeTypesMatching(
-                                maybeSourceSet.get(), groupId, artifactId);
-                        if (updated != maybeSourceSet.get()) {
-                            return sf.withMarkers(sf.getMarkers().setByType(updated));
-                        }
-                    }
+                    return JavaSourceSet.updateOnSourceFile(sf,
+                            sourceSet -> sourceSet.removeTypesMatching(groupId, artifactId));
                 }
                 return tree;
             }

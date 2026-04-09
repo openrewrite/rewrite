@@ -30,7 +30,6 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.HashMap;
@@ -176,14 +175,8 @@ public class RemoveDependency extends Recipe {
                     return gradleVisitor.visit(tree, ctx);
                 }
                 if (sf instanceof JavaSourceFile) {
-                    Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-                    if (maybeSourceSet.isPresent()) {
-                        JavaSourceSet updated = JavaSourceSetUpdater.removeTypesMatching(
-                                maybeSourceSet.get(), groupId, artifactId);
-                        if (updated != maybeSourceSet.get()) {
-                            return sf.withMarkers(sf.getMarkers().setByType(updated));
-                        }
-                    }
+                    return JavaSourceSet.updateOnSourceFile(sf,
+                            sourceSet -> sourceSet.removeTypesMatching(groupId, artifactId));
                 }
                 return tree;
             }
