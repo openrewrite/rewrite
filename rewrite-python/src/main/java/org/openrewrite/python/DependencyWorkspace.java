@@ -19,6 +19,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.python.internal.UvExecutor;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -27,11 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.Collections.synchronizedMap;
 
@@ -93,8 +90,12 @@ public class DependencyWorkspace {
 
         // Check in-memory cache
         Path cached = cache.get(hash);
-        if (cached != null && isWorkspaceValid(cached)) {
-            return cached;
+        if (cached != null) {
+            if (isWorkspaceValid(cached)) {
+                return cached;
+            }
+            cache.remove(hash);
+            ensureTempDirIsAbsent(cached);
         }
 
         // Check disk cache
@@ -189,8 +190,12 @@ public class DependencyWorkspace {
 
         // Check in-memory cache
         Path cached = cache.get(hash);
-        if (cached != null && isRequirementsWorkspaceValid(cached)) {
-            return cached;
+        if (cached != null) {
+            if (isRequirementsWorkspaceValid(cached)) {
+                return cached;
+            }
+            cache.remove(hash);
+            ensureTempDirIsAbsent(cached);
         }
 
         // Check disk cache
@@ -296,8 +301,12 @@ public class DependencyWorkspace {
 
         // Check in-memory cache
         Path cached = cache.get(hash);
-        if (cached != null && isRequirementsWorkspaceValid(cached)) {
-            return cached;
+        if (cached != null) {
+            if (isRequirementsWorkspaceValid(cached)) {
+                return cached;
+            }
+            cache.remove(hash);
+            ensureTempDirIsAbsent(cached);
         }
 
         // Check disk cache
@@ -488,6 +497,17 @@ public class DependencyWorkspace {
                     });
         } catch (IOException e) {
             // Ignore - cache will be populated as needed
+        }
+    }
+
+    private static void ensureTempDirIsAbsent(Path cached) {
+        File file = cached.toFile();
+        if (file.exists()) {
+            try {
+                file.delete();
+            } catch (Exception e) {
+                //Just a safety to make sure we can write to the directory later on.
+            }
         }
     }
 }
