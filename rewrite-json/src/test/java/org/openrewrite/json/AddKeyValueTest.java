@@ -106,6 +106,27 @@ class AddKeyValueTest implements RewriteTest {
     }
 
     @Test
+    void shouldAppendSimpleValueWithTrailingDot() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$.", "surname", "\"Doe\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "name": "John"
+              }
+              """,
+            """
+              {
+                  "name": "John",
+                  "surname": "Doe"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void shouldNotAppendIfExists() {
         rewriteRun(
           spec -> spec.recipe(new AddKeyValue("$", "key", "\"val\"", false)),
