@@ -216,6 +216,13 @@ public class RequirementsFile implements PythonDependencyFile {
             return this;
         }
         PlainText result = (PlainText) getTree();
+        Set<Marker> existingMarkers = new PlainTextVisitor<Set<Marker>>() {
+            @Override
+            public <M extends Marker> M visitMarker(Marker marker, Set<Marker> ctx) {
+                ctx.add(marker);
+                return (M) marker;
+            }
+        }.reduce(result, new HashSet<>());
         for (Map.Entry<String, String> entry : packageMessages.entrySet()) {
             Find find = new Find(entry.getKey(), null, false, null, null, null, null, null);
             PlainText markedResult = (PlainText) find.getVisitor().visitNonNull(result, ctx);
@@ -223,7 +230,7 @@ public class RequirementsFile implements PythonDependencyFile {
                 result = new PlainTextVisitor<ExecutionContext>() {
                     @Override
                     public <M extends Marker> M visitMarker(Marker marker, ExecutionContext executionContext) {
-                        if (marker instanceof SearchResult && ((SearchResult) marker).getDescription() == null) {
+                        if (!existingMarkers.contains(marker) && marker instanceof SearchResult && ((SearchResult) marker).getDescription() == null) {
                             return (M) ((SearchResult) marker).withDescription(entry.getValue());
                         }
                         return super.visitMarker(marker, executionContext);
