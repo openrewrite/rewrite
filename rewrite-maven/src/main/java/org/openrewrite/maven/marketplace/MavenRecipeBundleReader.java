@@ -208,36 +208,16 @@ public class MavenRecipeBundleReader implements RecipeBundleReader {
     private void setVersionRecursive(RecipeMarketplace.Category category) {
         for (RecipeListing recipe : category.getRecipes()) {
             RecipeBundle recipeBundle = recipe.getBundle();
-            if (bundle.getPackageName().equals(recipeBundle.getPackageName())) {
-                // Same package as the JAR we're reading -- use the JAR's version
-                recipeBundle.setVersion(bundle.getVersion());
-                recipeBundle.setRequestedVersion(bundle.getRequestedVersion());
-            } else if (recipeBundle.getVersion() == null) {
-                // Different package -- resolve the version from the dependency tree
-                resolveVersionFromDependencies(recipeBundle);
-            }
+            // All recipes in this JAR's recipes.csv should be attributed to this JAR,
+            // regardless of which dependency originally defines them. This ensures the
+            // resolver downloads this JAR (which has the dependency on its classpath)
+            // rather than trying to resolve the dependency separately.
+            recipeBundle.setPackageName(bundle.getPackageName());
+            recipeBundle.setVersion(bundle.getVersion());
+            recipeBundle.setRequestedVersion(bundle.getRequestedVersion());
         }
         for (RecipeMarketplace.Category child : category.getCategories()) {
             setVersionRecursive(child);
-        }
-    }
-
-    private void resolveVersionFromDependencies(RecipeBundle recipeBundle) {
-        if (mrr == null) {
-            return;
-        }
-        String[] ga = recipeBundle.getPackageName().split(":");
-        if (ga.length != 2) {
-            return;
-        }
-        for (ResolvedDependency dep : mrr.getDependencies().get(Scope.Runtime)) {
-            if (dep.getGroupId().equals(ga[0]) && dep.getArtifactId().equals(ga[1])) {
-                String version = dep.getDatedSnapshotVersion() != null ?
-                        dep.getDatedSnapshotVersion() : dep.getVersion();
-                recipeBundle.setVersion(version);
-                recipeBundle.setRequestedVersion(version);
-                return;
-            }
         }
     }
 }

@@ -179,18 +179,20 @@ class MavenRecipeBundleReaderTest {
 
         RecipeMarketplace marketplace = reader.read();
 
-        // Find the cross-package recipe and verify its version was resolved
+        // Find the cross-package recipe and verify it was attributed to the host JAR
         RecipeListing crossPackageRecipe = marketplace.getAllRecipes().stream()
                 .filter(r -> r.getName().equals("org.openrewrite.java.CrossPackageTestRecipe"))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("Cross-package recipe not found in marketplace"));
 
+        // The recipe should be attributed to the host JAR (rewrite-static-analysis),
+        // not the dependency JAR (rewrite-java), so the resolver downloads the right artifact
         assertThat(crossPackageRecipe.getBundle().getPackageName())
-                .isEqualTo("org.openrewrite:rewrite-java");
+                .isEqualTo("org.openrewrite.recipe:rewrite-static-analysis");
         assertThat(crossPackageRecipe.getBundle().getVersion())
-                .as("Cross-package recipe version should be resolved from the dependency tree")
+                .as("Cross-package recipe version should match the host JAR")
                 .isNotBlank()
-                .isEqualTo("8.79.0");
+                .isEqualTo("2.32.0");
 
         reader.close();
     }
