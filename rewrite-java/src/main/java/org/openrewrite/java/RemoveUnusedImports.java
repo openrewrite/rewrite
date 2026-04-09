@@ -524,20 +524,18 @@ public class RemoveUnusedImports extends Recipe {
          * Used to detect imports whose type name doesn't actually appear in the source.
          */
         private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
-            Set<String> names = new HashSet<>();
-            new JavaIsoVisitor<Integer>() {
+            return new JavaIsoVisitor<Set<String>>() {
                 @Override
-                public J.Import visitImport(J.Import import_, Integer p) {
+                public J.Import visitImport(J.Import import_, Set<String> names) {
                     return import_;
                 }
 
                 @Override
-                public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
                     names.add(identifier.getSimpleName());
-                    return super.visitIdentifier(identifier, p);
+                    return super.visitIdentifier(identifier, names);
                 }
-            }.visit(cu, 0);
-            return names;
+            }.reduce(cu, new HashSet<>());
         }
     }
 
