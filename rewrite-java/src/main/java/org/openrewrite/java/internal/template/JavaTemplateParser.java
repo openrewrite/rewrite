@@ -111,13 +111,19 @@ public class JavaTemplateParser {
     }
 
     public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
-        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports),
+        List<J> result = cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toGenericTypeString).sorted().collect(toList()), Expression.class, imports),
                 tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(stub);
                     return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
-                }).get(0);
+                });
+        if (result.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Failed to parse expression template. The generated stub may contain types that cannot be expressed " +
+                    "as valid Java source code. Use JavaTemplate.Builder#doBeforeParseTemplate() to inspect the generated code. Template:\n" + template);
+        }
+        return result.get(0);
     }
 
     public TypeTree parseExtends(Cursor cursor, String template) {

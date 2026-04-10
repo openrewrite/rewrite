@@ -177,7 +177,22 @@ public class Substitutions {
                 }
             }
         }
-        return TypeUtils.toString(type).replace("$", ".");
+        String typeName = TypeUtils.toString(type).replace("$", ".");
+        if (containsLocalOrAnonymousClassName(typeName)) {
+            // The type string contains a local or anonymous class name (e.g., "Map<String, Test.1Inner>")
+            // which is not valid Java source code. Fall back to java.lang.Object for the entire type.
+            return "java.lang.Object";
+        }
+        return typeName;
+    }
+
+    private static boolean containsLocalOrAnonymousClassName(String typeName) {
+        for (int i = 0; i < typeName.length() - 1; i++) {
+            if (typeName.charAt(i) == '.' && Character.isDigit(typeName.charAt(i + 1))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String substituteUntyped(Object parameter, int index) {

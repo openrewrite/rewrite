@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class UsePropertyAssignmentSyntaxTest implements RewriteTest {
 
@@ -165,6 +166,64 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
               tasks.register<JavaExec>("runLogic") {
                   description("My precious logic")
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void pluginVersionUnchangedInPluginsBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.develocity' version '3.19'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void pluginVersionUnchangedInBuildGradlePluginsBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          buildGradle(
+            """
+              plugins {
+                  id 'com.example.plugin' version '1.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionOutsidePluginsBlockConverted() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          buildGradle(
+            """
+              version '1.0-SNAPSHOT'
+              """,
+            """
+              version = '1.0-SNAPSHOT'
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallArgConvertedToAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          buildGradle(
+            """
+              version computeVersion()
+              """,
+            """
+              version = computeVersion()
               """
           )
         );

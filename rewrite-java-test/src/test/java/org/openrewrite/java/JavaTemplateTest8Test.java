@@ -634,4 +634,66 @@ class JavaTemplateTest8Test implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void replaceContextSensitiveMethodInvocationInAssignmentWithLocalClassType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("singletonMap") &&
+                      method.getMethodType() != null &&
+                      method.getMethodType().getDeclaringType().getFullyQualifiedName().equals("java.util.Collections")) {
+                      return JavaTemplate.builder("Map.of(#{any()}, #{any()})")
+                        .contextSensitive()
+                        .imports("java.util.Map")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(),
+                          method.getArguments().toArray());
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Map;
+
+              class Test {
+                  void test() {
+                      class Inner {
+                          String value;
+                      }
+                      class Entity {
+                          Map<String, List<Map<String, Inner>>> map;
+                      }
+                      var entity = new Entity();
+                      entity.map = Collections.singletonMap("collection",
+                              Collections.singletonList(Collections.singletonMap("dest", new Inner())));
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Map;
+
+              class Test {
+                  void test() {
+                      class Inner {
+                          String value;
+                      }
+                      class Entity {
+                          Map<String, List<Map<String, Inner>>> map;
+                      }
+                      var entity = new Entity();
+                      entity.map = Map.of("collection", Collections.singletonList(Map.of("dest", new Inner())));
+                  }
+              }
+              """
+          )
+        );
+    }
 }
