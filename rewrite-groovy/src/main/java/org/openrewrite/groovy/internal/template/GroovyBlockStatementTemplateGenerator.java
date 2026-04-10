@@ -34,12 +34,18 @@ public class GroovyBlockStatementTemplateGenerator extends BlockStatementTemplat
     @Override
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         if (j instanceof J.MethodInvocation) {
-            before.insert(0, "class Template {\n");
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
-            if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
+            if (methodType != null && methodType.getReturnType() == JavaType.Primitive.Void) {
+                // Bare statements like `version = expr;` are not valid at class body level
+                // in Groovy (unlike Java where initializer blocks work differently).
+                // Wrap in an initializer block so the template is valid Groovy.
+                before.insert(0, "class Template {{\n");
+                after.append("\n}}");
+            } else {
+                before.insert(0, "class Template {\n");
                 before.append("Object o = ");
+                after.append(";\n}");
             }
-            after.append(";\n}");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, "class Template {\n");
             before.append("Object o = ");

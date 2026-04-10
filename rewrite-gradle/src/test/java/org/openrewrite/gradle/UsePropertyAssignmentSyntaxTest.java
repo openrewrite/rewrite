@@ -215,6 +215,21 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
     }
 
     @Test
+    void methodCallArgConvertedToAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          buildGradle(
+            """
+              version computeVersion()
+              """,
+            """
+              version = computeVersion()
+              """
+          )
+        );
+    }
+
+    @Test
     void noArgMethodCallUnchanged() {
         rewriteRun(
           buildGradle(
