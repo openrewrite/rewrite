@@ -30,7 +30,7 @@ public sealed class SearchResult(Guid id, string? description) : Marker, IRpcCod
     /// Adds a SearchResult marker to the given tree node.
     /// Uses reflection to call WithMarkers on the concrete type.
     /// </summary>
-    public static T Found<T>(T tree, string? description = null) where T : J
+    public static T Found<T>(T tree, string? description = null) where T : Tree
     {
         var newMarkers = tree.Markers.Add(new SearchResult(Guid.NewGuid(), description));
         var withMarkers = tree.GetType().GetMethod("WithMarkers", [typeof(Markers)]);
