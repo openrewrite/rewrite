@@ -69,6 +69,27 @@ public class CachingMavenRecipeBundleResolver implements RecipeBundleResolver {
         return entry.createProxyResolver();
     }
 
+    @Override
+    public void close() throws Exception {
+        Exception deferredException = null;
+        for (Map.Entry<String, ResolverEntry> entry : resolverCache.entrySet()) {
+            try {
+                ResolverEntry resolverEntry = entry.getValue();
+                resolverEntry.resolver.close();
+                if (resolverEntry.leases.get() > 0) {
+                    throw new IllegalStateException("Apparent resolver leak detected");
+                }
+            } catch (Exception e) {
+                if (deferredException == null) {
+                    deferredException = e;
+                }
+            }
+        }
+        if (deferredException != null) {
+            throw deferredException;
+        }
+    }
+
     @RequiredArgsConstructor
     private static class ResolverEntry {
         private final RecipeBundle bundle;

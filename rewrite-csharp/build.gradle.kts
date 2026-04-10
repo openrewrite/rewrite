@@ -17,6 +17,12 @@ plugins {
     id("publishing")
 }
 
+normalization {
+    runtimeClasspath {
+        ignore("META-INF/rewrite-csharp-version.txt")
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -31,6 +37,7 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-xml"))
+    testImplementation(project(":rewrite-maven"))
     testImplementation("io.moderne:jsonrpc:latest.integration")
     testRuntimeOnly(project(":rewrite-java-21"))
 }
@@ -66,17 +73,40 @@ val csharpBuild by tasks.registering(Exec::class) {
     description = "Build C# projects"
 
     workingDir = csharpDir
-    commandLine(findDotnet(), "build")
 
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin"))
 
     doFirst {
+        commandLine(findDotnet(), "build")
         logger.lifecycle("Building C# projects in ${csharpDir}")
+    }
+}
+
+// Writes the test runtime classpath to a file so the C# RpcFixture can
+// launch JavaRewriteRpc via `java -cp <classpath> ...` without a fat JAR.
+val rpcTestClasspath by tasks.registering {
+    group = "csharp"
+    description = "Write the Java RPC test server classpath for C# integration tests"
+    dependsOn(tasks.named("testClasses"))
+
+    inputs.files(configurations["testRuntimeClasspath"])
+        .withNormalizer(ClasspathNormalizer::class)
+    inputs.files(tasks.named<JavaCompile>("compileJava").flatMap { it.destinationDirectory })
+    inputs.files(tasks.named<JavaCompile>("compileTestJava").flatMap { it.destinationDirectory })
+
+    val classpathFile = layout.buildDirectory.file("rpc-test-server-classpath.txt")
+    outputs.file(classpathFile)
+
+    doLast {
+        val cp = configurations["testRuntimeClasspath"].resolve().joinToString(File.pathSeparator) +
+                File.pathSeparator + tasks.named<JavaCompile>("compileJava").get().destinationDirectory.get().asFile +
+                File.pathSeparator + tasks.named<JavaCompile>("compileTestJava").get().destinationDirectory.get().asFile
+        classpathFile.get().asFile.writeText(cp)
     }
 }
 
@@ -85,22 +115,27 @@ val junitXmlFile = csharpDir.resolve("build/test-results/xunit/junit.xml")
 val csharpTest by tasks.registering(Exec::class) {
     group = "csharp"
     description = "Run C# xunit tests"
-    dependsOn(csharpBuild)
+    dependsOn(csharpBuild, rpcTestClasspath)
 
     workingDir = csharpDir
-    commandLine(
-        findDotnet(), "test", "--no-build", "--verbosity", "normal",
-        "--logger", "junit;LogFilePath=${junitXmlFile.absolutePath}"
-    )
 
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
+    environment("RPC_TEST_SERVER_CLASSPATH",
+        rpcTestClasspath.get().outputs.files.singleFile.absolutePath)
+
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
+    inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**", "**/build/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.files(junitXmlFile)
     outputs.cacheIf { true }
 
     doFirst {
+        // Use relative path for JUnit XML to avoid absolute paths in cache key
+        val relativeJunitPath = junitXmlFile.relativeTo(csharpDir).path
+        commandLine(
+            findDotnet(), "test", "--no-build", "--verbosity", "normal",
+            "--logger", "junit;LogFilePath=${relativeJunitPath}"
+        )
         logger.lifecycle("Running C# tests in ${csharpDir}")
     }
 }
@@ -166,10 +201,22 @@ tasks.withType<Test> {
 // CI builds use timestamped pre-release: 8.73.0-snapshot.20260110143252
 // Local builds use stable suffix that sorts higher: 8.73.0-zlocal
 // Releases use clean version: 8.73.0
+fun gitCommitTimestamp(): String {
+    val process = ProcessBuilder("git", "log", "-1", "--format=%ct")
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start()
+    val timestamp = process.inputStream.bufferedReader().readText().trim()
+    process.waitFor()
+    return Instant.ofEpochSecond(timestamp.toLong())
+        .atZone(ZoneOffset.UTC)
+        .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+}
+
 val nugetVersion: String = if (System.getenv("CI") != null) {
     project.version.toString().replace(
         "-SNAPSHOT",
-        "-snapshot.${Instant.now().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))}"
+        "-snapshot.${gitCommitTimestamp()}"
     )
 } else {
     project.version.toString().replace("-SNAPSHOT", "-zlocal")
@@ -206,7 +253,6 @@ val csharpBuildRelease by tasks.registering(Exec::class) {
     description = "Build C# projects in Release configuration"
 
     workingDir = csharpDir
-    commandLine(findDotnet(), "build", "--configuration", "Release")
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
         .withPathSensitivity(PathSensitivity.RELATIVE)
@@ -214,6 +260,10 @@ val csharpBuildRelease by tasks.registering(Exec::class) {
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.dir(csharpDir.resolve("OpenRewrite/bin/Release"))
     outputs.dir(csharpDir.resolve("OpenRewrite.Tool/bin/Release"))
+
+    doFirst {
+        commandLine(findDotnet(), "build", "--configuration", "Release")
+    }
 }
 
 val csharpPack by tasks.registering(Exec::class) {
@@ -223,13 +273,6 @@ val csharpPack by tasks.registering(Exec::class) {
     dependsOn(csharpBuildRelease)
 
     workingDir = csharpDir
-    commandLine(
-        findDotnet(), "pack",
-        "--no-build",
-        "--configuration", "Release",
-        "--output", "dist",
-        "/p:Version=$nugetVersion"
-    )
 
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite")) { exclude("**/bin/**", "**/obj/**") })
     inputs.files(fileTree(csharpDir.resolve("OpenRewrite.Tool")) { exclude("**/bin/**", "**/obj/**") })
@@ -238,6 +281,13 @@ val csharpPack by tasks.registering(Exec::class) {
 
     doFirst {
         csharpDir.resolve("dist").deleteRecursively()
+        commandLine(
+            findDotnet(), "pack",
+            "--no-build",
+            "--configuration", "Release",
+            "--output", "dist",
+            "/p:Version=$nugetVersion"
+        )
         logger.lifecycle("Packing C# NuGet packages (version: $nugetVersion)")
     }
 }
@@ -250,17 +300,17 @@ val csharpPublish by tasks.registering(Exec::class) {
     dependsOn(csharpPack)
 
     workingDir = csharpDir
-    commandLine(
-        findDotnet(), "nuget", "push",
-        "dist/*.nupkg",
-        "--source", "https://api.nuget.org/v3/index.json",
-        "--api-key", project.findProperty("nugetApiKey")?.toString() ?: ""
-    )
 
     doFirst {
         if (!project.hasProperty("nugetApiKey")) {
             throw GradleException("nugetApiKey property is required for NuGet publishing")
         }
+        commandLine(
+            findDotnet(), "nuget", "push",
+            "dist/*.nupkg",
+            "--source", "https://api.nuget.org/v3/index.json",
+            "--api-key", project.findProperty("nugetApiKey")?.toString() ?: ""
+        )
         logger.lifecycle("Publishing C# NuGet package (version: $nugetVersion)")
     }
 }

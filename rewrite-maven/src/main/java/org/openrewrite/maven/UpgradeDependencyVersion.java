@@ -29,7 +29,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
@@ -315,6 +314,30 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return false;
             }
 
+            /**
+             * Check if a local parent POM (in the same repository) also declares a dependency
+             * on the same groupId:artifactId without an explicit version. If so, the parent
+             * will also go through the managed-dependency property path and handle the property
+             * change — the child can skip it.
+             */
+            private boolean isDeclaredByLocalParent(String groupId, String artifactId) {
+                MavenResolutionResult current = getResolutionResult().getParent();
+                while (current != null) {
+                    ResolvedPom parentPom = current.getPom();
+                    if (!accumulator.projectArtifacts.contains(new GroupArtifact(parentPom.getGroupId(), parentPom.getArtifactId()))) {
+                        break; // Reached a non-local (remote) parent
+                    }
+                    for (Dependency dep : parentPom.getRequested().getDependencies()) {
+                        if (groupId.equals(dep.getGroupId()) && artifactId.equals(dep.getArtifactId())
+                                && dep.getVersion() == null) {
+                            return true;
+                        }
+                    }
+                    current = current.getParent();
+                }
+                return false;
+            }
+
             private Xml.Tag upgradeDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
                 ResolvedDependency d = findDependency(t);
                 if (d != null && d.getRepository() != null) {
@@ -330,9 +353,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             // if a managed dependency is expressed as a property, change the property value
                             // do this only when a requested bom is absent, otherwise changing property has no effect
                             if (dm != null && isProperty(dm.getRequested().getVersion()) && dm.getRequestedBom() == null) {
-                                doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
-                                        dm.getRequested().getVersion().length() - 1),
-                                        newerVersion, overrideManagedVersion, false).getVisitor());
+                                // if a local parent also declares this dependency, it will handle the property change
+                                if (!isDeclaredByLocalParent(d.getGroupId(), d.getArtifactId())) {
+                                    doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
+                                            dm.getRequested().getVersion().length() - 1),
+                                            newerVersion, overrideManagedVersion, false).getVisitor());
+                                }
                             } else if (dm != null && dm.getBomGav() == null) {
                                 // if the version is managed directly (not from a BOM) and comes from a local parent POM
                                 // (in the same repository), don't add an explicit version
@@ -489,7 +515,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
             private List<String> getAvailableBomVersions(String groupId, String artifactId, String currentVersion, ExecutionContext ctx)
                     throws MavenDownloadingException {
-                //noinspection SpellCheckingInspection
                 MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
                 MavenSettings settings = mctx.effectiveSettings(getResolutionResult());
                 MavenPomDownloader downloader = new MavenPomDownloader(
@@ -520,7 +545,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String dependencyGroupId,
                     String dependencyArtifactId,
                     ExecutionContext ctx) throws MavenDownloadingException {
-                //noinspection SpellCheckingInspection
                 MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
                 MavenSettings settings = mctx.effectiveSettings(getResolutionResult());
                 MavenPomDownloader downloader = new MavenPomDownloader(

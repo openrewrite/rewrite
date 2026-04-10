@@ -26,6 +26,10 @@ class VersionRequirementTest {
         return List.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
     }
 
+    private Iterable<String> availableWithMalformed() {
+        return List.of("1", "-captain-daily-SNAPSHOT", "2", "3");
+    }
+
     @Test
     void rangeSet() throws Exception {
         assertThat(VersionRequirement.fromVersion("[1,11)", 0).resolve(this::available))
@@ -63,5 +67,11 @@ class VersionRequirementTest {
     void emptyUnboundedRange() throws Exception {
         assertThat(VersionRequirement.fromVersion("(,)", 0).resolve(this::available))
                 .isEqualTo("10");
+    }
+
+    @Test
+    void malformedVersionsAreSkipped() throws Exception {
+        assertThat(VersionRequirement.fromVersion("[1,4)", 0).resolve(this::availableWithMalformed))
+                .isEqualTo("3");
     }
 }

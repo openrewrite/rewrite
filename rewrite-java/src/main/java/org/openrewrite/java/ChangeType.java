@@ -115,9 +115,9 @@ public class ChangeType extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
-                    Map<Tree, Reference> matches = new HashMap<>();
+                    Map<Tree, List<Reference>> matches = new HashMap<>();
                     for (Reference ref : references.findMatches(matcher)) {
-                        matches.put(ref.getTree(), ref);
+                        matches.computeIfAbsent(ref.getTree(), k -> new java.util.ArrayList<>()).add(ref);
                     }
                     return new ReferenceChangeTypeVisitor(matches, matcher.createRenamer(newFullyQualifiedTypeName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
@@ -221,6 +221,9 @@ public class ChangeType extends Recipe {
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 j = n.withConstructorType(updateType(n.getConstructorType()));
+            } else if (j instanceof MethodCall) {
+                MethodCall call = (MethodCall) j;
+                j = (J) call.withMethodType(updateType(call.getMethodType()));
             } else if (tree instanceof TypedTree) {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
             } else if (tree instanceof JavaSourceFile) {
@@ -615,14 +618,18 @@ public class ChangeType extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceChangeTypeVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Map<Tree, Reference> matches;
+        Map<Tree, List<Reference>> matches;
         Reference.Renamer renamer;
 
         @Override
         public Tree postVisit(Tree tree, ExecutionContext ctx) {
-            Reference reference = matches.get(tree);
-            if (reference != null && reference.supportsRename()) {
-                return reference.rename(renamer, getCursor(), ctx);
+            List<Reference> refs = matches.get(tree);
+            if (refs != null) {
+                for (Reference ref : refs) {
+                    if (ref.supportsRename()) {
+                        tree = ref.rename(renamer, new Cursor(getCursor().getParent(), tree), ctx);
+                    }
+                }
             }
             return tree;
         }

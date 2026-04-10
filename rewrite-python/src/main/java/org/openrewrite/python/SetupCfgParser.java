@@ -104,7 +104,7 @@ public class SetupCfgParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return "setup.cfg".equals(path.getFileName().toString());
+        return path.endsWith("setup.cfg");
     }
 
     @Override

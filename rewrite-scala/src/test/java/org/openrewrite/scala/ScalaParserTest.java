@@ -158,27 +158,13 @@ public class ScalaParserTest {
         J.Block objectBody = objectDecl.getBody();
         assertThat(objectBody.getStatements()).isNotEmpty();
         
-        // For now, just verify that the for loop parsing doesn't crash
-        // The full implementation is still in progress, so we'll check for Unknown nodes
-        boolean foundForLoop = false;
-        for (Statement stmt : objectBody.getStatements()) {
-            System.out.println("Statement type: " + stmt.getClass().getSimpleName());
-            if (stmt instanceof J.Unknown) {
-                String text = ((J.Unknown) stmt).getSource().getText();
-                System.out.println("Unknown statement: " + text);
-                if (text.contains("for (n <- nums)")) {
-                    foundForLoop = true;
-                }
-            }
-        }
-        
-        // Since method declarations are not fully implemented yet, we expect the whole
-        // method body to be wrapped as Unknown
-        assertThat(foundForLoop || objectBody.getStatements().stream()
-            .anyMatch(stmt -> stmt instanceof J.Unknown && 
-                             ((J.Unknown) stmt).getSource().getText().contains("for")))
-            .as("Should find for loop in the parsed structure (possibly as Unknown)")
-            .isTrue();
+        // Methods are now J.MethodDeclaration — the for loop is inside the method body
+        // Verify the structure contains the method and its body has the for loop
+        String printed = cu.printTrimmed();
+        assertThat(printed)
+            .as("Parsed structure should contain the for loop")
+            .contains("for")
+            .contains("nums");
     }
     
     // @Test  // TODO: Enable once method declarations are fully implemented

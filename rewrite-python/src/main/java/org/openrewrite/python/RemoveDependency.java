@@ -21,16 +21,17 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.internal.PythonDependencyExecutionContextView;
-import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.toml.TomlIsoVisitor;
-import org.openrewrite.toml.tree.Space;
+import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
-import org.openrewrite.toml.tree.TomlRightPadded;
 
-import java.util.*;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * Remove a dependency from the {@code [project].dependencies} array in pyproject.toml.
+ * Remove a dependency from a Python project. Supports {@code pyproject.toml}
+ * (with scope and group targeting), {@code requirements.txt}, and {@code Pipfile}.
  * When uv is available, the uv.lock file is regenerated to reflect the change.
  */
 @EqualsAndHashCode(callSuper = false)
@@ -43,9 +44,7 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
     String packageName;
 
     @Option(displayName = "Scope",
-            description = "The dependency scope to remove from. Defaults to `project.dependencies`.",
-            valid = {"project.dependencies", "project.optional-dependencies", "dependency-groups",
-                    "tool.uv.constraint-dependencies", "tool.uv.override-dependencies"},
+            description = "The dependency scope to remove from. All scopes are searched by default.",
             example = "project.dependencies",
             required = false)
     @Nullable
@@ -79,12 +78,13 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
     @Override
     public String getDescription() {
-        return "Remove a dependency from the `[project].dependencies` array in `pyproject.toml`. " +
+        return "Remove a dependency from a Python project. Supports `pyproject.toml` " +
+                "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
                 "When `uv` is available, the `uv.lock` file is regenerated.";
     }
 
     static class Accumulator {
-        final Set<String> projectsToUpdate = new HashSet<>();
+        final Set<Path> projectsToUpdate = new HashSet<>();
     }
 
     @Override
@@ -94,124 +94,69 @@ public class RemoveDependency extends ScanningRecipe<RemoveDependency.Accumulato
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
-        return new TomlIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
             @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                String sourcePath = document.getSourcePath().toString();
-
-                if (sourcePath.endsWith("uv.lock")) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                if (tree instanceof Toml.Document && sourceFile.getSourcePath().endsWith("uv.lock")) {
                     PythonDependencyExecutionContextView.view(ctx).getExistingLockContents().put(
-                            PyProjectHelper.correspondingPyprojectPath(sourcePath),
-                            document.printAll());
-                    return document;
+                            PyProjectHelper.correspondingPyprojectPath(sourceFile.getSourcePath()),
+                            ((Toml.Document) tree).printAll());
+                    return tree;
                 }
-
-                if (!sourcePath.endsWith("pyproject.toml")) {
-                    return document;
+                PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+                if (trait != null && PyProjectHelper.findDependencyInScope(trait.getMarker(), packageName, scope, groupName) != null) {
+                    acc.projectsToUpdate.add(sourceFile.getSourcePath());
                 }
-                Optional<PythonResolutionResult> resolution = document.getMarkers()
-                        .findFirst(PythonResolutionResult.class);
-                if (!resolution.isPresent()) {
-                    return document;
-                }
-
-                PythonResolutionResult marker = resolution.get();
-
-                // Check if the dependency exists in the target scope
-                if (PyProjectHelper.findDependencyInScope(marker, packageName, scope, groupName) == null) {
-                    return document;
-                }
-
-                acc.projectsToUpdate.add(sourcePath);
-                return document;
+                return tree;
             }
         };
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        return new TomlIsoVisitor<ExecutionContext>() {
-            @Override
-            public Toml.Document visitDocument(Toml.Document document, ExecutionContext ctx) {
-                String sourcePath = document.getSourcePath().toString();
+        if (acc.projectsToUpdate.isEmpty()) {
+            return TreeVisitor.noop();
+        }
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
 
-                if (sourcePath.endsWith("pyproject.toml") && acc.projectsToUpdate.contains(sourcePath)) {
-                    return removeDependencyFromPyproject(document, ctx, acc);
+            @Override
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
+                stopAfterPreVisit();
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                Path sourcePath = sourceFile.getSourcePath();
+
+                if (acc.projectsToUpdate.contains(sourcePath)) {
+                    PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
+                    if (trait != null) {
+                        PythonDependencyFile updated = trait.withRemovedDependencies(
+                                Collections.singleton(packageName), scope, groupName);
+                        if (updated.getTree() != tree) {
+                            return updated.afterModification(ctx);
+                        }
+                    }
                 }
 
-                if (sourcePath.endsWith("uv.lock")) {
-                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock(document, ctx);
+                if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
+                    Toml.Document updatedLock = PyProjectHelper.maybeUpdateUvLock((Toml.Document) tree, ctx);
                     if (updatedLock != null) {
                         return updatedLock;
                     }
                 }
 
-                return document;
+                return tree;
             }
         };
-    }
-
-    private Toml.Document removeDependencyFromPyproject(Toml.Document document, ExecutionContext ctx, Accumulator acc) {
-        String normalizedName = PythonResolutionResult.normalizeName(packageName);
-
-        Toml.Document updated = (Toml.Document) new TomlIsoVisitor<ExecutionContext>() {
-            @Override
-            public Toml.Array visitArray(Toml.Array array, ExecutionContext ctx) {
-                Toml.Array a = super.visitArray(array, ctx);
-
-                if (!PyProjectHelper.isInsideDependencyArray(getCursor(), scope, groupName)) {
-                    return a;
-                }
-
-                // Find and remove the matching dependency
-                List<TomlRightPadded<Toml>> existingPadded = a.getPadding().getValues();
-                List<TomlRightPadded<Toml>> newPadded = new ArrayList<>();
-                boolean found = false;
-                int removedIdx = -1;
-
-                for (int i = 0; i < existingPadded.size(); i++) {
-                    TomlRightPadded<Toml> padded = existingPadded.get(i);
-                    Toml element = padded.getElement();
-
-                    if (!found && element instanceof Toml.Literal) {
-                        Object val = ((Toml.Literal) element).getValue();
-                        if (val instanceof String) {
-                            String depName = PyProjectHelper.extractPackageName((String) val);
-                            if (depName != null && PythonResolutionResult.normalizeName(depName).equals(normalizedName)) {
-                                found = true;
-                                removedIdx = i;
-                                continue;
-                            }
-                        }
-                    }
-
-                    newPadded.add(padded);
-                }
-
-                if (!found) {
-                    return a;
-                }
-
-                // If the removed element was the first one, the next element
-                // may have a space prefix from comma formatting. Transfer the
-                // removed element's prefix to the first remaining real element.
-                if (removedIdx == 0 && !newPadded.isEmpty()) {
-                    TomlRightPadded<Toml> first = newPadded.get(0);
-                    if (!(first.getElement() instanceof Toml.Empty)) {
-                        Space originalPrefix = existingPadded.get(removedIdx).getElement().getPrefix();
-                        newPadded.set(0, first.map(el -> el.withPrefix(originalPrefix)));
-                    }
-                }
-
-                return a.getPadding().withValues(newPadded);
-            }
-        }.visitNonNull(document, ctx);
-
-        if (updated != document) {
-            updated = PyProjectHelper.regenerateLockAndRefreshMarker(updated, ctx);
-        }
-
-        return updated;
     }
 
 }

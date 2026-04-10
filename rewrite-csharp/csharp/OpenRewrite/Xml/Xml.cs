@@ -25,7 +25,6 @@ public interface Xml : Tree
 {
     string Prefix { get; }
 
-    Markers Markers { get; }
 }
 
 /// <summary>Marker interface for nodes that can appear as tag content.</summary>

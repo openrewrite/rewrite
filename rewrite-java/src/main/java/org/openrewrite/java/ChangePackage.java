@@ -28,7 +28,9 @@ import org.openrewrite.trait.Reference;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 
@@ -108,6 +110,11 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
+                    // Fully qualified javadoc references are excluded from TypesInUse
+                    // (they don't affect imports), but they still need package renaming.
+                    if (hasJavadocReferenceToPackage(cu, oldPackageName, recursive, recursivePackageNamePrefix)) {
+                        return SearchResult.found(cu);
+                    }
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
@@ -138,9 +145,9 @@ public class ChangePackage extends Recipe {
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
-                    Map<Tree, Reference> matches = new HashMap<>();
+                    Map<Tree, List<Reference>> matches = new HashMap<>();
                     for (Reference ref : references.findMatches(matcher)) {
-                        matches.put(ref.getTree(), ref);
+                        matches.computeIfAbsent(ref.getTree(), k -> new java.util.ArrayList<>()).add(ref);
                     }
                     return new ReferenceChangePackageVisitor(matches, matcher.createRenamer(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
@@ -391,17 +398,48 @@ public class ChangePackage extends Recipe {
 
     }
 
+    private static boolean hasJavadocReferenceToPackage(JavaSourceFile cu, String packageName, boolean recursive, String recursivePrefix) {
+        return new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean f) {
+                if (f.get()) {
+                    return fieldAccess;
+                }
+                for (Object o : getCursor().getPathAsStream().toArray()) {
+                    if (o instanceof Javadoc.Reference) {
+                        JavaType type = fieldAccess.getType();
+                        if (type instanceof JavaType.FullyQualified) {
+                            String pkg = ((JavaType.FullyQualified) type).getPackageName();
+                            if (pkg.equals(packageName) || recursive && pkg.startsWith(recursivePrefix)) {
+                                f.set(true);
+                            }
+                        }
+                        break;
+                    }
+                    if (o instanceof J.Block) {
+                        break;
+                    }
+                }
+                return fieldAccess;
+            }
+        }.reduce(cu, new AtomicBoolean()).get();
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceChangePackageVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Map<Tree, Reference> matches;
+        Map<Tree, List<Reference>> matches;
         Reference.Renamer renamer;
 
         @Override
         public Tree postVisit(Tree tree, ExecutionContext ctx) {
-            Reference reference = matches.get(tree);
-            if (reference != null && reference.supportsRename()) {
-                return reference.rename(renamer, getCursor(), ctx);
+            List<Reference> refs = matches.get(tree);
+            if (refs != null) {
+                for (Reference ref : refs) {
+                    if (ref.supportsRename()) {
+                        tree = ref.rename(renamer, new Cursor(getCursor().getParent(), tree), ctx);
+                    }
+                }
             }
             return tree;
         }

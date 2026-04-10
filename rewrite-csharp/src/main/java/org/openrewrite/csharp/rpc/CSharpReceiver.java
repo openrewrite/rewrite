@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
+import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaReceiver;
 import org.openrewrite.java.tree.*;
@@ -877,6 +878,31 @@ public class CSharpReceiver extends CSharpVisitor<RpcReceiveQueue> {
                 return delegate.visit(tree, p);
             }
             return super.visit(tree, p);
+        }
+
+        @Override
+        public Space visitSpace(Space space, RpcReceiveQueue q) {
+            return space
+                    .withComments(q.receiveList(space.getComments(), c -> {
+                        if (c instanceof CsDocCommentRawComment) {
+                            CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
+                            q.receive(dc.isMultiline()); // consume; always true
+                            return new CsDocCommentRawComment(
+                                    q.receive(dc.getText()),
+                                    q.receive(dc.getSuffix()),
+                                    q.receive(dc.getMarkers())
+                            );
+                        }
+                        if (c instanceof TextComment) {
+                            TextComment tc = (TextComment) c;
+                            return tc.withMultiline(q.receive(tc.isMultiline()))
+                                    .withText(q.receive(tc.getText()))
+                                    .withSuffix(q.receive(tc.getSuffix()))
+                                    .withMarkers(q.receive(tc.getMarkers()));
+                        }
+                        return c;
+                    }))
+                    .withWhitespace(q.receive(space.getWhitespace()));
         }
     }
 }

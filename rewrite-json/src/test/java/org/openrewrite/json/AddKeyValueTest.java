@@ -17,6 +17,7 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -99,6 +100,28 @@ class AddKeyValueTest implements RewriteTest {
                           }
                       }
                   ]
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6207")
+    @Test
+    void shouldAppendSimpleValueWithTrailingDot() {
+        rewriteRun(
+          spec -> spec.recipe(new AddKeyValue("$.", "surname", "\"Doe\"", false)),
+          //language=json
+          json(
+            """
+              {
+                  "name": "John"
+              }
+              """,
+            """
+              {
+                  "name": "John",
+                  "surname": "Doe"
               }
               """
           )

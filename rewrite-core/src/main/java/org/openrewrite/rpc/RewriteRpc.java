@@ -113,6 +113,11 @@ public class RewriteRpc {
      */
     private final List<RecipeBundleResolver> resolvers = new ArrayList<>();
 
+    /**
+     * Parsers available for handling Parse requests from remote peers.
+     */
+    private final List<Parser> parsers = new ArrayList<>();
+
     private final RecipeMarketplace marketplace;
 
     /**
@@ -123,6 +128,14 @@ public class RewriteRpc {
     public void setResolvers(List<RecipeBundleResolver> resolvers) {
         this.resolvers.clear();
         this.resolvers.addAll(resolvers);
+    }
+
+    /**
+     * Set the parsers available for handling Parse requests from remote peers.
+     */
+    public void setParsers(List<Parser> parsers) {
+        this.parsers.clear();
+        this.parsers.addAll(parsers);
     }
 
     /**
@@ -188,6 +201,7 @@ public class RewriteRpc {
             // Fall back to loading by class name if not found in marketplace
             return new RecipeLoader(null).load(id, opts);
         }));
+        jsonRpc.rpc("Parse", new Parse.Handler(localObjects, () -> parsers));
         jsonRpc.rpc("Print", new Print.Handler(this::getObject));
         jsonRpc.rpc("Reset", new JsonRpcMethod<Void>() {
             @Override
@@ -399,9 +413,9 @@ public class RewriteRpc {
         for (Parser.Input input : inputs) {
             inputList.add(input);
             if (input.isSynthetic() || !Files.isRegularFile(input.getPath())) {
-                mappedInputs.add(new Parse.StringInput(input.getSource(ctx).readFully(), input.getPath()));
+                mappedInputs.add(new Parse.Input(input.getSource(ctx).readFully(), input.getPath()));
             } else {
-                mappedInputs.add(new Parse.PathInput(input.getPath()));
+                mappedInputs.add(new Parse.Input(null, input.getPath()));
             }
         }
 

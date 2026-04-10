@@ -1846,3 +1846,82 @@ TypeVar
             assert 'typing' in result._fully_qualified_name
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestDeclarationDeclaringType:
+    """Tests for declaring type on function declarations."""
+
+    def test_declaration_declaring_type_no_ty_types(self):
+        """Without ty-types, declaring type remains None."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+        func_node = tree.body[0]
+        result = mapping.method_declaration_type(func_node)
+        assert result is not None
+        assert result._declaring_type is None
+
+    @requires_ty_types_cli
+    def test_declaration_declaring_type_with_ty_types(self):
+        """With ty-types, a function declaration should get a declaring type from the descriptor."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            func_node = tree.body[0]
+            result = mapping.method_declaration_type(func_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Method)
+            assert result._declaring_type is not None, \
+                "Declaration should have a declaring type, not None"
+            assert isinstance(result._declaring_type, JavaType.Class)
+            assert result._declaring_type._fully_qualified_name != "<unknown>"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestCyclicTypeResolution:
+    """Tests that FQN-deduplicated types don't produce self-referential supertypes.
+
+    Python's namedtuple pattern ``class Pair(namedtuple('Pair', ...))`` creates
+    two types with the same FQN. The type mapping deduplicates by FQN, which can
+    cause the single JavaType.Class object to have itself as its own supertype.
+    """
+
+    def test_namedtuple_subclass_no_self_supertype(self):
+        """A class extending a namedtuple with the same name must not have
+        itself as its own supertype.
+
+        This is the pattern from importlib_metadata._collections.Pair that
+        caused StackOverflowError in TypeUtils.isAssignableTo() on Moderne.
+        """
+        source = 'x = 1'
+        mapping = PythonTypeMapping(source)
+
+        # Simulate what ty-types produces for:
+        #   class Pair(collections.namedtuple('Pair', 'name value')): ...
+        # Two classLiteral descriptors with the same FQN but different type_ids.
+        # type_id 1: the namedtuple-generated Pair (no supertypes of its own here)
+        # type_id 2: the class Pair, whose supertype is type_id 1
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [],
+        }
+        mapping._type_registry[2] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [1],
+        }
+
+        type_pair = mapping._resolve_type(2)
+
+        assert type_pair is not None
+        assert isinstance(type_pair, JavaType.FullyQualified)
+        assert type_pair.fully_qualified_name == 'mymodule.Pair'
+
+        # The supertype must NOT be itself
+        supertype = getattr(type_pair, '_supertype', None)
+        assert supertype is not type_pair, \
+            "Pair has itself as its own supertype — would cause StackOverflowError in Java"

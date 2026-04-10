@@ -15,13 +15,17 @@
  */
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using JetBrains.Annotations;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
 using OpenRewrite.CSharp.Format;
+using OpenRewrite.CSharp.Rpc;
 using OpenRewrite.Java;
+using OpenRewrite.Xml;
+using OpenRewrite.Xml.Rpc;
 using Rewrite.Core;
 using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
@@ -69,47 +73,76 @@ public abstract class RewriteTest
         // 1. Parse all sources and validate round-trip
         var validations = recipeSpec.Validations;
         var parsed = new List<(SourceSpec Spec, SourceFile Source)>();
+
+        // Collect all csproj-related specs and parse them together in a shared temp directory
+        // so that MSBuild imports (Directory.Build.props/.targets) resolve correctly during restore.
+        var csprojSpecs = specs.Where(s => s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
+        Dictionary<string, SourceFile>? csprojParsed = null;
+        if (csprojSpecs.Count > 0)
+        {
+            csprojParsed = ParseCsprojFilesTogether(csprojSpecs);
+        }
+
         foreach (var spec in specs)
         {
-            SemanticModel? semanticModel = null;
-            if (metadataReferences != null)
+            SourceFile source;
+            if (spec.SourcePath != null && IsCsprojPath(spec.SourcePath) && csprojParsed != null)
             {
-                var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: "source.cs");
-                var compilation = CSharpCompilation.Create("TestCompilation")
-                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-                    .AddReferences(metadataReferences)
-                    .AddSyntaxTrees(syntaxTree);
-                semanticModel = compilation.GetSemanticModel(syntaxTree);
+                source = csprojParsed[spec.SourcePath];
             }
-
-            var source = parser.Parse(spec.Before, semanticModel: semanticModel);
-
-            // Verify no non-whitespace content leaked into Space fields
-            if (validations.WhitespaceInSpaces)
+            else if (spec.SourcePath != null)
             {
-                var whitespaceViolations = new List<WhitespaceViolation>();
-                new WhitespaceValidator().Visit(source, whitespaceViolations);
-                Assert.True(whitespaceViolations.Count == 0,
-                    $"Found non-whitespace content in Space fields:\n" +
-                    string.Join("\n", whitespaceViolations));
+                // Remote-parsed source (e.g., XML via Java RPC)
+                var rpc = RewriteRpcServer.Current
+                          ?? throw new InvalidOperationException(
+                              $"Parsing {spec.SourcePath} requires an RPC connection. " +
+                              "Use RpcFixture to start a Java RPC server.");
+                source = rpc.ParseOnRemote(spec.SourcePath, spec.Before,
+                    spec.SourceFileType);
             }
-
-            // Verify round-trip: printed should match input
-            var printed = printer.Print(source);
-            if (validations.PrintEqualsInput)
+            else
             {
-                AssertContentEquals(spec.Before, printed, source.SourcePath,
-                    "The printed source didn't match the original source code. " +
-                    "This means there is a bug in the parser implementation itself.");
-            }
+                // Local C# parsing
+                SemanticModel? semanticModel = null;
+                if (metadataReferences != null)
+                {
+                    var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: "source.cs");
+                    var compilation = CSharpCompilation.Create("TestCompilation")
+                        .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                        .AddReferences(metadataReferences)
+                        .AddSyntaxTrees(syntaxTree);
+                    semanticModel = compilation.GetSemanticModel(syntaxTree);
+                }
 
-            // Verify idempotence: reparse and reprint should match
-            if (validations.PrintIdempotence)
-            {
-                var reparsed = parser.Parse(printed);
-                var reprinted = printer.Print(reparsed);
-                AssertContentEquals(printed, reprinted, source.SourcePath,
-                    "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+                source = parser.Parse(spec.Before, semanticModel: semanticModel);
+
+                // Verify no non-whitespace content leaked into Space fields
+                if (validations.WhitespaceInSpaces)
+                {
+                    var whitespaceViolations = new List<WhitespaceViolation>();
+                    new WhitespaceValidator().Visit(source, whitespaceViolations);
+                    Assert.True(whitespaceViolations.Count == 0,
+                        $"Found non-whitespace content in Space fields:\n" +
+                        string.Join("\n", whitespaceViolations));
+                }
+
+                // Verify round-trip: printed should match input
+                var printed = printer.Print(source);
+                if (validations.PrintEqualsInput)
+                {
+                    AssertContentEquals(spec.Before, printed, source.SourcePath,
+                        "The printed source didn't match the original source code. " +
+                        "This means there is a bug in the parser implementation itself.");
+                }
+
+                // Verify idempotence: reparse and reprint should match
+                if (validations.PrintIdempotence)
+                {
+                    var reparsed = parser.Parse(printed);
+                    var reprinted = printer.Print(reparsed);
+                    AssertContentEquals(printed, reprinted, source.SourcePath,
+                        "The source is not print idempotent. Printing, re-parsing, and re-printing produced different output.");
+                }
             }
 
             parsed.Add((spec, source));
@@ -141,7 +174,7 @@ public abstract class RewriteTest
                     // Expected a change
                     Assert.True(result != null && result.After != null,
                         $"Recipe was expected to make changes but did not modify the source file.");
-                    var afterPrinted = printer.Print(result.After);
+                    var afterPrinted = PrintTree(result.After);
                     AssertContentEquals(spec.After, afterPrinted, result.After.SourcePath,
                         "Unexpected result from recipe");
                 }
@@ -158,6 +191,11 @@ public abstract class RewriteTest
     protected static SourceSpec CSharp(string before, string? after = null)
     {
         return new SourceSpec(before, after);
+    }
+
+    protected static SourceSpec CsProj([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null, string sourcePath = "project.csproj")
+    {
+        return new SourceSpec(before, after, sourcePath, "org.openrewrite.xml.tree.Xml$Document");
     }
 
     /// <summary>
@@ -200,6 +238,32 @@ public abstract class RewriteTest
         }
     }
 
+    private static string PrintTree(SourceFile tree)
+    {
+        if (tree is Xml.Document)
+        {
+            var capture = new PrintOutputCapture<object>(null!);
+            new XmlPrinter<object>().Visit(tree, capture);
+            return capture.ToString();
+        }
+        return new CSharpPrinter<object>().Print(tree);
+    }
+
+    private static readonly CsprojParser CsprojParserInstance = new();
+
+    private static bool IsCsprojPath(string path) => CsprojParserInstance.Accept(path);
+
+    private static Dictionary<string, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs)
+    {
+        var files = specs.Select(s => (s.Before, s.SourcePath!)).ToList();
+        var docs = CsprojParserInstance.ParseAll(files);
+
+        var result = new Dictionary<string, SourceFile>();
+        for (var i = 0; i < specs.Count; i++)
+            result[specs[i].SourcePath!] = docs[i];
+        return result;
+    }
+
     private static void AssertContentEquals(string expected, string actual, string sourcePath,
         string errorMessagePrefix)
     {
@@ -212,7 +276,15 @@ public abstract class RewriteTest
 /// <summary>
 /// Specification for a source file in a test.
 /// </summary>
-public record SourceSpec(string Before, string? After = null);
+/// <param name="Before">Source content before recipe execution.</param>
+/// <param name="After">Expected content after recipe execution (null = expect no change).</param>
+/// <param name="SourcePath">File path for remote parsing (null = local C# parsing).</param>
+/// <param name="SourceFileType">Java type name for RPC GetObject calls.</param>
+public record SourceSpec(
+    string Before,
+    string? After = null,
+    string? SourcePath = null,
+    string? SourceFileType = null);
 
 /// <summary>
 /// Specification for recipe configuration in a test.

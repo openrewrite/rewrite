@@ -1108,7 +1108,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             var downloader = new MavenPomDownloader(pomsByPath, ctx);
 
-            assertThrows(IllegalArgumentException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
+            assertThrows(MavenDownloadingException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
 
         @Test
@@ -1197,9 +1197,10 @@ class MavenPomDownloaderTest implements RewriteTest {
             assertDoesNotThrow(() -> downloader.download(requestedGav, null, resolvedPom, singletonList(nonexistentRepo)));
 
             // With empty relativePath (<relativePath/>), step 3 is skipped entirely.
-            // Since the parent can't be found by GAV match either, and the remote
-            // repo doesn't exist, download fails — proving local lookup was skipped.
-            assertThrows(Exception.class,
+            // Since the parent can't be found by GAV match either, the version still
+            // contains an unresolved placeholder, so download throws MavenDownloadingException
+            // instead of URISyntaxException from URI.create().
+            assertThrows(MavenDownloadingException.class,
               () -> downloader.download(requestedGav, "", resolvedPom, singletonList(nonexistentRepo)));
         }
 

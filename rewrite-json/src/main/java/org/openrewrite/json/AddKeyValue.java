@@ -39,7 +39,7 @@ public class AddKeyValue extends Recipe {
 
     @Option(displayName = "Key path",
             description = "A JsonPath expression to locate the *parent* JSON entry.",
-            example = "'$.subjects.*' or '$.' or '$.x[1].y.*' etc.")
+            example = "'$.subjects.*' or '$' or '$.x[1].y.*' etc.")
     String keyPath;
 
     @Option(displayName = "Key",

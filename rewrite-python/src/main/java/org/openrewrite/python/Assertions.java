@@ -237,6 +237,45 @@ public final class Assertions {
         return text;
     }
 
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before) {
+        return pipfile(before, s -> {
+        });
+    }
+
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before,
+                                       Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, PipfileParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("Pipfile");
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before,
+                                       @Language("toml") @Nullable String after) {
+        return pipfile(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before,
+                                       @Language("toml") @Nullable String after,
+                                       Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, PipfileParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("Pipfile");
+        toml.after(s -> after);
+        spec.accept(toml);
+        return toml;
+    }
+
     public static SourceSpecs python(@Language("py") @Nullable String before) {
         return python(before, s -> {
         });

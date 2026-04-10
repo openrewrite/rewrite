@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * The Scala language-specific AST types extend the J interface and its sub-types.
@@ -178,13 +179,15 @@ public interface S extends J {
 
         @Override
         public List<J.ClassDeclaration> getClasses() {
-            // TODO: Extract class declarations from statements
-            return Collections.emptyList();
+            return statements.stream()
+                    .filter(J.ClassDeclaration.class::isInstance)
+                    .map(J.ClassDeclaration.class::cast)
+                    .collect(Collectors.toList());
         }
 
         @Override
         public S.CompilationUnit withClasses(List<J.ClassDeclaration> classes) {
-            // TODO: Handle class updates
+            // Scala compilation units use statements, not a separate classes list
             return this;
         }
 
@@ -427,6 +430,72 @@ public interface S extends J {
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Wraps an {@link Expression} so it can appear where a {@link Statement} is required.
+     * Scala allows arbitrary expressions (including literals) as statements in class bodies
+     * and blocks. This wrapper bridges the J model's Expression/Statement distinction.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class ExpressionStatement implements S, Expression, Statement {
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Expression expression;
+
+        public ExpressionStatement(UUID id, Expression expression) {
+            this.id = id;
+            this.expression = expression;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withExpression(expression.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return expression.getPrefix();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withExpression(expression.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withExpression(expression.withType(type));
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitExpressionStatement(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
     }
 

@@ -264,6 +264,11 @@
   eolDate: "2025-11-01"
   suggestedReplacement: 3.23 or 3.22
 
+- imageName: alpine
+  tagPatterns: ["3.20", "3.20.*", "3.20-*"]
+  eolDate: "2026-04-01"
+  suggestedReplacement: 3.23 or 3.22
+
 - imageName: python
   tagPatterns: ["2.7", "2.7.*", "2.7-*"]
   eolDate: "2020-01-01"

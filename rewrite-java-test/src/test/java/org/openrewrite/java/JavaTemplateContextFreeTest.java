@@ -167,9 +167,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
-                      return JavaTemplate.builder("var o = #{any()};")
-                        .build()
-                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
+                      return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
@@ -241,9 +239,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if ("printf".equals(method.getSimpleName()) && method.getArguments().size() == 2) {
-                      return JavaTemplate.builder("System.out.printf(#{any()}, #{any()}, 0);")
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+                      return JavaTemplate.apply("System.out.printf(#{any()}, #{any()}, 0);", getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
                   }
                   return super.visitMethodInvocation(method, executionContext);
               }
@@ -277,9 +273,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
-                      return JavaTemplate.builder("var o = #{any()};")
-                        .build()
-                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
+                      return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
@@ -317,9 +311,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
-                      return JavaTemplate.builder("var o = #{any()};")
-                        .build()
-                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
+                      return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }
@@ -359,9 +351,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if ("o".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
-                      return JavaTemplate.builder("var o = #{any()};")
-                        .build()
-                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
+                      return JavaTemplate.apply("var o = #{any()};", getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().getFirst().getInitializer());
                   }
                   return multiVariable;
               }

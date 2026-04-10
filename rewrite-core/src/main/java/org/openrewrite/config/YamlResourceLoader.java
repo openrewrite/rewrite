@@ -91,7 +91,7 @@ public class YamlResourceLoader implements ResourceLoader {
         }
     }
 
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers) {
+    public YamlResourceLoader(InputStream yamlInput, URI source, @Nullable Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers) {
         this.source = source;
         this.dependencyResourceLoaders = emptyList();
         this.mapper = ObjectMappers.propertyBasedMapper(getClass().getClassLoader());
@@ -105,18 +105,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
         maybeAddKotlinModule(mapper);
 
-        try {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            int nRead;
-            byte[] data = new byte[8192];
-            while ((nRead = yamlInput.read(data, 0, data.length)) != -1) {
-                buffer.write(data, 0, nRead);
-            }
-            this.yamlSource = propertyPlaceholderHelper.replacePlaceholders(
-                    new String(buffer.toByteArray(), StandardCharsets.UTF_8), properties);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        this.yamlSource = readYamlSource(yamlInput, properties);
     }
 
     /**
@@ -127,7 +116,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param properties Placeholder properties
      * @throws UncheckedIOException On unexpected IOException
      */
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties) throws UncheckedIOException {
+    public YamlResourceLoader(InputStream yamlInput, URI source, @Nullable Properties properties) throws UncheckedIOException {
         this(yamlInput, source, properties, (ClassLoader) null);
     }
 
@@ -142,7 +131,7 @@ public class YamlResourceLoader implements ResourceLoader {
      */
     public YamlResourceLoader(InputStream yamlInput,
                               URI source,
-                              Properties properties,
+                              @Nullable Properties properties,
                               @Nullable ClassLoader classLoader) throws UncheckedIOException {
         this(yamlInput, source, properties, classLoader, emptyList());
     }
@@ -160,7 +149,7 @@ public class YamlResourceLoader implements ResourceLoader {
      */
     public YamlResourceLoader(InputStream yamlInput,
                               URI source,
-                              Properties properties,
+                              @Nullable Properties properties,
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders) throws UncheckedIOException {
         this(yamlInput, source, properties, classLoader, dependencyResourceLoaders, jsonMapper -> {
@@ -179,7 +168,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param mapperCustomizer          Customizer for the ObjectMapper
      * @throws UncheckedIOException On unexpected IOException
      */
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties,
+    public YamlResourceLoader(InputStream yamlInput, URI source, @Nullable Properties properties,
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders,
                               Consumer<ObjectMapper> mapperCustomizer) {
@@ -193,6 +182,10 @@ public class YamlResourceLoader implements ResourceLoader {
         mapperCustomizer.accept(mapper);
         maybeAddKotlinModule(mapper);
 
+        this.yamlSource = readYamlSource(yamlInput, properties);
+    }
+
+    private static String readYamlSource(InputStream yamlInput, @Nullable Properties properties) {
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             int nRead;
@@ -200,8 +193,8 @@ public class YamlResourceLoader implements ResourceLoader {
             while ((nRead = yamlInput.read(data, 0, data.length)) != -1) {
                 buffer.write(data, 0, nRead);
             }
-            this.yamlSource = propertyPlaceholderHelper.replacePlaceholders(
-                    new String(buffer.toByteArray(), StandardCharsets.UTF_8), properties);
+            String raw = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+            return properties != null ? propertyPlaceholderHelper.replacePlaceholders(raw, properties) : raw;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
