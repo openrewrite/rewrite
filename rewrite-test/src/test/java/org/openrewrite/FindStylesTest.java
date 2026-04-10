@@ -45,7 +45,6 @@ class FindStylesTest implements RewriteTest {
         rewriteRun(
           text(
             "hello world!",
-            "~~(No styles attached)~~>hello world!",
             spec -> spec.path("hello.txt")
           )
         );
