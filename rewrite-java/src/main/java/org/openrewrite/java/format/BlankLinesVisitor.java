@@ -158,7 +158,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     public J.Import visitImport(J.Import import_, P p) {
         J.Import i = super.visitImport(import_, p);
         JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-        if (i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
+        if (!cu.getImports().isEmpty() && i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
             i = i.withPrefix(i.getPrefix().withWhitespace(""));
         }
         return i;
