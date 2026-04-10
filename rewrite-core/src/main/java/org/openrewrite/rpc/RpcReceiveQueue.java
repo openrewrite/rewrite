@@ -138,6 +138,11 @@ public class RpcReceiveQueue {
                     after = codec.rpcReceive(before, this);
                 } else if (message.getValueType() == null) {
                     after = message.getValue();
+                } else if (message.getState() == RpcObjectData.State.ADD && message.getValue() == null) {
+                    throw new IllegalStateException(
+                            "No RPC codec registered on the Java side for '" + message.getValueType() + "'. " +
+                                    "The remote side has a codec and sent property messages that will not be consumed, " +
+                                    "causing RPC queue desynchronization.");
                 } else {
                     after = before;
                 }

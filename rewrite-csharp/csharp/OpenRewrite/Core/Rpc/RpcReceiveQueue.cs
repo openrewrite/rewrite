@@ -151,10 +151,12 @@ public class RpcReceiveQueue
                     // Simple value types (enums, primitives) sent with both valueType and value
                     after = ExtractValue<T>(message.Value);
                 }
-                else if (message.ValueType != null)
+                else if (message.State == ADD && message.ValueType != null)
                 {
-                    // ValueType set but no value and no codec - keep before
-                    after = before;
+                    throw new InvalidOperationException(
+                        $"No RPC codec registered on the C# side for '{message.ValueType}'. " +
+                        "The remote side has a codec and sent property messages that will not be consumed, " +
+                        "causing RPC queue desynchronization.");
                 }
                 else
                 {

@@ -192,6 +192,12 @@ class RpcReceiveQueue:
                     after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
                 else:
                     after = message.value
+            elif message.state == RpcObjectState.ADD and message.value_type:
+                raise RuntimeError(
+                    f"No RPC codec registered on the Python side for '{message.value_type}'. "
+                    "The remote side has a codec and sent property messages that will not be consumed, "
+                    "causing RPC queue desynchronization."
+                )
             else:
                 after = before
 
