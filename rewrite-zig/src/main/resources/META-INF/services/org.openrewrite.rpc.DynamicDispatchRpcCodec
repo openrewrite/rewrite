@@ -1,0 +1,5 @@
+org.openrewrite.zig.internal.rpc.ZigRpcCodec
+org.openrewrite.zig.internal.rpc.ZigRightPaddedRpcCodec
+org.openrewrite.zig.internal.rpc.ZigLeftPaddedRpcCodec
+org.openrewrite.zig.internal.rpc.ZigContainerRpcCodec
+org.openrewrite.zig.internal.rpc.ZigSpaceRpcCodec
