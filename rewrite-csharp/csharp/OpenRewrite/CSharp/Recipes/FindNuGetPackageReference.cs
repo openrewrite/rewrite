@@ -42,25 +42,4 @@ public class FindNuGetPackageReference : Recipe
             new IsProjectFile(),
             new FindNuGetPackageReferenceVisitor(PackageName));
     }
-
-    private class FindNuGetPackageReferenceVisitor(string packageName) : XmlVisitor<ExecutionContext>
-    {
-        public override Xml.Xml VisitDocument(Document document, ExecutionContext ctx)
-        {
-            var marker = document.Markers.FindFirst<MSBuildProject>();
-            if (marker != null)
-            {
-                foreach (var tfm in marker.TargetFrameworks)
-                {
-                    foreach (var pkgRef in tfm.PackageReferences)
-                    {
-                        if (GlobMatcher.Matches(pkgRef.Include, packageName))
-                            return document.WithMarkers(
-                                document.Markers.Add(new SearchResult(Guid.NewGuid(), null)));
-                    }
-                }
-            }
-            return document;
-        }
-    }
 }
