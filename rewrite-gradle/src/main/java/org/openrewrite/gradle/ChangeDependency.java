@@ -30,6 +30,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
@@ -37,6 +39,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.DependencyMatcher;
@@ -171,6 +174,8 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         Map<String, Object> versionVariableUpdates = new HashMap<>();
         Map<String, Set<GroupArtifact>> versionVariableUsages = new HashMap<>();
         Set<GroupArtifact> failedResolutions = new HashSet<>();
+        Map<JavaProject, ResolvedDependency> modulesWithOldDependency = new HashMap<>();
+        Map<JavaProject, List<MavenRepository>> moduleRepositories = new HashMap<>();
     }
 
     @Override
@@ -196,6 +201,21 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     gradleProject = tree.getMarkers().findFirst(GradleProject.class).orElse(null);
                     if (gradleProject == null) {
                         return (J) tree;
+                    }
+                    // Record this module if it has the old dependency
+                    Optional<JavaProject> maybeJp = tree.getMarkers().findFirst(JavaProject.class);
+                    if (maybeJp.isPresent() && !acc.modulesWithOldDependency.containsKey(maybeJp.get())) {
+                        outer:
+                        for (GradleDependencyConfiguration config : gradleProject.getConfigurations()) {
+                            for (ResolvedDependency resolved : config.getDirectResolved()) {
+                                if (StringUtils.matchesGlob(resolved.getGroupId(), oldGroupId) &&
+                                    StringUtils.matchesGlob(resolved.getArtifactId(), oldArtifactId)) {
+                                    acc.modulesWithOldDependency.put(maybeJp.get(), resolved);
+                                    acc.moduleRepositories.put(maybeJp.get(), gradleProject.getMavenRepositories());
+                                    break outer;
+                                }
+                            }
+                        }
                     }
                 }
                 return super.visit(tree, ctx);
@@ -480,14 +500,23 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
         });
 
         DependencyMatcher propsMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
+        boolean hasModulesWithOldDep = !acc.modulesWithOldDependency.isEmpty();
         return new TreeVisitor<Tree, ExecutionContext>() {
+            @Nullable
+            private JavaSourceSetUpdater updater;
+            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
+
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
                 if (sourceFile instanceof Properties.File) {
                     return sourceFile.getSourcePath().endsWith(GRADLE_PROPERTIES_FILE_NAME);
                 }
-                return (sourceFile instanceof G.CompilationUnit || sourceFile instanceof K.CompilationUnit)
-                        && sourceFile.getMarkers().findFirst(GradleProject.class).isPresent();
+                if ((sourceFile instanceof G.CompilationUnit || sourceFile instanceof K.CompilationUnit)
+                        && sourceFile.getMarkers().findFirst(GradleProject.class).isPresent()) {
+                    return true;
+                }
+                // Accept Java source files for JavaSourceSet updates
+                return hasModulesWithOldDep && sourceFile instanceof JavaSourceFile;
             }
 
             @Override
@@ -517,7 +546,50 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                     return tree;
                 }
+                // For Java source files, update JavaSourceSet marker
+                if (hasModulesWithOldDep && tree instanceof JavaSourceFile) {
+                    return updateJavaSourceSet((SourceFile) tree, ctx);
+                }
                 return gradleVisitor.visit(tree, ctx);
+            }
+
+            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
+                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
+                if (!maybeJp.isPresent()) {
+                    return sf;
+                }
+                ResolvedDependency oldDep = acc.modulesWithOldDependency.get(maybeJp.get());
+                if (oldDep == null) {
+                    return sf;
+                }
+                if (updater == null) {
+                    updater = new JavaSourceSetUpdater(ctx);
+                }
+                JavaProject jp = maybeJp.get();
+                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
+                    String effectiveNewGroupId = newGroupId != null ? newGroupId : oldDep.getGroupId();
+                    String effectiveNewArtifactId = newArtifactId != null ? newArtifactId : oldDep.getArtifactId();
+                    ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
+                            oldDep.getGav().getRepository(),
+                            effectiveNewGroupId, effectiveNewArtifactId, oldDep.getVersion(), null);
+                    ResolvedDependency newDep = oldDep
+                            .withGav(newGav)
+                            .withRepository(findRemoteRepository(jp));
+                    return updater.changeDependency(sourceSet, oldDep, newDep);
+                });
+            }
+
+            private MavenRepository findRemoteRepository(JavaProject jp) {
+                List<MavenRepository> repos = acc.moduleRepositories.get(jp);
+                if (repos != null) {
+                    for (MavenRepository repo : repos) {
+                        String uri = repo.getUri();
+                        if (uri != null && (uri.startsWith("http://") || uri.startsWith("https://"))) {
+                            return repo;
+                        }
+                    }
+                }
+                return MavenRepository.MAVEN_CENTRAL;
             }
         };
     }
