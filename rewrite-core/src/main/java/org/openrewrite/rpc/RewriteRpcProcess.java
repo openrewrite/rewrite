@@ -31,12 +31,14 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -47,9 +49,6 @@ import static org.openrewrite.internal.StringUtils.readFully;
  * A client for spawning and communicating with a subprocess that implements Rewrite RPC.
  */
 public class RewriteRpcProcess extends Thread {
-    private static final File DEV_NULL = new File(
-            System.getProperty("os.name").startsWith("Windows") ? "NUL" : "/dev/null");
-
     private final String[] command;
 
     @Setter
@@ -93,15 +92,39 @@ public class RewriteRpcProcess extends Thread {
             if (workingDirectory != null) {
                 pb.directory(workingDirectory.toFile());
             }
-            if (stderrRedirect != null) {
-                pb.redirectError(ProcessBuilder.Redirect.appendTo(stderrRedirect.toFile()));
-            } else {
-                pb.redirectError(ProcessBuilder.Redirect.to(DEV_NULL));
-            }
+            // Don't use ProcessBuilder.redirectError() — on Windows it leaks the
+            // parent-side file handle after process termination, preventing deletion
+            // of the log file.  Instead we drain stderr in a daemon thread.
             process = pb.start();
+            drainStderr(process, stderrRedirect);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static void drainStderr(Process process, @Nullable Path stderrRedirect) {
+        Thread thread = new Thread(() -> {
+            byte[] buf = new byte[8192];
+            try (InputStream stderr = process.getErrorStream()) {
+                if (stderrRedirect != null) {
+                    try (OutputStream out = Files.newOutputStream(stderrRedirect,
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+                        int n;
+                        while ((n = stderr.read(buf)) != -1) {
+                            out.write(buf, 0, n);
+                        }
+                    }
+                } else {
+                    //noinspection StatementWithEmptyBody
+                    while (stderr.read(buf) != -1) {
+                        // discard
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }, "rpc-stderr-drain");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
