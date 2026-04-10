@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
+using OpenRewrite.CSharp.Rpc;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
 using static OpenRewrite.Core.Preconditions;
@@ -24,8 +25,25 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 
 namespace OpenRewrite.Tests.Recipe;
 
-public class PreconditionsCheckTest : RewriteTest
+/// <summary>
+/// Tests for local (non-RPC) precondition logic. Ensures RewriteRpcServer.Current
+/// is null so that UsesType falls back to LocalUsesType instead of delegating to
+/// a Java RPC server that may have been started by other test collections.
+/// </summary>
+public class PreconditionsCheckTest : RewriteTest, IDisposable
 {
+    private readonly RewriteRpcServer? _savedRpcServer;
+
+    public PreconditionsCheckTest()
+    {
+        _savedRpcServer = RewriteRpcServer.Current;
+        RewriteRpcServer.SetCurrent(null);
+    }
+
+    public void Dispose()
+    {
+        RewriteRpcServer.SetCurrent(_savedRpcServer);
+    }
     /// <summary>
     /// Directly test that LocalUsesType finds the type and Check delegates to visitor.
     /// </summary>
