@@ -675,11 +675,17 @@ public interface Py extends J {
         @SuppressWarnings("unchecked")
         @Override
         public ExpressionTypeTree withType(@Nullable JavaType type) {
-            if (reference instanceof Expression) {
-                return withReference(((Expression) reference).withType(type));
-            }
-            if (reference instanceof TypedTree) {
-                return withReference(((TypedTree) reference).withType(type));
+            try {
+                if (reference instanceof Expression) {
+                    return withReference(((Expression) reference).withType(type));
+                }
+                if (reference instanceof TypedTree) {
+                    return withReference(((TypedTree) reference).withType(type));
+                }
+            } catch (UnsupportedOperationException ignored) {
+                // Some J types (e.g., MethodInvocation, MethodDeclaration) throw on withType()
+                // and require withMethodType() instead. When wrapped in ExpressionTypeTree,
+                // the inner node's type is already handled by the visitor directly.
             }
             return this;
         }
