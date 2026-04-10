@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
@@ -28,11 +29,17 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.openrewrite.java.Assertions.addTypesToSourceSet;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
@@ -662,6 +669,92 @@ class ChangePackageTest implements RewriteTest {
                 assertThat(cu.findType("org.openrewrite.Test")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void changePackageExpandsStarImportWhenItWouldCreateAmbiguity() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api", "hibernate-validator");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api", "hibernate-validator"))
+                  .beforeRecipe(addTypesToSourceSet("main",
+                    emptyList(), classpath)),
+          srcMainJava(
+            java(
+              """
+                package xyz;
+
+                import javax.validation.constraints.*;
+                import org.hibernate.validator.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @NotEmpty
+                    private String otherField;
+                }
+                """,
+              """
+                package xyz;
+
+                import jakarta.validation.constraints.NotNull;
+                import org.hibernate.validator.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @NotEmpty
+                    private String otherField;
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void changePackagePreservesStarImportWhenNoAmbiguity() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        List<Path> classpath = JavaParser.dependenciesFromResources(ctx,
+          "validation-api", "jakarta.validation-api");
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("javax.validation.constraints", "jakarta.validation.constraints", true))
+                  .parser(JavaParser.fromJavaVersion().classpathFromResources(ctx,
+                    "validation-api"))
+                  .beforeRecipe(addTypesToSourceSet("main",
+                    emptyList(), classpath)),
+          srcMainJava(
+            java(
+              """
+                package xyz;
+
+                import javax.validation.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @Size(max = 100)
+                    private String otherField;
+                }
+                """,
+              """
+                package xyz;
+
+                import jakarta.validation.constraints.*;
+
+                class A {
+                    @NotNull
+                    private String someField;
+                    @Size(max = 100)
+                    private String otherField;
+                }
+                """
+            )
           )
         );
     }
@@ -2059,4 +2152,5 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
 }

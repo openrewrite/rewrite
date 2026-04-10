@@ -32,4 +32,39 @@ public static class Preconditions
     {
         return new Check(precondition, visitor);
     }
+
+    /// <summary>
+    /// Wraps a visitor with a recipe-based precondition check. The recipe's visitor
+    /// is used as the precondition gate.
+    /// </summary>
+    public static ITreeVisitor<ExecutionContext> Check(
+        Recipe check,
+        ITreeVisitor<ExecutionContext> visitor)
+    {
+        if (check is IScanningRecipe)
+        {
+            throw new ArgumentException("ScanningRecipe is not supported as a check");
+        }
+        return new RecipeCheck(check, visitor);
+    }
+
+    /// <summary>
+    /// Negates a precondition visitor. Returns a search result when the inner visitor
+    /// does NOT match (i.e., does not modify the tree).
+    /// </summary>
+    public static ITreeVisitor<ExecutionContext> Not(
+        ITreeVisitor<ExecutionContext> visitor)
+    {
+        return new NotVisitor(visitor);
+    }
+
+    /// <summary>
+    /// Combines multiple precondition visitors with AND semantics. All visitors must
+    /// match (modify the tree) for the combined precondition to match.
+    /// </summary>
+    public static ITreeVisitor<ExecutionContext> And(
+        params ITreeVisitor<ExecutionContext>[] visitors)
+    {
+        return new AndVisitor(visitors);
+    }
 }

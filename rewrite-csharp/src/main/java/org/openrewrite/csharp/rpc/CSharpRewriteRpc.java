@@ -295,10 +295,11 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     );
                 }
             } else {
-                // Run via dotnet tool exec with the pinned version from the build
+                // Install and run the tool from a persistent tool-path, bypassing
+                // dotnet tool exec which has auth issues with private feeds (dotnet/sdk#51375)
                 String version = StringUtils.readFully(
                         CSharpRewriteRpc.class.getResourceAsStream("/META-INF/rewrite-csharp-version.txt")).trim();
-                cmd = buildToolExecCommand(version);
+                cmd = buildToolPathCommand(version);
             }
 
             return startProcess(cmd);
@@ -351,29 +352,74 @@ public class CSharpRewriteRpc extends RewriteRpc {
             );
         }
 
-        private Stream<@Nullable String> buildToolExecCommand(String version) {
-            // When the tool package exists in the NuGet global cache (e.g. from pTML),
-            // add it as a source so dotnet tool exec can resolve it without remote feeds
-            Path globalCachePath = Paths.get(System.getProperty("user.home"),
-                    ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
-            String addSource = Files.isDirectory(globalCachePath) ? globalCachePath.toString() : null;
+        /**
+         * Ensures the tool is installed at a persistent tool-path and returns a command
+         * to run it directly. This bypasses {@code dotnet tool exec} entirely, working
+         * around https://github.com/dotnet/sdk/issues/51375 where {@code dotnet tool exec}
+         * fails to authenticate against private NuGet feeds.
+         * <p>
+         * Uses {@code dotnet tool install --tool-path} which handles authentication
+         * correctly. The tool-path is version-specific so multiple versions can coexist
+         * without file-lock conflicts during parallel execution.
+         */
+        private Stream<@Nullable String> buildToolPathCommand(String version) {
+            Path toolPath = Paths.get(System.getProperty("user.home"),
+                    ".dotnet", "rewrite-tools", version);
+            Path toolExecutable = toolPath.resolve(TOOL_COMMAND);
+
+            if (!Files.isRegularFile(toolExecutable)) {
+                installTool(version, toolPath);
+            }
 
             return Stream.of(
-                    dotnetPath.toString(),
-                    "tool", "exec",
-                    NUGET_PACKAGE_ID + "@" + version,
-                    "-y",
-                    "--allow-roll-forward",
-                    addSource != null ? "--add-source" : null,
-                    addSource,
-                    "--ignore-failed-sources",
-                    // Suppress NuGet informational messages (e.g. "Skipping NuGet package
-                    // signature verification") that would corrupt the RPC stdout channel.
-                    "-v", "q",
-                    "--",
+                    toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null
             );
+        }
+
+        private void installTool(String version, Path toolPath) {
+            try {
+                Files.createDirectories(toolPath);
+
+                List<String> installCmd = new ArrayList<>(Arrays.asList(
+                        dotnetPath.toString(),
+                        "tool", "install",
+                        NUGET_PACKAGE_ID,
+                        "--version", version,
+                        "--tool-path", toolPath.toString(),
+                        "--ignore-failed-sources"
+                ));
+
+                // When the tool package exists in the NuGet global cache (e.g. from publishToMavenLocal),
+                // add it as a source so the install can resolve it without remote feeds
+                Path globalCachePath = Paths.get(System.getProperty("user.home"),
+                        ".nuget", "packages", NUGET_PACKAGE_ID.toLowerCase(), version);
+                if (Files.isDirectory(globalCachePath)) {
+                    installCmd.addAll(Arrays.asList("--add-source", globalCachePath.toString()));
+                }
+
+                ProcessBuilder pb = new ProcessBuilder(installCmd);
+                if (workingDirectory != null) {
+                    pb.directory(workingDirectory.toFile());
+                }
+                pb.environment().putAll(environment);
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+                String output = StringUtils.readFully(process.getInputStream());
+                int exitCode = process.waitFor();
+
+                if (exitCode != 0) {
+                    throw new RuntimeException(
+                            "Failed to install " + NUGET_PACKAGE_ID + "@" + version +
+                            " to " + toolPath + " (exit code " + exitCode + "): " + output);
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to install " + NUGET_PACKAGE_ID + "@" + version, e);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted while installing " + NUGET_PACKAGE_ID + "@" + version, e);
+            }
         }
     }
 }
