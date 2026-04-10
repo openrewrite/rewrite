@@ -15,10 +15,6 @@
  */
 package org.openrewrite.java.marker;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ClassInfo;
-import io.github.classgraph.ClassInfoList;
-import io.github.classgraph.ScanResult;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -57,7 +53,6 @@ public class JavaSourceSet implements SourceSet {
 
     /**
      * Extract type information from the provided classpath.
-     * Uses ClassGraph to compute the classpath.
      * <p>
      * Does not support gavToTypes or typeToGav mapping
      *
@@ -70,129 +65,8 @@ public class JavaSourceSet implements SourceSet {
         if (fullTypeInformation) {
             throw new UnsupportedOperationException();
         }
-
-        List<String> typeNames;
-        if (!classpath.iterator().hasNext()) {
-            // Only load JRE-provided types
-            try (ScanResult scanResult = new ClassGraph()
-                    .enableClassInfo()
-                    .enableSystemJarsAndModules()
-                    .acceptPackages("java")
-                    .ignoreClassVisibility()
-                    .scan()) {
-                typeNames = packagesToTypeDeclarations(scanResult);
-            }
-        } else {
-            // Load types from the classpath
-            try (ScanResult scanResult = new ClassGraph()
-                    .overrideClasspath(classpath)
-                    .enableSystemJarsAndModules()
-                    .enableClassInfo()
-                    .ignoreClassVisibility()
-                    .scan()) {
-                typeNames = packagesToTypeDeclarations(scanResult);
-            }
-        }
-
-        // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
-        typeNames.add("java.lang.Object");
-        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), emptyMap());
+        return build(sourceSetName, classpath);
     }
-
-
-    /*
-     * Create a map of package names to types contained within that package. Type names are not fully qualified, except for type parameter bounds.
-     * e.g.: "java.util" -> [List, Date]
-     */
-    private static List<String> packagesToTypeDeclarations(ScanResult scanResult) {
-        List<String> result = new ArrayList<>();
-        for (ClassInfo classInfo : scanResult.getAllClasses()) {
-            // Skip private classes, allowing package-private
-            if (classInfo.isAnonymousInnerClass() || classInfo.isPrivate() || classInfo.isSynthetic() || classInfo.getName().contains(".enum.")) {
-                continue;
-            }
-            if (classInfo.isStandardClass() && !classInfo.getName().startsWith("java.")) {
-                continue;
-            }
-            // Although the classfile says its bytecode version is 50 (within the range Java 8 supports),
-            // the Java 8 compiler says these class files from kotlin-reflect are invalid
-            // The error is severe enough that all subsequent stubs have missing type information, so exclude that package
-            if (classInfo.getPackageName().startsWith("kotlin.reflect.jvm.internal.impl.resolve.jvm")) {
-                continue;
-            }
-            String typeDeclaration = declarableFullyQualifiedName(classInfo);
-            if (typeDeclaration == null) {
-                continue;
-            }
-            result.add(typeDeclaration);
-        }
-        return result;
-    }
-
-    private static List<JavaType.FullyQualified> typesFrom(List<String> typeNames) {
-        List<JavaType.FullyQualified> types = new ArrayList<>(typeNames.size());
-        for (String typeName : typeNames) {
-            types.add(JavaType.ShallowClass.build(typeName));
-        }
-        return types;
-    }
-
-    /**
-     * Java allows "$" in class names, and also uses "$" as part of the names of inner classes. e.g.: OuterClass$InnerClass
-     * So if you only look at the textual representation of a class name, you can't tell if "A$B" means "class A$B {}" or "class A { class B {}}"
-     * The declarable name of "class A$B {}" is "A$B"
-     * The declarable name of class B in "class A { class B {}}" is "A.B"
-     * ClassInfo.getPackageName() does not understand this and will always replace "$" in names with "."
-     * <p>
-     * This method takes all of these considerations into account and returns a fully qualified name which replaces
-     * inner-class signifying "$" with ".", while preserving
-     */
-    private static @Nullable String declarableFullyQualifiedName(ClassInfo classInfo) {
-        String name;
-        if (classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
-            // Because we put java-supplied types into another package, we cannot access package-private types
-            return null;
-        }
-        if (classInfo.isInnerClass()) {
-            StringBuilder sb = new StringBuilder();
-            ClassInfoList outerClasses = classInfo.getOuterClasses();
-            // Classgraph orders this collection innermost -> outermost, but type names are declared outermost -> innermost
-            for (int i = outerClasses.size() - 1; i >= 0; i--) {
-                ClassInfo outerClass = outerClasses.get(i);
-                if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic() || outerClass.isExternalClass()) {
-                    return null;
-                }
-                if (i == outerClasses.size() - 1) {
-                    sb.append(outerClass.getName()).append(".");
-                } else if (!outerClass.getName().startsWith(sb.toString())) {
-                    // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
-                    return classInfo.getName();
-                } else {
-                    sb.append(outerClass.getName().substring(sb.length())).append(".");
-                }
-            }
-            if (!classInfo.getName().startsWith(sb.toString())) {
-                // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
-                return classInfo.getName();
-            }
-            String nameFragment = classInfo.getName().substring(sb.length());
-
-            if (!isDeclarable(nameFragment)) {
-                return null;
-            }
-            sb.append(nameFragment);
-            name = sb.toString();
-        } else {
-            name = classInfo.getName();
-        }
-        if (!isDeclarable(name)) {
-            return null;
-        }
-        return name;
-    }
-
-
-    // Purely IO-based classpath scanning below this point
 
     /**
      * Extract type information from the provided classpath.
@@ -291,8 +165,7 @@ public class JavaSourceSet implements SourceSet {
                     @Override
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
                         if (file.getFileName().toString().endsWith(".class")) {
-                            String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
-                            String s = entryNameToClassName(pathStr);
+                            String s = entryNameToClassName(path.relativize(file).toString());
                             if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
                             }
@@ -313,16 +186,22 @@ public class JavaSourceSet implements SourceSet {
         if (Files.exists(toolsJar)) {
             javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
         } else {
-            javaStandardLibraryTypes.addAll(typesFromPath(
-                    FileSystems.getFileSystem(URI.create("jrt:/")).getPath("modules", "java.base"),
-                    "java"));
+            // Scan all java.* system modules (java.base, java.desktop, java.sql, etc.)
+            // to find standard library types in the java package namespace
+            FileSystem jrt = FileSystems.getFileSystem(URI.create("jrt:/"));
+            Path modulesDir = jrt.getPath("modules");
+            try (DirectoryStream<Path> modules = Files.newDirectoryStream(modulesDir, "java.*")) {
+                for (Path module : modules) {
+                    javaStandardLibraryTypes.addAll(typesFromPath(module, "java"));
+                }
+            } catch (IOException ignored) {
+            }
         }
         return javaStandardLibraryTypes;
     }
 
     private static String entryNameToClassName(String entryName) {
-        int start = entryName.startsWith("modules/java.base/") ? "modules/java.base/".length() : 0;
-        return entryName.substring(start, entryName.length() - ".class".length())
+        return entryName.substring(0, entryName.length() - ".class".length())
                 .replace('/', '.');
     }
 
