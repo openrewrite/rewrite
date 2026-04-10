@@ -59,12 +59,7 @@ public class FindStyles extends Recipe {
                     List<NamedStyles> namedStylesList = sourceFile.getMarkers().findAll(NamedStyles.class);
 
                     if (namedStylesList.isEmpty()) {
-                        stylesInUse.insertRow(ctx, new StylesInUse.Row(
-                                sourceFile.getSourcePath().toString(),
-                                "(no styles attached)",
-                                ""
-                        ));
-                        return SearchResult.found(sourceFile, "No styles attached");
+                        return sourceFile;
                     }
 
                     String yaml = stylesToYaml(namedStylesList);
