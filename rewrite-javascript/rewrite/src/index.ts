@@ -40,6 +40,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
         AddDependency,
         AsyncCallbackInSyncArrayMethod,
         AutoFormat,
+        RemoveDependency,
         UpgradeDependencyVersion,
         UpgradeTransitiveDependencyVersion,
         OrderImports,
@@ -48,6 +49,7 @@ export async function activate(marketplace: RecipeMarketplace): Promise<void> {
     await marketplace.install(AddDependency, JavaScript);
     await marketplace.install(AsyncCallbackInSyncArrayMethod, JavaScript);
     await marketplace.install(AutoFormat, JavaScript);
+    await marketplace.install(RemoveDependency, JavaScript);
     await marketplace.install(UpgradeDependencyVersion, JavaScript);
     await marketplace.install(UpgradeTransitiveDependencyVersion, JavaScript);
     await marketplace.install(OrderImports, JavaScript);
