@@ -15,7 +15,6 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.CSharp;
-using OpenRewrite.CSharp.Rpc;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
 using static OpenRewrite.Core.Preconditions;
@@ -26,62 +25,11 @@ using ExecutionContext = OpenRewrite.Core.ExecutionContext;
 namespace OpenRewrite.Tests.Recipe;
 
 /// <summary>
-/// Tests for local (non-RPC) precondition logic. Ensures RewriteRpcServer.Current
-/// is null so that UsesType falls back to LocalUsesType instead of delegating to
-/// a Java RPC server that may have been started by other test collections.
+/// Tests for Preconditions.Check with RPC-backed precondition visitors.
+/// These tests require a Java RPC connection for UsesType/UsesMethod.
 /// </summary>
-public class PreconditionsCheckTest : RewriteTest, IDisposable
+public class PreconditionsCheckTest(RpcFixture fixture) : RpcRewriteTest(fixture)
 {
-    private readonly RewriteRpcServer? _savedRpcServer;
-
-    public PreconditionsCheckTest()
-    {
-        _savedRpcServer = RewriteRpcServer.Current;
-        RewriteRpcServer.SetCurrent(null);
-    }
-
-    public void Dispose()
-    {
-        RewriteRpcServer.SetCurrent(_savedRpcServer);
-    }
-    /// <summary>
-    /// Directly test that LocalUsesType finds the type and Check delegates to visitor.
-    /// </summary>
-    [Fact]
-    public async Task CheckDelegatesToVisitorWhenPreconditionMatches()
-    {
-        var parser = new CSharpParser();
-        var syntaxTree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
-            "using System; class T { void M() { Console.WriteLine(\"hi\"); } }", path: "source.cs");
-        var refs = await Assemblies.Net90
-            .ResolveAsync(Microsoft.CodeAnalysis.LanguageNames.CSharp, System.Threading.CancellationToken.None);
-        var compilation = Microsoft.CodeAnalysis.CSharp.CSharpCompilation.Create("Test")
-            .WithOptions(new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary))
-            .AddReferences(refs)
-            .AddSyntaxTrees(syntaxTree);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var source = parser.Parse(
-            "using System; class T { void M() { Console.WriteLine(\"hi\"); } }",
-            semanticModel: semanticModel);
-
-        // Step 1: Verify LocalUsesType finds System.Console
-        var precondition = UsesType("System.Console");
-        var precondResult = precondition.Visit(source, new ExecutionContext());
-        Assert.NotSame(source, precondResult); // Should be different (marked with SearchResult)
-
-        // Step 2: Verify Check delegates to inner visitor
-        var check = Check(precondition, new NoOpCSharpVisitor());
-        var checkResult = check.Visit(source, new ExecutionContext());
-        // If precondition matched, inner visitor ran (even if no-op)
-    }
-
-    private class NoOpCSharpVisitor : CSharpVisitor<ExecutionContext> { }
-
-    /// <summary>
-    /// Verifies that Preconditions.Check works with CSharpVisitor recipes.
-    /// The precondition (LocalUsesType) must be able to traverse C# trees
-    /// to find the type, and the inner CSharpVisitor must run when matched.
-    /// </summary>
     [Fact]
     public void PreconditionMatchesAndVisitorRuns()
     {
@@ -189,40 +137,9 @@ public class PreconditionsCheckTest : RewriteTest, IDisposable
 }
 
 /// <summary>
-/// A test recipe that uses Preconditions.Check with a CSharpVisitor.
-/// Renames Console.WriteLine to Console.Write in files that use System.Console.
+/// Test recipe that renames Console.WriteLine to Console.Write in files that use System.Console.
+/// Uses Preconditions.Check with an RPC-backed UsesType precondition.
 /// </summary>
-/// <summary>
-/// Test recipe that removes Console.WriteLine by returning null from VisitMethodInvocation.
-/// This does NOT work — returning null from VisitMethodInvocation removes the invocation
-/// but not the enclosing ExpressionStatement, so the tree appears unchanged.
-/// </summary>
-class RemoveConsoleWriteLineRecipe : OpenRewrite.Core.Recipe
-{
-    public override string DisplayName => "Remove Console.WriteLine (broken)";
-    public override string Description => "Attempts to remove Console.WriteLine by returning null from VisitMethodInvocation.";
-
-    public override JavaVisitor<ExecutionContext> GetVisitor() => new Visitor();
-
-    private class Visitor : CSharpVisitor<ExecutionContext>
-    {
-        public override J VisitMethodInvocation(MethodInvocation mi, ExecutionContext ctx)
-        {
-            mi = (MethodInvocation)base.VisitMethodInvocation(mi, ctx);
-
-            if (mi.Name.SimpleName == "WriteLine" &&
-                mi.Select?.Element is Identifier id &&
-                id.SimpleName == "Console")
-            {
-                //noinspection DataFlowIssue
-                return null!;
-            }
-
-            return mi;
-        }
-    }
-}
-
 class RenameWriteLineRecipe : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Rename Console.WriteLine to Write";
