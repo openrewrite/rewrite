@@ -98,6 +98,8 @@ val rpcTestClasspath by tasks.registering {
         .withNormalizer(ClasspathNormalizer::class)
     inputs.files(tasks.named<JavaCompile>("compileJava").flatMap { it.destinationDirectory })
     inputs.files(tasks.named<JavaCompile>("compileTestJava").flatMap { it.destinationDirectory })
+    inputs.files(tasks.named("processResources"))
+    inputs.files(tasks.named("processTestResources"))
 
     val classpathFile = layout.buildDirectory.file("rpc-test-server-classpath.txt")
     outputs.file(classpathFile)
@@ -105,7 +107,9 @@ val rpcTestClasspath by tasks.registering {
     doLast {
         val cp = configurations["testRuntimeClasspath"].resolve().joinToString(File.pathSeparator) +
                 File.pathSeparator + tasks.named<JavaCompile>("compileJava").get().destinationDirectory.get().asFile +
-                File.pathSeparator + tasks.named<JavaCompile>("compileTestJava").get().destinationDirectory.get().asFile
+                File.pathSeparator + tasks.named<JavaCompile>("compileTestJava").get().destinationDirectory.get().asFile +
+                File.pathSeparator + tasks.named("processResources").get().outputs.files.singleFile +
+                File.pathSeparator + tasks.named("processTestResources").get().outputs.files.singleFile
         classpathFile.get().asFile.writeText(cp)
     }
 }
