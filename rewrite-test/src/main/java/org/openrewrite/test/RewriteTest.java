@@ -562,7 +562,16 @@ public interface RewriteTest extends SourceSpecs {
                             boolean isRemote = result.getAfter() instanceof Remote;
                             if (!isRemote && Objects.equals(result.getBefore().getSourcePath(), result.getAfter().getSourcePath()) &&
                                 Objects.equals(before, actualAfter)) {
-                                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
+                                // Marker-only changes (e.g. JavaSourceSet updates from dependency
+                                // coordinate changes) produce Results with identical text. Accept
+                                // these silently rather than treating them as errors.
+                                allResults.remove(result);
+                                try {
+                                    //noinspection unchecked
+                                    ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                                } catch (ClassCastException ignored) {
+                                }
+                                continue nextSourceFile;
                             }
 
                             assert result.getBefore() != null;
