@@ -46,6 +46,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
             "${maven.compiler.testSource}", "${maven.compiler.testTarget}", "${maven.compiler.testRelease}"
     ));
 
+    private static final Set<String> COMPILER_SOURCE_TARGET_TAG_NAMES = new HashSet<>(Arrays.asList(
+            "source", "target", "testSource", "testTarget"
+    ));
+
     @Option(
             displayName = "Release version",
             description = "The new value for the release configuration. This recipe prefers ${java.version} if defined.",
@@ -62,9 +66,9 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 "`maven.compiler.testTarget` properties that are no longer referenced.";
 
     public static class Accumulator {
+        // Only tracks usages from OUTSIDE the compiler plugin's source/target/testSource/testTarget tags,
+        // since those tags will be replaced by the visitor
         Map<String, Set<ResolvedGroupArtifactVersion>> propertyUsages = new HashMap<>();
-        Set<ResolvedGroupArtifactVersion> pomsWithRelease = new HashSet<>();
-        Set<ResolvedGroupArtifactVersion> pomsWithTestRelease = new HashSet<>();
     }
 
     @Override
@@ -75,58 +79,36 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
+            private boolean insideCompilerPlugin;
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                boolean wasInsideCompilerPlugin = insideCompilerPlugin;
+                if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
+                    insideCompilerPlugin = true;
+                }
+
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                // Track ${maven.compiler.*} property usages outside of the <properties> section
+                // Track ${maven.compiler.*} property usages outside of <properties>,
+                // but skip usages from compiler plugin source/target tags (those will be replaced)
                 if (!isPropertyTag()) {
                     Optional<String> value = t.getValue();
                     if (value.isPresent()) {
-                        Matcher matcher = MAVEN_COMPILER_PROPERTY_PATTERN.matcher(value.get());
-                        while (matcher.find()) {
-                            acc.propertyUsages.computeIfAbsent(matcher.group(1), k -> new HashSet<>())
-                                    .add(getResolutionResult().getPom().getGav());
+                        boolean isCompilerSourceTargetTag = insideCompilerPlugin &&
+                                COMPILER_SOURCE_TARGET_TAG_NAMES.contains(t.getName());
+                        if (!isCompilerSourceTargetTag) {
+                            Matcher matcher = MAVEN_COMPILER_PROPERTY_PATTERN.matcher(value.get());
+                            while (matcher.find()) {
+                                acc.propertyUsages.computeIfAbsent(matcher.group(1), k -> new HashSet<>())
+                                        .add(getResolutionResult().getPom().getGav());
+                            }
                         }
                     }
                 }
 
-                // Track POMs that have <release> or <testRelease> in the compiler plugin configuration
-                // (including per-execution configurations)
-                if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
-                    scanCompilerPluginForRelease(t, acc);
-                }
-
+                insideCompilerPlugin = wasInsideCompilerPlugin;
                 return t;
-            }
-
-            private void scanCompilerPluginForRelease(Xml.Tag pluginTag, Accumulator acc) {
-                ResolvedGroupArtifactVersion gav = getResolutionResult().getPom().getGav();
-                // Check top-level <configuration>
-                Optional<Xml.Tag> config = pluginTag.getChild("configuration");
-                if (config.isPresent()) {
-                    if (config.get().getChildValue("release").isPresent()) {
-                        acc.pomsWithRelease.add(gav);
-                    }
-                    if (config.get().getChildValue("testRelease").isPresent()) {
-                        acc.pomsWithTestRelease.add(gav);
-                    }
-                }
-                // Check <executions>/<execution>/<configuration>
-                Optional<Xml.Tag> executions = pluginTag.getChild("executions");
-                if (executions.isPresent()) {
-                    for (Xml.Tag execution : executions.get().getChildren("execution")) {
-                        Optional<Xml.Tag> execConfig = execution.getChild("configuration");
-                        if (execConfig.isPresent()) {
-                            if (execConfig.get().getChildValue("release").isPresent()) {
-                                acc.pomsWithRelease.add(gav);
-                            }
-                            if (execConfig.get().getChildValue("testRelease").isPresent()) {
-                                acc.pomsWithTestRelease.add(gav);
-                            }
-                        }
-                    }
-                }
             }
         };
     }
@@ -134,6 +116,33 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
+            private final Set<String> propertiesToRemove = new HashSet<>();
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                propertiesToRemove.clear();
+                Xml.Document d = super.visitDocument(document, ctx);
+
+                // Schedule property removal as doAfterVisit so it runs in the same cycle,
+                // even though property tags appear before the compiler plugin in the POM
+                if (!propertiesToRemove.isEmpty()) {
+                    Set<String> toRemove = new HashSet<>(propertiesToRemove);
+                    doAfterVisit(new MavenIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                            Xml.Tag t = super.visitTag(tag, ctx);
+                            if (isPropertyTag() && toRemove.contains(t.getName())) {
+                                doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                                maybeUpdateModel();
+                            }
+                            return t;
+                        }
+                    });
+                }
+
+                return d;
+            }
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
@@ -141,20 +150,6 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 // Handle compiler plugin source/target → release replacement
                 if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
                     t = handleCompilerPlugin(t);
-                }
-
-                // Handle stale maven.compiler.* property removal
-                if (isPropertyTag()) {
-                    String name = t.getName();
-                    if (("maven.compiler.source".equals(name) || "maven.compiler.target".equals(name)) &&
-                        isPropertyStale(name, acc.pomsWithRelease, acc)) {
-                        doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
-                        maybeUpdateModel();
-                    } else if (("maven.compiler.testSource".equals(name) || "maven.compiler.testTarget".equals(name)) &&
-                               isTestPropertyStale(name, acc)) {
-                        doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
-                        maybeUpdateModel();
-                    }
                 }
 
                 return t;
@@ -193,10 +188,8 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                     testVersionValue = resolveVersion(testRelease, testSource, testTarget);
                     if (testVersionValue != null) {
                         if (DEFAULT_MAVEN_COMPILER_PROPERTIES.contains("${" + extractPropertyName(testVersionValue) + "}")) {
-                            // Default maven property like ${maven.compiler.testSource} - release covers it
                             testNeedsOwnRelease = false;
                         } else if (testVersionValue.startsWith("${")) {
-                            // Custom property reference - preserve as testRelease
                             testNeedsOwnRelease = true;
                         } else {
                             testNeedsOwnRelease = isHigherVersion(testVersionValue, releaseVersion.toString());
@@ -252,40 +245,35 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                             Xml.Tag.build("<testRelease>" + testReleaseVal + "</testRelease>"), getCursor().getParentOrThrow());
                 }
 
+                // Determine which maven.compiler.* properties are now stale and should be removed
+                boolean releaseConfigured = processMain || release.isPresent();
+                boolean testReleaseConfigured = (hasTestConfig && testNeedsOwnRelease) || testRelease.isPresent();
+
+                if (releaseConfigured) {
+                    markPropertyForRemovalIfUnused("maven.compiler.source", acc);
+                    markPropertyForRemovalIfUnused("maven.compiler.target", acc);
+                }
+                if (releaseConfigured || testReleaseConfigured) {
+                    markPropertyForRemovalIfUnused("maven.compiler.testSource", acc);
+                    markPropertyForRemovalIfUnused("maven.compiler.testTarget", acc);
+                }
+
                 return updated;
             }
 
-            private boolean isPropertyStale(String propertyName, Set<ResolvedGroupArtifactVersion> pomsWithConfig, Accumulator acc) {
+            private void markPropertyForRemovalIfUnused(String propertyName, Accumulator acc) {
                 ResolvedGroupArtifactVersion currentGav = getResolutionResult().getPom().getGav();
 
-                // Check if any POM references this property
                 Set<ResolvedGroupArtifactVersion> usages = acc.propertyUsages.get(propertyName);
                 if (usages != null) {
                     for (ResolvedGroupArtifactVersion usingGav : usages) {
                         if (isAncestorOrSelf(currentGav, usingGav)) {
-                            return false;
+                            return;
                         }
                     }
                 }
 
-                // Only remove if this POM (or a descendant in the project) has the relevant config
-                if (pomsWithConfig.contains(currentGav)) {
-                    return true;
-                }
-                for (ResolvedGroupArtifactVersion configGav : pomsWithConfig) {
-                    if (isAncestorOrSelf(currentGav, configGav)) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            private boolean isTestPropertyStale(String propertyName, Accumulator acc) {
-                // Test properties are stale if either <release> or <testRelease> is configured
-                // (since <release> covers both main and test compilation)
-                Set<ResolvedGroupArtifactVersion> combined = new HashSet<>(acc.pomsWithRelease);
-                combined.addAll(acc.pomsWithTestRelease);
-                return isPropertyStale(propertyName, combined, acc);
+                propertiesToRemove.add(propertyName);
             }
 
             private boolean isAncestorOrSelf(ResolvedGroupArtifactVersion possibleAncestor, ResolvedGroupArtifactVersion gav) {

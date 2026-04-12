@@ -770,7 +770,7 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     void removesStaleSourceTargetProperties() {
         rewriteRun(
           spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(21))
-            .cycles(2).expectedCyclesThatMakeChanges(2),
+            .cycles(1).expectedCyclesThatMakeChanges(1),
           //language=xml
           pomXml(
             """
@@ -832,7 +832,7 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     void removesImplicitlyStaleProperties() {
         rewriteRun(
           spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(21))
-            .cycles(2).expectedCyclesThatMakeChanges(2),
+            .cycles(1).expectedCyclesThatMakeChanges(1),
           //language=xml
           pomXml(
             """
@@ -894,7 +894,7 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     void keepsPropertiesWhenReferencedElsewhere() {
         rewriteRun(
           spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(21))
-            .cycles(2).expectedCyclesThatMakeChanges(2),
+            .cycles(1).expectedCyclesThatMakeChanges(1),
           //language=xml
           pomXml(
             """
@@ -1180,7 +1180,7 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
     void removesStaleTestSourceTargetProperties() {
         rewriteRun(
           spec -> spec.recipe(new UseMavenCompilerPluginReleaseConfiguration(21))
-            .cycles(2).expectedCyclesThatMakeChanges(2),
+            .cycles(1).expectedCyclesThatMakeChanges(1),
           //language=xml
           pomXml(
             """
