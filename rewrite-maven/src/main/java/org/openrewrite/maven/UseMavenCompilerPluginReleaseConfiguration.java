@@ -88,7 +88,7 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 // Track ${maven.compiler.*} property usages outside of <properties>
                 if (!isPropertyTag()) {
                     Optional<String> value = t.getValue();
-                    if (value.isPresent()) {
+                    if (value.isPresent() && value.get().contains("${maven.compiler.")) {
                         Matcher matcher = MAVEN_COMPILER_PROPERTY_PATTERN.matcher(value.get());
                         while (matcher.find()) {
                             acc.propertyUsages.computeIfAbsent(matcher.group(1), k -> new HashSet<>())
@@ -105,33 +105,6 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
-            private final Set<String> propertiesToRemove = new HashSet<>();
-
-            @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                propertiesToRemove.clear();
-                Xml.Document d = super.visitDocument(document, ctx);
-
-                // Schedule property removal as doAfterVisit so it runs in the same cycle,
-                // even though property tags appear before the compiler plugin in the POM
-                if (!propertiesToRemove.isEmpty()) {
-                    Set<String> toRemove = new HashSet<>(propertiesToRemove);
-                    doAfterVisit(new MavenIsoVisitor<ExecutionContext>() {
-                        @Override
-                        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                            Xml.Tag t = super.visitTag(tag, ctx);
-                            if (isPropertyTag() && toRemove.contains(t.getName())) {
-                                doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
-                                maybeUpdateModel();
-                            }
-                            return t;
-                        }
-                    });
-                }
-
-                return d;
-            }
-
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
@@ -176,7 +149,7 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 if (hasTestConfig) {
                     testVersionValue = resolveVersion(testRelease, testSource, testTarget);
                     if (testVersionValue != null) {
-                        if (DEFAULT_MAVEN_COMPILER_PROPERTIES.contains("${" + extractPropertyName(testVersionValue) + "}")) {
+                        if (DEFAULT_MAVEN_COMPILER_PROPERTIES.contains(testVersionValue)) {
                             testNeedsOwnRelease = false;
                         } else if (testVersionValue.startsWith("${")) {
                             testNeedsOwnRelease = true;
@@ -262,7 +235,17 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                     }
                 }
 
-                propertiesToRemove.add(propertyName);
+                doAfterVisit(new MavenIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                        Xml.Tag t = super.visitTag(tag, ctx);
+                        if (isPropertyTag() && propertyName.equals(t.getName())) {
+                            doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                            maybeUpdateModel();
+                        }
+                        return t;
+                    }
+                });
             }
 
             private boolean isAncestorOrSelf(ResolvedGroupArtifactVersion possibleAncestor, ResolvedGroupArtifactVersion gav) {
@@ -317,17 +300,6 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
             }
         }
         return null;
-    }
-
-    /**
-     * Extracts the property name from a value that may or may not be a property reference.
-     * For "${foo.bar}" returns "foo.bar", for "11" returns "11".
-     */
-    private static String extractPropertyName(String value) {
-        if (value.startsWith("${") && value.endsWith("}")) {
-            return value.substring(2, value.length() - 1);
-        }
-        return value;
     }
 
     private boolean hasJavaVersionProperty(Xml.Document xml) {
