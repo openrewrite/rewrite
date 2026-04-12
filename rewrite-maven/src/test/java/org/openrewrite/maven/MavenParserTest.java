@@ -984,7 +984,6 @@ class MavenParserTest implements RewriteTest {
     @Test
     void mirrorsAndAuth() throws Exception {
         // Set up a web server that returns 401 to any request without an Authorization header corresponding to specific credentials
-        // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
         var username = "admin";
         var password = "password";
         try (var mockRepo = new MockWebServer()) {
