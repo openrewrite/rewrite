@@ -64,15 +64,9 @@ public class CreateTomlFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create TOML file";
-    }
+    String displayName = "Create TOML file";
 
-    @Override
-    public String getDescription() {
-        return "Create a new TOML file.";
-    }
+    String description = "Create a new TOML file.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

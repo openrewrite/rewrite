@@ -45,15 +45,9 @@ public class FindNamespacePrefix extends Recipe {
     @Nullable
     String xPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Find XML namespace prefixes";
-    }
+    String displayName = "Find XML namespace prefixes";
 
-    @Override
-    public String getDescription() {
-        return "Find XML namespace prefixes, optionally restricting the search by a XPath expression.";
-    }
+    String description = "Find XML namespace prefixes, optionally restricting the search by a XPath expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

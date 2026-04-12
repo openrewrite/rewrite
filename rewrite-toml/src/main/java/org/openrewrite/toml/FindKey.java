@@ -32,15 +32,9 @@ public class FindKey extends Recipe {
             example = "**.name")
     String keyPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Find TOML keys";
-    }
+    String displayName = "Find TOML keys";
 
-    @Override
-    public String getDescription() {
-        return "Find TOML keys matching a path expression.";
-    }
+    String description = "Find TOML keys matching a path expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -47,45 +49,56 @@ public class RemoveDependency extends Recipe {
     @Nullable
     String scope;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Maven dependency";
-    }
+    String displayName = "Remove Maven dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a single dependency from the <dependencies> section of the pom.xml.";
-    }
+    String description = "Removes a single dependency from the <dependencies> section of the pom.xml. " +
+            "Does not remove usage of the dependency classes, nor guard against the resulting compilation errors.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveDependencyVisitor();
-    }
-
-    @Override
-    public Validated<Object> validate() {
-        return super.validate().and(Validated.test("scope", "Scope must be one of compile, runtime, test, or provided",
-                scope, s -> Scope.Invalid != Scope.fromName(s)));
-    }
-
-    private class RemoveDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            if (isDependencyTag(groupId, artifactId)) {
-                Scope checkScope = scope != null ? Scope.fromName(scope) : null;
-                ResolvedDependency dependency = findDependency(tag, checkScope);
-                if (dependency != null) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
-                    maybeUpdateModel();
+        MavenIsoVisitor<ExecutionContext> mavenVisitor = new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isDependencyTag(groupId, artifactId)) {
+                    Scope checkScope = scope != null ? Scope.fromName(scope) : null;
+                    ResolvedDependency dependency = findDependency(tag, checkScope);
+                    if (dependency != null) {
+                        doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                        maybeUpdateModel();
+                    }
                 }
+
+                return super.visitTag(tag, ctx);
+            }
+        };
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return mavenVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
             }
 
-            return super.visitTag(tag, ctx);
-        }
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sf = (SourceFile) tree;
+                if (mavenVisitor.isAcceptable(sf, ctx)) {
+                    return mavenVisitor.visit(tree, ctx);
+                }
+                if (sf instanceof JavaSourceFile) {
+                    return JavaSourceSet.updateOnSourceFile(sf,
+                            sourceSet -> sourceSet.removeTypesMatching(groupId, artifactId));
+                }
+                return tree;
+            }
+        };
     }
+
 }

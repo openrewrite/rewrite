@@ -58,19 +58,18 @@ public class UnfoldProperties extends Recipe {
         this.applyTo = applyTo == null ? emptyList() : applyTo;
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Unfold YAML properties";
-    }
+    String displayName = "Unfold YAML properties";
 
-    @Override
-    public String getDescription() {
-        return "Transforms dot-separated property keys in YAML files into nested map hierarchies to enhance clarity and readability, or for compatibility with tools expecting structured YAML.";
-    }
+    String description = "Transforms dot-separated property keys in YAML files into nested map hierarchies to enhance clarity and readability, or for compatibility with tools expecting structured YAML.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        List<JsonPathMatcher> exclusionMatchers = exclusions.stream().map(JsonPathMatcher::new).collect(toList());
+        // Only create JsonPathMatcher for patterns that are valid JsonPath syntax.
+        // Invalid patterns will still be processed by the custom matches() method in getParts().
+        List<JsonPathMatcher> exclusionMatchers = exclusions.stream()
+                .filter(ex -> JsonPathMatcher.validate("exclusion", ex).isValid())
+                .map(JsonPathMatcher::new)
+                .collect(toList());
         return new YamlIsoVisitor<ExecutionContext>() {
             private final FindIndentYamlVisitor<ExecutionContext> findIndent = new FindIndentYamlVisitor<>();
 
@@ -213,6 +212,24 @@ public class UnfoldProperties extends Recipe {
                             result.addAll(matches(key.substring(firstBracketMatch.length() + 1), secondBracket, (!parentKey.isEmpty() ? parentKey + "." : parentKey) + valueOfFirstBracket));
                         }
                     }
+                    // For nested entries, check if parentKey already satisfies the first bracket condition
+                    if (result.isEmpty() && !parentKey.isEmpty()) {
+                        // Check if the first bracket value matches part of parentKey (for simple values)
+                        if (parentKey.contains(valueOfFirstBracket)) {
+                            // Get the part of parentKey after the first bracket value for further matching
+                            int idx = parentKey.indexOf(valueOfFirstBracket);
+                            String remainingParent = parentKey.substring(idx + valueOfFirstBracket.length());
+                            if (remainingParent.startsWith(".")) {
+                                remainingParent = remainingParent.substring(1);
+                            }
+                            // Check if remaining conditions match parentKey remainder and current key
+                            if (!remainingParent.isEmpty()) {
+                                result.addAll(matches(remainingParent + "." + key, secondBracket, parentKey));
+                            } else {
+                                result.addAll(matches(key, secondBracket, parentKey));
+                            }
+                        }
+                    }
                     pattern = pattern.substring(1, secondBracketStart - 1) + secondBracket;
                 }
                 if (!pattern.startsWith("[") && pattern.contains("[") && parentKey.contains(pattern.split("\\[")[0])) {
@@ -235,7 +252,10 @@ public class UnfoldProperties extends Recipe {
                     result.add(pattern);
                 } else if (pattern.startsWith("?(@property.match(/") && pattern.endsWith("/))")) {
                     pattern = pattern.substring(19, pattern.length() - 3);
-                    Matcher m = Pattern.compile(".*(" + pattern + ").*").matcher(key);
+                    // Handle regex anchors - don't wrap with .* if the pattern has anchors
+                    String prefix = pattern.startsWith("^") ? "" : ".*";
+                    String suffix = pattern.endsWith("$") ? "" : ".*";
+                    Matcher m = Pattern.compile(prefix + "(" + pattern + ")" + suffix).matcher(key);
                     if (m.matches()) {
                         String match = m.group(1).isEmpty() ? m.group(0) : m.group(1);
                         if (match.endsWith(".")) {

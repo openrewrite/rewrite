@@ -20,11 +20,13 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -155,6 +157,29 @@ class FindMissingTypesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void packageAnnotationUnknownType() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()/* No implied classpath entry for jspecify! */),
+          java(
+            """
+              @NullMarked
+              package org.openrewrite.java;
+              import org.jspecify.annotations.NullMarked;
+              """,
+            """
+              /*~~(Annotation type is missing or malformed)~~>*/@NullMarked
+              package org.openrewrite.java;
+              import org.jspecify.annotations.NullMarked;
+              """,
+            spec -> spec.path("src/main/java/org/openrewrite/java/package-info.java")
+              .afterRecipe(cu ->
+                assertThat(cu.getPackageDeclaration().getAnnotations().getFirst().getType())
+                  .isInstanceOf(JavaType.Unknown.class))
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4405")
     @Test
     void missingMethodReturnTypeNoMethodArguments() {
@@ -252,7 +277,7 @@ class FindMissingTypesTest implements RewriteTest {
           kotlin(
             """
               package com.some.other
-              
+
               class EventPublisher {
               }
               """
@@ -260,10 +285,10 @@ class FindMissingTypesTest implements RewriteTest {
           kotlin(
             """
               package com.some.card
-              
+
               import com.some.other.EventPublisher
               import jakarta.persistence.EntityListeners
-              
+
               @EntityListeners(EventPublisher::class)
               data class Card(
               )
@@ -280,18 +305,18 @@ class FindMissingTypesTest implements RewriteTest {
           kotlin(
             """
               package com.some.card
-              
+
               import jakarta.persistence.EntityListeners
-              
+
               @EntityListeners(EventPublisher::class)
               data class Card(
               )
               """,
             """
               package com.some.card
-              
+
               import jakarta.persistence.EntityListeners
-              
+
               @EntityListeners(/*~~(MemberReference Parameterized type is missing or malformed)~~>*//*~~(Identifier type is missing or malformed)~~>*/EventPublisher::class)
               data class Card(
               )

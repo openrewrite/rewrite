@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
@@ -145,31 +146,19 @@ class RecipeLifecycleTest implements RewriteTest {
             };
         }
 
-        @Override
-        public String getDisplayName() {
-            return "Throw exception";
-        }
+        String displayName = "Throw exception";
 
-        @Override
-        public String getDescription() {
-            return "Throws an exception in the scanning phase.";
-        }
+        String description = "Throws an exception in the scanning phase.";
     }
 
     @EqualsAndHashCode(callSuper = false)
     @Value
     static class DeleteFirst extends Recipe {
 
-        @Override
-        public String getDisplayName() {
-            return "Delete a file";
-        }
+        String displayName = "Delete a file";
 
-        @Override
-        public String getDescription() {
-            return "Deletes a file early on in the recipe pipeline. " +
+        String description = "Deletes a file early on in the recipe pipeline. " +
                    "Subsequent recipes should not be passed a null source file.";
-        }
 
         @Override
         public List<Recipe> getRecipeList() {
@@ -491,15 +480,11 @@ class RecipeLifecycleTest implements RewriteTest {
 
 @SuppressWarnings("unused") // referenced in yaml
 class DefaultConstructorRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "DefaultConstructorRecipe";
-    }
+    @Getter
+    final String displayName = "DefaultConstructorRecipe";
 
-    @Override
-    public String getDescription() {
-        return "DefaultConstructorRecipe.";
-    }
+    @Getter
+    final String description = "DefaultConstructorRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -518,15 +503,11 @@ class DefaultConstructorRecipe extends Recipe {
 @NoArgsConstructor // referenced in yaml
 @SuppressWarnings("unused")
 class NoArgRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "NoArgRecipe";
-    }
+    @Getter
+    final String displayName = "NoArgRecipe";
 
-    @Override
-    public String getDescription() {
-        return "NoArgRecipe.";
-    }
+    @Getter
+    final String description = "NoArgRecipe.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

@@ -63,21 +63,15 @@ public class ChangeProjectVersion extends Recipe {
     @Nullable
     Boolean overrideParentVersion;
 
-    @Override
-    public String getDisplayName() {
-        return "Change Maven Project Version";
-    }
+    String displayName = "Change Maven Project Version";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, newVersion);
     }
 
-    @Override
-    public String getDescription() {
-        return "Change the project version of a Maven pom.xml. Identifies the project to be changed by its groupId and artifactId. " +
+    String description = "Change the project version of a Maven pom.xml. Identifies the project to be changed by its groupId and artifactId. " +
                "If the version is defined as a property, this recipe will only change the property value if the property exists within the same pom.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

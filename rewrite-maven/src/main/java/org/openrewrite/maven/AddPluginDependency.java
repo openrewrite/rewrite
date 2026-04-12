@@ -62,15 +62,9 @@ public class AddPluginDependency extends Recipe {
     @Nullable
     String version;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven plugin dependencies";
-    }
+    String displayName = "Add Maven plugin dependencies";
 
-    @Override
-    public String getDescription() {
-        return "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
-    }
+    String description = "Adds the specified dependencies to a Maven plugin. Will not add the plugin if it does not already exist in the pom.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

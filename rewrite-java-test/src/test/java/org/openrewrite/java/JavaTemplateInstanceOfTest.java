@@ -473,19 +473,13 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                    var mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                     if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
                         return mi;
                     }
 
                     List<Expression> arguments = mi.getArguments();
-                    mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                      .build()
-                      .apply(
-                        updateCursor(mi),
-                        mi.getCoordinates().replace(),
-                        arguments.toArray()
-                      );
+                    mi = JavaTemplate.apply("#{any(java.lang.String)}.formatted(#{any()})", updateCursor(mi), mi.getCoordinates().replace(), arguments.toArray());
 
                     return maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);

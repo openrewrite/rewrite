@@ -1,5 +1,6 @@
 import {Json} from "../../src/json";
-import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue} from "../../src/rpc";
+import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState} from "../../src/rpc";
+import type {RpcObjectData} from "../../src/rpc";
 
 describe("RPC queues", () => {
 
@@ -49,5 +50,18 @@ describe("RPC queues", () => {
         // Verify the property changed from Literal to Identifier
         expect(received.value.kind).toBe(Json.Kind.Identifier);
         expect(received.value.kind).not.toBe(beforeWrapper.value.kind);
+    });
+
+    test("detects missing codec on receiver side", async () => {
+        // given
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.ADD, valueType: "com.example.UnknownMarker", value: undefined},
+        ];
+        const rq = new RpcReceiveQueue(new Map(), undefined, async () => batch, undefined, false);
+
+        // when / then
+        await expect(rq.receive(undefined)).rejects.toThrow(
+            "No RPC codec registered on the TypeScript side for 'com.example.UnknownMarker'"
+        );
     });
 });

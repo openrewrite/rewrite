@@ -36,7 +36,7 @@ public class OrderImportsBenchmark {
 
     @Benchmark
     public void orderImports(JavaCompilationUnitState state) {
-        new OrderImports(false)
+        new OrderImports(false, null)
                 .run(state.getSourceSet(), new InMemoryExecutionContext());
     }
 

@@ -34,15 +34,9 @@ public class DeleteContent extends Recipe {
     )
     String contentPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete content";
-    }
+    String displayName = "Delete content";
 
-    @Override
-    public String getDescription() {
-        return "Delete HCL content by path.";
-    }
+    String description = "Delete HCL content by path.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

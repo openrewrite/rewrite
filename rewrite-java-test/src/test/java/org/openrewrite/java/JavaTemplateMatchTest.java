@@ -781,7 +781,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Foo {
                   void test() {
                       Objects.hash(new Object[5]);
-                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                      Objects.hash(new Object(), new Object()); // varargs also matches
                   }
               }
               """,
@@ -790,7 +790,7 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Foo {
                   void test() {
                       /*~~>*/Objects.hash(new Object[5]);
-                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                      /*~~>*/Objects.hash(new Object(), new Object()); // varargs also matches
                   }
               }
               """
@@ -1142,6 +1142,55 @@ class JavaTemplateMatchTest implements RewriteTest {
                   }
 
                   void test(Function<Object, String> fn) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-templating/issues/183")
+    @Test
+    void matchMemberReferenceWithLiteralReceiver() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final JavaTemplate before = JavaTemplate
+                .builder("#{collection:any(java.util.Collection)}.stream().anyMatch(#{value:any(java.lang.Object)}::equals)")
+                .build();
+              final JavaTemplate after = JavaTemplate
+                .builder("#{collection:any(java.util.Collection)}.contains(#{value:any(java.lang.Object)})")
+                .build();
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  JavaTemplate.Matcher matcher = before.matcher(getCursor());
+                  if (matcher.find()) {
+                      return after.apply(getCursor(), mi.getCoordinates().replace(), matcher.parameter(0), matcher.parameter(1));
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              import java.util.Collection;
+              import java.util.List;
+
+              class Test {
+                  void test(List<String> list, String value) {
+                      boolean a = list.stream().anyMatch(value::equals);
+                      boolean b = list.stream().anyMatch("string"::equals);
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.List;
+
+              class Test {
+                  void test(List<String> list, String value) {
+                      boolean a = list.contains(value);
+                      boolean b = list.contains("string");
                   }
               }
               """

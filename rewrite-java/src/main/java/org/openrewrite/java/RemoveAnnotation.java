@@ -28,15 +28,9 @@ public class RemoveAnnotation extends Recipe {
             example = "@java.lang.SuppressWarnings(\"deprecation\")")
     String annotationPattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove annotation";
-    }
+    String displayName = "Remove annotation";
 
-    @Override
-    public String getDescription() {
-        return "Remove matching annotations wherever they occur.";
-    }
+    String description = "Remove matching annotations wherever they occur.";
 
     @Override
     public RemoveAnnotationVisitor  getVisitor() {

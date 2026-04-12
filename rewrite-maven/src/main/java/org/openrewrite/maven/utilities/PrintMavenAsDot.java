@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.utilities;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -33,15 +34,11 @@ import static java.util.Collections.newSetFromMap;
 import static java.util.stream.Collectors.toList;
 
 public class PrintMavenAsDot extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Print Maven dependency hierarchy in DOT format";
-    }
+    @Getter
+    final String displayName = "Print Maven dependency hierarchy in DOT format";
 
-    @Override
-    public String getDescription() {
-        return "The DOT language format is specified [here](https://graphviz.org/doc/info/lang.html).";
-    }
+    @Getter
+    final String description = "The DOT language format is specified [here](https://graphviz.org/doc/info/lang.html).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

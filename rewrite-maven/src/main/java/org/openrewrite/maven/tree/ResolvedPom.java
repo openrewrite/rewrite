@@ -572,7 +572,28 @@ public class ResolvedPom {
         }
 
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
-            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
+            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion rawGav = pom.getParent().getGav();
+            if (rawGav.getVersion() == null) {
+                throw new MavenParsingException("Parent version must always specify a version " + rawGav);
+            }
+
+            // When the parent version contains unresolved property placeholders like
+            // ${project.version}, the properties needed to resolve it may only be available
+            // from the parent itself (see MavenXpp3Reader §4.0.0, "Inherited" on <version>).
+            // Try to find the parent in the reactor first using the raw GAV before attempting
+            // property resolution. MavenPomDownloader.download() checks the reactor (exact GAV
+            // match, property-merged match, and relative-path match) before going remote, so
+            // the exception is only thrown when the parent is genuinely not a local module.
+            if (rawGav.getVersion().contains("${")) {
+                try {
+                    return downloader.download(rawGav,
+                            pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                } catch (MavenDownloadingException ignored) {
+                    // Parent not found in reactor with raw GAV, fall through to property resolution
+                }
+            }
+
+            GroupArtifactVersion gav = getValues(rawGav);
             if (gav.getVersion() == null) {
                 throw new MavenParsingException("Parent version must always specify a version " + gav);
             }
@@ -901,30 +922,6 @@ public class ResolvedPom {
             );
         }
 
-        private ResolvedManagedDependency mergeProperties(ResolvedManagedDependency child, ResolvedManagedDependency parent) {
-            return new ResolvedManagedDependency(
-                    child.getGav().withVersion(child.getVersion() != null ? child.getVersion() : parent.getVersion()),
-                    child.getScope() != null ? child.getScope() : parent.getScope(),
-                    child.getType() != null ? child.getType() : parent.getType(),
-                    child.getClassifier() != null ? child.getClassifier() : parent.getClassifier(),
-                    // For exclusions, merge child and parent lists if both exist, otherwise take non-empty one
-                    mergeExclusions(child.getExclusions(), parent.getExclusions()),
-                    child.getRequested(), // Child's requested info always wins
-                    child.getRequestedBom() != null ? child.getRequestedBom() : parent.getRequestedBom(),
-                    child.getBomGav() != null ? child.getBomGav() : parent.getBomGav()
-            );
-        }
-
-        /**
-         * Merges exclusion lists, preferring child when both are present
-         */
-        private List<GroupArtifact> mergeExclusions(@Nullable List<GroupArtifact> childExclusions, @Nullable List<GroupArtifact> parentExclusions) {
-            if (childExclusions != null && !childExclusions.isEmpty()) {
-                return childExclusions;
-            }
-            return parentExclusions != null ? parentExclusions : emptyList();
-        }
-
         private void mergeDependencyManagement(
                 List<ManagedDependency> incomingDependencyManagement,
                 Map<GroupArtifactClassifierType, ResolvedManagedDependency> managedDependencyMap,
@@ -945,40 +942,40 @@ public class ResolvedPom {
                             .withRequestedBom(d)
                             .withBomGav(bom.getGav()));
                     for (ResolvedManagedDependency managed : bomManaged) {
-                        managedDependencyMap.compute(createDependencyManagementKey(managed), (key, existing) -> {
-                            if (existing == null) {
-                                return managed;
-                            }
-                            return mergeProperties(existing, managed);
-                        });
+                        managedDependencyMap.putIfAbsent(createDependencyManagementKey(managed), managed);
                     }
                 } else if (d instanceof Defined) {
                     Defined defined = (Defined) d;
+                    GroupArtifactVersion groupArtifactVersion = getValues(defined.getGav());
+                    String gavVersion = groupArtifactVersion.getVersion();
+                    if ("LATEST".equalsIgnoreCase(gavVersion) || "RELEASE".equalsIgnoreCase(gavVersion)) {
+                        MavenMetadata.Versioning versioning = downloader.downloadMetadata(groupArtifactVersion, ResolvedPom.this, repositories).getVersioning();
+                        if ("LATEST".equalsIgnoreCase(gavVersion)) {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getLatest());
+                        } else {
+                            groupArtifactVersion = groupArtifactVersion.withVersion(versioning.getRelease());
+                        }
+                    }
+                    final GroupArtifactVersion finalGav = groupArtifactVersion;
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
-                            .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
+                            .dependencyManagement(defined.withGav(finalGav), pom);
 
-                    ResolvedManagedDependency resolvedDefined = new ResolvedManagedDependency(
-                            getValues(defined.getGav()),
-                            defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
-                            getValue(defined.getType()),
-                            getValue(defined.getClassifier()),
-                            ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
-                            defined,
-                            null,
-                            null
-                    );
-                    managedDependencyMap.compute(createDependencyManagementKey(defined), (key, existing) -> {
-                        if (existing == null) {
-                            return resolvedDefined;
+                    managedDependencyMap.compute(createDependencyManagementKey(defined), (gav, existing) -> {
+                        if (existing != null && existing.getBomGav() == null) {
+                            return existing;
                         }
-                        if (existing.getBomGav() != null) {
-                            if (resolvedDefined.getVersion() != null) {
-                                return resolvedDefined;
-                            }
-                            return mergeProperties(resolvedDefined, existing);
-                        }
-                        return mergeProperties(existing, resolvedDefined);
+
+                        return new ResolvedManagedDependency(
+                                finalGav,
+                                defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
+                                getValue(defined.getType()),
+                                getValue(defined.getClassifier()),
+                                ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
+                                defined,
+                                null,
+                                null
+                        );
                     });
                 }
             }
@@ -1185,7 +1182,13 @@ public class ResolvedPom {
                         }
                     }
                 } catch (MavenDownloadingException e) {
-                    exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    String type = dd.getDependency().getType();
+                    if (type != null && !"jar".equals(type) && !"ejb".equals(type)) {
+                        // Non-classpath artifacts may lack a POM; skip like Maven does
+                        ctx.getOnError().accept(e);
+                    } else {
+                        exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
+                    }
                 }
             }
 

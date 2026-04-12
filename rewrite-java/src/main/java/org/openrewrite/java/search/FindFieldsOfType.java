@@ -50,20 +50,14 @@ public class FindFieldsOfType extends Recipe {
 
     private final transient FieldsOfTypeUses fieldsOfTypeUses = new FieldsOfTypeUses(this);
 
-    @Override
-    public String getDisplayName() {
-        return "Find fields of type";
-    }
+    String displayName = "Find fields of type";
 
     @Override
     public String getInstanceNameSuffix() {
         return "on types `" + fullyQualifiedTypeName + "`";
     }
 
-    @Override
-    public String getDescription() {
-        return "Finds declared fields matching a particular class name.";
-    }
+    String description = "Finds declared fields matching a particular class name.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

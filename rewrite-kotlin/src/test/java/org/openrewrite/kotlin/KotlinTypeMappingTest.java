@@ -51,7 +51,7 @@ class KotlinTypeMappingTest {
     private static final K.ClassDeclaration goatClassDeclaration;
 
     static {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         ctx.putMessage(REQUIRE_PRINT_EQUALS_INPUT, false);
         cu = (K.CompilationUnit) KotlinParser.builder()
             .logCompilationWarningsAndErrors(true)
@@ -170,13 +170,13 @@ class KotlinTypeMappingTest {
 
     @Test
     void className() {
-        JavaType.Class clazz = (JavaType.Class) this.firstMethodParameter("clazz");
+        var clazz = (JavaType.Class) this.firstMethodParameter("clazz");
         assertThat(TypeUtils.asFullyQualified(clazz).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Test
     void interfacesContainImplicitAbstractFlag() {
-        JavaType.Class clazz = (JavaType.Class) firstMethodParameter("clazz");
+        var clazz = (JavaType.Class) firstMethodParameter("clazz");
         JavaType.Method methodType = methodType("clazz");
         assertThat(clazz.getFlags()).contains(Flag.Abstract);
         assertThat(methodType.getFlags()).contains(Flag.Abstract);
@@ -190,7 +190,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void parameterized() {
-        JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
+        var parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
         assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
         assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
 
@@ -199,7 +199,7 @@ class KotlinTypeMappingTest {
           .map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
         assertThat(md.getMethodType().toString())
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=parameterized,return=org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>,parameters=[org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>]}");
-        J.VariableDeclarations vd = (J.VariableDeclarations) md.getParameters().getFirst();
+        var vd = (J.VariableDeclarations) md.getParameters().getFirst();
         assertThat(vd.getTypeExpression().getType().toString())
           .isEqualTo("org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>");
         assertThat(((J.ParameterizedType) vd.getTypeExpression()).getClazz().getType().toString())
@@ -208,13 +208,13 @@ class KotlinTypeMappingTest {
 
     @Test
     void primitive() {
-        JavaType.Class kotlinPrimitive = (JavaType.Class) firstMethodParameter("primitive");
+        var kotlinPrimitive = (JavaType.Class) firstMethodParameter("primitive");
         assertThat(kotlinPrimitive.getFullyQualifiedName()).isEqualTo("kotlin.Int");
     }
 
     @Test
     void generic() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().getFirst();
+        var generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
@@ -222,7 +222,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericContravariant() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().getFirst();
+        var generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(CONTRAVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).
@@ -232,7 +232,7 @@ class KotlinTypeMappingTest {
     @Test
     void genericMultipleBounds() {
         List<JavaType> typeParameters = goatType.getTypeParameters();
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameters.getLast();
+        var generic = (JavaType.GenericTypeVariable) typeParameters.getLast();
         assertThat(generic.getName()).isEqualTo("S");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().getFirst()).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
@@ -242,7 +242,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericUnbounded() {
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().getFirst();
+        var generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().getFirst();
         assertThat(generic.getName()).isEqualTo("U");
         assertThat(generic.getVariance()).isEqualTo(INVARIANT);
         assertThat(generic.getBounds()).isEmpty();
@@ -250,14 +250,14 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericRecursive() {
-        JavaType.Parameterized param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
+        var param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
         JavaType typeParam = param.getTypeParameters().getFirst();
-        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParam;
+        var generic = (JavaType.GenericTypeVariable) typeParam;
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asParameterized(generic.getBounds().getFirst())).isNotNull();
 
-        JavaType.GenericTypeVariable elemType = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(generic.getBounds().getFirst()).getTypeParameters().getFirst();
+        var elemType = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(generic.getBounds().getFirst()).getTypeParameters().getFirst();
         assertThat(elemType.getName()).isEqualTo("U");
         assertThat(elemType.getVariance()).isEqualTo(COVARIANT);
         assertThat(elemType.getBounds()).hasSize(1);
@@ -271,7 +271,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void inheritedJavaTypeGoat() {
-        JavaType.Parameterized clazz = (JavaType.Parameterized) firstMethodParameter("inheritedKotlinTypeGoat");
+        var clazz = (JavaType.Parameterized) firstMethodParameter("inheritedKotlinTypeGoat");
         assertThat(clazz.getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
         assertThat(clazz.getTypeParameters().get(1).toString()).isEqualTo("Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}");
         assertThat(clazz.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$InheritedKotlinTypeGoat<Generic{T}, Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}>");
@@ -279,7 +279,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void genericIntersectionType() {
-        JavaType.GenericTypeVariable clazz = (JavaType.GenericTypeVariable) firstMethodParameter("genericIntersection");
+        var clazz = (JavaType.GenericTypeVariable) firstMethodParameter("genericIntersection");
         assertThat(clazz.getBounds().getFirst().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$TypeA");
         assertThat(clazz.getBounds().get(1).toString()).isEqualTo("org.openrewrite.kotlin.PT<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$TypeA & org.openrewrite.kotlin.C}>");
         assertThat(clazz.getBounds().get(2).toString()).isEqualTo("org.openrewrite.kotlin.C");
@@ -288,7 +288,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void enumTypeA() {
-        JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
+        var clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
         JavaType.Method type = clazz.getMethods().stream()
           .filter(m -> "<constructor>".equals(m.getName()))
           .findFirst()
@@ -302,7 +302,7 @@ class KotlinTypeMappingTest {
 
     @Test
     void enumTypeB() {
-        JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
+        var clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
         JavaType.Method type = clazz.getMethods().stream()
           .filter(m -> "<constructor>".equals(m.getName()))
           .findFirst()
@@ -340,7 +340,7 @@ class KotlinTypeMappingTest {
     @Test
     void javaLangObject() {
         // These assertions are all based on the JavaTypeMapper.
-        JavaType.Class c = (JavaType.Class) firstMethodParameter("javaType");
+        var c = (JavaType.Class) firstMethodParameter("javaType");
         assertThat(c.getFullyQualifiedName()).isEqualTo("java.lang.Object");
         assertThat(c.getSupertype()).isNull();
         assertThat(c.getMethods()).hasSize(13);
@@ -350,7 +350,7 @@ class KotlinTypeMappingTest {
         assertThat(method).isNotNull();
         assertThat(method.toString()).isEqualTo("java.lang.Object{name=getClass,return=java.lang.Class<Generic{?}>,parameters=[]}");
 
-        JavaType.Parameterized returnType = (JavaType.Parameterized) method.getReturnType();
+        var returnType = (JavaType.Parameterized) method.getReturnType();
         // Assert the type of the parameterized type contains the type parameter from the source.
         assertThat(returnType.getType().getTypeParameters().getFirst().toString()).isEqualTo("Generic{T}");
     }
@@ -370,13 +370,13 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        MethodMatcher methodMatcher = new MethodMatcher("kotlin.collections.MutableList addAll(..)");
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var methodMatcher = new MethodMatcher("kotlin.collections.MutableList addAll(..)");
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                                 if (methodMatcher.matches(method)) {
-                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.Collection<Generic{E}>]}");
+                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<kotlin.String>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.Collection<kotlin.String>]}");
                                     found.set(true);
                                 }
                                 return super.visitMethodInvocation(method, found);
@@ -400,7 +400,7 @@ class KotlinTypeMappingTest {
                   abstract class Foo<T> : OfField<Foo<Any>>
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
@@ -425,8 +425,8 @@ class KotlinTypeMappingTest {
                   val l = listOf ( "foo" to "1" , "bar" to 2 )
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        MethodMatcher methodMatcher = new MethodMatcher("kotlin.collections.CollectionsKt listOf(..)");
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var methodMatcher = new MethodMatcher("kotlin.collections.CollectionsKt listOf(..)");
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
@@ -453,7 +453,7 @@ class KotlinTypeMappingTest {
                   val r = listOf("descriptor").block()
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             final MethodMatcher matcher = new MethodMatcher("kotlin.Function1 block(..)");
 
@@ -481,7 +481,7 @@ class KotlinTypeMappingTest {
                   val s = map.orEmpty().entries.joinToString { (key, value) -> "$key: $value" }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean found) {
@@ -527,7 +527,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
@@ -561,7 +561,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public K.When visitWhen(K.When when, AtomicBoolean found) {
@@ -578,8 +578,8 @@ class KotlinTypeMappingTest {
             );
         }
 
-        @Test
         @Issue("https://github.com/openrewrite/rewrite/issues/6140")
+        @Test
         void companionObject() {
             rewriteRun(
               kotlin(
@@ -590,8 +590,8 @@ class KotlinTypeMappingTest {
                   """,
                     spec -> spec.afterRecipe(cu -> {
                         J.VariableDeclarations.NamedVariable foo = ((J.VariableDeclarations) cu.getStatements().get(0)).getVariables().get(0);
-                        J.Identifier random = (J.Identifier) ((J.MethodInvocation) foo.getInitializer()).getSelect();
-                        JavaType.Class randomType = (JavaType.Class) random.getType();
+                        var random = (J.Identifier) ((J.MethodInvocation) foo.getInitializer()).getSelect();
+                        var randomType = (JavaType.Class) random.getType();
                         assertThat(randomType.getFullyQualifiedName()).isEqualTo("kotlin.random.Random");
                         assertThat(randomType.getSupertype().toString()).isEqualTo("kotlin.Any");
                     })
@@ -617,7 +617,7 @@ class KotlinTypeMappingTest {
                       }
                   }
                   """.formatted(p1), spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
                         public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, AtomicBoolean atomicBoolean) {
@@ -637,7 +637,7 @@ class KotlinTypeMappingTest {
 
                         @Override
                         public J.Binary visitBinary(J.Binary binary, AtomicBoolean b) {
-                            JavaType.Class mt = (JavaType.Class) binary.getType();
+                            var mt = (JavaType.Class) binary.getType();
                             if (p2.equals(mt.toString())) {
                                 found.set(true);
                             }
@@ -679,8 +679,8 @@ class KotlinTypeMappingTest {
                       %s
                   }
                   """.formatted(invocation), spec -> spec.afterRecipe(cu -> {
-                    MethodMatcher matcher = new MethodMatcher("*..* foo(..)");
-                    AtomicBoolean methodFound = new AtomicBoolean(false);
+                    var matcher = new MethodMatcher("*..* foo(..)");
+                    var methodFound = new AtomicBoolean(false);
                     new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
                         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, AtomicBoolean found) {
@@ -755,7 +755,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
@@ -783,7 +783,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, Integer integer) {
@@ -848,7 +848,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, AtomicBoolean found) {
@@ -1024,7 +1024,7 @@ class KotlinTypeMappingTest {
                   class KotlinTypeGoat<T, S>  where   S : A, T : D, S : B, T : C
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
                             public K.ClassDeclaration visitClassDeclaration(K.ClassDeclaration classDeclaration, AtomicBoolean atomicBoolean) {
@@ -1098,7 +1098,7 @@ class KotlinTypeMappingTest {
             rewriteRun(
               kotlin("%s".formatted(value),
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1126,7 +1126,7 @@ class KotlinTypeMappingTest {
               kotlin(
                 "val n = java.lang.Integer.`MAX_VALUE`",
                 spec -> spec.afterRecipe(cu -> {
-                      AtomicBoolean found = new AtomicBoolean(false);
+                      var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1151,7 +1151,7 @@ class KotlinTypeMappingTest {
               kotlin(
                 "val unused: (Int, Int) -> Int = { _, y -> y }",
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1184,11 +1184,11 @@ class KotlinTypeMappingTest {
                   }
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                    MethodMatcher getMatcher = new MethodMatcher("Test get(..)");
-                    AtomicBoolean foundGet = new AtomicBoolean(false);
+                    var getMatcher = new MethodMatcher("Test get(..)");
+                    var foundGet = new AtomicBoolean(false);
 
-                    MethodMatcher setMatcher = new MethodMatcher("Test set(..)");
-                    AtomicBoolean foundSet = new AtomicBoolean(false);
+                    var setMatcher = new MethodMatcher("Test set(..)");
+                    var foundSet = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer integer) {
@@ -1216,8 +1216,8 @@ class KotlinTypeMappingTest {
               kotlin(
                 "val i = Integer.valueOf(1)",
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
-                    MethodMatcher matcher = new MethodMatcher("java.lang.Integer valueOf(..)");
+                    var found = new AtomicBoolean(false);
+                    var matcher = new MethodMatcher("java.lang.Integer valueOf(..)");
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
@@ -1245,7 +1245,7 @@ class KotlinTypeMappingTest {
                   import `java`.`util`.`List`
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1281,7 +1281,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer integer) {
@@ -1308,7 +1308,7 @@ class KotlinTypeMappingTest {
               kotlin(
                       "%s".formatted(input),
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
@@ -1331,7 +1331,7 @@ class KotlinTypeMappingTest {
               kotlin(
                 "val arr = listOf(1, 2, 3)",
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
@@ -1357,8 +1357,8 @@ class KotlinTypeMappingTest {
                  }
                  """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean isFieldTargetNull = new AtomicBoolean(false);
-                        AtomicBoolean isStringBuilderTyped = new AtomicBoolean(false);
+                        var isFieldTargetNull = new AtomicBoolean(false);
+                        var isStringBuilderTyped = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1390,7 +1390,7 @@ class KotlinTypeMappingTest {
                   fun foo(l: List<Pair<String, String>>) {}
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicInteger count = new AtomicInteger(0);
+                        var count = new AtomicInteger(0);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1426,7 +1426,7 @@ class KotlinTypeMappingTest {
                   val m: MutableMap.MutableEntry<String, String>? = null
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicInteger count = new AtomicInteger(0);
+                        var count = new AtomicInteger(0);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1464,7 +1464,7 @@ class KotlinTypeMappingTest {
                   fun bar(b: Array<out Number>) {}
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicInteger count = new AtomicInteger(0);
+                        var count = new AtomicInteger(0);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1493,7 +1493,7 @@ class KotlinTypeMappingTest {
                  abstract class Test : AutoCloseable
                  """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1527,7 +1527,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.EnumValue visitEnumValue(J.EnumValue _enum, Integer integer) {
@@ -1553,7 +1553,7 @@ class KotlinTypeMappingTest {
                  fun foo() :   suspend    ( param : Int )  -> Unit = { }
                  """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1579,7 +1579,7 @@ class KotlinTypeMappingTest {
                  val arr = arrayOf(1, 2, 3)
                  """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
@@ -1605,7 +1605,7 @@ class KotlinTypeMappingTest {
                  }
                  """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicInteger count = new AtomicInteger(0);
+                        var count = new AtomicInteger(0);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.NewClass visitNewClass(J.NewClass newClass, Integer integer) {
@@ -1636,7 +1636,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                     spec -> spec.afterRecipe(cu -> {
-                        AtomicBoolean found = new AtomicBoolean(false);
+                        var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer integer) {
@@ -1670,7 +1670,7 @@ class KotlinTypeMappingTest {
                   val x = A.B.A.C()
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                      AtomicInteger count = new AtomicInteger(0);
+                      var count = new AtomicInteger(0);
                       new KotlinIsoVisitor<Integer>() {
                           @Override
                           public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
@@ -1718,7 +1718,7 @@ class KotlinTypeMappingTest {
               kotlin(
                 "val x = foo.bar.A.B.A.C<String>()",
                 spec -> spec.afterRecipe(cu -> {
-                      AtomicInteger count = new AtomicInteger(0);
+                      var count = new AtomicInteger(0);
                       new KotlinIsoVisitor<Integer>() {
 
                           @Override
@@ -1791,7 +1791,7 @@ class KotlinTypeMappingTest {
               kotlin(
                 "val x = foo.bar.A()",
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
@@ -1822,7 +1822,7 @@ class KotlinTypeMappingTest {
                   }
                   """,
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
+                    var found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {

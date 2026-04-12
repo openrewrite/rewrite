@@ -45,15 +45,9 @@ public class HasNamespaceUri extends Recipe {
     @Nullable
     String xPath;
 
-    @Override
-    public String getDisplayName() {
-        return "Find XML namespace URIs";
-    }
+    String displayName = "Find XML namespace URIs";
 
-    @Override
-    public String getDescription() {
-        return "Find XML namespace URIs, optionally restricting the search by a XPath expression.";
-    }
+    String description = "Find XML namespace URIs, optionally restricting the search by a XPath expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

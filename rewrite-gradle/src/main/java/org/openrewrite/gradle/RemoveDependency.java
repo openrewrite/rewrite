@@ -26,6 +26,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
@@ -58,24 +59,18 @@ public class RemoveDependency extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove a Gradle dependency";
-    }
+    String displayName = "Remove a Gradle dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a single dependency from the dependencies section of the `build.gradle`.";
-    }
+    String description = "Removes a single dependency from the dependencies section of the `build.gradle`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
+        TreeVisitor<?, ExecutionContext> gradleVisitor = Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             final GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                     .configuration(configuration)
                     .groupId(groupId)
@@ -163,5 +158,28 @@ public class RemoveDependency extends Recipe {
                 return gp;
             }
         });
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return gradleVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sf = (SourceFile) tree;
+                if (gradleVisitor.isAcceptable(sf, ctx)) {
+                    return gradleVisitor.visit(tree, ctx);
+                }
+                if (sf instanceof JavaSourceFile) {
+                    return JavaSourceSet.updateOnSourceFile(sf,
+                            sourceSet -> sourceSet.removeTypesMatching(groupId, artifactId));
+                }
+                return tree;
+            }
+        };
     }
 }

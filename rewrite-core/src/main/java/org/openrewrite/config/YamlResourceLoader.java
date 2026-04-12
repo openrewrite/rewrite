@@ -24,6 +24,8 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.RecipeBundle;
+import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeListing;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.style.NamedStyles;
@@ -89,32 +91,21 @@ public class YamlResourceLoader implements ResourceLoader {
         }
     }
 
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, RecipeMarketplace marketplace) {
+    public YamlResourceLoader(InputStream yamlInput, URI source, @Nullable Properties properties, RecipeMarketplace marketplace, Collection<RecipeBundleResolver> resolvers) {
         this.source = source;
         this.dependencyResourceLoaders = emptyList();
         this.mapper = ObjectMappers.propertyBasedMapper(getClass().getClassLoader());
         this.recipeLoader = (recipeName, options) -> {
             RecipeListing listing = marketplace.findRecipe(recipeName);
             if (listing == null) {
-                throw new IllegalStateException("Unable to find recipe " + recipeName + " listed in " + source);
+                throw new RecipeNotFoundException(recipeName, source);
             }
-            return listing.prepare(options == null ? emptyMap() : options);
+            return listing.prepare(resolvers, options == null ? emptyMap() : options);
         };
 
         maybeAddKotlinModule(mapper);
 
-        try {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            int nRead;
-            byte[] data = new byte[8192];
-            while ((nRead = yamlInput.read(data, 0, data.length)) != -1) {
-                buffer.write(data, 0, nRead);
-            }
-            this.yamlSource = propertyPlaceholderHelper.replacePlaceholders(
-                    new String(buffer.toByteArray(), StandardCharsets.UTF_8), properties);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        this.yamlSource = readYamlSource(yamlInput, properties);
     }
 
     /**
@@ -125,7 +116,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param properties Placeholder properties
      * @throws UncheckedIOException On unexpected IOException
      */
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties) throws UncheckedIOException {
+    public YamlResourceLoader(InputStream yamlInput, URI source, @Nullable Properties properties) throws UncheckedIOException {
         this(yamlInput, source, properties, (ClassLoader) null);
     }
 
@@ -140,7 +131,7 @@ public class YamlResourceLoader implements ResourceLoader {
      */
     public YamlResourceLoader(InputStream yamlInput,
                               URI source,
-                              Properties properties,
+                              @Nullable Properties properties,
                               @Nullable ClassLoader classLoader) throws UncheckedIOException {
         this(yamlInput, source, properties, classLoader, emptyList());
     }
@@ -158,7 +149,7 @@ public class YamlResourceLoader implements ResourceLoader {
      */
     public YamlResourceLoader(InputStream yamlInput,
                               URI source,
-                              Properties properties,
+                              @Nullable Properties properties,
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders) throws UncheckedIOException {
         this(yamlInput, source, properties, classLoader, dependencyResourceLoaders, jsonMapper -> {
@@ -177,7 +168,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param mapperCustomizer          Customizer for the ObjectMapper
      * @throws UncheckedIOException On unexpected IOException
      */
-    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties,
+    public YamlResourceLoader(InputStream yamlInput, URI source, @Nullable Properties properties,
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders,
                               Consumer<ObjectMapper> mapperCustomizer) {
@@ -191,6 +182,10 @@ public class YamlResourceLoader implements ResourceLoader {
         mapperCustomizer.accept(mapper);
         maybeAddKotlinModule(mapper);
 
+        this.yamlSource = readYamlSource(yamlInput, properties);
+    }
+
+    private static String readYamlSource(InputStream yamlInput, @Nullable Properties properties) {
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             int nRead;
@@ -198,8 +193,8 @@ public class YamlResourceLoader implements ResourceLoader {
             while ((nRead = yamlInput.read(data, 0, data.length)) != -1) {
                 buffer.write(data, 0, nRead);
             }
-            this.yamlSource = propertyPlaceholderHelper.replacePlaceholders(
-                    new String(buffer.toByteArray(), StandardCharsets.UTF_8), properties);
+            String raw = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+            return properties != null ? propertyPlaceholderHelper.replacePlaceholders(raw, properties) : raw;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -354,6 +349,12 @@ public class YamlResourceLoader implements ResourceLoader {
             } catch (IllegalArgumentException ignored) {
                 // it's probably declarative
                 addLazyLoadRecipe.accept(recipeName);
+            } catch (RecipeNotFoundException e) {
+                addInvalidRecipeValidation(
+                        addValidation,
+                        recipeName,
+                        null,
+                        e.getMessage());
             } catch (NoClassDefFoundError e) {
                 addInvalidRecipeValidation(
                         addValidation,
@@ -383,6 +384,12 @@ public class YamlResourceLoader implements ResourceLoader {
                                     recipeArgs,
                                     "Unable to load Recipe: " + e);
                         }
+                    } catch (RecipeNotFoundException e) {
+                        addInvalidRecipeValidation(
+                                addValidation,
+                                recipeName,
+                                recipeArgs,
+                                e.getMessage());
                     } catch (NoClassDefFoundError e) {
                         addInvalidRecipeValidation(
                                 addValidation,
@@ -402,7 +409,7 @@ public class YamlResourceLoader implements ResourceLoader {
                         addValidation,
                         recipeName,
                         recipeArgs,
-                        "Unexpected declarative recipe parsing exception " + e.getClass().getName());
+                        "Unexpected declarative recipe parsing exception " + e.getClass().getName() + ": " + e.getMessage());
             }
         } else {
             addValidation.accept(invalid(
@@ -416,6 +423,46 @@ public class YamlResourceLoader implements ResourceLoader {
     private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,
                                             @Nullable Object recipeArgs, String message) {
         addValidation.accept(Validated.invalid(recipeName, recipeArgs, message));
+    }
+
+    public Collection<RecipeListing> listRecipeListings(RecipeBundle bundle) {
+        Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
+        List<RecipeListing> recipeListings = new ArrayList<>(resources.size());
+        for (Map<String, Object> yaml : resources) {
+            if (!yaml.containsKey("name")) {
+                continue;
+            }
+
+            @Language("markdown") String name = (String) yaml.get("name");
+
+            @Language("markdown")
+            String displayName = (String) yaml.get("displayName");
+            if (displayName == null) {
+                displayName = name;
+            }
+
+            @Language("markdown")
+            String description = (String) yaml.get("description");
+
+            String estimatedEffortPerOccurrenceStr = (String) yaml.get("estimatedEffortPerOccurrence");
+            Duration estimatedEffortPerOccurrence = null;
+            if (estimatedEffortPerOccurrenceStr != null) {
+                estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
+            }
+
+            recipeListings.add(new RecipeListing(
+                    null,
+                    name,
+                    displayName,
+                    description,
+                    estimatedEffortPerOccurrence,
+                    emptyList(),
+                    emptyList(),
+                    0,
+                    bundle
+            ));
+        }
+        return recipeListings;
     }
 
     @Override

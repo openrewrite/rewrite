@@ -34,7 +34,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
-import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
@@ -988,7 +987,7 @@ class MavenParserTest implements RewriteTest {
         // Exceptions in the console output are due to MavenPomDownloader attempting to access via https first before falling back to http
         var username = "admin";
         var password = "password";
-        try (MockWebServer mockRepo = new MockWebServer()) {
+        try (var mockRepo = new MockWebServer()) {
             // TLS server setup based on https://github.com/square/okhttp/blob/master/okhttp-tls/README.md
             String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
             HeldCertificate localhostCertificate = new HeldCertificate.Builder()
@@ -1002,7 +1001,7 @@ class MavenParserTest implements RewriteTest {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
-                    MockResponse resp = new MockResponse();
+                    var resp = new MockResponse();
                     if (!Objects.equals(
                       request.getHeader("Authorization"),
                       "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))) {
@@ -3379,6 +3378,134 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multiModuleProjectVersionPropertyInInterModuleDependency() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>root</artifactId>
+                    <version>${project.version}</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <project.version>1.2.3</project.version>
+                    </properties>
+                    <modules>
+                        <module>child</module>
+                        <module>child2</module>
+                    </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>root</artifactId>
+                          <version>${project.version}</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                  </project>
+                  """
+              )
+            ),
+            mavenProject("child2",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>root</artifactId>
+                          <version>${project.version}</version>
+                      </parent>
+                      <artifactId>child2</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example</groupId>
+                              <artifactId>child</artifactId>
+                              <version>${project.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                    assertThat(pom.getVersion()).isEqualTo("1.2.3");
+                    assertThat(pom.getRequestedDependencies().get(0).getVersion()).isEqualTo("${project.version}");
+                    assertThat(pom.getValue("${project.version}")).isEqualTo("1.2.3");
+                })
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void projectVersionPropertyOverriddenByBuilderProperty() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder()
+            .property("project.version", "9.9.9")
+            .skipDependencyResolution(true)),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example</groupId>
+                    <artifactId>root</artifactId>
+                    <version>${project.version}</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <project.version>1.2.3</project.version>
+                    </properties>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.example</groupId>
+                                <artifactId>some-lib</artifactId>
+                                <version>${project.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                  assertThat(pom.getProperties().get("project.version")).isEqualTo("9.9.9");
+                  assertThat(pom.getValue("${project.version}")).isEqualTo("9.9.9");
+                  assertThat(pom.getManagedVersion("com.example", "some-lib", null, null)).isEqualTo("9.9.9");
+              })
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example</groupId>
+                          <artifactId>root</artifactId>
+                          <version>${project.version}</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    ResolvedPom pom = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom();
+                    assertThat(pom.getVersion()).isEqualTo("9.9.9");
+                    assertThat(pom.getManagedVersion("com.example", "some-lib", null, null)).isEqualTo("9.9.9");
+                })
+              )
+            )
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4319")
     @Test
     void multiModulePropertyVersionShouldAddModules() {
@@ -4716,101 +4843,6 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void transitiveDependencyVersion() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        rewriteRun(
-          spec -> spec.executionContext(ctx),
-          pomXml(
-            """
-            <project>
-              <groupId>com.example.my-app</groupId>
-              <artifactId>my-app-bom</artifactId>
-              <version>1</version>
-              <packaging>pom</packaging>
-              <dependencyManagement>
-                <dependencies>
-                  <dependency>
-                    <groupId>org.bouncycastle</groupId>
-                    <artifactId>bcprov-jdk18on</artifactId>
-                    <version>1.79</version>
-                  </dependency>
-                </dependencies>
-              </dependencyManagement>
-            </project>
-            """
-          ),
-          mavenProject("parent",
-            pomXml(
-              """
-                <project>
-                  <groupId>com.example.my-app</groupId>
-                  <artifactId>my-app-parent</artifactId>
-                  <version>1</version>
-                  <packaging>pom</packaging>
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.example.my-app</groupId>
-                        <artifactId>my-app-bom</artifactId>
-                        <version>1</version>
-                        <type>pom</type>
-                        <scope>import</scope>
-                      </dependency>
-                      <dependency>
-                        <groupId>org.bouncycastle</groupId>
-                        <artifactId>bcprov-jdk18on</artifactId>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-                """
-            )
-          ),
-          mavenProject("my-app",
-            pomXml(
-              """
-                <project>
-                  <groupId>com.example.my-app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <parent>
-                    <groupId>com.example.my-app</groupId>
-                    <artifactId>my-app-parent</artifactId>
-                    <version>1</version>
-                  </parent>
-                  <dependencies>
-                     <dependency>
-                       <groupId>org.bouncycastle</groupId>
-                       <artifactId>bcpkix-jdk18on</artifactId>
-                       <version>1.71</version>
-                     </dependency>
-                  </dependencies>
-                </project>
-                """,
-              spec -> spec.afterRecipe(pom -> {
-                  assertThat(pom).isNotNull();
-                  Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
-                  assertThat(maybeMrr).isPresent();
-
-                  MavenResolutionResult mrr = maybeMrr.get();
-                  assertThat(mrr.getDependencies().get(Scope.Compile).stream())
-                    .anyMatch(resolvedDependency -> "org.bouncycastle".equals(resolvedDependency.getGroupId()) &&
-                      "bcprov-jdk18on".equals(resolvedDependency.getArtifactId()) &&
-                      "1.79".equals(resolvedDependency.getVersion()))
-                    .noneMatch(resolvedDependency -> "org.bouncycastle".equals(resolvedDependency.getGroupId()) &&
-                      "bcprov-jdk18on".equals(resolvedDependency.getArtifactId()) &&
-                      !"1.79".equals(resolvedDependency.getVersion()));
-
-                  MavenPomCache pomCache = MavenExecutionContextView.view(ctx).getPomCache();
-                  assertThat(pomCache.getPom(new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(), "org.bouncycastle", "bcprov-jdk18on", "1.79", "1.79"))).isPresent();
-                  assertThat(pomCache.getPom(new ResolvedGroupArtifactVersion(MavenRepository.MAVEN_CENTRAL.getUri(), "org.bouncycastle", "bcprov-jdk18on", "1.71", "1.71"))).isNull();
-              })
-            )
-          )
-        );
-    }
-
-    @Test
     void groupIdAndArtifactIdAsProperties() {
         rewriteRun(
           mavenProject("my-app",
@@ -4924,6 +4956,229 @@ class MavenParserTest implements RewriteTest {
                   .as("jackson-bom is jackson-core's parent pom, it is not a runtime dependency")
                   .isEmpty();
             })
+          )
+        );
+    }
+
+    @Test
+    void diamondProblem() {
+        rewriteRun(
+          mavenProject("grandparent",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>grandparent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <bouncycastle.version>1.79</bouncycastle.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.bouncycastle</groupId>
+                                <artifactId>bcprov-jdk18on</artifactId>
+                                <version>${bouncycastle.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            )
+          ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>grandparent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>parent</artifactId>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <!-- This property becomes inert as a result of the below managed dependency -->
+                        <bouncycastle.version>1.68</bouncycastle.version>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.bouncycastle</groupId>
+                                <artifactId>bcprov-jdk18on</artifactId>
+                                <!--
+                                    1. Managed dependencies DO NOT have their properties merged together. A new managed dependency, completely overlays everything that came before it.
+                                    2. A version-less managed dependency results in no version recommendations being applied
+                                  -->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """
+            )
+          ),
+          mavenProject("dependent",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <artifactId>dependent</artifactId>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>grandparent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.bouncycastle</groupId>
+                        <artifactId>bcprov-jdk18on</artifactId>
+                      </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>dependent</artifactId>
+                        <version>1</version>
+                        <scope>test</scope>
+                      </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  assertThat(pom).isNotNull();
+                  Optional<MavenResolutionResult> maybeMrr = pom.getMarkers().findFirst(MavenResolutionResult.class);
+                  assertThat(maybeMrr).isPresent();
+
+                  MavenResolutionResult mrr = maybeMrr.get();
+                  assertThat(mrr.getDependencies().get(Scope.Test))
+                    .filteredOn(dep -> "org.bouncycastle".equals(dep.getGroupId()) && "bcprov-jdk18on".equals(dep.getArtifactId()))
+                    .singleElement()
+                    .extracting(ResolvedDependency::getVersion)
+                    .isEqualTo("1.79");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void directoryStyleRelativePathWithCiFriendlyVersion() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.example.boot</groupId>
+                    <artifactId>boot</artifactId>
+                    <version>${revision}</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <revision>1.0.0-SNAPSHOT</revision>
+                    </properties>
+                    <modules>
+                        <module>boot-dependencies</module>
+                        <module>boot-parent</module>
+                        <module>boot-core</module>
+                        <module>boot-starter</module>
+                    </modules>
+                </project>
+                """
+            ),
+            mavenProject("boot-dependencies",
+              pomXml(
+                """
+                  <project>
+                      <groupId>com.example.boot</groupId>
+                      <artifactId>boot-dependencies</artifactId>
+                      <version>${revision}</version>
+                      <packaging>pom</packaging>
+                      <properties>
+                          <revision>1.0.0-SNAPSHOT</revision>
+                      </properties>
+                  </project>
+                  """
+              )
+            ),
+            mavenProject("boot-parent",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example.boot</groupId>
+                          <artifactId>boot-dependencies</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../boot-dependencies</relativePath>
+                      </parent>
+                      <artifactId>boot-parent</artifactId>
+                      <packaging>pom</packaging>
+                  </project>
+                  """
+              )
+            ),
+            mavenProject("boot-core",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example.boot</groupId>
+                          <artifactId>boot-parent</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../boot-parent</relativePath>
+                      </parent>
+                      <artifactId>boot-core</artifactId>
+                  </project>
+                  """
+              )
+            ),
+            mavenProject("boot-starter",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.example.boot</groupId>
+                          <artifactId>boot-parent</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../boot-parent</relativePath>
+                      </parent>
+                      <artifactId>boot-starter</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.example.boot</groupId>
+                              <artifactId>boot-core</artifactId>
+                              <version>${revision}</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    MavenResolutionResult mrr = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    assertThat(mrr.getPom().getVersion()).isEqualTo("1.0.0-SNAPSHOT");
+                    assertThat(mrr.getDependencies().get(Scope.Compile))
+                      .filteredOn(dep -> "boot-core".equals(dep.getArtifactId()))
+                      .singleElement()
+                      .extracting(ResolvedDependency::getVersion)
+                      .isEqualTo("1.0.0-SNAPSHOT");
+                })
+              )
+            )
           )
         );
     }

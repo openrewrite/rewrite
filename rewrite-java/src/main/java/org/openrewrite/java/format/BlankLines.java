@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -24,15 +25,11 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import static java.util.Objects.requireNonNull;
 
 public class BlankLines extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Blank lines";
-    }
+    @Getter
+    final String displayName = "Blank lines";
 
-    @Override
-    public String getDescription() {
-        return "Add and/or remove blank lines.";
-    }
+    @Getter
+    final String description = "Add and/or remove blank lines.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

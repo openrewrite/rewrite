@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -29,17 +30,13 @@ import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.36.0")
 public class IsLikelyTest extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Find sources that are likely tests";
-    }
+    @Getter
+    final String displayName = "Find sources that are likely tests";
 
-    @Override
-    public String getDescription() {
-        return "Sources that contain indicators of being, or being exclusively for the use in tests. " +
-               "This recipe is not exhaustive, but is intended to be a good starting point for finding test sources. " +
-               "Looks at the source set name, and types in use; for example looks for uses of JUnit & TestNG annotations/assertions.";
-    }
+    @Getter
+    final String description = "Sources that contain indicators of being, or being exclusively for the use in tests. " +
+        "This recipe is not exhaustive, but is intended to be a good starting point for finding test sources. " +
+        "Looks at the source set name, and types in use; for example looks for uses of JUnit & TestNG annotations/assertions.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

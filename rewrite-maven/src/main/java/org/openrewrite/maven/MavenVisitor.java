@@ -43,6 +43,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
+    static final XPathMatcher PROFILE_PROPERTY_MATCHER = new XPathMatcher("/project/profiles/profile/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher ANNOTATION_PROCESSORS_PATH_MATCHER = new XPathMatcher("//annotationProcessorPaths/path");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
@@ -99,6 +100,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public boolean isPropertyTag() {
         return PROPERTY_MATCHER.matches(getCursor());
+    }
+
+    public boolean isProfilePropertyTag() {
+        return PROFILE_PROPERTY_MATCHER.matches(getCursor());
     }
 
     public boolean isDependencyTag() {
@@ -300,6 +305,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         if (childTag.isPresent()) {
             String oldValue = childTag.get().getValue().orElse(null);
             if (newValue != null && !newValue.equals(oldValue)) {
+                if (isImplicitlyDefinedVersionProperty(oldValue)) {
+                    // Implicitly defined version properties like ${project.parent.version} should never be changed
+                    // as they represent intentional links to parent/project versions
+                    return tag;
+                }
                 if (isProperty(oldValue)) {
                     MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
@@ -334,8 +344,13 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     @Contract("null -> false")
+    protected boolean isImplicitlyDefinedVersionProperty(@Nullable String value) {
+        return IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
+    }
+
+    @Contract("null -> false")
     protected boolean isProperty(@Nullable String value) {
-        return value != null && value.startsWith("${") && !IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
+        return !isImplicitlyDefinedVersionProperty(value) && ResolvedPom.placeholderHelper.hasPlaceholders(value);
     }
 
     public @Nullable ResolvedDependency findDependency(Xml.Tag tag) {

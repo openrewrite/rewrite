@@ -35,6 +35,7 @@ import org.openrewrite.rpc.request.Print;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.File;
 import java.io.IOException;
@@ -176,7 +177,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J preVisit(J tree, ExecutionContext ctx) {
-                  SourceFile t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
+                  var t = (SourceFile) modifyAll.getVisitor().visitNonNull(tree, ctx);
                   assertThat(t.printAll()).isEqualTo(java.trim());
                   stopAfterPreVisit();
                   return tree;
@@ -211,6 +212,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         Recipe recipe = client().prepareRecipe("org.openrewrite.example.npm.change-version",
           Map.of("version", "1.0.0"));
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Change version in `package.json`");
+        assertThat(recipe.getDescriptor().getOptions().size()).isEqualTo(1);
     }
 
     @SuppressWarnings("JSUnusedLocalSymbols")
@@ -431,6 +433,146 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
           .noneMatch(p -> p.contains("vendor"));
     }
 
+    @Test
+    void parseProjectWithVariousYamlStructures(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+
+        // Simple nested mappings
+        Files.writeString(projectDir.resolve("simple.yml"), """
+          top:
+            middle:
+              bottom: value
+          """);
+
+        // Anchors and aliases
+        Files.writeString(projectDir.resolve("anchors.yml"), """
+          defaults: &defaults
+            adapter: postgres
+            host: localhost
+          development:
+            database: dev_db
+            <<: *defaults
+          """);
+
+        // Sequences with nested mappings
+        Files.writeString(projectDir.resolve("sequences.yml"), """
+          items:
+            - name: first
+              value: 1
+            - name: second
+              value: 2
+          """);
+
+        // Multi-document
+        Files.writeString(projectDir.resolve("multi.yml"), """
+          ---
+          doc1: value1
+          ---
+          doc2: value2
+          """);
+
+        // Flow sequences and flow mappings
+        Files.writeString(projectDir.resolve("flow.yml"), """
+          flow_seq: [a, b, c]
+          flow_map: {key1: val1, key2: val2}
+          nested_flow: {outer: {inner: deep}}
+          """);
+
+        // Deeply nested (3+ levels)
+        Files.writeString(projectDir.resolve("deep.yml"), """
+          level1:
+            level2:
+              level3:
+                level4: deep_value
+              sibling3: sibling_value
+            sibling2: value
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        List<SourceFile> yamlFiles = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith(".yml"))
+          .toList();
+
+        assertThat(yamlFiles).hasSize(6);
+        for (SourceFile yamlFile : yamlFiles) {
+            assertThat(yamlFile)
+              .as("File %s should parse as YAML, not ParseError", yamlFile.getSourcePath())
+              .isInstanceOf(Yaml.Documents.class)
+              .isNotInstanceOf(ParseError.class);
+            assertThat(client().print(yamlFile))
+              .as("File %s should print non-empty", yamlFile.getSourcePath())
+              .isNotEmpty();
+        }
+    }
+
+    @Test
+    void parseProjectWithYamlContainingNestedFlowMappings(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+        // Reproduces the pattern from GitHub Actions workflow files like:
+        //   on: { push: {}, pull_request: {} }
+        // where nested flow mappings caused "Yaml.Mapping may not have a non-empty prefix"
+        // during RPC deserialization on the Java side.
+        Files.createDirectories(projectDir.resolve(".github/workflows"));
+        Files.writeString(projectDir.resolve(".github/workflows/ci.yml"), """
+          name: CI
+          on: { push: {}, pull_request: {} }
+          jobs:
+            test:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile yamlFile = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith("ci.yml"))
+          .findFirst().orElseThrow();
+
+        assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
+        assertThat(yamlFile).isNotInstanceOf(ParseError.class);
+        assertThat(client().print(yamlFile)).isNotEmpty();
+    }
+
+    @Test
+    void parseProjectWithYamlFlowCollectionKeys(@TempDir Path projectDir) throws IOException {
+        Files.writeString(projectDir.resolve("package.json"), """
+          {"name": "test-project", "version": "1.0.0"}
+          """);
+
+        // Flow mapping used as a mapping key (valid YAML, no ? needed)
+        // The yaml npm CST parser produces a flow-collection token as the key,
+        // which the TS parser converts to Yaml.Mapping - but MappingEntry.key
+        // expects YamlKey (Scalar | Alias). This causes ClassCastException
+        // when sent via RPC to Java.
+        Files.writeString(projectDir.resolve("complex-keys.yml"), """
+          {a: 1}: value1
+          {b: 2, c: 3}: value2
+          simple: normal_value
+          """);
+
+        List<SourceFile> sourceFiles = client()
+          .parseProject(projectDir, new InMemoryExecutionContext())
+          .toList();
+
+        SourceFile yamlFile = sourceFiles.stream()
+          .filter(sf -> sf.getSourcePath().toString().endsWith("complex-keys.yml"))
+          .findFirst().orElseThrow();
+
+        assertThat(yamlFile).isInstanceOf(Yaml.Documents.class);
+        assertThat(yamlFile).isNotInstanceOf(ParseError.class);
+        assertThat(client().print(yamlFile)).isNotEmpty();
+    }
+
     /**
      * Tests that a JavaScript recipe can delegate to a Java recipe via RPC.
      * This validates the "npm ecosystem" use case where JS code can invoke Java recipes.
@@ -478,7 +620,7 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
     }
 
     private void installRecipes() {
-        File exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
     }

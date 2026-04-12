@@ -23,6 +23,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.GitProvenance;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -45,16 +46,10 @@ public class UpdateScmFromGitOrigin extends Recipe {
     @Nullable
     Boolean addIfMissing;
 
-    @Override
-    public String getDisplayName() {
-        return "Update SCM with Git origin";
-    }
+    String displayName = "Update SCM with Git origin";
 
-    @Override
-    public String getDescription() {
-        return "Updates or adds the Maven `<scm>` tag based on the Git remote origin. " +
-               "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections.";
-    }
+    String description = "Updates or adds the Maven `<scm>` tag based on the Git remote origin. " +
+               "By default, only existing Source Control Management (SCM) sections are updated. Set `addIfMissing` to `true` to also add missing SCM sections to root POMs (POMs without a parent element).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -75,6 +70,15 @@ public class UpdateScmFromGitOrigin extends Recipe {
 
                 if(!document.getRoot().getChild("scm").isPresent()) {
                     if (Boolean.TRUE.equals(addIfMissing)) {
+                        // Only add SCM to root POMs (those without a parent)
+                        boolean hasParent = document.getMarkers()
+                                .findFirst(MavenResolutionResult.class)
+                                .map(mrr -> mrr.getParent() != null)
+                                .orElse(false);
+                        if (hasParent) {
+                            return document;
+                        }
+
                         // Build the SCM tag with all required elements
                         String httpUrl = "https://" + gitOrigin.getHost() + "/" + gitOrigin.getPath();
                         String gitPath = gitOrigin.getPath().endsWith(".git") ?

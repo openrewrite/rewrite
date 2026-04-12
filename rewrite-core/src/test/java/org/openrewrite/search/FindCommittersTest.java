@@ -38,7 +38,7 @@ class FindCommittersTest implements RewriteTest {
 
     @Test
     void findCommitters() {
-        GitProvenance git = new GitProvenance(
+        var git = new GitProvenance(
           randomId(), "https://github.com/org/repo.git", "main", "123", null, null,
           List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
             new TreeMap<>() {{
@@ -62,7 +62,7 @@ class FindCommittersTest implements RewriteTest {
 
     @Test
     void findCommittersFromDate() {
-        GitProvenance git = new GitProvenance(
+        var git = new GitProvenance(
           randomId(), "https://github.com/org/repo.git", "main", "123", null, null,
           List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
               new TreeMap<>() {{
@@ -91,7 +91,7 @@ class FindCommittersTest implements RewriteTest {
 
     @Test
     void findCommittersFromDateEmpty() {
-        GitProvenance git = new GitProvenance(
+        var git = new GitProvenance(
           randomId(), "https://github.com/org/repo.git", "main", "123", null, null,
           List.of(new GitProvenance.Committer("Jon", "jkschneider@gmail.com",
               new TreeMap<>() {{

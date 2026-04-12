@@ -15,6 +15,7 @@
  */
 import * as fs from "fs";
 import * as fsp from "fs/promises";
+import * as os from "os";
 import * as path from "path";
 import {spawnSync} from "child_process";
 
@@ -43,7 +44,8 @@ export const DEFAULT_DIR_EXCLUSIONS = new Set([
 export function isGitIgnored(filePath: string, cwd?: string): boolean {
     const result = spawnSync("git", ["check-ignore", "-q", filePath], {
         cwd: cwd || path.dirname(filePath),
-        encoding: "utf8"
+        encoding: "utf8",
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
     // Exit code 0 means the file IS ignored
     // Exit code 1 means the file is NOT ignored
@@ -57,7 +59,8 @@ export function isGitIgnored(filePath: string, cwd?: string): boolean {
 export function isInGitRepo(dir: string): boolean {
     const result = spawnSync("git", ["rev-parse", "--git-dir"], {
         cwd: dir,
-        encoding: "utf8"
+        encoding: "utf8",
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
     return result.status === 0;
 }
@@ -167,7 +170,8 @@ export function getGitTrackedFiles(dir: string): string[] {
     // Get tracked files
     const tracked = spawnSync("git", ["ls-files"], {
         cwd: dir,
-        encoding: "utf8"
+        encoding: "utf8",
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (tracked.status !== 0 || tracked.error) {
@@ -189,7 +193,8 @@ export function getGitTrackedFiles(dir: string): string[] {
     // Get untracked but not ignored files
     const untracked = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], {
         cwd: dir,
-        encoding: "utf8"
+        encoding: "utf8",
+        ...(os.platform() === 'win32' ? { shell: true } : {})
     });
 
     if (untracked.stdout) {

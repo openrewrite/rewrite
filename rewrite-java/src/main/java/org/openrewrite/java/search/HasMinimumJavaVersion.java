@@ -46,20 +46,14 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
     @Nullable
     Boolean checkTargetCompatibility;
 
-    @Override
-    public String getDisplayName() {
-        return "Find the oldest Java version in use";
-    }
+    String displayName = "Find the oldest Java version in use";
 
-    @Override
-    public String getDescription() {
-        return "The oldest Java version in use is the lowest Java " +
+    String description = "The oldest Java version in use is the lowest Java " +
                "version in use in any source set of any subproject of " +
                "a repository. It is possible that, for example, the main " +
                "source set of a project uses Java 8, but a test source set " +
                "uses Java 17. In this case, the oldest Java version in use is " +
                "Java 8.";
-    }
 
     @SuppressWarnings("ConstantConditions")
     @Override

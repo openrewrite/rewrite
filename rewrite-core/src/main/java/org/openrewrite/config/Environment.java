@@ -182,6 +182,14 @@ public class Environment {
             }
         }
         if (recipe == null) {
+            for (ResourceLoader loader : dependencyResourceLoaders) {
+                recipe = loader.loadRecipe(recipeName, details);
+                if (recipe != null) {
+                    break;
+                }
+            }
+        }
+        if (recipe == null) {
             return null;
         }
 
@@ -196,15 +204,15 @@ public class Environment {
             }
         }
 
-        Map<String, Recipe> dependencyRecipes = new HashMap<>();
+        Map<String, Recipe> nameToRecipe = new HashMap<>();
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
             for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
-                dependencyRecipes.putIfAbsent(listedRecipe.getName(), listedRecipe);
+                nameToRecipe.putIfAbsent(listedRecipe.getName(), listedRecipe);
             }
         }
-        for (Recipe dependency : dependencyRecipes.values()) {
+        for (Recipe dependency : nameToRecipe.values()) {
             if (dependency instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) dependency).initialize(dependencyRecipes::get);
+                ((DeclarativeRecipe) dependency).initialize(nameToRecipe::get);
             }
         }
 
@@ -213,17 +221,26 @@ public class Environment {
         }
 
         if (recipe instanceof DeclarativeRecipe) {
-            Function<String, @Nullable Recipe> loadFunction = key -> {
-                if (dependencyRecipes.containsKey(key)) {
-                    return dependencyRecipes.get(key);
-                }
-                for (ResourceLoader resourceLoader : resourceLoaders) {
-                    Recipe r = resourceLoader.loadRecipe(key, details);
-                    if (r != null) {
-                        return r;
+            Function<String, @Nullable Recipe> loadFunction = new Function<String, Recipe>() {
+                @Override
+                public @Nullable Recipe apply(String key) {
+                    Recipe cached = nameToRecipe.get(key);
+                    if (cached != null) {
+                        return cached;
                     }
+
+                    for (ResourceLoader resourceLoader : resourceLoaders) {
+                        Recipe r = resourceLoader.loadRecipe(key, details);
+                        if (r != null) {
+                            nameToRecipe.put(key, r);
+                            if (r instanceof DeclarativeRecipe) {
+                                ((DeclarativeRecipe) r).initialize(this);
+                            }
+                            return r;
+                        }
+                    }
+                    return null;
                 }
-                return null;
             };
             ((DeclarativeRecipe) recipe).initialize(loadFunction);
         }
@@ -279,7 +296,7 @@ public class Environment {
         this.dependencyResourceLoaders = dependencyResourceLoaders;
     }
 
-    public static Builder builder(Properties properties) {
+    public static Builder builder(@Nullable Properties properties) {
         return new Builder(properties);
     }
 
@@ -288,11 +305,11 @@ public class Environment {
     }
 
     public static class Builder {
-        private final Properties properties;
+        private final @Nullable Properties properties;
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
         private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
 
-        public Builder(Properties properties) {
+        public Builder(@Nullable Properties properties) {
             this.properties = properties;
         }
 
@@ -310,7 +327,7 @@ public class Environment {
         }
 
         /**
-         * @param jar         A path to a jar file to scan.
+         * @param jar         A path to a jar file or directory containing class files to scan.
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
          * @return This builder.
          */

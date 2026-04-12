@@ -25,15 +25,9 @@ import org.openrewrite.java.tree.J;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRepository extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Remove repository";
-    }
+    String displayName = "Remove repository";
 
-    @Override
-    public String getDescription() {
-        return "Removes a repository from Gradle build scripts. Named repositories include \"jcenter\", \"mavenCentral\", \"mavenLocal\", and \"google\".";
-    }
+    String description = "Removes a repository from Gradle build scripts. Named repositories include \"jcenter\", \"mavenCentral\", \"mavenLocal\", and \"google\".";
 
     @Option(displayName = "Repository",
             description = "The name of the repository to remove",

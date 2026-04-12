@@ -2359,6 +2359,16 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         const otherMethod = other as J.MethodInvocation;
 
+        // Fast path: if both have method types with known names, compare canonical method names first.
+        // This catches most mismatches (e.g., jest.fn() vs jest.mock()) before the
+        // more expensive FQ declaring type analysis below.
+        // Skip when either name is the placeholder "unknown" (incomplete type attribution).
+        if (method.methodType && otherMethod.methodType &&
+            method.methodType.name !== otherMethod.methodType.name &&
+            method.methodType.name !== 'unknown' && otherMethod.methodType.name !== 'unknown') {
+            return this.valueMismatch('methodType.name', method.methodType.name, otherMethod.methodType.name);
+        }
+
         // Check if we can skip name checking based on type attribution
         // We can only skip the name check if both have method types AND they represent the SAME method
         // (not just type-compatible methods, but the actual same function with same FQN)

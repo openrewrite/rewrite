@@ -22,13 +22,7 @@ import org.openrewrite.Recipe;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RecipeNoParameters extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Recipe with no parameters";
-    }
+    String displayName = "Recipe with no parameters";
 
-    @Override
-    public String getDescription() {
-        return "A recipe with no parameters, used in EnvironmentTest";
-    }
+    String description = "A recipe with no parameters, used in EnvironmentTest";
 }

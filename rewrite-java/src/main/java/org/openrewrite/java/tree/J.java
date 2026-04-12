@@ -3225,7 +3225,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class DeconstructionPattern implements J, TypedTree {
+    final class DeconstructionPattern implements J, Expression, TypedTree {
 
         @Nullable
         @NonFinal
@@ -3265,6 +3265,12 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitDeconstructionPattern(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @Override
@@ -5878,6 +5884,62 @@ public interface J extends Tree {
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
                 return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
+        }
+    }
+
+    /**
+     * A type bound on a type parameter, such as {@code <: Comparable} (upper) or
+     * {@code >: Null} (lower) in Scala, or {@code extends Number} in Java.
+     * <p>
+     * Implements {@link TypeTree} so it can be used as an element in
+     * {@link TypeParameter}'s existing {@code JContainer<TypeTree> bounds} without
+     * a breaking change. Old LSTs that have bare {@link TypeTree} elements in bounds
+     * are implicitly upper bounds.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    final class TypeBound implements J, TypeTree {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+
+        Markers markers;
+
+        Kind kind;
+
+        /**
+         * The constraining type, e.g. {@code Number} in {@code extends Number}.
+         */
+        TypeTree boundedType;
+
+        public enum Kind {
+            /**
+             * Upper type bound. Java {@code extends}, Scala {@code <:}, Kotlin {@code :}.
+             */
+            Upper,
+            /**
+             * Lower type bound. Scala {@code >:}.
+             */
+            Lower
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return boundedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public TypeBound withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            // Visited as part of TypeParameter bounds traversal
+            return this;
         }
     }
 

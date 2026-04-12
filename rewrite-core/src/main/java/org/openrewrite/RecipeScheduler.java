@@ -27,7 +27,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
@@ -42,7 +41,7 @@ public class RecipeScheduler {
             LargeSourceSet after = runRecipeCycles(recipe, sourceSet, ctx, maxCycles, minCycles);
             return new RecipeRun(
                     after.getChangeset(),
-                    ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
+                    DataTableExecutionContextView.view(ctx).getDataTableStore()
             );
         } finally {
             Path workingDirectoryRoot = ctx.getMessage(WORKING_DIRECTORY_ROOT);
@@ -73,8 +72,7 @@ public class RecipeScheduler {
                 // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
                 Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
                 try {
-                    RecipeRunCycle<LargeSourceSet> cycle = new RecipeRunCycle<>(recipe, i, rootCursor, ctxWithWatch,
-                            recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
+                    RecipeRunCycle<LargeSourceSet> cycle = createRecipeRunCycle(recipe, i, rootCursor, ctxWithWatch, recipeRunStats, searchResults, sourceFileResults, errorsTable);
                     ctxWithWatch.putCycle(cycle);
                     after.beforeCycle(i == maxCycles);
 
@@ -115,6 +113,11 @@ public class RecipeScheduler {
             recursiveOnComplete(recipe, ctxWithWatch);
         }
         return after;
+    }
+
+    protected RecipeRunCycle<LargeSourceSet> createRecipeRunCycle(Recipe recipe, int cycle, Cursor rootCursor, WatchableExecutionContext ctxWithWatch, RecipeRunStats recipeRunStats, SearchResults searchResults, SourcesFileResults sourceFileResults, SourcesFileErrors errorsTable) {
+        return new RecipeRunCycle<>(recipe, cycle, rootCursor, ctxWithWatch,
+                recipeRunStats, searchResults, sourceFileResults, errorsTable, LargeSourceSet::edit);
     }
 
     private void recursiveOnComplete(Recipe recipe, ExecutionContext ctx) {

@@ -130,6 +130,7 @@ public class MavenArtifactDownloader {
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
+        String username, password;
         MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
         if (authInfo != null) {
             if (authInfo.getConfiguration() != null && authInfo.getConfiguration().getHttpHeaders() != null) {
@@ -137,9 +138,15 @@ public class MavenArtifactDownloader {
                     request.withHeader(header.getName(), header.getValue());
                 }
             }
-            return request.withBasicAuthentication(authInfo.getUsername(), authInfo.getPassword());
-        } else if (repository.getUsername() != null && repository.getPassword() != null) {
-            return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
+            username = authInfo.getUsername();
+            password = authInfo.getPassword();
+        } else {
+            username = repository.getUsername();
+            password = repository.getPassword();
+        }
+        if (username != null && !username.contains("${") &&
+                password != null && !password.contains("${")) {
+            return request.withBasicAuthentication(username, password);
         }
         return request;
     }

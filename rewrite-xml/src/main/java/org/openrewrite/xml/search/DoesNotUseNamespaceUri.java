@@ -33,15 +33,9 @@ public class DoesNotUseNamespaceUri extends Recipe {
             example = "http://www.w3.org/2001/XMLSchema-instance")
     String namespaceUri;
 
-    @Override
-    public String getDisplayName() {
-        return "Find files without Namespace URI";
-    }
+    String displayName = "Find files without Namespace URI";
 
-    @Override
-    public String getDescription() {
-        return "Find XML root elements that do not have a specific Namespace URI, optionally restricting the search by an XPath expression.";
-    }
+    String description = "Find XML root elements that do not have a specific Namespace URI, optionally restricting the search by an XPath expression.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

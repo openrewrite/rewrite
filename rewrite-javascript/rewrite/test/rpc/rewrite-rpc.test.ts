@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
 import {Cursor, RecipeMarketplace, rootCursor} from "../../src";
 import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
 import {PlainText, text} from "../../src/text";
@@ -249,6 +248,16 @@ describe("Rewrite RPC", () => {
             text(
                 "hi",
                 "hello"
+            )
+        );
+    });
+
+    test("runRecipeWithCrossModuleRecipeList", async () => {
+        spec.recipe = await client.prepareRecipe("org.openrewrite.example.text.cross-module-recipe-list");
+        await spec.rewriteRun(
+            text(
+                "hi",
+                "cross-module"
             )
         );
     });

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -32,16 +33,12 @@ import static java.util.Objects.requireNonNull;
 
 public class MethodParamPad extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Method parameter padding";
-    }
+    @Getter
+    final String displayName = "Method parameter padding";
 
-    @Override
-    public String getDescription() {
-        return "Fixes whitespace padding between the identifier of a method definition or method invocation and the left parenthesis of the parameter list. " +
-                "For example, when configured to remove spacing, `someMethodInvocation (x);` becomes `someMethodInvocation(x)`.";
-    }
+    @Getter
+    final String description = "Fixes whitespace padding between the identifier of a method definition or method invocation and the left parenthesis of the parameter list. " +
+        "For example, when configured to remove spacing, `someMethodInvocation (x);` becomes `someMethodInvocation(x)`.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

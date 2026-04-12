@@ -171,7 +171,7 @@ class AutodetectTest implements RewriteTest {
             sources.forEach(detector::sample);
 
             @SuppressWarnings("unchecked")
-            S foundStyle = (S) detector.build().getStyles().stream()
+            var foundStyle = (S) detector.build().getStyles().stream()
               .filter(styleClass::isInstance)
               .findAny().orElseThrow();
             fn.accept(foundStyle);

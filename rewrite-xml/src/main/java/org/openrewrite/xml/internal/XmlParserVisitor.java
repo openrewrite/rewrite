@@ -410,8 +410,13 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 for (int i = 0; i < children.size(); i++) {
                     ParserRuleContext element = (ParserRuleContext) children.get(i);
                     // Markup declarations are not fully implemented.
-                    // n.getText() includes element subsets.
-                    Xml.Ident ident = convert(element, (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
+                    // Use the original source text to preserve whitespace between tokens.
+                    Xml.Ident ident = convert(element, (n, p) -> {
+                        int startIdx = n.getStart().getStartIndex();
+                        int stopIdx = n.getStop().getStopIndex();
+                        String text = source.substring(startIdx, stopIdx + 1);
+                        return new Xml.Ident(randomId(), p, Markers.EMPTY, text);
+                    });
 
                     String beforeElementTag = "";
                     if (i == children.size() - 1) {

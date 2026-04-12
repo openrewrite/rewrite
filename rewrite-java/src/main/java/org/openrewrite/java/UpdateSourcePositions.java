@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
@@ -28,15 +29,11 @@ import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.18.0")
 public class UpdateSourcePositions extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Update source positions";
-    }
+    @Getter
+    final String displayName = "Update source positions";
 
-    @Override
-    public String getDescription() {
-        return "Calculate start position and length for every LST element.";
-    }
+    @Getter
+    final String description = "Calculate start position and length for every LST element.";
 
     @Override
     public @Nullable TreeVisitor<?, ExecutionContext> getVisitor() {

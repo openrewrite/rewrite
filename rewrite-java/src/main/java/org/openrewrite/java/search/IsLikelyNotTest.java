@@ -15,14 +15,13 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Getter;
 import org.openrewrite.*;
 
 @Incubating(since = "7.36.0")
 public class IsLikelyNotTest extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Find files that are likely not tests";
-    }
+    @Getter
+    final String displayName = "Find files that are likely not tests";
 
     @Override
     public String getDescription() {

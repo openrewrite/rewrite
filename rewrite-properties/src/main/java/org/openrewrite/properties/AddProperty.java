@@ -15,6 +15,9 @@
  */
 package org.openrewrite.properties;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -34,9 +37,12 @@ import java.util.stream.Stream;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.isBlank;
 
 @Value
+@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @EqualsAndHashCode(callSuper = false)
+@Builder
 public class AddProperty extends Recipe {
 
     @Option(displayName = "Property key",
@@ -70,23 +76,40 @@ public class AddProperty extends Recipe {
     @Nullable
     Boolean orderedInsertion;
 
-    @Override
-    public String getDisplayName() {
-        return "Add a new property";
-    }
+    @Option(displayName = "Insert mode",
+            description = "Choose an insertion point relative to an existing property. Default is `Last`. " +
+                    "Takes precedence over `orderedInsertion`. " +
+                    "If the referenced property does not exist, falls back to default behavior.",
+            valid = {"Before", "After", "Last"},
+            required = false)
+    @Nullable
+    InsertMode insertMode;
 
-    @Override
-    public String getDescription() {
-        return "Adds a new property to a property file. " +
-               "Attempts to place the new property in alphabetical order by the property keys. " +
-               "Whitespace before and after the `=` must be included in the property and value.";
-    }
+    @Option(displayName = "Insert property",
+            description = "The key of an existing property to use as the reference point for the insert mode. " +
+                    "Required when `insertMode` is `Before` or `After`.",
+            required = false,
+            example = "server.port")
+    @Nullable
+    String insertProperty;
+
+    public enum InsertMode {Before, After, Last}
+
+    String displayName = "Add a new property";
+
+    String description = "Adds a new property to a property file. " +
+            "Attempts to place the new property in alphabetical order by the property keys. " +
+            "Whitespace before and after the `=` must be included in the property and value.";
 
     @Override
     public Validated<Object> validate() {
         return Validated.none()
                 .and(Validated.required("property", property))
-                .and(Validated.required("value", value));
+                .and(Validated.required("value", value))
+                .and(Validated.test("insertProperty",
+                        "Insert property must be provided when `insertMode` is `Before` or `After`.",
+                        insertProperty,
+                        s -> insertMode == null || insertMode == InsertMode.Last || !isBlank(s)));
     }
 
     @Override
@@ -110,7 +133,7 @@ public class AddProperty extends Recipe {
 
 
                 List<Properties.Content> newContents;
-                if(StringUtils.isBlank(comment)) {
+                if (StringUtils.isBlank(comment)) {
                     newContents = singletonList(entry);
                 } else {
                     newContents = Arrays.asList(
@@ -119,28 +142,44 @@ public class AddProperty extends Recipe {
                                     "\n",
                                     Markers.EMPTY,
                                     Properties.Comment.Delimiter.HASH_TAG,
-                                " " + comment.trim()),
+                                    " " + comment.trim()),
                             entry);
                 }
 
-                List<Properties.Content> contentList = new ArrayList<>(p.getContent().size() + 1);
-                if (orderedInsertion == null || orderedInsertion) {
-                    int insertionIndex = sortedInsertionIndex(entry, p.getContent());
-                    contentList.addAll(p.getContent().subList(0, insertionIndex));
-                    contentList.addAll(newContents);
-                    contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                List<Properties.Content> contentList = new ArrayList<>(p.getContent().size() + newContents.size());
+                boolean inserted = false;
+
+                if (insertMode != null && insertMode != InsertMode.Last && !isBlank(insertProperty)) {
+                    int refIndex = findEntryIndex(p.getContent(), p, insertProperty);
+                    if (refIndex >= 0) {
+                        int insertIndex = insertMode == InsertMode.Before ?
+                                findCommentBlockStart(p.getContent(), refIndex) :
+                                refIndex + 1;
+                        contentList.addAll(p.getContent().subList(0, insertIndex));
+                        contentList.addAll(newContents);
+                        contentList.addAll(p.getContent().subList(insertIndex, p.getContent().size()));
+                        inserted = true;
+                    }
                 }
-                else {
-                    contentList.addAll(p.getContent());
-                    contentList.addAll(newContents);
+
+                if (!inserted) {
+                    if (orderedInsertion == null || orderedInsertion) {
+                        int insertionIndex = sortedInsertionIndex(entry, p.getContent());
+                        contentList.addAll(p.getContent().subList(0, insertionIndex));
+                        contentList.addAll(newContents);
+                        contentList.addAll(p.getContent().subList(insertionIndex, p.getContent().size()));
+                    } else {
+                        contentList.addAll(p.getContent());
+                        contentList.addAll(newContents);
+                    }
                 }
 
 
                 // First entry in the file does not need a newline, but every other entry does
                 contentList = ListUtils.map(contentList, (i, c) -> {
-                    if(i == 0) {
+                    if (i == 0) {
                         return (Properties.Content) c.withPrefix("");
-                    } else if(!c.getPrefix().contains("\n")) {
+                    } else if (!c.getPrefix().contains("\n")) {
                         return (Properties.Content) c.withPrefix("\n" + c.getPrefix());
                     }
                     return c;
@@ -149,6 +188,23 @@ public class AddProperty extends Recipe {
                 return p.withContent(contentList);
             }
         };
+    }
+
+    private static int findEntryIndex(List<Properties.Content> contentList, Properties.File file, String referenceKey) {
+        Set<Properties.Entry> matches = FindProperties.find(file, referenceKey, false);
+        if (matches.isEmpty()) {
+            return -1;
+        }
+        Properties.Entry matched = matches.iterator().next();
+        return contentList.indexOf(matched);
+    }
+
+    private static int findCommentBlockStart(List<Properties.Content> contentList, int entryIndex) {
+        int start = entryIndex;
+        while (start > 0 && contentList.get(start - 1) instanceof Properties.Comment) {
+            start--;
+        }
+        return start;
     }
 
     private static int sortedInsertionIndex(Properties.Entry entry, List<Properties.Content> contentsList) {

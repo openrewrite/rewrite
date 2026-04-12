@@ -52,8 +52,7 @@ public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
     transient ExplainDependenciesInUse explainDependenciesInUse = new ExplainDependenciesInUse(this);
 
-    private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
-    private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
+    private static final MethodMatcher DEPENDENCY_CLOSURE_MATCHER = new MethodMatcher("org.gradle.api.Project dependencies(..)", true);
     private static final Function<Object, Set<GroupArtifactVersion>> EMPTY = gav -> new HashSet<>();
 
     @Option(displayName = "Group pattern",
@@ -82,16 +81,10 @@ public class DependencyInsight extends Recipe {
     @Nullable
     String configuration;
 
-    @Override
-    public String getDisplayName() {
-        return "Gradle dependency insight";
-    }
+    String displayName = "Gradle dependency insight";
 
-    @Override
-    public String getDescription() {
-        return "Find direct and transitive dependencies matching a group, artifact, resolved version, and optionally a configuration name. " +
+    String description = "Find direct and transitive dependencies matching a group, artifact, resolved version, and optionally a configuration name. " +
                 "Results include dependencies that either directly match or transitively include a matching dependency.";
-    }
 
     @Override
     public Validated<Object> validate() {

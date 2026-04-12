@@ -16,13 +16,11 @@
 package org.openrewrite.groovy.format;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.groovy.marker.AsStyleTypeCast;
 import org.openrewrite.internal.ToBeRemoved;
-import org.openrewrite.java.style.EmptyForInitializerPadStyle;
-import org.openrewrite.java.style.EmptyForIteratorPadStyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
+import org.openrewrite.java.style.*;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
@@ -34,16 +32,25 @@ import java.util.List;
 import java.util.function.Supplier;
 
 public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<P> {
-    public SpacesVisitor(SourceFile sourceFile, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(sourceFile.getMarkers().findAll(NamedStyles.class), removeCustomLineBreaks, stopAfter);
+    public SpacesVisitor(List<NamedStyles> styles, @Nullable Tree stopAfter) {
+        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), getStyle(WrappingAndBracesStyle.class, styles, IntelliJ::wrappingAndBraces), stopAfter);
     }
 
-    private SpacesVisitor(List<NamedStyles> styles, boolean removeCustomLineBreaks, @Nullable Tree stopAfter) {
-        this(getStyle(SpacesStyle.class, styles, IntelliJ::spaces), getStyle(EmptyForInitializerPadStyle.class, styles), getStyle(EmptyForIteratorPadStyle.class, styles), stopAfter, removeCustomLineBreaks);
+    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, WrappingAndBracesStyle wrappingAndBracesStyle, @Nullable Tree stopAfter) {
+        super(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, wrappingAndBracesStyle, stopAfter);
     }
 
-    public SpacesVisitor(SpacesStyle spacesStyle, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter, boolean removeCustomLineBreaks) {
-        super(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, stopAfter, removeCustomLineBreaks);
+    @Override
+    public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
+        if (typeCast.getMarkers().findFirst(AsStyleTypeCast.class).isPresent()) {
+            // For Groovy as-style casts (e.g., "expr as Type"), the space before the "as" keyword
+            // is stored in ControlParentheses -> JRightPadded.after. The Java SpacesVisitor would
+            // strip this space because it treats it as within-parentheses padding for Java-style
+            // casts. Skip Java's SpacesVisitor processing entirely for as-style casts to preserve
+            // the required whitespace around the "as" keyword.
+            return typeCast;
+        }
+        return super.visitTypeCast(typeCast, p);
     }
 
     @Override
@@ -79,7 +86,7 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
         return super.visitSpace(space, loc, ctx);
     }
 
-    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> @Nullable S getStyle(Class<S> styleClass, List<NamedStyles> styles) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {
@@ -88,7 +95,7 @@ public class SpacesVisitor<P> extends org.openrewrite.java.format.SpacesVisitor<
         return null;
     }
 
-    @ToBeRemoved(after = "30-01-2026", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
+    @ToBeRemoved(after = "2026-03-01", reason = "Replace me with org.openrewrite.style.StyleHelper.getStyle now available in parent runtime")
     private static <S extends Style> S getStyle(Class<S> styleClass, List<NamedStyles> styles, Supplier<S> defaultStyle) {
         S style = NamedStyles.merge(styleClass, styles);
         if (style != null) {

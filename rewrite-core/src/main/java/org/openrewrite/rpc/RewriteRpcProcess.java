@@ -33,9 +33,12 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +66,9 @@ public class RewriteRpcProcess extends Thread {
 
     private final Map<String, String> environment = new LinkedHashMap<>();
 
+    @Setter
+    private @Nullable Path stderrRedirect;
+
     public RewriteRpcProcess(String... command) {
         this.command = command;
         this.setName("JavaScriptRewriteRpcProcess");
@@ -86,32 +92,64 @@ public class RewriteRpcProcess extends Thread {
             if (workingDirectory != null) {
                 pb.directory(workingDirectory.toFile());
             }
+            // Don't use ProcessBuilder.redirectError() — on Windows it leaks the
+            // parent-side file handle after process termination, preventing deletion
+            // of the log file.  Instead we drain stderr in a daemon thread.
             process = pb.start();
+            drainStderr(process, stderrRedirect);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public @Nullable RuntimeException getLivenessCheck() {
-        if (process != null && !process.isAlive()) {
-            int exitCode = process.exitValue();
-            String errorOutput = "", stdOutput = "";
+    private static void drainStderr(Process process, @Nullable Path stderrRedirect) {
+        Thread thread = new Thread(() -> {
+            byte[] buf = new byte[8192];
+            try (InputStream stderr = process.getErrorStream()) {
+                if (stderrRedirect != null) {
+                    try (OutputStream out = Files.newOutputStream(stderrRedirect,
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+                        int n;
+                        while ((n = stderr.read(buf)) != -1) {
+                            out.write(buf, 0, n);
+                        }
+                    }
+                } else {
+                    //noinspection StatementWithEmptyBody
+                    while (stderr.read(buf) != -1) {
+                        // discard
+                    }
+                }
+            } catch (IOException ignored) {
+            }
+        }, "rpc-stderr-drain");
+        thread.setDaemon(true);
+        thread.start();
+    }
 
-            // Read any remaining output from the process
-            try (InputStream errorStream = process.getErrorStream();
-                 InputStream inputStream = process.getInputStream()) {
-                errorOutput = readFully(errorStream);
+    public @Nullable RuntimeException getLivenessCheck() {
+        if (process == null) {
+            return null;
+        }
+
+        if (!process.isAlive()) {
+            int exitCode = process.exitValue();
+
+            // Read any remaining stdout
+            String stdOutput = "";
+            try {
+                InputStream inputStream = process.getInputStream();
                 stdOutput = readFully(inputStream);
-            } catch (IOException | UnsupportedOperationException e) {
-                // Ignore errors reading final output
+            } catch (UnsupportedOperationException e) {
+                // Ignore errors reading final stdout
             }
 
-            String message = "JavaScript RPC process shut down early with exit code " + exitCode;
+            String message = "RPC process shut down early with exit code " + exitCode;
             if (!stdOutput.isEmpty()) {
                 message += "\nStandard output:\n  " + stdOutput.replace("\n", "\n  ");
             }
-            if (!errorOutput.isEmpty()) {
-                message += "\nError output:\n  " + errorOutput.replace("\n", "\n  ");
+            if (stderrRedirect != null) {
+                message += "\nSee stderr log: " + stderrRedirect;
             }
             return new IllegalStateException(message.trim());
         }

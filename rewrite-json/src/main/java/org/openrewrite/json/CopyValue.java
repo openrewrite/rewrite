@@ -65,10 +65,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Nullable
     String destinationFilePath;
 
-    @Override
-    public String getDisplayName() {
-        return "Copy JSON value";
-    }
+    String displayName = "Copy JSON value";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -79,12 +76,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                 destinationKeyPath);
     }
 
-    @Override
-    public String getDescription() {
-        return "Copies a JSON value from one key to another. " +
+    String description = "Copies a JSON value from one key to another. " +
                "The existing key/value pair remains unaffected by this change. " +
                "Attempts to create the new key if it does not exist.";
-    }
 
     @Data
     public static class Accumulator {

@@ -39,17 +39,11 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
     @Nullable
     String untilDate;
 
-    @Override
-    public String getDisplayName() {
-        return "Add date bounds to OWASP suppressions";
-    }
+    String displayName = "Add date bounds to OWASP suppressions";
 
-    @Override
-    public String getDescription() {
-        return "Adds an expiration date to all OWASP suppressions in order to ensure that they are periodically reviewed. " +
+    String description = "Adds an expiration date to all OWASP suppressions in order to ensure that they are periodically reviewed. " +
                 "For use with the OWASP `dependency-check` tool. " +
                 "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
-    }
 
     @Override
     public Validated<Object> validate() {

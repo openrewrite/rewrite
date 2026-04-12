@@ -138,6 +138,11 @@ public class RpcReceiveQueue {
                     after = codec.rpcReceive(before, this);
                 } else if (message.getValueType() == null) {
                     after = message.getValue();
+                } else if (message.getState() == RpcObjectData.State.ADD && message.getValue() == null) {
+                    throw new IllegalStateException(
+                            "No RPC codec registered on the Java side for '" + message.getValueType() + "'. " +
+                                    "The remote side has a codec and sent property messages that will not be consumed, " +
+                                    "causing RPC queue desynchronization.");
                 } else {
                     after = before;
                 }
@@ -164,7 +169,10 @@ public class RpcReceiveQueue {
                 // Intentional fall-through...
             case CHANGE:
                 msg = take(); // the next message should be a CHANGE with a list of positions
-                assert msg.getState() == RpcObjectData.State.CHANGE;
+                if (msg.getState() != RpcObjectData.State.CHANGE) {
+                    throw new IllegalStateException("Expected CHANGE with positions in receiveList, but got " +
+                        msg.getState() + " (valueType=" + msg.getValueType() + ", value=" + msg.getValue() + ", ref=" + msg.getRef() + ")");
+                }
                 List<Integer> positions = requireNonNull(msg.getValue());
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {

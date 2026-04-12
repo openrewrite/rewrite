@@ -89,20 +89,14 @@ public class AddPlatformDependency extends ScanningRecipe<AddPlatformDependency.
     @Nullable
     Boolean enforced;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Gradle platform dependency";
-    }
+    String displayName = "Add Gradle platform dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s:%s`", groupId, artifactId, version);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a gradle platform dependency to a `build.gradle` file in the correct configuration based on where it is used.";
-    }
+    String description = "Add a gradle platform dependency to a `build.gradle` file in the correct configuration based on where it is used.";
 
     @Override
     public Validated<Object> validate() {

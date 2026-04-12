@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-import {Option, Recipe} from "../../recipe";
-import {TreeVisitor} from "../../visitor";
-import {ExecutionContext} from "../../execution";
-import {JavaScriptVisitor, JS} from "../index";
-import {maybeAddImport} from "../add-import";
-import {J, isIdentifier, Type} from "../../java";
-import {create as produce, Draft} from "mutative";
+import { Option, Recipe } from "../../recipe";
+import { TreeVisitor } from "../../visitor";
+import { ExecutionContext } from "../../execution";
+import { JavaScriptVisitor, JS } from "../index";
+import { maybeAddImport } from "../add-import";
+import { J, isIdentifier, Type } from "../../java";
+import { create as produce, Draft } from "mutative";
 
 /**
  * Changes an import from one module to another, updating all type attributions.
@@ -223,6 +223,13 @@ export class ChangeImport extends Recipe {
                                     if (specifier.specifier.kind === J.Kind.Identifier &&
                                         specifier.specifier.simpleName === oldMember) {
                                         specifier.specifier.simpleName = newMember;
+                                    } else if (specifier.specifier.kind === JS.Kind.Alias) {
+                                        const aliasNode = specifier.specifier as Draft<JS.Alias>;
+                                        const propertyName = aliasNode.propertyName.element;
+                                        if (propertyName.kind === J.Kind.Identifier &&
+                                            propertyName.simpleName === oldMember) {
+                                            propertyName.simpleName = newMember;
+                                        }
                                     }
                                 }
                             }
@@ -520,7 +527,7 @@ export class ChangeImport extends Recipe {
 
                         // Also update the method name if we're renaming the member
                         const updatedName = (oldMember !== 'default' && oldMember !== '*' &&
-                                            methodType.name === oldMember && newMember !== oldMember)
+                            methodType.name === oldMember && newMember !== oldMember)
                             ? newMember
                             : methodType.name;
 

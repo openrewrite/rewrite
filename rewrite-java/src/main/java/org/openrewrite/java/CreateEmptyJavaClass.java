@@ -73,15 +73,9 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     String relativePath;
 
-    @Override
-    public String getDisplayName() {
-        return "Create Java class";
-    }
+    String displayName = "Create Java class";
 
-    @Override
-    public String getDescription() {
-        return "Create a new, empty Java class.";
-    }
+    String description = "Create a new, empty Java class.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

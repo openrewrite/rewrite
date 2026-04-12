@@ -63,15 +63,9 @@ public class CreateJsonFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create JSON file";
-    }
+    String displayName = "Create JSON file";
 
-    @Override
-    public String getDescription() {
-        return "Create a new JSON file.";
-    }
+    String description = "Create a new JSON file.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

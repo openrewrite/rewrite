@@ -37,15 +37,9 @@ public class FindGradleProject extends Recipe {
     @Nullable
     SearchCriteria searchCriteria;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle projects";
-    }
+    String displayName = "Find Gradle projects";
 
-    @Override
-    public String getDescription() {
-        return "Gradle projects are those with `build.gradle` or `build.gradle.kts` files.";
-    }
+    String description = "Gradle projects are those with `build.gradle` or `build.gradle.kts` files.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
