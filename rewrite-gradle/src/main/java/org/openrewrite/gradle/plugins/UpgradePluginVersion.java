@@ -28,7 +28,6 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -56,7 +55,6 @@ import static java.util.stream.Collectors.toSet;
 @EqualsAndHashCode(callSuper = false)
 public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.DependencyVersionState> {
     private static final String GRADLE_PROPERTIES_FILE_NAME = "gradle.properties";
-    private static final MethodMatcher VERSION_MATCHER = new MethodMatcher("org.gradle.plugin.use.PluginDependencySpec version(..)", true);
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
@@ -110,33 +108,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         return new DependencyVersionState();
     }
 
-    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    private boolean isPluginVersion(Cursor cursor) {
-        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
-            return false;
-        }
-        J.MethodInvocation maybeVersion = cursor.getValue();
-        if (!VERSION_MATCHER.matches(maybeVersion, true)) {
-            return false;
-        }
-        // Walk up the method invocation chain to find "plugins" method
-        // This handles cases like: id(...) version "x.y.z" apply false
-        // where apply is between version and plugins
-        Cursor parent = cursor.dropParentUntil(it -> (it instanceof J.MethodInvocation) || it == Cursor.ROOT_VALUE);
-        while (parent.getValue() instanceof J.MethodInvocation) {
-            J.MethodInvocation parentMethod = parent.getValue();
-            if ("plugins".equals(parentMethod.getSimpleName())) {
-                return true;
-            }
-            // Continue walking up the chain
-            parent = parent.dropParentUntil(it -> (it instanceof J.MethodInvocation) || it == Cursor.ROOT_VALUE);
-            if (parent.getValue() == Cursor.ROOT_VALUE) {
-                break;
-            }
-        }
-        return false;
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
 
@@ -174,37 +145,25 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!isPluginVersion(getCursor())) {
-                    return m;
-                }
-                assert m.getSelect() != null;
-                List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
-                if (!(pluginArgs.get(0) instanceof J.Literal)) {
-                    return m;
-                }
-                String pluginId;
-                if ("kotlin".equals(((J.MethodInvocation) m.getSelect()).getSimpleName())) {
-                    pluginId = "kotlin";
-                } else {
-                    pluginId = literalValue(pluginArgs.get(0));
-                }
-                if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
+
+                if (!"version".equals(m.getSimpleName())) {
                     return m;
                 }
 
+                GradlePlugin plugin = new GradlePlugin.Matcher().get(getCursor()).orElse(null);
+                if (plugin == null || plugin.getPluginId() == null) {
+                    return m;
+                }
+
+                String pluginId = plugin.getPluginId();
+                if (!matchesPluginId(pluginId, pluginIdPattern)) {
+                    return m;
+                }
                 List<Expression> versionArgs = m.getArguments();
                 try {
-                    String currentVersion = literalValue(versionArgs.get(0));
-                    if (currentVersion != null) {
-                        String resolvedVersion;
-                        if ("kotlin".equals(pluginId)) {
-                            String fullPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
-                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                    .select(new GroupArtifactVersion(fullPluginId, fullPluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
-                        } else {
-                            resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                    .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", currentVersion), "classpath", newVersion, versionPattern, ctx);
-                        }
+                    if (plugin.getVersion() != null) {
+                        String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
+                                .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", plugin.getVersion()), "classpath", newVersion, versionPattern, ctx);
                         acc.pluginIdToNewVersion.put(pluginId, resolvedVersion);
                     } else if (versionArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) versionArgs.get(0);
@@ -214,12 +173,8 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
                         G.GString.Value gStringValue = (G.GString.Value) gString.getStrings().get(0);
                         String versionVariableName = gStringValue.getTree().toString();
-                        String resolverPluginId = pluginId;
-                        if ("kotlin".equals(pluginId)) {
-                            resolverPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
-                        }
                         String resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                .select(new GroupArtifact(resolverPluginId, resolverPluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                                .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
                         assert resolvedPluginVersion != null;
@@ -227,18 +182,14 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
                     } else if (versionArgs.get(0) instanceof J.Identifier) {
                         J.Identifier identifier = (J.Identifier) versionArgs.get(0);
                         String versionVariableName = identifier.getSimpleName();
-                        String resolverPluginId = pluginId;
-                        if ("kotlin".equals(pluginId)) {
-                            resolverPluginId = String.format("org.jetbrains.%s.%s", pluginId, literalValue(pluginArgs.get(0)));
-                        }
                         String localCurrentVersion = localVariableValues.get(versionVariableName);
                         String resolvedPluginVersion;
                         if (localCurrentVersion != null) {
                             resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                    .select(new GroupArtifactVersion(resolverPluginId, resolverPluginId + ".gradle.plugin", localCurrentVersion), "classpath", newVersion, versionPattern, ctx);
+                                    .select(new GroupArtifactVersion(pluginId, pluginId + ".gradle.plugin", localCurrentVersion), "classpath", newVersion, versionPattern, ctx);
                         } else {
                             resolvedPluginVersion = new DependencyVersionSelector(metadataFailures, gradleProject, gradleSettings)
-                                    .select(new GroupArtifact(resolverPluginId, resolverPluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
+                                    .select(new GroupArtifact(pluginId, pluginId + ".gradle.plugin"), "classpath", newVersion, versionPattern, ctx);
                         }
 
                         acc.versionPropNameToPluginId.put(versionVariableName, pluginId);
@@ -348,31 +299,24 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                // Match the trait before super to ensure the cursor is unmodified
+                GradlePlugin plugin = "version".equals(method.getSimpleName()) ?
+                        new GradlePlugin.Matcher().get(getCursor()).orElse(null) : null;
+                if (plugin != null && !matchesPluginId(plugin.getPluginId(), pluginIdPattern)) {
+                    plugin = null;
+                }
+
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!isPluginVersion(getCursor())) {
-                    return m;
-                }
-                assert m.getSelect() != null;
-                List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
-                String pluginId;
-                if ("kotlin".equals(((J.MethodInvocation) m.getSelect()).getSimpleName())) {
-                    pluginId = "kotlin";
-                } else {
-                    pluginId = literalValue(pluginArgs.get(0));
-                }
-                if (pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
+
+                if (plugin == null || plugin.getPluginId() == null || plugin.getVersion() == null) {
                     return m;
                 }
 
-                List<Expression> versionArgs = m.getArguments();
-                String currentVersion = literalValue(m.getArguments().get(0));
-                if (currentVersion == null) {
-                    return m;
-                }
-                String resolvedVersion = acc.pluginIdToNewVersion.get(pluginId);
+                String resolvedVersion = acc.pluginIdToNewVersion.get(plugin.getPluginId());
                 if (resolvedVersion == null) {
                     return m;
                 }
+                List<Expression> versionArgs = m.getArguments();
                 return m.withArguments(ListUtils.map(versionArgs, v -> ChangeStringLiteral.withStringValue(v, resolvedVersion)));
             }
 
@@ -399,6 +343,20 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             }
         };
         return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
+    }
+
+    private static boolean matchesPluginId(@Nullable String pluginId, String pluginIdPattern) {
+        if (pluginId == null) {
+            return false;
+        }
+        if (StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
+            return true;
+        }
+        // Support matching by short "kotlin" name for org.jetbrains.kotlin.* plugins
+        if (pluginId.startsWith("org.jetbrains.kotlin.")) {
+            return StringUtils.matchesGlob("kotlin", pluginIdPattern);
+        }
+        return false;
     }
 
     private @Nullable String literalValue(Expression expr) {
