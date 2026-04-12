@@ -46,10 +46,6 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
             "${maven.compiler.testSource}", "${maven.compiler.testTarget}", "${maven.compiler.testRelease}"
     ));
 
-    private static final Set<String> COMPILER_SOURCE_TARGET_TAG_NAMES = new HashSet<>(Arrays.asList(
-            "source", "target", "testSource", "testTarget"
-    ));
-
     @Option(
             displayName = "Release version",
             description = "The new value for the release configuration. This recipe prefers ${java.version} if defined.",
@@ -79,35 +75,28 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
-            private boolean insideCompilerPlugin;
-
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                boolean wasInsideCompilerPlugin = insideCompilerPlugin;
+                // Skip visiting compiler plugin children entirely; the visitor will replace
+                // source/target/testSource/testTarget, so those references should not count as usages
                 if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
-                    insideCompilerPlugin = true;
+                    return tag;
                 }
 
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                // Track ${maven.compiler.*} property usages outside of <properties>,
-                // but skip usages from compiler plugin source/target tags (those will be replaced)
+                // Track ${maven.compiler.*} property usages outside of <properties>
                 if (!isPropertyTag()) {
                     Optional<String> value = t.getValue();
                     if (value.isPresent()) {
-                        boolean isCompilerSourceTargetTag = insideCompilerPlugin &&
-                                COMPILER_SOURCE_TARGET_TAG_NAMES.contains(t.getName());
-                        if (!isCompilerSourceTargetTag) {
-                            Matcher matcher = MAVEN_COMPILER_PROPERTY_PATTERN.matcher(value.get());
-                            while (matcher.find()) {
-                                acc.propertyUsages.computeIfAbsent(matcher.group(1), k -> new HashSet<>())
-                                        .add(getResolutionResult().getPom().getGav());
-                            }
+                        Matcher matcher = MAVEN_COMPILER_PROPERTY_PATTERN.matcher(value.get());
+                        while (matcher.find()) {
+                            acc.propertyUsages.computeIfAbsent(matcher.group(1), k -> new HashSet<>())
+                                    .add(getResolutionResult().getPom().getGav());
                         }
                     }
                 }
 
-                insideCompilerPlugin = wasInsideCompilerPlugin;
                 return t;
             }
         };
