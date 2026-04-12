@@ -192,7 +192,7 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
                 if (hasTestConfig) {
                     testVersionValue = resolveVersion(testRelease, testSource, testTarget);
                     if (testVersionValue != null) {
-                        if (isDefaultMavenCompilerProperty("${" + extractPropertyName(testVersionValue) + "}")) {
+                        if (DEFAULT_MAVEN_COMPILER_PROPERTIES.contains("${" + extractPropertyName(testVersionValue) + "}")) {
                             // Default maven property like ${maven.compiler.testSource} - release covers it
                             testNeedsOwnRelease = false;
                         } else if (testVersionValue.startsWith("${")) {
@@ -334,16 +334,12 @@ public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<U
         for (Optional<String> config : configs) {
             if (config.isPresent()) {
                 String value = config.get();
-                if (value.startsWith("${") && value.endsWith("}") && !isDefaultMavenCompilerProperty(value)) {
+                if (value.startsWith("${") && value.endsWith("}") && !DEFAULT_MAVEN_COMPILER_PROPERTIES.contains(value)) {
                     return value;
                 }
             }
         }
         return null;
-    }
-
-    private static boolean isDefaultMavenCompilerProperty(String value) {
-        return DEFAULT_MAVEN_COMPILER_PROPERTIES.contains(value);
     }
 
     /**
