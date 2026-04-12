@@ -52,6 +52,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -274,7 +275,7 @@ public abstract class Recipe implements Cloneable {
                         option.displayName(),
                         option.description(),
                         option.example().isEmpty() ? null : option.example(),
-                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                        validValues(option, field.getType()),
                         option.required(),
                         value));
             }
@@ -289,7 +290,7 @@ public abstract class Recipe implements Cloneable {
                             option.displayName(),
                             option.description(),
                             option.example().isEmpty() ? null : option.example(),
-                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            validValues(option, method.getReturnType()),
                             option.required(),
                             null));
                 }
@@ -305,7 +306,7 @@ public abstract class Recipe implements Cloneable {
                             option.displayName(),
                             option.description(),
                             option.example().isEmpty() ? null : option.example(),
-                            option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                            validValues(option, parameter.getType()),
                             option.required(),
                             null));
                 }
@@ -316,6 +317,18 @@ public abstract class Recipe implements Cloneable {
 
         options.trimToSize();
         return options;
+    }
+
+    private static @Nullable List<String> validValues(Option option, Class<?> type) {
+        if (!(option.valid().length == 1 && option.valid()[0].isEmpty())) {
+            return Arrays.asList(option.valid());
+        }
+        if (type.isEnum()) {
+            return Arrays.stream(type.getEnumConstants())
+                    .map(e -> ((Enum<?>) e).name())
+                    .collect(Collectors.toList());
+        }
+        return null;
     }
 
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
