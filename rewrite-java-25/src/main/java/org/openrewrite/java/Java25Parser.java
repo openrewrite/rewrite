@@ -93,7 +93,7 @@ public class Java25Parser implements JavaParser {
 
                 return new Java25Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java25Parser.", e);
+                throw new IllegalStateException("Unable to construct Java25Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath(), e);
             }
         }
     }

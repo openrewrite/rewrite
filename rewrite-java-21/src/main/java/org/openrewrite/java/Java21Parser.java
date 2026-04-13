@@ -93,7 +93,7 @@ public class Java21Parser implements JavaParser {
 
                 return new Java21Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java21Parser.", e);
+                throw new IllegalStateException("Unable to construct Java21Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath(), e);
             }
         }
     }
