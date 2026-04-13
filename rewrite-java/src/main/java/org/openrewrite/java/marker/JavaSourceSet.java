@@ -66,6 +66,11 @@ public class JavaSourceSet implements SourceSet {
      * @return a new JavaSourceSet with the types added
      */
     public JavaSourceSet addTypesForGav(String gavKey, List<JavaType.FullyQualified> types) {
+        List<JavaType.FullyQualified> existing = gavToTypes.get(gavKey);
+        if (existing != null && existing.equals(types)) {
+            return this;
+        }
+
         List<JavaType.FullyQualified> newClasspath = new ArrayList<>(classpath);
         newClasspath.addAll(types);
 
@@ -178,6 +183,9 @@ public class JavaSourceSet implements SourceSet {
         String cacheKey = maybeJp.get().getId().toString() + ":" + maybeSourceSet.get().getName();
         JavaSourceSet cached = cache.get(cacheKey);
         if (cached != null) {
+            if (cached == maybeSourceSet.get()) {
+                return sf;
+            }
             return sf.withMarkers(sf.getMarkers().setByType(cached));
         }
         JavaSourceSet updated = transform.apply(maybeSourceSet.get());
