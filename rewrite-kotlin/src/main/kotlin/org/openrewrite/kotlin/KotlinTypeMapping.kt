@@ -290,12 +290,24 @@ class KotlinTypeMapping(
         } else if (type is ConeTypeParameterType) {
             val classifierSymbol: FirClassifierSymbol<*>? = type.lookupTag.toSymbol(firSession)
             if (classifierSymbol is FirTypeParameterSymbol) {
+                // Type parameters declared on Java-origin types (e.g. java.util.Optional<T>)
+                // have their kotlin.Any bound stripped so they match the Java parser's output
+                // (which treats unbounded type parameters as having no bounds). Kotlin-source
+                // type parameters with explicit `Any` bounds are left alone.
+                val paramFromJava = classifierSymbol.containingDeclarationSymbol.origin is FirDeclarationOrigin.Java
                 for (bound: FirResolvedTypeRef in classifierSymbol.resolvedBounds) {
                     if (bound !is FirImplicitNullableAnyTypeRef) {
+                        val mapped = type(bound)
+                        if (paramFromJava) {
+                            val fq = TypeUtils.asFullyQualified(mapped)
+                            if (fq != null && "kotlin.Any" == fq.fullyQualifiedName) {
+                                continue
+                            }
+                        }
                         if (bounds == null) {
                             bounds = ArrayList()
                         }
-                        bounds.add(type(bound))
+                        bounds.add(mapped)
                     }
                 }
                 variance = when {
@@ -373,9 +385,24 @@ class KotlinTypeMapping(
         }
         var clazz: Class? = (if (fq is Parameterized) fq.type else fq) as Class?
         if (clazz == null) {
+            var flags = mapToFlagsBitmap(firClass.visibility, firClass.modality(), firClass.isStatic)
+            // Ensure class-kind flags align with the Java parser's output. Interfaces and
+            // annotation types are implicitly abstract in the JVM and must carry the
+            // Interface flag; they must not carry Final.
+            when (firClass.classKind) {
+                ClassKind.INTERFACE, ClassKind.ANNOTATION_CLASS -> {
+                    flags = flags or (1L shl 9)  // Interface
+                    flags = flags or (1L shl 10) // Abstract
+                    flags = flags and (1L shl 4).inv() // not Final
+                }
+                ClassKind.ENUM_CLASS -> {
+                    flags = flags or (1L shl 14) // Enum
+                }
+                else -> {}
+            }
             clazz = Class(
                 null,
-                mapToFlagsBitmap(firClass.visibility, firClass.modality(), firClass.isStatic),
+                flags,
                 fqn,
                 mapKind(firClass.classKind),
                 null, null, null, null, null, null, null
@@ -399,10 +426,17 @@ class KotlinTypeMapping(
                     else -> {}
                 }
             }
-            val supertype =
+            var supertype =
                 if (superTypeRef == null || "java.lang.Object" == signature) null else TypeUtils.asFullyQualified(
                     type(superTypeRef)
                 )
+            // For classes coming from Java sources/classpath, Kotlin's FIR maps their JVM
+            // supertypes to kotlin.Any etc. Remap back to the Java FQNs so cross-parser
+            // dedup can collapse them. Leave Kotlin-source classes alone so their
+            // explicit kotlin.Any supertype is preserved.
+            if (supertype != null && firClass.origin is FirDeclarationOrigin.Java) {
+                supertype = remapKotlinBuiltin(supertype)
+            }
             var declaringType: FullyQualified? = null
             if (!firClass.isLocal && firClass.symbol.classId.isNestedClass) {
                 val parentSymbol = firClass.symbol.classId.outerClassId!!.toSymbol(firSession)
@@ -426,7 +460,11 @@ class KotlinTypeMapping(
                 } else if (declaration is FirSimpleFunction) {
                     functions.add(declaration as FirFunction)
                 } else if (declaration is FirConstructor) {
-                    functions.add(declaration as FirFunction)
+                    // Annotation types have no real constructor in bytecode; the Java parser
+                    // omits them, so skip here for cross-parser dedup to match.
+                    if (firClass.classKind != ClassKind.ANNOTATION_CLASS) {
+                        functions.add(declaration as FirFunction)
+                    }
                 } else if (declaration is FirEnumEntry) {
                     enumEntries.add(declaration)
                 } else if (declaration is FirAnonymousInitializer) {
@@ -473,8 +511,15 @@ class KotlinTypeMapping(
             if (!interfaceTypeRefs.isNullOrEmpty()) {
                 interfaces = ArrayList(interfaceTypeRefs.size)
                 for (iParam: FirTypeRef? in interfaceTypeRefs) {
-                    val javaType = TypeUtils.asFullyQualified(type(iParam))
+                    var javaType = TypeUtils.asFullyQualified(type(iParam))
                     if (javaType != null) {
+                        // For Java-origin classes, remap Kotlin builtins to their JVM FQNs so
+                        // cross-parser dedup can match. Kotlin-source classes keep their
+                        // Kotlin-native interface references (e.g. an annotation class
+                        // declared in Kotlin source legitimately has kotlin.Annotation).
+                        if (firClass.origin is FirDeclarationOrigin.Java) {
+                            javaType = remapKotlinBuiltin(javaType)
+                        }
                         interfaces.add(javaType)
                     }
                 }
@@ -552,9 +597,23 @@ class KotlinTypeMapping(
                 paramNames.add(p.name.asString())
             }
         }
+        var methodFlags = mapToFlagsBitmap(function.visibility, function.modality, function.isStatic)
+        // Align with the Java parser: instance methods on an interface are always Abstract
+        // (even when they have a default body); additionally, non-abstract instance methods
+        // on an interface are default methods, which the Java parser marks with bit 43.
+        val parentClass = if (parent is FirRegularClass) parent else null
+        if (parentClass != null &&
+            parentClass.classKind == ClassKind.INTERFACE &&
+            !function.isStatic &&
+            function.symbol !is FirConstructorSymbol) {
+            methodFlags = methodFlags or (1L shl 10) // Abstract
+            if (function.modality != Modality.ABSTRACT) {
+                methodFlags = methodFlags or (1L shl 43) // Default
+            }
+        }
         val method = Method(
             null,
-            mapToFlagsBitmap(function.visibility, function.modality, function.isStatic),
+            methodFlags,
             null,
             if (function.symbol is FirConstructorSymbol) "<constructor>" else methodName(function),
             null,
@@ -643,18 +702,28 @@ class KotlinTypeMapping(
                 defaultValues.add(javaMethod.annotationParameterDefaultValue!!.name!!.asString())
             }
         }
+        var methodFlags = if (javaMethod is BinaryJavaMethod) {
+            javaMethod.access.toLong()
+        } else {
+            convertToFlagsBitMap(
+                javaMethod.visibility,
+                javaMethod.isStatic,
+                javaMethod.isFinal,
+                javaMethod.isAbstract
+            )
+        }
+        // Align with the Java parser: instance methods on an interface are always Abstract
+        // (even when they have a default body); additionally, non-abstract instance methods
+        // on an interface are default methods, which the Java parser marks with bit 43.
+        if (javaMethod.containingClass.isInterface && !javaMethod.isStatic) {
+            methodFlags = methodFlags or (1L shl 10) // Abstract
+            if (!javaMethod.isAbstract) {
+                methodFlags = methodFlags or (1L shl 43) // Default
+            }
+        }
         val method = Method(
             null,
-            (if (javaMethod is BinaryJavaMethod) {
-                javaMethod.access.toLong()
-            } else {
-                convertToFlagsBitMap(
-                    javaMethod.visibility,
-                    javaMethod.isStatic,
-                    javaMethod.isFinal,
-                    javaMethod.isAbstract
-                )
-            }),
+            methodFlags,
             null,
             javaMethod.name.asString(),
             null,
@@ -728,15 +797,29 @@ class KotlinTypeMapping(
                 }
             }
         }
+        var invocationFlags = when (sym) {
+            is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
+            is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
+            else -> {
+                throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
+            }
+        }
+        // Align with the Java parser: instance methods on an interface are always Abstract;
+        // non-abstract instance methods are default methods (bit 43).
+        if (sym is FirNamedFunctionSymbol) {
+            val invocationContainer = sym.containingClassLookupTag()?.toRegularClassSymbol(firSession)?.fir
+            if (invocationContainer != null &&
+                invocationContainer.classKind == ClassKind.INTERFACE &&
+                !sym.isStatic) {
+                invocationFlags = invocationFlags or (1L shl 10) // Abstract
+                if (sym.modality != Modality.ABSTRACT) {
+                    invocationFlags = invocationFlags or (1L shl 43) // Default
+                }
+            }
+        }
         val method = Method(
             null,
-            when (sym) {
-                is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
-                is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
-                else -> {
-                    throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
-                }
-            },
+            invocationFlags,
             null,
             when {
                 sym is FirConstructorSymbol ||
@@ -836,6 +919,40 @@ class KotlinTypeMapping(
         return method
     }
 
+    /**
+     * Kotlin builtins like kotlin.Any, kotlin.Annotation, kotlin.String, kotlin.Int, etc.
+     * compile to specific JVM types (java.lang.Object, java.lang.annotation.Annotation, etc.).
+     * The Java parser produces the JVM FQNs directly, so when Kotlin's FIR resolves a type to
+     * a Kotlin builtin, we remap it to its JVM equivalent so cross-parser dedup can match them.
+     */
+    private fun remapKotlinBuiltin(fq: FullyQualified): FullyQualified {
+        val javaFqn = when (fq.fullyQualifiedName) {
+            "kotlin.Any" -> "java.lang.Object"
+            "kotlin.Annotation" -> "java.lang.annotation.Annotation"
+            "kotlin.Throwable" -> "java.lang.Throwable"
+            "kotlin.Comparable" -> "java.lang.Comparable"
+            "kotlin.CharSequence" -> "java.lang.CharSequence"
+            "kotlin.Number" -> "java.lang.Number"
+            "kotlin.String" -> "java.lang.String"
+            "kotlin.Enum" -> "java.lang.Enum"
+            // Kotlin translates meta-annotations read from Java class files into its own
+            // kotlin.annotation.* equivalents. Remap to the Java names so cross-parser
+            // dedup collapses them to a single instance.
+            "kotlin.annotation.Retention" -> "java.lang.annotation.Retention"
+            "kotlin.annotation.MustBeDocumented" -> "java.lang.annotation.Documented"
+            "kotlin.annotation.Target" -> "java.lang.annotation.Target"
+            "kotlin.annotation.Repeatable" -> "java.lang.annotation.Repeatable"
+            else -> return fq
+        }
+        // Prefer an existing entry in the type cache so we return the full Class rather
+        // than a minimal ShallowClass (which would hide the underlying type information).
+        val existing = typeCache.get<FullyQualified>(javaFqn)
+        if (existing != null) {
+            return existing
+        }
+        return ShallowClass.build(javaFqn)
+    }
+
     private fun createShallowClass(name: String): FullyQualified {
         val c = ShallowClass.build(name)
         typeCache.put(name, c)
@@ -868,14 +985,27 @@ class KotlinTypeMapping(
         typeCache.put(signature, gtv)
         var bounds: MutableList<JavaType>? = null
         var variance: GenericTypeVariable.Variance = JavaType.GenericTypeVariable.Variance.INVARIANT
+        // Type parameters declared on Java-origin containers (e.g. java.util.Optional<T>) have
+        // their implicit kotlin.Any bound stripped so they match the Java parser's output.
+        // Kotlin-source type parameters with explicit `Any` bounds are left alone.
+        val containerFromJava = type.containingDeclarationSymbol.origin is FirDeclarationOrigin.Java
         if (!(type.bounds.size == 1 && type.bounds[0] is FirImplicitNullableAnyTypeRef)) {
             bounds = ArrayList(type.bounds.size)
             for (bound: FirTypeRef in type.bounds) {
-                bounds.add(type(bound))
+                val boundType = type(bound)
+                if (containerFromJava) {
+                    val fq = TypeUtils.asFullyQualified(boundType)
+                    if (fq != null && "kotlin.Any" == fq.fullyQualifiedName) {
+                        continue
+                    }
+                }
+                bounds.add(boundType)
             }
-            if (type.variance == Variance.IN_VARIANCE) {
+            if (bounds.isEmpty()) {
+                bounds = null
+            } else if (type.variance == Variance.IN_VARIANCE) {
                 variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
-            } else if (bounds.isNotEmpty()) {
+            } else {
                 variance = JavaType.GenericTypeVariable.Variance.COVARIANT
             }
         }
@@ -967,9 +1097,21 @@ class KotlinTypeMapping(
         val fqn = type.fqName.asString()
         var clazz = typeCache.get<Class>(fqn)
         if (clazz == null) {
+            var flags = type.access.toLong()
+            // Ensure class-kind flags are set to match the Java parser's output.
+            // The Kotlin compiler's BinaryJavaClass.access may not include Interface/Abstract
+            // bits for interfaces and annotations.
+            if (type.isInterface || type.isAnnotationType) {
+                flags = flags or (1L shl 9)  // Interface
+                flags = flags or (1L shl 10) // Abstract
+                flags = flags and (1L shl 4).inv() // not Final
+            }
+            if (type.isEnum) {
+                flags = flags or (1L shl 14) // Enum
+            }
             clazz = Class(
                 null,
-                type.access.toLong(),
+                flags,
                 type.fqName.asString(),
                 when {
                     type.isAnnotationType -> FullyQualified.Kind.Annotation
@@ -1183,7 +1325,8 @@ class KotlinTypeMapping(
         var bounds: List<JavaType>? = null
         if (type.upperBounds.size == 1) {
             val mappedBound = type(type.upperBounds.toTypedArray()[0])
-            if (mappedBound !is FullyQualified || "java.lang.Object" != mappedBound.fullyQualifiedName) {
+            if (mappedBound !is FullyQualified ||
+                ("java.lang.Object" != mappedBound.fullyQualifiedName && "kotlin.Any" != mappedBound.fullyQualifiedName)) {
                 bounds = listOf(mappedBound)
             }
         } else {
@@ -1252,7 +1395,7 @@ class KotlinTypeMapping(
                 }
                 val fq = TypeUtils.asFullyQualified(type(firAnnotation))
                 if (fq != null) {
-                    annotations.add(fq)
+                    annotations.add(remapKotlinBuiltin(fq))
                 }
             }
         }
@@ -1270,7 +1413,7 @@ class KotlinTypeMapping(
                 }
                 val fq = TypeUtils.asFullyQualified(type(javaAnnotation))
                 if (fq != null) {
-                    annotations.add(fq)
+                    annotations.add(remapKotlinBuiltin(fq))
                 }
             }
         }

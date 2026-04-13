@@ -195,7 +195,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         if (clazz == null) {
             clazz = JavaType.Class(
                 null,
-                mapToFlagsBitmap(irClass.visibility, irClass.modality),
+                mapToFlagsBitmap(irClass.visibility, irClass.modality, irClass.kind),
                 fqn,
                 mapKind(irClass.kind),
                 null, null, null, null, null, null, null
@@ -360,18 +360,29 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         for (param: IrValueParameter in regularParams) {
             paramNames!!.add(param.name.asString())
         }
+        val modality = when (function) {
+            is IrFunctionImpl -> function.modality
+            is IrFunctionWithLateBindingImpl -> function.modality
+            is Fir2IrLazySimpleFunction -> function.modality
+            is IrConstructorImpl, is Fir2IrLazyConstructor -> null
+            else -> throw UnsupportedOperationException("Unsupported IrFunction type: " + function.javaClass)
+        }
+        var methodFlags = mapToFlagsBitmap(function.visibility, modality)
+        // Default interface methods: non-abstract methods on an interface
+        val parent = function.parent
+        if (parent is IrClass && parent.kind == ClassKind.INTERFACE &&
+            modality != null && modality != Modality.ABSTRACT &&
+            function !is IrConstructor) {
+            methodFlags = methodFlags or (1L shl 43) // Default flag
+        }
+        // Static methods
+        if (function is IrSimpleFunction && function.dispatchReceiverParameter == null &&
+            function !is IrConstructor && parent is IrClass && !parent.isCompanion) {
+            methodFlags = methodFlags or (1L shl 3) // Static flag
+        }
         val method = JavaType.Method(
             null,
-            mapToFlagsBitmap(
-                function.visibility,
-                when (function) {
-                    is IrFunctionImpl -> function.modality
-                    is IrFunctionWithLateBindingImpl -> function.modality
-                    is Fir2IrLazySimpleFunction -> function.modality
-                    is IrConstructorImpl, is Fir2IrLazyConstructor -> null
-                    else -> throw UnsupportedOperationException("Unsupported IrFunction type: " + function.javaClass)
-                }
-            ),
+            methodFlags,
             null,
             if (function is IrConstructor) "<constructor>" else function.name.asString(),
             null,
@@ -757,6 +768,10 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
     }
 
     private fun mapToFlagsBitmap(visibility: DescriptorVisibility, modality: Modality?): Long {
+        return mapToFlagsBitmap(visibility, modality, null)
+    }
+
+    private fun mapToFlagsBitmap(visibility: DescriptorVisibility, modality: Modality?, classKind: ClassKind?): Long {
         var bitMask: Long = 0
 
         when (visibility.externalDisplayName.lowercase()) {
@@ -780,6 +795,28 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
                 }
             }
         }
+
+        // Set class-kind-specific flags to match the Java parser's output.
+        // Interfaces and annotations are implicitly abstract in the JVM.
+        if (classKind != null) {
+            when (classKind) {
+                ClassKind.INTERFACE -> {
+                    bitMask = bitMask or (1L shl 9)  // Interface
+                    bitMask = bitMask or (1L shl 10) // Abstract
+                    bitMask = bitMask and (1L shl 4).inv() // not Final
+                }
+                ClassKind.ANNOTATION_CLASS -> {
+                    bitMask = bitMask or (1L shl 9)  // Interface (annotations are interfaces in bytecode)
+                    bitMask = bitMask or (1L shl 10) // Abstract
+                    bitMask = bitMask and (1L shl 4).inv() // not Final
+                }
+                ClassKind.ENUM_CLASS -> {
+                    bitMask = bitMask or (1L shl 14) // Enum
+                }
+                else -> {}
+            }
+        }
+
         return bitMask
     }
 
