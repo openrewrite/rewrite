@@ -346,7 +346,16 @@ class MavenPomDownloaderTest implements RewriteTest {
         void useHttpWhenHttpsFails() throws Exception {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             try (var mockRepo = new MockWebServer()) {
-                mockRepo.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
+                // Use a Dispatcher instead of enqueue to avoid flakiness: normalizeRepository()
+                // probes HTTPS first, and TLS bytes sent to this HTTP-only server can sometimes
+                // parse as valid HTTP, consuming an enqueued response before the real HTTP request.
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        return new MockResponse().setResponseCode(200).setBody("body");
+                    }
+                });
+                mockRepo.start();
                 var httpRepo = MavenRepository.builder()
                   .id("id")
                   .uri("http://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
