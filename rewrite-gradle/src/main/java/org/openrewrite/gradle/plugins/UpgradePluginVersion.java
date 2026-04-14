@@ -146,19 +146,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                if (!"version".equals(m.getSimpleName())) {
-                    return m;
-                }
-
-                GradlePlugin plugin = new GradlePlugin.Matcher().get(getCursor()).orElse(null);
+                GradlePlugin plugin = new GradlePlugin.Matcher().pluginIdPattern(effectivePluginIdPattern()).get(getCursor()).orElse(null);
                 if (plugin == null || plugin.getPluginId() == null) {
                     return m;
                 }
 
                 String pluginId = plugin.getPluginId();
-                if (!matchesPluginId(pluginId, pluginIdPattern)) {
-                    return m;
-                }
                 List<Expression> versionArgs = m.getArguments();
                 try {
                     if (plugin.getVersion() != null) {
@@ -300,15 +293,12 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 // Match the trait before super to ensure the cursor is unmodified
-                GradlePlugin plugin = "version".equals(method.getSimpleName()) ?
-                        new GradlePlugin.Matcher().get(getCursor()).orElse(null) : null;
-                if (plugin != null && !matchesPluginId(plugin.getPluginId(), pluginIdPattern)) {
-                    plugin = null;
-                }
+                GradlePlugin plugin = new GradlePlugin.Matcher().pluginIdPattern(effectivePluginIdPattern()).get(getCursor()).orElse(null);
 
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                if (plugin == null || plugin.getPluginId() == null || plugin.getVersion() == null) {
+                if (plugin == null || plugin.getPluginId() == null || plugin.getVersion() == null ||
+                        !"version".equals(m.getSimpleName())) {
                     return m;
                 }
 
@@ -345,18 +335,9 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
         return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
     }
 
-    private static boolean matchesPluginId(@Nullable String pluginId, String pluginIdPattern) {
-        if (pluginId == null) {
-            return false;
-        }
-        if (StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
-            return true;
-        }
-        // Support matching by short "kotlin" name for org.jetbrains.kotlin.* plugins
-        if (pluginId.startsWith("org.jetbrains.kotlin.")) {
-            return StringUtils.matchesGlob("kotlin", pluginIdPattern);
-        }
-        return false;
+    private String effectivePluginIdPattern() {
+        // Translate the short "kotlin" DSL name to the full plugin ID pattern
+        return "kotlin".equals(pluginIdPattern) ? "org.jetbrains.kotlin.*" : pluginIdPattern;
     }
 
     private @Nullable String literalValue(Expression expr) {
