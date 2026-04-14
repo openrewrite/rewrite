@@ -121,6 +121,22 @@ class KotlinTypeMapping(
     fun type(type: Any?, parent: Any?, signature: String): JavaType? {
         return when (type) {
             is ConeClassLikeType, is FirClass, is FirResolvedQualifier -> {
+                // Kotlin primitives compile to JVM primitives (for non-nullable uses) or
+                // to boxed classes (for nullable uses / generic arguments). The parser
+                // surfaces the JVM primitive form so dedup/recipes match what the Java
+                // parser would produce. Class-definition contexts (where methods are being
+                // declared on kotlin.Int itself) still resolve through `classType()` —
+                // they don't reach `type()` for the declaring class.
+                val nonNullable = when (type) {
+                    is ConeClassLikeType -> !type.isMarkedNullable
+                    else -> true
+                }
+                if (nonNullable) {
+                    val primitive = kotlinPrimitiveFromFqn(signature)
+                    if (primitive != null) {
+                        return primitive
+                    }
+                }
                 classType(type, parent, signature)
             }
 
@@ -747,11 +763,6 @@ class KotlinTypeMapping(
             return null
         }
         val returnType = type(javaMethod.returnType)
-        if (javaMethod.name.asString() == "intValue" || javaMethod.name.asString() == "hashCode") {
-            val rt = javaMethod.returnType
-            val sig = if (rt != null) signatureBuilder.signature(rt) else "null"
-            System.err.println("DEBUG intValue: returnType=$returnType class=${returnType.javaClass.simpleName} rawClass=${rt?.javaClass?.name} sig=$sig")
-        }
         var parameterTypes: MutableList<JavaType>? = null
         if (javaMethod.valueParameters.isNotEmpty()) {
             parameterTypes = ArrayList(javaMethod.valueParameters.size)
@@ -851,7 +862,7 @@ class KotlinTypeMapping(
             val resolvedSymbol =
                 (function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
-                declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.dispatchReceiverType))
+                declaringType = asDeclaringType(resolvedSymbol.dispatchReceiverType as ConeClassLikeType)
             } else if (resolvedSymbol.containingClassLookupTag() != null &&
                 resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir != null
             ) {
@@ -933,6 +944,37 @@ class KotlinTypeMapping(
      * The Java parser produces the JVM FQNs directly, so when Kotlin's FIR resolves a type to
      * a Kotlin builtin, we remap it to its JVM equivalent so cross-parser dedup can match them.
      */
+    /**
+     * Resolve a Kotlin cone type to its declaring-class form (always {@link FullyQualified}),
+     * bypassing the primitive remap that {@link #type(Any?, Any?, String)} normally applies
+     * to non-nullable kotlin primitives. Method declaring types are class instances even
+     * when the receiver value is a JVM primitive — `kotlin.Char.toInt()` is a method on
+     * the kotlin.Char class, not on the JVM `char` primitive.
+     */
+    private fun asDeclaringType(coneType: ConeClassLikeType): FullyQualified? {
+        val signature = signatureBuilder.signature(coneType)
+        val cached = typeCache.get<FullyQualified>(signature)
+        if (cached != null) {
+            return cached
+        }
+        return TypeUtils.asFullyQualified(classType(coneType, firFile, signature))
+    }
+
+    private fun kotlinPrimitiveFromFqn(fqn: String): JavaType.Primitive? {
+        return when (fqn) {
+            "kotlin.Int" -> JavaType.Primitive.Int
+            "kotlin.Long" -> JavaType.Primitive.Long
+            "kotlin.Short" -> JavaType.Primitive.Short
+            "kotlin.Byte" -> JavaType.Primitive.Byte
+            "kotlin.Float" -> JavaType.Primitive.Float
+            "kotlin.Double" -> JavaType.Primitive.Double
+            "kotlin.Boolean" -> JavaType.Primitive.Boolean
+            "kotlin.Char" -> JavaType.Primitive.Char
+            "kotlin.Unit" -> JavaType.Primitive.Void
+            else -> null
+        }
+    }
+
     /**
      * Construct a JVM-style fully-qualified name for a binary Java class, where nested
      * classes are separated by `$` from their containing class. Kotlin's

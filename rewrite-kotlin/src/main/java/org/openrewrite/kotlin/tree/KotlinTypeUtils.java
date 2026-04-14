@@ -71,6 +71,19 @@ public final class KotlinTypeUtils {
         m.put("kotlin.annotation.Retention", "java.lang.annotation.Retention");
         m.put("kotlin.annotation.Target", "java.lang.annotation.Target");
 
+        // Kotlin primitives compile to JVM primitives (non-nullable) or boxed classes
+        // (nullable). The parser produces JVM primitives for non-nullable positions, so
+        // a recipe asking for "kotlin.Int" should also match `int` / `java.lang.Integer`.
+        m.put("kotlin.Int", "java.lang.Integer");
+        m.put("kotlin.Long", "java.lang.Long");
+        m.put("kotlin.Short", "java.lang.Short");
+        m.put("kotlin.Byte", "java.lang.Byte");
+        m.put("kotlin.Float", "java.lang.Float");
+        m.put("kotlin.Double", "java.lang.Double");
+        m.put("kotlin.Boolean", "java.lang.Boolean");
+        m.put("kotlin.Char", "java.lang.Character");
+        m.put("kotlin.Unit", "java.lang.Void");
+
         // Kotlin collection interfaces compile to their java.util counterparts at the JVM level.
         m.put("kotlin.collections.Collection", "java.util.Collection");
         m.put("kotlin.collections.Iterable", "java.lang.Iterable");
@@ -127,14 +140,38 @@ public final class KotlinTypeUtils {
     /**
      * {@link TypeUtils#isOfClassType(JavaType, String)} that also recognises Kotlin
      * built-in FQNs. Callers may pass either the Kotlin name or the JVM name; both
-     * forms match types that carry the JVM representation.
+     * forms match types that carry the JVM representation. For Kotlin primitive FQNs
+     * (e.g. {@code kotlin.Int}) the match also accepts the JVM primitive (e.g. {@code int}),
+     * since the parser unboxes non-nullable primitive uses.
      */
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
         if (TypeUtils.isOfClassType(type, fqn)) {
             return true;
         }
+        // Kotlin primitive aliases also accept the JVM primitive form.
+        if (type instanceof JavaType.Primitive) {
+            JavaType.Primitive expected = kotlinFqnToPrimitive(fqn);
+            if (expected != null && type == expected) {
+                return true;
+            }
+        }
         String jvm = KOTLIN_TO_JVM_FQN.get(fqn);
         return jvm != null && TypeUtils.isOfClassType(type, jvm);
+    }
+
+    private static JavaType.@Nullable Primitive kotlinFqnToPrimitive(String fqn) {
+        switch (fqn) {
+            case "kotlin.Int": return JavaType.Primitive.Int;
+            case "kotlin.Long": return JavaType.Primitive.Long;
+            case "kotlin.Short": return JavaType.Primitive.Short;
+            case "kotlin.Byte": return JavaType.Primitive.Byte;
+            case "kotlin.Float": return JavaType.Primitive.Float;
+            case "kotlin.Double": return JavaType.Primitive.Double;
+            case "kotlin.Boolean": return JavaType.Primitive.Boolean;
+            case "kotlin.Char": return JavaType.Primitive.Char;
+            case "kotlin.Unit": return JavaType.Primitive.Void;
+            default: return null;
+        }
     }
 
     /**
