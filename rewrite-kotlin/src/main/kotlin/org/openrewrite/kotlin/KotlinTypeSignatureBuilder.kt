@@ -530,10 +530,19 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         return when (type) {
             is JavaArrayType -> javaArraySignature(type)
             is JavaPrimitiveType -> javaPrimitiveSignature(type)
-            // The classifier is evaluated separately, because the BinaryJavaClass may have type parameters.
-            is JavaClassifierType -> if (type.typeArguments.isNotEmpty()) javaParameterizedSignature(type) else signature(
-                type.classifier
-            )
+            // A raw JavaClassifierType (one without explicit type arguments) refers
+            // to the classifier as a raw type. Use the classifier's non-parameterized
+            // FQN so this is a distinct cache key from the BinaryJavaClass's own raw
+            // Parameterized form (which uses the `Foo<Generic{T}>` signature). Without
+            // this, a raw reference to a generic class collides on the type cache with
+            // the class's raw Parameterized and surfaces as Parameterized — which
+            // diverges from the Java parser's handling of raw references.
+            is JavaClassifierType -> if (type.typeArguments.isNotEmpty()) {
+                javaParameterizedSignature(type)
+            } else when (val classifier = type.classifier) {
+                is JavaClass -> javaClassSignature(classifier)
+                else -> signature(classifier)
+            }
 
             is BinaryJavaAnnotation -> signature(type.classId.toSymbol(firSession)?.fir)
             is BinaryJavaClass -> if (type.typeParameters.isNotEmpty()) javaParameterizedSignature(type) else javaClassSignature(
@@ -552,6 +561,14 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaClassSignature(type: BinaryJavaClass): String {
+        // Walk outerClass to produce the JVM-style `Outer$Inner` FQN. Without this,
+        // nested `BinaryJavaClass` entries would surface as `Outer.Inner` — not
+        // matching the `$`-separated form the Java parser (and `toJvmFqn`) uses,
+        // which blocks cross-parser cache coherence for nested classes.
+        val outer = type.outerClass
+        if (outer != null) {
+            return "${javaClassSignature(outer)}${'$'}${type.name.asString()}"
+        }
         return type.fqName.asString()
     }
 
@@ -589,7 +606,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaParameterizedSignature(type: BinaryJavaClass): String {
-        val sig = StringBuilder(type.fqName.asString())
+        val sig = StringBuilder(javaClassSignature(type))
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeParameters) {
             joiner.add(signature(tp, type))
@@ -598,7 +615,16 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaParameterizedSignature(type: JavaClassifierType): String {
-        val sig = StringBuilder(type.classifierQualifiedName)
+        // Use the classifier's own FQN rendering (which produces `$`-separated form
+        // for nested classes via `javaClassSignature(JavaClass)`) so instantiated
+        // signatures stay consistent with the BinaryJavaClass's raw Parameterized
+        // signature. Falling back to `classifierQualifiedName` yields dotted form,
+        // which would produce `Outer.Inner<T>` instead of `Outer$Inner<T>` and
+        // diverge from the JVM-style FQN used elsewhere.
+        val sig = StringBuilder(when (val classifier = type.classifier) {
+            is JavaClass -> javaClassSignature(classifier)
+            else -> type.classifierQualifiedName
+        })
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeArguments) {
             joiner.add(signature(tp, type))

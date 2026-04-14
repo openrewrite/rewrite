@@ -330,7 +330,7 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
             throw UnsupportedOperationException("Add support for reified generic types.")
         }
         for (bound: IrType in type.superTypes) {
-            if (isNotAny(bound)) {
+            if (isNotAny(bound) && isNotObject(bound)) {
                 if (bounds == null) {
                     bounds = ArrayList()
                 }
@@ -339,6 +339,15 @@ class KotlinIrTypeMapping(private val typeCache: JavaTypeCache) : JavaTypeMappin
         }
         gtv.unsafeSet(gtv.name, if (bounds == null) INVARIANT else COVARIANT, bounds)
         return gtv
+    }
+
+    // Drop `java.lang.Object` bounds to match the Java parser's handling of
+    // unbounded type parameters. Kotlin's IR surfaces Java-origin `<T>` as
+    // `<T : Object>` (the bytecode's explicit bound); keeping that produces
+    // `Generic{T extends java.lang.Object}` which never dedups against the
+    // Java parser's unbounded `Generic{T}`.
+    private fun isNotObject(type: IrType): Boolean {
+        return !(type.classifierOrNull != null && type.classifierOrNull!!.owner is IrClass && "java.lang.Object" == (type.classifierOrNull!!.owner as IrClass).kotlinFqName.asString())
     }
 
     fun methodDeclarationType(function: IrFunction?): JavaType.Method? {
