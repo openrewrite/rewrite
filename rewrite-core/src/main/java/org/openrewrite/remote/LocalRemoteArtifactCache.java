@@ -30,6 +30,15 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 public class LocalRemoteArtifactCache implements RemoteArtifactCache {
+    private static final char[] HEX_ARRAY = "0123456789abcdef".toCharArray();
+    private static final ThreadLocal<MessageDigest> DIGEST = ThreadLocal.withInitial(() -> {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    });
+
     private final Path cacheDir;
 
     public LocalRemoteArtifactCache(Path cacheDir) {
@@ -73,22 +82,16 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
     }
 
     public static String hashUri(URI uri) {
-        // hash the string using SHA-256
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = digest.digest(uri.toString().getBytes(StandardCharsets.UTF_8));
+        MessageDigest digest = DIGEST.get();
+        digest.reset();
+        byte[] hashBytes = digest.digest(uri.toString().getBytes(StandardCharsets.UTF_8));
 
-            StringBuilder hashStringBuilder = new StringBuilder();
-            for (byte hashByte : hashBytes) {
-                String hex = Integer.toHexString(0xff & hashByte);
-                if (hex.length() == 1) {
-                    hashStringBuilder.append('0');
-                }
-                hashStringBuilder.append(hex);
-            }
-            return hashStringBuilder.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+        char[] hexChars = new char[hashBytes.length * 2];
+        for (int i = 0; i < hashBytes.length; i++) {
+            int v = hashBytes[i] & 0xFF;
+            hexChars[i * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[i * 2 + 1] = HEX_ARRAY[v & 0x0F];
         }
+        return new String(hexChars);
     }
 }
