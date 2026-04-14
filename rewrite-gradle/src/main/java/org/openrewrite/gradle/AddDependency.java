@@ -337,6 +337,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Nullable
             private JavaSourceSetUpdater updater;
+            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -363,12 +364,15 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (!maybeJp.isPresent() || !acc.configurationsByProject.containsKey(maybeJp.get())) {
                     return sf;
                 }
-                if (updater == null) {
-                    updater = new JavaSourceSetUpdater(ctx);
-                }
-                return JavaSourceSet.updateOnSourceFile(sf, sourceSet ->
-                        sourceSet.getGavToTypes().isEmpty() ? sourceSet :
-                                updater.addDependency(sourceSet, groupId, artifactId, acc.resolvedVersion, acc.repositories));
+                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
+                    if (sourceSet.getGavToTypes().isEmpty()) {
+                        return sourceSet;
+                    }
+                    if (updater == null) {
+                        updater = new JavaSourceSetUpdater(ctx);
+                    }
+                    return updater.addDependency(sourceSet, groupId, artifactId, acc.resolvedVersion, acc.repositories);
+                });
             }
         };
     }
