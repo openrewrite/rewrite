@@ -15,6 +15,7 @@
  */
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using JetBrains.Annotations;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Testing;
@@ -72,12 +73,26 @@ public abstract class RewriteTest
         // 1. Parse all sources and validate round-trip
         var validations = recipeSpec.Validations;
         var parsed = new List<(SourceSpec Spec, SourceFile Source)>();
+
+        // Collect all csproj-related specs and parse them together in a shared temp directory
+        // so that MSBuild imports (Directory.Build.props/.targets) resolve correctly during restore.
+        var csprojSpecs = specs.Where(s => s.SourcePath != null && IsCsprojPath(s.SourcePath)).ToList();
+        Dictionary<string, SourceFile>? csprojParsed = null;
+        if (csprojSpecs.Count > 0)
+        {
+            csprojParsed = ParseCsprojFilesTogether(csprojSpecs);
+        }
+
         foreach (var spec in specs)
         {
             SourceFile source;
-            if (spec.SourcePath != null)
+            if (spec.SourcePath != null && IsCsprojPath(spec.SourcePath) && csprojParsed != null)
             {
-                // Remote-parsed source (e.g., XML/.csproj via Java RPC)
+                source = csprojParsed[spec.SourcePath];
+            }
+            else if (spec.SourcePath != null)
+            {
+                // Remote-parsed source (e.g., XML via Java RPC)
                 var rpc = RewriteRpcServer.Current
                           ?? throw new InvalidOperationException(
                               $"Parsing {spec.SourcePath} requires an RPC connection. " +
@@ -178,9 +193,9 @@ public abstract class RewriteTest
         return new SourceSpec(before, after);
     }
 
-    protected static SourceSpec CsProj(string before, string? after = null)
+    protected static SourceSpec CsProj([LanguageInjection("xml")]string before, [LanguageInjection("xml")]string? after = null, string sourcePath = "project.csproj")
     {
-        return new SourceSpec(before, after, "project.csproj", "org.openrewrite.xml.tree.Xml$Document");
+        return new SourceSpec(before, after, sourcePath, "org.openrewrite.xml.tree.Xml$Document");
     }
 
     /// <summary>
@@ -232,6 +247,21 @@ public abstract class RewriteTest
             return capture.ToString();
         }
         return new CSharpPrinter<object>().Print(tree);
+    }
+
+    private static readonly CsprojParser CsprojParserInstance = new();
+
+    private static bool IsCsprojPath(string path) => CsprojParserInstance.Accept(path);
+
+    private static Dictionary<string, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs)
+    {
+        var files = specs.Select(s => (s.Before, s.SourcePath!)).ToList();
+        var docs = CsprojParserInstance.ParseAll(files);
+
+        var result = new Dictionary<string, SourceFile>();
+        for (var i = 0; i < specs.Count; i++)
+            result[specs[i].SourcePath!] = docs[i];
+        return result;
     }
 
     private static void AssertContentEquals(string expected, string actual, string sourcePath,

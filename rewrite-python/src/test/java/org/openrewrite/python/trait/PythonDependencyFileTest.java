@@ -32,7 +32,6 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -620,7 +619,7 @@ class PythonDependencyFileTest implements RewriteTest {
                 singletonMap("requests", "CVE-2023-1234"))),
               requirementsTxt(
                 "requests>=2.28.0\nflask>=2.0",
-                "~~>requests>=2.28.0\nflask>=2.0"
+                "~~(CVE-2023-1234)~~>requests>=2.28.0\nflask>=2.0"
               )
             );
         }
@@ -675,7 +674,7 @@ class PythonDependencyFileTest implements RewriteTest {
                 singletonMap("requests", "CVE-2023-1234"), null, null)),
               requirementsTxt(
                 "requests>=2.28.0",
-                "~~>requests>=2.28.0",
+                "~~(CVE-2023-1234)~~>requests>=2.28.0",
                 s -> s.path("requirements-dev.txt")
               )
             );
@@ -688,7 +687,7 @@ class PythonDependencyFileTest implements RewriteTest {
                 singletonMap("requests", "CVE-2023-1234"), "", null)),
               requirementsTxt(
                 "requests>=2.28.0",
-                "~~>requests>=2.28.0"
+                "~~(CVE-2023-1234)~~>requests>=2.28.0"
               )
             );
         }

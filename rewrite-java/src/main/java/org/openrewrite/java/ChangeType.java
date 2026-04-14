@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -276,6 +277,12 @@ public class ChangeType extends Recipe {
                         setCursor(cursor);
                     }
                 }));
+
+                // If the new type is covered by a star import and another star import
+                // provides a type with the same simple name, add an explicit import
+                if (fullyQualifiedTarget != null) {
+                    j = maybeAddExplicitImportForAmbiguity((JavaSourceFile) j, fullyQualifiedTarget);
+                }
             }
 
             return j;
@@ -594,6 +601,77 @@ public class ChangeType extends Recipe {
             // Replace the original type prefix with the target type prefix
             String newNestedFqn = targetFqn + nestedFqn.substring(originalFqn.length());
             return JavaType.ShallowClass.build(newNestedFqn);
+        }
+
+        /**
+         * When the new type is provided by a star import and another star import provides
+         * a type with the same simple name, add an explicit import to disambiguate.
+         */
+        private JavaSourceFile maybeAddExplicitImportForAmbiguity(JavaSourceFile sf, JavaType.FullyQualified newType) {
+            String newPkg = newType.getPackageName();
+            String simpleName = newType.getClassName();
+
+            // Check if the new type is covered by a star import
+            boolean coveredByStar = false;
+            Set<String> otherStarPackages = new LinkedHashSet<>();
+            for (J.Import anImport : sf.getImports()) {
+                if (anImport.isStatic() || !"*".equals(anImport.getQualid().getSimpleName())) {
+                    // Check if there's already an explicit import for this type
+                    if (!anImport.isStatic() && anImport.getTypeName().replace('$', '.').equals(newType.getFullyQualifiedName())) {
+                        return sf; // Already has explicit import, no ambiguity possible
+                    }
+                    continue;
+                }
+                if (anImport.getPackageName().equals(newPkg)) {
+                    coveredByStar = true;
+                } else {
+                    otherStarPackages.add(anImport.getPackageName());
+                }
+            }
+
+            if (!coveredByStar || otherStarPackages.isEmpty()) {
+                return sf;
+            }
+
+            // Check if any other star-imported package has a type with the same simple name
+            Optional<JavaSourceSet> sourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
+            if (!sourceSet.isPresent()) {
+                return sf;
+            }
+            boolean ambiguous = false;
+            for (JavaType.FullyQualified fq : sourceSet.get().getClasspath()) {
+                if (fq.getClassName().equals(simpleName) && otherStarPackages.contains(fq.getPackageName())) {
+                    ambiguous = true;
+                    break;
+                }
+            }
+
+            if (!ambiguous) {
+                return sf;
+            }
+
+            // Add an explicit import to resolve the ambiguity
+            J.Import explicitImport = new J.Import(Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY),
+                    TypeTree.build(newType.getFullyQualifiedName()).withPrefix(Space.SINGLE_SPACE),
+                    null);
+
+            List<JRightPadded<J.Import>> imports = new ArrayList<>(sf.getPadding().getImports());
+            // Insert the explicit import right before the star import for its package
+            for (int i = 0; i < imports.size(); i++) {
+                J.Import imp = imports.get(i).getElement();
+                if (!imp.isStatic() && "*".equals(imp.getQualid().getSimpleName()) && imp.getPackageName().equals(newPkg)) {
+                    // Give the explicit import the star import's prefix (which has the leading newline)
+                    JRightPadded<J.Import> padded = JRightPadded.build(explicitImport.withPrefix(imp.getPrefix()));
+                    // Give the star import a fresh newline prefix
+                    imports.set(i, imports.get(i).map(starImp -> starImp.withPrefix(Space.format("\n"))));
+                    imports.add(i, padded);
+                    break;
+                }
+            }
+            return sf.getPadding().withImports(imports);
         }
 
         private boolean hasNoConflictingImport(@Nullable JavaSourceFile sf) {

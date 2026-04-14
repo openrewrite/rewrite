@@ -80,8 +80,7 @@ public class RpcFixture : IDisposable
                          "Run './gradlew :rewrite-csharp:rpcTestClasspath' to generate the classpath file.");
 
         var classpath = File.ReadAllText(cpFile).Trim();
-        return new ProcessStartInfo("java",
-            $"-cp \"{classpath}\" org.openrewrite.maven.rpc.JavaRewriteRpc")
+        var psi = new ProcessStartInfo("java", "org.openrewrite.maven.rpc.JavaRewriteRpc")
         {
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -89,6 +88,8 @@ public class RpcFixture : IDisposable
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        psi.Environment["CLASSPATH"] = classpath;
+        return psi;
     }
 
     public void Dispose()

@@ -9,11 +9,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.python.RequirementsTxtParser;
 import org.openrewrite.python.internal.PyProjectHelper;
-import org.openrewrite.text.Find;
 import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.text.Find;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.util.*;
@@ -213,9 +216,27 @@ public class RequirementsFile implements PythonDependencyFile {
             return this;
         }
         PlainText result = (PlainText) getTree();
+        Set<Marker> existingMarkers = new PlainTextVisitor<Set<Marker>>() {
+            @Override
+            public <M extends Marker> M visitMarker(Marker marker, Set<Marker> ctx) {
+                ctx.add(marker);
+                return (M) marker;
+            }
+        }.reduce(result, new HashSet<>());
         for (Map.Entry<String, String> entry : packageMessages.entrySet()) {
             Find find = new Find(entry.getKey(), null, false, null, null, null, null, null);
-            result = (PlainText) find.getVisitor().visitNonNull(result, ctx);
+            PlainText markedResult = (PlainText) find.getVisitor().visitNonNull(result, ctx);
+            if (markedResult != result) {
+                result = new PlainTextVisitor<ExecutionContext>() {
+                    @Override
+                    public <M extends Marker> M visitMarker(Marker marker, ExecutionContext executionContext) {
+                        if (!existingMarkers.contains(marker) && marker instanceof SearchResult && ((SearchResult) marker).getDescription() == null) {
+                            return (M) ((SearchResult) marker).withDescription(entry.getValue());
+                        }
+                        return super.visitMarker(marker, executionContext);
+                    }
+                }.visitText(markedResult, ctx);
+            }
         }
         if (result != getTree()) {
             return new RequirementsFile(new Cursor(cursor.getParentOrThrow(), result), marker);

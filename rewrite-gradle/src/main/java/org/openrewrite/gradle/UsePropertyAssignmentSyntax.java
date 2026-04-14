@@ -54,6 +54,10 @@ public class UsePropertyAssignmentSyntax extends Recipe {
         return Preconditions.check(new FindSourceFiles("**/*.gradle"), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if ("plugins".equals(method.getSimpleName())) {
+                    return method;
+                }
+
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (m.getArguments().size() != 1 || m.getArguments().get(0) instanceof J.Empty) {

@@ -34,34 +34,37 @@ public static class Preconditions
     }
 
     /// <summary>
-    /// Wraps a recipe so its visitor only runs on files where the precondition matches.
-    /// Useful for applying a precondition to sub-recipes within a composite recipe.
+    /// Wraps a visitor with a recipe-based precondition check. The recipe's visitor
+    /// is used as the precondition gate.
     /// </summary>
-    public static Recipe Check(ITreeVisitor<ExecutionContext> precondition, Recipe recipe)
+    public static ITreeVisitor<ExecutionContext> Check(
+        Recipe check,
+        ITreeVisitor<ExecutionContext> visitor)
     {
-        return new PreconditionedRecipe(precondition, recipe);
-    }
-}
-
-/// <summary>
-/// A recipe wrapper that gates execution on a precondition visitor.
-/// </summary>
-internal class PreconditionedRecipe : Recipe
-{
-    private readonly ITreeVisitor<ExecutionContext> _precondition;
-    private readonly Recipe _delegate;
-
-    public PreconditionedRecipe(ITreeVisitor<ExecutionContext> precondition, Recipe @delegate)
-    {
-        _precondition = precondition;
-        _delegate = @delegate;
+        if (check is IScanningRecipe)
+        {
+            throw new ArgumentException("ScanningRecipe is not supported as a check");
+        }
+        return new RecipeCheck(check, visitor);
     }
 
-    public override string DisplayName => _delegate.DisplayName;
-    public override string Description => _delegate.Description;
-
-    public override ITreeVisitor<ExecutionContext> GetVisitor()
+    /// <summary>
+    /// Negates a precondition visitor. Returns a search result when the inner visitor
+    /// does NOT match (i.e., does not modify the tree).
+    /// </summary>
+    public static ITreeVisitor<ExecutionContext> Not(
+        ITreeVisitor<ExecutionContext> visitor)
     {
-        return Preconditions.Check(_precondition, _delegate.GetVisitor());
+        return new NotVisitor(visitor);
+    }
+
+    /// <summary>
+    /// Combines multiple precondition visitors with AND semantics. All visitors must
+    /// match (modify the tree) for the combined precondition to match.
+    /// </summary>
+    public static ITreeVisitor<ExecutionContext> And(
+        params ITreeVisitor<ExecutionContext>[] visitors)
+    {
+        return new AndVisitor(visitors);
     }
 }

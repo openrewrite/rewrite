@@ -205,20 +205,9 @@ public class JavaRewriteRpc {
         //  discovery (e.g. make Parser.Builder a service interface) so that any
         //  parser on the classpath is automatically available for RPC Parse requests.
         //
-        // Register parsers for handling Parse requests. More specific parsers
-        // (like CsprojParser) must come before generic ones (XmlParser) so they
-        // win the accept() dispatch for file types they both handle.
+        // Register parsers for handling Parse requests.
+        // .csproj files are parsed natively on the C# side (XmlParser + MSBuildProject marker).
         List<Parser> parsers = new ArrayList<>();
-        try {
-            Object builder = Class.forName("org.openrewrite.csharp.CsprojParser")
-                    .getMethod("builder").invoke(null);
-            parsers.add((Parser) builder.getClass().getMethod("build").invoke(builder));
-        } catch (ClassNotFoundException ignored) {
-            // CsprojParser not on classpath — fall through to XmlParser
-        } catch (ReflectiveOperationException e) {
-            PrintStream err = logStream != null ? logStream : System.err;
-            err.println("Failed to load CsprojParser: " + e.getMessage());
-        }
         parsers.add(new XmlParser());
         server.setParsers(parsers);
 

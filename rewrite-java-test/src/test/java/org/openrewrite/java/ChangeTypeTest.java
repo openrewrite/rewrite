@@ -31,6 +31,7 @@ import org.openrewrite.test.SourceSpec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
@@ -2596,4 +2597,59 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeTypeAddsExplicitImportWhenStarImportsWouldBeAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Ambiguous", "b.Ambiguous", true))
+                  .beforeRecipe(withSourceTypesOnClasspath()),
+          java(
+            """
+              package a;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Other {}
+              """
+          ),
+          java(
+            """
+              package c;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              import a.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """,
+            """
+              import b.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """
+          )
+        );
+    }
+
 }

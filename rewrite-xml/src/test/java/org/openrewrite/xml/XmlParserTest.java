@@ -686,9 +686,15 @@ class XmlParserTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {
       "foo.xml",
+      "foo.XML",
       "proj.csproj",
+      "proj.Csproj",
       "/foo/bar/baz.jsp",
-      "packages.config"
+      "packages.config",
+      "Packages.config",
+      "nuget.config",
+      "NuGet.config",
+      "NuGet.Config"
     })
     void acceptWithValidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isTrue();
