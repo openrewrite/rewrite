@@ -165,13 +165,14 @@ public class Cursor {
     }
 
     public <T> @Nullable T firstEnclosing(Class<T> tClass) {
-        CursorIterator iter = new CursorIterator(this);
-        while (iter.hasNext()) {
-            Object value = iter.next();
-            if (tClass.isAssignableFrom(value.getClass())) {
+        Cursor current = this;
+        while (current != null) {
+            Object currentValue = current.value;
+            if (tClass.isInstance(currentValue)) {
                 //noinspection unchecked
-                return (T) value;
+                return (T) currentValue;
             }
+            current = current.parent;
         }
         return null;
     }
