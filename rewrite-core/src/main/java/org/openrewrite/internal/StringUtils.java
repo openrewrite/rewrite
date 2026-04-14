@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 public class StringUtils {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
+    private static final Pattern URI_PROTOCOL_PATTERN = Pattern.compile("(?<!\\\\)://");
 
     private StringUtils() {
     }
@@ -177,9 +178,19 @@ public class StringUtils {
         if (string == null || string.isEmpty()) {
             return true;
         }
-        for (int i = 0; i < string.length(); i++) {
-            if (!Character.isWhitespace(string.charAt(i))) {
+        int len = string.length();
+        for (int i = 0; i < len; i++) {
+            char c = string.charAt(i);
+            // Fast-path for ASCII: avoid Character.isWhitespace() overhead
+            if (c <= 0x7F) {
+                if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\u000B') {
+                    continue;
+                }
                 return false;
+            } else {
+                if (!Character.isWhitespace(c)) {
+                    return false;
+                }
             }
         }
         return true;
@@ -526,18 +537,16 @@ public class StringUtils {
     }
 
     public static String indent(String text) {
-        StringBuilder indent = new StringBuilder();
-        for (int i = 0; i < text.length(); i++) {
+        int length = text.length();
+        for (int i = 0; i < length; i++) {
             char c = text.charAt(i);
             if (c == '\n' || c == '\r') {
-                return indent.toString();
-            } else if (Character.isWhitespace(c)) {
-                indent.append(c);
-            } else {
-                return indent.toString();
+                return text.substring(0, i);
+            } else if (!Character.isWhitespace(c)) {
+                return text.substring(0, i);
             }
         }
-        return indent.toString();
+        return text;
     }
 
     /**
@@ -700,13 +709,14 @@ public class StringUtils {
         boolean inSingleLineComment = false;
 
         int length = source.length();
+        char[] chars = source.toCharArray();
         for (; cursor < length; cursor++) {
-            char current = source.charAt(cursor);
+            char current = chars[cursor];
             if (inSingleLineComment) {
                 inSingleLineComment = current != '\n';
                 continue;
-            } else if (length > cursor + 1) {
-                char next = source.charAt(cursor + 1);
+            } else if (cursor + 1 < length) {
+                char next = chars[cursor + 1];
                 if (inMultiLineComment) {
                     if (current == '*' && next == '/') {
                         inMultiLineComment = false;
@@ -731,7 +741,7 @@ public class StringUtils {
     }
 
     public static String formatUriForPropertiesFile(String uri) {
-        return uri.replaceAll("(?<!\\\\)://", "\\\\://");
+        return URI_PROTOCOL_PATTERN.matcher(uri).replaceAll("\\\\://");
     }
 
     public static boolean hasLineBreak(@Nullable String s) {
