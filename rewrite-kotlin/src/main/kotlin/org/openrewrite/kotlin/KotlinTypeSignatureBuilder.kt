@@ -607,16 +607,21 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     private fun javaPrimitiveSignature(type: JavaPrimitiveType): String {
+        // Use the primitive keyword (e.g. "int", "boolean") rather than the boxed FQN —
+        // the type cache is keyed by signature, and JavaType.Primitive.Int.className is
+        // "java.lang.Integer", which collides with the java.lang.Integer class entry
+        // (written by javaClassType) and causes the cache to hand back the boxed Class
+        // when asked for the primitive.
         return when (type.type) {
-            PrimitiveType.BOOLEAN -> JavaType.Primitive.Boolean.className
-            PrimitiveType.BYTE -> JavaType.Primitive.Byte.className
-            PrimitiveType.CHAR -> JavaType.Primitive.Char.className
-            PrimitiveType.DOUBLE -> JavaType.Primitive.Double.className
-            PrimitiveType.FLOAT -> JavaType.Primitive.Float.className
-            PrimitiveType.INT -> JavaType.Primitive.Int.className
-            PrimitiveType.LONG -> JavaType.Primitive.Long.className
-            PrimitiveType.SHORT -> JavaType.Primitive.Short.className
-            null -> JavaType.Primitive.Void.className
+            PrimitiveType.BOOLEAN -> JavaType.Primitive.Boolean.keyword
+            PrimitiveType.BYTE -> JavaType.Primitive.Byte.keyword
+            PrimitiveType.CHAR -> JavaType.Primitive.Char.keyword
+            PrimitiveType.DOUBLE -> JavaType.Primitive.Double.keyword
+            PrimitiveType.FLOAT -> JavaType.Primitive.Float.keyword
+            PrimitiveType.INT -> JavaType.Primitive.Int.keyword
+            PrimitiveType.LONG -> JavaType.Primitive.Long.keyword
+            PrimitiveType.SHORT -> JavaType.Primitive.Short.keyword
+            null -> JavaType.Primitive.Void.keyword
         }
     }
 

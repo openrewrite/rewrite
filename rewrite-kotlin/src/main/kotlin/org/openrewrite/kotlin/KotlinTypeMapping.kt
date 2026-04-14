@@ -708,6 +708,13 @@ class KotlinTypeMapping(
                 javaMethod.isAbstract
             )
         }
+        // The JVM reuses bit 7 for both ACC_TRANSIENT (fields) and ACC_VARARGS (methods).
+        // OpenRewrite's Flag keeps them separate — Transient at bit 7, Varargs at bit 34.
+        // Rewrite the bit for method contexts so downstream dedup / recipes see Varargs.
+        if (methodFlags and (1L shl 7) != 0L) {
+            methodFlags = methodFlags and (1L shl 7).inv()
+            methodFlags = methodFlags or (1L shl 34) // Varargs
+        }
         // Align with the Java parser: instance methods on an interface are always Abstract
         // (even when they have a default body); additionally, non-abstract instance methods
         // on an interface are default methods, which the Java parser marks with bit 43.
@@ -740,6 +747,11 @@ class KotlinTypeMapping(
             return null
         }
         val returnType = type(javaMethod.returnType)
+        if (javaMethod.name.asString() == "intValue" || javaMethod.name.asString() == "hashCode") {
+            val rt = javaMethod.returnType
+            val sig = if (rt != null) signatureBuilder.signature(rt) else "null"
+            System.err.println("DEBUG intValue: returnType=$returnType class=${returnType.javaClass.simpleName} rawClass=${rt?.javaClass?.name} sig=$sig")
+        }
         var parameterTypes: MutableList<JavaType>? = null
         if (javaMethod.valueParameters.isNotEmpty()) {
             parameterTypes = ArrayList(javaMethod.valueParameters.size)
@@ -921,6 +933,20 @@ class KotlinTypeMapping(
      * The Java parser produces the JVM FQNs directly, so when Kotlin's FIR resolves a type to
      * a Kotlin builtin, we remap it to its JVM equivalent so cross-parser dedup can match them.
      */
+    /**
+     * Construct a JVM-style fully-qualified name for a binary Java class, where nested
+     * classes are separated by `$` from their containing class. Kotlin's
+     * `BinaryJavaClass.fqName` uses `.` throughout, which conflicts with the Java parser's
+     * output and prevents nested classes (e.g. `java.util.Map$Entry`) from dedup-matching.
+     */
+    private fun toJvmFqn(type: BinaryJavaClass): String {
+        val outer = type.outerClass
+        if (outer != null) {
+            return toJvmFqn(outer as BinaryJavaClass) + "$" + type.name.asString()
+        }
+        return type.fqName.asString()
+    }
+
     private fun remapKotlinBuiltin(fq: FullyQualified): FullyQualified {
         // For a Parameterized (e.g. kotlin.Enum<Foo>) remap the underlying raw type but
         // keep the parameterization so we don't lose type argument information.
@@ -1107,7 +1133,11 @@ class KotlinTypeMapping(
         if (type !is BinaryJavaClass) {
             throw UnsupportedOperationException("Unsupported JavaClassifier: ${type.javaClass.name}")
         }
-        val fqn = type.fqName.asString()
+        // Use the JVM-style FQN so nested classes appear as `Outer$Inner` rather than
+        // `Outer.Inner`. The Java parser (and recipes that match on FQN) uses the
+        // dollar-separated form; without this, a nested class surfaces under two
+        // different names depending on parser and never dedups.
+        val fqn = toJvmFqn(type)
         var clazz = typeCache.get<Class>(fqn)
         if (clazz == null) {
             var flags = type.access.toLong()
@@ -1125,7 +1155,7 @@ class KotlinTypeMapping(
             clazz = Class(
                 null,
                 flags,
-                type.fqName.asString(),
+                fqn,
                 when {
                     type.isAnnotationType -> FullyQualified.Kind.Annotation
                     type.isEnum -> FullyQualified.Kind.Enum
@@ -1221,6 +1251,16 @@ class KotlinTypeMapping(
     }
 
     private fun javaClassType(type: JavaClassifierType, signature: String): JavaType? {
+        // When the classifier is a type parameter (e.g. the `S` return type on a method
+        // declared with `<S extends BaseStream<T, S>>`), resolving it gives a
+        // GenericTypeVariable rather than a FullyQualified. A JavaClassifierType whose
+        // classifier is a type parameter can never be parameterized in its own right
+        // (type parameters don't take type arguments), so return the GTV directly —
+        // otherwise we fall through to a null FullyQualified and the enclosing
+        // `type()` returns Unknown, which breaks F-bounded generic resolution.
+        if (type.classifier is JavaTypeParameter && type.typeArguments.isEmpty()) {
+            return type(type.classifier!!)
+        }
         var clazz : FullyQualified?
         clazz = if (type.classifier != null) {
             TypeUtils.asFullyQualified(type(type.classifier!!))
@@ -1266,18 +1306,25 @@ class KotlinTypeMapping(
             }
         }
         val defaultValues: List<String>? = null
+        var constructorFlags = if (constructor is BinaryJavaConstructor) {
+            constructor.access.toLong()
+        } else {
+            convertToFlagsBitMap(
+                constructor.visibility,
+                constructor.isStatic,
+                constructor.isFinal,
+                constructor.isAbstract
+            )
+        }
+        // JVM bit 7 means ACC_VARARGS on methods/constructors; OpenRewrite represents Varargs
+        // at bit 34 so it doesn't collide with the field-only ACC_TRANSIENT at bit 7.
+        if (constructorFlags and (1L shl 7) != 0L) {
+            constructorFlags = constructorFlags and (1L shl 7).inv()
+            constructorFlags = constructorFlags or (1L shl 34)
+        }
         val method = Method(
             null,
-            (if (constructor is BinaryJavaConstructor) {
-                constructor.access.toLong()
-            } else {
-                convertToFlagsBitMap(
-                    constructor.visibility,
-                    constructor.isStatic,
-                    constructor.isFinal,
-                    constructor.isAbstract
-                )
-            }),
+            constructorFlags,
             null,
             "<constructor>",
             null,
