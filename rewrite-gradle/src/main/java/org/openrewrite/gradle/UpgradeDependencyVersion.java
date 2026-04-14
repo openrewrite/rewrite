@@ -317,6 +317,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             private final UpdateProperties updateProperties = new UpdateProperties(acc);
             @Nullable
             private JavaSourceSetUpdater jssUpdater;
+            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
 
             @Override
             public boolean isAcceptable(SourceFile sf, ExecutionContext ctx) {
@@ -403,33 +404,31 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (oldDeps == null || oldDeps.isEmpty()) {
                     return sf;
                 }
-                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-                if (!maybeSourceSet.isPresent() || maybeSourceSet.get().getGavToTypes().isEmpty()) {
-                    return sf;
-                }
                 if (jssUpdater == null) {
                     jssUpdater = new JavaSourceSetUpdater(ctx);
                 }
-                JavaSourceSet sourceSet = maybeSourceSet.get();
-                for (ResolvedDependency oldDep : oldDeps) {
-                    GroupArtifact ga = new GroupArtifact(oldDep.getGroupId(), oldDep.getArtifactId());
-                    Object newVersionObj = acc.gaToNewVersion.get(ga);
-                    if (!(newVersionObj instanceof String)) {
-                        continue;
+                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
+                    if (sourceSet.getGavToTypes().isEmpty()) {
+                        return sourceSet;
                     }
-                    String resolvedNewVersion = (String) newVersionObj;
-                    ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
-                            oldDep.getGav().getRepository(),
-                            oldDep.getGroupId(), oldDep.getArtifactId(), resolvedNewVersion, null);
-                    ResolvedDependency newDep = oldDep
-                            .withGav(newGav)
-                            .withRepository(MavenRepository.MAVEN_CENTRAL);
-                    sourceSet = jssUpdater.changeDependency(sourceSet, oldDep, newDep);
-                }
-                if (sourceSet != maybeSourceSet.get()) {
-                    return sf.withMarkers(sf.getMarkers().setByType(sourceSet));
-                }
-                return sf;
+                    JavaSourceSet result = sourceSet;
+                    for (ResolvedDependency oldDep : oldDeps) {
+                        GroupArtifact ga = new GroupArtifact(oldDep.getGroupId(), oldDep.getArtifactId());
+                        Object newVersionObj = acc.gaToNewVersion.get(ga);
+                        if (!(newVersionObj instanceof String)) {
+                            continue;
+                        }
+                        String resolvedNewVersion = (String) newVersionObj;
+                        ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
+                                oldDep.getGav().getRepository(),
+                                oldDep.getGroupId(), oldDep.getArtifactId(), resolvedNewVersion, null);
+                        ResolvedDependency newDep = oldDep
+                                .withGav(newGav)
+                                .withRepository(MavenRepository.MAVEN_CENTRAL);
+                        result = jssUpdater.changeDependency(result, oldDep, newDep);
+                    }
+                    return result;
+                });
             }
         };
     }

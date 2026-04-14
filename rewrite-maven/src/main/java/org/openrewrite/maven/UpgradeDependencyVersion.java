@@ -616,6 +616,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Nullable
             private JavaSourceSetUpdater updater;
+            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -650,10 +651,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (newVersion == null) {
                     return sf;
                 }
-                Optional<JavaSourceSet> maybeSourceSet = sf.getMarkers().findFirst(JavaSourceSet.class);
-                if (!maybeSourceSet.isPresent() || maybeSourceSet.get().getGavToTypes().isEmpty()) {
-                    return sf;
-                }
                 if (updater == null) {
                     updater = new JavaSourceSetUpdater(ctx);
                 }
@@ -663,11 +660,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 ResolvedDependency newDep = oldDep
                         .withGav(newGav)
                         .withRepository(findRemoteRepository(maybeJp.get()));
-                JavaSourceSet updated = updater.changeDependency(maybeSourceSet.get(), oldDep, newDep);
-                if (updated != maybeSourceSet.get()) {
-                    return sf.withMarkers(sf.getMarkers().setByType(updated));
-                }
-                return sf;
+                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet ->
+                        sourceSet.getGavToTypes().isEmpty() ? sourceSet :
+                                updater.changeDependency(sourceSet, oldDep, newDep));
             }
 
             private MavenRepository findRemoteRepository(JavaProject jp) {
