@@ -271,14 +271,15 @@ func rightPaddedFromElement(elem any, after tree.Space, markers tree.Markers) an
 	// Types implementing both: MethodInvocation, Assignment, Unary, MethodDeclaration, etc.
 	//
 	// For the bidirectional RPC, the container type determines which variant is needed.
-	// Since most containers in the RPC protocol use Expression (arguments, conditions),
-	// and Statement-only containers are mostly for block bodies, we check Statement FIRST
-	// and fall back to Expression. The caller (container update) will handle the type assertion.
-	if stmt, ok := elem.(tree.Statement); ok {
-		return tree.RightPadded[tree.Statement]{Element: stmt, After: after, Markers: markers}
-	}
+	// We prefer Expression over Statement because most RPC containers (arguments,
+	// conditions, return expressions) expect Expression, and types like MethodInvocation
+	// implement both interfaces. Statement-only containers (block bodies) use
+	// coerceToStatementRP to convert as needed.
 	if expr, ok := elem.(tree.Expression); ok {
 		return tree.RightPadded[tree.Expression]{Element: expr, After: after, Markers: markers}
+	}
+	if stmt, ok := elem.(tree.Statement); ok {
+		return tree.RightPadded[tree.Statement]{Element: stmt, After: after, Markers: markers}
 	}
 	if j, ok := elem.(tree.J); ok {
 		return tree.RightPadded[tree.J]{Element: j, After: after, Markers: markers}

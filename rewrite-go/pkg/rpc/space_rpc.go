@@ -165,9 +165,9 @@ func sendMarkerCodecFields(v any, q *SendQueue) {
 	case tree.TypeSwitchGuard:
 		q.GetAndSend(m, func(x any) any { return x.(tree.TypeSwitchGuard).Ident.String() }, nil)
 	case tree.StructTag:
-		// StructTag.rpcSend sends: id (UUID string), tag (J.Literal)
+		// StructTag.rpcSend sends: id (UUID string), tag valueSource (string)
 		q.GetAndSend(m, func(x any) any { return x.(tree.StructTag).Ident.String() }, nil)
-		q.GetAndSend(m, func(x any) any { return x.(tree.StructTag).Tag }, nil)
+		q.GetAndSend(m, func(x any) any { return x.(tree.StructTag).Tag.Source }, nil)
 	case tree.TrailingComma:
 		// TrailingComma.rpcSend sends: id (UUID string), before whitespace, after whitespace
 		q.GetAndSend(m, func(x any) any { return x.(tree.TrailingComma).Ident.String() }, nil)
@@ -352,14 +352,22 @@ func receiveMarkersCodec(q *ReceiveQueue, before tree.Markers) tree.Markers {
 					m.Ident = parsed
 				}
 			}
-			// Tag is a J.Literal — Java sends it as an inline value (no codec).
-			// Read the value and convert from JSON map to Literal if needed.
-			tagResult := q.Receive(m.Tag, nil)
-			if tagResult != nil {
-				if lit, ok := tagResult.(*tree.Literal); ok {
-					m.Tag = lit
+			// Java now sends just the valueSource string instead of the full Literal.
+			// Receive it and reconstruct the Literal with the updated source.
+			var beforeSource string
+			if m.Tag != nil {
+				beforeSource = m.Tag.Source
+			}
+			valueSource := receiveScalar[string](q, beforeSource)
+			if m.Tag != nil {
+				tag := *m.Tag
+				tag.Source = valueSource
+				m.Tag = &tag
+			} else {
+				m.Tag = &tree.Literal{
+					ID:     uuid.New(),
+					Source: valueSource,
 				}
-				// If it's a map or other type from JSON, leave Tag as is
 			}
 			return m
 		case tree.TrailingComma:
