@@ -418,6 +418,11 @@ class KotlinTypeMapping(
                 }
                 else -> {}
             }
+            // Nested interfaces and annotation types are always implicitly static on the JVM.
+            if (firClass.symbol.classId.isNestedClass &&
+                (firClass.classKind == ClassKind.INTERFACE || firClass.classKind == ClassKind.ANNOTATION_CLASS)) {
+                flags = flags or (1L shl 3) // Static
+            }
             clazz = Class(
                 null,
                 flags,
@@ -740,6 +745,16 @@ class KotlinTypeMapping(
                 methodFlags = methodFlags or (1L shl 43) // Default
             }
         }
+        // Methods annotated with @java.lang.invoke.MethodHandle.PolymorphicSignature
+        // (the invoke/invokeExact methods on MethodHandle, and compareAndExchange et al.
+        // on VarHandle) carry Flag.SignaturePolymorphic in the Java parser output.
+        for (ann in javaMethod.annotations) {
+            val classId = ann.classId
+            if (classId != null && "java.lang.invoke.MethodHandle.PolymorphicSignature" == classId.asSingleFqName().asString()) {
+                methodFlags = methodFlags or (1L shl 46) // SignaturePolymorphic
+                break
+            }
+        }
         val method = Method(
             null,
             methodFlags,
@@ -944,6 +959,60 @@ class KotlinTypeMapping(
      * The Java parser produces the JVM FQNs directly, so when Kotlin's FIR resolves a type to
      * a Kotlin builtin, we remap it to its JVM equivalent so cross-parser dedup can match them.
      */
+    /**
+     * Synthesize the enum `static T[] values()` method that the Java compiler generates
+     * for every enum class. The Kotlin parser only sees source-declared methods, so
+     * cross-parser dedup of enum types needs these added back.
+     */
+    private fun enumValuesMethod(declaringType: Class): Method {
+        // ACC_PUBLIC | ACC_STATIC (matches the Java parser's output)
+        val flags = 1L or (1L shl 3)
+        val method = Method(
+            null, flags, null, "values", null,
+            null as MutableList<String>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?,
+            null as MutableList<String>?,
+            null as MutableList<String>?
+        )
+        val array = Array(null, null, null)
+        array.unsafeSet(declaringType, null)
+        method.unsafeSet(
+            declaringType, array as JavaType,
+            null as MutableList<JavaType>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?
+        )
+        return method
+    }
+
+    /**
+     * Synthesize the enum `static T valueOf(String)` method that the Java compiler
+     * generates for every enum class.
+     */
+    private fun enumValueOfMethod(declaringType: Class): Method {
+        // ACC_PUBLIC | ACC_STATIC
+        val flags = 1L or (1L shl 3)
+        val method = Method(
+            null, flags, null, "valueOf", null,
+            mutableListOf("name"),
+            null as MutableList<JavaType>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?,
+            null as MutableList<String>?,
+            null as MutableList<String>?
+        )
+        val stringType: JavaType = typeCache.get<FullyQualified>("java.lang.String") ?: ShallowClass.build("java.lang.String")
+        val params: MutableList<JavaType> = mutableListOf(stringType)
+        method.unsafeSet(
+            declaringType, declaringType as JavaType, params,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?
+        )
+        return method
+    }
+
     /**
      * Resolve a Kotlin cone type to its declaring-class form (always {@link FullyQualified}),
      * bypassing the primitive remap that {@link #type(Any?, Any?, String)} normally applies
@@ -1194,6 +1263,15 @@ class KotlinTypeMapping(
             if (type.isEnum) {
                 flags = flags or (1L shl 14) // Enum
             }
+            // JVM nested interfaces and annotation types are always implicitly static
+            // (only concrete classes can be inner classes). The ACC_STATIC bit is stored
+            // in the InnerClasses attribute and not on BinaryJavaClass.access, so apply it
+            // here to match the Java parser. Detect nesting via the `$`-separated JVM FQN
+            // since Kotlin's BinaryJavaClass.outerClass may not be populated for some
+            // synthetic/library classes.
+            if (fqn.contains('$') && (type.isInterface || type.isAnnotationType)) {
+                flags = flags or (1L shl 3) // Static
+            }
             clazz = Class(
                 null,
                 flags,
@@ -1258,6 +1336,16 @@ class KotlinTypeMapping(
                         }
                     }
                 }
+            }
+            // The JVM adds synthetic `static T[] values()` and `static T valueOf(String)`
+            // methods to every enum class. Kotlin's BinaryJavaClass only surfaces methods
+            // declared in source, so synthesize them here to match the Java parser.
+            if (type.isEnum) {
+                if (methods == null) {
+                    methods = ArrayList()
+                }
+                methods.add(enumValuesMethod(clazz))
+                methods.add(enumValueOfMethod(clazz))
             }
             var typeParameters: MutableList<JavaType>? = null
             if (type.typeParameters.isNotEmpty()) {
