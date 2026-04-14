@@ -50,6 +50,7 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api")
     implementation("org.apache.commons:commons-text:latest.release")
+    implementation("io.github.classgraph:classgraph:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 

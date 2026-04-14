@@ -123,10 +123,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         this.recipeLoader = new RecipeLoader(classLoader);
 
         this.performScan = () -> {
-            Map<String, String> jarClasses = new HashMap<>();
-            buildSuperclassMapFromPath(jar, jarClasses);
-            sharedSuperclassMap.putAll(jarClasses);
-            configureRecipesAndStyles(jarClasses, sharedSuperclassMap, classLoader);
+            configureRecipesAndStyles(sharedSuperclassMap.scan(jar), classLoader);
             scanYaml(listYamlResourcesFromPath(jar), properties, dependencyResourceLoaders, classLoader);
         };
     }
@@ -166,15 +163,29 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     // ---- Class hierarchy scanning via ASM ----
 
+    private static final Set<String> SKIP_CLASS_PREFIXES = new HashSet<>(Arrays.asList(
+            "java/", "javax/", "com/sun/", "sun/", "jdk/", "org/w3c/", "org/xml/", "org/ietf/"
+    ));
+
+    private static boolean shouldSkipClassEntry(String entryName) {
+        for (String prefix : SKIP_CLASS_PREFIXES) {
+            if (entryName.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Builds a map of className -> superClassName by reading class bytecode headers from
      * all URLs in a classloader. Only reads the first few bytes of each class file via ASM's
      * ClassReader to extract the superclass — no full parsing or class loading required.
      */
     private static Map<String, String> buildSuperclassMapFromClassLoader(ClassLoader classLoader) {
+        Set<String> scannedPaths = new HashSet<>();
         Map<String, String> superclassMap = new HashMap<>();
         for (Path path : classpathEntriesOf(classLoader)) {
-            buildSuperclassMapFromPath(path, superclassMap);
+            buildSuperclassMapFromPath(path, superclassMap, scannedPaths);
         }
         return superclassMap;
     }
@@ -209,19 +220,30 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * Builds a map of className -> superClassName from a JAR file or directory.
      */
     private static void buildSuperclassMapFromPath(Path path, Map<String, String> superclassMap) {
+        buildSuperclassMapFromPath(path, superclassMap, null);
+    }
+
+    private static void buildSuperclassMapFromPath(Path path, Map<String, String> superclassMap, @Nullable Set<String> scannedPaths) {
+        try {
+            String canonicalPath = path.toAbsolutePath().normalize().toString();
+            if (scannedPaths != null && !scannedPaths.add(canonicalPath)) {
+                return;
+            }
+        } catch (Exception ignored) {
+        }
         if (Files.isDirectory(path)) {
             try {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                        if (file.toString().endsWith(".class") && !file.toString().contains("module-info")) {
+                        String fileName = file.toString();
+                        if (fileName.endsWith(".class") && !fileName.contains("module-info")) {
+                            String relative = path.relativize(file).toString();
+                            if (shouldSkipClassEntry(relative)) {
+                                return FileVisitResult.CONTINUE;
+                            }
                             try (InputStream is = Files.newInputStream(file)) {
-                                ClassReader cr = new ClassReader(is);
-                                String className = cr.getClassName().replace('/', '.');
-                                String superName = cr.getSuperName();
-                                if (superName != null) {
-                                    superclassMap.put(className, superName.replace('/', '.'));
-                                }
+                                readSuperclass(is, superclassMap);
                             } catch (IOException | IllegalArgumentException ignored) {
                             }
                         }
@@ -236,14 +258,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 while (entries.hasMoreElements()) {
                     JarEntry entry = entries.nextElement();
                     String name = entry.getName();
-                    if (name.endsWith(".class") && !name.contains("module-info") && !entry.isDirectory()) {
+                    if (name.endsWith(".class") && !name.contains("module-info") && !entry.isDirectory()
+                            && !shouldSkipClassEntry(name)) {
                         try (InputStream is = jarFile.getInputStream(entry)) {
-                            ClassReader cr = new ClassReader(is);
-                            String className = cr.getClassName().replace('/', '.');
-                            String superName = cr.getSuperName();
-                            if (superName != null) {
-                                superclassMap.put(className, superName.replace('/', '.'));
-                            }
+                            readSuperclass(is, superclassMap);
                         } catch (IOException | IllegalArgumentException ignored) {
                         }
                     }
@@ -253,34 +271,64 @@ public class ClasspathScanningLoader implements ResourceLoader {
         }
     }
 
+    private static void readSuperclass(InputStream is, Map<String, String> superclassMap) throws IOException {
+        ClassReader cr = new ClassReader(is);
+        String superName = cr.getSuperName();
+        if (superName != null) {
+            String superClassName = superName.replace('/', '.');
+            // Don't store entries whose superclass is a JDK terminal — isSubclassOf
+            // will short-circuit on these prefixes anyway, so they just waste map space.
+            if (!superClassName.startsWith("java.") && !superClassName.startsWith("javax.") &&
+                    !superClassName.startsWith("com.sun.") && !superClassName.startsWith("sun.") &&
+                    !superClassName.startsWith("jdk.")) {
+                superclassMap.put(cr.getClassName().replace('/', '.'), superClassName);
+            }
+        }
+    }
+
     /**
      * A map that lazily resolves superclass names by reading class bytecode from the classloader.
      * Entries from the seed map are returned directly; missing entries are resolved on demand
      * by finding the .class resource via the classloader and reading its header with ASM.
      */
-    static class ClassLoaderBackedSuperclassMap extends HashMap<String, String> {
+    static class ClassLoaderBackedSuperclassMap {
         private static final String NOT_FOUND = "\0";
+        private final Map<String, String> delegate = new HashMap<>();
         private final ClassLoader classLoader;
+        private final Set<String> scannedPaths = new HashSet<>();
 
         ClassLoaderBackedSuperclassMap(Map<String, String> seed, ClassLoader classLoader) {
-            super(seed);
+            delegate.putAll(seed);
             this.classLoader = classLoader;
         }
 
-        @Override
-        public @Nullable String get(Object key) {
-            String result = super.get(key);
+        public @Nullable String get(String key) {
+            String result = delegate.get(key);
             if (result != null) {
                 return NOT_FOUND.equals(result) ? null : result;
             }
-            if (key instanceof String) {
-                String className = (String) key;
-                String resolved = resolveSuperclass(className);
-                // Cache both positive and negative results to avoid repeated lookups
-                put(className, resolved != null ? resolved : NOT_FOUND);
-                return resolved;
-            }
-            return null;
+            String resolved = resolveSuperclass(key);
+            // Cache both positive and negative results to avoid repeated lookups
+            delegate.put(key, resolved != null ? resolved : NOT_FOUND);
+            return resolved;
+        }
+
+        public void putAll(Map<String, String> m) {
+            delegate.putAll(m);
+        }
+
+        /**
+         * Scan a path for class files, merge the results into this map, and track
+         * the path to avoid duplicate scanning.
+         *
+         * @return a {@link Scan} bundling the classes found in this specific path
+         * (the candidates) together with this hierarchy map.
+         */
+        public Scan scan(Path path) {
+            Map<String, String> classes = new HashMap<>();
+            buildSuperclassMapFromPath(path, classes, scannedPaths);
+            delegate.putAll(classes);
+            return new Scan(classes, this);
         }
 
         private @Nullable String resolveSuperclass(String className) {
@@ -297,10 +345,22 @@ public class ClasspathScanningLoader implements ResourceLoader {
         }
     }
 
-    private static final Set<String> RECIPE_SUPERCLASS_NAMES = new HashSet<>(Arrays.asList(
-            Recipe.class.getName(),
-            "org.openrewrite.ScanningRecipe"
-    ));
+    /**
+     * The result of scanning a path: the classes discovered in that path (candidates for
+     * recipe/style registration) together with the hierarchy map used to trace superclass
+     * chains across all previously scanned paths.
+     */
+    static class Scan {
+        final Map<String, String> candidates;
+        final ClassLoaderBackedSuperclassMap hierarchy;
+
+        Scan(Map<String, String> candidates, ClassLoaderBackedSuperclassMap hierarchy) {
+            this.candidates = candidates;
+            this.hierarchy = hierarchy;
+        }
+    }
+
+    private static final String RECIPE_SUPERCLASS_NAME = Recipe.class.getName();
 
     private static final String NAMED_STYLES_NAME = NamedStyles.class.getName();
 
@@ -308,10 +368,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * Walk the superclass chain in the map to determine if a class transitively
      * extends one of the target superclasses.
      */
-    private static boolean isSubclassOf(String className, Set<String> targetSuperclasses, Map<String, String> superclassMap) {
+    private static boolean isSubclassOf(String className, String targetSuperclass, ClassLoaderBackedSuperclassMap superclassMap) {
         String current = className;
         while (current != null) {
-            if (targetSuperclasses.contains(current)) {
+            if (targetSuperclass.equals(current)) {
                 return true;
             }
             if (current.startsWith("java.") || current.startsWith("com.sun.") ||
@@ -400,18 +460,19 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * Configure recipes and styles where candidates and hierarchy are in the same map.
      */
     private void configureRecipesAndStyles(Map<String, String> superclassMap, ClassLoader classLoader) {
-        configureRecipesAndStyles(superclassMap, superclassMap, classLoader);
+        configureRecipesAndStyles(new Scan(superclassMap, new ClassLoaderBackedSuperclassMap(superclassMap, classLoader)), classLoader);
     }
 
     /**
-     * Configure recipes and styles. Candidates are the classes to consider; the hierarchy
-     * map is used to trace superclass chains (may include classes from dependencies).
+     * Configure recipes and styles. The scan provides both the candidate classes to
+     * consider and the hierarchy map used to trace superclass chains (which may
+     * include classes from dependencies).
      */
-    private void configureRecipesAndStyles(Map<String, String> candidates, Map<String, String> hierarchyMap, ClassLoader classLoader) {
+    private void configureRecipesAndStyles(Scan scan, ClassLoader classLoader) {
         Set<String> configured = new HashSet<>();
 
-        for (String name : candidates.keySet()) {
-            if (isSubclassOf(name, RECIPE_SUPERCLASS_NAMES, hierarchyMap)) {
+        for (String name : scan.candidates.keySet()) {
+            if (isSubclassOf(name, RECIPE_SUPERCLASS_NAME, scan.hierarchy)) {
                 try {
                     Class<?> cls = classLoader.loadClass(name);
                     if (!cls.getName().equals(DeclarativeRecipe.class.getName()) &&
@@ -421,7 +482,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     }
                 } catch (ClassNotFoundException | LinkageError ignored) {
                 }
-            } else if (isSubclassOf(name, Collections.singleton(NAMED_STYLES_NAME), hierarchyMap)) {
+            } else if (isSubclassOf(name, NAMED_STYLES_NAME, scan.hierarchy)) {
                 try {
                     Class<?> cls = classLoader.loadClass(name);
                     if ((cls.getModifiers() & Modifier.PUBLIC) != 0 &&
