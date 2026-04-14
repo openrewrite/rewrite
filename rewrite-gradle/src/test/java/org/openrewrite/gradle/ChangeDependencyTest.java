@@ -32,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.properties.Assertions.properties;
 
 class ChangeDependencyTest implements RewriteTest {
@@ -1140,6 +1142,52 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyWhenJavaSourcesPresent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          mavenProject("sample",
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "commons-lang:commons-lang:2.6"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "org.apache.commons:commons-lang3:3.11"
+                }
+                """
+            ),
+            java(
+              """
+                class A {
+                    String foo(String s) {
+                        return s;
+                    }
+                }
+                """
+            )
           )
         );
     }

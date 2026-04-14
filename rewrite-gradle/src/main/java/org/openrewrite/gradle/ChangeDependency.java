@@ -546,8 +546,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                     return tree;
                 }
-                // For Java source files, update JavaSourceSet marker
-                if (hasModulesWithOldDep && tree instanceof JavaSourceFile) {
+                // Update JavaSourceSet marker on source files that have one
+                if (hasModulesWithOldDep && tree instanceof SourceFile &&
+                    ((SourceFile) tree).getMarkers().findFirst(JavaSourceSet.class).isPresent()) {
                     return updateJavaSourceSet((SourceFile) tree, ctx);
                 }
                 return gradleVisitor.visit(tree, ctx);
