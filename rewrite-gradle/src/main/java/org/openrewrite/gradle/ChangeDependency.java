@@ -546,17 +546,9 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                     return tree;
                 }
-                // Gradle build scripts implement JavaSourceFile but must be handled by gradleVisitor,
-                // not routed to updateJavaSourceSet. Check source path to distinguish .gradle/.gradle.kts
-                // build scripts from regular .groovy/.kt source files that need JavaSourceSet updates.
-                if (tree instanceof SourceFile) {
-                    String path = ((SourceFile) tree).getSourcePath().toString();
-                    if (path.endsWith(".gradle") || path.endsWith(".gradle.kts")) {
-                        return gradleVisitor.visit(tree, ctx);
-                    }
-                }
-                // For Java/Kotlin/Groovy source files, update JavaSourceSet marker
-                if (hasModulesWithOldDep && tree instanceof JavaSourceFile) {
+                // Update JavaSourceSet marker on source files that have one
+                if (hasModulesWithOldDep && tree instanceof SourceFile &&
+                    ((SourceFile) tree).getMarkers().findFirst(JavaSourceSet.class).isPresent()) {
                     return updateJavaSourceSet((SourceFile) tree, ctx);
                 }
                 return gradleVisitor.visit(tree, ctx);
