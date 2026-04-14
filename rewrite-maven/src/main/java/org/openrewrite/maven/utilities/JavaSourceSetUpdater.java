@@ -72,10 +72,13 @@ public class JavaSourceSetUpdater {
                                           ResolvedDependency newDep) {
         String oldGavKey = gavKey(oldDep);
         String newGavKey = gavKey(newDep);
-        // Idempotent: if already changed (old absent, new present), skip
-        if (!sourceSet.getGavToTypes().containsKey(oldGavKey) &&
-            sourceSet.getGavToTypes().containsKey(newGavKey)) {
-            return sourceSet;
+        if (!sourceSet.getGavToTypes().containsKey(oldGavKey)) {
+            // Old dependency not tracked. If gavToTypes is non-empty, other dependencies
+            // are being tracked but this one wasn't — nothing to change. If gavToTypes is
+            // empty, we're in initial population mode (first call on this source set).
+            if (!sourceSet.getGavToTypes().isEmpty() || sourceSet.getGavToTypes().containsKey(newGavKey)) {
+                return sourceSet;
+            }
         }
         sourceSet = sourceSet.removeTypesForGav(oldGavKey);
         List<JavaType.FullyQualified> newTypes = downloadAndScanTypes(newDep);
