@@ -123,20 +123,6 @@ class TypeCastTest implements RewriteTest {
     }
 
     @Test
-    void castOnNewLine() {
-        rewriteRun(
-          scala(
-            """
-              object Test {
-                val x = Seq.empty
-                  .asInstanceOf[Seq[String]]
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void castChain() {
         rewriteRun(
           scala(

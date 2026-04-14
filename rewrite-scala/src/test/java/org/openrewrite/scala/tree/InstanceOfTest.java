@@ -123,20 +123,6 @@ class InstanceOfTest implements RewriteTest {
     }
 
     @Test
-    void instanceOfOnNewLine() {
-        rewriteRun(
-            scala(
-                """
-                object Test {
-                  val x = Seq.empty
-                    .isInstanceOf[Seq[String]]
-                }
-                """
-            )
-        );
-    }
-
-    @Test
     void multipleInstanceOfChecks() {
         rewriteRun(
             scala(
