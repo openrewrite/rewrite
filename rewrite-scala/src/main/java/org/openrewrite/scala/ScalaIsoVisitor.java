@@ -38,8 +38,8 @@ public class ScalaIsoVisitor<P> extends ScalaVisitor<P> {
     }
 
     @Override
-    public S.BlockExpression visitBlockExpression(S.BlockExpression blockExpression, P p) {
-        return (S.BlockExpression) super.visitBlockExpression(blockExpression, p);
+    public J visitStatementExpression(S.StatementExpression statementExpression, P p) {
+        return super.visitStatementExpression(statementExpression, p);
     }
 
     @Override

@@ -126,12 +126,13 @@ class Scala2CompatTest implements RewriteTest {
 
     @Test
     void blockArgumentWithTypedParam() {
+        // In Scala 3, typed lambda params in block args need parentheses: (x: Int) =>
         rewriteRun(
             scala(
                 """
                 object Test {
                   val list = List(1, 2, 3)
-                  list.foreach { x: Int =>
+                  list.foreach { (x: Int) =>
                     println(x)
                   }
                 }
@@ -446,7 +447,6 @@ class Scala2CompatTest implements RewriteTest {
         );
     }
 
-    @org.junit.jupiter.api.Disabled("Context bounds should desugar to implicit params — not yet implemented")
     @Test
     void contextBound() {
         rewriteRun(
@@ -810,7 +810,6 @@ class Scala2CompatTest implements RewriteTest {
         );
     }
 
-    @org.junit.jupiter.api.Disabled("Space before : in type annotation not yet preserved")
     @Test
     void namedGivenSpaceBeforeColon() {
         rewriteRun(

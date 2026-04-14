@@ -20,7 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
@@ -129,22 +128,31 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return w;
     }
 
-    public J visitExpressionStatement(S.ExpressionStatement expressionStatement, P p) {
-        S.ExpressionStatement e = expressionStatement;
-        J j = visit(e.getExpression(), p);
-        if (j instanceof S.ExpressionStatement) {
-            return j;
-        } else if (j instanceof Expression) {
-            return e.withExpression((Expression) j);
-        }
-        return j;
+    public J visitStatementExpression(S.StatementExpression statementExpression, P p) {
+        // Transparent — just visit the inner statement
+        return statementExpression.acceptScala(this, p);
     }
 
-    public J visitBlockExpression(S.BlockExpression blockExpression, P p) {
-        S.BlockExpression b = blockExpression;
-        b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
-        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
-        b = b.withBlock(visitAndCast(b.getBlock(), p));
-        return b;
+    public J visitTypeAscription(S.TypeAscription typeAscription, P p) {
+        S.TypeAscription t = typeAscription;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withExpression(visitAndCast(t.getExpression(), p));
+        t = t.withTypeTree(visitAndCast(t.getTypeTree(), p));
+        return t;
+    }
+
+    public J visitTypeAlias(S.TypeAlias typeAlias, P p) {
+        S.TypeAlias t = typeAlias;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        return t;
+    }
+
+    public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
+        S.PatternDefinition pd = patDef;
+        pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
+        return pd;
     }
 }
