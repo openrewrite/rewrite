@@ -81,6 +81,132 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
+    void detectsNestedBlockIndent() {
+        rewriteRun(
+          withDetectedStyle(TabsAndIndentsStyle.class, style -> {
+              assertThat(style.getUseTabCharacter()).isFalse();
+              assertThat(style.getIndentSize()).isEqualTo(2);
+          }),
+          hcl(
+            """
+            resource "aws_instance" "example" {
+              ami           = "abc-123"
+              instance_type = "t2.micro"
+
+              provisioner "local-exec" {
+                command = "echo hello"
+              }
+
+              tags = {
+                Name = "example"
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void detectsIndentAcrossMultipleFiles() {
+        rewriteRun(
+          withDetectedStyle(TabsAndIndentsStyle.class, style -> {
+              assertThat(style.getUseTabCharacter()).isFalse();
+              assertThat(style.getIndentSize()).isEqualTo(2);
+          }),
+          hcl(
+            """
+            resource "aws_instance" "a" {
+              ami = "abc-123"
+            }
+            """
+          ),
+          hcl(
+            """
+            resource "aws_instance" "b" {
+              ami = "def-456"
+              instance_type = "t2.micro"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void spacesWinOverTabsWhenMajority() {
+        rewriteRun(
+          withDetectedStyle(TabsAndIndentsStyle.class, style ->
+            assertThat(style.getUseTabCharacter()).isFalse()),
+          hcl(
+            """
+            resource "aws_instance" "a" {
+              ami = "abc-123"
+              instance_type = "t2.micro"
+            }
+            """
+          ),
+          hcl(
+            """
+            resource "aws_instance" "b" {
+              ami = "def-456"
+            }
+            """
+          ),
+          hcl(
+            """
+            resource "aws_instance" "c" {
+            TABami = "ghi-789"
+            }
+            """.replaceAll("TAB", "\t")
+          )
+        );
+    }
+
+    @Test
+    void tabsWinOverSpacesWhenMajority() {
+        rewriteRun(
+          withDetectedStyle(TabsAndIndentsStyle.class, style ->
+            assertThat(style.getUseTabCharacter()).isTrue()),
+          hcl(
+            """
+            resource "aws_instance" "a" {
+            TABami = "abc-123"
+            TABinstance_type = "t2.micro"
+            }
+            """.replaceAll("TAB", "\t")
+          ),
+          hcl(
+            """
+            resource "aws_instance" "b" {
+            TABami = "def-456"
+            }
+            """.replaceAll("TAB", "\t")
+          ),
+          hcl(
+            """
+            resource "aws_instance" "c" {
+              ami = "ghi-789"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void defaultsToTwoSpaceWhenNoIndentsDetected() {
+        rewriteRun(
+          withDetectedStyle(TabsAndIndentsStyle.class, style -> {
+              assertThat(style.getUseTabCharacter()).isFalse();
+              assertThat(style.getIndentSize()).isEqualTo(TabsAndIndentsStyle.DEFAULT.getIndentSize());
+          }),
+          hcl(
+            """
+            variable "name" {}
+            """
+          )
+        );
+    }
+
+    @Test
     void detectsLFLineEndings() {
         rewriteRun(
           withDetectedStyle(GeneralFormatStyle.class, style ->
@@ -91,6 +217,17 @@ class AutodetectTest implements RewriteTest {
               ami = "abc-123"
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void detectsCRLFLineEndings() {
+        rewriteRun(
+          withDetectedStyle(GeneralFormatStyle.class, style ->
+            assertThat(style.isUseCRLFNewLines()).isTrue()),
+          hcl(
+            "resource \"aws_instance\" \"example\" {\r\n  ami = \"abc-123\"\r\n}\r\n"
           )
         );
     }
