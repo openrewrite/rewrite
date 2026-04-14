@@ -339,13 +339,14 @@ func (n *Return) WithMarkers(markers Markers) *Return {
 // If represents an if statement.
 // In Go, if can have an init statement: `if init; cond { }`.
 type If struct {
-	ID        uuid.UUID
-	Prefix    Space
-	Markers   Markers
-	Init      *RightPadded[Statement] // nil if no init; After = space before `;`
-	Condition Expression
-	Then      *Block
-	ElsePart  *RightPadded[J] // nil if no else clause
+	ID          uuid.UUID
+	Prefix      Space
+	Markers     Markers
+	Init        *RightPadded[Statement] // nil if no init; After = space before `;`
+	Condition   Expression
+	ConditionCP *ControlParentheses // cached ControlParentheses from RPC round-trip
+	Then        *Block
+	ElsePart    *RightPadded[J] // nil if no else clause
 }
 
 func (*If) isTree()      {}
