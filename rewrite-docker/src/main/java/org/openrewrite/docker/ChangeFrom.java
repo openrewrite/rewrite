@@ -25,9 +25,11 @@ import org.openrewrite.docker.tree.Space;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
@@ -96,7 +98,9 @@ public class ChangeFrom extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the base image in a Dockerfile FROM instruction.";
+        return "Change the base image in a Dockerfile FROM instruction. " +
+                "Each `*` in an `old*` glob is a positional capture; `$N` in the paired `new*` substitutes capture N. " +
+                "`$0` substitutes the full original value; `\\$` is a literal dollar.";
     }
 
     @Override
@@ -109,6 +113,24 @@ public class ChangeFrom extends Recipe {
         if (newImageName != null && newImageName.isEmpty()) {
             validated = validated.and(Validated.invalid("newImageName", newImageName,
                     "newImageName cannot be empty; omit to preserve the existing name"));
+        }
+        validated = validateBackrefs(validated, "newImageName", newImageName, oldImageName);
+        validated = validateBackrefs(validated, "newTag", newTag, oldTag);
+        validated = validateBackrefs(validated, "newDigest", newDigest, oldDigest);
+        validated = validateBackrefs(validated, "newPlatform", newPlatform, oldPlatform);
+        return validated;
+    }
+
+    private static Validated<Object> validateBackrefs(Validated<Object> validated, String field,
+                                                     @Nullable String template, @Nullable String oldPattern) {
+        int highest = highestBackref(template);
+        if (highest > 0) {
+            int captures = countCaptures(oldPattern);
+            if (highest > captures) {
+                validated = validated.and(Validated.invalid(field, template,
+                        String.format("%s references $%d but the paired old-field pattern has only %d capture group(s).",
+                                field, highest, captures)));
+            }
         }
         return validated;
     }
@@ -136,12 +158,18 @@ public class ChangeFrom extends Recipe {
             String currentDigest = image.getDigest();
             String currentPlatform = image.getPlatform();
 
-            boolean imageNameChanged = newImageName != null && !currentImageName.equals(newImageName);
-            boolean tagChanged = newTag != null && !newTag.equals(currentTag == null ? "" : currentTag);
-            boolean digestChanged = newDigest != null && !newDigest.equals(currentDigest == null ? "" : currentDigest);
-            boolean platformChanged = newPlatform != null && !Objects.equals(
+            // Resolve $N backrefs against captures from the paired old-field glob
+            String resolvedNewImageName = resolve(newImageName, currentImageName, oldImageName);
+            String resolvedNewTag = resolve(newTag, currentTag, oldTag);
+            String resolvedNewDigest = resolve(newDigest, currentDigest, oldDigest);
+            String resolvedNewPlatform = resolve(newPlatform, currentPlatform, oldPlatform);
+
+            boolean imageNameChanged = resolvedNewImageName != null && !currentImageName.equals(resolvedNewImageName);
+            boolean tagChanged = resolvedNewTag != null && !resolvedNewTag.equals(currentTag == null ? "" : currentTag);
+            boolean digestChanged = resolvedNewDigest != null && !resolvedNewDigest.equals(currentDigest == null ? "" : currentDigest);
+            boolean platformChanged = resolvedNewPlatform != null && !Objects.equals(
                     currentPlatform == null ? "" : currentPlatform,
-                    newPlatform);
+                    resolvedNewPlatform);
 
             if (!imageNameChanged && !tagChanged && !digestChanged && !platformChanged) {
                 return f;
@@ -151,10 +179,10 @@ public class ChangeFrom extends Recipe {
 
             // Update platform flag if needed
             if (platformChanged) {
-                if (newPlatform.isEmpty()) {
+                if (resolvedNewPlatform.isEmpty()) {
                     result = updatePlatformFlag(result, null);
                 } else {
-                    result = updatePlatformFlag(result, newPlatform);
+                    result = updatePlatformFlag(result, resolvedNewPlatform);
                 }
             }
 
@@ -167,20 +195,20 @@ public class ChangeFrom extends Recipe {
 
             if (wasSingleContent) {
                 // Keep as a single content item (don't split)
-                String imagePart = newImageName != null ? newImageName : currentImageName;
+                String imagePart = resolvedNewImageName != null ? resolvedNewImageName : currentImageName;
                 StringBuilder sb = new StringBuilder(imagePart);
                 // For tag: null=keep existing, ""=remove, value=set
-                if (newTag != null) {
-                    if (!newTag.isEmpty()) {
-                        sb.append(":").append(newTag);
+                if (resolvedNewTag != null) {
+                    if (!resolvedNewTag.isEmpty()) {
+                        sb.append(":").append(resolvedNewTag);
                     }
                 } else if (currentTag != null) {
                     sb.append(":").append(currentTag);
                 }
                 // For digest: null=keep existing, ""=remove, value=set
-                if (newDigest != null) {
-                    if (!newDigest.isEmpty()) {
-                        sb.append("@").append(newDigest);
+                if (resolvedNewDigest != null) {
+                    if (!resolvedNewDigest.isEmpty()) {
+                        sb.append("@").append(resolvedNewDigest);
                     }
                 } else if (currentDigest != null) {
                     sb.append("@").append(currentDigest);
@@ -191,29 +219,29 @@ public class ChangeFrom extends Recipe {
             }
 
             // Update image name: null=keep, value=set
-            if (newImageName != null) {
-                Docker.ArgumentContent newImageContent = createContent(newImageName, quoteStyle);
+            if (resolvedNewImageName != null) {
+                Docker.ArgumentContent newImageContent = createContent(resolvedNewImageName, quoteStyle);
                 Docker.Argument newImageArg = f.getImageName().withContents(singletonList(newImageContent));
                 result = result.withImageName(newImageArg);
             }
 
             // Update tag: null=keep, ""=remove, value=set
-            if (newTag != null) {
-                if (newTag.isEmpty()) {
+            if (resolvedNewTag != null) {
+                if (resolvedNewTag.isEmpty()) {
                     result = result.withTag(null);
                 } else {
-                    Docker.ArgumentContent newTagContent = createContent(newTag, quoteStyle);
+                    Docker.ArgumentContent newTagContent = createContent(resolvedNewTag, quoteStyle);
                     Docker.Argument newTagArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newTagContent));
                     result = result.withTag(newTagArg);
                 }
             }
 
             // Update digest: null=keep, ""=remove, value=set
-            if (newDigest != null) {
-                if (newDigest.isEmpty()) {
+            if (resolvedNewDigest != null) {
+                if (resolvedNewDigest.isEmpty()) {
                     result = result.withDigest(null);
                 } else {
-                    Docker.ArgumentContent newDigestContent = createContent(newDigest, quoteStyle);
+                    Docker.ArgumentContent newDigestContent = createContent(resolvedNewDigest, quoteStyle);
                     Docker.Argument newDigestArg = new Docker.Argument(randomId(), Space.EMPTY, Markers.EMPTY, singletonList(newDigestContent));
                     result = result.withDigest(newDigestArg);
                 }
@@ -221,6 +249,110 @@ public class ChangeFrom extends Recipe {
 
             return result;
         });
+    }
+
+    private static @Nullable String resolve(@Nullable String template, @Nullable String originalText, @Nullable String oldPattern) {
+        if (template == null) {
+            return null;
+        }
+        List<String> captures = extractCaptures(originalText, oldPattern);
+        return applyBackrefs(template, originalText == null ? "" : originalText, captures);
+    }
+
+    private static List<String> extractCaptures(@Nullable String text, @Nullable String pattern) {
+        if (text == null || pattern == null || pattern.indexOf('*') < 0) {
+            return emptyList();
+        }
+        java.util.regex.Matcher m = globToRegex(pattern).matcher(text);
+        if (!m.matches()) {
+            return emptyList();
+        }
+        List<String> captures = new ArrayList<>(m.groupCount());
+        for (int i = 1; i <= m.groupCount(); i++) {
+            String g = m.group(i);
+            captures.add(g == null ? "" : g);
+        }
+        return captures;
+    }
+
+    private static java.util.regex.Pattern globToRegex(String glob) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < glob.length(); i++) {
+            char c = glob.charAt(i);
+            if (c == '*') {
+                sb.append("(.*)");
+            } else if (c == '?') {
+                sb.append(".");
+            } else if ("\\.^$|()[]{}+".indexOf(c) >= 0) {
+                sb.append('\\').append(c);
+            } else {
+                sb.append(c);
+            }
+        }
+        return java.util.regex.Pattern.compile(sb.toString(), java.util.regex.Pattern.DOTALL);
+    }
+
+    private static String applyBackrefs(String template, String originalText, List<String> captures) {
+        if (template.indexOf('$') < 0 && template.indexOf('\\') < 0) {
+            return template;
+        }
+        StringBuilder sb = new StringBuilder(template.length());
+        int i = 0;
+        while (i < template.length()) {
+            char c = template.charAt(i);
+            if (c == '\\' && i + 1 < template.length() && template.charAt(i + 1) == '$') {
+                sb.append('$');
+                i += 2;
+            } else if (c == '$' && i + 1 < template.length() && Character.isDigit(template.charAt(i + 1))) {
+                int n = template.charAt(i + 1) - '0';
+                if (n == 0) {
+                    sb.append(originalText);
+                } else if (n <= captures.size()) {
+                    sb.append(captures.get(n - 1));
+                }
+                i += 2;
+            } else {
+                sb.append(c);
+                i++;
+            }
+        }
+        return sb.toString();
+    }
+
+    private static int countCaptures(@Nullable String glob) {
+        if (glob == null) {
+            return 0;
+        }
+        int count = 0;
+        for (int i = 0; i < glob.length(); i++) {
+            if (glob.charAt(i) == '*') {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static int highestBackref(@Nullable String template) {
+        if (template == null) {
+            return -1;
+        }
+        int highest = -1;
+        int i = 0;
+        while (i < template.length()) {
+            char c = template.charAt(i);
+            if (c == '\\' && i + 1 < template.length() && template.charAt(i + 1) == '$') {
+                i += 2;
+            } else if (c == '$' && i + 1 < template.length() && Character.isDigit(template.charAt(i + 1))) {
+                int n = template.charAt(i + 1) - '0';
+                if (n > highest) {
+                    highest = n;
+                }
+                i += 2;
+            } else {
+                i++;
+            }
+        }
+        return highest;
     }
 
     private Docker.ArgumentContent createContent(String text, Docker.Literal.@Nullable QuoteStyle quoteStyle) {
