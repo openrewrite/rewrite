@@ -618,10 +618,13 @@ class KotlinTypeMapping(
         // Align with the Java parser: instance methods on an interface are always Abstract
         // (even when they have a default body); additionally, non-abstract instance methods
         // on an interface are default methods, which the Java parser marks with bit 43.
+        // Private interface methods (Java 9+) are concrete and stay non-abstract.
         val parentClass = if (parent is FirRegularClass) parent else null
+        val isPrivate = methodFlags and (1L shl 1) != 0L
         if (parentClass != null &&
             parentClass.classKind == ClassKind.INTERFACE &&
             !function.isStatic &&
+            !isPrivate &&
             function.symbol !is FirConstructorSymbol) {
             methodFlags = methodFlags or (1L shl 10) // Abstract
             if (function.modality != Modality.ABSTRACT) {
@@ -739,7 +742,10 @@ class KotlinTypeMapping(
         // Align with the Java parser: instance methods on an interface are always Abstract
         // (even when they have a default body); additionally, non-abstract instance methods
         // on an interface are default methods, which the Java parser marks with bit 43.
-        if (javaMethod.containingClass.isInterface && !javaMethod.isStatic) {
+        // Private instance methods on interfaces (Java 9+) are neither abstract nor
+        // default — they're concrete methods with private visibility.
+        val isPrivate = methodFlags and (1L shl 1) != 0L
+        if (javaMethod.containingClass.isInterface && !javaMethod.isStatic && !isPrivate) {
             methodFlags = methodFlags or (1L shl 10) // Abstract
             if (!javaMethod.isAbstract) {
                 methodFlags = methodFlags or (1L shl 43) // Default
