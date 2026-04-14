@@ -40,6 +40,10 @@ public class MavenDependencyPropertyUsageOverlap {
     ) {
         // resolvedPom being `null` is an indicator of dealing with a remote parent that we can't change
         Set<String> remainingProperties = new HashSet<>(relevantProperties);
+        // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
+        if (requestedPom.getDependencyManagement() == null || requestedPom.getDependencies() == null) {
+            return remainingProperties;
+        }
         for (ManagedDependency md : requestedPom.getDependencyManagement()) {
             if (remainingProperties.isEmpty()) {
                 break;

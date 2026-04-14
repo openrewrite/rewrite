@@ -268,6 +268,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 MavenResolutionResult result = getResolutionResult();
                 ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
+                // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
+                if (requestedPom.getDependencies() == null) {
+                    return Collections.emptySet();
+                }
                 Set<String> relevantProperties = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
@@ -597,6 +601,10 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 MavenResolutionResult result = getResolutionResult();
                 ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
+                // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
+                if (requestedPom.getDependencies() == null) {
+                    return Collections.emptySet();
+                }
                 Set<String> relevantProperties = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
