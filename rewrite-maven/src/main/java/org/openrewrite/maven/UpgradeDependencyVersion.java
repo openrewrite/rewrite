@@ -651,12 +651,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (newVersion == null) {
                     return sf;
                 }
-                if (updater == null) {
-                    updater = new JavaSourceSetUpdater(ctx);
-                }
                 return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
                     if (sourceSet.getGavToTypes().isEmpty()) {
                         return sourceSet;
+                    }
+                    if (updater == null) {
+                        updater = new JavaSourceSetUpdater(ctx);
                     }
                     ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
                             oldDep.getGav().getRepository(),

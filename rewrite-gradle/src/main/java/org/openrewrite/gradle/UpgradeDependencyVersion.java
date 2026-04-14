@@ -404,12 +404,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (oldDeps == null || oldDeps.isEmpty()) {
                     return sf;
                 }
-                if (jssUpdater == null) {
-                    jssUpdater = new JavaSourceSetUpdater(ctx);
-                }
                 return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
                     if (sourceSet.getGavToTypes().isEmpty()) {
                         return sourceSet;
+                    }
+                    if (jssUpdater == null) {
+                        jssUpdater = new JavaSourceSetUpdater(ctx);
                     }
                     JavaSourceSet result = sourceSet;
                     for (ResolvedDependency oldDep : oldDeps) {
