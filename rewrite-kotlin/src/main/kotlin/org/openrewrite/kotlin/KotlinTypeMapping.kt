@@ -290,19 +290,21 @@ class KotlinTypeMapping(
         } else if (type is ConeTypeParameterType) {
             val classifierSymbol: FirClassifierSymbol<*>? = type.lookupTag.toSymbol(firSession)
             if (classifierSymbol is FirTypeParameterSymbol) {
-                // Type parameters declared on Java-origin types (e.g. java.util.Optional<T>)
-                // have their kotlin.Any bound stripped so they match the Java parser's output
-                // (which treats unbounded type parameters as having no bounds). Kotlin-source
-                // type parameters with explicit `Any` bounds are left alone.
+                // Java-origin type parameters (e.g. java.util.Optional<T>) have their
+                // kotlin.Any bound stripped (matching Java's unbounded `<T>`). Kotlin-source
+                // `<T : Any>` keeps an explicit bound, remapped to java.lang.Object.
                 val paramFromJava = classifierSymbol.containingDeclarationSymbol.origin is FirDeclarationOrigin.Java
                 for (bound: FirResolvedTypeRef in classifierSymbol.resolvedBounds) {
                     if (bound !is FirImplicitNullableAnyTypeRef) {
-                        val mapped = type(bound)
-                        if (paramFromJava) {
-                            val fq = TypeUtils.asFullyQualified(mapped)
-                            if (fq != null && "kotlin.Any" == fq.fullyQualifiedName) {
+                        var mapped = type(bound)
+                        val fq = TypeUtils.asFullyQualified(mapped)
+                        if (fq != null && "kotlin.Any" == fq.fullyQualifiedName) {
+                            if (paramFromJava) {
                                 continue
                             }
+                            mapped = remapKotlinBuiltin(fq)
+                        } else if (fq != null) {
+                            mapped = remapKotlinBuiltin(fq)
                         }
                         if (bounds == null) {
                             bounds = ArrayList()
@@ -430,11 +432,11 @@ class KotlinTypeMapping(
                 if (superTypeRef == null || "java.lang.Object" == signature) null else TypeUtils.asFullyQualified(
                     type(superTypeRef)
                 )
-            // For classes coming from Java sources/classpath, Kotlin's FIR maps their JVM
-            // supertypes to kotlin.Any etc. Remap back to the Java FQNs so cross-parser
-            // dedup can collapse them. Leave Kotlin-source classes alone so their
-            // explicit kotlin.Any supertype is preserved.
-            if (supertype != null && firClass.origin is FirDeclarationOrigin.Java) {
+            // Kotlin's builtins (kotlin.Any, kotlin.Annotation, kotlin.String, etc.) compile
+            // to JVM types. Remap so the produced JavaType mirrors what the Java parser would
+            // produce for the same bytecode. Recipes that match on java.lang.Object /
+            // java.lang.String then work uniformly over Kotlin sources as well.
+            if (supertype != null) {
                 supertype = remapKotlinBuiltin(supertype)
             }
             var declaringType: FullyQualified? = null
@@ -513,13 +515,7 @@ class KotlinTypeMapping(
                 for (iParam: FirTypeRef? in interfaceTypeRefs) {
                     var javaType = TypeUtils.asFullyQualified(type(iParam))
                     if (javaType != null) {
-                        // For Java-origin classes, remap Kotlin builtins to their JVM FQNs so
-                        // cross-parser dedup can match. Kotlin-source classes keep their
-                        // Kotlin-native interface references (e.g. an annotation class
-                        // declared in Kotlin source legitimately has kotlin.Annotation).
-                        if (firClass.origin is FirDeclarationOrigin.Java) {
-                            javaType = remapKotlinBuiltin(javaType)
-                        }
+                        javaType = remapKotlinBuiltin(javaType)
                         interfaces.add(javaType)
                     }
                 }
@@ -926,6 +922,18 @@ class KotlinTypeMapping(
      * a Kotlin builtin, we remap it to its JVM equivalent so cross-parser dedup can match them.
      */
     private fun remapKotlinBuiltin(fq: FullyQualified): FullyQualified {
+        // For a Parameterized (e.g. kotlin.Enum<Foo>) remap the underlying raw type but
+        // keep the parameterization so we don't lose type argument information.
+        if (fq is Parameterized) {
+            val inner = fq.type ?: return fq
+            val remappedInner = remapKotlinBuiltin(inner)
+            if (remappedInner === inner) {
+                return fq
+            }
+            val pt = Parameterized(null, null, null)
+            pt.unsafeSet(remappedInner, fq.typeParameters)
+            return pt
+        }
         val javaFqn = when (fq.fullyQualifiedName) {
             "kotlin.Any" -> "java.lang.Object"
             "kotlin.Annotation" -> "java.lang.annotation.Annotation"
@@ -986,18 +994,23 @@ class KotlinTypeMapping(
         var bounds: MutableList<JavaType>? = null
         var variance: GenericTypeVariable.Variance = JavaType.GenericTypeVariable.Variance.INVARIANT
         // Type parameters declared on Java-origin containers (e.g. java.util.Optional<T>) have
-        // their implicit kotlin.Any bound stripped so they match the Java parser's output.
-        // Kotlin-source type parameters with explicit `Any` bounds are left alone.
+        // their implicit kotlin.Any bound stripped so they match the Java parser's output
+        // (Java's unbounded `<T>` has no bound at all). Kotlin source `<T : Any>` has an
+        // explicit bound that we remap to java.lang.Object so Java recipes matching on the
+        // JVM type work uniformly over Kotlin code.
         val containerFromJava = type.containingDeclarationSymbol.origin is FirDeclarationOrigin.Java
         if (!(type.bounds.size == 1 && type.bounds[0] is FirImplicitNullableAnyTypeRef)) {
             bounds = ArrayList(type.bounds.size)
             for (bound: FirTypeRef in type.bounds) {
-                val boundType = type(bound)
-                if (containerFromJava) {
-                    val fq = TypeUtils.asFullyQualified(boundType)
-                    if (fq != null && "kotlin.Any" == fq.fullyQualifiedName) {
+                var boundType = type(bound)
+                val fq = TypeUtils.asFullyQualified(boundType)
+                if (fq != null && "kotlin.Any" == fq.fullyQualifiedName) {
+                    if (containerFromJava) {
                         continue
                     }
+                    boundType = remapKotlinBuiltin(fq)
+                } else if (fq != null) {
+                    boundType = remapKotlinBuiltin(fq)
                 }
                 bounds.add(boundType)
             }

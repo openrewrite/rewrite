@@ -96,7 +96,9 @@ class KotlinTypeMappingTest {
 
     @Test
     void extendsKotlinAny() {
-        assertThat(goatType.getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
+        // Kotlin's kotlin.Any is remapped to java.lang.Object so that Java-authored recipes
+        // matching on java.lang.Object / java.lang.String work uniformly over Kotlin code.
+        assertThat(goatType.getSupertype().getFullyQualifiedName()).isEqualTo("java.lang.Object");
     }
 
     @Test
@@ -297,7 +299,7 @@ class KotlinTypeMappingTest {
 
         JavaType.FullyQualified supertype = clazz.getSupertype();
         assertThat(supertype).isNotNull();
-        assertThat(supertype.toString()).isEqualTo("kotlin.Enum<org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeA>");
+        assertThat(supertype.toString()).isEqualTo("java.lang.Enum<org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeA>");
     }
 
     @Test
@@ -311,7 +313,7 @@ class KotlinTypeMappingTest {
 
         JavaType.FullyQualified supertype = clazz.getSupertype();
         assertThat(supertype).isNotNull();
-        assertThat(supertype.toString()).isEqualTo("kotlin.Enum<org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB>");
+        assertThat(supertype.toString()).isEqualTo("java.lang.Enum<org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB>");
     }
 
     @Test
@@ -593,7 +595,7 @@ class KotlinTypeMappingTest {
                         var random = (J.Identifier) ((J.MethodInvocation) foo.getInitializer()).getSelect();
                         var randomType = (JavaType.Class) random.getType();
                         assertThat(randomType.getFullyQualifiedName()).isEqualTo("kotlin.random.Random");
-                        assertThat(randomType.getSupertype().toString()).isEqualTo("kotlin.Any");
+                        assertThat(randomType.getSupertype().toString()).isEqualTo("java.lang.Object");
                     })
               )
             );
@@ -1106,7 +1108,7 @@ class KotlinTypeMappingTest {
                                 assertThat(identifier.getType().toString()).isEqualTo("kotlin.Int");
                                 found.set(true);
                             } else if ("T".equals(identifier.getSimpleName())) {
-                                assertThat(identifier.getType().toString()).isEqualTo("Generic{T extends kotlin.Any}");
+                                assertThat(identifier.getType().toString()).isEqualTo("Generic{T extends java.lang.Object}");
                                 found.set(true);
                             }
                             return super.visitIdentifier(identifier, integer);
@@ -1609,7 +1611,7 @@ class KotlinTypeMappingTest {
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.NewClass visitNewClass(J.NewClass newClass, Integer integer) {
-                                assertThat(newClass.getMethodType().toString()).isEqualTo("java.util.function.Supplier{name=<constructor>,return=java.util.function.Supplier<kotlin.String>,parameters=[kotlin.Function0<Generic{T extends kotlin.Any}>]}");
+                                assertThat(newClass.getMethodType().toString()).isEqualTo("java.util.function.Supplier{name=<constructor>,return=java.util.function.Supplier<kotlin.String>,parameters=[kotlin.Function0<Generic{T extends java.lang.Object}>]}");
                                 count.getAndIncrement();
                                 assertThat(newClass.getClazz().getType().toString()).isEqualTo("java.util.function.Supplier<kotlin.String>");
                                 count.getAndIncrement();
@@ -1828,7 +1830,7 @@ class KotlinTypeMappingTest {
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                             if ("copy".equals(method.getSimpleName())) {
                                 String signature = method.getMethodType() != null ? method.getMethodType().toString() : "";
-                                assertThat(signature).isEqualTo("Foo<Generic{T extends kotlin.Any}>{name=copy,return=Foo<Generic{T extends kotlin.Any}>,parameters=[kotlin.Int,Generic{T extends kotlin.Any}]}");
+                                assertThat(signature).isEqualTo("Foo<Generic{T extends java.lang.Object}>{name=copy,return=Foo<Generic{T extends java.lang.Object}>,parameters=[kotlin.Int,Generic{T extends java.lang.Object}]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, integer);
