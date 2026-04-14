@@ -546,6 +546,10 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     }
                     return tree;
                 }
+                // Gradle/Kotlin build scripts are JavaSourceFiles but should be handled by gradleVisitor
+                if (tree instanceof G.CompilationUnit || tree instanceof K.CompilationUnit) {
+                    return gradleVisitor.visit(tree, ctx);
+                }
                 // For Java source files, update JavaSourceSet marker
                 if (hasModulesWithOldDep && tree instanceof JavaSourceFile) {
                     return updateJavaSourceSet((SourceFile) tree, ctx);
