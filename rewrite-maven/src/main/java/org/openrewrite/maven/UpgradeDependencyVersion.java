@@ -654,15 +654,18 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (updater == null) {
                     updater = new JavaSourceSetUpdater(ctx);
                 }
-                ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
-                        oldDep.getGav().getRepository(),
-                        oldDep.getGroupId(), oldDep.getArtifactId(), newVersion, null);
-                ResolvedDependency newDep = oldDep
-                        .withGav(newGav)
-                        .withRepository(findRemoteRepository(maybeJp.get()));
-                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet ->
-                        sourceSet.getGavToTypes().isEmpty() ? sourceSet :
-                                updater.changeDependency(sourceSet, oldDep, newDep));
+                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
+                    if (sourceSet.getGavToTypes().isEmpty()) {
+                        return sourceSet;
+                    }
+                    ResolvedGroupArtifactVersion newGav = new ResolvedGroupArtifactVersion(
+                            oldDep.getGav().getRepository(),
+                            oldDep.getGroupId(), oldDep.getArtifactId(), newVersion, null);
+                    ResolvedDependency newDep = oldDep
+                            .withGav(newGav)
+                            .withRepository(findRemoteRepository(maybeJp.get()));
+                    return updater.changeDependency(sourceSet, oldDep, newDep);
+                });
             }
 
             private MavenRepository findRemoteRepository(JavaProject jp) {
