@@ -300,4 +300,99 @@ class MavenRecipeMarketplaceGeneratorTest {
                 .allMatch(r -> r.getName().equals(fullyQualifiedName));
     }
 
+    /**
+     * Verifies that recipes extending a Recipe subclass from a dependency JAR
+     * (not directly extending Recipe) are discovered during classpath scanning.
+     * This reproduces the case where a recipe like CustomDependencyVulnerabilityCheck
+     * extends DependencyVulnerabilityCheckBase (in a dependency) which extends ScanningRecipe.
+     */
+    @Test
+    void generateMarketplaceFindsRecipeExtendingExternalBaseClass(@TempDir Path tempDir) throws Exception {
+        String packageName = "org.openrewrite.test.generated";
+
+        // Step 1: Compile an abstract base recipe into a separate "dependency" directory
+        String baseClassName = "AbstractBaseRecipe";
+        String baseSource = """
+                package %s;
+
+                import org.openrewrite.Recipe;
+                import org.openrewrite.ExecutionContext;
+                import org.openrewrite.TreeVisitor;
+
+                public abstract class %s extends Recipe {
+                    @Override
+                    public TreeVisitor<?, ExecutionContext> getVisitor() {
+                        return TreeVisitor.noop();
+                    }
+                }
+                """.formatted(packageName, baseClassName);
+
+        Path sourceDir = tempDir.resolve("src");
+        Path depClassesDir = tempDir.resolve("dep-classes");
+        Path recipeClassesDir = tempDir.resolve("recipe-classes");
+        Files.createDirectories(sourceDir.resolve(packageName.replace('.', '/')));
+        Files.createDirectories(depClassesDir);
+        Files.createDirectories(recipeClassesDir);
+
+        // Compile the base class
+        Path baseSourceFile = sourceDir.resolve(packageName.replace('.', '/') + "/" + baseClassName + ".java");
+        Files.writeString(baseSourceFile, baseSource);
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertThat(compiler).as("Java compiler must be available").isNotNull();
+
+        String systemClasspath = System.getProperty("java.class.path");
+        int result = compiler.run(null, null, null,
+                "-classpath", systemClasspath,
+                "-d", depClassesDir.toString(),
+                baseSourceFile.toString());
+        assertThat(result).as("Base class compilation should succeed").isEqualTo(0);
+
+        // Step 2: Compile a concrete recipe that extends the base class, into the "recipe" directory
+        String concreteClassName = "ConcreteRecipe";
+        String concreteSource = """
+                package %s;
+
+                public class %s extends %s {
+                    @Override
+                    public String getDisplayName() {
+                        return "Concrete recipe extending external base.";
+                    }
+
+                    @Override
+                    public String getDescription() {
+                        return "Tests that recipes extending an external base class are discovered.";
+                    }
+                }
+                """.formatted(packageName, concreteClassName, baseClassName);
+
+        Path concreteSourceFile = sourceDir.resolve(packageName.replace('.', '/') + "/" + concreteClassName + ".java");
+        Files.writeString(concreteSourceFile, concreteSource);
+
+        // Compile against both system classpath AND the dep-classes directory
+        String compileClasspath = systemClasspath + System.getProperty("path.separator") + depClassesDir;
+        result = compiler.run(null, null, null,
+                "-classpath", compileClasspath,
+                "-d", recipeClassesDir.toString(),
+                concreteSourceFile.toString());
+        assertThat(result).as("Concrete class compilation should succeed").isEqualTo(0);
+
+        // Step 3: Run the generator with recipe-classes as the scanned path,
+        // and dep-classes + system classpath as dependencies
+        List<Path> classpathEntries = new ArrayList<>();
+        classpathEntries.add(depClassesDir);
+        for (String entry : systemClasspath.split(System.getProperty("path.separator"))) {
+            classpathEntries.add(Path.of(entry));
+        }
+
+        GroupArtifact ga = new GroupArtifact("org.openrewrite.test", "ext-base-recipes");
+        MavenRecipeMarketplaceGenerator generator = new MavenRecipeMarketplaceGenerator(ga, recipeClassesDir, classpathEntries);
+        RecipeMarketplace marketplace = generator.generate();
+
+        String expectedName = packageName + "." + concreteClassName;
+        assertThat(marketplace.getAllRecipes())
+                .as("Should find recipe that extends a base class in a dependency: " + expectedName)
+                .anyMatch(r -> r.getName().equals(expectedName));
+    }
+
 }
