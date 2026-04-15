@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,19 @@ package org.openrewrite.yaml.style;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
+import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import java.util.function.Consumer;
 
-class AutodetectTest {
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.yaml.Assertions.yaml;
+
+class AutodetectTest implements RewriteTest {
 
     private static Yaml.Documents parse(String code) {
         return (Yaml.Documents) YamlParser.builder().build().parse(code).findFirst().orElseThrow();
@@ -67,5 +74,62 @@ class AutodetectTest {
         ), YamlDefaultStyles.indents());
 
         assertThat(style.isIndentedSequences()).isTrue();
+    }
+
+    @Test
+    void detectorDetectsIndentSize() {
+        rewriteRun(
+          withDetectedStyle(IndentsStyle.class, indentsStyle ->
+            assertThat(indentsStyle.getIndentSize()).isEqualTo(4)),
+          yaml(
+            """
+            root:
+                child:
+                    grandchild: value
+            """
+          )
+        );
+    }
+
+    @Test
+    void detectorDetectsDefaultIndentSize() {
+        rewriteRun(
+          withDetectedStyle(IndentsStyle.class, indentsStyle ->
+            assertThat(indentsStyle.getIndentSize()).isEqualTo(2)),
+          yaml(
+            """
+            root:
+              child:
+                grandchild: value
+            """
+          )
+        );
+    }
+
+    @Test
+    void detectorDetectsGeneralFormat() {
+        rewriteRun(
+          withDetectedStyle(GeneralFormatStyle.class, generalFormatStyle ->
+            assertThat(generalFormatStyle.isUseCRLFNewLines()).isFalse()),
+          yaml(
+            """
+            key: value
+            other: data
+            """
+          )
+        );
+    }
+
+    private static <S extends Style> Consumer<RecipeSpec> withDetectedStyle(Class<S> styleClass, Consumer<S> fn) {
+        return spec -> spec.beforeRecipe(sources -> {
+            Autodetect.Detector detector = Autodetect.detector();
+            sources.forEach(detector::sample);
+
+            @SuppressWarnings("unchecked")
+            var foundStyle = (S) detector.build().getStyles().stream()
+              .filter(styleClass::isInstance)
+              .findAny().orElseThrow();
+            fn.accept(foundStyle);
+        });
     }
 }

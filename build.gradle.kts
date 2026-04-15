@@ -5,6 +5,13 @@ plugins {
     id("org.openrewrite.build.java-base") version "latest.release"
 }
 
+buildscript {
+    configurations.classpath {
+        exclude(group = "org.openrewrite", module = "rewrite-yaml")
+        exclude(group = "org.openrewrite", module = "rewrite-hcl")
+    }
+}
+
 repositories {
     mavenCentral()
 }
