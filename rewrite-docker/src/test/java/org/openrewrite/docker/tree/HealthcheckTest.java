@@ -160,6 +160,19 @@ class HealthcheckTest implements RewriteTest {
     }
 
     @Test
+    void healthcheckWithLineContinuationCRLF() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(all().allowNonWhitespaceInWhitespace(true)),
+          docker(
+            "FROM ubuntu:20.04\r\n" +
+            "HEALTHCHECK --interval=30s \\\r\n" +
+            "    --timeout=29s \\\r\n" +
+            "    --retries=3 CMD curl -f http://localhost/\r\n"
+          )
+        );
+    }
+
+    @Test
     void healthcheckWithExecForm() {
         rewriteRun(
           docker(

@@ -24,6 +24,10 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.Set;
+
+import static java.util.Collections.singleton;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ResultOfMethodCallIgnored extends Recipe {
@@ -45,6 +49,8 @@ public class ResultOfMethodCallIgnored extends Recipe {
     String displayName = "Result of method call ignored";
 
     String description = "Find locations where the result of the method call is being ignored.";
+
+    Set<String> tags = singleton("RSPEC-S6809");
 
     @Override
     public Validated<Object> validate() {

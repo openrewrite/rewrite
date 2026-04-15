@@ -17,13 +17,24 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.text.PlainTextParser;
+
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.properties.Assertions.properties;
 
 class ChangeDependencyTest implements RewriteTest {
     @Override
@@ -262,9 +273,99 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              def version = '2.6'
+              def version = '3.11'
               dependencies {
-                  implementation platform("org.apache.commons:commons-lang3:3.11")
+                  implementation platform("org.apache.commons:commons-lang3:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksWithGStringFromGradleProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            """
+              commonsLangVersion=3.11
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.apache.commons:commons-lang3:${commonsLangVersion}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslStringInterpolationFromGradleProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              commonsLangVersion=2.6
+              """,
+            """
+              commonsLangVersion=3.11
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val commonsLangVersion: String by project
+              dependencies {
+                  implementation("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val commonsLangVersion: String by project
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
@@ -573,8 +674,8 @@ class ChangeDependencyTest implements RewriteTest {
               }
 
               dependencies {
-                  val commonsLangVersion = "2.6"
-                  implementation("org.apache.commons:commons-lang3:3.11")
+                  val commonsLangVersion = "3.11"
+                  implementation("org.apache.commons:commons-lang3:${commonsLangVersion}")
               }
               """
           )
@@ -846,6 +947,247 @@ class ChangeDependencyTest implements RewriteTest {
                 .containsOnlyOnce("tools.jackson.core:jackson-databind:3")
                 .doesNotContain("datatype")
                 .actual())
+          )
+        );
+    }
+
+    @Test
+    void sharedGStringVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation "commons-lang:commons-lang:${version}"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11"
+                  implementation "com.google.guava:guava:${version}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedGradlePropertiesVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          properties(
+            """
+              sharedVersion=2.6
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "commons-lang:commons-lang:${sharedVersion}"
+                  implementation "com.google.guava:guava:${sharedVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11"
+                  implementation "com.google.guava:guava:${sharedVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedKotlinDslStringTemplateVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("commons-lang:commons-lang:${version}")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val version = "2.6"
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("com.google.guava:guava:${version}")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void isAcceptable() {
+        var recipe = new ChangeDependency(
+                "org.old", "artifact", "org.new", "artifact", null, null, null
+        );
+        @SuppressWarnings("unchecked")
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
+                .findFirst().orElseThrow()
+                .withSourcePath(Path.of("not-a-gradle-file.txt"));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+    }
+
+    @Test
+    void isNotAcceptableForPlainTextWithGradleProjectMarker() {
+        var recipe = new ChangeDependency(
+                "org.old", "artifact", "org.new", "artifact", null, null, null
+        );
+        @SuppressWarnings("unchecked")
+        var visitor = (TreeVisitor<?, ExecutionContext>) recipe.getVisitor();
+
+        SourceFile sourceFile = PlainTextParser.builder().build().parse("not a gradle file")
+                .findFirst().orElseThrow()
+                .withSourcePath(Path.of("build.gradle"))
+                .withMarkers(new org.openrewrite.marker.Markers(org.openrewrite.Tree.randomId(),
+                        java.util.Collections.singletonList(GradleProject.builder()
+                                .group("com.example")
+                                .name("test")
+                                .version("1.0")
+                                .path(":")
+                                .build())));
+        assertThat(visitor.isAcceptable(sourceFile, new InMemoryExecutionContext())).isFalse();
+    }
+
+    @Test
+    void doesNotChangeGroupIdWhenNewCoordinatesDontResolve() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("org.hibernate", "hibernate-*", "org.hibernate.orm", null, "6.0.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate:hibernate-core:${hibernateVersion}"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def hibernateVersion = '5.6.15.Final'
+              dependencies {
+                  implementation "org.hibernate.orm:hibernate-core:6.0.2.Final"
+                  implementation "org.hibernate:hibernate-validator:${hibernateVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyWhenJavaSourcesPresent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          mavenProject("sample",
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "commons-lang:commons-lang:2.6"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "org.apache.commons:commons-lang3:3.11"
+                }
+                """
+            ),
+            java(
+              """
+                class A {
+                    String foo(String s) {
+                        return s;
+                    }
+                }
+                """
+            )
           )
         );
     }

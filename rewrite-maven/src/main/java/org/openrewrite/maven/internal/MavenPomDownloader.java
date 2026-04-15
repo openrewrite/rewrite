@@ -39,6 +39,7 @@ import org.openrewrite.semver.Semver;
 import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -214,12 +215,23 @@ public class MavenPomDownloader {
             return null;
         }
         String relativePath = parent.getRelativePath();
-        if (StringUtils.isBlank(relativePath)) {
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
+        if (relativePath != null && relativePath.isEmpty()) {
+            return null;
+        }
+        if (relativePath == null) {
             relativePath = "../pom.xml";
+        }
+        // Maven resolves <relativePath> to a directory + /pom.xml when it doesn't
+        // already point to a file. Match that behaviour so that directory-style
+        // relative paths like "../my-parent" resolve correctly.
+        Path resolvedRelativePath = Paths.get(relativePath);
+        if (!relativePath.endsWith(".xml")) {
+            resolvedRelativePath = resolvedRelativePath.resolve("pom.xml");
         }
         Path parentPath = projectPom.getSourcePath()
                 .resolve("..")
-                .resolve(Paths.get(relativePath))
+                .resolve(resolvedRelativePath)
                 .normalize();
         Pom parentPom = projectPoms.get(parentPath);
         return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
@@ -516,20 +528,28 @@ public class MavenPomDownloader {
             }
         }
 
+        // An explicit empty <relativePath/> means "do not look for the parent locally"
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-            !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
-            Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
-            if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath).resolve("pom.xml"))
-                        .normalize());
-                // Even poms published to remote repositories still contain relative paths to their parent poms
-                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
-                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
-                if (maybeLocalPom != null &&
-                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
-                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
-                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
-                    return maybeLocalPom;
+                !(relativePath != null && relativePath.isEmpty())) {
+            // Maven POM §4.0.0 specifies that <relativePath> defaults to ".." when omitted.
+            // See DefaultModelBuilder#readParentLocally in maven-model-builder.
+            String effectiveRelativePath = relativePath == null ? ".." : relativePath;
+            if (!effectiveRelativePath.contains(":")) {
+                Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
+                if (folderContainingPom != null) {
+                    Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(effectiveRelativePath).resolve("pom.xml"))
+                            .normalize());
+                    // Even poms published to remote repositories still contain relative paths to their parent poms.
+                    // Like Maven 3's DefaultModelBuilder#readParentLocally, check groupId, artifactId,
+                    // and version to guard against a relative path like ".." or "../.." coincidentally
+                    // resolving to an unrelated local pom. The version check is relaxed when it contains
+                    // unresolved placeholders (e.g. ${project.version}) that only the parent can resolve.
+                    if (maybeLocalPom != null &&
+                            gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                            gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                            (gav.getVersion().equals(maybeLocalPom.getVersion()) || gav.getVersion().contains("${"))) {
+                        return maybeLocalPom;
+                    }
                 }
             }
         }
@@ -538,6 +558,12 @@ public class MavenPomDownloader {
         gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         gav = handleSnapshotTimestampVersion(gav);
+
+        if (gav.getVersion().contains("${")) {
+            throw new MavenDownloadingException("Unable to download POM " + gav +
+                    ". Version contains unresolved property placeholder.", null, originalGav);
+        }
+
         Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
@@ -897,6 +923,13 @@ public class MavenPomDownloader {
             repository = repository.withUri(containingPom.getValue(repository.getUri()));
         }
         repository = applyAuthenticationToRepository(applyMirrors(repository));
+
+        // Normalize file URIs early, before the knownToExist check, so that all
+        // downstream URI.create() calls receive a properly encoded file:// URI.
+        if (!repository.getUri().contains("${") && repository.getUri().regionMatches(true, 0, "file:", 0, 5)) {
+            repository = repository.withUri(normalizeFileUri(repository.getUri()));
+        }
+
         try {
             if (repository.isKnownToExist()) {
                 return repository;
@@ -1224,5 +1257,34 @@ public class MavenPomDownloader {
             }
         }
         return null;
+    }
+
+    /**
+     * Normalizes a file:// URI so that non-ASCII characters are percent-encoded
+     * and Windows backslashes are converted to forward slashes. Already-encoded
+     * URIs pass through unchanged (idempotent).
+     */
+    static String normalizeFileUri(String uri) {
+        String path;
+        try {
+            // getPath() decodes %C3%BC → ü, ensuring re-encoding is idempotent
+            path = URI.create(uri).getPath();
+        } catch (IllegalArgumentException e) {
+            // Malformed (e.g. Windows backslashes) — extract path manually
+            path = uri.substring(5).replaceFirst("^/+", "/");
+        }
+
+        path = path.replace('\\', '/');
+        boolean trailingSlash = path.endsWith("/");
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+
+        try {
+            String normalized = new URI("file", "", path, null).toASCIIString();
+            return trailingSlash && !normalized.endsWith("/") ? normalized + "/" : normalized;
+        } catch (URISyntaxException e) {
+            return uri;
+        }
     }
 }

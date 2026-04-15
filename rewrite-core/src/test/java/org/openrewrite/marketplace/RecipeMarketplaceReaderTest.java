@@ -402,6 +402,84 @@ class RecipeMarketplaceReaderTest {
         }
     }
 
+    @Test
+    void mergePreservesMetadata() {
+        // Source marketplace has a recipe with metadata in "Java" category
+        RecipeMarketplace source = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.TestRecipe,Test Recipe,A test recipe,Java,maven,org.example:test,abc123
+          """);
+
+        // Verify metadata was read
+        RecipeListing sourceRecipe = source.getAllRecipes().iterator().next();
+        assertThat(sourceRecipe.getMetadata().get("embedding")).isEqualTo("abc123");
+
+        // Target marketplace also has a recipe in "Java" (overlapping category)
+        RecipeMarketplace target = new RecipeMarketplaceReader().fromCsv("""
+          name,displayName,description,category,ecosystem,packageName,embedding
+          org.example.OtherRecipe,Other Recipe,Another recipe,Java,maven,org.example:other,xyz789
+          """);
+
+        // Merge source into target — both have "Java" category so this exercises
+        // the recursive merge path where withMarketplace() is called
+        target.getRoot().merge(source.getRoot());
+
+        // Verify both recipes exist and metadata is preserved
+        RecipeListing mergedTest = target.findRecipe("org.example.TestRecipe");
+        assertThat(mergedTest).isNotNull();
+        assertThat(mergedTest.getMetadata().get("embedding"))
+          .as("Metadata should be preserved through merge when categories overlap")
+          .isEqualTo("abc123");
+
+        RecipeListing mergedOther = target.findRecipe("org.example.OtherRecipe");
+        assertThat(mergedOther).isNotNull();
+        assertThat(mergedOther.getMetadata().get("embedding")).isEqualTo("xyz789");
+    }
+
+    @Test
+    void mergeCategoriesCaseInsensitive() {
+        // Simulates the real-world scenario where rewrite-java defines category "AI"
+        // and rewrite-ai defines category "ai" -- these should merge into one category
+        RecipeMarketplace marketplace1 = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          org.openrewrite.java.ai.ClassDefinitionLength,AI,maven,org.openrewrite:rewrite-java
+          org.openrewrite.java.ai.MethodDefinitionLength,AI,maven,org.openrewrite:rewrite-java
+          """);
+
+        RecipeMarketplace marketplace2 = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          io.moderne.ai.FindAgentsInUse,ai,maven,io.moderne.recipe:rewrite-ai
+          io.moderne.ai.FindLibrariesInUse,ai,maven,io.moderne.recipe:rewrite-ai
+          """);
+
+        marketplace1.getRoot().merge(marketplace2.getRoot());
+
+        assertThat(marketplace1.getRoot().getCategories())
+          .as("AI and ai should merge into a single category")
+          .hasSize(1);
+        assertThat(marketplace1.getRoot().getCategories().getFirst().getRecipes()).hasSize(4);
+        // The first-seen casing wins
+        assertThat(marketplace1.getRoot().getCategories().getFirst().getDisplayName()).isEqualTo("AI");
+    }
+
+    @Test
+    void installCategoriesCaseInsensitive() {
+        // When installing recipes via CSV where one uses "AI" and another uses "ai"
+        // in the same category position, they should land in the same category
+        RecipeMarketplace marketplace = new RecipeMarketplaceReader().fromCsv("""
+          name,category1,ecosystem,packageName
+          org.example.Recipe1,AI,maven,org.example:test1
+          org.example.Recipe2,ai,maven,org.example:test2
+          """);
+
+        assertThat(marketplace.getRoot().getCategories())
+          .as("AI and ai should be treated as the same category during install")
+          .hasSize(1);
+        assertThat(marketplace.getRoot().getCategories().getFirst().getRecipes()).hasSize(2);
+        // The first-seen casing wins
+        assertThat(marketplace.getRoot().getCategories().getFirst().getDisplayName()).isEqualTo("AI");
+    }
+
     private static RecipeMarketplace.Category findCategory(RecipeMarketplace.Category category, String name) {
         return category.getCategories().stream()
           .filter(c -> c.getDisplayName().equals(name))

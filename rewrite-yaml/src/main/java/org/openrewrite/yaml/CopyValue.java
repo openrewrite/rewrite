@@ -16,15 +16,16 @@
 package org.openrewrite.yaml;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.util.Collections.singletonList;
 
@@ -100,13 +101,8 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         this(oldKeyPath, oldFilePath, newKey, newFilePath, null);
     }
 
-    @Data
     public static class Accumulator {
-        @Language("yml")
-        @Nullable
-        String snippet;
-
-        Path path;
+        final Map<Path, String> snippetsByPath = new HashMap<>();
     }
 
 
@@ -121,19 +117,11 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
             final JsonPathMatcher oldPathMatcher = new JsonPathMatcher(oldKeyPath);
 
             @Override
-            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                if (acc.snippet == null) {
-                    return super.visitDocuments(documents, ctx);
-                }
-                return documents;
-            }
-
-            @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry source = super.visitMappingEntry(entry, ctx);
                 if (oldPathMatcher.matches(getCursor())) {
-                    acc.snippet = entry.getValue().print(getCursor());
-                    acc.path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                    Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                    acc.snippetsByPath.putIfAbsent(path, entry.getValue().print(getCursor()));
                 }
                 return source;
             }
@@ -147,19 +135,32 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if (acc.snippet == null) {
+        if (acc.snippetsByPath.isEmpty()) {
             return TreeVisitor.noop();
         }
-        return Preconditions.check(
-                new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
-                new YamlIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                        doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
-                        return (Yaml.Documents) new MergeYaml(newKey, acc.snippet, false, null, null, null, null, createNewKeys)
+
+        return new YamlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                Path currentPath = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
+                Yaml.Documents d = documents;
+                boolean changed = false;
+                for (Map.Entry<Path, String> entry : acc.snippetsByPath.entrySet()) {
+                    Path targetPath = newFilePath != null
+                            ? Paths.get(newFilePath)
+                            : entry.getKey();
+                    if (currentPath.equals(targetPath)) {
+                        d = (Yaml.Documents) new MergeYaml(newKey, entry.getValue(), false, null, null, null, null, createNewKeys)
                                 .getVisitor()
-                                .visitNonNull(documents, ctx);
+                                .visitNonNull(d, ctx);
+                        changed = true;
                     }
-                });
+                }
+                if (changed) {
+                    doAfterVisit(new UnfoldProperties(null, singletonList(newKey)).getVisitor());
+                }
+                return d;
+            }
+        };
     }
 }

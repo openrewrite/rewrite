@@ -17,21 +17,34 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
+public class UseMavenCompilerPluginReleaseConfiguration extends ScanningRecipe<UseMavenCompilerPluginReleaseConfiguration.Accumulator> {
+
+    private static final Pattern MAVEN_COMPILER_PROPERTY_PATTERN =
+            Pattern.compile("\\$\\{(maven\\.compiler\\.(?:source|target|testSource|testTarget))}");
+
+    private static final Set<String> DEFAULT_MAVEN_COMPILER_PROPERTIES = new HashSet<>(Arrays.asList(
+            "${maven.compiler.source}", "${maven.compiler.target}", "${maven.compiler.release}",
+            "${maven.compiler.testSource}", "${maven.compiler.testTarget}", "${maven.compiler.testRelease}"
+    ));
 
     @Option(
             displayName = "Release version",
@@ -43,55 +56,250 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
     String displayName = "Use Maven compiler plugin release configuration";
 
     String description = "Replaces any explicit `source` or `target` configuration (if present) on the `maven-compiler-plugin` with " +
-                "`release`, and updates the `release` value if needed. Will not downgrade the Java version if the current version is higher.";
+                "`release`, and updates the `release` value if needed. When `testSource` or `testTarget` differ from the main " +
+                "version, introduces `testRelease`. Will not downgrade the Java version if the current version is higher. " +
+                "Also removes stale `maven.compiler.source`, `maven.compiler.target`, `maven.compiler.testSource`, and " +
+                "`maven.compiler.testTarget` properties that are no longer referenced.";
+
+    public static class Accumulator {
+        // Only tracks usages from OUTSIDE the compiler plugin's source/target/testSource/testTarget tags,
+        // since those tags will be replaced by the visitor
+        Map<String, Set<ResolvedGroupArtifactVersion>> propertyUsages = new HashMap<>();
+    }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        return new Accumulator();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = super.visitTag(tag, ctx);
-                if (!isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
-                    return t;
-                }
-                Optional<Xml.Tag> maybeCompilerPluginConfig = t.getChild("configuration");
-                if (!maybeCompilerPluginConfig.isPresent()) {
-                    return t;
-                }
-                Xml.Tag compilerPluginConfig = maybeCompilerPluginConfig.get();
-                Optional<String> source = compilerPluginConfig.getChildValue("source");
-                Optional<String> target = compilerPluginConfig.getChildValue("target");
-                Optional<String> release = compilerPluginConfig.getChildValue("release");
-                if (!source.isPresent() && !target.isPresent() && !release.isPresent()) {
-                    return t; // Do not introduce a new tag if none of the values are present
-                }
-                if (currentNewerThanProposed(source) ||
-                        currentNewerThanProposed(target) ||
-                        currentNewerThanProposed(release)) {
-                    return t;
+                // Skip visiting compiler plugin children entirely; the visitor will replace
+                // source/target/testSource/testTarget, so those references should not count as usages
+                if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
+                    return tag;
                 }
 
-                Xml.Tag updated = filterTagChildren(t, compilerPluginConfig,
-                        child -> !("source".equals(child.getName()) || "target".equals(child.getName())));
-                String releaseVersionValue = hasJavaVersionProperty(getCursor().firstEnclosingOrThrow(Xml.Document.class)) ?
-                        "${java.version}" : releaseVersion.toString();
-                return addOrUpdateChild(updated, compilerPluginConfig,
-                        Xml.Tag.build("<release>" + releaseVersionValue + "</release>"), getCursor().getParentOrThrow());
+                Xml.Tag t = super.visitTag(tag, ctx);
+
+                // Track ${maven.compiler.*} property usages outside of <properties>
+                if (!isPropertyTag()) {
+                    Optional<String> value = t.getValue();
+                    if (value.isPresent() && value.get().contains("${maven.compiler.")) {
+                        Matcher matcher = MAVEN_COMPILER_PROPERTY_PATTERN.matcher(value.get());
+                        while (matcher.find()) {
+                            acc.propertyUsages.computeIfAbsent(matcher.group(1), k -> new HashSet<>())
+                                    .add(getResolutionResult().getPom().getGav());
+                        }
+                    }
+                }
+
+                return t;
             }
         };
     }
 
-    private boolean currentNewerThanProposed(@SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String> config) {
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+
+                // Handle compiler plugin source/target → release replacement
+                if (isPluginTag("org.apache.maven.plugins", "maven-compiler-plugin")) {
+                    t = handleCompilerPlugin(t);
+                }
+
+                return t;
+            }
+
+            private Xml.Tag handleCompilerPlugin(Xml.Tag t) {
+                Optional<Xml.Tag> maybeConfig = t.getChild("configuration");
+                if (!maybeConfig.isPresent()) {
+                    return t;
+                }
+                Xml.Tag config = maybeConfig.get();
+                Optional<String> source = config.getChildValue("source");
+                Optional<String> target = config.getChildValue("target");
+                Optional<String> release = config.getChildValue("release");
+                Optional<String> testSource = config.getChildValue("testSource");
+                Optional<String> testTarget = config.getChildValue("testTarget");
+                Optional<String> testRelease = config.getChildValue("testRelease");
+
+                boolean hasMainConfig = source.isPresent() || target.isPresent() || release.isPresent();
+                boolean hasTestConfig = testSource.isPresent() || testTarget.isPresent() || testRelease.isPresent();
+
+                if (!hasMainConfig && !hasTestConfig) {
+                    return t;
+                }
+
+                // Determine whether to process main source/target → release
+                boolean processMain = hasMainConfig &&
+                        !versionNewerThanProposed(source) &&
+                        !versionNewerThanProposed(target) &&
+                        !versionNewerThanProposed(release);
+
+                // Determine test handling: whether testRelease is needed after removing testSource/testTarget
+                boolean testNeedsOwnRelease = false;
+                @Nullable String testVersionValue = null;
+                if (hasTestConfig) {
+                    testVersionValue = resolveVersion(testRelease, testSource, testTarget);
+                    if (testVersionValue != null) {
+                        if (DEFAULT_MAVEN_COMPILER_PROPERTIES.contains(testVersionValue)) {
+                            testNeedsOwnRelease = false;
+                        } else if (testVersionValue.startsWith("${")) {
+                            testNeedsOwnRelease = true;
+                        } else {
+                            testNeedsOwnRelease = isHigherVersion(testVersionValue, releaseVersion.toString());
+                        }
+                    }
+                }
+
+                if (!processMain && !hasTestConfig) {
+                    return t;
+                }
+
+                // Build the set of tags to remove from configuration
+                Set<String> tagsToRemove = new HashSet<>();
+                if (processMain) {
+                    tagsToRemove.add("source");
+                    tagsToRemove.add("target");
+                }
+                if (hasTestConfig) {
+                    tagsToRemove.add("testSource");
+                    tagsToRemove.add("testTarget");
+                    if (!testNeedsOwnRelease) {
+                        tagsToRemove.add("testRelease");
+                    }
+                }
+
+                if (tagsToRemove.isEmpty()) {
+                    return t;
+                }
+
+                Xml.Tag updated = filterTagChildren(t, config,
+                        child -> !tagsToRemove.contains(child.getName()));
+
+                // Add/update <release>
+                if (processMain) {
+                    String existingPropertyRef = getExistingPropertyReference(release, source, target);
+                    String releaseVal;
+                    if (existingPropertyRef != null) {
+                        releaseVal = existingPropertyRef;
+                    } else if (hasJavaVersionProperty(getCursor().firstEnclosingOrThrow(Xml.Document.class))) {
+                        releaseVal = "${java.version}";
+                    } else {
+                        releaseVal = releaseVersion.toString();
+                    }
+                    updated = addOrUpdateChild(updated, config,
+                            Xml.Tag.build("<release>" + releaseVal + "</release>"), getCursor().getParentOrThrow());
+                }
+
+                // Add/update <testRelease> if test version is higher than proposed release
+                if (hasTestConfig && testNeedsOwnRelease && testVersionValue != null) {
+                    String testExistingRef = getExistingPropertyReference(testRelease, testSource, testTarget);
+                    String testReleaseVal = testExistingRef != null ? testExistingRef : testVersionValue;
+                    updated = addOrUpdateChild(updated, config,
+                            Xml.Tag.build("<testRelease>" + testReleaseVal + "</testRelease>"), getCursor().getParentOrThrow());
+                }
+
+                // Determine which maven.compiler.* properties are now stale and should be removed
+                boolean releaseConfigured = processMain || release.isPresent();
+                boolean testReleaseConfigured = (hasTestConfig && testNeedsOwnRelease) || testRelease.isPresent();
+
+                if (releaseConfigured) {
+                    markPropertyForRemovalIfUnused("maven.compiler.source", acc);
+                    markPropertyForRemovalIfUnused("maven.compiler.target", acc);
+                }
+                if (releaseConfigured || testReleaseConfigured) {
+                    markPropertyForRemovalIfUnused("maven.compiler.testSource", acc);
+                    markPropertyForRemovalIfUnused("maven.compiler.testTarget", acc);
+                }
+
+                return updated;
+            }
+
+            private void markPropertyForRemovalIfUnused(String propertyName, Accumulator acc) {
+                ResolvedGroupArtifactVersion currentGav = getResolutionResult().getPom().getGav();
+
+                Set<ResolvedGroupArtifactVersion> usages = acc.propertyUsages.get(propertyName);
+                if (usages != null) {
+                    for (ResolvedGroupArtifactVersion usingGav : usages) {
+                        if (isAncestorOrSelf(currentGav, usingGav)) {
+                            return;
+                        }
+                    }
+                }
+
+                doAfterVisit(new MavenIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                        Xml.Tag t = super.visitTag(tag, ctx);
+                        if (isPropertyTag() && propertyName.equals(t.getName())) {
+                            doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
+                            maybeUpdateModel();
+                        }
+                        return t;
+                    }
+                });
+            }
+
+            private boolean isAncestorOrSelf(ResolvedGroupArtifactVersion possibleAncestor, ResolvedGroupArtifactVersion gav) {
+                if (possibleAncestor.equals(gav)) {
+                    return true;
+                }
+                MavenResolutionResult ancestor = getResolutionResult();
+                while (ancestor != null) {
+                    if (ancestor.getPom().getGav().equals(possibleAncestor)) {
+                        return true;
+                    }
+                    ancestor = ancestor.getParent();
+                }
+                return false;
+            }
+        };
+    }
+
+    private boolean versionNewerThanProposed(@SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String> config) {
         if (!config.isPresent()) {
             return false;
         }
+        return isHigherVersion(config.get(), releaseVersion.toString());
+    }
+
+    private static boolean isHigherVersion(String current, String proposed) {
         try {
-            float currentVersion = Float.parseFloat(config.get());
-            float proposedVersion = Float.parseFloat(releaseVersion.toString());
-            return proposedVersion < currentVersion;
+            return Float.parseFloat(current) > Float.parseFloat(proposed);
         } catch (NumberFormatException e) {
             return false;
         }
+    }
+
+    private static @Nullable String resolveVersion(
+            @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String>... configs) {
+        for (Optional<String> config : configs) {
+            if (config.isPresent()) {
+                return config.get();
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable String getExistingPropertyReference(
+            @SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String>... configs) {
+        for (Optional<String> config : configs) {
+            if (config.isPresent()) {
+                String value = config.get();
+                if (value.startsWith("${") && value.endsWith("}") && !DEFAULT_MAVEN_COMPILER_PROPERTIES.contains(value)) {
+                    return value;
+                }
+            }
+        }
+        return null;
     }
 
     private boolean hasJavaVersionProperty(Xml.Document xml) {

@@ -78,10 +78,17 @@ public class GradleWrapper {
 
     public static GradleWrapper create(@Nullable String currentDistributionUrl, @Nullable String distributionTypeName, @Nullable String version, ExecutionContext ctx) {
         String normalizedCurrentDistributionUrl = currentDistributionUrl == null ? null : currentDistributionUrl.replace("\\", "");
-        DistributionType distributionType = Arrays.stream(DistributionType.values())
-                .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
-                .findAny()
-                .orElse(DistributionType.Bin);
+        DistributionType distributionType;
+        if (distributionTypeName != null) {
+            distributionType = Arrays.stream(DistributionType.values())
+                    .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
+                    .findAny()
+                    .orElse(DistributionType.Bin);
+        } else if (normalizedCurrentDistributionUrl != null && normalizedCurrentDistributionUrl.endsWith("-all.zip")) {
+            distributionType = DistributionType.All;
+        } else {
+            distributionType = DistributionType.Bin;
+        }
         VersionComparator versionComparator = StringUtils.isBlank(version) ?
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());

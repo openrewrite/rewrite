@@ -68,6 +68,16 @@ public class MavenDependency implements Trait<Xml.Tag> {
             return null;
         }
 
+        // For exact version, check upfront whether the target version is actually an
+        // upgrade from the current version before downloading metadata
+        if (versionComparator instanceof ExactVersion) {
+            String exactVersion = ((ExactVersion) versionComparator).getVersion();
+            if (exactVersion.equals(finalVersion) ||
+                versionComparator.compare(finalVersion, finalVersion, exactVersion) > 0) {
+                return null;
+            }
+        }
+
         try {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
             MavenSettings settings = mctx.effectiveSettings(mrr);
@@ -105,7 +115,9 @@ public class MavenDependency implements Trait<Xml.Tag> {
                         Pom pom = new MavenPomDownloader(emptyMap(), ctx,
                                 mrr.getMavenSettings(), mrr.getActiveProfiles()).download(new GroupArtifactVersion(groupId, artifactId, ((ExactVersion) versionComparator).getVersion()),
                                 null, null, mrr.getPom().getRepositories());
-                        if (pom.getGav().getVersion().equals(exactVersion)) {
+                        if (pom.getGav().getVersion().equals(exactVersion) &&
+                            !exactVersion.equals(finalVersion) &&
+                            versionComparator.compare(finalVersion, finalVersion, exactVersion) <= 0) {
                             return exactVersion;
                         }
                     } catch (MavenDownloadingException e) {

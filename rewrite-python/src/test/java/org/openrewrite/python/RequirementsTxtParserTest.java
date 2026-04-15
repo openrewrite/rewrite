@@ -18,6 +18,7 @@ package org.openrewrite.python;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.python.internal.UvExecutor;
@@ -33,6 +34,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -105,6 +107,57 @@ class RequirementsTxtParserTest {
         assertThat(deps).hasSize(1);
         assertThat(deps.get(0).getName()).isEqualTo("requests");
         assertThat(deps.get(0).getResolved()).isSameAs(requests);
+    }
+
+    @Test
+    void dependenciesFromResolvedTreatsDeclaredPackagesAsDirect() {
+        ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
+        ResolvedDependency requests = new ResolvedDependency("requests", "2.31.0", null, List.of(certifi));
+
+        List<ResolvedDependency> resolved = List.of(certifi, requests);
+        Set<String> declared = RequirementsTxtParser.parseDeclaredPackageNames(
+                "certifi==2024.2.2\nrequests==2.31.0\n");
+        List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolved, declared);
+
+        assertThat(deps).hasSize(2);
+        assertThat(deps.get(0).getName()).isEqualTo("certifi");
+        assertThat(deps.get(1).getName()).isEqualTo("requests");
+    }
+
+    @Test
+    void declaredPackagesAreDirectAndUndeclaredTransitivesAreExcluded() {
+        ResolvedDependency urllib3 = new ResolvedDependency("urllib3", "2.2.1", null, null);
+        ResolvedDependency charsetNormalizer = new ResolvedDependency("charset-normalizer", "3.3.2", null, null);
+        ResolvedDependency certifi = new ResolvedDependency("certifi", "2024.2.2", null, null);
+        ResolvedDependency requests = new ResolvedDependency("requests", "2.31.0", null,
+                List.of(certifi, urllib3, charsetNormalizer));
+
+        List<ResolvedDependency> resolved = List.of(urllib3, charsetNormalizer, certifi, requests);
+        Set<String> declared = RequirementsTxtParser.parseDeclaredPackageNames(
+                "requests==2.31.0\ncertifi==2024.2.2\n");
+        List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolved, declared);
+
+        assertThat(deps).hasSize(2);
+        assertThat(deps.stream().map(Dependency::getName))
+                .containsExactly("certifi", "requests");
+    }
+
+    @Test
+    void parseDeclaredPackageNamesExtractsNames() {
+        Set<String> names = RequirementsTxtParser.parseDeclaredPackageNames("""
+                # This is a comment
+                requests>=2.28.0
+                certifi==2024.2.2
+                charset-normalizer<4,>=2
+                Jinja2~=3.1.5
+                -r other-requirements.txt
+                aiohttp==3.13.3
+
+                langchain-core==1.2.12
+                """);
+        assertThat(names).containsExactlyInAnyOrder(
+                "requests", "certifi", "charset_normalizer", "jinja2",
+                "aiohttp", "langchain_core");
     }
 
     @Test
@@ -209,6 +262,29 @@ class RequirementsTxtParserTest {
                 .contains("certifi", "urllib3");
 
         assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Uv);
+    }
+
+    @Test
+    void unresolvableRequirementsAttachesParseExceptionMarker() {
+        // A non-existent package will fail to install regardless of whether uv is present
+        // (without uv, workspace creation fails; with uv, the install itself fails).
+        String requirements = "this-package-definitely-does-not-exist-zzz==9.9.9\n";
+
+        RequirementsTxtParser parser = new RequirementsTxtParser();
+        Parser.Input input = Parser.Input.fromString(Paths.get("requirements.txt"), requirements);
+        List<SourceFile> parsed = parser.parseInputs(
+                Collections.singletonList(input),
+                null,
+                new InMemoryExecutionContext(t -> {})
+        ).collect(Collectors.toList());
+
+        assertThat(parsed).hasSize(1);
+        SourceFile sf = parsed.get(0);
+        ParseExceptionResult marker = sf.getMarkers().findFirst(ParseExceptionResult.class).orElse(null);
+        assertThat(marker).isNotNull();
+        assertThat(marker.getMessage()).contains("PythonResolutionResult");
+        // Should not have a successful resolution marker
+        assertThat(sf.getMarkers().findFirst(PythonResolutionResult.class)).isEmpty();
     }
 
     @Test

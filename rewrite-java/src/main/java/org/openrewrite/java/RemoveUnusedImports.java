@@ -73,6 +73,10 @@ public class RemoveUnusedImports extends Recipe {
             // Collect all unqualified type references upfront for efficiency
             Set<String> unqualifiedTypeNames = collectUnqualifiedTypeNames(cu);
 
+            // Collect all identifier simple names from source (excluding imports) to detect
+            // types that only appear in type attribution but not in actual source references
+            Set<String> sourceIdentifierNames = collectSourceIdentifierNames(cu);
+
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
                     methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(), t -> new TreeSet<>())
@@ -194,6 +198,8 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                     .getElement().withPrefix(elem.getPrefix())));
 
+                            anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
+
                             changed = true;
                         } else {
                             usedStaticWildcardImports.add(elem.getTypeName());
@@ -245,6 +251,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (!anImport.imports.isEmpty()) {
                                 anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                         .getElement().withPrefix(elem.getPrefix())));
+                                anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
                                 changed = true;
                             } else {
                                 // No types are used unqualified, so remove the wildcard import entirely
@@ -254,6 +261,11 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             usedWildcardImports.add(target);
                         }
+                    } else if (!sourceIdentifierNames.contains(qualid.getSimpleName())) {
+                        // The imported type's simple name doesn't appear anywhere in the source code;
+                        // it only appears in type attribution (e.g., as a parameter type of a statically imported method)
+                        anImport.used = false;
+                        changed = true;
                     } else if (combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
@@ -503,6 +515,25 @@ public class RemoveUnusedImports extends Recipe {
                         cursor = cursor.getParent();
                     }
                     return false;
+                }
+            }.reduce(cu, new HashSet<>());
+        }
+
+        /**
+         * Collect all identifier simple names appearing in source code, excluding import statements.
+         * Used to detect imports whose type name doesn't actually appear in the source.
+         */
+        private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
+            return new JavaIsoVisitor<Set<String>>() {
+                @Override
+                public J.Import visitImport(J.Import import_, Set<String> names) {
+                    return import_;
+                }
+
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
+                    names.add(identifier.getSimpleName());
+                    return super.visitIdentifier(identifier, names);
                 }
             }.reduce(cu, new HashSet<>());
         }

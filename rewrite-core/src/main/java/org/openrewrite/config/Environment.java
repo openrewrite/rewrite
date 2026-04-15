@@ -31,6 +31,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparingInt;
@@ -84,7 +85,7 @@ public class Environment {
     }
 
     public Collection<CategoryDescriptor> listCategoryDescriptors() {
-        return resourceLoaders.stream()
+        return Stream.concat(resourceLoaders.stream(), dependencyResourceLoaders.stream())
                 .flatMap(r -> r.listCategoryDescriptors().stream())
                 .collect(toList());
     }
@@ -179,6 +180,14 @@ public class Environment {
             recipe = loader.loadRecipe(recipeName, details);
             if (recipe != null) {
                 break;
+            }
+        }
+        if (recipe == null) {
+            for (ResourceLoader loader : dependencyResourceLoaders) {
+                recipe = loader.loadRecipe(recipeName, details);
+                if (recipe != null) {
+                    break;
+                }
             }
         }
         if (recipe == null) {
@@ -288,7 +297,7 @@ public class Environment {
         this.dependencyResourceLoaders = dependencyResourceLoaders;
     }
 
-    public static Builder builder(Properties properties) {
+    public static Builder builder(@Nullable Properties properties) {
         return new Builder(properties);
     }
 
@@ -297,11 +306,11 @@ public class Environment {
     }
 
     public static class Builder {
-        private final Properties properties;
+        private final @Nullable Properties properties;
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
         private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
 
-        public Builder(Properties properties) {
+        public Builder(@Nullable Properties properties) {
             this.properties = properties;
         }
 
@@ -325,23 +334,21 @@ public class Environment {
          */
         @SuppressWarnings("unused")
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
-            List<ClasspathScanningLoader> firstPassLoaderList = new ArrayList<>();
-            for (Path dep : dependencies) {
-                firstPassLoaderList.add(new ClasspathScanningLoader(dep, properties, emptyList(), classLoader));
-            }
+            // Share a single superclass resolution cache across all loaders to avoid
+            // redundant ASM bytecode reads when resolving class hierarchies.
+            ClasspathScanningLoader.ClassLoaderBackedSuperclassMap sharedSuperclassMap =
+                    new ClasspathScanningLoader.ClassLoaderBackedSuperclassMap(new java.util.HashMap<>(), classLoader);
 
-            /*
-             * Second loader creation pass where the firstPassLoaderList is passed as the
-             * dependencyResourceLoaders list to ensure that we can resolve transitive
-             * dependencies using the loaders we just created. This is necessary because
-             * the first pass may have missing recipes since the full list of loaders was
-             * not provided.
-             */
-            List<ClasspathScanningLoader> secondPassLoaderList = new ArrayList<>();
+            // Create a single set of dependency loaders, passing the list to itself so that
+            // cross-dependency YAML recipe references can be resolved. This works because
+            // scanning is lazy and ensureScanned() nulls the scan action before running it,
+            // preventing re-entrant scans when a dependency loader triggers scanning of
+            // another dependency during YAML resolution.
+            List<ClasspathScanningLoader> dependencyLoaders = new ArrayList<>();
             for (Path dep : dependencies) {
-                secondPassLoaderList.add(new ClasspathScanningLoader(dep, properties, firstPassLoaderList, classLoader));
+                dependencyLoaders.add(new ClasspathScanningLoader(dep, properties, dependencyLoaders, classLoader, sharedSuperclassMap));
             }
-            return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
+            return load(new ClasspathScanningLoader(jar, properties, dependencyLoaders, classLoader, sharedSuperclassMap), dependencyLoaders);
         }
 
         @SuppressWarnings("unused") // Used by rewrite-maven-plugin and CLI

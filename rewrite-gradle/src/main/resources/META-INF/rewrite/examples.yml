@@ -292,6 +292,24 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeTaskToTasksRegister
+examples:
+- description: '`ChangeTaskToTasksRegisterTest#groovyTaskWithClosure`'
+  sources:
+  - before: |
+      task taskName(type: Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    after: |
+      tasks.register("taskName", Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.DependencyConstraintToRule
 examples:
 - description: '`DependencyConstraintToRuleTest#newResolutionStrategyBlock`'
@@ -517,6 +535,40 @@ examples:
       h2 = { group = "com.h2database", name = "h2", version.ref = "h2" }
     path: gradle/libs.versions.toml
     language: toml
+---
+type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.MigrateToGradle9
+examples:
+- description: '`MigrateToGradle9Test#multipleSubRecipesApplyTogether`'
+  sources:
+  - before: |
+      plugins {
+          id 'java'
+          id 'jacoco'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
+      }
+    after: |
+      plugins {
+          id 'java'
+          id 'jacoco'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation "com.google.guava:guava:31.1-jre"
+      }
+    path: build.gradle
+    language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.RemoveDependency

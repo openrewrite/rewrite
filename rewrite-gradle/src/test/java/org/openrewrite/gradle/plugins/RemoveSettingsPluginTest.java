@@ -17,17 +17,23 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradleKts;
 
 class RemoveSettingsPluginTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise"));
+    }
+
     @DocumentExample
     @Test
     void removePlugin() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise")),
           settingsGradle(
             """
               plugins {
@@ -42,7 +48,6 @@ class RemoveSettingsPluginTest implements RewriteTest {
     @Test
     void removePluginKts() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise")),
           settingsGradleKts(
             """
               plugins {

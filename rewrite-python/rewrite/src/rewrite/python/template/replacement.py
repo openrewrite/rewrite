@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Union, TYPE_CHECKING
 from uuid import uuid4
 
 from rewrite.java import J, Expression
@@ -149,7 +149,7 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
     Visitor that replaces placeholder identifiers with actual values.
 
     This visitor traverses a template AST and replaces any identifiers
-    that match the placeholder pattern (__placeholder_name__) with
+    that match the placeholder pattern (__plh_name__) with
     the corresponding captured values.
 
     When a substituted value has lower operator precedence than the
@@ -157,12 +157,13 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
     to preserve semantics.
     """
 
-    def __init__(self, values: Dict[str, J]):
+    def __init__(self, values: Dict[str, Union[J, List[J]]]):
         """
         Initialize the replacement visitor.
 
         Args:
             values: Dict mapping capture names to their AST values.
+                Variadic captures map to List[J].
         """
         super().__init__()
         self._values = values
@@ -192,6 +193,42 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
 
         # Not a placeholder or no value provided, continue normally
         return super().visit_identifier(ident, p)
+
+    def visit_block(self, block: j.Block, p: None) -> J:
+        """Override visit_block to unwrap ExpressionStatement around placeholders.
+
+        When a template has a placeholder in statement position (e.g., the body
+        of a ``with`` block), the parser wraps it as ``ExpressionStatement(Identifier(...))``
+        since it looks like a bare expression.  If the replacement value is a
+        non-Expression statement (``return``, ``if``, ``for``, etc.), we must
+        substitute it directly into the statements list, bypassing the
+        ``ExpressionStatement`` wrapper.  This mirrors the JS template engine's
+        ``visitBlock`` logic.
+        """
+        # Substitute statement-position placeholders BEFORE the default
+        # visitor runs, so visit_expression_statement never sees them.
+        new_stmts: List[JRightPadded] = []
+        changed = False
+        for rp in block.padding.statements:
+            stmt = rp.element
+            if isinstance(stmt, py.ExpressionStatement):
+                expr = stmt.expression
+                if isinstance(expr, j.Identifier):
+                    capture_name = from_placeholder(expr.simple_name)
+                    if capture_name is not None and capture_name in self._values:
+                        replacement = self._values[capture_name]
+                        # Preserve the placeholder's whitespace prefix
+                        if hasattr(replacement, '_prefix'):
+                            replacement = replacement.replace(_prefix=expr.prefix)
+                        new_stmts.append(rp.replace(element=replacement))
+                        changed = True
+                        continue
+            new_stmts.append(rp)
+
+        if changed:
+            block = block.padding.replace(statements=new_stmts)
+
+        return super().visit_block(block, p)
 
     def visit_binary(self, binary: j.Binary, p: None) -> J:
         """Visit a Java Binary and auto-parenthesize substituted operands if needed."""
@@ -279,7 +316,23 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
         if padded_args is not None:
             new_padded = []
             for rp in padded_args.padding.elements:
-                new_elem = self.visit(rp.element, p)
+                elem = rp.element
+                # Check if this argument is a variadic placeholder
+                if isinstance(elem, j.Identifier):
+                    cap_name = from_placeholder(elem.simple_name)
+                    if cap_name is not None and cap_name in self._values:
+                        value = self._values[cap_name]
+                        if isinstance(value, list):
+                            # Splice the list into the argument positions
+                            for i, item in enumerate(value):
+                                prefix = elem.prefix if i == 0 else j.Space([], ' ')
+                                spliced = item.replace(prefix=prefix) if hasattr(item, 'prefix') else item
+                                new_padded.append(JRightPadded(
+                                    spliced, j.Space([], ''), j.Markers.EMPTY,
+                                ))
+                            continue
+                # Scalar replacement (or non-placeholder) — visit normally
+                new_elem = self.visit(elem, p)
                 if new_elem is not None:
                     new_padded.append(rp.replace(element=new_elem))
             method = method.padding.replace(
@@ -289,34 +342,3 @@ class PlaceholderReplacementVisitor(PythonVisitor[None]):
             )
 
         return method
-
-
-class VariadicExpansionVisitor(PythonVisitor[None]):
-    """
-    Visitor that expands variadic captures in containers.
-
-    When a variadic capture matches multiple elements (like function arguments),
-    this visitor handles expanding them into the appropriate container structure.
-    """
-
-    def __init__(
-        self,
-        values: Dict[str, J],
-        variadic_values: Dict[str, List[J]]
-    ):
-        """
-        Initialize the expansion visitor.
-
-        Args:
-            values: Dict mapping capture names to single AST values.
-            variadic_values: Dict mapping capture names to lists of AST values.
-        """
-        super().__init__()
-        self._values = values
-        self._variadic_values = variadic_values
-
-    # TODO: Implement variadic expansion for:
-    # - Function arguments
-    # - List/tuple/set elements
-    # - Dict key-value pairs
-    # - Block statements

@@ -79,7 +79,10 @@ public class Assertions {
             List<Docker> elementsWithNonBlankWhitespace = new DockerIsoVisitor<List<Docker>>() {
                 @Override
                 public Space visitSpace(Space space, List<Docker> elements) {
-                    if (!space.getWhitespace().trim().isEmpty()) {
+                    // Strip line continuation characters (\ or ` followed by optional whitespace and newline)
+                    // before checking, since they are valid in Dockerfile whitespace
+                    String ws = space.getWhitespace().replaceAll("[\\\\`][ \\t]*(?=\\r?\\n)", "");
+                    if (!ws.trim().isEmpty()) {
                         elements.add(getCursor().firstEnclosingOrThrow(Docker.class));
                     }
                     return super.visitSpace(space, elements);

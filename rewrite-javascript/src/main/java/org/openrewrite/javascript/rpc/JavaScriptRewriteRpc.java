@@ -18,12 +18,17 @@ package org.openrewrite.javascript.rpc;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.javascript.JavaScriptParser;
+import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
+import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -43,6 +48,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+
+import static java.util.Collections.singletonList;
 import java.util.stream.StreamSupport;
 
 import static java.util.Objects.requireNonNull;
@@ -85,6 +92,10 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
     public static void shutdownCurrent() {
         MANAGER.shutdown();
+    }
+
+    public static void resetCurrent() {
+        MANAGER.reset();
     }
 
     public InstallRecipesResponse installRecipes(File recipes) {
@@ -147,6 +158,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
      */
     public Stream<SourceFile> parseProject(Path projectPath, @Nullable List<String> exclusions, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
 
         return StreamSupport.stream(new Spliterator<SourceFile>() {
             private int index = 0;
@@ -169,7 +181,26 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
                 SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
                 // for status update messages
-                parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                Parser.Input input = Parser.Input.fromFile(sourceFile.getSourcePath());
+                parsingListener.startedParsing(input);
+                try {
+                    if (sourceFile instanceof JS.CompilationUnit) {
+                        validator.visit(sourceFile, 0);
+                    }
+                } catch (Exception e) {
+                    sourceFile = new ParseError(
+                            sourceFile.getId(),
+                            new Markers(Tree.randomId(), singletonList(
+                                    ParseExceptionResult.build(JavaScriptParser.class, e, e.getMessage()))),
+                            sourceFile.getSourcePath(),
+                            null,
+                            null,
+                            false,
+                            null,
+                            input.getSource(ctx).readFully(),
+                            null
+                    );
+                }
                 action.accept(sourceFile);
                 return true;
             }
@@ -315,6 +346,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         @Override
         public JavaScriptRewriteRpc get() {
+            DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());
+
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
@@ -328,6 +361,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
                         serverJs.toAbsolutePath().normalize().toString(),
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         traceRpcMessages ? "--trace-rpc-messages" : null,
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
@@ -353,6 +387,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
             if (workingDirectory != null) {
                 process.setWorkingDirectory(workingDirectory);
             }
+            process.setStderrRedirect(log);
 
             process.environment().putAll(environment);
             // caller-provided options, if any, are taking precedence over the options baked above

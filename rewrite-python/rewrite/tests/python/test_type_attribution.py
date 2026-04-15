@@ -1517,3 +1517,411 @@ handler: typing.Callable[[int], str] = lambda x: str(x)
                 f"Expected typing.Callable to resolve to a Class, got Unknown"
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestCallableDescriptor:
+    """Tests for the callable kind descriptor (Callable[[int], str])."""
+
+    def test_callable_with_return_type(self):
+        """A callable descriptor with returnType should resolve to the return type."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[200] = {
+            'kind': 'callable',
+            'parameters': [
+                {'name': '', 'kind': 'positionalOnly', 'typeId': 201, 'hasDefault': False},
+            ],
+            'returnType': 202,
+        }
+        mapping._type_registry[201] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[202] = {'kind': 'instance', 'className': 'str'}
+
+        result = mapping._resolve_type(200)
+        assert result == JavaType.Primitive.String
+
+    def test_callable_without_return_type(self):
+        """A callable descriptor without returnType should return Unknown."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[200] = {
+            'kind': 'callable',
+            'parameters': [],
+        }
+
+        result = mapping._resolve_type(200)
+        assert isinstance(result, JavaType.Unknown)
+
+    def test_callable_is_not_variable(self):
+        """Callable descriptors should not be treated as variables."""
+        mapping = PythonTypeMapping("", file_path=None)
+        descriptor = {'kind': 'callable', 'parameters': [], 'returnType': None}
+        assert not mapping._is_variable_descriptor(descriptor)
+
+
+class TestWrapperDescriptor:
+    """Tests for the wrapperDescriptor kind."""
+
+    def test_wrapper_descriptor_with_return_type(self):
+        """A wrapperDescriptor with returnType should resolve to the return type."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[300] = {
+            'kind': 'wrapperDescriptor',
+            'descriptorKind': 'Get',
+            'parameters': [
+                {'name': 'self', 'kind': 'positionalOrKeyword', 'typeId': 301, 'hasDefault': False},
+            ],
+            'returnType': 302,
+        }
+        mapping._type_registry[301] = {'kind': 'instance', 'className': 'MyClass'}
+        mapping._type_registry[302] = {'kind': 'instance', 'className': 'int'}
+
+        result = mapping._resolve_type(300)
+        assert result == JavaType.Primitive.Int
+
+    def test_wrapper_descriptor_is_not_variable(self):
+        """wrapperDescriptor should not be treated as a variable."""
+        mapping = PythonTypeMapping("", file_path=None)
+        descriptor = {'kind': 'wrapperDescriptor', 'descriptorKind': 'Set'}
+        assert not mapping._is_variable_descriptor(descriptor)
+
+
+class TestKnownInstanceDescriptor:
+    """Tests for the knownInstance kind."""
+
+    def test_known_instance_resolves_to_class(self):
+        """A knownInstance with className should resolve to a class type."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = {
+            'kind': 'knownInstance',
+            'className': 'TypeVar',
+        }
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'typing.TypeVar'
+
+    def test_known_instance_special_form(self):
+        """A knownInstance for _SpecialForm should resolve correctly."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = {
+            'kind': 'knownInstance',
+            'className': '_SpecialForm',
+        }
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Class)
+        assert 'typing' in result._fully_qualified_name
+
+    def test_known_instance_empty_classname_returns_unknown(self):
+        """A knownInstance without className should return Unknown."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[400] = {
+            'kind': 'knownInstance',
+            'className': '',
+        }
+
+        result = mapping._resolve_type(400)
+        assert isinstance(result, JavaType.Unknown)
+
+
+class TestTypeAliasDescriptor:
+    """Tests for the enriched typeAlias kind."""
+
+    def test_type_alias_with_value_type(self):
+        """A typeAlias with valueType should resolve to the underlying type."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[500] = {
+            'kind': 'typeAlias',
+            'name': 'MyAlias',
+            'valueType': 501,
+        }
+        mapping._type_registry[501] = {'kind': 'instance', 'className': 'int'}
+
+        result = mapping._resolve_type(500)
+        assert result == JavaType.Primitive.Int
+
+    def test_type_alias_without_value_type(self):
+        """A typeAlias without valueType should fall back to class from name."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[500] = {
+            'kind': 'typeAlias',
+            'name': 'MyAlias',
+        }
+
+        result = mapping._resolve_type(500)
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'MyAlias'
+
+    def test_type_alias_with_class_value_type(self):
+        """A typeAlias pointing to a class should resolve to that class."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[500] = {
+            'kind': 'typeAlias',
+            'name': 'StringList',
+            'valueType': 501,
+            'typeParameters': [],
+        }
+        mapping._type_registry[501] = {
+            'kind': 'instance',
+            'className': 'list',
+        }
+
+        result = mapping._resolve_type(500)
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'list'
+
+
+class TestTypeVarConstraints:
+    """Tests for typeVar constraints field."""
+
+    def test_typevar_with_constraints(self):
+        """A typeVar with constraints should have them as bounds."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[600] = {
+            'kind': 'typeVar',
+            'name': 'T',
+            'variance': 'invariant',
+            'constraints': [601, 602],
+        }
+        mapping._type_registry[601] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[602] = {'kind': 'instance', 'className': 'str'}
+
+        result = mapping._resolve_type(600)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert result.name == 'T'
+        assert len(result.bounds) == 2
+        assert result.bounds[0] is JavaType.Primitive.Int
+        assert result.bounds[1] is JavaType.Primitive.String
+
+    def test_typevar_upper_bound_takes_precedence_over_constraints(self):
+        """upperBound should be used instead of constraints when both present."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[600] = {
+            'kind': 'typeVar',
+            'name': 'T',
+            'variance': 'invariant',
+            'upperBound': 601,
+            'constraints': [602, 603],
+        }
+        mapping._type_registry[601] = {'kind': 'instance', 'className': 'float'}
+        mapping._type_registry[602] = {'kind': 'instance', 'className': 'int'}
+        mapping._type_registry[603] = {'kind': 'instance', 'className': 'str'}
+
+        result = mapping._resolve_type(600)
+        assert isinstance(result, JavaType.GenericTypeVariable)
+        assert len(result.bounds) == 1
+        assert result.bounds[0] is JavaType.Primitive.Double  # float -> Double
+
+
+class TestBoundMethodClassName:
+    """Tests for the boundMethod className field."""
+
+    def test_bound_method_declaring_type_from_classname(self):
+        """boundMethod with className should resolve declaring type."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[700] = {
+            'kind': 'boundMethod',
+            'name': 'method',
+            'className': 'MyClass',
+            'moduleName': 'mymod',
+            'parameters': [],
+            'returnType': 701,
+        }
+        mapping._type_registry[701] = {'kind': 'instance', 'className': 'str'}
+
+        result = mapping._declaring_type_from_descriptor(mapping._type_registry[700])
+        assert result is not None
+        assert isinstance(result, JavaType.Class)
+        assert result._fully_qualified_name == 'mymod.MyClass'
+
+    def test_bound_method_declaring_type_builtins_no_module(self):
+        """boundMethod from builtins should use just className."""
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[700] = {
+            'kind': 'boundMethod',
+            'name': 'upper',
+            'className': 'str',
+            'moduleName': 'builtins',
+            'parameters': [],
+            'returnType': 701,
+        }
+        mapping._type_registry[701] = {'kind': 'instance', 'className': 'str'}
+
+        result = mapping._declaring_type_from_descriptor(mapping._type_registry[700])
+        assert result is not None
+        assert result._fully_qualified_name == 'str'
+
+
+@requires_ty_types_cli
+class TestNewDescriptorsWithTyTypes:
+    """Integration tests for new ty-types 0.0.20 descriptor kinds using live ty-types."""
+
+    def test_callable_annotation_resolves(self):
+        """A Callable[[int], str] annotation should resolve."""
+        source = '''from typing import Callable
+my_func: Callable[[int], str] = str
+my_func
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[2].value  # bare 'my_func' expression
+            result = mapping.type(name_node)
+            # The type of my_func should be a callable — resolve to its return type (str)
+            # or to a class type. Either way, not Unknown.
+            assert result is not None
+            assert not isinstance(result, JavaType.Unknown), \
+                "Callable annotation should not resolve to Unknown"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_bound_method_has_classname_declaring_type(self):
+        """Bound method on user class should produce declaring type from className."""
+        source = '''class Calculator:
+    def add(self, a: int, b: int) -> int:
+        return a + b
+
+c = Calculator()
+c.add(1, 2)
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            call = tree.body[2].value  # c.add(1, 2)
+            result = mapping.method_invocation_type(call)
+            assert result is not None
+            assert result._name == 'add'
+            assert result._declaring_type is not None
+            assert result._declaring_type._fully_qualified_name.endswith('Calculator')
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_typevar_with_constraints_from_ty_types(self):
+        """TypeVar with constraints should produce GenericTypeVariable with bounds."""
+        source = '''from typing import TypeVar
+T = TypeVar('T', int, str)
+x: T
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            # Look up the type of 'x' which should be T
+            name_node = tree.body[2].target  # x in 'x: T'
+            result = mapping.type(name_node)
+            # T should be a GenericTypeVariable
+            if isinstance(result, JavaType.GenericTypeVariable):
+                assert result.name == 'T'
+                # With constraints, bounds should have int and str
+                assert len(result.bounds) >= 1
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_type_alias_resolves_through_value(self):
+        """A type alias should resolve through to its value type."""
+        source = '''type MyInt = int
+x: MyInt = 42
+x
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[2].value  # bare 'x'
+            result = mapping.type(name_node)
+            # x: MyInt should resolve to int
+            assert result is not None
+            # Could be Primitive.Int or a Class('int') or Class('MyInt')
+            # The key is it shouldn't be Unknown
+            assert not isinstance(result, JavaType.Unknown), \
+                "type alias should not resolve to Unknown"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_known_instance_typevar_resolves_to_class(self):
+        """The TypeVar constructor name should resolve to a class, not Unknown."""
+        source = '''from typing import TypeVar
+TypeVar
+'''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            name_node = tree.body[1].value  # bare 'TypeVar'
+            result = mapping.type(name_node)
+            assert result is not None
+            assert not isinstance(result, JavaType.Unknown), \
+                "TypeVar name should resolve to a Class via knownInstance"
+            assert isinstance(result, JavaType.Class)
+            assert 'typing' in result._fully_qualified_name
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestDeclarationDeclaringType:
+    """Tests for declaring type on function declarations."""
+
+    def test_declaration_declaring_type_no_ty_types(self):
+        """Without ty-types, declaring type remains None."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        tree = ast.parse(source)
+        mapping = PythonTypeMapping(source)
+        func_node = tree.body[0]
+        result = mapping.method_declaration_type(func_node)
+        assert result is not None
+        assert result._declaring_type is None
+
+    @requires_ty_types_cli
+    def test_declaration_declaring_type_with_ty_types(self):
+        """With ty-types, a function declaration should get a declaring type from the descriptor."""
+        source = 'def greet(name: str) -> str:\n    return name\n'
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            func_node = tree.body[0]
+            result = mapping.method_declaration_type(func_node)
+            assert result is not None
+            assert isinstance(result, JavaType.Method)
+            assert result._declaring_type is not None, \
+                "Declaration should have a declaring type, not None"
+            assert isinstance(result._declaring_type, JavaType.Class)
+            assert result._declaring_type._fully_qualified_name != "<unknown>"
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+
+class TestCyclicTypeResolution:
+    """Tests that FQN-deduplicated types don't produce self-referential supertypes.
+
+    Python's namedtuple pattern ``class Pair(namedtuple('Pair', ...))`` creates
+    two types with the same FQN. The type mapping deduplicates by FQN, which can
+    cause the single JavaType.Class object to have itself as its own supertype.
+    """
+
+    def test_namedtuple_subclass_no_self_supertype(self):
+        """A class extending a namedtuple with the same name must not have
+        itself as its own supertype.
+
+        This is the pattern from importlib_metadata._collections.Pair that
+        caused StackOverflowError in TypeUtils.isAssignableTo() on Moderne.
+        """
+        source = 'x = 1'
+        mapping = PythonTypeMapping(source)
+
+        # Simulate what ty-types produces for:
+        #   class Pair(collections.namedtuple('Pair', 'name value')): ...
+        # Two classLiteral descriptors with the same FQN but different type_ids.
+        # type_id 1: the namedtuple-generated Pair (no supertypes of its own here)
+        # type_id 2: the class Pair, whose supertype is type_id 1
+        mapping._type_registry[1] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [],
+        }
+        mapping._type_registry[2] = {
+            'kind': 'classLiteral',
+            'className': 'Pair',
+            'moduleName': 'mymodule',
+            'supertypes': [1],
+        }
+
+        type_pair = mapping._resolve_type(2)
+
+        assert type_pair is not None
+        assert isinstance(type_pair, JavaType.FullyQualified)
+        assert type_pair.fully_qualified_name == 'mymodule.Pair'
+
+        # The supertype must NOT be itself
+        supertype = getattr(type_pair, '_supertype', None)
+        assert supertype is not type_pair, \
+            "Pair has itself as its own supertype — would cause StackOverflowError in Java"

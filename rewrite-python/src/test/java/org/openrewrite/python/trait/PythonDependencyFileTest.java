@@ -1,0 +1,841 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.python.trait;
+
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.*;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.python.marker.PythonResolutionResult;
+import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
+import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
+import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.toml.TomlParser;
+import org.openrewrite.toml.TomlVisitor;
+import org.openrewrite.toml.tree.Toml;
+
+import java.nio.file.Paths;
+import java.util.*;
+
+import static java.util.Collections.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.python.Assertions.pyproject;
+import static org.openrewrite.python.Assertions.requirementsTxt;
+
+class PythonDependencyFileTest implements RewriteTest {
+
+    // region Helper methods
+
+    private static PythonResolutionResult createMarker(List<Dependency> dependencies,
+                                                       List<ResolvedDependency> resolved) {
+        return new PythonResolutionResult(
+          randomId(), "test-project", "1.0.0", null, null,
+          ".", null, null,
+          emptyList(), dependencies,
+          Collections.emptyMap(), Collections.emptyMap(),
+          emptyList(), emptyList(),
+          resolved, null, null
+        );
+    }
+
+    private static Toml.Document parseToml(String content, PythonResolutionResult marker) {
+        TomlParser parser = new TomlParser();
+        Parser.Input input = Parser.Input.fromString(Paths.get("pyproject.toml"), content);
+        List<SourceFile> parsed = parser.parseInputs(
+          singletonList(input), null,
+          new InMemoryExecutionContext(Throwable::printStackTrace)
+        ).toList();
+        Toml.Document doc = (Toml.Document) parsed.getFirst();
+        return doc.withMarkers(doc.getMarkers().addIfAbsent(marker));
+    }
+
+    private static PlainText createRequirementsTxt(String content, PythonResolutionResult marker) {
+        return new PlainText(
+          randomId(), Paths.get("requirements.txt"),
+          Markers.EMPTY.addIfAbsent(marker),
+          "UTF-8", false, null, null, content, null
+        );
+    }
+
+    private static Cursor rootCursor(Object value) {
+        return new Cursor(new Cursor(null, Cursor.ROOT_VALUE), value);
+    }
+
+    private static PyProjectFile pyProjectTrait(Toml.Document doc, PythonResolutionResult marker) {
+        return new PyProjectFile(rootCursor(doc), marker);
+    }
+
+    private static RequirementsFile requirementsTrait(PlainText pt, PythonResolutionResult marker) {
+        return new RequirementsFile(rootCursor(pt), marker);
+    }
+
+    /**
+     * A recipe that applies {@link PythonDependencyFile#withDependencySearchMarkers} via the trait matcher.
+     */
+    private static Recipe searchMarkersRecipe(Map<String, String> packageMessages) {
+        return searchMarkersRecipe(packageMessages, null, null);
+    }
+
+    private static Recipe searchMarkersRecipe(Map<String, String> packageMessages, @Nullable String scope, @Nullable String groupName) {
+        return RewriteTest.toRecipe(() -> new TreeVisitor<>() {
+            final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+            @Override
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                PythonDependencyFile trait = matcher.test(getCursor());
+                if (trait != null) {
+                    return trait.withDependencySearchMarkers(packageMessages, scope, groupName, ctx).getTree();
+                }
+                return tree;
+            }
+        });
+    }
+
+    // endregion
+
+    @Nested
+    class RewritePep508SpecTest {
+        @Test
+        void simpleUpgrade() {
+            String result = PythonDependencyFile.rewritePep508Spec("requests>=2.28.0", "requests", "2.31.0");
+            assertThat(result).isEqualTo("requests>=2.31.0");
+        }
+
+        @Test
+        void preservesExtras() {
+            String result = PythonDependencyFile.rewritePep508Spec("requests[security]>=2.28.0", "requests", "2.31.0");
+            assertThat(result).isEqualTo("requests[security]>=2.31.0");
+        }
+
+        @Test
+        void preservesEnvironmentMarker() {
+            String result = PythonDependencyFile.rewritePep508Spec(
+              "pywin32>=300; sys_platform=='win32'", "pywin32", "306");
+            assertThat(result).isEqualTo("pywin32>=306; sys_platform=='win32'");
+        }
+
+        @Test
+        void preservesExtrasAndMarker() {
+            String result = PythonDependencyFile.rewritePep508Spec(
+              "requests[security]>=2.28.0; python_version>='3.8'", "requests", "2.31.0");
+            assertThat(result).isEqualTo("requests[security]>=2.31.0; python_version>='3.8'");
+        }
+
+        @Test
+        void nameOnly() {
+            String result = PythonDependencyFile.rewritePep508Spec("requests", "requests", "2.31.0");
+            assertThat(result).isEqualTo("requests>=2.31.0");
+        }
+    }
+
+    @Nested
+    class UpdateResolvedVersionsTest {
+        @Test
+        void updatesMatchingVersions() {
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
+            ResolvedDependency flask = new ResolvedDependency("flask", "2.0.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), Arrays.asList(requests, flask));
+
+            Map<String, String> updates = Map.of("requests", "2.31.0");
+            PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
+
+            assertThat(updated.getResolvedDependencies()).hasSize(2);
+            assertThat(updated.getResolvedDependencies().get(0).getVersion()).isEqualTo("2.31.0");
+            assertThat(updated.getResolvedDependencies().get(1).getVersion()).isEqualTo("2.0.0");
+        }
+
+        @Test
+        void returnsOriginalWhenNoChanges() {
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(requests));
+
+            Map<String, String> updates = Map.of("nonexistent", "1.0.0");
+            PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
+
+            assertThat(updated).isSameAs(marker);
+        }
+
+        @Test
+        void returnsOriginalWhenVersionUnchanged() {
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(requests));
+
+            Map<String, String> updates = Map.of("requests", "2.28.0");
+            PythonResolutionResult updated = PythonDependencyFile.updateResolvedVersions(marker, updates);
+
+            assertThat(updated).isSameAs(marker);
+        }
+    }
+
+    @Nested
+    class MatcherTest {
+        PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+
+        @Test
+        void matchesPyProjectToml() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.31.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+            Toml.Document doc = parseToml("[project]\nname = \"test\"\ndependencies = [\"requests>=2.28.0\"]", marker);
+
+            PythonDependencyFile result = matcher.test(rootCursor(doc));
+
+            assertThat(result).isInstanceOf(PyProjectFile.class);
+        }
+
+        @Test
+        void matchesRequirementsTxt() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.31.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+
+            PythonDependencyFile result = matcher.test(rootCursor(pt));
+
+            assertThat(result).isInstanceOf(RequirementsFile.class);
+        }
+
+        @Test
+        void doesNotMatchWithoutMarker() {
+            TomlParser parser = new TomlParser();
+            Parser.Input input = Parser.Input.fromString(Paths.get("pyproject.toml"),
+              "[project]\nname = \"test\"");
+            Toml.Document doc = (Toml.Document) parser.parseInputs(
+              singletonList(input), null,
+              new InMemoryExecutionContext(Throwable::printStackTrace)
+            ).toList().getFirst();
+
+            assertThat(matcher.test(rootCursor(doc))).isNull();
+        }
+
+        @Test
+        void doesNotMatchNonPythonFile() {
+            PlainText pt = new PlainText(
+              randomId(), Paths.get("readme.txt"),
+              Markers.EMPTY, "UTF-8", false, null, null, "hello", null
+            );
+
+            assertThat(matcher.test(rootCursor(pt))).isNull();
+        }
+    }
+
+    @Nested
+    class PyProjectFileTest {
+
+        @Test
+        void upgradesDependencyVersion() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            Dependency dep = new Dependency("requests", ">=2.28.0", null, null, resolved);
+            PythonResolutionResult marker = createMarker(singletonList(dep), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            Toml.Document result = (Toml.Document) upgraded.getTree();
+            String printed = result.printAll();
+            assertThat(printed).contains("\"requests>=2.31.0\"");
+            assertThat(printed).doesNotContain("\"requests>=2.28.0\"");
+        }
+
+        @Test
+        void upgradePreservesExtras() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests[security]>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            String printed = upgraded.getTree().printAll();
+            assertThat(printed).contains("\"requests[security]>=2.31.0\"");
+        }
+
+        @Test
+        void upgradeNoOpWhenPackageNotFound() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> upgrades = singletonMap("nonexistent", "1.0.0");
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(upgraded).isSameAs(trait);
+        }
+
+        @Test
+        void upgradeUpdatesResolvedVersionsInMarker() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(upgraded.getMarker().getResolvedDependencies().getFirst().getVersion()).isEqualTo("2.31.0");
+        }
+
+        @Test
+        void searchMarkersOnVulnerableDependency() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n    \"flask>=2.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = singletonMap("requests", "CVE-2023-1234");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
+
+            Toml.Document result = (Toml.Document) marked.getTree();
+            new TomlVisitor<Integer>() {
+                @Override
+                public Toml visitLiteral(Toml.Literal literal, Integer p) {
+                    if (literal.getValue().toString().contains("requests")) {
+                        assertThat(literal.getMarkers().findFirst(SearchResult.class)).isPresent();
+                    }
+                    return literal;
+                }
+            }.visit(result, 0);
+            assertThat(result).isNotSameAs(doc);
+        }
+
+        @Test
+        void searchMarkersNoOpWhenNoMatch() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = singletonMap("nonexistent", "CVE-2023-9999");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
+
+            assertThat(marked).isSameAs(trait);
+        }
+
+        @Test
+        void searchMarkersFilteredByMatchingScope() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = singletonMap("requests", "CVE-2023-1234");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, "project.dependencies", null, ctx);
+
+            Toml.Document result = (Toml.Document) marked.getTree();
+            assertThat(result).isNotSameAs(doc);
+            new TomlVisitor<Integer>() {
+                @Override
+                public Toml visitLiteral(Toml.Literal literal, Integer p) {
+                    if (literal.getValue().toString().contains("requests")) {
+                        assertThat(literal.getMarkers().findFirst(SearchResult.class)).isPresent();
+                    }
+                    return literal;
+                }
+            }.visit(result, 0);
+        }
+
+        @Test
+        void searchMarkersNoOpWhenScopeDoesNotMatch() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = singletonMap("requests", "CVE-2023-1234");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, "build-system.requires", null, ctx);
+
+            assertThat(marked).isSameAs(trait);
+        }
+
+        @Test
+        void searchMarkersNullScopeMatchesAllSections() {
+            ResolvedDependency setuptools = new ResolvedDependency("setuptools", "68.0", null, null);
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), List.of(setuptools, requests));
+
+            String toml = "[build-system]\nrequires = [\"setuptools>=67.0\"]\n\n[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> vulnerabilities = new HashMap<>();
+            vulnerabilities.put("setuptools", "CVE-2023-0001");
+            vulnerabilities.put("requests", "CVE-2023-1234");
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            PyProjectFile marked = trait.withDependencySearchMarkers(vulnerabilities, null, null, ctx);
+
+            Toml.Document result = (Toml.Document) marked.getTree();
+            assertThat(result).isNotSameAs(doc);
+            boolean[] foundSetuptools = {false};
+            boolean[] foundRequests = {false};
+            new TomlVisitor<Integer>() {
+                @Override
+                public Toml visitLiteral(Toml.Literal literal, Integer p) {
+                    if (literal.getValue().toString().contains("setuptools") &&
+                      literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                        foundSetuptools[0] = true;
+                    }
+                    if (literal.getValue().toString().contains("requests") &&
+                      literal.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                        foundRequests[0] = true;
+                    }
+                    return literal;
+                }
+            }.visit(result, 0);
+            assertThat(foundSetuptools[0]).as("setuptools in build-system should be marked").isTrue();
+            assertThat(foundRequests[0]).as("requests in project.dependencies should be marked").isTrue();
+        }
+
+        @Test
+        void upgradeMultipleDependencies() {
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
+            ResolvedDependency flask = new ResolvedDependency("flask", "2.0.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), List.of(requests, flask));
+
+            String toml = "[project]\nname = \"test\"\ndependencies = [\n    \"requests>=2.28.0\",\n    \"flask>=2.0.0\",\n]";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> upgrades = new HashMap<>();
+            upgrades.put("requests", "2.31.0");
+            upgrades.put("flask", "3.0.0");
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            String printed = upgraded.getTree().printAll();
+            assertThat(printed).contains("\"requests>=2.31.0\"");
+            assertThat(printed).contains("\"flask>=3.0.0\"");
+        }
+
+        @Test
+        void doesNotUpgradeDependenciesOutsideTargetScope() {
+            ResolvedDependency resolved = new ResolvedDependency("setuptools", "68.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            String toml = "[build-system]\nrequires = [\"setuptools>=67.0\"]\n\n[project]\nname = \"test\"\ndependencies = []";
+            Toml.Document doc = parseToml(toml, marker);
+            PyProjectFile trait = pyProjectTrait(doc, marker);
+
+            Map<String, String> upgrades = singletonMap("setuptools", "69.0");
+            PyProjectFile upgraded = trait.withUpgradedVersions(upgrades, "project.dependencies", null);
+
+            // build-system is not inside project.dependencies, so it should not be upgraded
+            assertThat(upgraded).isSameAs(trait);
+        }
+    }
+
+    @Nested
+    class RequirementsFileTest {
+
+        @Test
+        void upgradesDependencyVersion() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0\nflask>=2.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            PlainText result = (PlainText) upgraded.getTree();
+            assertThat(result.getText()).contains("requests>=2.31.0");
+            assertThat(result.getText()).contains("flask>=2.0");
+        }
+
+        @Test
+        void upgradePreservesExtras() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests[security]>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).isEqualTo("requests[security]>=2.31.0");
+        }
+
+        @Test
+        void upgradePreservesEnvironmentMarkers() {
+            ResolvedDependency resolved = new ResolvedDependency("pywin32", "300", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("pywin32>=300; sys_platform=='win32'", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("pywin32", "306");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText())
+              .isEqualTo("pywin32>=306; sys_platform=='win32'");
+        }
+
+        @Test
+        void upgradeSkipsComments() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("# this is a comment\nrequests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            String text = ((PlainText) upgraded.getTree()).getText();
+            assertThat(text).startsWith("# this is a comment\n");
+            assertThat(text).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void upgradeSkipsFlags() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("-r base.txt\nrequests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            String text = ((PlainText) upgraded.getTree()).getText();
+            assertThat(text).startsWith("-r base.txt\n");
+            assertThat(text).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void upgradeNoOpWhenPackageNotFound() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("nonexistent", "1.0.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(upgraded).isSameAs(trait);
+        }
+
+        @Test
+        void upgradeUpdatesResolvedVersionsInMarker() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(upgraded.getMarker().getResolvedDependencies().getFirst().getVersion()).isEqualTo("2.31.0");
+        }
+
+        @Test
+        void upgradePreservesLeadingWhitespace() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("  requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).isEqualTo("  requests>=2.31.0");
+        }
+
+        @Test
+        void addsDependencyToEnd() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> additions = singletonMap("flask", "3.0.0");
+            RequirementsFile added = trait.withAddedDependencies(additions, null, null);
+
+            String text = ((PlainText) added.getTree()).getText();
+            assertThat(text).isEqualTo("requests>=2.28.0\nflask>=3.0.0");
+        }
+
+        @Test
+        void addDependencyNoOpWhenAlreadyPresent() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> additions = singletonMap("requests", "2.31.0");
+            RequirementsFile added = trait.withAddedDependencies(additions, null, null);
+
+            assertThat(added).isSameAs(trait);
+        }
+
+        @Test
+        void searchMarkersOnVulnerableDependency() {
+            rewriteRun(
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"))),
+              requirementsTxt(
+                "requests>=2.28.0\nflask>=2.0",
+                "~~(CVE-2023-1234)~~>requests>=2.28.0\nflask>=2.0"
+              )
+            );
+        }
+
+        @Test
+        void searchMarkersNoOpWhenNoMatch() {
+            rewriteRun(
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("nonexistent", "CVE-2023-9999"))),
+              requirementsTxt("requests>=2.28.0")
+            );
+        }
+
+        @Test
+        void upgradeMultipleDependencies() {
+            ResolvedDependency requests = new ResolvedDependency("requests", "2.28.0", null, null);
+            ResolvedDependency flask = new ResolvedDependency("flask", "2.0.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), List.of(requests, flask));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0\nflask>=2.0.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = new HashMap<>();
+            upgrades.put("requests", "2.31.0");
+            upgrades.put("flask", "3.0.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            String text = ((PlainText) upgraded.getTree()).getText();
+            assertThat(text).contains("requests>=2.31.0");
+            assertThat(text).contains("flask>=3.0.0");
+        }
+
+        @Test
+        void upgradeHandlesEmptyLines() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0\n\nflask>=2.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            String text = ((PlainText) upgraded.getTree()).getText();
+            assertThat(text).isEqualTo("requests>=2.31.0\n\nflask>=2.0");
+        }
+
+        @Test
+        void searchMarkersNullScopeMatchesAllFiles() {
+            rewriteRun(
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"), null, null)),
+              requirementsTxt(
+                "requests>=2.28.0",
+                "~~(CVE-2023-1234)~~>requests>=2.28.0",
+                s -> s.path("requirements-dev.txt")
+              )
+            );
+        }
+
+        @Test
+        void searchMarkersMatchingScopeMarksFile() {
+            rewriteRun(
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"), "", null)),
+              requirementsTxt(
+                "requests>=2.28.0",
+                "~~(CVE-2023-1234)~~>requests>=2.28.0"
+              )
+            );
+        }
+
+        @Test
+        void searchMarkersNoOpWhenScopeDoesNotMatch() {
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(new ResolvedDependency("requests", "2.28.0", null, null)));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+            RequirementsFile marked = trait.withDependencySearchMarkers(
+              singletonMap("requests", "CVE-2023-1234"), "dev", null, ctx);
+
+            assertThat(marked).isSameAs(trait);
+        }
+    }
+
+    @Nested
+    class PyProjectSearchMarkersTest {
+
+        @Test
+        void searchMarkersViaMatcher() {
+            rewriteRun(
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("requests", "CVE-2023-1234"))),
+              pyproject(
+                """
+                  [project]
+                  name = "test"
+                  dependencies = [
+                      "requests>=2.28.0",
+                      "flask>=2.0",
+                  ]
+                  """,
+                """
+                  [project]
+                  name = "test"
+                  dependencies = [
+                      ~~(CVE-2023-1234)~~>"requests>=2.28.0",
+                      "flask>=2.0",
+                  ]
+                  """
+              )
+            );
+        }
+
+        @Test
+        void searchMarkersNoOpViaMatcher() {
+            rewriteRun(
+              spec -> spec.recipe(searchMarkersRecipe(
+                singletonMap("nonexistent", "CVE-2023-9999"))),
+              pyproject(
+                """
+                  [project]
+                  name = "test"
+                  dependencies = [
+                      "requests>=2.28.0",
+                  ]
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    class RequirementsScopeFilterTest {
+
+        @Test
+        void nullScopeMatchesAllFiles() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, null, null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void emptyScopeMatchesRootRequirementsTxt() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            // requirements.txt (no suffix) should match scope=""
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "", null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void emptyScopeDoesNotMatchScopedFile() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = new PlainText(
+              randomId(), Paths.get("requirements-dev.txt"),
+              Markers.EMPTY.addIfAbsent(marker),
+              "UTF-8", false, null, null, "requests>=2.28.0", null
+            );
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "", null);
+
+            // scope="" should NOT match requirements-dev.txt
+            assertThat(upgraded).isSameAs(trait);
+        }
+
+        @Test
+        void devScopeMatchesDevFile() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = new PlainText(
+              randomId(), Paths.get("requirements-dev.txt"),
+              Markers.EMPTY.addIfAbsent(marker),
+              "UTF-8", false, null, null, "requests>=2.28.0", null
+            );
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "dev", null);
+
+            assertThat(((PlainText) upgraded.getTree()).getText()).contains("requests>=2.31.0");
+        }
+
+        @Test
+        void devScopeDoesNotMatchRootFile() {
+            ResolvedDependency resolved = new ResolvedDependency("requests", "2.28.0", null, null);
+            PythonResolutionResult marker = createMarker(emptyList(), singletonList(resolved));
+
+            PlainText pt = createRequirementsTxt("requests>=2.28.0", marker);
+            RequirementsFile trait = requirementsTrait(pt, marker);
+
+            Map<String, String> upgrades = singletonMap("requests", "2.31.0");
+            RequirementsFile upgraded = trait.withUpgradedVersions(upgrades, "dev", null);
+
+            // scope="dev" should NOT match requirements.txt
+            assertThat(upgraded).isSameAs(trait);
+        }
+    }
+}

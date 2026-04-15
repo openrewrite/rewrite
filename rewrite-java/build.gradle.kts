@@ -93,7 +93,7 @@ tasks.withType<Javadoc>().configureEach {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java")
+    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/J.java", "**/ImportLayoutStyle**")
 }
 
 tasks.named<ShadowJar>("shadowJar").configure {

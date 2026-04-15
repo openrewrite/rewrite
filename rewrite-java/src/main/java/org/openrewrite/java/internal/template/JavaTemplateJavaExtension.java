@@ -435,12 +435,40 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     }
                     return m;
                 }
+                Object parentValue = getCursor().getParentTreeCursor().getValue();
+                if (loc == STATEMENT_PREFIX && isScope(method) &&
+                    (parentValue instanceof J.Return ||
+                     parentValue instanceof J.Assignment ||
+                     parentValue instanceof J.AssignmentOperation ||
+                     parentValue instanceof J.TypeCast)) {
+                    // Method invocation is used as an expression (e.g., inside return, assignment, type cast),
+                    // not as a standalone statement in a block. Parse as expression replacement.
+                    return autoFormat(unsubstitute(templateParser.parseExpression(
+                                    getCursor(),
+                                    substitutedTemplate,
+                                    substitutions.getTypeVariables(),
+                                    loc))
+                            .withPrefix(method.getPrefix()), integer);
+                }
                 return maybeReplaceStatement(method, J.class, 0);
             }
 
             @Override
             public J visitNewClass(J.NewClass newClass, Integer p) {
                 if (isScope(newClass)) {
+                    Object parentValue = getCursor().getParentTreeCursor().getValue();
+                    if (loc == STATEMENT_PREFIX &&
+                        (parentValue instanceof J.Return ||
+                         parentValue instanceof J.Assignment ||
+                         parentValue instanceof J.AssignmentOperation ||
+                         parentValue instanceof J.TypeCast)) {
+                        return autoFormat(unsubstitute(templateParser.parseExpression(
+                                        getCursor(),
+                                        substitutedTemplate,
+                                        substitutions.getTypeVariables(),
+                                        loc))
+                                .withPrefix(newClass.getPrefix()), p);
+                    }
                     // allow a `J.NewClass` to also be replaced by an expression
                     return maybeReplaceStatement(newClass, J.class, p);
                 }

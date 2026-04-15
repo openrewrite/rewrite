@@ -435,7 +435,7 @@ class PythonTypeMapping:
             module_name = descriptor.get('moduleName', '')
             return self._create_class_type(module_name)
 
-        elif kind in ('function', 'boundMethod'):
+        elif kind in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
             # Use structured return type if available
             return_type_id = descriptor.get('returnType')
             if return_type_id is not None:
@@ -451,7 +451,15 @@ class PythonTypeMapping:
                 fqn = f"{module_name}.{class_name}"
             else:
                 fqn = class_name
-            class_type = self._create_class_type(fqn)
+
+            # Create a fresh JavaType.Class per type_id rather than deduplicating
+            # by FQN. ty-types can emit multiple classLiterals with the same FQN
+            # (e.g., class Pair(namedtuple('Pair', ...))) and collapsing them
+            # would cause self-referential supertypes.
+            class_type = JavaType.Class()
+            class_type._flags_bit_map = 0
+            class_type._fully_qualified_name = fqn
+            class_type._kind = JavaType.FullyQualified.Kind.Class
 
             # Infer Kind from supertypes before resolving them
             supertypes = descriptor.get('supertypes', [])
@@ -468,12 +476,12 @@ class PythonTypeMapping:
                         break
 
             # Populate supertypes: first → _supertype, rest → _interfaces
-            if supertypes and getattr(class_type, '_supertype', None) is None:
+            if supertypes:
                 super_type = self._resolve_type(supertypes[0])
                 if isinstance(super_type, JavaType.FullyQualified):
                     class_type._supertype = super_type
 
-                if len(supertypes) > 1 and getattr(class_type, '_interfaces', None) is None:
+                if len(supertypes) > 1:
                     interfaces = []
                     for st_id in supertypes[1:]:
                         iface = self._resolve_type(st_id)
@@ -502,7 +510,7 @@ class PythonTypeMapping:
                     if member_type_id is None:
                         continue
                     member_desc = self._type_registry.get(member_type_id)
-                    if member_desc and member_desc.get('kind') in ('function', 'boundMethod'):
+                    if member_desc and member_desc.get('kind') in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
                         method = self._create_method_from_descriptor(member_desc, class_type)
                         if method:
                             methods.append(method)
@@ -555,6 +563,25 @@ class PythonTypeMapping:
                 return self._create_class_type(name)
             return _UNKNOWN
 
+        elif kind == 'knownInstance':
+            class_name = descriptor.get('className', '')
+            if class_name:
+                return self._create_class_type(f"typing.{class_name}")
+            return _UNKNOWN
+
+        elif kind == 'typeAlias':
+            # Resolve through to the underlying value type when available
+            value_type_id = descriptor.get('valueType')
+            if value_type_id is not None:
+                result = self._resolve_type(value_type_id)
+                if result is not None:
+                    return result
+            # Fall back to creating a class from the alias name
+            name = descriptor.get('name', '')
+            if name:
+                return self._create_class_type(name)
+            return _UNKNOWN
+
         elif kind == 'typeVar':
             name = descriptor.get('name', '')
             if not name:
@@ -571,6 +598,17 @@ class PythonTypeMapping:
                 bound_type = self._resolve_type(upper_bound_id)
                 if bound_type is not None:
                     bounds = [bound_type]
+            # Use constraints as bounds if no upper bound
+            if bounds is None:
+                constraint_ids = descriptor.get('constraints', [])
+                if constraint_ids:
+                    resolved_constraints = []
+                    for c_id in constraint_ids:
+                        c_type = self._resolve_type(c_id)
+                        if c_type is not None:
+                            resolved_constraints.append(c_type)
+                    if resolved_constraints:
+                        bounds = resolved_constraints
             return JavaType.GenericTypeVariable(_name=name, _variance=variance, _bounds=bounds)
 
         else:
@@ -624,7 +662,7 @@ class PythonTypeMapping:
     def _is_variable_descriptor(self, descriptor: Dict[str, Any]) -> bool:
         """Check if a type descriptor represents a variable (not a function, class, or module)."""
         kind = descriptor.get('kind')
-        return kind not in ('function', 'boundMethod', 'module', 'classLiteral')
+        return kind not in ('function', 'boundMethod', 'callable', 'wrapperDescriptor', 'module', 'classLiteral')
 
     def name_type_info(self, node: ast.Name) -> Tuple[Optional[JavaType], Optional[JavaType.Variable]]:
         """Get expression type and variable type for a name reference.
@@ -685,7 +723,7 @@ class PythonTypeMapping:
         type_id = self._lookup_type_id(node)
         if type_id is not None:
             descriptor = self._type_registry.get(type_id)
-            if descriptor and descriptor.get('kind') in ('function', 'boundMethod'):
+            if descriptor and descriptor.get('kind') in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
                 # If the descriptor has parameters/returnType, use them directly
                 params = descriptor.get('parameters')
                 ret_id = descriptor.get('returnType')
@@ -751,7 +789,7 @@ class PythonTypeMapping:
 
         return JavaType.Method(
             _flags_bit_map=0,
-            _declaring_type=None,
+            _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
@@ -906,7 +944,14 @@ class PythonTypeMapping:
                     kind = descriptor.get('kind')
                     if kind == 'module':
                         return self._create_class_type(descriptor.get('moduleName', ''))
-                    elif kind in ('function', 'boundMethod'):
+                    elif kind in ('function', 'boundMethod', 'callable', 'wrapperDescriptor'):
+                        # boundMethod has className — use it for declaring type
+                        class_name = descriptor.get('className')
+                        if class_name:
+                            module_name = descriptor.get('moduleName')
+                            if module_name and module_name != 'builtins':
+                                return self._create_class_type(f"{module_name}.{class_name}")
+                            return self._create_class_type(class_name)
                         module_name = descriptor.get('moduleName')
                         if module_name and module_name != 'builtins':
                             return self._create_class_type(module_name)
@@ -1020,6 +1065,14 @@ class PythonTypeMapping:
         elif kind == 'classLiteral':
             class_name = descriptor.get('className', '')
             return self._create_class_type(class_name)
+
+        elif kind == 'boundMethod':
+            class_name = descriptor.get('className')
+            if class_name:
+                module_name = descriptor.get('moduleName')
+                if module_name and module_name != 'builtins':
+                    return self._create_class_type(f"{module_name}.{class_name}")
+                return self._create_class_type(class_name)
 
         return None
 
@@ -1221,3 +1274,20 @@ class PythonTypeMapping:
     def module_to_fqn(module_path: str) -> str:
         """Convert a Python module path to a fully qualified name."""
         return module_path
+
+    def _get_declaration_declaring_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
+        """Get the declaring type for a function declaration.
+
+        Mirrors the invocation-side logic from _get_declaring_type() to ensure
+        declarations and invocations produce matching FQNs.
+        """
+        class_name = descriptor.get('className')
+        if class_name:
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                return self._create_class_type(f"{module_name}.{class_name}")
+            return self._create_class_type(class_name)
+        module_name = descriptor.get('moduleName')
+        if module_name and module_name != 'builtins':
+            return self._create_class_type(module_name)
+        return None

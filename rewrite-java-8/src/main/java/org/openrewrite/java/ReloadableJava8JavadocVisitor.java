@@ -582,9 +582,17 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
             cursor += ref.memberName.toString().length();
 
-            JavaType.Method methodRefType = methodReferenceType(ref, qualifierType);
-            JavaType.Variable fieldRefType = methodRefType == null ?
-                    fieldReferenceType(ref, qualifierType) : null;
+            JavaType.Method methodRefType;
+            JavaType.Variable fieldRefType;
+            if (ref.paramTypes != null) {
+                // Has parentheses -> must be a method reference
+                methodRefType = methodReferenceType(ref, qualifierType);
+                fieldRefType = null;
+            } else {
+                // No parentheses -> try field first (per Javadoc spec), fall back to method
+                fieldRefType = fieldReferenceType(ref, qualifierType);
+                methodRefType = fieldRefType == null ? methodReferenceType(ref, qualifierType) : null;
+            }
 
             if (ref.paramTypes != null) {
                 JContainer<Expression> paramContainer;

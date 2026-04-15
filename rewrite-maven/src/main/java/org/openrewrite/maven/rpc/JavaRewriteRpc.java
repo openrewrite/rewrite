@@ -40,7 +40,9 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.marketplace.MavenRecipeBundleResolver;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
+import org.openrewrite.Parser;
 import org.openrewrite.rpc.RewriteRpc;
+import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -64,7 +66,7 @@ import java.util.List;
  * <p>
  * Options:
  * <ul>
- *   <li>--marketplace=&lt;path&gt; - Path to marketplace CSV file (required)</li>
+ *   <li>--marketplace=&lt;path&gt; - Path to marketplace CSV file (optional; without it, recipes are resolved by class name from the classpath)</li>
  *   <li>--log-file=&lt;path&gt; - Log file for debugging</li>
  *   <li>--trace - Enable RPC message tracing</li>
  * </ul>
@@ -96,13 +98,7 @@ public class JavaRewriteRpc {
             }
         }
 
-        if (marketplaceCsv == null) {
-            System.err.println("Error: --marketplace=<path> is required");
-            System.err.println("Usage: java org.openrewrite.maven.rpc.JavaRewriteRpc --marketplace=<csv> [--log-file=<path>] [--trace]");
-            System.exit(1);
-        }
-
-        if (!Files.exists(marketplaceCsv)) {
+        if (marketplaceCsv != null && !Files.exists(marketplaceCsv)) {
             System.err.println("Error: Marketplace CSV file not found: " + marketplaceCsv);
             System.exit(1);
         }
@@ -132,14 +128,22 @@ public class JavaRewriteRpc {
         }
     }
 
-    private static void run(Path marketplaceCsv, boolean trace, @Nullable PrintStream logStream) {
-        // Load the recipe marketplace from CSV
-        RecipeMarketplaceReader reader = new RecipeMarketplaceReader();
-        RecipeMarketplace marketplace = reader.fromCsv(marketplaceCsv);
-
-        if (logStream != null) {
-            logStream.println("Loaded marketplace with " + marketplace.getAllRecipes().size() + " recipes from " + marketplaceCsv);
-            logStream.flush();
+    private static void run(@Nullable Path marketplaceCsv, boolean trace, @Nullable PrintStream logStream) {
+        // Load the recipe marketplace from CSV, or use an empty one if not provided
+        RecipeMarketplace marketplace;
+        if (marketplaceCsv != null) {
+            RecipeMarketplaceReader reader = new RecipeMarketplaceReader();
+            marketplace = reader.fromCsv(marketplaceCsv);
+            if (logStream != null) {
+                logStream.println("Loaded marketplace with " + marketplace.getAllRecipes().size() + " recipes from " + marketplaceCsv);
+                logStream.flush();
+            }
+        } else {
+            marketplace = new RecipeMarketplace();
+            if (logStream != null) {
+                logStream.println("No marketplace CSV provided; using empty marketplace (classpath fallback only)");
+                logStream.flush();
+            }
         }
 
         // Set up execution context
@@ -196,6 +200,16 @@ public class JavaRewriteRpc {
 
         // Create the RPC server with the marketplace and resolvers
         RewriteRpc server = new RewriteRpc(jsonRpc, marketplace, resolvers);
+
+        // FIXME replace reflective parser discovery with ServiceLoader-based
+        //  discovery (e.g. make Parser.Builder a service interface) so that any
+        //  parser on the classpath is automatically available for RPC Parse requests.
+        //
+        // Register parsers for handling Parse requests.
+        // .csproj files are parsed natively on the C# side (XmlParser + MSBuildProject marker).
+        List<Parser> parsers = new ArrayList<>();
+        parsers.add(new XmlParser());
+        server.setParsers(parsers);
 
         if (logStream != null) {
             server.log(logStream);

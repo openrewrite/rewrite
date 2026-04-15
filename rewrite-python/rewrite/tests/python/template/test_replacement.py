@@ -73,7 +73,7 @@ class TestPlaceholderReplacement:
         result = visitor.visit(tree, None)
 
         assert isinstance(result, j.Identifier)
-        assert result.simple_name == '__placeholder_x__'
+        assert result.simple_name == '__plh_x__'
 
     def test_replace_in_nested_expression(self):
         """Replace placeholder in a binary expression."""
@@ -341,3 +341,111 @@ class TestNotAutoParenthesization:
         assert isinstance(result, j.Unary)
         # Comparisons have precedence 4 which is >= 3 (not threshold), so no parens
         assert isinstance(result.expression, j.Binary)
+
+
+class TestBlockStatementPlaceholder:
+    """Tests for placeholder replacement in statement position inside blocks.
+
+    When a template has {body} inside a block (e.g. ``if True:\\n    {body}``),
+    the parser wraps it as ``ExpressionStatement(Identifier(placeholder))``.
+    If the replacement is a non-Expression statement (Return, If, etc.),
+    the visitor must unwrap the ExpressionStatement so the block directly
+    contains the replacement statement.
+    """
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_return_in_block_placeholder(self):
+        """Substituting a Return for a block placeholder should unwrap ExpressionStatement."""
+        tree = TemplateEngine.get_template_tree(
+            "if True:\n    {body}", {'body': capture('body')}
+        )
+        return_stmt = j.Return(
+            uuid4(), Space([], '    '), Markers.EMPTY, _ident('result')
+        )
+        visitor = PlaceholderReplacementVisitor({'body': return_stmt})
+        result = visitor.visit(tree, None)
+
+        # The result should be an If statement
+        assert isinstance(result, j.If)
+        # The then-part block should contain a Return, NOT an ExpressionStatement
+        then_block = result.then_part
+        assert isinstance(then_block, j.Block)
+        stmts = then_block.statements
+        assert len(stmts) == 1
+        assert isinstance(stmts[0], j.Return), (
+            f"Expected Return in block, got {type(stmts[0]).__name__}"
+        )
+
+
+class TestVariadicExpansion:
+    """Tests for variadic capture expansion in method arguments."""
+
+    def setup_method(self):
+        TemplateEngine.clear_cache()
+
+    def test_splice_multiple_args(self):
+        """func({args}) with args=[a, b, c] should produce func(a, b, c)."""
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree("func({args})", {'args': args_cap})
+        visitor = PlaceholderReplacementVisitor({
+            'args': [_ident('a'), _ident('b'), _ident('c')],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        assert len(args) == 3
+        assert args[0].simple_name == 'a'
+        assert args[1].simple_name == 'b'
+        assert args[2].simple_name == 'c'
+
+    def test_splice_single_arg(self):
+        """func({args}) with args=[x] should produce func(x)."""
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree("func({args})", {'args': args_cap})
+        visitor = PlaceholderReplacementVisitor({
+            'args': [_ident('x')],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        assert len(args) == 1
+        assert args[0].simple_name == 'x'
+
+    def test_splice_empty_args(self):
+        """func({args}) with args=[] should produce func()."""
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree("func({args})", {'args': args_cap})
+        visitor = PlaceholderReplacementVisitor({
+            'args': [],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        # Should be empty (or just the Empty sentinel)
+        non_empty = [a for a in args if not isinstance(a, j.Empty)]
+        assert len(non_empty) == 0
+
+    def test_splice_mixed_with_scalar(self):
+        """func({x}, {args}) with x=val, args=[a, b] should produce func(val, a, b)."""
+        x_cap = capture('x')
+        args_cap = capture('args', variadic=True)
+        tree = TemplateEngine.get_template_tree(
+            "func({x}, {args})", {'x': x_cap, 'args': args_cap}
+        )
+        visitor = PlaceholderReplacementVisitor({
+            'x': _ident('val'),
+            'args': [_ident('a'), _ident('b')],
+        })
+        result = visitor.visit(tree, None)
+
+        assert isinstance(result, j.MethodInvocation)
+        args = result.arguments
+        assert len(args) == 3
+        assert args[0].simple_name == 'val'
+        assert args[1].simple_name == 'a'
+        assert args[2].simple_name == 'b'
