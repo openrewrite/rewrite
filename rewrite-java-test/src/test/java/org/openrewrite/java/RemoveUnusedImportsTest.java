@@ -2398,6 +2398,34 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7380")
+    @Test
+    void keepImportWhenUsedOnlyAsStaticFieldQualifier() {
+        rewriteRun(
+          java(
+            """
+            package foo;
+            public class A {
+                public static final int VALUE = 1;
+            }
+            """
+          ),
+          java(
+            """
+            package bar;
+
+            import foo.A;
+
+            public class Test {
+                public int getValue() {
+                    return A.VALUE;
+                }
+            }
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/6544")
     @Test
     void starImportWithExplicitImportsFromSamePackage() {
