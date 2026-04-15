@@ -574,7 +574,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
                 MavenResolutionResult result = getResolutionResult();
 
-                List<ManagedDependency> managedDependencies = result.getPom().getDependencyManagement();
+                List<ResolvedManagedDependency> managedDependencies = result.getPom().getDependencyManagement();
                 if (managedDependencies == null) {
                     return false;
                 }
@@ -592,7 +592,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
 
-                List<ManagedDependency> managedDependencies = requestedPom.getPom().getDependencyManagement();
+                List<ManagedDependency> managedDependencies = requestedPom.getDependencyManagement();
                 if (managedDependencies == null) {
                     return false;
                 }
