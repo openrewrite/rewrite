@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,39 +15,16 @@
  */
 package org.openrewrite.yaml.style;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.NamedStyles;
-import org.openrewrite.style.Style;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.search.FindIndentYamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.UUID;
-
-import static java.util.Collections.emptySet;
-
-public class Autodetect extends NamedStyles {
-    @JsonCreator
-    public Autodetect(UUID id, Collection<Style> styles) {
-        super(id,
-                "org.openrewrite.yaml.Autodetect",
-                "Auto-detected",
-                "Automatically detect styles from a repository's existing code.",
-                emptySet(), styles);
-    }
-
-    public static Detector detector() {
-        return new Detector();
-    }
-
+public class Autodetect {
     public static IndentsStyle tabsAndIndents(Yaml yaml, IndentsStyle orElse) {
         FindIndentYamlVisitor<Integer> findIndent = new FindIndentYamlVisitor<>();
         FindSequenceIndentStyleVisitor<Integer> findSeqIndent = new FindSequenceIndentStyleVisitor<>();
@@ -70,41 +47,6 @@ public class Autodetect extends NamedStyles {
         findLineFormat.visit(yaml, 0);
 
         return new GeneralFormatStyle(!findLineFormat.isIndentedWithLFNewLines());
-    }
-
-    public static class Detector {
-
-        private final FindIndentYamlVisitor<Integer> findIndent = new FindIndentYamlVisitor<>();
-        private final FindSequenceIndentStyleVisitor<Integer> findSeqIndent = new FindSequenceIndentStyleVisitor<>();
-        private final FindLineFormatYamlVisitor<Integer> findLineFormat = new FindLineFormatYamlVisitor<>();
-
-        public Detector sample(SourceFile yaml) {
-            if (yaml instanceof Yaml.Documents) {
-                //noinspection ConstantConditions
-                findIndent.visit(yaml, 0);
-                //noinspection ConstantConditions
-                findSeqIndent.visit(yaml, 0);
-                //noinspection ConstantConditions
-                findLineFormat.visit(yaml, 0);
-            }
-            return this;
-        }
-
-        public Autodetect build() {
-            IndentsStyle indentsStyle;
-            if (findIndent.nonZeroIndents() > 0) {
-                indentsStyle = new IndentsStyle(findIndent.getMostCommonIndent(), findSeqIndent.isIndentedSequences());
-            } else {
-                indentsStyle = YamlDefaultStyles.indents();
-            }
-
-            GeneralFormatStyle generalFormatStyle = new GeneralFormatStyle(!findLineFormat.isIndentedWithLFNewLines());
-
-            return new Autodetect(Tree.randomId(), Arrays.asList(
-                    indentsStyle,
-                    generalFormatStyle
-            ));
-        }
     }
 
     /**
