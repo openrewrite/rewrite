@@ -38,7 +38,6 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.max;
-import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Validated.required;
