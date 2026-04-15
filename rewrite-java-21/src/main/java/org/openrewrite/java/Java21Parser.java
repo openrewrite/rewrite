@@ -93,7 +93,8 @@ public class Java21Parser implements JavaParser {
 
                 return new Java21Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java21Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath(), e);
+                throw new IllegalStateException("Unable to construct Java21Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath() +
+                                                "\nhttps://docs.openrewrite.org/reference/faq#im-getting-unable-to-construct-java21parser-or-similar-when-running-my-recipe-what-does-this-mean", e);
             }
         }
     }

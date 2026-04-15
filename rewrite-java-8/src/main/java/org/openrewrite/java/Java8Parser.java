@@ -139,7 +139,8 @@ public class Java8Parser implements JavaParser {
 
                 return new Java8Parser(delegate);
             } catch (Exception e) {
-                throw new IllegalStateException("Unable to construct Java8Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath(), e);
+                throw new IllegalStateException("Unable to construct Java8Parser. java.version: " + System.getProperty("java.version") + ", classpath: " + resolvedClasspath() +
+                                                "\nhttps://docs.openrewrite.org/reference/faq#im-getting-unable-to-construct-java21parser-or-similar-when-running-my-recipe-what-does-this-mean", e);
             }
         }
     }
