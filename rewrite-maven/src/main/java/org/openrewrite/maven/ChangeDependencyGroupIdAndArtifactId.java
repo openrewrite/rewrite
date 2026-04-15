@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.max;
+import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Validated.required;
@@ -572,7 +573,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
                 MavenResolutionResult result = getResolutionResult();
-                for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
+
+                List<ManagedDependency> managedDependencies = result.getPom().getDependencyManagement();
+                if (managedDependencies == null) {
+                    return false;
+                }
+
+                for (ResolvedManagedDependency managedDependency : managedDependencies) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
                     }
@@ -584,7 +591,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 // We're only going to be able to effect managed dependencies that are either direct or are brought in as direct via a local parent
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
-                for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
+
+                List<ManagedDependency> managedDependencies = requestedPom.getPom().getDependencyManagement();
+                if (managedDependencies == null) {
+                    return false;
+                }
+                for (ManagedDependency requestedManagedDependency : managedDependencies) {
                     if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
                         if (requestedManagedDependency instanceof ManagedDependency.Defined) {
                             return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
