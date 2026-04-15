@@ -572,7 +572,13 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
                 MavenResolutionResult result = getResolutionResult();
-                for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
+
+                List<ResolvedManagedDependency> managedDependencies = result.getPom().getDependencyManagement();
+                if (managedDependencies == null) {
+                    return false;
+                }
+
+                for (ResolvedManagedDependency managedDependency : managedDependencies) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
                     }
@@ -584,7 +590,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 // We're only going to be able to effect managed dependencies that are either direct or are brought in as direct via a local parent
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
-                for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
+
+                List<ManagedDependency> managedDependencies = requestedPom.getDependencyManagement();
+                if (managedDependencies == null) {
+                    return false;
+                }
+                for (ManagedDependency requestedManagedDependency : managedDependencies) {
                     if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
                         if (requestedManagedDependency instanceof ManagedDependency.Defined) {
                             return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
