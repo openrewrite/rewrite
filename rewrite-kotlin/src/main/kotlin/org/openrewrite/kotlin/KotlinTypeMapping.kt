@@ -1190,22 +1190,25 @@ class KotlinTypeMapping(
             for (bound: FirTypeRef in type.bounds) {
                 var boundType = type(bound)
                 val fq = TypeUtils.asFullyQualified(boundType)
-                if (fq != null && "kotlin.Any" == fq.fullyQualifiedName) {
+                val originalWasKotlinAny = fq != null && "kotlin.Any" == fq.fullyQualifiedName
+                if (originalWasKotlinAny) {
                     if (containerFromJava) {
                         continue
                     }
-                    boundType = remapKotlinBuiltin(fq)
+                    boundType = remapKotlinBuiltin(fq!!)
                 } else if (fq != null) {
                     boundType = remapKotlinBuiltin(fq)
                 }
-                // Java-origin type parameters with an explicit `java.lang.Object` bound
-                // (common when Kotlin resolves a Java class's unbounded `<T>` to
-                // `<T : Object>`) should drop the Object bound to match the Java parser's
-                // unbounded form. Otherwise the GTV surfaces as `Generic{T extends java.lang.Object}`
-                // vs the Java parser's `Generic{T}`, blocking cross-parser class dedup.
-                if (containerFromJava) {
-                    val boundFq = TypeUtils.asFullyQualified(boundType)
-                    if (boundFq != null && "java.lang.Object" == boundFq.fullyQualifiedName) {
+                // When the original bound was `java.lang.Object` (not `kotlin.Any`),
+                // strip it to match the Java parser's unbounded `<T>` form. This
+                // handles Java-origin type parameters whose containing declaration's
+                // `origin` may surface as `Library` rather than `Java` (e.g. JDK
+                // classes loaded via Kotlin's classfile loader). Kotlin-source
+                // `<T : Any>` explicitly names `kotlin.Any` and is kept (remapped
+                // to `java.lang.Object`) to preserve the author's intent.
+                if (!originalWasKotlinAny) {
+                    val mappedFq = TypeUtils.asFullyQualified(boundType)
+                    if (mappedFq != null && "java.lang.Object" == mappedFq.fullyQualifiedName) {
                         continue
                     }
                 }
