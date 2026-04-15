@@ -659,6 +659,11 @@
   eolDate: "2025-06-24"
   suggestedReplacement: 
 
+- imageName: nginx
+  tagPatterns: ["1.28", "1.28.*", "1.28-*"]
+  eolDate: "2026-04-14"
+  suggestedReplacement: 
+
 # Go (golang)
 - imageName: golang
   tagPatterns: ["1.10", "1.10.*", "1.10-*"]
