@@ -218,7 +218,7 @@ public class RemoveUnusedImports extends Recipe {
                             .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
                             .collect(toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
-                    if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
+                    if ((combinedTypes.isEmpty() && !unqualifiedTypeNames.contains(elem.getTypeName())) || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
@@ -259,7 +259,7 @@ public class RemoveUnusedImports extends Recipe {
                             return elem.getPackageName().equals(c.getPackageName());
                         }
                         return fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName());
-                    })) {
+                    }) && !unqualifiedTypeNames.contains(elem.getTypeName())) {
                         anImport.used = false;
                         changed = true;
                     }
