@@ -268,10 +268,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 MavenResolutionResult result = getResolutionResult();
                 ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
-                // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
-                if (requestedPom.getDependencies() == null) {
-                    return Collections.emptySet();
-                }
                 Set<String> relevantProperties = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
@@ -572,13 +568,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
 
             private boolean isDependencyManaged(Scope scope, String groupId, String artifactId) {
                 MavenResolutionResult result = getResolutionResult();
-
-                List<ResolvedManagedDependency> managedDependencies = result.getPom().getDependencyManagement();
-                if (managedDependencies == null) {
-                    return false;
-                }
-
-                for (ResolvedManagedDependency managedDependency : managedDependencies) {
+                for (ResolvedManagedDependency managedDependency : result.getPom().getDependencyManagement()) {
                     if (groupId.equals(managedDependency.getGroupId()) && artifactId.equals(managedDependency.getArtifactId())) {
                         return scope.isInClasspathOf(managedDependency.getScope());
                     }
@@ -590,12 +580,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 // We're only going to be able to effect managed dependencies that are either direct or are brought in as direct via a local parent
                 // `ChangeManagedDependencyGroupIdAndArtifactId` cannot manipulate BOM imported managed dependencies nor direct dependencies from remote parents
                 Pom requestedPom = result.getPom().getRequested();
-
-                List<ManagedDependency> managedDependencies = requestedPom.getDependencyManagement();
-                if (managedDependencies == null) {
-                    return false;
-                }
-                for (ManagedDependency requestedManagedDependency : managedDependencies) {
+                for (ManagedDependency requestedManagedDependency : requestedPom.getDependencyManagement()) {
                     if (matchesGlob(requestedManagedDependency.getGroupId(), groupId) && matchesGlob(requestedManagedDependency.getArtifactId(), artifactId)) {
                         if (requestedManagedDependency instanceof ManagedDependency.Defined) {
                             return scope.isInClasspathOf(Scope.fromName(((ManagedDependency.Defined) requestedManagedDependency).getScope()));
@@ -612,10 +597,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends ScanningRecipe<ChangeD
                 MavenResolutionResult result = getResolutionResult();
                 ResolvedPom resolvedPom = result.getPom();
                 Pom requestedPom = resolvedPom.getRequested();
-                // Pom fields default to emptyList() via @Builder.Default, but deserialization can leave them null
-                if (requestedPom.getDependencies() == null) {
-                    return Collections.emptySet();
-                }
                 Set<String> relevantProperties = requestedPom.getDependencies().stream()
                         .filter(d -> isProperty(d.getVersion()) &&
                                 matchesGlob(resolvedPom.getValue(d.getGroupId()), groupId) &&
