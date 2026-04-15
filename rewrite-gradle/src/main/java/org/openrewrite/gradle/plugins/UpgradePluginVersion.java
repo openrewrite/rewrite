@@ -146,7 +146,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
-                GradlePlugin plugin = new GradlePlugin.Matcher().pluginIdPattern(effectivePluginIdPattern()).get(getCursor()).orElse(null);
+                GradlePlugin plugin = new GradlePlugin.Matcher().pluginIdPattern(pluginIdPattern).get(getCursor()).orElse(null);
                 if (plugin == null || plugin.getPluginId() == null) {
                     return m;
                 }
@@ -293,7 +293,7 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 // Match the trait before super to ensure the cursor is unmodified
-                GradlePlugin plugin = new GradlePlugin.Matcher().pluginIdPattern(effectivePluginIdPattern()).get(getCursor()).orElse(null);
+                GradlePlugin plugin = new GradlePlugin.Matcher().pluginIdPattern(pluginIdPattern).get(getCursor()).orElse(null);
 
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
@@ -333,11 +333,6 @@ public class UpgradePluginVersion extends ScanningRecipe<UpgradePluginVersion.De
             }
         };
         return Preconditions.or(propertiesVisitor, Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), javaVisitor));
-    }
-
-    private String effectivePluginIdPattern() {
-        // Translate the short "kotlin" DSL name to the full plugin ID pattern
-        return "kotlin".equals(pluginIdPattern) ? "org.jetbrains.kotlin.*" : pluginIdPattern;
     }
 
     private @Nullable String literalValue(Expression expr) {
