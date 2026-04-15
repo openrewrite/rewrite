@@ -32,7 +32,6 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -46,26 +45,25 @@ public class ScalaParser implements Parser {
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
 
+    private static final Pattern PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+([.\\w]+)");
+    private static final Pattern CLASS_PATTERN = Pattern.compile("(class|object|trait|case\\s+class)\\s*(<[^>]*>)?\\s+(\\w+)");
+
+    private static String derivedRelativePath(String sourceCode) {
+        Matcher packageMatcher = PACKAGE_PATTERN.matcher(sourceCode);
+        String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
+
+        Matcher classMatcher = CLASS_PATTERN.matcher(sourceCode);
+        String simpleName = classMatcher.find() ? classMatcher.group(3) : Long.toString(System.nanoTime());
+
+        return pkg + simpleName + ".scala";
+    }
+
     @Override
     public Stream<SourceFile> parse(@Language("scala") String... sources) {
-        Pattern packagePattern = Pattern.compile("\\bpackage\\s+([.\\w]+)");
-        Pattern classPattern = Pattern.compile("(class|object|trait|case\\s+class)\\s*(<[^>]*>)?\\s+(\\w+)");
-
-        Function<String, String> simpleName = sourceStr -> {
-            Matcher classMatcher = classPattern.matcher(sourceStr);
-            return classMatcher.find() ? classMatcher.group(3) : null;
-        };
-
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> {
-                            Matcher packageMatcher = packagePattern.matcher(sourceFile);
-                            String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
-
-                            String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                                       .orElse(Long.toString(System.nanoTime())) + ".scala";
-
-                            Path path = Paths.get(pkg + className);
+                            Path path = Paths.get(derivedRelativePath(sourceFile));
                             return Input.fromString(path, sourceFile);
                         })
                         .collect(Collectors.toList()),
@@ -154,7 +152,7 @@ public class ScalaParser implements Parser {
 
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve("file.scala");
+        return prefix.resolve(derivedRelativePath(sourceCode));
     }
 
     public static ScalaParser.Builder builder() {
