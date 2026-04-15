@@ -30,7 +30,7 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
 
     static {
         @SuppressWarnings({"unchecked", "rawtypes"}) ServiceLoader<DynamicDispatchRpcCodec<?>> loader = (ServiceLoader<DynamicDispatchRpcCodec<?>>)
-                (ServiceLoader) ServiceLoader.load(DynamicDispatchRpcCodec.class);
+                (ServiceLoader) ServiceLoader.load(DynamicDispatchRpcCodec.class, DynamicDispatchRpcCodec.class.getClassLoader());
         for (DynamicDispatchRpcCodec<?> provider : loader) {
             CODEC_BY_TYPE.computeIfAbsent(provider.getSourceFileType(), p -> new ArrayList<>())
                     .add(provider);
