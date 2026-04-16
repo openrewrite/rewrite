@@ -70,14 +70,14 @@ class AddDependencyTest implements RewriteTest {
           ]
           """;
 
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        var ctx = new InMemoryExecutionContext();
         rewriteRun(
           spec -> spec.executionContext(ctx).recipe(new CompositeRecipe(List.of(
             new AddDependency("flask", ">=2.0", null, null),
             new AddDependency("click", ">=8.0", null, null)
           ))).afterRecipe(run -> {
               // Verify lock was regenerated with both new dependencies
-              Map<String, String> updatedLocks = PythonDependencyExecutionContextView.view(ctx).getUpdatedLockFiles();
+              Map<Path, String> updatedLocks = PythonDependencyExecutionContextView.view(ctx).getUpdatedLockFiles();
               assertThat(updatedLocks).isNotEmpty();
               String lockContent = updatedLocks.values().iterator().next();
               assertThat(lockContent).contains("name = \"flask\"");
@@ -342,8 +342,45 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyToRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          requirementsTxt(
+            "requests>=2.28.0",
+            "requests>=2.28.0\nflask>=2.0"
+          )
+        );
+    }
+
+    @Test
+    void skipWhenAlreadyPresentInRequirementsTxt() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("requests", null, null, null)),
+          requirementsTxt("requests>=2.28.0")
+        );
+    }
+
+    @Test
+    void addDependencyToPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("flask", ">=2.0", null, null)),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
+              """,
+            """
+              [packages]
+              requests = ">=2.28.0"
+              flask = ">=2.0"
+              """
+          )
+        );
+    }
+
+    @Test
     void validateRequiresGroupName() {
-        AddDependency recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
+        var recipe = new AddDependency("pytest", null, "project.optional-dependencies", null);
         assertThat(recipe.validate().isValid()).isFalse();
     }
 }

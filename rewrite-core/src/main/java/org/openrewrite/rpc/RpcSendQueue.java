@@ -150,7 +150,7 @@ public class RpcSendQueue {
     }
 
     private <T> Map<Object, Integer> putListPositions(List<T> after, @Nullable List<T> before, Function<? super T, ?> id) {
-        Map<Object, Integer> beforeIdx = new IdentityHashMap<>();
+        Map<Object, Integer> beforeIdx = new HashMap<>();
         if (before != null) {
             for (int i = 0; i < before.size(); i++) {
                 beforeIdx.put(id.apply(before.get(i)), i);

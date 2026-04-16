@@ -15,6 +15,7 @@
  */
 package org.openrewrite.csharp;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,11 @@ class CSharpRecipeTest implements RewriteTest {
 
     @AfterEach
     void tearDown() {
+        CSharpRewriteRpc.resetCurrent();
+    }
+
+    @AfterAll
+    static void shutDown() {
         CSharpRewriteRpc.shutdownCurrent();
     }
 
@@ -82,12 +88,15 @@ class CSharpRecipeTest implements RewriteTest {
         List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
           "Newtonsoft.Json", "13.0.1");
 
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
+        List<SourceFile> csFiles = sourceFiles.stream()
+          .filter(sf -> sf instanceof Cs.CompilationUnit)
+          .toList();
+        assertThat(csFiles).hasSize(1);
+        SourceFile sf = csFiles.getFirst();
         assertThat(sf).isInstanceOf(Cs.CompilationUnit.class);
 
         // Find the method invocation
-        Cs.CompilationUnit cu = (Cs.CompilationUnit) sf;
+        var cu = (Cs.CompilationUnit) sf;
         J.MethodInvocation invocation = findFirstMethodInvocation(cu);
         assertThat(invocation).as("Should find SerializeObject invocation").isNotNull();
         assertThat(invocation.getSimpleName()).isEqualTo("SerializeObject");
@@ -122,7 +131,7 @@ class CSharpRecipeTest implements RewriteTest {
         try (OutputStream os = Files.newOutputStream(csproj)) {
             os.write(csprojContent.getBytes(StandardCharsets.UTF_8));
         }
-        return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).sourceFiles().toList();
+        return rpc.parseSolution(csproj, tempDir, new InMemoryExecutionContext()).toList();
     }
 
     private static J.MethodInvocation findFirstMethodInvocation(Object tree) {
@@ -132,32 +141,42 @@ class CSharpRecipeTest implements RewriteTest {
         if (tree instanceof Cs.CompilationUnit cu) {
             for (Statement member : cu.getMembers()) {
                 J.MethodInvocation result = findFirstMethodInvocation(member);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof Cs.NamespaceDeclaration ns) {
             for (var member : ns.getMembers()) {
                 J.MethodInvocation result = findFirstMethodInvocation(member);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.ClassDeclaration cd) {
             for (Statement stmt : cd.getBody().getStatements()) {
                 J.MethodInvocation result = findFirstMethodInvocation(stmt);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.MethodDeclaration md && md.getBody() != null) {
             for (Statement stmt : md.getBody().getStatements()) {
                 J.MethodInvocation result = findFirstMethodInvocation(stmt);
-                if (result != null) return result;
+                if (result != null) {
+                    return result;
+                }
             }
         }
         if (tree instanceof J.VariableDeclarations vd) {
             for (var v : vd.getVariables()) {
                 if (v.getInitializer() != null) {
                     J.MethodInvocation result = findFirstMethodInvocation(v.getInitializer());
-                    if (result != null) return result;
+                    if (result != null) {
+                        return result;
+                    }
                 }
             }
         }
@@ -172,8 +191,11 @@ class CSharpRecipeTest implements RewriteTest {
         List<SourceFile> sourceFiles = parseSolutionWithRefs(rpc, source, "Test.cs",
           "Newtonsoft.Json", "13.0.1");
 
-        assertThat(sourceFiles).hasSize(1);
-        SourceFile sf = sourceFiles.getFirst();
+        List<SourceFile> csFiles = sourceFiles.stream()
+          .filter(f -> f instanceof Cs.CompilationUnit)
+          .toList();
+        assertThat(csFiles).hasSize(1);
+        SourceFile sf = csFiles.getFirst();
 
         // Apply ChangeMethodName recipe directly via visitor
         var recipe = new ChangeMethodName(
@@ -484,4 +506,5 @@ class CSharpRecipeTest implements RewriteTest {
           )
         );
     }
+
 }

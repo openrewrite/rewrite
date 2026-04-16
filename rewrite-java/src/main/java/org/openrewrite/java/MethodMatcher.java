@@ -300,6 +300,7 @@ public class MethodMatcher {
             return false;
         }
 
+        //noinspection NullableProblems
         List<JavaType> parameterTypes =
                 method
                         .getParameters()
@@ -363,7 +364,14 @@ public class MethodMatcher {
             return matchUnknownTypes && matchesAllowingUnknownTypes(method);
         }
 
-        return matches(method.getMethodType());
+        if (matches(method.getMethodType())) {
+            return true;
+        }
+
+        // When matchUnknownTypes is true, fall back to structural matching even when
+        // type information is present but incomplete (e.g. after lossy LST deserialization
+        // where interface hierarchies may be stripped from declaring types)
+        return matchUnknownTypes && matchesAllowingUnknownTypes(method);
     }
 
     private boolean matchesAllowingUnknownTypes(J.MethodInvocation method) {

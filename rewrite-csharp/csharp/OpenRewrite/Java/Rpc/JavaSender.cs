@@ -15,6 +15,7 @@
  */
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
+using OpenRewrite.CSharp;
 using static Rewrite.Core.Rpc.Reference;
 
 namespace OpenRewrite.Java.Rpc;
@@ -233,6 +234,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         q.GetAndSend(classDecl, c => c.Implements, impl => VisitContainer(impl, q));
         q.GetAndSend(classDecl, c => c.Permits, perm => VisitContainer(perm, q));
         q.GetAndSend(classDecl, c => (J)c.Body, j => Visit(j, q));
+        q.GetAndSend(classDecl, c => AsRef(c.Type), type => VisitType(GetValueNonNull<JavaType>(type), q));
         return classDecl;
     }
 
@@ -669,25 +671,11 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     public virtual void VisitSpace(Space space, RpcSendQueue q)
     {
         q.GetAndSendList(space, s => s.Comments,
+            c => c.Text + c.Suffix,
             c =>
             {
-                if (c is TextComment tc)
-                {
-                    return tc.Text + c.Suffix;
-                }
-                throw new ArgumentException($"Unexpected comment type {c.GetType().Name}");
-            },
-            c =>
-            {
-                if (c is TextComment tc)
-                {
-                    q.GetAndSend(tc, t => t.Multiline);
-                    q.GetAndSend(tc, t => t.Text);
-                }
-                else
-                {
-                    throw new ArgumentException($"Unexpected comment type {c.GetType().Name}");
-                }
+                q.GetAndSend(c, cm => cm.Multiline);
+                q.GetAndSend(c, cm => cm.Text);
                 q.GetAndSend(c, cm => cm.Suffix);
                 // C# Comment does not have Markers; send empty Markers for protocol compatibility
                 q.GetAndSend(c, _ => Markers.Empty);

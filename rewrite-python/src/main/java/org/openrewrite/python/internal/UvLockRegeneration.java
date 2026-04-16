@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.Map;
 
 /**
  * Utility for regenerating uv.lock files by running {@code uv lock} in a temporary directory.
@@ -53,7 +55,7 @@ public class UvLockRegeneration {
      * @return a result containing the new lock file content, or an error message
      */
     public static Result regenerate(String pyprojectContent) {
-        return regenerate(pyprojectContent, null);
+        return regenerate(pyprojectContent, null, Collections.emptyMap());
     }
 
     /**
@@ -67,6 +69,21 @@ public class UvLockRegeneration {
      * @return a result containing the new lock file content, or an error message
      */
     public static Result regenerate(String pyprojectContent, @Nullable String existingLockContent) {
+        return regenerate(pyprojectContent, existingLockContent, Collections.emptyMap());
+    }
+
+    /**
+     * Regenerate a uv.lock file from the given pyproject.toml content.
+     * When an existing lock file is provided it is seeded into the working
+     * directory so that {@code uv lock} performs a minimal update rather
+     * than re-resolving every dependency from scratch.
+     *
+     * @param pyprojectContent    the pyproject.toml content to lock
+     * @param existingLockContent the current uv.lock content, or {@code null}
+     * @param environment         additional environment variables for subprocess (e.g., SSL_CERT_FILE)
+     * @return a result containing the new lock file content, or an error message
+     */
+    public static Result regenerate(String pyprojectContent, @Nullable String existingLockContent, Map<String, String> environment) {
         String uvPath = UvExecutor.findUvExecutable();
         if (uvPath == null) {
             return Result.failure("uv is not installed. Install it with: pip install uv");
@@ -88,7 +105,7 @@ public class UvLockRegeneration {
                 );
             }
 
-            UvExecutor.RunResult runResult = UvExecutor.run(tempDir, uvPath, "lock");
+            UvExecutor.RunResult runResult = UvExecutor.run(tempDir, uvPath, environment, "lock");
             if (!runResult.isSuccess()) {
                 return Result.failure("uv lock failed (exit code " + runResult.getExitCode() + "): " + runResult.getStderr());
             }

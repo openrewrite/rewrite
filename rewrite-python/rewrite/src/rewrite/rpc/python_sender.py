@@ -678,6 +678,7 @@ class PythonRpcSender:
         q.get_and_send(class_decl, lambda x: x.padding.permits if hasattr(x.padding, 'permits') else None,
                       lambda c: self._visit_container(c, q) if c else None)
         q.get_and_send(class_decl, lambda x: x.body, lambda el: self._visit(el, q))
+        q.get_and_send_as_ref(class_decl, lambda x: x.type, lambda t: self._visit_type(t, q) if t else None)
 
     def _visit_j_class_declaration_kind(self, kind, q: 'RpcSendQueue') -> None:
         # Java ClassDeclaration.Kind: preVisit IS automatically called by _visit before this method

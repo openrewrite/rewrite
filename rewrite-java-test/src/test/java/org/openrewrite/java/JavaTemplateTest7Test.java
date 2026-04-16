@@ -73,18 +73,13 @@ class JavaTemplateTest7Test implements RewriteTest {
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                   var cd = classDecl;
                   if (cd.getBody().getStatements().isEmpty()) {
-                      cd = JavaTemplate.builder(
-                          //language=java
-                          """
-                            /**
-                             * comment
-                             */
-                            void foo() {
-                            }
-                            """
-                        )
-                        .build()
-                        .apply(getCursor(), cd.getBody().getCoordinates().firstStatement());
+                      cd = JavaTemplate.apply("""
+                          /**
+                           * comment
+                           */
+                          void foo() {
+                          }
+                          """, getCursor(), cd.getBody().getCoordinates().firstStatement());
                   }
                   return cd;
               }

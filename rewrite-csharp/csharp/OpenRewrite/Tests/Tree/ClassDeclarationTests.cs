@@ -1532,6 +1532,23 @@ public class ClassDeclarationTests : RewriteTest
         );
     }
 
+    [Fact]
+    public void SelfReferentialGenericType()
+    {
+        RewriteRun(
+            CSharp(
+                """
+                interface ISelf<T> where T : ISelf<T> { }
+                class Node : ISelf<Node>
+                {
+                    Node _parent;
+                    public Node GetSelf() => this;
+                }
+                """
+            )
+        );
+    }
+
     // ==================== Whitespace Preservation ====================
 
     [Fact]

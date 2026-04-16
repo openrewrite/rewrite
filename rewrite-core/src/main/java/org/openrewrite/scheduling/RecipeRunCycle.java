@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.*;
@@ -406,7 +407,14 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             response = rpc.batchVisit(originalBefore, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
             if (!batch.recipeStacks.isEmpty()) {
-                handleError(batch.recipeStacks.get(0).peek(), originalBefore, originalBefore, t);
+                SourceFile beforeError = source;
+                if (!(t instanceof RecipeRunException)) {
+                    source = Markup.error(source, t);
+                }
+                source = handleError(batch.recipeStacks.get(0).peek(), originalBefore, source, t);
+                if (source != null && source != beforeError) {
+                    source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
+                }
             }
             batch.clear();
             return source;
@@ -711,8 +719,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         ctx.getOnError().accept(t);
 
         if (t instanceof RecipeRunException && after != null) {
-            RecipeRunException vt = (RecipeRunException) t;
-            after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
+            try {
+                RecipeRunException vt = (RecipeRunException) t;
+                after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
+            } catch (Throwable ignored) {
+                // Tree is too broken for node-level marker — fall back to marking the whole file
+                after = Markup.error(after, t);
+            }
         }
 
         // Use the original source file to record the error, not the one that may have been modified by the visitor.

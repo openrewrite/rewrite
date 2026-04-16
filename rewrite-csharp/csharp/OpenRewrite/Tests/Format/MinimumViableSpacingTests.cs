@@ -81,6 +81,90 @@ public class MinimumViableSpacingTests
         Assert.DoesNotContain("int_x", result);
     }
 
+    /// <summary>
+    /// Simulates what MakeFieldReadOnly does: adds a readonly modifier to a field
+    /// that previously had none. The type expression has an empty prefix because
+    /// the indentation lives on the VariableDeclarations prefix.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithGenericType()
+    {
+        var cu = _parser.Parse("""
+            class Foo
+            {
+                List<int> _elements = new List<int>();
+            }
+            """);
+
+        // Add a readonly modifier to the field, simulating what a recipe does
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        // Run MVS to ensure spacing
+        var restored = new MinimumViableSpacingVisitor().Visit(cu, 0) as CompilationUnit ?? cu;
+        var result = _printer.Print(restored);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", result);
+        Assert.Contains("readonly List", result);
+    }
+
+    /// <summary>
+    /// Same scenario as AddedModifierToFieldWithGenericType but going through the full
+    /// RoslynFormatter.Format() pipeline, which involves MVS → print → Roslyn → reconcile.
+    /// This is the actual code path used by MaybeAutoFormat in recipes.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithGenericTypeThroughRoslynFormatter()
+    {
+        var cu = _parser.Parse("""
+            using System.Collections.Generic;
+            class Stack<T>
+            {
+                List<T> elements = new List<T>();
+                public int Count => elements.Count;
+            }
+            """);
+
+        // Add a readonly modifier to the field, simulating what MakeFieldReadOnly does
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        // Run through the full formatting pipeline (same as MaybeAutoFormat)
+        var formatted = RoslynFormatter.Format(cu);
+        var result = _printer.Print(formatted);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", result);
+        Assert.Contains("readonly List", result);
+    }
+
+    /// <summary>
+    /// Same as above but with a simple (non-generic) type.
+    /// </summary>
+    [Fact]
+    public void AddedModifierToFieldWithSimpleType()
+    {
+        var cu = _parser.Parse("""
+            class Foo
+            {
+                int _x;
+            }
+            """);
+
+        var addModifier = new AddReadonlyModifierVisitor();
+        addModifier.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        cu = (CompilationUnit)(addModifier.Visit(cu, 0) ?? cu);
+
+        var restored = new MinimumViableSpacingVisitor().Visit(cu, 0) as CompilationUnit ?? cu;
+        var result = _printer.Print(restored);
+
+        Assert.DoesNotContain("readonlyint", result);
+        Assert.Contains("readonly int", result);
+    }
+
     [Fact]
     public void ReturnWithExpression()
     {
@@ -287,6 +371,61 @@ public class MinimumViableSpacingTests
     }
 
     /// <summary>
+    /// Reproduces the exact MakeFieldReadOnly pattern: a visitor that adds a modifier
+    /// in VisitVariableDeclarations, then calls MaybeAutoFormat at the CU level.
+    /// This is the actual code path that was producing "readonlyList&lt;T&gt;".
+    /// </summary>
+    [Fact]
+    public void AddedModifierWithMaybeAutoFormatAtCuLevel()
+    {
+        var cu = _parser.Parse("""
+            using System.Collections.Generic;
+            class Stack<T>
+            {
+                List<T> elements = new List<T>();
+                public int Count => elements.Count;
+            }
+            """);
+
+        // Use a visitor that adds readonly and calls MaybeAutoFormat at CU level
+        var visitor = new AddReadonlyWithAutoFormatVisitor();
+        visitor.Cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        var result = visitor.Visit(cu, 0) as CompilationUnit ?? cu;
+        var printed = _printer.Print(result);
+
+        // The readonly keyword must be separated from the type name
+        Assert.DoesNotContain("readonlyList", printed);
+        Assert.Contains("readonly List", printed);
+    }
+
+    /// <summary>
+    /// Same as above but using RecipeScheduler.Run() — the exact path that
+    /// recipes-csharp uses. This matches how MakeFieldReadOnly actually executes.
+    /// </summary>
+    [Fact]
+    public void AddedModifierWithMaybeAutoFormatViaRecipeScheduler()
+    {
+        var cu = _parser.Parse("""
+            using System.Collections.Generic;
+            class Stack<T>
+            {
+                List<T> elements = new List<T>();
+                public int Count => elements.Count;
+            }
+            """);
+
+        var recipe = new AddReadonlyRecipe();
+        var results = RecipeScheduler.Run(recipe, [cu], new OpenRewrite.Core.ExecutionContext());
+
+        Assert.Single(results);
+        Assert.NotNull(results[0].After);
+        var printed = _printer.Print(results[0].After!);
+
+        Assert.DoesNotContain("readonlyList", printed);
+        Assert.Contains("readonly List", printed);
+    }
+
+    /// <summary>
     /// Visitor that strips all whitespace from the tree, simulating a recipe
     /// that builds nodes with Space.Empty everywhere.
     /// </summary>
@@ -295,6 +434,84 @@ public class MinimumViableSpacingTests
         public override Space VisitSpace(Space space, int p)
         {
             return Space.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Visitor that adds a readonly modifier to field declarations,
+    /// simulating what the MakeFieldReadOnly recipe does.
+    /// </summary>
+    private class AddReadonlyModifierVisitor : CSharpVisitor<int>
+    {
+        public override J VisitVariableDeclarations(VariableDeclarations varDecl, int p)
+        {
+            var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
+
+            // Only add to fields (inside a class body)
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
+                return v;
+
+            // Don't add if already has readonly
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
+                return v;
+
+            var newModifiers = new List<Modifier>(v.Modifiers);
+            newModifiers.Add(new Modifier(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                Modifier.ModifierType.Readonly, new List<Annotation>()));
+            return v.WithModifiers(newModifiers);
+        }
+    }
+
+    /// <summary>
+    /// ScanningRecipe that adds readonly to fields, matching MakeFieldReadOnly's
+    /// structure for use with RecipeScheduler.Run().
+    /// </summary>
+    private class AddReadonlyRecipe : ScanningRecipe<int>
+    {
+        public override string DisplayName => "Test";
+        public override string Description => "Test";
+        public override int GetInitialValue(OpenRewrite.Core.ExecutionContext ctx) => 0;
+        public override ITreeVisitor<OpenRewrite.Core.ExecutionContext> GetScanner(int acc) => ITreeVisitor<OpenRewrite.Core.ExecutionContext>.Noop();
+        public override ITreeVisitor<OpenRewrite.Core.ExecutionContext> GetVisitor(int acc) => new AddReadonlyWithAutoFormatVisitor<OpenRewrite.Core.ExecutionContext>();
+    }
+
+    /// <summary>
+    /// Visitor that adds a readonly modifier in VisitVariableDeclarations and
+    /// calls MaybeAutoFormat at the CompilationUnit level — the exact pattern
+    /// used by MakeFieldReadOnly.
+    /// </summary>
+    private class AddReadonlyWithAutoFormatVisitor : AddReadonlyWithAutoFormatVisitor<int>;
+
+    private class AddReadonlyWithAutoFormatVisitor<P> : CSharpVisitor<P>
+    {
+        public override J VisitCompilationUnit(CompilationUnit cu, P p)
+        {
+            var before = cu;
+            cu = (CompilationUnit)base.VisitCompilationUnit(cu, p);
+            return MaybeAutoFormat(before, cu, p, Cursor);
+        }
+
+        public override J VisitVariableDeclarations(VariableDeclarations varDecl, P p)
+        {
+            var v = (VariableDeclarations)base.VisitVariableDeclarations(varDecl, p);
+
+            if (Cursor.FirstEnclosing<ClassDeclaration>() == null)
+                return v;
+
+            if (v.Modifiers.Any(m => m.Type == Modifier.ModifierType.Readonly))
+                return v;
+
+            // Skip properties (has accessors)
+            if (Cursor.FirstEnclosing<PropertyDeclaration>() != null)
+                return v;
+
+            // Test with keyword string but using Add
+            var newModifiers = new List<Modifier>(v.Modifiers);
+            newModifiers.Add(new Modifier(
+                Guid.NewGuid(), Space.SingleSpace, Markers.Empty,
+                Modifier.ModifierType.Readonly, new List<Annotation>(), "readonly"));
+            return v.WithModifiers(newModifiers);
         }
     }
 }

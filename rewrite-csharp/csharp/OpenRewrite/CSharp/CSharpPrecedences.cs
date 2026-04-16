@@ -48,7 +48,7 @@ internal static class CSharpPrecedences
         Unary => 13,
         CsUnary => 13,
         TypeCast => 13,
-        IsPattern => 7,
+        IsPattern ip => GetIsPatternPrecedence(ip),
         RangeExpression => 12,
         SwitchExpression => 11,
         WithExpression => 11,
@@ -78,6 +78,25 @@ internal static class CSharpPrecedences
         return new Parentheses<Expression>(
             Guid.NewGuid(), expr.Prefix, Markers.Empty,
             new JRightPadded<Expression>(J.SetPrefix(expr, Space.Empty), Space.Empty, Markers.Empty));
+    }
+
+    /// <summary>
+    /// IsPattern with pattern combinators (or/and) has lower effective precedence
+    /// than a plain is-type check, because the combinator keywords extend the pattern
+    /// in a way that can be ambiguous when nested inside binary expressions like &amp;&amp;.
+    /// </summary>
+    private static int GetIsPatternPrecedence(IsPattern ip)
+    {
+        if (ip.Pattern.Element is CsBinary csb)
+        {
+            return csb.Operator.Element switch
+            {
+                CsBinary.OperatorType.Or => 1,  // same as ||
+                CsBinary.OperatorType.And => 2, // same as &&
+                _ => 7
+            };
+        }
+        return 7;
     }
 
     public static bool IsAssociative(Expression expr) => expr switch

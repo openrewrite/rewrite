@@ -17,8 +17,10 @@ package org.openrewrite.python;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.python.internal.PyProjectHelper;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.PackageManager;
@@ -35,6 +37,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -50,12 +53,21 @@ public class RequirementsTxtParser implements Parser {
     private static final Pattern EXTRA_MARKER_PATTERN = Pattern.compile("\\bextra\\s*==");
 
     private final PlainTextParser plainTextParser = new PlainTextParser();
+    private final Map<String, String> subprocessEnvironment;
+
+    public RequirementsTxtParser() {
+        this(emptyMap());
+    }
+
+    public RequirementsTxtParser(Map<String, String> subprocessEnvironment) {
+        this.subprocessEnvironment = subprocessEnvironment;
+    }
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return plainTextParser.parseInputs(sources, relativeTo, ctx).map(sf -> {
             if (!(sf instanceof PlainText)) {
-                return sf;
+                return sf.withMarkers(sf.getMarkers().add(ParseExceptionResult.build(this, new UnsupportedOperationException(), "Creating a PythonResolutionResult can only be done for PlainText LST elements.")));
             }
             PlainText text = (PlainText) sf;
 
@@ -64,17 +76,21 @@ public class RequirementsTxtParser implements Parser {
                 originalFilePath = relativeTo.resolve(text.getSourcePath());
             }
             Path workspace = DependencyWorkspace.getOrCreateRequirementsWorkspace(
-                    text.getText(), originalFilePath);
+                    text.getText(), originalFilePath, subprocessEnvironment);
             if (workspace == null) {
-                return sf;
+                return sf.withMarkers(sf.getMarkers().add(ParseExceptionResult.build(this, new UnsupportedOperationException(),
+                        "Failed to create the PythonResolutionResult due to a failure to install the requirement file. " +
+                                "Perhaps you are missing `uv` in the environment or trying to build a requirement text file containing dependencies which are not available?")));
             }
 
             List<ResolvedDependency> resolvedDeps = parseFreezeOutput(workspace);
             if (resolvedDeps.isEmpty()) {
-                return sf;
+                return sf.withMarkers(sf.getMarkers().add(ParseExceptionResult.build(this, new UnsupportedOperationException(),
+                        "Failed to create the PythonResolutionResult: no resolved dependencies.")));
             }
 
-            List<Dependency> deps = dependenciesFromResolved(resolvedDeps);
+            List<Dependency> deps = dependenciesFromResolved(resolvedDeps,
+                    parseDeclaredPackageNames(text.getText()));
 
             PythonResolutionResult marker = new PythonResolutionResult(
                     randomId(),
@@ -131,7 +147,11 @@ public class RequirementsTxtParser implements Parser {
      * are treated as direct so that client code traversing {@code getDependencies()} finds every package.
      */
     public static List<Dependency> dependenciesFromResolved(List<ResolvedDependency> resolved) {
-        // Collect all packages that appear as a transitive dependency of another package
+        return dependenciesFromResolved(resolved, Collections.emptySet());
+    }
+
+    public static List<Dependency> dependenciesFromResolved(List<ResolvedDependency> resolved,
+                                                            Set<String> declaredPackageNames) {
         Set<String> transitive = new HashSet<>();
         for (ResolvedDependency r : resolved) {
             if (r.getDependencies() != null) {
@@ -143,11 +163,29 @@ public class RequirementsTxtParser implements Parser {
 
         List<Dependency> deps = new ArrayList<>();
         for (ResolvedDependency r : resolved) {
-            if (transitive.isEmpty() || !transitive.contains(PythonResolutionResult.normalizeName(r.getName()))) {
+            String normalizedName = PythonResolutionResult.normalizeName(r.getName());
+            if (transitive.isEmpty() ||
+                    !transitive.contains(normalizedName) ||
+                    declaredPackageNames.contains(normalizedName)) {
                 deps.add(new Dependency(r.getName(), "==" + r.getVersion(), null, null, r));
             }
         }
         return deps;
+    }
+
+    static Set<String> parseDeclaredPackageNames(String requirementsTxtContent) {
+        Set<String> names = new HashSet<>();
+        for (String line : requirementsTxtContent.split("\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("-")) {
+                continue;
+            }
+            String name = PyProjectHelper.extractPackageName(trimmed);
+            if (name != null) {
+                names.add(PythonResolutionResult.normalizeName(name));
+            }
+        }
+        return names;
     }
 
     /**

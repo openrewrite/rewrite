@@ -222,9 +222,16 @@ public class MavenPomDownloader {
         if (relativePath == null) {
             relativePath = "../pom.xml";
         }
+        // Maven resolves <relativePath> to a directory + /pom.xml when it doesn't
+        // already point to a file. Match that behaviour so that directory-style
+        // relative paths like "../my-parent" resolve correctly.
+        Path resolvedRelativePath = Paths.get(relativePath);
+        if (!relativePath.endsWith(".xml")) {
+            resolvedRelativePath = resolvedRelativePath.resolve("pom.xml");
+        }
         Path parentPath = projectPom.getSourcePath()
                 .resolve("..")
-                .resolve(Paths.get(relativePath))
+                .resolve(resolvedRelativePath)
                 .normalize();
         Pom parentPom = projectPoms.get(parentPath);
         return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
@@ -551,6 +558,12 @@ public class MavenPomDownloader {
         gav = resolveNamedVersion(gav, containingPom, repositories, ctx);
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         gav = handleSnapshotTimestampVersion(gav);
+
+        if (gav.getVersion().contains("${")) {
+            throw new MavenDownloadingException("Unable to download POM " + gav +
+                    ". Version contains unresolved property placeholder.", null, originalGav);
+        }
+
         Iterable<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();

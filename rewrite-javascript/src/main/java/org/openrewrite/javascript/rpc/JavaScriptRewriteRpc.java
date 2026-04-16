@@ -23,10 +23,12 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.internal.rpc.JavaScriptValidator;
 import org.openrewrite.javascript.tree.JS;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
@@ -344,6 +346,8 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
 
         @Override
         public JavaScriptRewriteRpc get() {
+            DynamicDispatchRpcCodec.requireCodecFor(Json.Document.class.getName());
+
             Stream<@Nullable String> cmd;
 
             if (inspectBrk != null) {
@@ -357,6 +361,7 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                         "--enable-source-maps",
                         "--inspect-brk=" + inspectBrk,
                         serverJs.toAbsolutePath().normalize().toString(),
+                        metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                         log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
                         traceRpcMessages ? "--trace-rpc-messages" : null,
                         recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()

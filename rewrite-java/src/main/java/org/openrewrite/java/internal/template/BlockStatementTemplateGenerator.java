@@ -132,6 +132,17 @@ public class BlockStatementTemplateGenerator {
             @Override
             public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc,
                                                       Integer integer) {
+                if (left != null && blockEnclosingTemplateComment == null) {
+                    for (Comment comment : left.getBefore().getComments()) {
+                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
+                            // The __TEMPLATE__ comment is in the JLeftPadded padding (e.g., between '=' and
+                            // the RHS expression in an assignment). Set the enclosing block so the element
+                            // inside this padding will be collected by the visit() method.
+                            blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
+                            break;
+                        }
+                    }
+                }
                 left = super.visitLeftPadded(left, loc, integer);
                 if (left != null) {
                     for (Comment comment : left.getBefore().getComments()) {
@@ -310,8 +321,9 @@ public class BlockStatementTemplateGenerator {
             }
 
             if (prior == insertionPoint && prior instanceof Expression) {
-                // the template represents an expression, so we need to wrap it in a statement
-                after.append(';');
+                // the template represents an expression, so we need to wrap it in a statement.
+                // Use insert(0, ...) so the semicolon comes before any "}\nreturn ...;" from non-void methods.
+                after.insert(0, ';');
             }
             after.append('}');
         } else if (j instanceof J.Annotation) {
@@ -376,7 +388,9 @@ public class BlockStatementTemplateGenerator {
             if (n.getBody() != null && referToSameElement(prior, n.getBody())) {
                 // prior is the body of this anonymous class - already handled by J.Block case
                 // just need to close the anonymous class properly
-                after.append(";");
+                if (!(next(cursor).getValue() instanceof MethodCall)) {
+                    after.append(";");
+                }
             } else if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 StringBuilder beforeSegments = new StringBuilder();
                 StringBuilder afterSegments = new StringBuilder();

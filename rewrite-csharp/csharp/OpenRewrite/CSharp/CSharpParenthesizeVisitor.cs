@@ -53,6 +53,16 @@ public static class CSharpParenthesizeVisitor
 
         return newTree;
     }
+
+    /// <summary>
+    /// Recursively walks <paramref name="tree"/> and adds parentheses wherever operator
+    /// precedence requires them within the tree itself (not considering the graft site).
+    /// Call this on template results before <see cref="MaybeParenthesize"/>.
+    /// </summary>
+    public static J ParenthesizeDeep(J tree)
+    {
+        return new CSharpParenthesizeVisitor<int>(true).Visit(tree, 0)!;
+    }
 }
 
 /// <summary>
@@ -239,6 +249,11 @@ public class CSharpParenthesizeVisitor<P> : CSharpVisitor<P>
 
         if (parent is IsPattern)
         {
+            // CsBinary with Or/And inside IsPattern is a pattern combinator, not a
+            // boolean expression — it must NOT be wrapped in parentheses.
+            if (expr is CsBinary csb && csb.Operator.Element is CsBinary.OperatorType.Or or CsBinary.OperatorType.And)
+                return false;
+
             return expr is Binary or CsBinary or Ternary or Assignment or AssignmentOperation or Lambda;
         }
 

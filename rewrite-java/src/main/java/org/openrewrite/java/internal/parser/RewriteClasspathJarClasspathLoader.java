@@ -15,10 +15,6 @@
  */
 package org.openrewrite.java.internal.parser;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.Resource;
-import io.github.classgraph.ResourceList;
-import io.github.classgraph.ScanResult;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaParser;
@@ -27,13 +23,11 @@ import org.openrewrite.java.JavaParserExecutionContextView;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.net.URL;
+import java.nio.file.*;
+import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.sort;
@@ -50,30 +44,70 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  * will be removed in a future release.
  */
 public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLoader, AutoCloseable {
+    private static final String CLASSPATH_PREFIX = "META-INF/rewrite/classpath/";
     private final Class<?> caller = findCaller();
-    private final ScanResult result;
-    private final ResourceList resources;
+    private final List<String> resourcePaths;
     private final ExecutionContext ctx;
 
     public RewriteClasspathJarClasspathLoader(ExecutionContext ctx) {
         this.ctx = ctx;
-        result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath").scan();
-        resources = result.getResourcesWithExtension(".jar");
+        this.resourcePaths = findClasspathJarResources();
+    }
+
+    private static List<String> findClasspathJarResources() {
+        List<String> paths = new ArrayList<>();
+        try {
+            ClassLoader cl = RewriteClasspathJarClasspathLoader.class.getClassLoader();
+            Enumeration<URL> urls = cl.getResources("META-INF/rewrite/classpath");
+            while (urls.hasMoreElements()) {
+                URL url = urls.nextElement();
+                if ("jar".equals(url.getProtocol())) {
+                    String jarPath = url.getPath();
+                    int bangIdx = jarPath.indexOf('!');
+                    if (bangIdx > 0) {
+                        String filePath = jarPath.substring(0, bangIdx);
+                        if (filePath.startsWith("file:")) {
+                            filePath = filePath.substring(5);
+                        }
+                        try (JarFile jarFile = new JarFile(filePath)) {
+                            Enumeration<JarEntry> entries = jarFile.entries();
+                            while (entries.hasMoreElements()) {
+                                String name = entries.nextElement().getName();
+                                if (name.startsWith(CLASSPATH_PREFIX) && name.endsWith(".jar")) {
+                                    paths.add(name);
+                                }
+                            }
+                        }
+                    }
+                } else if ("file".equals(url.getProtocol())) {
+                    Path dir = Paths.get(url.toURI());
+                    if (Files.isDirectory(dir)) {
+                        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*.jar")) {
+                            for (Path file : stream) {
+                                paths.add(CLASSPATH_PREFIX + file.getFileName());
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return paths;
     }
 
     @Override
     public @Nullable Path load(String artifactName) {
         Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
-        for (Resource resource : resources) {
-            String fileName = Paths.get(resource.getPath()).getFileName().toString();
+        for (String resourcePath : resourcePaths) {
+            String fileName = Paths.get(resourcePath).getFileName().toString();
             if (jarPattern.matcher(fileName).matches()) {
                 try {
-                    Path artifact = getJarsFolder(ctx).resolve(Paths.get(resource.getPath()).getFileName());
+                    Path artifact = getJarsFolder(ctx).resolve(fileName);
                     if (!Files.exists(artifact)) {
                         try {
                             InputStream resourceAsStream = requireNonNull(
-                                    caller.getResourceAsStream("/" + resource.getPath()),
-                                    caller.getCanonicalName() + " resource not found: " + resource.getPath());
+                                    caller.getResourceAsStream("/" + resourcePath),
+                                    caller.getCanonicalName() + " resource not found: " + resourcePath);
                             Files.copy(resourceAsStream, artifact);
                         } catch (FileAlreadyExistsException ignore) {
                             // can happen when tests run in parallel, for example
@@ -90,9 +124,9 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
 
     @Override
     public Collection<String> availableArtifacts() {
-        List<String> available = new ArrayList<>(resources.size());
-        for (Resource resource : resources) {
-            String fileName = Paths.get(resource.getPath()).getFileName().toString();
+        List<String> available = new ArrayList<>(resourcePaths.size());
+        for (String resourcePath : resourcePaths) {
+            String fileName = Paths.get(resourcePath).getFileName().toString();
             if (fileName.endsWith(".jar")) {
                 available.add(fileName.substring(0, fileName.length() - 4));
             }
@@ -126,7 +160,5 @@ public class RewriteClasspathJarClasspathLoader implements JavaParserClasspathLo
 
     @Override
     public void close() {
-        resources.close();
-        result.close();
     }
 }

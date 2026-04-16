@@ -81,8 +81,12 @@ public class YamlReceiver extends YamlVisitor<RpcReceiveQueue> {
 
     @Override
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, RpcReceiveQueue q) {
+        YamlKey originalKey = entry.getKey();
         return entry
-                .withKey(q.receive(entry.getKey(), k -> (YamlKey) visitNonNull(k, q)))
+                .withKey(q.receive(entry.getKey(), k -> {
+                    Yaml visited = (Yaml) visitNonNull(k, q);
+                    return visited instanceof YamlKey ? (YamlKey) visited : originalKey;
+                }))
                 .withBeforeMappingValueIndicator(q.receive(entry.getBeforeMappingValueIndicator()))
                 .withValue(q.receive(entry.getValue(), v -> (Yaml.Block) visitNonNull(v, q)));
     }

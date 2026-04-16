@@ -21,13 +21,16 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 @EqualsAndHashCode(callSuper = false)
@@ -70,7 +73,7 @@ public class FindManagedDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, versionPattern, () -> findManagedDependency(tag, null))) {
+                    versionIsValid(version, versionPattern, tag, this::findManagedDependency, this::getResolutionResult)) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -95,7 +98,7 @@ public class FindManagedDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, versionPattern, () -> findManagedDependency(tag, null))) {
+                    versionIsValid(version, versionPattern, tag, this::findManagedDependency, this::getResolutionResult)) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -103,20 +106,28 @@ public class FindManagedDependency extends Recipe {
         };
     }
 
-    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
-                                          Supplier<@Nullable ResolvedManagedDependency> resolvedDependencySupplier) {
+    private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern, Xml.Tag tag,
+                                          BiFunction<Xml.Tag, @Nullable Scope, @Nullable ResolvedManagedDependency> findManagedDependency,
+                                          Supplier<MavenResolutionResult> getResolutionResult) {
         if (desiredVersion == null) {
             return true;
         }
-        ResolvedManagedDependency resolvedDependency = resolvedDependencySupplier.get();
-        if (resolvedDependency == null) {
-            // shouldn't happen, but if it does, fail the condition
+
+        ResolvedManagedDependency resolved = findManagedDependency.apply(tag, null);
+        String actualVersion;
+        if (resolved != null) {
+            actualVersion = resolved.getVersion();
+        } else {
+            actualVersion = tag.getChildValue("version")
+                    .map(v -> getResolutionResult.get().getPom().getValue(v))
+                    .orElse(null);
+        }
+        if (actualVersion == null) {
             return false;
         }
-        String actualVersion = resolvedDependency.getVersion();
+
         Validated<VersionComparator> validate = Semver.validate(desiredVersion, versionPattern);
-        return actualVersion != null &&
-                validate.isValid() &&
+        return validate.isValid() &&
                 validate.getValue() != null &&
                 validate.getValue().isValid(actualVersion, actualVersion);
     }

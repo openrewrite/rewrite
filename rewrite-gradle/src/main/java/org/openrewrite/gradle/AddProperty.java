@@ -124,7 +124,8 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
                                 sourceFile :
                                 new ChangePropertyValue(key, value, null, false, null)
                                         .getVisitor().visitNonNull(sourceFile, ctx);
-                        return new org.openrewrite.properties.AddProperty(key, value, null, null, null)
+                        return org.openrewrite.properties.AddProperty.builder()
+                                .property(key).value(value).build()
                                 .getVisitor()
                                 .visitNonNull(t, ctx);
                     }
@@ -133,7 +134,8 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
                             sourceFile :
                             new ChangePropertyValue(key, value, null, false, null)
                                     .getVisitor().visitNonNull(sourceFile, ctx);
-                    return new org.openrewrite.properties.AddProperty(key, value, null, null, null)
+                    return org.openrewrite.properties.AddProperty.builder()
+                            .property(key).value(value).build()
                             .getVisitor()
                             .visitNonNull(t, ctx);
                 }

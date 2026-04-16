@@ -21,8 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.nio.file.Path;
 
-import static org.openrewrite.python.Assertions.pyproject;
-import static org.openrewrite.python.Assertions.uv;
+import static org.openrewrite.python.Assertions.*;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
@@ -490,6 +489,37 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               dependencies = [
                   "requests>=2.28.0",
               ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void addTransitivePinToPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("certifi", ">=2023.7.22")),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
+              """,
+            """
+              [packages]
+              requests = ">=2.28.0"
+              certifi = ">=2023.7.22"
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipDirectDependencyInPipfile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("requests", ">=2.31.0")),
+          pipfile(
+            """
+              [packages]
+              requests = ">=2.28.0"
               """
           )
         );

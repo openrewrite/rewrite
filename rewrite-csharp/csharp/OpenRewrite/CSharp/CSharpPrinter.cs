@@ -61,11 +61,11 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             case Throw:
             case Break:
             case Continue:
-            case UsingDirective:
-            case ExternAlias:
             case GotoStatement:
             case DelegateDeclaration:
             case Yield:
+            case ExternAlias:
+            case UsingDirective:
                 p.Append(';');
                 break;
 
@@ -121,6 +121,21 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitCompilationUnit(CompilationUnit compilationUnit, PrintOutputCapture<P> p)
     {
         BeforeSyntax(compilationUnit, p);
+
+        foreach (var externAlias in compilationUnit.Externs)
+        {
+            VisitStatement(externAlias, p);
+        }
+
+        foreach (var usingDirective in compilationUnit.Usings)
+        {
+            VisitStatement(usingDirective, p);
+        }
+
+        foreach (var attrList in compilationUnit.AttributeLists)
+        {
+            Visit(attrList, p);
+        }
 
         foreach (var member in compilationUnit.Members)
         {
@@ -186,15 +201,38 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append("namespace");
         Visit(ns.Name.Element, p);
         VisitSpace(ns.Name.After, p);
-        p.Append('{');
+
+        // File-scoped namespace: Semicolon marker on Name padding means ';' instead of '{...}'
+        bool isFileScopedNamespace = ns.Name.Markers.FindFirst<Semicolon>() != null;
+        if (isFileScopedNamespace)
+        {
+            p.Append(';');
+        }
+        else
+        {
+            p.Append('{');
+        }
+
+        foreach (var externAlias in ns.Externs)
+        {
+            VisitStatement(externAlias, p);
+        }
+
+        foreach (var usingDirective in ns.Usings)
+        {
+            VisitStatement(usingDirective, p);
+        }
 
         foreach (var member in ns.Members)
         {
             VisitStatement(member, p);
         }
 
-        VisitSpace(ns.End, p);
-        p.Append('}');
+        if (!isFileScopedNamespace)
+        {
+            VisitSpace(ns.End, p);
+            p.Append('}');
+        }
         AfterSyntax(ns, p);
         return ns;
     }
@@ -250,8 +288,8 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         // Check for PointerMemberAccess marker on target PointerDereference - if present, print -> instead of .
         var isPointerMemberAccess = fieldAccess.Target is PointerDereference pd
             && pd.Markers.FindFirst<PointerMemberAccess>() != null;
-        // Check for NullSafe marker on the name - if present, print ?. instead of .
-        var nullSafe = fieldAccess.Name.Element.Markers.FindFirst<NullSafe>();
+        // Check for NullSafe marker on the FieldAccess - if present, print ?. instead of .
+        var nullSafe = fieldAccess.Markers.FindFirst<NullSafe>();
         if (isPointerMemberAccess)
         {
             p.Append("->");
@@ -356,9 +394,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             VisitSpace(aa.Prefix, p);
             Visit(aa.Indexed, p);
             VisitSpace(aa.Dimension.Prefix, p);
-            // Check for NullSafe marker - if present, print ?[ instead of [
-            var isNullSafe = aa.Dimension.Markers.FindFirst<NullSafe>() != null;
-            p.Append(isNullSafe ? "?[" : "[");
+            var nullSafe = aa.Markers.FindFirst<NullSafe>();
+            if (nullSafe != null)
+            {
+                p.Append('?');
+                VisitSpace(nullSafe.DotPrefix, p);
+            }
+            p.Append('[');
             Visit(aa.Dimension.Index.Element, p);
             VisitSpace(aa.Dimension.Index.After, p);
             // Don't print ] - parent will
@@ -368,9 +410,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     public override J VisitArrayDimension(ArrayDimension dimension, PrintOutputCapture<P> p)
     {
         BeforeSyntax(dimension, p);
-        // Check for NullSafe marker - if present, print ?[ instead of [
-        var isNullSafe = dimension.Markers.FindFirst<NullSafe>() != null;
-        p.Append(isNullSafe ? "?[" : "[");
+        // NullSafe marker lives on the parent ArrayAccess — check via cursor
+        // Dimension prefix holds space before ?, NullSafe.DotPrefix holds space between ? and [
+        var nullSafe = Cursor.Value is ArrayAccess aa
+            ? aa.Markers.FindFirst<NullSafe>() : null;
+        if (nullSafe != null)
+        {
+            p.Append('?');
+            VisitSpace(nullSafe.DotPrefix, p);
+        }
+        p.Append('[');
         Visit(dimension.Index.Element, p);
         VisitSpace(dimension.Index.After, p);
         p.Append(']');
@@ -393,9 +442,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             // For delegate invocation, skip the dot and name (it's syntactic sugar for .Invoke())
             if (!isDelegateInvocation)
             {
-                // Check for NullSafe marker on the name - if present, print ?. instead of .
+                // Check for NullSafe marker on the MethodInvocation - if present, print ?. instead of .
                 // Check for PointerMemberAccess marker on select PointerDereference - if present, print -> instead of .
-                var nullSafe = mi.Name.Markers.FindFirst<NullSafe>();
+                var nullSafe = mi.Markers.FindFirst<NullSafe>();
                 var isPointerDeref = mi.Select.Element is PointerDereference selectPd
                     && selectPd.Markers.FindFirst<PointerMemberAccess>() != null;
                 if (isPointerDeref)
@@ -1498,12 +1547,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         }
 
         // Print body or semicolon (for interface methods without body)
-        if (method.Markers.FindFirst<ExpressionBodied>() != null && method.Body != null)
+        if (method.Markers.FindFirst<ExpressionBodied>() != null && method.Body != null
+            && method.Body.Statements.Count > 0 && method.Body.Statements[0].Element is Return returnStmt)
         {
             // Expression-bodied: print => expr;
             VisitSpace(method.Body.Prefix, p);
             p.Append("=>");
-            var returnStmt = (Return)method.Body.Statements[0].Element;
             Visit(returnStmt.Expression, p);
             p.Append(';');
         }
@@ -1701,19 +1750,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
 
         foreach (var c in tr.Catches)
         {
-            VisitSpace(c.Prefix, p);
-            p.Append("catch");
-
-            if (c.Parameter.Tree.Element.TypeExpression != null || c.Parameter.Tree.Element.Variables.Count > 0)
-            {
-                VisitSpace(c.Parameter.Prefix, p);
-                p.Append('(');
-                VisitVariableDeclarationsWithoutSemicolon(c.Parameter.Tree.Element, p);
-                VisitSpace(c.Parameter.Tree.After, p);
-                p.Append(')');
-            }
-
-            VisitBlock(c.Body, p);
+            VisitCatchClause(c, p);
         }
 
         if (tr.Finally != null)
@@ -2840,7 +2877,12 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         p.Append(space.Whitespace);
         foreach (var comment in space.Comments)
         {
-            if (comment.Multiline)
+            if (comment is XmlDocComment)
+            {
+                // XmlDocComment text starts after "//" — printer prepends "//"
+                p.Append("//").Append(comment.Text);
+            }
+            else if (comment.Multiline)
             {
                 p.Append("/*").Append(comment.Text).Append("*/");
             }
@@ -2925,7 +2967,10 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             if (branchTrailingNewlines[0][d])
                 p.Append('\n');
 
-            // Update the active branch stack
+            // Update the active branch stack.
+            // Guard against empty stack: recipe visitors can remove nodes whose
+            // prefix carried ghost comments, causing directiveOrder to be missing
+            // the matching #if for an #elif/#else/#endif.
             switch (directive.Kind)
             {
                 case PreprocessorDirectiveKind.If:
@@ -2933,16 +2978,16 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                     break;
                 case PreprocessorDirectiveKind.Elif:
                 case PreprocessorDirectiveKind.Else:
-                    stack.Pop();
+                    if (stack.Count > 0) stack.Pop();
                     stack.Push(directive.ActiveBranchIndex);
                     break;
                 case PreprocessorDirectiveKind.Endif:
-                    stack.Pop();
+                    if (stack.Count > 0) stack.Pop();
                     break;
             }
 
             // Emit next section from the active branch
-            int activeBranch = stack.Peek();
+            int activeBranch = stack.Count > 0 ? stack.Peek() : 0;
             // Fall back to primary branch when no branch activates this directive
             if (activeBranch < 0) activeBranch = 0;
             int sectionIndex = d + 1;
@@ -3096,7 +3141,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// <summary>
     /// Called at the start of each visit method. Handles prefix space and markers.
     /// </summary>
-    protected void BeforeSyntax(J j, PrintOutputCapture<P> p)
+    protected virtual void BeforeSyntax(J j, PrintOutputCapture<P> p)
     {
         BeforeSyntax(j.Prefix, j.Markers, p);
     }
@@ -3124,7 +3169,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
     /// <summary>
     /// Called at the end of each visit method. Handles markers after syntax.
     /// </summary>
-    protected void AfterSyntax(J j, PrintOutputCapture<P> p)
+    protected virtual void AfterSyntax(J j, PrintOutputCapture<P> p)
     {
         AfterSyntax(j.Markers, p);
     }
@@ -3452,60 +3497,70 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         return twa;
     }
 
-    public override J VisitExceptionFilteredTry(ExceptionFilteredTry eft, PrintOutputCapture<P> p)
+    private void VisitCatchClause(Try.Catch catchClause, PrintOutputCapture<P> p)
     {
-        BeforeSyntax(eft, p);
+        VisitSpace(catchClause.Prefix, p);
+        p.Append("catch");
 
-        // Print 'try' keyword and body via the inner Try's prefix
-        var innerTry = eft.Try;
-        VisitSpace(innerTry.Prefix, p);
-        p.Append("try");
+        var varDecl = catchClause.Parameter.Tree.Element;
+        bool hasDeclaration = varDecl.TypeExpression != null;
 
-        Visit(innerTry.Body, p);
-
-        // Print catch clauses with filters
-        for (int i = 0; i < innerTry.Catches.Count; i++)
+        // Find the WhenClause if present (stored on the NamedVariable initializer)
+        JLeftPadded<Expression>? whenInitializer = null;
+        if (varDecl.Variables.Count > 0)
         {
-            var catchClause = innerTry.Catches[i];
-            VisitSpace(catchClause.Prefix, p);
-            p.Append("catch");
-
-            // Print catch parameter manually (ControlParentheses<VariableDeclarations>
-            // is not handled by VisitControlParentheses which only takes Expression)
-            if (catchClause.Parameter.Tree.Element.TypeExpression != null || catchClause.Parameter.Tree.Element.Variables.Count > 0)
+            var namedVar = varDecl.Variables[0].Element;
+            if (namedVar.Initializer?.Element is WhenClause)
             {
-                VisitSpace(catchClause.Parameter.Prefix, p);
-                p.Append('(');
-                VisitVariableDeclarationsWithoutSemicolon(catchClause.Parameter.Tree.Element, p);
-                VisitSpace(catchClause.Parameter.Tree.After, p);
-                p.Append(')');
+                whenInitializer = namedVar.Initializer;
             }
-
-            // Print filter if present: when (expr)
-            if (i < eft.CatchFilters.Count && eft.CatchFilters[i] is { } filter)
-            {
-                VisitSpace(filter.Before, p);
-                p.Append("when");
-                VisitSpace(filter.Element.Prefix, p);
-                p.Append('(');
-                Visit(filter.Element.Tree.Element, p);
-                VisitSpace(filter.Element.Tree.After, p);
-                p.Append(')');
-            }
-
-            Visit(catchClause.Body, p);
         }
 
-        // Print finally if present
-        if (innerTry.Finally != null)
+        if (hasDeclaration)
         {
-            VisitSpace(innerTry.Finally.Before, p);
-            p.Append("finally");
-            Visit(innerTry.Finally.Element, p);
+            VisitSpace(catchClause.Parameter.Prefix, p);
+            p.Append('(');
+
+            // Print type
+            Visit(varDecl.TypeExpression, p);
+
+            // Print variable name if present (skip empty names used as when-clause holders)
+            if (varDecl.Variables.Count > 0)
+            {
+                var namedVar = varDecl.Variables[0].Element;
+                if (namedVar.Name.SimpleName.Length > 0)
+                {
+                    VisitSpace(namedVar.Prefix, p);
+                    VisitSpace(namedVar.Name.Prefix, p);
+                    p.Append(namedVar.Name.SimpleName);
+                }
+            }
+
+            VisitSpace(catchClause.Parameter.Tree.After, p);
+            p.Append(')');
         }
 
-        AfterSyntax(eft, p);
-        return eft;
+        // Print when clause if present
+        if (whenInitializer != null)
+        {
+            VisitSpace(whenInitializer.Before, p);
+            p.Append("when");
+            Visit(whenInitializer.Element, p);
+        }
+
+        VisitBlock(catchClause.Body, p);
+    }
+
+    public override J VisitWhenClause(WhenClause whenClause, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(whenClause, p);
+        VisitSpace(whenClause.Condition.Prefix, p);
+        p.Append('(');
+        Visit(whenClause.Condition.Tree.Element, p);
+        VisitSpace(whenClause.Condition.Tree.After, p);
+        p.Append(')');
+        AfterSyntax(whenClause, p);
+        return whenClause;
     }
 
     public override J VisitExplicitInterfaceMember(ExplicitInterfaceMember eim, PrintOutputCapture<P> p)
@@ -3516,6 +3571,9 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         {
             // In C# source order: [modifiers] ReturnType InterfaceName.MethodName(params)
             // The interface specifier is printed between the return type and the method name.
+            // Print the method's prefix (e.g., newline between attribute and return type)
+            // since PrintMethodDeclarationBody does not call BeforeSyntax on the method.
+            VisitSpace(method.Prefix, p);
             PrintMethodDeclarationBody(method, eim.InterfaceSpecifier, p);
         }
         else
@@ -3698,12 +3756,13 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
         PrintParameterList("(", operatorDeclaration.Parameters, ")", p);
 
         // Body — expression-bodied (=> expr;) or block body ({...})
-        if (operatorDeclaration.Markers.FindFirst<ExpressionBodied>() != null)
+        if (operatorDeclaration.Markers.FindFirst<ExpressionBodied>() != null
+            && operatorDeclaration.Body.Statements.Count > 0
+            && operatorDeclaration.Body.Statements[0].Element is Return opReturnStmt)
         {
             VisitSpace(operatorDeclaration.Body.Prefix, p);
             p.Append("=>");
-            var returnStmt = (Return)operatorDeclaration.Body.Statements[0].Element;
-            Visit(returnStmt.Expression, p);
+            Visit(opReturnStmt.Expression, p);
             p.Append(';');
         }
         else

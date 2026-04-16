@@ -246,6 +246,26 @@ class CSharpParseProjectTest implements RewriteTest {
         );
     }
 
+    @Test
+    void xmlDocComment() {
+        rewriteRun(
+          csharp(
+            """
+              namespace Test
+              {
+                  public class Foo
+                  {
+                      /// <inheritdoc />
+                      public void Bar()
+                      {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     // ---- Full working set sweep ----
 
     @Tag("workingSet-full")
@@ -288,13 +308,13 @@ class CSharpParseProjectTest implements RewriteTest {
             CSharpRewriteRpc.shutdownCurrent();
             CSharpRewriteRpc rpc = CSharpRewriteRpc.getOrStart();
 
-            InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            var ctx = new InMemoryExecutionContext(t -> {
                 System.err.println("  Execution error: " + t.getMessage());
                 t.printStackTrace(System.err);
             });
 
             try {
-                List<SourceFile> sourceFiles = rpc.parseSolution(solutionPath, rootDir, ctx).sourceFiles().toList();
+                List<SourceFile> sourceFiles = rpc.parseSolution(solutionPath, rootDir, ctx).toList();
 
                 int parseErrors = 0;
                 for (SourceFile sf : sourceFiles) {

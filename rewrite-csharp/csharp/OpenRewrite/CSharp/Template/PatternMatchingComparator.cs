@@ -30,6 +30,7 @@ internal class PatternMatchingComparator
 {
     private readonly IReadOnlyDictionary<string, object> _captures;
     private readonly Dictionary<string, object> _bindings = new();
+    private readonly Dictionary<string, NullSafe> _nullSafeBindings = new();
 
     public PatternMatchingComparator(IReadOnlyDictionary<string, object> captures)
     {
@@ -43,11 +44,35 @@ internal class PatternMatchingComparator
     public Dictionary<string, object>? Match(J pattern, J candidate, Cursor cursor)
     {
         _bindings.Clear();
+        _nullSafeBindings.Clear();
         return MatchNode(pattern, candidate, cursor) ? new Dictionary<string, object>(_bindings) : null;
+    }
+
+    /// <summary>
+    /// After a successful <see cref="Match"/>, returns capture names mapped to the
+    /// <see cref="NullSafe"/> marker from the candidate MethodInvocation/FieldAccess
+    /// when the capture was in the Select position. Used by the template engine to
+    /// preserve <c>?.</c> through rewrites.
+    /// </summary>
+    internal IReadOnlyDictionary<string, NullSafe> NullSafeBindings => _nullSafeBindings;
+
+    /// <summary>
+    /// Recursively strip <see cref="Parentheses{T}"/> wrappers
+    /// so that <c>(expr)</c> and <c>expr</c> compare as equivalent.
+    /// </summary>
+    internal static J UnwrapParentheses(J node)
+    {
+        while (node is Parentheses p)
+            node = p.InnerTree;
+        return node;
     }
 
     private bool MatchNode(J pattern, J candidate, Cursor cursor)
     {
+        // Unwrap parentheses from both sides so (expr) matches expr
+        pattern = UnwrapParentheses(pattern);
+        candidate = UnwrapParentheses(candidate);
+
         // Check if pattern node is a placeholder identifier
         if (pattern is Identifier patternId)
         {
@@ -60,6 +85,10 @@ internal class PatternMatchingComparator
                     // Already bound — check consistency
                     return MatchValue(existing, candidate, cursor);
                 }
+                // Evaluate constraint before binding — pass the pattern placeholder's
+                // resolved type so typed captures can compare JavaType-to-JavaType
+                if (!EvaluateConstraint(_captures[captureName], candidate, cursor, patternId.Type))
+                    return false;
                 _bindings[captureName] = candidate;
                 return true;
             }
@@ -69,38 +98,256 @@ internal class PatternMatchingComparator
         if (pattern.GetType() != candidate.GetType())
             return MatchCrossType(pattern, candidate, cursor);
 
-        // NullSafe marker must match: ?. and . are structurally different
-        if (TreeHelper.HasNullSafe(pattern) != TreeHelper.HasNullSafe(candidate))
+        // NullSafe: a pattern with ?. only matches candidates with ?.
+        // but a pattern without ?. matches both (asymmetric — patterns are lenient)
+        if (TreeHelper.HasNullSafe(pattern) && !TreeHelper.HasNullSafe(candidate))
             return false;
 
         // Semantic matching for method invocations: when both resolve to the same
         // static method (same declaring type + name), skip receiver comparison.
+        bool matched;
         if (pattern is MethodInvocation patMethod && candidate is MethodInvocation candMethod)
-            return MatchMethodInvocation(patMethod, candMethod, cursor);
-
-        // Generic property-based comparison: iterate all structural properties
-        // and compare them recursively, skipping formatting/identity fields.
-        if (pattern is Binary patBin && candidate is Binary candBin)
+            matched = MatchMethodInvocation(patMethod, candMethod, cursor);
+        else if (pattern is Binary patBin && candidate is Binary candBin)
         {
-            // Save bindings so we can backtrack if direct match fails
+            // Generic property-based comparison with backtracking for commutative ops
             var savedBindings = new Dictionary<string, object>(_bindings);
-            if (MatchProperties(pattern, candidate, cursor))
-                return true;
-
-            // Restore bindings and try commuted (swapped) operands for == and !=
-            _bindings.Clear();
-            foreach (var kvp in savedBindings)
-                _bindings[kvp.Key] = kvp.Value;
-            return MatchCommutedBinary(patBin, candBin, cursor);
+            matched = MatchProperties(pattern, candidate, cursor);
+            if (!matched)
+            {
+                // Restore bindings and try commuted (swapped) operands for == and !=
+                _bindings.Clear();
+                foreach (var kvp in savedBindings)
+                    _bindings[kvp.Key] = kvp.Value;
+                matched = MatchCommutedBinary(patBin, candBin, cursor);
+            }
         }
+        else
+            matched = MatchProperties(pattern, candidate, cursor);
 
-        return MatchProperties(pattern, candidate, cursor);
+        // Record NullSafe associations for captures used as Select in MI/FA
+        if (matched)
+            RecordNullSafeForCaptures(pattern, candidate);
+
+        return matched;
+    }
+
+    /// <summary>
+    /// After a successful match of a MethodInvocation, FieldAccess, or ArrayAccess,
+    /// check if the candidate has a NullSafe marker that the pattern doesn't have.
+    /// If so, find the capture placeholder in the Select/Target/Indexed position and
+    /// record the NullSafe association so the template engine can preserve <c>?.</c>
+    /// and <c>?[</c> through rewrites.
+    /// </summary>
+    private void RecordNullSafeForCaptures(J pattern, J candidate)
+    {
+        if (pattern is MethodInvocation patMi && candidate is MethodInvocation candMi)
+        {
+            var candNullSafe = candMi.Markers.FindFirst<NullSafe>();
+            if (candNullSafe != null && patMi.Markers.FindFirst<NullSafe>() == null)
+            {
+                if (FindSelectCaptureName(patMi.Select) is { } captureName)
+                    _nullSafeBindings[captureName] = candNullSafe;
+            }
+        }
+        else if (pattern is FieldAccess patFa && candidate is FieldAccess candFa)
+        {
+            var candNullSafe = candFa.Markers.FindFirst<NullSafe>();
+            if (candNullSafe != null && patFa.Markers.FindFirst<NullSafe>() == null)
+            {
+                if (FindTargetCaptureName(patFa.Target) is { } captureName)
+                    _nullSafeBindings[captureName] = candNullSafe;
+            }
+        }
+        else if (pattern is ArrayAccess patAa && candidate is ArrayAccess candAa)
+        {
+            var candNullSafe = candAa.Markers.FindFirst<NullSafe>();
+            if (candNullSafe != null && patAa.Markers.FindFirst<NullSafe>() == null)
+            {
+                if (FindTargetCaptureName(patAa.Indexed) is { } captureName)
+                    _nullSafeBindings[captureName] = candNullSafe;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Check if a MI's Select (JRightPadded&lt;Expression&gt;?) contains a direct
+    /// capture placeholder, returning its name if so.
+    /// </summary>
+    private string? FindSelectCaptureName(JRightPadded<Expression>? select)
+    {
+        if (select?.Element is Identifier ident)
+        {
+            var name = Placeholder.FromPlaceholder(ident.SimpleName);
+            if (name != null && _captures.ContainsKey(name))
+                return name;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Check if a FieldAccess's Target is a direct capture placeholder.
+    /// </summary>
+    private string? FindTargetCaptureName(Expression target)
+    {
+        if (target is Identifier ident)
+        {
+            var name = Placeholder.FromPlaceholder(ident.SimpleName);
+            if (name != null && _captures.ContainsKey(name))
+                return name;
+        }
+        return null;
     }
 
     /// <summary>
     /// Compare all structural properties of two same-type nodes.
+    /// Dispatches to direct property access for common AST node types to avoid
+    /// reflection overhead, falling back to reflection for less common types.
     /// </summary>
     private bool MatchProperties(J pattern, J candidate, Cursor cursor)
+    {
+        switch (pattern)
+        {
+            case MethodInvocation p:
+            {
+                var c = (MethodInvocation)candidate;
+                return MatchValue(p.Select, c.Select, cursor)
+                    && MatchValue(p.Name, c.Name, cursor)
+                    && MatchValue(p.TypeParameters, c.TypeParameters, cursor)
+                    && MatchValue(p.Arguments, c.Arguments, cursor);
+            }
+            case Identifier p:
+            {
+                var c = (Identifier)candidate;
+                return MatchValue(p.Annotations, c.Annotations, cursor)
+                    && p.SimpleName == c.SimpleName;
+            }
+            case Binary p:
+            {
+                var c = (Binary)candidate;
+                return MatchValue(p.Left, c.Left, cursor)
+                    && MatchValue(p.Operator, c.Operator, cursor)
+                    && MatchValue(p.Right, c.Right, cursor);
+            }
+            case Literal p:
+            {
+                var c = (Literal)candidate;
+                return Equals(p.Value, c.Value)
+                    && p.ValueSource == c.ValueSource
+                    && MatchValue(p.UnicodeEscapes, c.UnicodeEscapes, cursor);
+            }
+            case FieldAccess p:
+            {
+                var c = (FieldAccess)candidate;
+                return MatchValue(p.Target, c.Target, cursor)
+                    && MatchValue(p.Name, c.Name, cursor);
+            }
+            case Block p:
+            {
+                var c = (Block)candidate;
+                return MatchValue(p.Static, c.Static, cursor)
+                    && MatchValue(p.Statements, c.Statements, cursor);
+            }
+            case If p:
+            {
+                var c = (If)candidate;
+                return MatchValue(p.Condition, c.Condition, cursor)
+                    && MatchValue(p.ThenPart, c.ThenPart, cursor)
+                    && MatchValue(p.ElsePart, c.ElsePart, cursor);
+            }
+            case NewClass p:
+            {
+                var c = (NewClass)candidate;
+                return MatchValue(p.Enclosing, c.Enclosing, cursor)
+                    && MatchValue(p.Clazz, c.Clazz, cursor)
+                    && MatchValue(p.Arguments, c.Arguments, cursor)
+                    && MatchValue(p.Body, c.Body, cursor);
+            }
+            case Unary p:
+            {
+                var c = (Unary)candidate;
+                return MatchValue(p.Operator, c.Operator, cursor)
+                    && MatchValue(p.Expression, c.Expression, cursor);
+            }
+            case ArrayAccess p:
+            {
+                var c = (ArrayAccess)candidate;
+                return MatchValue(p.Indexed, c.Indexed, cursor)
+                    && MatchValue(p.Dimension, c.Dimension, cursor);
+            }
+            case Assignment p:
+            {
+                var c = (Assignment)candidate;
+                return MatchValue(p.Variable, c.Variable, cursor)
+                    && MatchValue(p.AssignmentValue, c.AssignmentValue, cursor);
+            }
+            case AssignmentOperation p:
+            {
+                var c = (AssignmentOperation)candidate;
+                return MatchValue(p.Variable, c.Variable, cursor)
+                    && MatchValue(p.Operator, c.Operator, cursor)
+                    && MatchValue(p.AssignmentValue, c.AssignmentValue, cursor);
+            }
+            case Ternary p:
+            {
+                var c = (Ternary)candidate;
+                return MatchValue(p.Condition, c.Condition, cursor)
+                    && MatchValue(p.TruePart, c.TruePart, cursor)
+                    && MatchValue(p.FalsePart, c.FalsePart, cursor);
+            }
+            case TypeCast p:
+            {
+                var c = (TypeCast)candidate;
+                return MatchValue(p.Clazz, c.Clazz, cursor)
+                    && MatchValue(p.Expression, c.Expression, cursor);
+            }
+            case Return p:
+            {
+                var c = (Return)candidate;
+                return MatchValue(p.Expression, c.Expression, cursor);
+            }
+            case Lambda p:
+            {
+                var c = (Lambda)candidate;
+                return MatchValue(p.Params, c.Params, cursor)
+                    && MatchValue(p.Body, c.Body, cursor);
+            }
+            case MemberReference p:
+            {
+                var c = (MemberReference)candidate;
+                return MatchValue(p.Containing, c.Containing, cursor)
+                    && MatchValue(p.TypeParameters, c.TypeParameters, cursor)
+                    && MatchValue(p.Reference, c.Reference, cursor);
+            }
+            case VariableDeclarations p:
+            {
+                var c = (VariableDeclarations)candidate;
+                return MatchValue(p.LeadingAnnotations, c.LeadingAnnotations, cursor)
+                    && MatchValue(p.Modifiers, c.Modifiers, cursor)
+                    && MatchValue(p.TypeExpression, c.TypeExpression, cursor)
+                    && MatchValue(p.DimensionsBeforeName, c.DimensionsBeforeName, cursor)
+                    && MatchValue(p.Variables, c.Variables, cursor);
+            }
+            case IsPattern p:
+            {
+                var c = (IsPattern)candidate;
+                return MatchValue(p.Expression, c.Expression, cursor)
+                    && MatchValue(p.Pattern, c.Pattern, cursor);
+            }
+            case ConstantPattern p:
+            {
+                var c = (ConstantPattern)candidate;
+                return MatchValue(p.Value, c.Value, cursor);
+            }
+            default:
+                return MatchPropertiesViaReflection(pattern, candidate, cursor);
+        }
+    }
+
+    /// <summary>
+    /// Reflection-based fallback for types without direct property access overloads.
+    /// </summary>
+    private bool MatchPropertiesViaReflection(J pattern, J candidate, Cursor cursor)
     {
         var properties = TreeHelper.GetStructuralProperties(pattern.GetType());
         foreach (var prop in properties)
@@ -183,6 +430,20 @@ internal class PatternMatchingComparator
     /// <c>Identifier</c> ↔ <c>FieldAccess</c> for static members).
     /// Called when pattern and candidate have different node types.
     /// </summary>
+    /// <summary>
+    /// Returns <c>true</c> when the two node types form a pair that
+    /// <see cref="MatchCrossType"/> knows how to compare. Used by
+    /// <see cref="CSharpPattern.Match"/> to avoid rejecting these pairs
+    /// in its fast-reject check.
+    /// </summary>
+    internal static bool HasCrossTypeEquivalence(J pattern, J candidate)
+    {
+        return (pattern is Binary && candidate is IsPattern)
+            || (pattern is IsPattern && candidate is Binary)
+            || (pattern is FieldAccess && candidate is Identifier)
+            || (pattern is Identifier && candidate is FieldAccess);
+    }
+
     private bool MatchCrossType(J pattern, J candidate, Cursor cursor)
     {
         // Binary(expr == null) pattern ↔ IsPattern(expr is null) candidate
@@ -250,7 +511,7 @@ internal class PatternMatchingComparator
         if (patternBinary.Operator.Element != Binary.OperatorType.Equal)
             return false;
 
-        if (candidateIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+        if (candidateIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
             return false;
 
         // pattern: {s} == null → match {s} against candidate's expression
@@ -272,7 +533,7 @@ internal class PatternMatchingComparator
         if (candidateBinary.Operator.Element != Binary.OperatorType.Equal)
             return false;
 
-        if (patternIsPattern.Pattern.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
+        if (patternIsPattern.Pattern?.Element is not ConstantPattern cp || !IsNullLiteral(cp.Value))
             return false;
 
         // candidate: expr == null → match pattern's expression against candidate's left
@@ -300,9 +561,14 @@ internal class PatternMatchingComparator
         // Both null
         if (patternValue == null && candidateValue == null)
             return true;
-        // One null
+        // One null — but a pattern container with only zero-min variadic captures
+        // can match a null candidate (e.g., pattern `Fact({args})` vs `[Fact]` with no parens)
         if (patternValue == null || candidateValue == null)
+        {
+            if (patternValue != null && candidateValue == null && TreeHelper.IsContainer(patternValue))
+                return MatchContainerAgainstNull(patternValue, cursor);
             return false;
+        }
 
         // J tree nodes — recursive structural match
         if (patternValue is J pj && candidateValue is J cj)
@@ -350,6 +616,39 @@ internal class PatternMatchingComparator
             return patternElements == null && candidateElements == null;
 
         return MatchPaddedList(patternElements, candidateElements, cursor);
+    }
+
+    /// <summary>
+    /// Match a pattern container against a null candidate. Succeeds only when every
+    /// element in the container is a variadic capture placeholder with min == 0,
+    /// binding each to an empty list.
+    /// </summary>
+    private bool MatchContainerAgainstNull(object patternContainer, Cursor cursor)
+    {
+        var patternElements = TreeHelper.GetContainerElements(patternContainer);
+        if (patternElements == null || patternElements.Count == 0)
+            return true;
+
+        foreach (var el in patternElements)
+        {
+            var inner = TreeHelper.UnwrapPadded(el) ?? el;
+            if (inner is Identifier id)
+            {
+                var captureName = Placeholder.FromPlaceholder(id.SimpleName);
+                if (captureName != null && _captures.TryGetValue(captureName, out var captureObj)
+                    && IsVariadic(captureObj))
+                {
+                    var (min, _) = GetVariadicBounds(captureObj);
+                    if (min == 0)
+                    {
+                        _bindings[captureName] = new List<object>().AsReadOnly();
+                        continue;
+                    }
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -413,6 +712,10 @@ internal class PatternMatchingComparator
                         captured.Add(innerCandidate);
                     }
 
+                    // Evaluate variadic constraint before binding
+                    if (!EvaluateVariadicConstraint(captureObj, captured.AsReadOnly(), cursor))
+                        continue;
+
                     // Save bindings for backtracking
                     var savedBindings = new Dictionary<string, object>(_bindings);
                     _bindings[captureName] = captured.AsReadOnly();
@@ -456,20 +759,14 @@ internal class PatternMatchingComparator
         return true;
     }
 
-    private static bool IsVariadic(object captureObj)
-    {
-        var prop = captureObj.GetType().GetProperty("IsVariadic");
-        return prop != null && (bool)(prop.GetValue(captureObj) ?? false);
-    }
+    private static bool IsVariadic(object captureObj) =>
+        captureObj is ICapture capture && capture.IsVariadic;
 
     private static (int min, int max) GetVariadicBounds(object captureObj)
     {
-        var type = captureObj.GetType();
-        var minProp = type.GetProperty("MinCount");
-        var maxProp = type.GetProperty("MaxCount");
-        var min = minProp?.GetValue(captureObj) as int? ?? 0;
-        var max = maxProp?.GetValue(captureObj) as int? ?? int.MaxValue;
-        return (min, max);
+        if (captureObj is not ICapture capture)
+            return (0, int.MaxValue);
+        return (capture.MinCount ?? 0, capture.MaxCount ?? int.MaxValue);
     }
 
     /// <summary>
@@ -505,5 +802,14 @@ internal class PatternMatchingComparator
 
     private static bool IsStatic(JavaType.Variable variable) =>
         (variable.FlagsBitMap & FlagStatic) != 0;
+
+    private CaptureConstraintContext BuildConstraintContext(Cursor cursor, JavaType? patternType = null) =>
+        new(cursor, new Dictionary<string, object>(_bindings), patternType);
+
+    private bool EvaluateConstraint(object captureObj, object candidate, Cursor cursor, JavaType? patternType = null) =>
+        captureObj is not ICapture capture || capture.EvaluateConstraint(candidate, BuildConstraintContext(cursor, patternType));
+
+    private bool EvaluateVariadicConstraint(object captureObj, IReadOnlyList<object> captured, Cursor cursor) =>
+        captureObj is not ICapture capture || capture.EvaluateVariadicConstraint(captured, BuildConstraintContext(cursor));
 
 }

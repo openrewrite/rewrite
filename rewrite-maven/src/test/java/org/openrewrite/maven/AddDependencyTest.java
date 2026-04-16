@@ -96,7 +96,8 @@ class AddDependencyTest implements RewriteTest {
                 </project>
                 """,
               """
-                <project>
+                <!--~~(doesnotexist:doesnotexist failed. Unable to download metadata. Tried repositories:
+                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
@@ -238,7 +239,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependencyWithClassifier() {
-        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
+        var addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
           "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
@@ -1117,7 +1118,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void testScopedDependencyNotAddedWhenTypeOnlyInMainSources() {
+    void scopedDependencyNotAddedWhenTypeOnlyInMainSources() {
         rewriteRun(
           spec -> spec.recipe(addDependency(
             "com.fasterxml.jackson.core:jackson-core:2.12.0",
@@ -1149,7 +1150,7 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void testScopedDependencyAddedWhenTypeInTestSources() {
+    void scopedDependencyAddedWhenTypeInTestSources() {
         rewriteRun(
           spec -> spec.recipe(addDependency(
             "com.fasterxml.jackson.core:jackson-core:2.12.0",

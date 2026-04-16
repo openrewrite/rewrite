@@ -23,6 +23,8 @@ import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.binary.Binary;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
@@ -268,11 +270,21 @@ public class Result {
 
     public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
         try {
-            return (before == after) ||
-                   (before != null && after != null &&
-                    // Remote source files are fetched on `printAll`, let's avoid that cost.
-                    !(before instanceof Remote) && !(after instanceof Remote) &&
-                    before.printAll().equals(after.printAll()));
+            if (before == after) {
+                return true;
+            }
+            if (before == null || after == null) {
+                return false;
+            }
+            // Remote source files are fetched on `printAll`, let's avoid that cost.
+            if (before instanceof Remote || after instanceof Remote) {
+                return false;
+            }
+            // Quarks don't support printAll(); compare by source path instead
+            if (before instanceof Quark && after instanceof Quark) {
+                return before.getSourcePath().equals(after.getSourcePath());
+            }
+            return before.printAll().equals(after.printAll());
         } catch (Exception e) {
             return false;
         }

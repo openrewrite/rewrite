@@ -823,6 +823,13 @@ public class YamlParser implements org.openrewrite.Parser {
                 key = (Yaml.Scalar) block;
             } else if (key == null && block instanceof Yaml.Alias) {
                 key = (Yaml.Alias) block;
+            } else if (key == null) {
+                // Complex YAML key (mapping or sequence used as key).
+                // The YamlKey interface only supports Scalar and Alias, so convert
+                // the complex key to a placeholder Scalar. This won't round-trip
+                // and will become a ParseError, but prevents NPE/ClassCastException.
+                key = new Yaml.Scalar(randomId(), block.getPrefix(), Markers.EMPTY,
+                        Yaml.Scalar.Style.PLAIN, null, null, "");
             } else {
                 String keySuffix = block.getPrefix();
                 int colonIndex = commentAwareIndexOf(':', keySuffix);

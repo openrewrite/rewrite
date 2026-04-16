@@ -421,11 +421,11 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
     @CsvSource({
         "all, e6d864e3b5bc05cc62041842b306383fc1fefcec359e70cebb1d470a6094ca82",
         "bin, 29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda"
     })
+    @ParameterizedTest
     void preserveExistingDistributionType(String distributionType, String expectedChecksum) {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null, null))

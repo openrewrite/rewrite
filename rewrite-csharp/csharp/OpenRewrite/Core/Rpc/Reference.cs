@@ -17,13 +17,17 @@ namespace Rewrite.Core.Rpc;
 
 public class Reference
 {
+    [ThreadStatic] private static Reference? _flyweight;
+
     private object? _value;
 
     public object? Value => _value;
 
     public static Reference AsRef(object? t)
     {
-        return new Reference { _value = t };
+        _flyweight ??= new Reference();
+        _flyweight._value = t;
+        return _flyweight;
     }
 
     public static T? GetValue<T>(object? maybeRef)

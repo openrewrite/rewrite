@@ -74,4 +74,11 @@ internal static class TestHelpers
     public static Parentheses<Expression> MakeParens(Expression expr) =>
         new(Guid.NewGuid(), Space.Empty, Markers.Empty,
             new JRightPadded<Expression>(expr, Space.Empty, Markers.Empty));
+
+    public static IsPattern MakeIsPattern(Expression expression, Pattern pattern) =>
+        new(Guid.NewGuid(), Space.Empty, Markers.Empty, expression,
+            new JLeftPadded<Pattern>(Space.Empty, pattern));
+
+    public static ConstantPattern MakeConstantPattern(Expression value) =>
+        new(Guid.NewGuid(), Space.Empty, Markers.Empty, value);
 }

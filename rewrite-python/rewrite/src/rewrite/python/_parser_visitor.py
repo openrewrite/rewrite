@@ -1773,6 +1773,9 @@ class ParserVisitor(ast.NodeVisitor):
 
         method_type = self._type_mapping.method_invocation_type(node)
 
+        if method_type is not None and isinstance(name, j.Identifier):
+            name = dataclasses.replace(name, _type=method_type)
+
         return j.MethodInvocation(
             random_id(),
             prefix,

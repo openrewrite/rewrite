@@ -68,6 +68,12 @@ public interface JsonPathParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitFilterExpression(JsonPathParser.FilterExpressionContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link JsonPathParser#negationExpression}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitNegationExpression(JsonPathParser.NegationExpressionContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link JsonPathParser#binaryExpression}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

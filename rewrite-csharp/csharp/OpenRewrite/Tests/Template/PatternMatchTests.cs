@@ -792,14 +792,15 @@ public class PatternMatchTests : RewriteTest
     }
 
     [Fact]
-    public void RegularDotPatternDoesNotMatchNullConditionalAccess()
+    public void RegularDotPatternMatchesNullConditionalAccess()
     {
         var obj = Capture.Of<Expression>("obj");
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"{obj}.ToString()")),
             CSharp(
-                // ?. access should NOT match a regular . pattern
-                "class C { void M() { string s = null; var x = s?.ToString(); } }"
+                // A pattern without ?. matches both . and ?. access (asymmetric)
+                "class C { void M() { string s = null; var x = s?.ToString(); } }",
+                "class C { void M() { string s = null; var x = /*~~>*/s?.ToString(); } }"
             )
         );
     }
@@ -921,7 +922,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureMatchesZeroArguments()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -934,7 +935,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureInNonTrailingPosition()
     {
-        var args = Capture.Variadic<Expression>("args");
+        var args = Capture.Expression("args", variadic: new());
         var last = Capture.Of<Expression>("last");
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args}, {last})")),
@@ -948,7 +949,7 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMinBoundRejectsFewerArgs()
     {
-        var args = Capture.Variadic<Expression>("args", min: 2);
+        var args = Capture.Expression("args", variadic: new(Min: 2));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
@@ -961,12 +962,50 @@ public class PatternMatchTests : RewriteTest
     [Fact]
     public void VariadicCaptureWithMaxBoundRejectsMoreArgs()
     {
-        var args = Capture.Variadic<Expression>("args", max: 1);
+        var args = Capture.Expression("args", variadic: new(Max: 1));
         RewriteRun(
             spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
             CSharp(
                 // 3 args — max is 1, should NOT match
                 "class C { void M() { Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    // ===============================================================
+    // Variadic captures in attribute arguments
+    // ===============================================================
+
+    [Fact]
+    public void VariadicAttributeCaptureMatchesNoParens()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(FindAnnotation($"Fact({args})")),
+            CSharp(
+                """
+                class C { [Fact] void M() {} }
+                """,
+                """
+                class C { [/*~~>*/Fact] void M() {} }
+                """
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicAttributeCaptureMatchesWithArguments()
+    {
+        var args = Capture.Expression("args", variadic: new());
+        RewriteRun(
+            spec => spec.SetRecipe(FindAnnotation($"Fact({args})")),
+            CSharp(
+                """
+                class C { [Fact(DisplayName = "test")] void M() {} }
+                """,
+                """
+                class C { [/*~~>*/Fact(DisplayName = "test")] void M() {} }
+                """
             )
         );
     }
@@ -1408,78 +1447,291 @@ public class PatternMatchTests : RewriteTest
     }
 
     // ===============================================================
+    // Capture constraints
+    // ===============================================================
+
+    [Fact]
+    public void ConstraintThatReturnsTrueAllowsMatch()
+    {
+        var expr = Capture.Expression("expr", constraint: (_, _) => true);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintThatReturnsFalseBlocksMatch()
+    {
+        var expr = Capture.Expression("expr", constraint: (_, _) => false);
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintReceivesCapturedNode()
+    {
+        // Constraint that only accepts Literal nodes with value "42"
+        var expr = Capture.Expression("expr",
+            constraint: (node, _) => node is Literal { ValueSource: "42" });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintRejectsMismatchedNode()
+    {
+        // Constraint that only accepts Literal nodes with value "99"
+        var expr = Capture.Expression("expr",
+            constraint: (node, _) => node is Literal { ValueSource: "99" });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ConstraintReceivesCursorPositionedAtNode()
+    {
+        CaptureConstraintContext? capturedCtx = null;
+        var expr = Capture.Expression("expr", constraint: (_, ctx) =>
+        {
+            capturedCtx = ctx;
+            return true;
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Console.WriteLine({expr})")),
+            CSharp(
+                "class C { void M() { Console.WriteLine(42); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine(42); } }"
+            )
+        );
+        // The context passed to the constraint should contain the cursor from the visitor
+        Assert.NotNull(capturedCtx);
+        Assert.NotNull(capturedCtx!.Cursor);
+    }
+
+    [Fact]
+    public void ConstraintReceivesPreviouslyBoundCaptures()
+    {
+        // First capture binds with no constraint, second uses dependent constraint
+        var a = Capture.Of<Expression>("a");
+        var b = Capture.Expression("b", constraint: (node, ctx) =>
+        {
+            // The constraint on 'b' can read the already-bound value of 'a'
+            return ctx.Captures.ContainsKey("a")
+                && ctx.Captures["a"] is Literal { ValueSource: "1" };
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Math.Max({a}, {b})")),
+            CSharp(
+                "class C { void M() { Math.Max(1, 2); } }",
+                "class C { void M() { /*~~>*/Math.Max(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void DependentConstraintRejectsWhenPreviousCaptureDoesNotMatch()
+    {
+        var a = Capture.Of<Expression>("a");
+        var b = Capture.Expression("b", constraint: (node, ctx) =>
+        {
+            // Require 'a' to have been bound to a literal "99" — which it won't be
+            return ctx.Captures.ContainsKey("a")
+                && ctx.Captures["a"] is Literal { ValueSource: "99" };
+        });
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Math.Max({a}, {b})")),
+            CSharp(
+                "class C { void M() { Math.Max(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintReceivesCapturedList()
+    {
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 2));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2); } }",
+                "class C { void M() { /*~~>*/Foo(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintThatReturnsFalseBlocksMatch()
+    {
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.Count == 3));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // 2 args — constraint requires 3
+                "class C { void M() { Foo(1, 2); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintCanInspectElements()
+    {
+        // Only match when all captured args are Literal nodes
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                "class C { void M() { Foo(1, 2, 3); } }",
+                "class C { void M() { /*~~>*/Foo(1, 2, 3); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void VariadicConstraintRejectsNonMatchingElements()
+    {
+        // Only match when all captured args are Literal nodes
+        var args = Capture.Expression("args",
+            variadic: new(Constraint: (items, _) => items.All(item => item is Literal)));
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation($"Foo({args})")),
+            CSharp(
+                // x is an Identifier, not a Literal — should fail
+                "class C { void M() { Foo(1, x, 3); } }"
+            )
+        );
+    }
+
+    // ===============================================================
+    // Parentheses unwrapping
+    // ===============================================================
+
+    [Fact]
+    public void MatchesConcreteArgThroughParentheses()
+    {
+        // Pattern `Console.WriteLine("hello")` should match `Console.WriteLine(("hello"))`
+        // The argument "hello" is wrapped in parens — comparator should unwrap
+        RewriteRun(
+            spec => spec.SetRecipe(FindMethodInvocation("Console.WriteLine(\"hello\")")),
+            CSharp(
+                "class C { void M() { Console.WriteLine((\"hello\")); } }",
+                "class C { void M() { /*~~>*/Console.WriteLine((\"hello\")); } }"
+            )
+        );
+    }
+
+    [Fact]
+    public void ParenthesizedPatternMatchesUnparenthesized()
+    {
+        // Pattern `(x + 1)` should match candidate `x + 1` (unwrap pattern parens)
+        var x = Capture.Of<Expression>("x");
+        RewriteRun(
+            spec => spec.SetRecipe(FindExpression($"({x} + 1)")),
+            CSharp(
+                "class C { int M(int x) => x + 1; }",
+                "class C { int M(int x) => /*~~>*/x + 1; }"
+            )
+        );
+    }
+
+    // ===============================================================
     // Recipe factories
     // ===============================================================
 
-    private static Core.Recipe Search<T>(TemplateStringHandler handler) where T : J =>
+#pragma warning disable CS0618
+    private static OpenRewrite.Core.Recipe Search<T>(TemplateStringHandler handler) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(handler));
 
-    private static Core.Recipe Search<T>(string code) where T : J =>
+    private static OpenRewrite.Core.Recipe Search<T>(string code) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(code));
 
-    private static Core.Recipe Search<T>(TemplateStringHandler handler, IReadOnlyList<string> usings) where T : J =>
+    private static OpenRewrite.Core.Recipe Search<T>(TemplateStringHandler handler, IReadOnlyList<string> usings) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(handler, usings: usings));
 
-    private static Core.Recipe Search<T>(string code, IReadOnlyList<string> usings) where T : J =>
+    private static OpenRewrite.Core.Recipe Search<T>(string code, IReadOnlyList<string> usings) where T : J =>
         new PatternSearchRecipe<T>(CSharpPattern.Create(code, usings: usings));
+#pragma warning restore CS0618
 
-    private static Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
-    private static Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
-    private static Core.Recipe FindMethodInvocation(TemplateStringHandler h, IReadOnlyList<string> usings) => Search<MethodInvocation>(h, usings);
-    private static Core.Recipe FindMethodInvocation(string c, IReadOnlyList<string> usings) => Search<MethodInvocation>(c, usings);
-    private static Core.Recipe FindFieldAccess(TemplateStringHandler h) => Search<FieldAccess>(h);
-    private static Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
-    private static Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
-    private static Core.Recipe FindStaticMember(string c) =>
-        new StaticMemberSearchRecipe(CSharpPattern.Create(c));
-    private static Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
-        new StaticMemberSearchRecipe(CSharpPattern.Create(c, usings: usings));
-    private static Core.Recipe FindLiteral(string c) => Search<Literal>(c);
-    private static Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
-    private static Core.Recipe FindUnary(TemplateStringHandler h) => Search<Unary>(h);
-    private static Core.Recipe FindTernary(TemplateStringHandler h) => Search<Ternary>(h);
-    private static Core.Recipe FindAssignment(TemplateStringHandler h) => Search<Assignment>(h);
-    private static Core.Recipe FindAssignmentOperation(TemplateStringHandler h) => Search<OpenRewrite.CSharp.AssignmentOperation>(h);
-    private static Core.Recipe FindNewClass(string c) => Search<NewClass>(c);
-    private static Core.Recipe FindNewClass(TemplateStringHandler h) => Search<NewClass>(h);
-    private static Core.Recipe FindNewArray(string c) => Search<NewArray>(c);
-    private static Core.Recipe FindTypeCast(TemplateStringHandler h) => Search<TypeCast>(h);
-    private static Core.Recipe FindArrayAccess(TemplateStringHandler h) => Search<ArrayAccess>(h);
-    private static Core.Recipe FindReturn(TemplateStringHandler h) => Search<Return>(h);
-    private static Core.Recipe FindThrow(string c) => Search<Throw>(c);
-    private static Core.Recipe FindThrow(TemplateStringHandler h) => Search<Throw>(h);
-    private static Core.Recipe FindIf(string c) => Search<If>(c);
-    private static Core.Recipe FindWhileLoop(string c) => Search<WhileLoop>(c);
-    private static Core.Recipe FindDoWhileLoop(string c) => Search<DoWhileLoop>(c);
-    private static Core.Recipe FindForEachLoop(string c) => Search<ForEachLoop>(c);
-    private static Core.Recipe FindSwitch(string c) => Search<Switch>(c);
-    private static Core.Recipe FindTry(string c) => Search<Try>(c);
-    private static Core.Recipe FindLambda(string c) => Search<Lambda>(c);
-    private static Core.Recipe FindInstanceOf(string c) => Search<InstanceOf>(c);
-    private static Core.Recipe FindDefaultExpression(string c) => Search<DefaultExpression>(c);
-    private static Core.Recipe FindSizeOf(string c) => Search<SizeOf>(c);
-    private static Core.Recipe FindSwitchExpression(string c) => Search<OpenRewrite.CSharp.SwitchExpression>(c);
-    private static Core.Recipe FindTupleExpression(string c) => Search<TupleExpression>(c);
-    private static Core.Recipe FindNullSafeExpression(string c) => Search<NullSafeExpression>(c);
-    private static Core.Recipe FindIsPattern(string c) => Search<IsPattern>(c);
-    private static Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
-    private static Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(TemplateStringHandler h) => Search<MethodInvocation>(h);
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(string c) => Search<MethodInvocation>(c);
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(TemplateStringHandler h, IReadOnlyList<string> usings) => Search<MethodInvocation>(h, usings);
+    private static OpenRewrite.Core.Recipe FindMethodInvocation(string c, IReadOnlyList<string> usings) => Search<MethodInvocation>(c, usings);
+    private static OpenRewrite.Core.Recipe FindFieldAccess(TemplateStringHandler h) => Search<FieldAccess>(h);
+    private static OpenRewrite.Core.Recipe FindFieldAccess(string c) => Search<FieldAccess>(c);
+    private static OpenRewrite.Core.Recipe FindFieldAccess(string c, IReadOnlyList<string> usings) => Search<FieldAccess>(c, usings);
+    private static OpenRewrite.Core.Recipe FindStaticMember(string c) =>
+        new StaticMemberSearchRecipe(CSharpPattern.Expression(c));
+    private static OpenRewrite.Core.Recipe FindStaticMember(string c, IReadOnlyList<string> usings) =>
+        new StaticMemberSearchRecipe(CSharpPattern.Expression(c, usings: usings));
+    private static OpenRewrite.Core.Recipe FindLiteral(string c) => Search<Literal>(c);
+    private static OpenRewrite.Core.Recipe FindBinary(TemplateStringHandler h) => Search<Binary>(h);
+    private static OpenRewrite.Core.Recipe FindUnary(TemplateStringHandler h) => Search<Unary>(h);
+    private static OpenRewrite.Core.Recipe FindTernary(TemplateStringHandler h) => Search<Ternary>(h);
+    private static OpenRewrite.Core.Recipe FindAssignment(TemplateStringHandler h) => Search<Assignment>(h);
+    private static OpenRewrite.Core.Recipe FindAssignmentOperation(TemplateStringHandler h) => Search<OpenRewrite.CSharp.AssignmentOperation>(h);
+    private static OpenRewrite.Core.Recipe FindNewClass(string c) => Search<NewClass>(c);
+    private static OpenRewrite.Core.Recipe FindNewClass(TemplateStringHandler h) => Search<NewClass>(h);
+    private static OpenRewrite.Core.Recipe FindNewArray(string c) => Search<NewArray>(c);
+    private static OpenRewrite.Core.Recipe FindTypeCast(TemplateStringHandler h) => Search<TypeCast>(h);
+    private static OpenRewrite.Core.Recipe FindArrayAccess(TemplateStringHandler h) => Search<ArrayAccess>(h);
+    private static OpenRewrite.Core.Recipe FindReturn(TemplateStringHandler h) => Search<Return>(h);
+    private static OpenRewrite.Core.Recipe FindThrow(string c) => Search<Throw>(c);
+    private static OpenRewrite.Core.Recipe FindThrow(TemplateStringHandler h) => Search<Throw>(h);
+    private static OpenRewrite.Core.Recipe FindIf(string c) => Search<If>(c);
+    private static OpenRewrite.Core.Recipe FindWhileLoop(string c) => Search<WhileLoop>(c);
+    private static OpenRewrite.Core.Recipe FindDoWhileLoop(string c) => Search<DoWhileLoop>(c);
+    private static OpenRewrite.Core.Recipe FindForEachLoop(string c) => Search<ForEachLoop>(c);
+    private static OpenRewrite.Core.Recipe FindSwitch(string c) => Search<Switch>(c);
+    private static OpenRewrite.Core.Recipe FindTry(string c) => Search<Try>(c);
+    private static OpenRewrite.Core.Recipe FindLambda(string c) => Search<Lambda>(c);
+    private static OpenRewrite.Core.Recipe FindInstanceOf(string c) => Search<InstanceOf>(c);
+    private static OpenRewrite.Core.Recipe FindDefaultExpression(string c) => Search<DefaultExpression>(c);
+    private static OpenRewrite.Core.Recipe FindSizeOf(string c) => Search<SizeOf>(c);
+    private static OpenRewrite.Core.Recipe FindSwitchExpression(string c) => Search<OpenRewrite.CSharp.SwitchExpression>(c);
+    private static OpenRewrite.Core.Recipe FindTupleExpression(string c) => Search<TupleExpression>(c);
+    private static OpenRewrite.Core.Recipe FindNullSafeExpression(string c) => Search<NullSafeExpression>(c);
+    private static OpenRewrite.Core.Recipe FindIsPattern(string c) => Search<IsPattern>(c);
+    private static OpenRewrite.Core.Recipe FindCsBinary(string c) => Search<CsBinary>(c);
+    private static OpenRewrite.Core.Recipe FindCsBinary(TemplateStringHandler h) => Search<CsBinary>(h);
+
+    private static OpenRewrite.Core.Recipe FindExpression(TemplateStringHandler h) => Search<Expression>(h);
+    private static OpenRewrite.Core.Recipe FindAnnotation(TemplateStringHandler h) =>
+        new PatternSearchRecipe<Annotation>(CSharpPattern.Attribute(h));
 
     /// <summary>
     /// Search for a Binary or IsPattern null-check, matching across both node types.
     /// </summary>
-    private static Core.Recipe FindNullCheck(TemplateStringHandler h) =>
-        new NullCheckSearchRecipe(CSharpPattern.Create(h));
+    private static OpenRewrite.Core.Recipe FindNullCheck(TemplateStringHandler h) =>
+        new NullCheckSearchRecipe(CSharpPattern.Expression(h));
 
-    private static Core.Recipe FindNullCheck(string c) =>
-        new NullCheckSearchRecipe(CSharpPattern.Create(c));
+    private static OpenRewrite.Core.Recipe FindNullCheck(string c) =>
+        new NullCheckSearchRecipe(CSharpPattern.Expression(c));
 }
 
 /// <summary>
 /// Generic search recipe that visits all nodes of type <typeparamref name="T"/>
 /// and marks matches with a <see cref="SearchResult"/> marker.
 /// </summary>
-file class PatternSearchRecipe<T>(CSharpPattern pat) : Core.Recipe where T : J
+file class PatternSearchRecipe<T>(CSharpPattern pat) : OpenRewrite.Core.Recipe where T : J
 {
     public override string DisplayName => $"Find {typeof(T).Name}";
     public override string Description => $"Searches for {typeof(T).Name} matching the pattern.";
@@ -1503,7 +1755,7 @@ file class PatternSearchRecipe<T>(CSharpPattern pat) : Core.Recipe where T : J
 /// Search recipe that visits both Binary and IsPattern nodes to support
 /// cross-type null-check equivalence (== null ↔ is null).
 /// </summary>
-file class NullCheckSearchRecipe(CSharpPattern pat) : Core.Recipe
+file class NullCheckSearchRecipe(CSharpPattern pat) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find null check";
     public override string Description => "Searches for null checks matching the pattern (== null or is null).";
@@ -1527,7 +1779,7 @@ file class NullCheckSearchRecipe(CSharpPattern pat) : Core.Recipe
 /// Search recipe that visits both FieldAccess and Identifier nodes to support
 /// cross-type semantic matching for static members (e.g. Math.PI ↔ PI with using static).
 /// </summary>
-file class StaticMemberSearchRecipe(CSharpPattern pat) : Core.Recipe
+file class StaticMemberSearchRecipe(CSharpPattern pat) : OpenRewrite.Core.Recipe
 {
     public override string DisplayName => "Find static member";
     public override string Description => "Searches for static member references matching the pattern (FieldAccess or Identifier).";

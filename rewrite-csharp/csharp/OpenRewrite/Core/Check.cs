@@ -45,3 +45,69 @@ public class Check : TreeVisitor<Tree, ExecutionContext>
         return tree;
     }
 }
+
+/// <summary>
+/// A Check that holds a reference to the Recipe used as the precondition,
+/// matching the Java RecipeCheck pattern.
+/// </summary>
+public class RecipeCheck : Check
+{
+    public Recipe Recipe { get; }
+
+    internal RecipeCheck(Recipe check, ITreeVisitor<ExecutionContext> visitor)
+        : base(check.GetVisitor(), visitor)
+    {
+        Recipe = check;
+    }
+}
+
+/// <summary>
+/// Negates a precondition: matches when the inner visitor does NOT modify the tree.
+/// </summary>
+internal class NotVisitor : TreeVisitor<Tree, ExecutionContext>
+{
+    private readonly ITreeVisitor<ExecutionContext> _visitor;
+
+    public NotVisitor(ITreeVisitor<ExecutionContext> visitor)
+    {
+        _visitor = visitor;
+    }
+
+    public override Tree? Visit(Tree? tree, ExecutionContext ctx)
+    {
+        var t2 = _visitor.Visit(tree, ctx);
+        if (tree == t2 && tree != null)
+        {
+            return SearchResult.Found(tree);
+        }
+        return tree;
+    }
+}
+
+/// <summary>
+/// Combines multiple precondition visitors with AND semantics.
+/// All must match (modify the tree) for the result to be modified.
+/// </summary>
+internal class AndVisitor : TreeVisitor<Tree, ExecutionContext>
+{
+    private readonly ITreeVisitor<ExecutionContext>[] _visitors;
+
+    public AndVisitor(ITreeVisitor<ExecutionContext>[] visitors)
+    {
+        _visitors = visitors;
+    }
+
+    public override Tree? Visit(Tree? tree, ExecutionContext ctx)
+    {
+        Tree? t2 = tree;
+        foreach (var v in _visitors)
+        {
+            t2 = v.Visit(tree, ctx);
+            if (tree == t2)
+            {
+                return tree;
+            }
+        }
+        return t2;
+    }
+}

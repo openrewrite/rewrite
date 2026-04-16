@@ -248,7 +248,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 final PythonResolutionResult finalMarker = marker;
                 rpcStream = rpcStream.map(sf -> {
                     if (sf instanceof Py.CompilationUnit &&
-                            sf.getSourcePath().getFileName().toString().equals("setup.py")) {
+                            sf.getSourcePath().endsWith("setup.py")) {
                         return sf.withMarkers(sf.getMarkers().addIfAbsent(finalMarker));
                     }
                     return sf;
@@ -273,7 +273,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             return null;
         }
 
-        Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(source, projectPath);
+        Path workspace = DependencyWorkspace.getOrCreateSetuptoolsWorkspace(source, projectPath, commandEnv);
         if (workspace == null) {
             return null;
         }
@@ -334,20 +334,19 @@ public class PythonRewriteRpc extends RewriteRpc {
         Path setupCfgPath = projectPath.resolve("setup.cfg");
         if (Files.exists(setupCfgPath)) {
             Parser.Input input = Parser.Input.fromFile(setupCfgPath);
-            return new SetupCfgParser().parseInputs(
+            return new SetupCfgParser(commandEnv).parseInputs(
                     Collections.singletonList(input), effectiveRelativeTo, ctx);
         }
 
-        RequirementsTxtParser reqsParser = new RequirementsTxtParser();
+        RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
         try (Stream<Path> entries = Files.list(projectPath)) {
-            Path reqsPath = entries
-                    .filter(p -> reqsParser.accept(p.getFileName()))
-                    .findFirst()
-                    .orElse(null);
-            if (reqsPath != null) {
-                Parser.Input input = Parser.Input.fromFile(reqsPath);
-                return reqsParser.parseInputs(
-                        Collections.singletonList(input), effectiveRelativeTo, ctx);
+            List<Parser.Input> reqInputs = new ArrayList<>();
+            entries.filter(p -> reqsParser.accept(p.getFileName()))
+                    .sorted()
+                    .map(Parser.Input::fromFile)
+                    .forEach(reqInputs::add);
+            if (!reqInputs.isEmpty()) {
+                return reqsParser.parseInputs(reqInputs, effectiveRelativeTo, ctx);
             }
         } catch (IOException e) {
             // Silently skip manifest parsing if we can't list the directory
@@ -719,6 +718,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                         "--target=" + pipPackagesPath.toAbsolutePath().normalize(),
                         "openrewrite==" + version
                 );
+                pb.environment().putAll(environment);
                 pb.redirectErrorStream(true);
                 if (log != null) {
                     File logFile = log.toAbsolutePath().normalize().toFile();

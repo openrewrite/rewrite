@@ -37,6 +37,25 @@ public abstract class DynamicDispatchRpcCodec<T> implements RpcCodec<T> {
         }
     }
 
+    /**
+     * Verifies that at least one {@link DynamicDispatchRpcCodec} is registered for the
+     * given source file type. Call this at startup to fail fast when the ServiceLoader
+     * has not discovered the expected codec implementations (e.g. missing module on the
+     * classpath).
+     *
+     * @param sourceFileType The fully-qualified class name of the source file type
+     *                       (e.g. {@code "org.openrewrite.json.tree.Json$Document"}).
+     * @throws IllegalStateException if no codec is registered for the given type.
+     */
+    public static void requireCodecFor(String sourceFileType) {
+        if (!CODEC_BY_TYPE.containsKey(sourceFileType)) {
+            throw new IllegalStateException(
+                    "No DynamicDispatchRpcCodec registered for '" + sourceFileType + "'. " +
+                    "The ServiceLoader found zero DynamicDispatchRpcCodec implementations for this type. " +
+                    "Ensure that the module providing this codec is on the classpath.");
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public static <T> @Nullable RpcCodec<T> getCodec(Object t, @Nullable String sourceFileType) {
         if (sourceFileType == null) {

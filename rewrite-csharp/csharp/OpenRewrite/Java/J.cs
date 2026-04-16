@@ -25,7 +25,6 @@ namespace OpenRewrite.Java;
 public partial interface J : Tree
 {
     Space Prefix { get; }
-    Markers Markers { get; }
 }
 
 /// <summary>
@@ -209,34 +208,6 @@ public sealed class Literal(
 
     public bool Equals(Literal? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as Literal);
-    public override int GetHashCode() => Id.GetHashCode();
-}
-
-/// <summary>
-/// An expression used as a statement.
-/// </summary>
-public sealed class ExpressionStatement(
-    Guid id,
-    Expression expression
-) : J, Statement, IEquatable<ExpressionStatement>
-{
-    public Guid Id { get; } = id;
-    public Expression Expression { get; } = expression;
-
-    public ExpressionStatement WithId(Guid id) =>
-        id == Id ? this : new(id, Expression);
-    public ExpressionStatement WithExpression(Expression expression) =>
-        ReferenceEquals(expression, Expression) ? this : new(Id, expression);
-
-    // ExpressionStatement delegates prefix/markers to its expression
-    public Space Prefix => Expression.Prefix;
-    public Markers Markers => Expression.Markers;
-
-
-    Tree Tree.WithId(Guid id) => WithId(id);
-
-    public bool Equals(ExpressionStatement? other) => other is not null && Id == other.Id;
-    public override bool Equals(object? obj) => Equals(obj as ExpressionStatement);
     public override int GetHashCode() => Id.GetHashCode();
 }
 
@@ -1759,6 +1730,16 @@ public sealed class TypeCast(
 }
 
 /// <summary>
+/// Non-generic interface for <see cref="Parentheses{T}"/>, allowing type-checks
+/// and unwrapping without knowing the generic type parameter.
+/// </summary>
+public interface Parentheses : Expression
+{
+    /// <summary>The inner expression, unwrapped from parentheses.</summary>
+    J InnerTree { get; }
+}
+
+/// <summary>
 /// A parenthesized expression.
 /// </summary>
 public sealed class Parentheses<T>(
@@ -1766,7 +1747,7 @@ public sealed class Parentheses<T>(
     Space prefix,
     Markers markers,
     JRightPadded<T> tree
-) : J, Expression, IEquatable<Parentheses<T>> where T : J
+) : J, Parentheses, IEquatable<Parentheses<T>> where T : J
 {
     public Guid Id { get; } = id;
     public Space Prefix { get; } = prefix;
@@ -1781,6 +1762,8 @@ public sealed class Parentheses<T>(
         ReferenceEquals(markers, Markers) ? this : new(Id, Prefix, markers, Tree);
     public Parentheses<T> WithTree(JRightPadded<T> tree) =>
         ReferenceEquals(tree, Tree) ? this : new(Id, Prefix, Markers, tree);
+
+    public J InnerTree => Tree.Element;
 
     public JavaType? Type => Tree.Element is Expression expr ? expr.Type : null;
 

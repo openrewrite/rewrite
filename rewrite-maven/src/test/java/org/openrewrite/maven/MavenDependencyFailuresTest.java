@@ -342,6 +342,46 @@ class MavenDependencyFailuresTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unresolvableTgzDependencyShouldNotFailBuild() {
+        rewriteRun(
+          spec -> spec.executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder()
+              .dependencyModel(false)
+              .build()),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.example.mongo.osx</groupId>
+                    <artifactId>mongodb-osx-ssl-x86_64</artifactId>
+                    <version>3.6.23</version>
+                    <type>tgz</type>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.example.mongo.linux</groupId>
+                    <artifactId>mongodb-linux-x86_64</artifactId>
+                    <version>3.6.23</version>
+                    <type>tgz</type>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(after -> {
+                // tgz dependencies that can't be downloaded should NOT cause a parse failure
+                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                assertThat(maybeParseException).isEmpty();
+            })
+          )
+        );
+    }
+
     private Recipe updateModel() {
         return toRecipe(() -> new MavenIsoVisitor<>() {
             @Override

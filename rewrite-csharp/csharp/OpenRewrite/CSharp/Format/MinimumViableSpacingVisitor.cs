@@ -20,9 +20,13 @@ namespace OpenRewrite.CSharp.Format;
 
 /// <summary>
 /// Ensures minimum viable spacing between AST elements so that the printed
-/// output is parseable C#. This visitor inserts the minimum whitespace needed
-/// to prevent token merging (e.g., "publicvoid" → "public void") without
-/// attempting indentation or full formatting — Roslyn handles that.
+/// output is parseable C#. This visitor ONLY inserts single spaces where needed
+/// to prevent token merging (e.g., "publicvoid" → "public void").
+///
+/// This visitor must NOT insert indentation or general structural formatting.
+/// Its sole purpose is preventing adjacent tokens from fusing into unparseable output.
+/// All formatting beyond token separation is Roslyn's responsibility — with one
+/// exception documented inline as a workaround for a Roslyn formatter bug.
 /// </summary>
 public class MinimumViableSpacingVisitor : CSharpVisitor<int>
 {
@@ -118,6 +122,20 @@ public class MinimumViableSpacingVisitor : CSharpVisitor<int>
                 dv = dv.WithElement((Expression)EnsureSpace(dv.Element));
             }
             m = m.WithDefaultValue(dv);
+        }
+
+        // Workaround for https://github.com/dotnet/roslyn/issues/82974:
+        // Roslyn's Formatter.Format does not expand empty constructor bodies to
+        // Allman style when a constructor initializer (`: base(...)`) is present.
+        // Insert newlines so the printed source has multi-line braces that Roslyn
+        // can then indent correctly.
+        if (m.DefaultValue != null &&
+            m.Body is { Statements.Count: 0 } body &&
+            body.Prefix.IsEmpty && body.End.IsEmpty)
+        {
+            m = m.WithBody(body
+                .WithPrefix(body.Prefix.WithWhitespace("\n"))
+                .WithEnd(body.End.WithWhitespace("\n")));
         }
 
         return m;

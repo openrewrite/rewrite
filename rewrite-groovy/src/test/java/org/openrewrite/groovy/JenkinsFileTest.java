@@ -121,6 +121,32 @@ class JenkinsFileTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/moderneinc/customer-requests/issues/1478")
+    @Test
+    void jenkinsfileWithDestructuringAssignment() {
+        rewriteRun(
+          groovy(
+            """
+              pipeline {
+                agent any
+                stages {
+                  stage('Build') {
+                    steps {
+                      script {
+                        def tag = '1.2.3'
+                        def (major, minor, patch) = tag.tokenize('.')
+                        echo "Major: ${major}, Minor: ${minor}, Patch: ${patch}"
+                      }
+                    }
+                  }
+                }
+              }
+              """,
+            spec -> spec.path("Jenkinsfile")
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/pull/4887")
     @Test
     void jenkinsfileWithComment() {

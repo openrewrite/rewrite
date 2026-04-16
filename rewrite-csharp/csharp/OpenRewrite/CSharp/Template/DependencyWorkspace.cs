@@ -33,6 +33,24 @@ internal static class DependencyWorkspace
     private static readonly ConcurrentDictionary<string, ImmutableArray<MetadataReference>> ReferencesCache = new();
 
     /// <summary>
+    /// Synthetic source file mirroring the <c>GlobalUsings.g.cs</c> that MSBuild generates
+    /// when <c>&lt;ImplicitUsings&gt;enable&lt;/ImplicitUsings&gt;</c> is set (.NET 6+ default).
+    /// Added to scaffold compilations so types like <c>Dictionary&lt;,&gt;</c> resolve
+    /// without explicit <c>using</c> directives.
+    /// </summary>
+    private static readonly SyntaxTree ImplicitUsingsSyntaxTree = CSharpSyntaxTree.ParseText(
+        """
+        global using System;
+        global using System.Collections.Generic;
+        global using System.IO;
+        global using System.Linq;
+        global using System.Net.Http;
+        global using System.Threading;
+        global using System.Threading.Tasks;
+        """,
+        path: "__GlobalUsings__.g.cs");
+
+    /// <summary>
     /// Resolve NuGet dependencies into metadata references.
     /// Results are cached by the sorted dependency set.
     /// </summary>
@@ -46,6 +64,8 @@ internal static class DependencyWorkspace
     /// <summary>
     /// Create a Roslyn <see cref="SemanticModel"/> for the given source code,
     /// with NuGet package references resolved for type attribution.
+    /// Includes .NET 6+ implicit usings so types like <c>Dictionary&lt;,&gt;</c>
+    /// resolve without explicit <c>using</c> directives in the scaffold.
     /// </summary>
     internal static SemanticModel CreateSemanticModel(string source,
         IReadOnlyDictionary<string, string> dependencies)
@@ -55,7 +75,7 @@ internal static class DependencyWorkspace
         var compilation = CSharpCompilation.Create("TemplateCompilation")
             .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             .AddReferences(references)
-            .AddSyntaxTrees(syntaxTree);
+            .AddSyntaxTrees(ImplicitUsingsSyntaxTree, syntaxTree);
         return compilation.GetSemanticModel(syntaxTree);
     }
 
