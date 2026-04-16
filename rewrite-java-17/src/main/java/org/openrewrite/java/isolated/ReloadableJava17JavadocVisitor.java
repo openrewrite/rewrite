@@ -194,8 +194,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Override
     public Tree visitAttribute(AttributeTree node, List<Javadoc> body) {
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         List<Javadoc> beforeEqual;
         List<Javadoc> value;
 
@@ -402,8 +401,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitEndElement(EndElementTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("</"));
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         return new Javadoc.EndElement(
                 randomId(),
                 Markers.EMPTY,
@@ -868,8 +866,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitStartElement(StartElementTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("<"));
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         return new Javadoc.StartElement(
                 randomId(),
                 Markers.EMPTY,
@@ -956,6 +953,28 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     private static String unicodeEscaped(char c) {
         return String.format("\\u%04X", (int) c);
+    }
+
+    /**
+     * Consume the given {@code name} from the source, preserving any Unicode escape sequences (e.g. {@code \u00ef})
+     * that the Java compiler expanded before the Javadoc parser saw the source. Returns the raw source representation
+     * so that the printed output remains byte-for-byte identical to the input.
+     */
+    private String consumeNameWithUnicodeEscapes(String name) {
+        StringBuilder raw = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (cursor < source.length() && source.charAt(cursor) != c &&
+                    (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor))) {
+                int escapedCharLength = unicodeEscaped(c).length();
+                raw.append(source, cursor, cursor + escapedCharLength);
+                cursor += escapedCharLength;
+            } else {
+                raw.append(c);
+                cursor++;
+            }
+        }
+        return raw.toString();
     }
 
     @Override
