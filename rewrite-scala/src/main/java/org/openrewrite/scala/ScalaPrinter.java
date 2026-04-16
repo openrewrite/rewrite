@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
@@ -1175,6 +1176,32 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return method;
         }
         
+        // In Scala, method-level type arguments go AFTER the name (e.g., `foo.bar[T](x)`)
+        // and use square brackets. Also honor OmitParentheses on the arguments container
+        // for parenless calls like `List.newBuilder[Instant]`.
+        if (method.getTypeParameters() != null && !method.getTypeParameters().isEmpty()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+            visit(method.getName(), p);
+            visitContainer("[", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", "]", p);
+            JContainer<Expression> args = method.getPadding().getArguments();
+            if (args == null || !args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                visitContainer("(", args, JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
+            }
+            afterSyntax(method, p);
+            return method;
+        }
+
+        // If arguments have OmitParentheses (no type args path), suppress the `()` too.
+        JContainer<Expression> args = method.getPadding().getArguments();
+        if (args != null && args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+            visit(method.getName(), p);
+            afterSyntax(method, p);
+            return method;
+        }
+
         // For regular method calls, use the default Java printing
         return super.visitMethodInvocation(method, p);
     }
