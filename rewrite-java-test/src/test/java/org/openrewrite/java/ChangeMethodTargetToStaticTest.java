@@ -463,7 +463,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
             """
               import a.A;
               import b.B;
-
+              
               class C {
                  public void test() {
                      A a = new A();
