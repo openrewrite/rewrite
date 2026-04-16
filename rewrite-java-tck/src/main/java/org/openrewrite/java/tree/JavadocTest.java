@@ -379,6 +379,31 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unicodeEscapedCharAsHtmlElementName() {
+        // https://moderneinc.slack.com/archives/C06K78R5M4J/p1776321855348559
+        // The source literally contains the 6-character escape sequence `\u00ef`,
+        // which the Java compiler expands to `\u00ef` before the Javadoc parser sees it.
+        rewriteRun(
+          java(
+            "package com.sap.engine.lib.util;\n" +
+            "\n" +
+            "public class ArrayByte {\n" +
+            "  /**\n" +
+            "   * Replaces the element at the specified position in this ArrayByte\n" +
+            "   * with the specified element. <\\u00ef>\n" +
+            "   *\n" +
+            "   * @param  index the index of the element to be replaced.\n" +
+            "   * @param  element the element to be stored at the specified position.\n" +
+            "   * @return the element which was previously at the specified position.\n" +
+            "   * @exception ArrayIndexOutOfBoundsException if index is out of range.\n" +
+            "   */\n" +
+            "  public byte set(int index, byte element) { return 0; }\n" +
+            "}\n"
+          )
+        );
+    }
+
     // entity
     @Test
     void htmlEntity() {
