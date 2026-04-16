@@ -4560,22 +4560,11 @@ class ScalaTreeVisitor(
   /**
    * Parse the `[T, U, ...]` portion of a TypeApply into a JContainer of type-argument
    * expressions. Assumes `cursor` is positioned at or before the opening `[`.
+   * Leaves cursor positioned just past the closing `]`.
    */
   private def parseTypeApplyArgs(ta: Trees.TypeApply[?]): JContainer[Expression] = {
-    val bracketPos = source.indexOf('[', cursor)
-    val beforeBracket = if (bracketPos > cursor) Space.format(source.substring(cursor, bracketPos)) else Space.EMPTY
-    if (bracketPos >= 0) cursor = bracketPos + 1
-
-    val taEnd = Math.max(0, ta.span.end - offsetAdjustment)
-    val closeBracketPos = if (taEnd > 0 && taEnd <= source.length && source.charAt(taEnd - 1) == ']') {
-      taEnd - 1
-    } else {
-      val idx = source.indexOf(']', cursor)
-      if (idx >= 0) idx else taEnd
-    }
-
+    val beforeBracket = sourceBefore("[")
     val elements = new util.ArrayList[JRightPadded[Expression]]()
-
     for (i <- ta.args.indices) {
       val arg = ta.args(i)
       val expr: Expression = visitTree(arg) match {
@@ -4585,29 +4574,9 @@ class ScalaTreeVisitor(
         case _ => return JContainer.build(beforeBracket, elements, Markers.EMPTY)
       }
       val isLast = i == ta.args.size - 1
-      val after = if (isLast) {
-        if (cursor < closeBracketPos && closeBracketPos <= source.length) {
-          Space.format(source.substring(cursor, closeBracketPos))
-        } else Space.EMPTY
-      } else {
-        val commaPos = source.indexOf(',', cursor)
-        if (commaPos > cursor && commaPos < closeBracketPos) {
-          Space.format(source.substring(cursor, commaPos))
-        } else Space.EMPTY
-      }
+      val after = if (isLast) sourceBefore("]") else sourceBefore(",")
       elements.add(new JRightPadded(expr, after, Markers.EMPTY))
-      if (!isLast) {
-        val commaPos = source.indexOf(',', cursor)
-        if (commaPos >= 0) cursor = commaPos + 1
-      } else {
-        cursor = closeBracketPos
-      }
     }
-
-    if (closeBracketPos < source.length && source.charAt(closeBracketPos) == ']') {
-      cursor = closeBracketPos + 1
-    }
-
     JContainer.build(beforeBracket, elements, Markers.EMPTY)
   }
   
