@@ -106,6 +106,93 @@ class AddAnnotationProcessorTest implements RewriteTest {
     }
 
     @Test
+    void omitVersionWhenManagedByParent() {
+        // When the processor's version is already managed via <dependencyManagement>
+        // (e.g. inherited from spring-boot-starter-parent), the added <path> should
+        // NOT include a <version> — modern maven-compiler-plugin resolves it from
+        // dependencyManagement automatically.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.projectlombok</groupId>
+                              <artifactId>lombok-mapstruct-binding</artifactId>
+                              <version>0.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.projectlombok</groupId>
+                              <artifactId>lombok-mapstruct-binding</artifactId>
+                              <version>0.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <configuration>
+                                      <annotationProcessorPaths>
+                                          <path>
+                                              <groupId>org.projectlombok</groupId>
+                                              <artifactId>lombok-mapstruct-binding</artifactId>
+                                          </path>
+                                      </annotationProcessorPaths>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void shouldUpdateProcessorVersionAlreadyPresent() {
         rewriteRun(
           pomXml(

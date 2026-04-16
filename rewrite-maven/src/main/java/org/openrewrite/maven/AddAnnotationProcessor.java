@@ -239,6 +239,12 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                                             continue;
                                         }
 
+                                        if (!child.getChildValue("version").isPresent()) {
+                                            // No explicit version: the path intentionally defers to
+                                            // the effective POM's dependencyManagement. Leave it alone.
+                                            return tg;
+                                        }
+
                                         if (!version.equals(child.getChildValue("version").orElse(null))) {
                                             String oldVersion = child.getChildValue("version").orElse("");
                                             boolean oldVersionUsesProperty = oldVersion.startsWith("${");
@@ -261,10 +267,17 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                                         return tg;
                                     }
 
-                                    // Not found, so we add it
-                                    return tg.withContent(ListUtils.concat(tg.getChildren(), Xml.Tag.build(String.format(
-                                            "<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>",
-                                            groupId, artifactId, version))));
+                                    // Not found, so we add it. Omit <version> when the effective POM's
+                                    // dependencyManagement already manages this coordinate — modern
+                                    // maven-compiler-plugin (3.12+) resolves annotation processor path
+                                    // versions from dependencyManagement automatically.
+                                    String managedVersion = currentMrr.getPom().getManagedVersion(groupId, artifactId, null, null);
+                                    String pathXml = managedVersion != null ?
+                                            String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n</path>",
+                                                    groupId, artifactId) :
+                                            String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>",
+                                                    groupId, artifactId, version);
+                                    return tg.withContent(ListUtils.concat(tg.getChildren(), Xml.Tag.build(pathXml)));
                                 }
                             }.visitTag(plugin.getTree(), ctx);
 
