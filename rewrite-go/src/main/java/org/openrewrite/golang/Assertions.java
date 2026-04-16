@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.text.PlainText;
 
 import java.util.function.Consumer;
 
@@ -47,5 +48,30 @@ public final class Assertions {
         SourceSpec<Go.CompilationUnit> go = new SourceSpec<>(Go.CompilationUnit.class, null, GolangParser.builder(), before, s -> after);
         spec.accept(go);
         return go;
+    }
+
+    public static SourceSpecs goMod(@Nullable String before) {
+        return goMod(before, s -> {
+        });
+    }
+
+    public static SourceSpecs goMod(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> goMod = new SourceSpec<>(PlainText.class, null, GoModParser.builder(), before, null);
+        goMod.path("go.mod");
+        spec.accept(goMod);
+        return goMod;
+    }
+
+    public static SourceSpecs goMod(@Nullable String before, String after) {
+        return goMod(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs goMod(@Nullable String before, String after,
+                                    Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> goMod = new SourceSpec<>(PlainText.class, null, GoModParser.builder(), before, s -> after);
+        goMod.path("go.mod");
+        spec.accept(goMod);
+        return goMod;
     }
 }
