@@ -427,6 +427,54 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
         );
     }
 
+    @Test
+    void constructorNotChangedWhenMethodPatternIsWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeMethodTargetToStatic("a.A *(..)", "b.B", null, null, false)
+          ),
+          java(
+            """
+              package a;
+              public class A {
+                 public A() {}
+                 public void doSomething() {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static void doSomething() {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              class C {
+                 public void test() {
+                     A a = new A();
+                     a.doSomething();
+                 }
+              }
+              """,
+            """
+              import a.A;
+              import b.B;
+              
+              class C {
+                 public void test() {
+                     A a = new A();
+                     B.doSomething();
+                 }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/3085")
     @SuppressWarnings("ResultOfMethodCallIgnored")

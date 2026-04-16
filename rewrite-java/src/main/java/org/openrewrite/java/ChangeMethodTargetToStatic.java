@@ -202,6 +202,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
             if (n.getBody() != null || n.getEnclosing() != null) {
                 return n;
             }
+            if (!methodPattern.contains("<constructor>") && !methodPattern.contains("<init>")) {
+                return n;
+            }
             if (methodMatcher.matches(n)) {
                 String methodName;
                 JavaType.Method transformedType = null;
