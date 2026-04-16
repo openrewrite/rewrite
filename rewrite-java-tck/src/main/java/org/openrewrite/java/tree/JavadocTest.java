@@ -386,7 +386,7 @@ class JavadocTest implements RewriteTest {
         // which the Java compiler expands to `\u00ef` before the Javadoc parser sees it.
         rewriteRun(
           java(
-            "package com.sap.engine.lib.util;\n" +
+            "package com.foo;\n" +
             "\n" +
             "public class ArrayByte {\n" +
             "  /**\n" +
