@@ -26,6 +26,7 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -268,11 +269,14 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                                     }
 
                                     // Not found, so we add it. Omit <version> when the effective POM's
-                                    // dependencyManagement already manages this coordinate — modern
-                                    // maven-compiler-plugin (3.12+) resolves annotation processor path
-                                    // versions from dependencyManagement automatically.
-                                    String managedVersion = currentMrr.getPom().getManagedVersion(groupId, artifactId, null, null);
-                                    String pathXml = managedVersion != null ?
+                                    // dependencyManagement already manages this coordinate AND the
+                                    // effective maven-compiler-plugin is 3.12+, which resolves
+                                    // annotation processor path versions from dependencyManagement.
+                                    // For older plugin versions the <version> is still required.
+                                    boolean omitVersion =
+                                            currentMrr.getPom().getManagedVersion(groupId, artifactId, null, null) != null &&
+                                                    compilerPluginSupportsManagedVersions(currentMrr.getPom());
+                                    String pathXml = omitVersion ?
                                             String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n</path>",
                                                     groupId, artifactId) :
                                             String.format("<path>\n<groupId>%s</groupId>\n<artifactId>%s</artifactId>\n<version>%s</version>\n</path>",
@@ -296,6 +300,29 @@ public class AddAnnotationProcessor extends ScanningRecipe<AddAnnotationProcesso
                 }.visit(tree, ctx);
             }
         };
+    }
+
+    /**
+     * True when the effective maven-compiler-plugin version is 3.12.0 or newer.
+     * From 3.12.0 onward the plugin resolves annotation processor path versions
+     * from effective {@code <dependencyManagement>}, so callers can safely omit
+     * {@code <version>} inside {@code <path>}. When the version cannot be
+     * determined (e.g. no version anywhere in the effective POM), this is
+     * conservatively false.
+     */
+    private static boolean compilerPluginSupportsManagedVersions(ResolvedPom resolvedPom) {
+        for (Plugin p : ListUtils.concatAll(resolvedPom.getPlugins(), resolvedPom.getPluginManagement())) {
+            if (!MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(p.getGroupId()) ||
+                    !MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(p.getArtifactId())) {
+                continue;
+            }
+            String effectiveVersion = resolvedPom.getValue(p.getVersion());
+            if (effectiveVersion == null) {
+                continue;
+            }
+            return new LatestRelease(null).compare(null, effectiveVersion, "3.12.0") >= 0;
+        }
+        return false;
     }
 
     private boolean hasAnnotationProcessor(List<Plugin> plugins) {

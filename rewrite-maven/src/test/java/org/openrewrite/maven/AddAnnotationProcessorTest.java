@@ -108,44 +108,19 @@ class AddAnnotationProcessorTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/7384")
-    void omitVersionWhenManagedByParent() {
+    void omitVersionWhenManagedByParentAndCompilerPluginSupportsIt() {
         // When the processor's version is already managed via <dependencyManagement>
-        // (e.g. inherited from spring-boot-starter-parent), the added <path> should
-        // NOT include a <version> — modern maven-compiler-plugin resolves it from
-        // dependencyManagement automatically.
+        // (e.g. inherited from spring-boot-starter-parent) AND the maven-compiler-plugin
+        // is 3.12+ (which resolves annotation processor path versions from
+        // dependencyManagement), the added <path> should NOT include a <version>.
         rewriteRun(
           pomXml(
             """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
-                  <artifactId>parent</artifactId>
+                  <artifactId>my-app</artifactId>
                   <version>1</version>
-                  <packaging>pom</packaging>
-                  <modules>
-                      <module>child</module>
-                  </modules>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.projectlombok</groupId>
-                              <artifactId>lombok-mapstruct-binding</artifactId>
-                              <version>0.2.0</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>parent</artifactId>
-                  <version>1</version>
-                  <packaging>pom</packaging>
-                  <modules>
-                      <module>child</module>
-                  </modules>
                   <dependencyManagement>
                       <dependencies>
                           <dependency>
@@ -156,40 +131,129 @@ class AddAnnotationProcessorTest implements RewriteTest {
                       </dependencies>
                   </dependencyManagement>
                   <build>
-                      <pluginManagement>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.apache.maven.plugins</groupId>
-                                  <artifactId>maven-compiler-plugin</artifactId>
-                                  <configuration>
-                                      <annotationProcessorPaths>
-                                          <path>
-                                              <groupId>org.projectlombok</groupId>
-                                              <artifactId>lombok-mapstruct-binding</artifactId>
-                                          </path>
-                                      </annotationProcessorPaths>
-                                  </configuration>
-                              </plugin>
-                          </plugins>
-                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.13.0</version>
+                              <configuration>
+                                  <annotationProcessorPaths/>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.projectlombok</groupId>
+                              <artifactId>lombok-mapstruct-binding</artifactId>
+                              <version>0.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.13.0</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok-mapstruct-binding</artifactId>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
                   </build>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/7384")
+    void keepVersionWhenCompilerPluginIsOlderThan312() {
+        // maven-compiler-plugin before 3.12.0 does NOT resolve annotation processor
+        // path versions from dependencyManagement. Even if the coordinate is managed,
+        // we must still emit an explicit <version> to keep the build working.
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.projectlombok</groupId>
+                              <artifactId>lombok-mapstruct-binding</artifactId>
+                              <version>0.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.11.0</version>
+                              <configuration>
+                                  <annotationProcessorPaths/>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.projectlombok</groupId>
+                              <artifactId>lombok-mapstruct-binding</artifactId>
+                              <version>0.2.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.11.0</version>
+                              <configuration>
+                                  <annotationProcessorPaths>
+                                      <path>
+                                          <groupId>org.projectlombok</groupId>
+                                          <artifactId>lombok-mapstruct-binding</artifactId>
+                                          <version>0.2.0</version>
+                                      </path>
+                                  </annotationProcessorPaths>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>parent</artifactId>
-                        <version>1</version>
-                    </parent>
-                    <artifactId>child</artifactId>
-                </project>
-                """
-            )
           )
         );
     }
