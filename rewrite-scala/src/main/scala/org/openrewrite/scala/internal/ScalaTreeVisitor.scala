@@ -246,8 +246,11 @@ class ScalaTreeVisitor(
     // Strip them so we can parse the number correctly.
     val valueSource = rawSource.replaceAll("[^0-9a-fA-FxXlLfFdDeE._+-]", "")
 
+    // Strip underscore digit separators; valueSource keeps them for printing.
+    val parseSource = valueSource.replace("_", "")
+
     // Parse the number to determine its type and value
-    val (value: Any, javaType: JavaType.Primitive) = valueSource match {
+    val (value: Any, javaType: JavaType.Primitive) = parseSource match {
       case s if s.startsWith("0x") || s.startsWith("0X") =>
         // Hexadecimal literal
         val hexStr = s.substring(2)
@@ -257,11 +260,11 @@ class ScalaTreeVisitor(
         } else {
           (java.lang.Long.valueOf(longVal), JavaType.Primitive.Long)
         }
-      case s if s.endsWith("L") || s.endsWith("l") => 
+      case s if s.endsWith("L") || s.endsWith("l") =>
         (java.lang.Long.valueOf(s.dropRight(1)), JavaType.Primitive.Long)
-      case s if s.endsWith("F") || s.endsWith("f") => 
+      case s if s.endsWith("F") || s.endsWith("f") =>
         (java.lang.Float.valueOf(s.dropRight(1)), JavaType.Primitive.Float)
-      case s if s.endsWith("D") || s.endsWith("d") => 
+      case s if s.endsWith("D") || s.endsWith("d") =>
         (java.lang.Double.valueOf(s.dropRight(1)), JavaType.Primitive.Double)
       case s if s.contains(".") || s.contains("e") || s.contains("E") =>
         (java.lang.Double.valueOf(s), JavaType.Primitive.Double)
