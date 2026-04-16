@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -106,6 +107,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/7384")
     void omitVersionWhenManagedByParent() {
         // When the processor's version is already managed via <dependencyManagement>
         // (e.g. inherited from spring-boot-starter-parent), the added <path> should
