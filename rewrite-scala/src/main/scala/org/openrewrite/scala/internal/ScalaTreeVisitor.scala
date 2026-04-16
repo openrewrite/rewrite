@@ -756,7 +756,6 @@ class ScalaTreeVisitor(
           case ta: Trees.TypeApply[?] =>
             // Type-parameterized constructor: Array[Int]() desugars to Array.apply[Int]()
             // Preserve full source including ()
-            val prefix = extractPrefix(app.span)
             val text = extractSource(app.span)
             updateCursor(app.span.end)
             return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
@@ -769,10 +768,9 @@ class ScalaTreeVisitor(
         ta.fun match {
           case id: Trees.Ident[?] if id.name.toString == "Array" =>
             // Array[T](...) — preserve full source text including type params and args
-            val taPrefix = extractPrefix(app.span)
             val taText = extractSource(app.span)
             updateCursor(app.span.end)
-            return new J.Identifier(Tree.randomId(), taPrefix, Markers.EMPTY,
+            return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
               Collections.emptyList(), taText, typeFor(app.span), null)
           case _ =>
             // Other TypeApply: continue with regular method invocation
@@ -850,7 +848,6 @@ class ScalaTreeVisitor(
       case innerApp: Trees.Apply[?] =>
         // Curried call: matrix(0)(1), Array.fill(5)(0)
         // Visit the full expression as source-preserving identifier
-        val prefix = extractPrefix(app.span)
         val text = extractSource(app.span)
         updateCursor(app.span.end)
         return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
@@ -858,7 +855,6 @@ class ScalaTreeVisitor(
 
       case _ =>
         // Other function applications — preserve source
-        val prefix = extractPrefix(app.span)
         val text = extractSource(app.span)
         updateCursor(app.span.end)
         return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,

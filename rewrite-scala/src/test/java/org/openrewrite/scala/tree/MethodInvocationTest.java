@@ -242,4 +242,17 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void curriedCallWithBlockArgInsideBlock() {
+        rewriteRun(
+          scala(
+            """
+            val x = {
+              foo(1) { in => bar(in) }
+            }
+            """
+          )
+        );
+    }
 }
