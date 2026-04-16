@@ -216,12 +216,20 @@ class ScalaTreeVisitor(
       case parsedTry: untpd.ParsedTry => visitParsedTry(parsedTry)
       case matchTree: Trees.Match[?] => visitMatchTree(matchTree)
       case thisTree: Trees.This[?] => visitThis(thisTree)
+      case superTree: Trees.Super[?] => visitSuper(superTree)
       case interp: untpd.InterpolatedString => visitInterpolatedString(interp)
       case sym: untpd.SymbolLit => visitSymbolLit(sym)
       case na: Trees.NamedArg[?] => visitNamedArg(na)
       case bnt: Trees.ByNameTypeTree[?] => visitByNameTypeTree(bnt)
       case tbt: Trees.TypeBoundsTree[?] => visitTypeBoundsTree(tbt)
       case bind: Trees.Bind[?] => visitBind(bind)
+      case alt: Trees.Alternative[?] => visitAlternative(alt)
+      case stt: Trees.SingletonTypeTree[?] => visitSingletonTypeTree(stt)
+      case rtt: Trees.RefinedTypeTree[?] => visitRefinedTypeTree(rtt)
+      case ann: Trees.Annotated[?] => visitAnnotated(ann)
+      case mac: untpd.MacroTree => visitMacroTree(mac)
+      case ext: untpd.ExtMethods => visitExtMethods(ext)
+      case forYield: untpd.ForYield => visitForYield(forYield)
       case _ => visitUnknown(tree)
     }
   }
@@ -401,7 +409,13 @@ class ScalaTreeVisitor(
         // Curried application: matrix(0)(1), List.fill(5)(0)
         visitMethodInvocation(app)
       case _ =>
-        visitUnknown(app)
+        // Other Apply forms (e.g., super(args), this(args)) — preserve full source
+        // for round-trip printing rather than throw.
+        val prefix = extractPrefix(app.span)
+        val text = extractSource(app.span)
+        updateCursor(app.span.end)
+        new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(),
+          text, typeFor(app.span), null)
     }
   }
   
@@ -1411,9 +1425,21 @@ class ScalaTreeVisitor(
   
   private def visitInfixOp(infixOp: untpd.InfixOp): J = {
     val opName = infixOp.op.name.toString
-    
-    // Check if this is a compound assignment operator
-    if (opName.endsWith("=") && opName != "==" && opName != "!=" && opName != "<=" && opName != ">=" && opName.length > 1) {
+
+    // Compound assignment like +=, -=, *=, etc. Must end with a single '=' and base
+    // must be a known arithmetic/bitwise op. This excludes user-defined operators
+    // like ===, =:=, <:<, !==, which are infix method calls, not compound assigns.
+    def isCompoundAssign(op: String): Boolean = {
+      if (!op.endsWith("=") || op.length < 2) return false
+      if (op == "==" || op == "!=" || op == "<=" || op == ">=") return false
+      val base = op.dropRight(1)
+      base match {
+        case "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "<<" | ">>" | ">>>" => true
+        case _ => false
+      }
+    }
+
+    if (isCompoundAssign(opName)) {
       // This is a compound assignment like +=, -=, *=, /=
       val prefix = extractPrefix(infixOp.span)
       
@@ -1438,7 +1464,7 @@ class ScalaTreeVisitor(
         case "<<" => J.AssignmentOperation.Type.LeftShift
         case ">>" => J.AssignmentOperation.Type.RightShift
         case ">>>" => J.AssignmentOperation.Type.UnsignedRightShift
-        case _ => return visitUnknown(infixOp)
+        case _ => return visitUnknown(infixOp) // unreachable: isCompoundAssign filters
       }
       
       // Extract space around the operator
@@ -3521,17 +3547,20 @@ class ScalaTreeVisitor(
   
   private def visitForDo(forTree: untpd.ForDo): J = {
     // Only handle the simple single-generator case: for (x <- iterable) body
+    // Multi-generator or guarded forms fall back to source preservation.
     val enums = forTree.enums
-    if (enums.size != 1) {
-      visitUnknown(forTree)
+    if (enums.size == 1) {
+      enums.head match {
+        case genFrom: untpd.GenFrom if genFrom.pat.isInstanceOf[Trees.Ident[?]] =>
+          return visitSimpleForEach(forTree, genFrom)
+        case _ =>
+      }
     }
-
-    enums.head match {
-      case genFrom: untpd.GenFrom =>
-        visitSimpleForEach(forTree, genFrom)
-      case _ =>
-        visitUnknown(forTree)
-    }
+    // Fallback: preserve entire for-loop as identifier for round-trip printing
+    val prefix = extractPrefix(forTree.span)
+    val text = extractSource(forTree.span)
+    updateCursor(forTree.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, typeFor(forTree.span), null)
   }
 
   private def visitSimpleForEach(forTree: untpd.ForDo, genFrom: untpd.GenFrom): J = {
@@ -5879,6 +5908,21 @@ class ScalaTreeVisitor(
       "this", typeFor(thisTree.span), null)
   }
 
+  private def visitSuper(superTree: Trees.Super[?]): J.Identifier = {
+    val prefix = extractPrefix(superTree.span)
+    // For `super[Trait]`, the span covers the entire `super[Trait]` text — use source text
+    // as identifier name to preserve the trait qualifier. For plain `super`, the span
+    // covers just "super".
+    val name = if (superTree.mix != null && !superTree.mix.isEmpty) {
+      extractSource(superTree.span)
+    } else {
+      updateCursor(superTree.span.end)
+      "super"
+    }
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(),
+      name, typeFor(superTree.span), null)
+  }
+
   private def visitInterpolatedString(interp: untpd.InterpolatedString): J.Identifier = {
     // String interpolation like s"Hello, $name" — preserve as identifier (Statement + Expression)
     val prefix = extractPrefix(interp.span)
@@ -5929,6 +5973,64 @@ class ScalaTreeVisitor(
     val text = extractSource(bind.span)
     updateCursor(bind.span.end)
     new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, null, null)
+  }
+
+  private def visitAlternative(alt: Trees.Alternative[?]): J.Identifier = {
+    // Pattern alternatives: `case 1 | 2 | 3 => ...` or `case "a" | "b" => ...`
+    // Preserve the full pattern source as an identifier so the printer round-trips.
+    val prefix = extractPrefix(alt.span)
+    val text = extractSource(alt.span)
+    updateCursor(alt.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, null, null)
+  }
+
+  private def visitSingletonTypeTree(stt: Trees.SingletonTypeTree[?]): J.Identifier = {
+    // Singleton type reference: `None.type`, `obj.type`
+    val prefix = extractPrefix(stt.span)
+    val text = extractSource(stt.span)
+    updateCursor(stt.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, typeFor(stt.span), null)
+  }
+
+  private def visitRefinedTypeTree(rtt: Trees.RefinedTypeTree[?]): J.Identifier = {
+    // Structural type refinement: `Any { def greet(): String }`
+    val prefix = extractPrefix(rtt.span)
+    val text = extractSource(rtt.span)
+    updateCursor(rtt.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, typeFor(rtt.span), null)
+  }
+
+  private def visitAnnotated(ann: Trees.Annotated[?]): J.Identifier = {
+    // Annotated expression/type: `x: @switch`, `(pos: @switch) match {...}`
+    val prefix = extractPrefix(ann.span)
+    val text = extractSource(ann.span)
+    updateCursor(ann.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, typeFor(ann.span), null)
+  }
+
+  private def visitMacroTree(mac: untpd.MacroTree): J.Identifier = {
+    // Scala 3 inline/macro expressions: ${ ... } and '{ ... }
+    val prefix = extractPrefix(mac.span)
+    val text = extractSource(mac.span)
+    updateCursor(mac.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, null, null)
+  }
+
+  private def visitExtMethods(ext: untpd.ExtMethods): J.Identifier = {
+    // Scala 3 extension method block: `extension (x: T) { def ... }`
+    val prefix = extractPrefix(ext.span)
+    val text = extractSource(ext.span)
+    updateCursor(ext.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, null, null)
+  }
+
+  private def visitForYield(forYield: untpd.ForYield): J.Identifier = {
+    // Scala for-comprehension with yield: `for { x <- xs } yield expr`
+    // Preserve the full expression as an identifier for round-trip printing.
+    val prefix = extractPrefix(forYield.span)
+    val text = extractSource(forYield.span)
+    updateCursor(forYield.span.end)
+    new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY, Collections.emptyList(), text, typeFor(forYield.span), null)
   }
 
   private def visitByNameTypeTree(bnt: Trees.ByNameTypeTree[?]): J.Identifier = {
