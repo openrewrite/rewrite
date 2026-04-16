@@ -30,6 +30,19 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void numericLiteralsWithUnderscoreSeparator() {
+        rewriteRun(
+          scala(
+            """
+            val i = 60_000
+            val l = 1_000_000L
+            val d = 3.141_592
+            """
+          )
+        );
+    }
+
+    @Test
     void hexLiteral() {
         rewriteRun(
           scala("0xFF")
