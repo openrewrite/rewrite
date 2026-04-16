@@ -653,4 +653,3 @@ public class JavaSender extends JavaVisitor<RpcSendQueue> {
         return javaTypeSender.visit(javaType, q);
     }
 }
-

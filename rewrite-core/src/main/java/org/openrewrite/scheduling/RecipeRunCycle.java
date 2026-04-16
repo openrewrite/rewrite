@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.*;
@@ -718,8 +719,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         ctx.getOnError().accept(t);
 
         if (t instanceof RecipeRunException && after != null) {
-            RecipeRunException vt = (RecipeRunException) t;
-            after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
+            try {
+                RecipeRunException vt = (RecipeRunException) t;
+                after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
+            } catch (Throwable ignored) {
+                // Tree is too broken for node-level marker — fall back to marking the whole file
+                after = Markup.error(after, t);
+            }
         }
 
         // Use the original source file to record the error, not the one that may have been modified by the visitor.
