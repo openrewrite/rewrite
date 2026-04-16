@@ -6415,41 +6415,43 @@ class ScalaTreeVisitor(
       // If we have synthetic params and underscore in source, it's likely a placeholder lambda
       // These should be treated as regular lambdas but we skip the synthetic param
       if (hasUnderscorePlaceholder) {
-        func.body match {
-          case app: Trees.Apply[?] =>
-            // This might be a partially applied function like add(5, _)
-            // Check if it's a method invocation with underscore arguments
-            var hasPartialApplication = false
-            app.args.foreach {
-              case id: Trees.Ident[?] if syntheticParams.contains(id.name.toString) =>
-                hasPartialApplication = true
-              case _ =>
-            }
-            
-            if (hasPartialApplication) {
-              // Partially applied function - return the method invocation
-              val prefix = extractPrefix(func.span)
-              val result = visitApply(app)
-              result match {
-                case mi: J.MethodInvocation => return mi.withPrefix(prefix)
-                case _ => return result
-              }
-            }
-          case _ =>
-            // For other cases like `_ * 2`, this is an underscore placeholder lambda
-            // We need to create a proper lambda with S.Wildcard in the body
+        // Detect partial application like `add(5, _)` where the synthetic param
+        // appears as a *direct argument* of an Apply. The placeholder being the
+        // receiver of an Apply (e.g. `_.substring(0, 1)`) is NOT partial application
+        // and must be handled as a regular underscore placeholder lambda.
+        val partialApplication: Option[Trees.Apply[?]] = func.body match {
+          case app: Trees.Apply[?] if app.args.exists {
+            case id: Trees.Ident[?] => syntheticParams.contains(id.name.toString)
+            case _ => false
+          } => Some(app)
+          case _ => None
+        }
+
+        partialApplication match {
+          case Some(app) =>
+            // Partially applied function - return the method invocation
             val prefix = extractPrefix(func.span)
-            
+            val result = visitApply(app)
+            result match {
+              case mi: J.MethodInvocation => return mi.withPrefix(prefix)
+              case _ => return result
+            }
+          case None =>
+            // For all other cases (like `_ * 2` or `_.substring(0, 1)`),
+            // this is an underscore placeholder lambda.
+            // We need to create a proper lambda with S.Wildcard in the body.
+            val prefix = extractPrefix(func.span)
+
             // Set a flag to indicate we're in an underscore placeholder context
             val oldSyntheticParams = currentSyntheticParams
             currentSyntheticParams = syntheticParams
-            
+
             // Visit the body - the visitIdent method will now create S.Wildcard for synthetic params
             val body = visitTree(func.body)
-            
+
             // Restore the flag
             currentSyntheticParams = oldSyntheticParams
-            
+
             // Create a wildcard parameter for the lambda parameter list
             val wildcard = new S.Wildcard(
               Tree.randomId(),
@@ -6457,10 +6459,10 @@ class ScalaTreeVisitor(
               Markers.EMPTY,
               null
             )
-            
+
             val params = new util.ArrayList[JRightPadded[J]]()
             params.add(JRightPadded.build(wildcard))
-            
+
             val parameters = new J.Lambda.Parameters(
               Tree.randomId(),
               Space.EMPTY,
@@ -6468,7 +6470,7 @@ class ScalaTreeVisitor(
               false, // no parentheses for underscore syntax
               params
             )
-            
+
             // Create lambda with the underscore placeholder marker
             val lambda = new J.Lambda(
               Tree.randomId(),
@@ -6479,7 +6481,7 @@ class ScalaTreeVisitor(
               body,
               null
             )
-            
+
             return lambda
         }
       }
