@@ -433,4 +433,3 @@ val printTestClasspath by tasks.registering {
 extensions.configure<LicenseExtension> {
     exclude("**/rewrite-python-version.txt")
 }
-

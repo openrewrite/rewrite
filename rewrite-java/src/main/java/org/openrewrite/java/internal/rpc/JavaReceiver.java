@@ -682,4 +682,3 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return javaTypeReceiver.visit(javaType, q);
     }
 }
-
