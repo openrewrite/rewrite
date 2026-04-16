@@ -3378,6 +3378,71 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void selfReferencingPropertyDoesNotStackOverflow() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>pom-with-property-self-reference</artifactId>
+                  <version>${revision}</version>
+
+                  <properties>
+                      <revision>${revision}</revision>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void cyclicPropertyReferenceDoesNotStackOverflow() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>org.example</groupId>
+                    <artifactId>pom-with-property-cycle-parent</artifactId>
+                    <version>${revision}</version>
+                    <packaging>pom</packaging>
+
+                    <modules>
+                        <module>child</module>
+                    </modules>
+
+                    <properties>
+                        <revision>${project.build.version}</revision>
+                    </properties>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>org.example</groupId>
+                          <artifactId>pom-with-property-cycle-parent</artifactId>
+                          <version>${revision}</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+
+                      <artifactId>pom-with-property-cycle-child</artifactId>
+
+                      <properties>
+                          <project.build.version>${revision}</project.build.version>
+                      </properties>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void multiModuleProjectVersionPropertyInInterModuleDependency() {
         rewriteRun(
           spec -> spec.parser(MavenParser.builder().skipDependencyResolution(true)),
