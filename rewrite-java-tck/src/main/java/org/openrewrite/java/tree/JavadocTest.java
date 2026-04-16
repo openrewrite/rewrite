@@ -1171,6 +1171,34 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7228")
+    @Test
+    void seeWithFieldRefOnExternalType() {
+        rewriteRun(
+          java(
+            """
+                class Node {
+                    static final int LEAF = 1;
+                }
+                """
+          ),
+          java(
+            """
+              class Test {
+                  /**
+                   * @see Node#LEAF
+                   */
+                  boolean isLeaf() { return false; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getTypesInUse().getVariables()).isNotEmpty();
+                assertThat(cu.getTypesInUse().getVariables().iterator().next().getName()).isEqualTo("LEAF");
+            })
+          )
+        );
+    }
+
     @Test
     void methodFound() {
         rewriteRun(

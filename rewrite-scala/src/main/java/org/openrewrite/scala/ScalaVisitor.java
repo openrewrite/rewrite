@@ -128,11 +128,31 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         return w;
     }
 
-    public J visitBlockExpression(S.BlockExpression blockExpression, P p) {
-        S.BlockExpression b = blockExpression;
-        b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
-        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
-        b = b.withBlock(visitAndCast(b.getBlock(), p));
-        return b;
+    public J visitStatementExpression(S.StatementExpression statementExpression, P p) {
+        // Transparent — just visit the inner statement
+        return statementExpression.acceptScala(this, p);
+    }
+
+    public J visitTypeAscription(S.TypeAscription typeAscription, P p) {
+        S.TypeAscription t = typeAscription;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withExpression(visitAndCast(t.getExpression(), p));
+        t = t.withTypeTree(visitAndCast(t.getTypeTree(), p));
+        return t;
+    }
+
+    public J visitTypeAlias(S.TypeAlias typeAlias, P p) {
+        S.TypeAlias t = typeAlias;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        return t;
+    }
+
+    public J visitPatternDefinition(S.PatternDefinition patDef, P p) {
+        S.PatternDefinition pd = patDef;
+        pd = pd.withPrefix(visitSpace(pd.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
+        return pd;
     }
 }

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import io.github.classgraph.ClassGraph;
 import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -401,12 +401,12 @@ class RuntimeClasspathCache {
             synchronized (RuntimeClasspathCache.class) {
                 paths = runtimeClasspath;
                 if (paths == null) {
-                    runtimeClasspath = paths = new ClassGraph()
-                            .disableNestedJarScanning()
-                            .getClasspathURIs().stream()
-                            .filter(uri -> "file".equals(uri.getScheme()))
-                            .map(Paths::get)
-                            .collect(toList());
+                    String cp = System.getProperty("java.class.path");
+                    runtimeClasspath = paths = cp == null ? Collections.emptyList() :
+                            Arrays.stream(cp.split(System.getProperty("path.separator")))
+                                    .map(Paths::get)
+                                    .filter(Files::exists)
+                                    .collect(toList());
                 }
             }
         }

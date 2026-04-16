@@ -122,6 +122,32 @@ class CompilationUnitTest implements RewriteTest {
     }
 
     @Test
+    void multipleFilesGetDistinctPaths() {
+        // Regression: sourcePathFromSourceText used to hard-code "file.scala" which caused
+        // multi-file tests to collide on the same path and garble each other on print.
+        rewriteRun(
+          scala(
+            """
+            package com.example
+
+            class A {
+              def use(b: com.other.B): String = b.value
+            }
+            """
+          ),
+          scala(
+            """
+            package com.other
+
+            class B {
+              val value: String = "hi"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void withTrailingWhitespace() {
         rewriteRun(
           scala(

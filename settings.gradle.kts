@@ -18,6 +18,7 @@ val allProjects = listOf(
     "rewrite-csharp",
     "rewrite-docker",
     "rewrite-gradle",
+    "rewrite-go",
     "rewrite-groovy",
     "rewrite-hcl",
     "rewrite-java",

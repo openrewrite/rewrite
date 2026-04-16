@@ -25,7 +25,6 @@ namespace OpenRewrite.Java;
 public partial interface J : Tree
 {
     Space Prefix { get; }
-    Markers Markers { get; }
 }
 
 /// <summary>

@@ -25,6 +25,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
@@ -179,9 +181,14 @@ class RewriteRpcTest implements RewriteTest {
         }
 
         // Step 4: verify the sender cleaned up its stale remoteObjects entry
+        // and rolled back any refs assigned during the failed exchange
         assertThat(server.remoteObjects)
           .describedAs("Sender should remove stale remoteObjects entry after send failure")
           .doesNotContainKey(id);
+        int refsAfterFailure = server.localRefs.size();
+        assertThat(refsAfterFailure)
+          .describedAs("Sender should roll back localRefs assigned during failed exchange")
+          .isEqualTo(0);
 
         // Step 5: put back a valid tree and retry — should succeed via full ADD
         PlainText fixed = original.withText("Fixed");
@@ -413,6 +420,37 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    /**
+     * When an RPC batch visit throws an exception (e.g. a recipe visitor fails on the
+     * remote side), the error must be visible: the source file should carry a Markup.Error
+     * marker and the error should be recorded in the SourcesFileErrors data table.
+     */
+    @Test
+    void batchVisitExceptionProducesErrorMarker() {
+        // given
+        // Two consecutive same-RPC recipes are required for the batch path to kick in
+        Recipe r1 = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$ThrowingRpcRecipe", Map.of());
+        Recipe r2 = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$ThrowingRpcRecipe", Map.of());
+
+        var errors = new java.util.ArrayList<Throwable>();
+        var ctx = new InMemoryExecutionContext(errors::add);
+        var source = PlainText.builder().text("hello").sourcePath(Path.of("test.txt")).build();
+
+        // when
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new CompositeRecipe(List.of(r1, r2)),
+          new InMemoryLargeSourceSet(List.of(source)), ctx, 1, 1);
+
+        // then
+        assertThat(errors).isNotEmpty();
+
+        List<Result> results = run.getChangeset().getAllResults();
+        assertThat(results).isNotEmpty();
+        assertThat(results.getFirst().getAfter().getMarkers().findFirst(Markup.Error.class))
+          .describedAs("Source should carry Markup.Error so the failure is visible")
+          .isPresent();
+    }
+
     @Test
     void getCursor() {
         var parent = new Cursor(null, Cursor.ROOT_VALUE);
@@ -429,6 +467,29 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public PlainText visitText(PlainText text, Integer p) {
             return text.withText("Hello World!");
+        }
+    }
+
+    @SuppressWarnings("unused")
+    public static class ThrowingRpcRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "Throwing RPC recipe";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Test recipe that throws during visit.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new PlainTextVisitor<>() {
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    throw new RuntimeException("boom from RPC");
+                }
+            };
         }
     }
 

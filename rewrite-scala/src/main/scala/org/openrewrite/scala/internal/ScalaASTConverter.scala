@@ -93,17 +93,21 @@ class ScalaASTConverter {
           packageDecl = createPackageDeclaration(pkgDef, visitor)
         }
 
-        // Process the statements within the package
-        pkgDef.stats.foreach {
+        // Process the statements within the package.
+        // Sort by source position to ensure source order is preserved —
+        // the Dotty parser may reorder brace imports internally.
+        val sortedStats = pkgDef.stats.sortBy(s => if (s.span.exists) s.span.start else Int.MaxValue)
+        sortedStats.foreach {
           case _: Trees.PackageDef[?] =>
           case imp: Trees.Import[?] =>
-            // Handle imports - simple ones as J.Import, complex ones as statements
             val converted = visitor.visitTree(imp)
             converted match {
               case jImport: J.Import =>
                 imports.add(jImport)
               case unknown: J.Unknown =>
-                // Complex imports that we can't map to J.Import yet
+                // Complex imports (braces, aliases) that can't map to J.Import.
+                // Add as statements - they'll be interleaved correctly since
+                // both lists are in source order.
                 statements.add(unknown)
               case null =>
               case _: J.Empty =>

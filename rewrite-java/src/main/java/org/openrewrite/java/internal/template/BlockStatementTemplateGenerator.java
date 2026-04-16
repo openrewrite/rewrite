@@ -321,8 +321,9 @@ public class BlockStatementTemplateGenerator {
             }
 
             if (prior == insertionPoint && prior instanceof Expression) {
-                // the template represents an expression, so we need to wrap it in a statement
-                after.append(';');
+                // the template represents an expression, so we need to wrap it in a statement.
+                // Use insert(0, ...) so the semicolon comes before any "}\nreturn ...;" from non-void methods.
+                after.insert(0, ';');
             }
             after.append('}');
         } else if (j instanceof J.Annotation) {

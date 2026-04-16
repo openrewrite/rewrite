@@ -3,17 +3,6 @@ import java.util.Calendar
 plugins {
     id("org.openrewrite.build.root") version "latest.release"
     id("org.openrewrite.build.java-base") version "latest.release"
-    id("org.owasp.dependencycheck") version "latest.release"
-}
-
-configure<org.owasp.dependencycheck.gradle.extension.DependencyCheckExtension> {
-    analyzers.assemblyEnabled = false
-    analyzers.nodeAudit { enabled = false }
-    analyzers.nodePackage { enabled = false }
-    failBuildOnCVSS = System.getenv("FAIL_BUILD_ON_CVSS")?.toFloatOrNull() ?: 9.0F
-    format = System.getenv("DEPENDENCY_CHECK_FORMAT") ?: "HTML"
-    nvd.apiKey = System.getenv("NVD_API_KEY")
-    suppressionFile = "suppressions.xml"
 }
 
 repositories {
@@ -31,7 +20,7 @@ subprojects {
             doLast {
                 val idx = args?.indexOf("-o") ?: return@doLast
                 if (idx < 0 || idx + 1 >= args!!.size) return@doLast
-                val rootPrefix = rootProject.projectDir.absolutePath + "/"
+                val rootPrefix = rootProject.projectDir.absolutePath.replace("\\", "/") + "/"
                 val year = Calendar.getInstance().get(Calendar.YEAR)
                 val licenseHeader = "/*\n" + rootProject.file("gradle/licenseHeader.txt")
                     .readText().trim()

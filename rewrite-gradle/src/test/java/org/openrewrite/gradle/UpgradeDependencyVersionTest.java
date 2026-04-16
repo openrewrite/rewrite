@@ -2398,6 +2398,33 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void doesNotDowngradeExtPropertyVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0-jre", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  guavaVersion = "30.1.1-jre"
+              }
+
+              dependencies {
+                  implementation "com.google.guava:guava:${guavaVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradeAnnotationProcessors() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("org.mapstruct", "mapstruct*", "1.6.x", null)),

@@ -77,6 +77,21 @@ class LambdaTest implements RewriteTest {
     }
 
     @Test
+    void lambdaWithUnderscoreMethodCall() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val xs: List[String] = Nil
+                  xs.map(_.substring(0, 1))
+                  xs.map(_.substring(0, 1)).mkString
+                }
+                """
+            )
+        );
+    }
+
+    @Test
     void lambdaWithBlock() {
         rewriteRun(
             scala(

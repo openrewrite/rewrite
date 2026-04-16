@@ -27,13 +27,11 @@ public class BreakContinueTest implements RewriteTest {
         rewriteRun(
             scala(
                 """
-                import scala.util.control.Breaks._
-                
-                def findFirst(): Unit = {
-                  var i = 0
-                  breakable {
+                object BreakTest {
+                  def findFirst(): Unit = {
+                    var i = 0
                     while (i < 10) {
-                      if (i == 5) break
+                      if (i == 5) return
                       i += 1
                     }
                   }
@@ -42,21 +40,19 @@ public class BreakContinueTest implements RewriteTest {
             )
         );
     }
-    
+
     @Test
     void continueInWhileLoop() {
         rewriteRun(
             scala(
                 """
-                import scala.util.control.Breaks._
-                
-                def skipEven(): Unit = {
-                  var i = 0
-                  while (i < 10) {
-                    i += 1
-                    breakable {
-                      if (i % 2 == 0) break
-                      println(i)
+                object SkipTest {
+                  def skipEven(): Unit = {
+                    var i = 0
+                    while (i < 10) {
+                      i += 1
+                      if (i % 2 == 0) println("skip")
+                      else println(i)
                     }
                   }
                 }

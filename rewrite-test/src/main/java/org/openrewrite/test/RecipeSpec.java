@@ -250,8 +250,7 @@ public class RecipeSpec {
                 }
             }
             assertThat(dataTable).isNotNull();
-            @SuppressWarnings("unchecked")
-            List<E> rows = (List<E>) store.getRows(dataTable.getName(), dataTable.getGroup())
+            List<?> rows = store.getRows(dataTable.getName(), dataTable.getGroup())
                     .collect(java.util.stream.Collectors.toList());
             StringWriter writer = new StringWriter();
             CsvMapper mapper = CsvMapper.builder()
