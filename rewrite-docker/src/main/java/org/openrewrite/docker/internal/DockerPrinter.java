@@ -157,13 +157,15 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitEnv(Docker.Env env, PrintOutputCapture<P> p) {
         beforeSyntax(env, p);
         p.append(env.getKeyword());
-        for (Docker.Env.EnvPair pair : env.getPairs()) {
-            visitSpace(pair.getPrefix(), p);
-            visit(pair.getKey(), p);
-            if (pair.isHasEquals()) {
-                p.append("=");
+        if (env.getPairs() != null) {
+            for (Docker.Env.EnvPair pair : env.getPairs()) {
+                visitSpace(pair.getPrefix(), p);
+                visit(pair.getKey(), p);
+                if (pair.isHasEquals()) {
+                    p.append("=");
+                }
+                visit(pair.getValue(), p);
             }
-            visit(pair.getValue(), p);
         }
         afterSyntax(env, p);
         return env;
@@ -173,13 +175,15 @@ public class DockerPrinter<P> extends DockerVisitor<PrintOutputCapture<P>> {
     public Docker visitLabel(Docker.Label label, PrintOutputCapture<P> p) {
         beforeSyntax(label, p);
         p.append(label.getKeyword());
-        for (Docker.Label.LabelPair pair : label.getPairs()) {
-            visitSpace(pair.getPrefix(), p);
-            visit(pair.getKey(), p);
-            if (pair.isHasEquals()) {
-                p.append("=");
+        if (label.getPairs() != null) {
+            for (Docker.Label.LabelPair pair : label.getPairs()) {
+                visitSpace(pair.getPrefix(), p);
+                visit(pair.getKey(), p);
+                if (pair.isHasEquals()) {
+                    p.append("=");
+                }
+                visit(pair.getValue(), p);
             }
-            visit(pair.getValue(), p);
         }
         afterSyntax(label, p);
         return label;
