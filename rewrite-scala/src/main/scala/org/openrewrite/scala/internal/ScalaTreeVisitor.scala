@@ -23,6 +23,7 @@ import dotty.tools.dotc.util.Spans
 import org.openrewrite.Tree
 import org.openrewrite.java.tree.*
 import org.openrewrite.java.marker.ImplicitReturn
+import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.marker.Markers
 import org.openrewrite.scala.marker.Implicit
 import org.openrewrite.scala.marker.LambdaParameter
@@ -755,7 +756,6 @@ class ScalaTreeVisitor(
           case ta: Trees.TypeApply[?] =>
             // Type-parameterized constructor: Array[Int]() desugars to Array.apply[Int]()
             // Preserve full source including ()
-            val prefix = extractPrefix(app.span)
             val text = extractSource(app.span)
             updateCursor(app.span.end)
             return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
@@ -768,10 +768,9 @@ class ScalaTreeVisitor(
         ta.fun match {
           case id: Trees.Ident[?] if id.name.toString == "Array" =>
             // Array[T](...) — preserve full source text including type params and args
-            val taPrefix = extractPrefix(app.span)
             val taText = extractSource(app.span)
             updateCursor(app.span.end)
-            return new J.Identifier(Tree.randomId(), taPrefix, Markers.EMPTY,
+            return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
               Collections.emptyList(), taText, typeFor(app.span), null)
           case _ =>
             // Other TypeApply: continue with regular method invocation
@@ -781,7 +780,11 @@ class ScalaTreeVisitor(
     }
     
     // Handle the method call target
-    val (select: Expression, selectAfterSpace: Space, methodName: String, typeParams: java.util.List[Expression]) = app.fun match {
+    var select: Expression = null
+    var selectAfterSpace: Space = Space.EMPTY
+    var methodName: String = ""
+    var typeParamsContainer: JContainer[Expression] = null
+    app.fun match {
       case sel: Trees.Select[?] =>
         val target = visitTree(sel.qualifier) match {
           case expr: Expression => expr
@@ -804,13 +807,15 @@ class ScalaTreeVisitor(
           }
         }
 
-        (target, selectAfter, sel.name.toString, Collections.emptyList[Expression]())
+        select = target
+        selectAfterSpace = selectAfter
+        methodName = sel.name.toString
 
       case id: Trees.Ident[?] =>
-        (null, Space.EMPTY, id.name.toString, Collections.emptyList[Expression]())
+        methodName = id.name.toString
 
       case typeApp: Trees.TypeApply[?] =>
-        // TypeApply as method invocation target (e.g., __P__.p[int])
+        // TypeApply as method invocation target (e.g., Option.apply[String]("hi"), __P__.p[int])
         // Extract the Select inside the TypeApply to get target and method name
         typeApp.fun match {
           case sel: Trees.Select[?] =>
@@ -826,12 +831,16 @@ class ScalaTreeVisitor(
               val nameEnd = Math.max(0, sel.nameSpan.end - offsetAdjustment)
               if (nameEnd > cursor) cursor = nameEnd
             }
-            // Skip past type args [int]
-            updateCursor(typeApp.span.end)
-            (target, selectAfter, sel.name.toString, Collections.emptyList[Expression]())
+            // Parse [T] type args — advances cursor past `]`
+            select = target
+            selectAfterSpace = selectAfter
+            methodName = sel.name.toString
+            typeParamsContainer = parseTypeApplyArgs(typeApp)
           case id: Trees.Ident[?] =>
-            updateCursor(typeApp.span.end)
-            (null, Space.EMPTY, id.name.toString, Collections.emptyList[Expression]())
+            val nameEnd = if (id.span.exists) Math.max(0, id.span.end - offsetAdjustment) else cursor
+            if (nameEnd > cursor) cursor = nameEnd
+            methodName = id.name.toString
+            typeParamsContainer = parseTypeApplyArgs(typeApp)
           case _ =>
             cursor = savedCursor; return visitUnknown(app)
         }
@@ -839,7 +848,6 @@ class ScalaTreeVisitor(
       case innerApp: Trees.Apply[?] =>
         // Curried call: matrix(0)(1), Array.fill(5)(0)
         // Visit the full expression as source-preserving identifier
-        val prefix = extractPrefix(app.span)
         val text = extractSource(app.span)
         updateCursor(app.span.end)
         return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
@@ -847,7 +855,6 @@ class ScalaTreeVisitor(
 
       case _ =>
         // Other function applications — preserve source
-        val prefix = extractPrefix(app.span)
         val text = extractSource(app.span)
         updateCursor(app.span.end)
         return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
@@ -999,7 +1006,7 @@ class ScalaTreeVisitor(
       prefix,
       markers,
       if (select != null) new JRightPadded(select, selectAfterSpace, Markers.EMPTY) else null,
-      null, // typeParameters - handled separately in TypeApply
+      typeParamsContainer,
       name,
       argContainer,
       methodTypeOfTree(app)
@@ -4457,7 +4464,13 @@ class ScalaTreeVisitor(
             null  // type
           )
         }
-        
+
+        // General method reference with type arguments and no value arguments:
+        //   List.newBuilder[Instant], List.empty[Int], Option.empty[String], etc.
+        // Maps to J.MethodInvocation with typeParameters populated and arguments
+        // marked OmitParentheses (since the source has no `(...)`).
+        return visitMethodInvocationFromTypeApply(ta, sel, savedCursor)
+
       case id: Trees.Ident[?] if id.name.toString == "classOf" && ta.args.size == 1 =>
         // classOf[String] — preserve as identifier (Statement + Expression)
         val prefix = extractPrefix(ta.span)
@@ -4486,6 +4499,81 @@ class ScalaTreeVisitor(
 
     // Shouldn't reach here — all cases return above
     visitUnknown(ta)
+  }
+
+  /**
+   * Build a J.MethodInvocation from a TypeApply wrapping a Select, for method references
+   * that have type arguments but no value argument list (e.g., `List.newBuilder[Instant]`,
+   * `List.empty[Int]`). The arguments container is marked with OmitParentheses so the
+   * printer emits the call without `()`.
+   */
+  private def visitMethodInvocationFromTypeApply(ta: Trees.TypeApply[?], sel: Trees.Select[?], savedCursor: Int): J = {
+    val prefix = extractPrefix(ta.span)
+
+    // Visit the qualifier (e.g., `List`)
+    val qual = visitTree(sel.qualifier) match {
+      case e: Expression => e
+      case j: J => new S.StatementExpression(Tree.randomId(), j)
+      case _ => cursor = savedCursor; return visitUnknown(ta)
+    }
+
+    // Capture space between qualifier and the `.`
+    val dotPos = source.indexOf('.', cursor)
+    val selectAfter = if (dotPos > cursor) Space.format(source.substring(cursor, dotPos)) else Space.EMPTY
+    if (dotPos >= 0) cursor = dotPos + 1
+
+    // Method name (e.g., `newBuilder`)
+    val methodNameStr = sel.name.toString
+    val nameStart = if (sel.nameSpan.exists) Math.max(0, sel.nameSpan.start - offsetAdjustment) else cursor
+    val namePrefix = if (nameStart > cursor && nameStart <= source.length) {
+      Space.format(source.substring(cursor, nameStart))
+    } else Space.EMPTY
+    cursor = Math.min(source.length, nameStart + methodNameStr.length)
+    val name = new J.Identifier(Tree.randomId(), namePrefix, Markers.EMPTY,
+      Collections.emptyList(), methodNameStr, null, null)
+
+    // Type arguments between `[` and `]`
+    val typeParams = parseTypeApplyArgs(ta)
+
+    // Empty value-argument container with OmitParentheses marker
+    val omitParens = Markers.build(Collections.singletonList(new OmitParentheses(Tree.randomId())))
+    val args = JContainer.build(Space.EMPTY, Collections.emptyList[JRightPadded[Expression]](), omitParens)
+
+    updateCursor(ta.span.end)
+
+    new J.MethodInvocation(
+      Tree.randomId(),
+      prefix,
+      Markers.EMPTY,
+      new JRightPadded(qual, selectAfter, Markers.EMPTY),
+      typeParams,
+      name,
+      args,
+      methodTypeOfTree(ta)
+    )
+  }
+
+  /**
+   * Parse the `[T, U, ...]` portion of a TypeApply into a JContainer of type-argument
+   * expressions. Assumes `cursor` is positioned at or before the opening `[`.
+   * Leaves cursor positioned just past the closing `]`.
+   */
+  private def parseTypeApplyArgs(ta: Trees.TypeApply[?]): JContainer[Expression] = {
+    val beforeBracket = sourceBefore("[")
+    val elements = new util.ArrayList[JRightPadded[Expression]]()
+    for (i <- ta.args.indices) {
+      val arg = ta.args(i)
+      val expr: Expression = visitTree(arg) match {
+        case e: Expression => e
+        case tt: TypeTree => tt.asInstanceOf[Expression]
+        case j: J => new S.StatementExpression(Tree.randomId(), j)
+        case _ => return JContainer.build(beforeBracket, elements, Markers.EMPTY)
+      }
+      val isLast = i == ta.args.size - 1
+      val after = if (isLast) sourceBefore("]") else sourceBefore(",")
+      elements.add(new JRightPadded(expr, after, Markers.EMPTY))
+    }
+    JContainer.build(beforeBracket, elements, Markers.EMPTY)
   }
   
   private def visitAppliedTypeTree(at: Trees.AppliedTypeTree[?]): J = {
