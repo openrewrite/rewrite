@@ -22,17 +22,17 @@ import dotty.tools.dotc.ast.Trees.*
 object ScalaASTDebugTest {
   def main(args: Array[String]): Unit = {
     val bridge = new ScalaCompilerBridge()
-    
+
     // Test binary expression
     val result = bridge.parse("test.scala", "1 + 2")
-    
+
     println(s"Wrapped: ${result.wasWrapped}")
     println(s"Tree class: ${result.tree.getClass.getName}")
-    
+
     // Print tree structure
     printTree(result.tree, 0)
   }
-  
+
   def printTree(tree: untpd.Tree, indent: Int): Unit = {
     val prefix = " " * (indent * 2)
     tree match {

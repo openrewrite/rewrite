@@ -13,16 +13,16 @@ object TestSpanDebug {
   var (a, b) = (1, 2)
   (a, b) = (3, 4)
 }"""
-    
+
     // Setup compiler context
     val driver = new Driver
     given Context = driver.initCtx.fresh
-    
+
     val source = SourceFile.virtual("test.scala", code)
     val unit = CompilationUnit(source)
     val parser = Parser(source)
     val tree = parser.parse()
-    
+
     def showTree(t: untpd.Tree, indent: Int = 0): Unit = {
       val prefix = "  " * indent
       val span = t.span
@@ -34,9 +34,9 @@ object TestSpanDebug {
         } else "???"
         s"[${start}-${end}] '$content'"
       } else "[no span]"
-      
+
       println(s"${prefix}${t.getClass.getSimpleName}: $spanStr")
-      
+
       t match {
         case pkg: untpd.PackageDef =>
           pkg.stats.foreach(showTree(_, indent + 1))
@@ -66,7 +66,7 @@ object TestSpanDebug {
           }
       }
     }
-    
+
     showTree(tree)
   }
 }

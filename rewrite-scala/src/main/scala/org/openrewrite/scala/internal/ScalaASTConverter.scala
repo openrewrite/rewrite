@@ -39,7 +39,7 @@ class CompilationUnitResult(
   def getImports: JList[J.Import] = imports
 
   def getStatements: JList[Statement] = statements
-  
+
   def getLastCursorPosition: Int = lastCursorPosition
 }
 

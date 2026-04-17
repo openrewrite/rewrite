@@ -39,12 +39,12 @@ case class OmitBraces(id: UUID) extends Marker {
 /**
  * Marks a J.ClassDeclaration as a Scala object (singleton).
  * In Scala, object declarations create singleton instances.
- * 
+ *
  * This marker distinguishes between:
  * - Regular classes: class Foo
  * - Singleton objects: object Foo
  * - Case objects: case object Foo (would have this marker + case modifier)
- * 
+ *
  * @param id The marker ID
  * @param companion Whether this is a companion object (has the same name as a class in the same scope)
  */

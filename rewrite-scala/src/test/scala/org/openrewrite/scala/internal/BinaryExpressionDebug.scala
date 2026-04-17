@@ -19,18 +19,18 @@ object BinaryExpressionDebug {
   def main(args: Array[String]): Unit = {
     val bridge = new ScalaCompilerBridge()
     val converter = new ScalaASTConverter()
-    
+
     val source = "1.+(2)"
     println(s"Testing: $source")
-    
+
     val parseResult = bridge.parse("test.scala", source)
     println(s"Was wrapped: ${parseResult.wasWrapped}")
-    
+
     // Get compilation unit result
     val result = converter.convertToCompilationUnit(parseResult, source)
     val statements = result.getStatements
     println(s"Number of statements: ${statements.size()}")
-    
+
     // Get remaining source
     val remaining = converter.getRemainingSource(parseResult, source, result.getLastCursorPosition)
     println(s"Remaining source: '$remaining'")
