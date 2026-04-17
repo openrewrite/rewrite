@@ -38,6 +38,7 @@ import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.TypeAscription;
+import org.openrewrite.scala.marker.PartialFunctionLiteral;
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda;
 import org.openrewrite.scala.tree.S;
 
@@ -1250,12 +1251,26 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
     
     public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
         beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
-        
+
         // Check if this is an underscore placeholder lambda
         if (lambda.getMarkers().findFirst(UnderscorePlaceholderLambda.class).isPresent()) {
             // For underscore placeholder lambdas, just print the body
             // The underscores in the body will be printed as S.Wildcard
             visit(lambda.getBody(), p);
+            afterSyntax(lambda, p);
+            return lambda;
+        }
+
+        // Partial-function literal `{ case pat => ... }` — the body is a J.Block of J.Case.
+        if (lambda.getMarkers().findFirst(PartialFunctionLiteral.class).isPresent() &&
+                lambda.getBody() instanceof J.Block) {
+            J.Block cases = (J.Block) lambda.getBody();
+            p.append('{');
+            for (Statement caseStmt : cases.getStatements()) {
+                visit(caseStmt, p);
+            }
+            visitSpace(cases.getEnd(), Space.Location.BLOCK_END, p);
+            p.append('}');
             afterSyntax(lambda, p);
             return lambda;
         }

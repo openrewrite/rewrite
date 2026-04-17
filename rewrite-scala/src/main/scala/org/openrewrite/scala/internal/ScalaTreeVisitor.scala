@@ -36,6 +36,7 @@ import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
 import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
+import org.openrewrite.scala.marker.PartialFunctionLiteral
 import org.openrewrite.scala.marker.Curried
 import org.openrewrite.scala.tree.S
 
@@ -5711,6 +5712,23 @@ class ScalaTreeVisitor(
 
   private def visitMatchImpl(matchTree: Trees.Match[?]): J = {
     val prefix = extractPrefix(matchTree.span)
+
+    // Partial-function literal `{ case pat => ... }` has a synthetic selector with NoSpan.
+    // Emit a J.Lambda (no params) whose body is the cases block; printer uses the marker
+    // to emit the `{ case ... => ... }` form.
+    if (!matchTree.selector.span.exists) {
+      val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
+      val bi = bs.indexOf('{'); if (bi >= 0) cursor = cursor + bi + 1
+      val casesBlock = buildCasesBlock(matchTree)
+      updateCursor(matchTree.span.end)
+      val parameters = new J.Lambda.Parameters(
+        Tree.randomId(), Space.EMPTY, Markers.EMPTY, false, Collections.emptyList())
+      return new J.Lambda(
+        Tree.randomId(), prefix,
+        Markers.build(Collections.singletonList(new PartialFunctionLiteral(UUID.randomUUID()))),
+        parameters, Space.EMPTY, casesBlock, null)
+    }
+
     // `x match { ... }` — the selector can itself be a compound expression (if/block/match).
     // Wrap non-Expression J via StatementExpression so chained expressions parse.
     val selector = visitTree(matchTree.selector) match {
@@ -5724,6 +5742,13 @@ class ScalaTreeVisitor(
     val bs = if (cursor < source.length) source.substring(cursor, Math.min(cursor + 20, source.length)) else ""
     val bi = bs.indexOf('{'); if (bi >= 0) cursor = cursor + bi + 1
 
+    val casesBlock = buildCasesBlock(matchTree)
+    updateCursor(matchTree.span.end)
+    val selectorParens = new J.ControlParentheses[Expression](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(selector))
+    new J.Switch(Tree.randomId(), prefix, Markers.EMPTY, selectorParens, casesBlock)
+  }
+
+  private def buildCasesBlock(matchTree: Trees.Match[?]): J.Block = {
     val caseStatements = new util.ArrayList[JRightPadded[Statement]]()
     for (caseDef <- matchTree.cases) {
       val casePrefix = extractPrefix(caseDef.span)
@@ -5772,10 +5797,7 @@ class ScalaTreeVisitor(
         matchEndSpace = Space.format(remaining.substring(0, closeIdx))
       }
     }
-    val casesBlock = new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), caseStatements, matchEndSpace)
-    updateCursor(matchTree.span.end)
-    val selectorParens = new J.ControlParentheses[Expression](Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(selector))
-    new J.Switch(Tree.randomId(), prefix, Markers.EMPTY, selectorParens, casesBlock)
+    new J.Block(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JRightPadded.build(false), caseStatements, matchEndSpace)
   }
 
   private def visitThis(thisTree: Trees.This[?]): J.Identifier = {
