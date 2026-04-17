@@ -19,9 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -267,51 +265,5 @@ public final class KotlinTypeUtils {
      */
     public static boolean isAny(@Nullable JavaType type) {
         return TypeUtils.isObject(type);
-    }
-
-    /**
-     * Render a type parameter list (including angle brackets and an optional {@code where}
-     * clause for multi-bound variables) in Kotlin syntax from a collection of
-     * {@link JavaType.GenericTypeVariable}. Returns an empty string when there are no
-     * nameable type variables.
-     */
-    public static String toKotlinTypeParameters(Collection<JavaType.GenericTypeVariable> typeVariables) {
-        if (typeVariables.isEmpty()) {
-            return "";
-        }
-        StringBuilder params = new StringBuilder("<");
-        StringBuilder where = new StringBuilder();
-        boolean firstParam = true;
-        for (JavaType.GenericTypeVariable tv : typeVariables) {
-            if ("?".equals(tv.getName())) {
-                continue;
-            }
-            if (!firstParam) {
-                params.append(", ");
-            }
-            firstParam = false;
-            params.append(tv.getName());
-            List<JavaType> bounds = tv.getBounds();
-            if (tv.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT && !bounds.isEmpty()) {
-                if (bounds.size() == 1) {
-                    params.append(" : ").append(TypeUtils.toString(bounds.get(0)));
-                } else {
-                    for (JavaType bound : bounds) {
-                        if (where.length() > 0) {
-                            where.append(", ");
-                        }
-                        where.append(tv.getName()).append(" : ").append(TypeUtils.toString(bound));
-                    }
-                }
-            }
-        }
-        if (firstParam) {
-            return "";
-        }
-        params.append(">");
-        if (where.length() > 0) {
-            params.append(" where ").append(where);
-        }
-        return params.toString();
     }
 }
