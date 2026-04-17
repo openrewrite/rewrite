@@ -38,6 +38,8 @@ import org.openrewrite.scala.marker.TypeAscription
 import org.openrewrite.scala.marker.UnderscorePlaceholderLambda
 import org.openrewrite.scala.marker.PartialFunctionLiteral
 import org.openrewrite.scala.marker.Curried
+import org.openrewrite.scala.marker.InfixNotation
+import org.openrewrite.scala.marker.RightAssociative
 import org.openrewrite.scala.tree.S
 
 import java.util
@@ -1517,17 +1519,18 @@ class ScalaTreeVisitor(
 
   private def visitInfixMethodCall(infixOp: untpd.InfixOp): J = {
     val prefix = extractPrefix(infixOp.span)
-    
-    // Visit the select (left side)
-    val select = visitTree(infixOp.left) match {
+
+    // Visit the left-hand-side expression as it appears in source
+    val leftExpr = visitTree(infixOp.left) match {
       case expr: Expression => expr
       case j: J => new S.StatementExpression(Tree.randomId(), j)
       case _ => return visitUnknown(infixOp)
     }
-    
-    // Extract method name
+
     val methodName = infixOp.op.name.toString
-    
+    // Scala: any operator ending in ':' is right-associative, so `a op: b` means `b.op:(a)`.
+    val rightAssoc = methodName.endsWith(":")
+
     // Extract space before the method name
     val leftEnd = Math.max(0, infixOp.left.span.end - offsetAdjustment)
     val opStart = Math.max(0, infixOp.op.span.start - offsetAdjustment)
@@ -1537,30 +1540,30 @@ class ScalaTreeVisitor(
     } else {
       Space.format(" ")
     }
-    
+
     // Move cursor past the method name
     cursor = Math.max(0, infixOp.op.span.end - offsetAdjustment)
-    
-    // Extract space before the argument
+
+    // Extract space between the operator and the right-hand-side expression
     val opEnd = Math.max(0, infixOp.op.span.end - offsetAdjustment)
     val rightStart = Math.max(0, infixOp.right.span.start - offsetAdjustment)
-    val argSpace = if (opEnd < rightStart && opEnd >= cursor && rightStart <= source.length) {
+    val rhsSpace = if (opEnd < rightStart && opEnd >= cursor && rightStart <= source.length) {
       cursor = rightStart
       Space.format(source.substring(opEnd, rightStart))
     } else {
       Space.format(" ")
     }
-    
-    // Visit the argument (right side)
+
+    // Visit the right-hand-side expression as it appears in source
     val savedCursorArg = cursor
-    val arg = visitTree(infixOp.right) match {
+    val rightExpr = visitTree(infixOp.right) match {
       case expr: Expression => expr
       case block: J.Block =>
         // Block arguments in infix calls: `"test" should { ... }`
-        new S.StatementExpression(Tree.randomId(), block.withPrefix(argSpace))
+        new S.StatementExpression(Tree.randomId(), block.withPrefix(rhsSpace))
       case _ => cursor = savedCursorArg; return visitUnknown(infixOp)
     }
-    
+
     // Create the method name identifier
     val name = new J.Identifier(
       Tree.randomId(),
@@ -1571,20 +1574,25 @@ class ScalaTreeVisitor(
       null,
       null
     )
-    
-    // Create the arguments container
+
+    // For right-associative operators, store semantically: select = right, argument = left.
+    // The printer checks for RightAssociative to restore the syntactic order on output.
+    val (selectExpr, argExpr) =
+      if (rightAssoc) (rightExpr.withPrefix(rhsSpace), leftExpr)
+      else (leftExpr, rightExpr.withPrefix(rhsSpace))
+
     val args = new util.ArrayList[JRightPadded[Expression]]()
-    args.add(JRightPadded.build(arg.withPrefix(argSpace)).withAfter(Space.EMPTY))
-    
-    // Import the InfixNotation marker
-    import org.openrewrite.scala.marker.InfixNotation
-    
-    // Create the method invocation with the InfixNotation marker
+    args.add(JRightPadded.build(argExpr).withAfter(Space.EMPTY))
+
+    val markersList = new util.ArrayList[org.openrewrite.marker.Marker]()
+    markersList.add(InfixNotation.create())
+    if (rightAssoc) markersList.add(RightAssociative.create())
+
     new J.MethodInvocation(
       Tree.randomId(),
       prefix,
-      Markers.build(Collections.singletonList(InfixNotation.create())),
-      JRightPadded.build(select),
+      Markers.build(markersList),
+      JRightPadded.build(selectExpr),
       null, // typeParameters
       name,
       JContainer.build(Space.EMPTY, args, Markers.EMPTY),

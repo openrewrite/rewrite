@@ -22,6 +22,8 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcSendQueue;
 
+import java.util.Arrays;
+
 import static org.openrewrite.rpc.Reference.asRef;
 
 public class JavaTypeSender extends JavaTypeVisitor<RpcSendQueue> {
@@ -30,22 +32,25 @@ public class JavaTypeSender extends JavaTypeVisitor<RpcSendQueue> {
     @Override
     public JavaType visitAnnotation(JavaType.Annotation annotation, RpcSendQueue q) {
         q.getAndSend(annotation, a -> asRef(a.getType()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
-        // TODO examine serialization of element types when they are raw Objects
-//            q.getAndSendListAsRef(annotation, JavaType.Annotation::getValues, v ->
-//                    sig.signature(v.getElement()) + ":" + v.getValue(), v -> {
-//                q.getAndSend(v, e -> asRef(e.getElement()));
-//                if (v instanceof JavaType.Annotation.SingleElementValue) {
-//                    JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
-//                    q.getAndSend(sev, JavaType.Annotation.SingleElementValue::getConstantValue);
-//                    q.getAndSend(sev, e -> asRef(e.getReferenceValue()));
-//                } else if (v instanceof JavaType.Annotation.ArrayElementValue) {
-//                    JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
-//                    q.getAndSendList(aev, e -> e.getConstantValues() == null ? null : Arrays.asList(e.getConstantValues()),
-//                            Object::toString, null);
-//                    q.getAndSendListAsRef(aev, e -> e.getReferenceValues() == null ? null : Arrays.asList(e.getReferenceValues()),
-//                            sig::signature, null);
-//                }
-//            });
+        q.getAndSendListAsRef(annotation, JavaType.Annotation::getValues,
+                v -> sig.signature(v.getElement()), v -> {
+                    q.getAndSend(v, e -> asRef(e.getElement()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
+                    if (v instanceof JavaType.Annotation.SingleElementValue) {
+                        JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
+                        // constantValue is sent as the raw JSON-native value: numeric/boolean/string types
+                        // can collapse on the wire (e.g. Long 42 → Integer 42, Character 'c' → String "c"),
+                        // which is acceptable since recipes rarely depend on the exact runtime subclass.
+                        q.getAndSend(sev, JavaType.Annotation.SingleElementValue::getConstantValue);
+                        q.getAndSend(sev, e -> asRef(e.getReferenceValue()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
+                    } else if (v instanceof JavaType.Annotation.ArrayElementValue) {
+                        JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
+                        q.getAndSendList(aev,
+                                e -> e.getConstantValues() == null ? null : Arrays.asList(e.getConstantValues()),
+                                String::valueOf, null);
+                        q.getAndSendListAsRef(aev, e -> e.getReferenceValues() == null ? null : Arrays.asList(e.getReferenceValues()),
+                                sig::signature, t -> visit(t, q));
+                    }
+                });
         return annotation;
     }
 

@@ -41,7 +41,61 @@ func (r *JavaTypeReceiver) VisitAnnotation(a *tree.JavaTypeAnnotation, p any) tr
 	cc := *a
 	a = &cc
 	a.Type = receiveAsType[*tree.JavaTypeClass](r, q, a.Type)
+	a.Values = r.receiveAnnotationElementValueList(q, a.Values)
 	return a
+}
+
+func (r *JavaTypeReceiver) receiveAnnotationElementValueList(
+	q *ReceiveQueue, before []tree.JavaTypeAnnotationElementValue,
+) []tree.JavaTypeAnnotationElementValue {
+	beforeAny := elementValueSlice(before)
+	afterAny := q.ReceiveList(beforeAny, func(v any) any {
+		return r.receiveAnnotationElementValue(q, v.(tree.JavaTypeAnnotationElementValue))
+	})
+	if afterAny == nil {
+		return nil
+	}
+	out := make([]tree.JavaTypeAnnotationElementValue, len(afterAny))
+	for i, v := range afterAny {
+		out[i] = v.(tree.JavaTypeAnnotationElementValue)
+	}
+	return out
+}
+
+func (r *JavaTypeReceiver) receiveAnnotationElementValue(
+	q *ReceiveQueue, v tree.JavaTypeAnnotationElementValue,
+) tree.JavaTypeAnnotationElementValue {
+	element := receiveAsType[tree.JavaType](r, q, v.GetElement())
+	switch ev := v.(type) {
+	case *tree.JavaTypeAnnotationArrayElementValue:
+		// Constant values arrive as whatever the JSON-RPC layer deserialized;
+		// numeric subtype and char/string distinctions are not preserved.
+		constantValues := q.ReceiveList(ev.ConstantValues, nil)
+		refValues := receiveTypeList(r, q, ev.ReferenceValues)
+		return &tree.JavaTypeAnnotationArrayElementValue{
+			Element:         element,
+			ConstantValues:  constantValues,
+			ReferenceValues: refValues,
+		}
+	default:
+		var sev *tree.JavaTypeAnnotationSingleElementValue
+		if s, ok := v.(*tree.JavaTypeAnnotationSingleElementValue); ok {
+			sev = s
+		}
+		var beforeConstant any
+		var beforeRef tree.JavaType
+		if sev != nil {
+			beforeConstant = sev.ConstantValue
+			beforeRef = sev.ReferenceValue
+		}
+		constantValue := q.Receive(beforeConstant, nil)
+		refValue := receiveAsType[tree.JavaType](r, q, beforeRef)
+		return &tree.JavaTypeAnnotationSingleElementValue{
+			Element:        element,
+			ConstantValue:  constantValue,
+			ReferenceValue: refValue,
+		}
+	}
 }
 
 // VisitMultiCatch mirrors JavaTypeReceiver.visitMultiCatch

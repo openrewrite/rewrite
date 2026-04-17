@@ -463,8 +463,9 @@ class SpacesVisitor(PythonVisitor):
     def visit_import(self, import_: Import, p: P) -> J:
         imp: Import = cast(Import, super().visit_import(import_, p))
         if imp.padding.alias:
-            imp = imp.replace(alias=space_before(imp.alias, True))
-            imp = imp.padding.replace(alias=space_before_left_padded(imp.padding.alias, True))
+            new_alias = space_before_left_padded(imp.padding.alias, True)
+            new_alias = space_before_left_padded_element(new_alias, True)
+            imp = imp.padding.replace(alias=new_alias)
         return imp
 
     def visit_type_hint(self, hint: TypeHint, p: P) -> J:

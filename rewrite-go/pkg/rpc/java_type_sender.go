@@ -17,6 +17,8 @@
 package rpc
 
 import (
+	"fmt"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -40,7 +42,59 @@ func (s *JavaTypeSender) VisitAnnotation(a *tree.JavaTypeAnnotation, p any) tree
 	q := p.(*SendQueue)
 	q.GetAndSend(a, func(v any) any { return AsRef(v.(*tree.JavaTypeAnnotation).Type) },
 		func(v any) { s.Visit(GetValueNonNull(v).(tree.JavaType), q) })
+	q.GetAndSendListAsRef(a,
+		func(v any) []any { return elementValueSlice(v.(*tree.JavaTypeAnnotation).Values) },
+		func(v any) any { return tree.TypeSignature(v.(tree.JavaTypeAnnotationElementValue).GetElement()) },
+		func(v any) { s.visitAnnotationElementValue(v.(tree.JavaTypeAnnotationElementValue), q) })
 	return a
+}
+
+func elementValueSlice(in []tree.JavaTypeAnnotationElementValue) []any {
+	if in == nil {
+		return nil
+	}
+	out := make([]any, len(in))
+	for i, v := range in {
+		out[i] = v
+	}
+	return out
+}
+
+func (s *JavaTypeSender) visitAnnotationElementValue(v tree.JavaTypeAnnotationElementValue, q *SendQueue) {
+	q.GetAndSend(v,
+		func(x any) any { return AsRef(x.(tree.JavaTypeAnnotationElementValue).GetElement()) },
+		func(t any) { s.Visit(GetValueNonNull(t).(tree.JavaType), q) })
+	switch ev := v.(type) {
+	case *tree.JavaTypeAnnotationArrayElementValue:
+		// Constant values are sent as raw JSON-native values; numeric subtype
+		// (int/long/float/double) and char/string distinctions are not preserved.
+		q.GetAndSendList(ev,
+			func(x any) []any {
+				return x.(*tree.JavaTypeAnnotationArrayElementValue).ConstantValues
+			},
+			func(x any) any {
+				if x == nil {
+					return "null"
+				}
+				return fmt.Sprintf("%v", x)
+			},
+			nil)
+		q.GetAndSendListAsRef(ev,
+			func(x any) []any {
+				return javaTypeSlice(x.(*tree.JavaTypeAnnotationArrayElementValue).ReferenceValues)
+			},
+			func(x any) any { return tree.TypeSignature(x.(tree.JavaType)) },
+			func(t any) { s.Visit(t.(tree.JavaType), q) })
+	case *tree.JavaTypeAnnotationSingleElementValue:
+		q.GetAndSend(ev,
+			func(x any) any {
+				return x.(*tree.JavaTypeAnnotationSingleElementValue).ConstantValue
+			},
+			nil)
+		q.GetAndSend(ev,
+			func(x any) any { return AsRef(x.(*tree.JavaTypeAnnotationSingleElementValue).ReferenceValue) },
+			func(t any) { s.Visit(GetValueNonNull(t).(tree.JavaType), q) })
+	}
 }
 
 // VisitMultiCatch matches JavaTypeSender.visitMultiCatch
