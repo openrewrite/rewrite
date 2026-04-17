@@ -692,6 +692,11 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             case JavaType.Annotation annotation:
                 q.GetAndSend(annotation, a => AsRef(a.AnnotationType),
                     t => VisitType(GetValueNonNull<JavaType>(t), q));
+                q.GetAndSendListAsRef(
+                    annotation,
+                    a => a.Values,
+                    v => v.Element != null ? TypeSignature(v.Element) : "null",
+                    v => VisitAnnotationElementValue(v, q));
                 break;
 
             case JavaType.MultiCatch multiCatch:
@@ -782,6 +787,32 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         }
 
         return javaType;
+    }
+
+    private void VisitAnnotationElementValue(JavaType.Annotation.ElementValue v, RpcSendQueue q)
+    {
+        q.GetAndSend(v, e => AsRef(e.Element),
+            t => VisitType(GetValueNonNull<JavaType>(t), q));
+        switch (v)
+        {
+            case JavaType.Annotation.ArrayElementValue array:
+                q.GetAndSendList(
+                    array,
+                    a => AnnotationConstantValueCodec.EncodeList(a.ConstantValues),
+                    s => s ?? "",
+                    null);
+                q.GetAndSendListAsRef(
+                    array,
+                    a => a.ReferenceValues,
+                    t => TypeSignature(t),
+                    t => VisitType(t, q));
+                break;
+            case JavaType.Annotation.SingleElementValue single:
+                q.GetAndSend(single, s => AnnotationConstantValueCodec.Encode(s.ConstantValue));
+                q.GetAndSend(single, s => AsRef(s.ReferenceValue),
+                    t => VisitType(GetValueNonNull<JavaType>(t), q));
+                break;
+        }
     }
 
     /// <summary>

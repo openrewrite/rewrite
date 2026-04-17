@@ -872,8 +872,14 @@ class PythonRpcSender:
             q.get_and_send_list_as_ref(java_type, lambda x: getattr(x, '_type_parameters', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
 
         elif isinstance(java_type, JT.Annotation):
-            # Annotation: type (FullyQualified) — values TODO on Java side
+            # Annotation: type (FullyQualified), values (list of ElementValue)
             q.get_and_send_as_ref(java_type, lambda x: getattr(x, '_type', None), lambda t: self._visit_type(t, q))
+            q.get_and_send_list_as_ref(
+                java_type,
+                lambda x: getattr(x, '_values', None) or [],
+                lambda v: self._type_signature(getattr(v, '_element', None)),
+                lambda v: self._visit_annotation_element_value(v, q),
+            )
 
         elif isinstance(java_type, JT.Class):
             # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
@@ -924,6 +930,33 @@ class PythonRpcSender:
             # Unknown has no additional fields
             pass
 
+    def _visit_annotation_element_value(self, v, q: 'RpcSendQueue') -> None:
+        """Visit a JavaType.Annotation.ElementValue (Single or Array variant).
+
+        Mirrors the Java JavaTypeSender visitor lambda inside visitAnnotation.
+        """
+        from rewrite.java.support_types import JavaType as JT
+        from rewrite.rpc._annotation_constant_value_codec import encode, encode_list
+
+        q.get_and_send_as_ref(v, lambda e: getattr(e, '_element', None), lambda t: self._visit_type(t, q))
+        if isinstance(v, JT.Annotation.ArrayElementValue):
+            q.get_and_send_list(
+                v,
+                lambda e: encode_list(getattr(e, '_constant_values', None)),
+                lambda s: s if s is not None else '',
+                None,
+            )
+            q.get_and_send_list_as_ref(
+                v,
+                lambda e: getattr(e, '_reference_values', None) or [],
+                self._type_signature,
+                lambda t: self._visit_type(t, q),
+            )
+        else:
+            # SingleElementValue (default)
+            q.get_and_send(v, lambda e: encode(getattr(e, '_constant_value', None)))
+            q.get_and_send_as_ref(v, lambda e: getattr(e, '_reference_value', None), lambda t: self._visit_type(t, q))
+
     def _type_signature(self, java_type) -> str:
         """Generate a signature string for a JavaType, used as list item identifier."""
         from rewrite.java.support_types import JavaType as JT
@@ -941,6 +974,9 @@ class PythonRpcSender:
         if isinstance(java_type, JT.Variable):
             owner_sig = self._type_signature(java_type._owner) if java_type._owner else ''
             return f"{owner_sig}{{name={java_type._name},type={self._type_signature(java_type._type)}}}"
+        if isinstance(java_type, JT.Annotation):
+            inner_sig = self._type_signature(getattr(java_type, '_type', None))
+            return f"@{inner_sig}"
         if isinstance(java_type, JT.Parameterized):
             inner_sig = self._type_signature(getattr(java_type, '_type', None))
             params_sig = ','.join(self._type_signature(p) for p in (getattr(java_type, '_type_parameters', None) or []))

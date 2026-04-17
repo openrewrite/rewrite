@@ -40,6 +40,8 @@ const (
 	JavaTypeMethodKind             = "org.openrewrite.java.tree.JavaType$Method"
 	JavaTypeVariableKind           = "org.openrewrite.java.tree.JavaType$Variable"
 	JavaTypeAnnotationKind         = "org.openrewrite.java.tree.JavaType$Annotation"
+	JavaTypeAnnotationSingleElementValueKind = "org.openrewrite.java.tree.JavaType$Annotation$SingleElementValue"
+	JavaTypeAnnotationArrayElementValueKind  = "org.openrewrite.java.tree.JavaType$Annotation$ArrayElementValue"
 	JavaTypeMultiCatchKind         = "org.openrewrite.java.tree.JavaType$MultiCatch"
 	JavaTypeIntersectionKind       = "org.openrewrite.java.tree.JavaType$Intersection"
 	JavaTypeUnknownKind            = "org.openrewrite.java.tree.JavaType$Unknown"
@@ -132,10 +134,42 @@ func (*JavaTypeVariable) isJavaType() {}
 
 // JavaTypeAnnotation represents an annotation type reference.
 type JavaTypeAnnotation struct {
-	Type *JavaTypeClass
+	Type   *JavaTypeClass
+	Values []JavaTypeAnnotationElementValue
 }
 
 func (*JavaTypeAnnotation) isJavaType() {}
+
+// JavaTypeAnnotationElementValue is the interface for annotation element values.
+// One of *JavaTypeAnnotationSingleElementValue or *JavaTypeAnnotationArrayElementValue.
+type JavaTypeAnnotationElementValue interface {
+	isJavaTypeAnnotationElementValue()
+	GetElement() JavaType
+}
+
+// JavaTypeAnnotationSingleElementValue is a single annotation element value (one
+// constant or one reference). Java parser puts class literals and enum constants
+// in ReferenceValue; only String/Number/Boolean/Character live in ConstantValue.
+type JavaTypeAnnotationSingleElementValue struct {
+	Element        JavaType
+	ConstantValue  any
+	ReferenceValue JavaType
+}
+
+func (*JavaTypeAnnotationSingleElementValue) isJavaTypeAnnotationElementValue() {}
+
+func (s *JavaTypeAnnotationSingleElementValue) GetElement() JavaType { return s.Element }
+
+// JavaTypeAnnotationArrayElementValue is an array of annotation element values.
+type JavaTypeAnnotationArrayElementValue struct {
+	Element         JavaType
+	ConstantValues  []any
+	ReferenceValues []JavaType
+}
+
+func (*JavaTypeAnnotationArrayElementValue) isJavaTypeAnnotationElementValue() {}
+
+func (a *JavaTypeAnnotationArrayElementValue) GetElement() JavaType { return a.Element }
 
 // JavaTypeMultiCatch represents a multi-catch type (e.g., IOException | SQLException).
 type JavaTypeMultiCatch struct {

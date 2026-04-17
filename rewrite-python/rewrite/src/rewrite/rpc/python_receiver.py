@@ -1445,14 +1445,46 @@ def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
 
 
 def _receive_java_type_annotation(annotation, q: RpcReceiveQueue):
-    """Codec for receiving JavaType.Annotation - consumes type only (values TODO on Java side)."""
+    """Codec for receiving JavaType.Annotation - consumes type and values."""
     from rewrite.java.support_types import JavaType as JT
 
     type_ = q.receive(getattr(annotation, '_type', None))
+    before_values = getattr(annotation, '_values', None)
+    values = q.receive_list(before_values, lambda v: _receive_annotation_element_value(v, q))
 
     a = JT.Annotation()
     a._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
+    a._values = values
     return a
+
+
+def _receive_annotation_element_value(v, q: RpcReceiveQueue):
+    """Receive a JavaType.Annotation.ElementValue (Single or Array variant).
+
+    Mirrors the Java JavaTypeReceiver visitor lambda inside visitAnnotation.
+    """
+    from rewrite.java.support_types import JavaType as JT
+    from rewrite.rpc._annotation_constant_value_codec import encode, encode_list, decode, decode_list
+
+    element = q.receive(getattr(v, '_element', None))
+    if isinstance(v, JT.Annotation.ArrayElementValue):
+        before_constants = encode_list(getattr(v, '_constant_values', None))
+        encoded_constants = q.receive_list(before_constants, None)
+        ref_values = q.receive_list(getattr(v, '_reference_values', None) or [])
+        return JT.Annotation.ArrayElementValue(
+            _element=element,
+            _constant_values=decode_list(encoded_constants),
+            _reference_values=ref_values,
+        )
+    sev = v if isinstance(v, JT.Annotation.SingleElementValue) else None
+    before_constant = encode(getattr(sev, '_constant_value', None)) if sev is not None else None
+    encoded_constant = q.receive(before_constant)
+    ref_value = q.receive(getattr(sev, '_reference_value', None) if sev is not None else None)
+    return JT.Annotation.SingleElementValue(
+        _element=element,
+        _constant_value=decode(encoded_constant),
+        _reference_value=ref_value,
+    )
 
 
 def _receive_java_type_array(array, q: RpcReceiveQueue):
@@ -1568,12 +1600,28 @@ def _register_java_type_codecs():
         lambda: JT.Parameterized()  # Factory creates empty Parameterized
     )
 
-    # JavaType.Annotation - type only (values TODO on Java side)
+    # JavaType.Annotation - type and values
     register_codec_with_both_names(
         'org.openrewrite.java.tree.JavaType$Annotation',
         JT.Annotation,
         _receive_java_type_annotation,
         lambda: JT.Annotation()  # Factory creates empty Annotation
+    )
+
+    # JavaType.Annotation.SingleElementValue - element + constantValue + referenceValue
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation$SingleElementValue',
+        JT.Annotation.SingleElementValue,
+        _receive_annotation_element_value,
+        lambda: JT.Annotation.SingleElementValue(),
+    )
+
+    # JavaType.Annotation.ArrayElementValue - element + constantValues + referenceValues
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation$ArrayElementValue',
+        JT.Annotation.ArrayElementValue,
+        _receive_annotation_element_value,
+        lambda: JT.Annotation.ArrayElementValue(),
     )
 
     # JavaType.Array - element type and annotations

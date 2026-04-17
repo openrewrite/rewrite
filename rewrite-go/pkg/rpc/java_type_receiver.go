@@ -41,7 +41,87 @@ func (r *JavaTypeReceiver) VisitAnnotation(a *tree.JavaTypeAnnotation, p any) tr
 	cc := *a
 	a = &cc
 	a.Type = receiveAsType[*tree.JavaTypeClass](r, q, a.Type)
+	a.Values = r.receiveAnnotationElementValueList(q, a.Values)
 	return a
+}
+
+func (r *JavaTypeReceiver) receiveAnnotationElementValueList(
+	q *ReceiveQueue, before []tree.JavaTypeAnnotationElementValue,
+) []tree.JavaTypeAnnotationElementValue {
+	beforeAny := elementValueSlice(before)
+	afterAny := q.ReceiveList(beforeAny, func(v any) any {
+		return r.receiveAnnotationElementValue(q, v.(tree.JavaTypeAnnotationElementValue))
+	})
+	if afterAny == nil {
+		return nil
+	}
+	out := make([]tree.JavaTypeAnnotationElementValue, len(afterAny))
+	for i, v := range afterAny {
+		out[i] = v.(tree.JavaTypeAnnotationElementValue)
+	}
+	return out
+}
+
+func (r *JavaTypeReceiver) receiveAnnotationElementValue(
+	q *ReceiveQueue, v tree.JavaTypeAnnotationElementValue,
+) tree.JavaTypeAnnotationElementValue {
+	element := receiveAsType[tree.JavaType](r, q, v.GetElement())
+	switch ev := v.(type) {
+	case *tree.JavaTypeAnnotationArrayElementValue:
+		beforeEncoded := EncodeAnnotationConstantList(ev.ConstantValues)
+		beforeEncodedAny := make([]any, len(beforeEncoded))
+		for i, s := range beforeEncoded {
+			beforeEncodedAny[i] = s
+		}
+		afterEncodedAny := q.ReceiveList(beforeEncodedAny, nil)
+		var afterEncoded []*string
+		if afterEncodedAny != nil {
+			afterEncoded = make([]*string, len(afterEncodedAny))
+			for i, x := range afterEncodedAny {
+				if x == nil {
+					afterEncoded[i] = nil
+				} else if ptr, ok := x.(*string); ok {
+					afterEncoded[i] = ptr
+				} else if s, ok := x.(string); ok {
+					afterEncoded[i] = &s
+				}
+			}
+		}
+		refValues := receiveTypeList(r, q, ev.ReferenceValues)
+		return &tree.JavaTypeAnnotationArrayElementValue{
+			Element:         element,
+			ConstantValues:  DecodeAnnotationConstantList(afterEncoded),
+			ReferenceValues: refValues,
+		}
+	default:
+		var sev *tree.JavaTypeAnnotationSingleElementValue
+		if s, ok := v.(*tree.JavaTypeAnnotationSingleElementValue); ok {
+			sev = s
+		}
+		var beforeConstant any
+		if sev != nil {
+			beforeConstant = EncodeAnnotationConstant(sev.ConstantValue)
+		}
+		afterConstantAny := q.Receive(beforeConstant, nil)
+		var afterConstant *string
+		if afterConstantAny != nil {
+			if ptr, ok := afterConstantAny.(*string); ok {
+				afterConstant = ptr
+			} else if s, ok := afterConstantAny.(string); ok {
+				afterConstant = &s
+			}
+		}
+		var beforeRef tree.JavaType
+		if sev != nil {
+			beforeRef = sev.ReferenceValue
+		}
+		refValue := receiveAsType[tree.JavaType](r, q, beforeRef)
+		return &tree.JavaTypeAnnotationSingleElementValue{
+			Element:        element,
+			ConstantValue:  DecodeAnnotationConstant(afterConstant),
+			ReferenceValue: refValue,
+		}
+	}
 }
 
 // VisitMultiCatch mirrors JavaTypeReceiver.visitMultiCatch
