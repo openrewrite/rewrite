@@ -511,6 +511,15 @@ type ImportBlock struct {
 
 func (b ImportBlock) ID() uuid.UUID { return b.Ident }
 
+// ChanDirMarker is a marker on a Channel that stores whitespace around the direction operator.
+// For SEND channels, it stores the space before `<-`. For RECV channels, it's unused (space is in Prefix).
+type ChanDirMarker struct {
+	Ident  uuid.UUID
+	Before Space // space before the direction operator (<- or ->)
+}
+
+func (c ChanDirMarker) ID() uuid.UUID { return c.Ident }
+
 // MultiAssignment represents a multi-value assignment: `x, y = 1, 2` or `x, y := f()`.
 type MultiAssignment struct {
 	ID        uuid.UUID

@@ -800,12 +800,22 @@ func (p *GoPrinter) VisitPointerType(pt *tree.PointerType, param any) tree.J {
 func (p *GoPrinter) VisitChannel(ch *tree.Channel, param any) tree.J {
 	out := param.(*PrintOutputCapture)
 	p.beforeSyntax(ch.Prefix, ch.Markers, out)
+
+	// Check for ChanDirMarker in markers for space before direction operator
+	var dirMarker tree.Space
+	if marker := tree.FindMarker[tree.ChanDirMarker](ch.Markers); marker != nil {
+		dirMarker = marker.Before
+	}
+
 	switch ch.Dir {
 	case tree.ChanBidi:
 		out.Append("chan")
 	case tree.ChanSendOnly:
-		out.Append("chan<-")
+		out.Append("chan")
+		p.visitSpace(dirMarker, out)
+		out.Append("<-")
 	case tree.ChanRecvOnly:
+		p.visitSpace(dirMarker, out)
 		out.Append("<-chan")
 	}
 	p.Visit(ch.Value, out)

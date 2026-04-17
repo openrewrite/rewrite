@@ -760,7 +760,7 @@ func (ctx *parseContext) mapFieldListAsParams(fl *ast.FieldList) tree.Container[
 	} else {
 		closeParen := ctx.prefix(fl.Closing)
 		ctx.skip(1) // ")"
-		if len(closeParen.Comments) > 0 {
+		if !closeParen.IsEmpty() {
 			elements = append(elements, tree.RightPadded[tree.Statement]{
 				Element: &tree.Empty{ID: uuid.New()},
 				After:   closeParen,
@@ -2193,8 +2193,14 @@ func (ctx *parseContext) mapSliceExpr(expr *ast.SliceExpr) tree.Expression {
 // mapMapType maps a map type expression like `map[K]V`.
 func (ctx *parseContext) mapMapType(expr *ast.MapType) tree.Expression {
 	prefix := ctx.prefixAndSkip(expr.Map, len("map"))
-	lbrackPrefix := ctx.prefix(expr.Map + token.Pos(len("map")))
-	ctx.skip(1) // "["
+	lbrackOff := ctx.findNext('[')
+	var lbrackPrefix tree.Space
+	if lbrackOff >= 0 {
+		lbrackPrefix = ctx.prefix(ctx.file.Pos(lbrackOff))
+		ctx.skip(1) // "["
+	} else {
+		ctx.skip(1) // "["
+	}
 	key := ctx.mapTypeExpr(expr.Key)
 	rbrackOff := ctx.findNext(']')
 	var rbrackPrefix tree.Space
@@ -2216,15 +2222,40 @@ func (ctx *parseContext) mapMapType(expr *ast.MapType) tree.Expression {
 // mapChanType maps a channel type expression.
 func (ctx *parseContext) mapChanType(expr *ast.ChanType) tree.Expression {
 	prefix := ctx.prefix(expr.Begin)
+	var markers tree.Markers
 
 	var dir tree.ChanDir
 	switch expr.Dir {
 	case ast.SEND:
 		dir = tree.ChanSendOnly
-		ctx.skip(len("chan<-"))
+		ctx.skip(len("chan"))
+		// Capture space before the arrow
+		arrowOff := ctx.findNext('<')
+		var dirMarkerBefore tree.Space
+		if arrowOff >= 0 {
+			dirMarkerBefore = ctx.prefix(ctx.file.Pos(arrowOff))
+			ctx.cursor = arrowOff
+		}
+		ctx.skip(2) // "<-"
+		// Create marker to store the space
+		if !dirMarkerBefore.IsEmpty() {
+			markers = tree.Markers{
+				ID: uuid.New(),
+				Entries: []tree.Marker{tree.ChanDirMarker{
+					Ident:  uuid.New(),
+					Before: dirMarkerBefore,
+				}},
+			}
+		}
 	case ast.RECV:
 		dir = tree.ChanRecvOnly
-		ctx.skip(len("<-chan"))
+		ctx.skip(2) // "<-"
+		// Skip any whitespace/comments before "chan"
+		chanOff := ctx.findNext('c')
+		if chanOff >= 0 && chanOff+4 <= len(ctx.src) && string(ctx.src[chanOff:chanOff+4]) == "chan" {
+			ctx.cursor = chanOff
+		}
+		ctx.skip(len("chan"))
 	default:
 		dir = tree.ChanBidi
 		ctx.skip(len("chan"))
@@ -2232,10 +2263,11 @@ func (ctx *parseContext) mapChanType(expr *ast.ChanType) tree.Expression {
 
 	value := ctx.mapTypeExpr(expr.Value)
 	return &tree.Channel{
-		ID:     uuid.New(),
-		Prefix: prefix,
-		Dir:    dir,
-		Value:  value,
+		ID:      uuid.New(),
+		Prefix:  prefix,
+		Markers: markers,
+		Dir:     dir,
+		Value:   value,
 	}
 }
 
