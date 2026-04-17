@@ -16,244 +16,151 @@
 package org.openrewrite.yaml.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.internal.StringUtils.quoteIfNeeded;
 
 class StringUtilsTest {
 
-    // Already-quoted passthrough
-
-    @Test
-    void singleQuotedPassthrough() {
-        assertThat(quoteIfNeeded("'hello'")).isEqualTo("'hello'");
+    @ParameterizedTest
+    @MethodSource
+    void alreadyQuotedPassthrough(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    @Test
-    void doubleQuotedPassthrough() {
-        assertThat(quoteIfNeeded("\"hello\"")).isEqualTo("\"hello\"");
+    static Stream<Arguments> alreadyQuotedPassthrough() {
+        return Stream.of(
+                Arguments.of("'hello'", "'hello'"),
+                Arguments.of("\"hello\"", "\"hello\""),
+                Arguments.of("''", "''")
+        );
     }
 
-    @Test
-    void emptyQuotedPassthrough() {
-        assertThat(quoteIfNeeded("''")).isEqualTo("''");
+    @ParameterizedTest
+    @MethodSource
+    void noQuotingNeeded(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    // No quoting needed
-
-    @Test
-    void plainStringUnchanged() {
-        assertThat(quoteIfNeeded("hello")).isEqualTo("hello");
+    static Stream<Arguments> noQuotingNeeded() {
+        return Stream.of(
+                Arguments.of("hello", "hello"),
+                Arguments.of("hello world", "hello world"),
+                Arguments.of("some-key", "some-key"),
+                Arguments.of("path/to/file", "path/to/file"),
+                Arguments.of("1.0.0", "1.0.0"),
+                Arguments.of("truefalse", "truefalse"),
+                Arguments.of("https://example.com", "https://example.com")
+        );
     }
-
-    @Test
-    void plainStringWithSpacesUnchanged() {
-        assertThat(quoteIfNeeded("hello world")).isEqualTo("hello world");
-    }
-
-    @Test
-    void plainStringWithHyphensUnchanged() {
-        assertThat(quoteIfNeeded("some-key")).isEqualTo("some-key");
-    }
-
-    @Test
-    void pathUnchanged() {
-        assertThat(quoteIfNeeded("path/to/file")).isEqualTo("path/to/file");
-    }
-
-    @Test
-    void versionLikeStringUnchanged() {
-        assertThat(quoteIfNeeded("1.0.0")).isEqualTo("1.0.0");
-    }
-
-    @Test
-    void nonReservedWordUnchanged() {
-        assertThat(quoteIfNeeded("truefalse")).isEqualTo("truefalse");
-    }
-
-    @Test
-    void urlUnchanged() {
-        assertThat(quoteIfNeeded("https://example.com")).isEqualTo("https://example.com");
-    }
-
-    // Empty string
 
     @Test
     void emptyStringQuoted() {
         assertThat(quoteIfNeeded("")).isEqualTo("''");
     }
 
-    // Valid YAML typed values left unchanged
-
-    @Test
-    void nullUnchanged() {
-        assertThat(quoteIfNeeded("null")).isEqualTo("null");
+    @ParameterizedTest
+    @MethodSource
+    void validYamlTypedValuesUnchanged(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    @Test
-    void trueUnchanged() {
-        assertThat(quoteIfNeeded("true")).isEqualTo("true");
+    static Stream<Arguments> validYamlTypedValuesUnchanged() {
+        return Stream.of(
+                Arguments.of("null", "null"),
+                Arguments.of("true", "true"),
+                Arguments.of("false", "false"),
+                Arguments.of("YES", "YES"),
+                Arguments.of("123", "123"),
+                Arguments.of("1.23", "1.23")
+        );
     }
 
-    @Test
-    void falseUnchanged() {
-        assertThat(quoteIfNeeded("false")).isEqualTo("false");
+    @ParameterizedTest
+    @MethodSource
+    void indicatorCharactersQuoted(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    @Test
-    void yesUnchanged() {
-        assertThat(quoteIfNeeded("YES")).isEqualTo("YES");
+    static Stream<Arguments> indicatorCharactersQuoted() {
+        return Stream.of(
+                Arguments.of("~", "~"),
+                Arguments.of("- item", "'- item'"),
+                Arguments.of("-42", "'-42'"),
+                Arguments.of("# comment", "'# comment'"),
+                Arguments.of("*alias", "'*alias'"),
+                Arguments.of("&anchor", "'&anchor'"),
+                Arguments.of("[list]", "'[list]'"),
+                Arguments.of("{map}", "'{map}'"),
+                Arguments.of("!tag", "'!tag'"),
+                Arguments.of("%directive", "'%directive'")
+        );
     }
 
-    @Test
-    void integerUnchanged() {
-        assertThat(quoteIfNeeded("123")).isEqualTo("123");
+    @ParameterizedTest
+    @MethodSource
+    void dangerousMidStringPatternsQuoted(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    @Test
-    void floatUnchanged() {
-        assertThat(quoteIfNeeded("1.23")).isEqualTo("1.23");
+    static Stream<Arguments> dangerousMidStringPatternsQuoted() {
+        return Stream.of(
+                Arguments.of("key: value", "'key: value'"),
+                Arguments.of("TODO: Follow this link https://example.com/page",
+                        "'TODO: Follow this link https://example.com/page'"),
+                Arguments.of("before # after", "'before # after'")
+        );
     }
 
-    // Indicator characters at start
-
-    @Test
-    void tildeUnchanged() {
-        assertThat(quoteIfNeeded("~")).isEqualTo("~");
+    @ParameterizedTest
+    @MethodSource
+    void documentMarkersQuoted(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    @Test
-    void dashSpaceQuoted() {
-        assertThat(quoteIfNeeded("- item")).isEqualTo("'- item'");
+    static Stream<Arguments> documentMarkersQuoted() {
+        return Stream.of(
+                Arguments.of("---", "'---'"),
+                Arguments.of("...", "'...'")
+        );
     }
 
-    @Test
-    void negativeNumberQuotedAsIndicator() {
-        assertThat(quoteIfNeeded("-42")).isEqualTo("'-42'");
+    @ParameterizedTest
+    @MethodSource
+    void leadingTrailingWhitespaceQuoted(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    @Test
-    void hashQuoted() {
-        assertThat(quoteIfNeeded("# comment")).isEqualTo("'# comment'");
+    static Stream<Arguments> leadingTrailingWhitespaceQuoted() {
+        return Stream.of(
+                Arguments.of(" hello", "' hello'"),
+                Arguments.of("hello ", "'hello '"),
+                Arguments.of("\thello", "\"\\thello\"")
+        );
     }
 
-    @Test
-    void asteriskQuoted() {
-        assertThat(quoteIfNeeded("*alias")).isEqualTo("'*alias'");
+    @ParameterizedTest
+    @MethodSource
+    void doubleQuoteCases(String input, String expected) {
+        assertThat(quoteIfNeeded(input)).isEqualTo(expected);
     }
 
-    @Test
-    void ampersandQuoted() {
-        assertThat(quoteIfNeeded("&anchor")).isEqualTo("'&anchor'");
-    }
-
-    @Test
-    void bracketQuoted() {
-        assertThat(quoteIfNeeded("[list]")).isEqualTo("'[list]'");
-    }
-
-    @Test
-    void braceQuoted() {
-        assertThat(quoteIfNeeded("{map}")).isEqualTo("'{map}'");
-    }
-
-    @Test
-    void exclamationQuoted() {
-        assertThat(quoteIfNeeded("!tag")).isEqualTo("'!tag'");
-    }
-
-    @Test
-    void percentQuoted() {
-        assertThat(quoteIfNeeded("%directive")).isEqualTo("'%directive'");
-    }
-
-    // Dangerous mid-string patterns
-
-    @Test
-    void colonSpaceQuoted() {
-        assertThat(quoteIfNeeded("key: value")).isEqualTo("'key: value'");
-    }
-
-    @Test
-    void colonSpaceInTextWithUrlQuoted() {
-        assertThat(quoteIfNeeded("TODO: Follow this link https://example.com/page"))
-                .isEqualTo("'TODO: Follow this link https://example.com/page'");
-    }
-
-    @Test
-    void spaceHashQuoted() {
-        assertThat(quoteIfNeeded("before # after")).isEqualTo("'before # after'");
-    }
-
-    // Document markers
-
-    @Test
-    void documentStartMarkerQuoted() {
-        assertThat(quoteIfNeeded("---")).isEqualTo("'---'");
-    }
-
-    @Test
-    void documentEndMarkerQuoted() {
-        assertThat(quoteIfNeeded("...")).isEqualTo("'...'");
-    }
-
-    // Leading/trailing whitespace
-
-    @Test
-    void leadingSpaceQuoted() {
-        assertThat(quoteIfNeeded(" hello")).isEqualTo("' hello'");
-    }
-
-    @Test
-    void trailingSpaceQuoted() {
-        assertThat(quoteIfNeeded("hello ")).isEqualTo("'hello '");
-    }
-
-    @Test
-    void leadingTabQuoted() {
-        assertThat(quoteIfNeeded("\thello")).isEqualTo("\"\\thello\"");
-    }
-
-    // Double-quote cases
-
-    @Test
-    void singleQuoteInValueUsesDoubleQuotes() {
-        // Contains ': ' (needs quoting) AND single quote (forces double quotes)
-        assertThat(quoteIfNeeded("it's: a test")).isEqualTo("\"it's: a test\"");
-    }
-
-    @Test
-    void newlineUsesDoubleQuotes() {
-        assertThat(quoteIfNeeded("line1\nline2")).isEqualTo("\"line1\\nline2\"");
-    }
-
-    @Test
-    void tabUsesDoubleQuotes() {
-        assertThat(quoteIfNeeded("col1\tcol2")).isEqualTo("\"col1\\tcol2\"");
-    }
-
-    @Test
-    void plainStringWithSingleQuoteMidStringUnchanged() {
-        assertThat(quoteIfNeeded("it's")).isEqualTo("it's");
-    }
-
-    @Test
-    void carriageReturnUsesDoubleQuotes() {
-        assertThat(quoteIfNeeded("line1\rline2")).isEqualTo("\"line1\\rline2\"");
-    }
-
-    @Test
-    void nullCharUsesDoubleQuotes() {
-        assertThat(quoteIfNeeded("abc\0def")).isEqualTo("\"abc\\0def\"");
-    }
-
-    @Test
-    void backslashInDoubleQuotesEscaped() {
-        assertThat(quoteIfNeeded("path\\to")).isEqualTo("path\\to");
-    }
-
-    @Test
-    void doubleQuoteCharInValueEscaped() {
-        assertThat(quoteIfNeeded("say \"hello\"")).isEqualTo("say \"hello\"");
+    static Stream<Arguments> doubleQuoteCases() {
+        return Stream.of(
+                // Contains ': ' (needs quoting) AND single quote (forces double quotes)
+                Arguments.of("it's: a test", "\"it's: a test\""),
+                Arguments.of("line1\nline2", "\"line1\\nline2\""),
+                Arguments.of("col1\tcol2", "\"col1\\tcol2\""),
+                Arguments.of("it's", "it's"),
+                Arguments.of("line1\rline2", "\"line1\\rline2\""),
+                Arguments.of("abc\0def", "\"abc\\0def\""),
+                Arguments.of("path\\to", "path\\to"),
+                Arguments.of("say \"hello\"", "say \"hello\"")
+        );
     }
 }
