@@ -142,4 +142,21 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void newClassWithMultiLineArguments() {
+        rewriteRun(
+          scala(
+            """
+            class Person(name: String, age: Int)
+            object Test {
+              val p = new Person(
+                "John",
+                30
+              )
+            }
+            """
+          )
+        );
+    }
 }
