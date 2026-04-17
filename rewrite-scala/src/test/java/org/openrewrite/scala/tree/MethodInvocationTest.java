@@ -255,4 +255,18 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void curriedCall() {
+        rewriteRun(
+          scala(
+            """
+              class Test {
+                def f(x: Int)(y: Int): Int = x + y
+                f(1)(2)
+              }
+              """
+          )
+        );
+    }
 }
