@@ -680,11 +680,18 @@ class KotlinTypeMapping(
             null
         )
         typeCache.put(signature, method)
-        var parentType = when {
+        // A method's declaring type is always a class even when its receiver is a Kotlin
+        // primitive (e.g. `kotlin.Char.toInt()` is declared on the `kotlin.Char` class, not
+        // the JVM `char` primitive). Bypass the primitive remap that `type()` applies to
+        // non-nullable Kotlin primitives by going through `asDeclaringType` / `classType`.
+        var parentType: JavaType? = when {
             function.symbol is FirConstructorSymbol -> type(function.returnTypeRef)
+            function.dispatchReceiverType is ConeClassLikeType ->
+                asDeclaringType(function.dispatchReceiverType as ConeClassLikeType)
             function.dispatchReceiverType != null -> type(function.dispatchReceiverType!!)
             function.symbol.getOwnerLookupTag()?.toRegularClassSymbol(firSession)?.fir != null -> {
-                type(function.symbol.getOwnerLookupTag()!!.toRegularClassSymbol(firSession)!!.fir)
+                val fir = function.symbol.getOwnerLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
+                TypeUtils.asFullyQualified(classType(fir, firFile, signatureBuilder.signature(fir)))
             }
 
             parent is FirRegularClass || parent != null -> type(parent)

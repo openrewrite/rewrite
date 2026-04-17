@@ -1816,6 +1816,36 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/7408")
+        @Test
+        void declaringTypeOnKotlinPrimitiveReceiver() {
+            rewriteRun(
+              kotlin(
+                """
+                  fun test(c: Char): Int {
+                      return c.toInt()
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
+                            if ("toInt".equals(method.getSimpleName())) {
+                                JavaType.FullyQualified declaringType = method.getMethodType().getDeclaringType();
+                                assertThat(declaringType).isNotInstanceOf(JavaType.Unknown.class);
+                                assertThat(declaringType.getFullyQualifiedName()).isEqualTo("kotlin.Char");
+                                assertThat(new MethodMatcher("kotlin.Char toInt()").matches(method)).isTrue();
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/590")
         @Test
         void callWithDefaultedGenericParameters() {
