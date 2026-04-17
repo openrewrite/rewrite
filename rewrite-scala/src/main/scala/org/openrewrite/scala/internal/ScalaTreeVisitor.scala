@@ -1740,12 +1740,18 @@ class ScalaTreeVisitor(
     val args = new util.ArrayList[JRightPadded[Expression]]()
     for (i <- app.args.indices) {
       val arg = app.args(i)
-      
-      // Extract prefix space for this argument (space after previous comma)
+      val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
+
+      // Extract prefix space for this argument: space after previous comma,
+      // or space after '(' for the first argument.
       var argPrefix = Space.EMPTY
-      if (i > 0) {
+      if (i == 0) {
+        if (cursor < thisStart && thisStart <= source.length) {
+          argPrefix = Space.format(source.substring(cursor, thisStart))
+          cursor = thisStart
+        }
+      } else {
         val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
-        val thisStart = Math.max(0, arg.span.start - offsetAdjustment)
         if (prevEnd < thisStart && prevEnd >= cursor && thisStart <= source.length) {
           val between = source.substring(prevEnd, thisStart)
           val commaIndex = between.indexOf(',')
@@ -1755,7 +1761,7 @@ class ScalaTreeVisitor(
           }
         }
       }
-      
+
       visitTree(arg) match {
         case expr: Expression =>
           // Apply the prefix space to the expression
@@ -1774,7 +1780,15 @@ class ScalaTreeVisitor(
             case _ => expr
           }
 
-          args.add(JRightPadded.build(exprWithPrefix))
+          // For the last arg, capture trailing whitespace before ')'.
+          val afterSpace = if (i == app.args.size - 1) {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val closePos = source.indexOf(')', Math.max(cursor, argEnd))
+            if (closePos > argEnd) Space.format(source.substring(argEnd, closePos))
+            else Space.EMPTY
+          } else Space.EMPTY
+
+          args.add(new JRightPadded[Expression](exprWithPrefix, afterSpace, Markers.EMPTY))
         case j: J => args.add(JRightPadded.build(new S.StatementExpression(Tree.randomId(), j).asInstanceOf[Expression]))
         case _ => return visitUnknown(app)
       }
