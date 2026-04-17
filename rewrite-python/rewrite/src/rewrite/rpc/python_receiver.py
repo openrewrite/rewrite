@@ -1444,6 +1444,17 @@ def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
     return p
 
 
+def _receive_java_type_annotation(annotation, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Annotation - consumes type only (values TODO on Java side)."""
+    from rewrite.java.support_types import JavaType as JT
+
+    type_ = q.receive(getattr(annotation, '_type', None))
+
+    a = JT.Annotation()
+    a._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
+    return a
+
+
 def _receive_java_type_array(array, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Array - consumes elemType and annotations."""
     from rewrite.java.support_types import JavaType as JT
@@ -1555,6 +1566,14 @@ def _register_java_type_codecs():
         JT.Parameterized,
         _receive_java_type_parameterized,
         lambda: JT.Parameterized()  # Factory creates empty Parameterized
+    )
+
+    # JavaType.Annotation - type only (values TODO on Java side)
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation',
+        JT.Annotation,
+        _receive_java_type_annotation,
+        lambda: JT.Annotation()  # Factory creates empty Annotation
     )
 
     # JavaType.Array - element type and annotations

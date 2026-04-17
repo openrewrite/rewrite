@@ -98,6 +98,14 @@ class JavaType(ABC):
         @property
         def fully_qualified_name(self) -> str: ...
 
+    class Annotation(FullyQualified):
+        _type: JavaType.FullyQualified
+
+        @property
+        def type(self) -> JavaType.FullyQualified: ...
+        @property
+        def fully_qualified_name(self) -> str: ...
+
 
     @dataclass
     class GenericTypeVariable:
