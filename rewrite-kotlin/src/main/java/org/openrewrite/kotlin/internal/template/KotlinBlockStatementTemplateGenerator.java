@@ -21,11 +21,10 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KotlinTypeUtils;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Set;
 
 public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplateGenerator {
@@ -35,7 +34,7 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
 
     @Override
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
-        String classDeclaration = "class Template" + kotlinTypeParameters(typeVariables);
+        String classDeclaration = "class Template" + KotlinTypeUtils.toKotlinTypeParameters(typeVariables);
         if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, classDeclaration + " {\n");
             before.append("var o : Any = ");
@@ -56,45 +55,5 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
         for (String anImport : imports) {
             before.insert(0, anImport);
         }
-    }
-
-    private static String kotlinTypeParameters(Collection<JavaType.GenericTypeVariable> typeVariables) {
-        if (typeVariables.isEmpty()) {
-            return "";
-        }
-        StringBuilder params = new StringBuilder("<");
-        StringBuilder where = new StringBuilder();
-        boolean firstParam = true;
-        for (JavaType.GenericTypeVariable tv : typeVariables) {
-            if ("?".equals(tv.getName())) {
-                continue;
-            }
-            if (!firstParam) {
-                params.append(", ");
-            }
-            firstParam = false;
-            params.append(tv.getName());
-            List<JavaType> bounds = tv.getBounds();
-            if (tv.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT && !bounds.isEmpty()) {
-                if (bounds.size() == 1) {
-                    params.append(" : ").append(TypeUtils.toString(bounds.get(0)));
-                } else {
-                    for (JavaType bound : bounds) {
-                        if (where.length() > 0) {
-                            where.append(", ");
-                        }
-                        where.append(tv.getName()).append(" : ").append(TypeUtils.toString(bound));
-                    }
-                }
-            }
-        }
-        if (firstParam) {
-            return "";
-        }
-        params.append(">");
-        if (where.length() > 0) {
-            params.append(" where ").append(where);
-        }
-        return params.toString();
     }
 }
