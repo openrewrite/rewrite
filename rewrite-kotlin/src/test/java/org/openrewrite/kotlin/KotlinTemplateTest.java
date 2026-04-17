@@ -105,6 +105,39 @@ class KotlinTemplateTest implements RewriteTest {
     }
 
     @Test
+    void replaceUnitReturningMethodInvocation() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("foo".equals(method.getSimpleName())) {
+                      return KotlinTemplate.builder("bar()")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun foo() {}
+              fun bar() {}
+              fun test() {
+                  foo()
+              }
+              """,
+            """
+              fun foo() {}
+              fun bar() {}
+              fun test() {
+                  bar()
+              }
+              """
+          ));
+    }
+
+    @Test
     void parserClasspath() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
