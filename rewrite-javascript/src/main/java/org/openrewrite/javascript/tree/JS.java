@@ -3819,7 +3819,7 @@ public interface JS extends J {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class ComputedPropertyMethodDeclaration implements JS, Statement, TypedTree {
+    final class ComputedPropertyMethodDeclaration implements JS, Statement, TypedTree, MethodDeclarationLike {
         @Nullable
         @NonFinal
         transient WeakReference<ComputedPropertyMethodDeclaration.Padding> padding;

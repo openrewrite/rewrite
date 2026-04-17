@@ -3884,7 +3884,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodDeclaration implements J, Statement, TypedTree {
+    final class MethodDeclaration implements J, Statement, TypedTree, MethodDeclarationLike {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
