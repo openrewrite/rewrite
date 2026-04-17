@@ -155,4 +155,13 @@ public class ScalaVisitor<P> extends JavaVisitor<P> {
         pd = pd.withMarkers(visitMarkers(pd.getMarkers(), p));
         return pd;
     }
+
+    public J visitFunctionCall(S.FunctionCall functionCall, P p) {
+        S.FunctionCall f = functionCall;
+        f = f.withPrefix(visitSpace(f.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        f = f.getPadding().withFunction(visitRightPadded(f.getPadding().getFunction(), JRightPadded.Location.LANGUAGE_EXTENSION, p));
+        f = f.getPadding().withArguments(visitContainer(f.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p));
+        return f;
+    }
 }

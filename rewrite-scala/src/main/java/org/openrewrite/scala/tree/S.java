@@ -673,4 +673,126 @@ public interface S extends J {
             return new CoordinateBuilder.Statement(this);
         }
     }
+
+    /**
+     * Represents a function call where the callee is itself an expression rather than a simple
+     * method select. Used for Scala forms that are not adequately modelled by
+     * {@link J.MethodInvocation}, such as curried application of another application's result:
+     * <pre>{@code
+     * f(1)(2)
+     * matrix(0)(1)
+     * Array.fill(5)(0)
+     * }</pre>
+     * Mirrors the {@code JS.FunctionCall} concept in rewrite-javascript.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class FunctionCall implements S, Expression, Statement, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> function;
+
+        public Expression getFunction() {
+            return function.getElement();
+        }
+
+        public S.FunctionCall withFunction(Expression function) {
+            return getPadding().withFunction(JRightPadded.withElement(this.function, function));
+        }
+
+        JContainer<Expression> arguments;
+
+        public List<Expression> getArguments() {
+            return arguments.getElements();
+        }
+
+        public S.FunctionCall withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
+        }
+
+        @With
+        @Getter
+        JavaType.@Nullable Method methodType;
+
+        public static FunctionCall build(UUID id, Space prefix, Markers markers,
+                                         JRightPadded<Expression> function,
+                                         JContainer<Expression> arguments,
+                                         JavaType.@Nullable Method methodType) {
+            return new FunctionCall(null, id, prefix, markers, function, arguments, methodType);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return methodType == null ? null : methodType.getReturnType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public S.FunctionCall withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitFunctionCall(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final S.FunctionCall t;
+
+            public JRightPadded<Expression> getFunction() {
+                return t.function;
+            }
+
+            public S.FunctionCall withFunction(JRightPadded<Expression> function) {
+                return t.function == function ? t : new S.FunctionCall(null, t.id, t.prefix, t.markers, function, t.arguments, t.methodType);
+            }
+
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
+            }
+
+            public S.FunctionCall withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new S.FunctionCall(null, t.id, t.prefix, t.markers, t.function, arguments, t.methodType);
+            }
+        }
+    }
 }

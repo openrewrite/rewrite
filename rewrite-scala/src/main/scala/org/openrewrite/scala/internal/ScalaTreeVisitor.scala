@@ -850,12 +850,60 @@ class ScalaTreeVisitor(
         }
 
       case innerApp: Trees.Apply[?] =>
-        // Curried call: matrix(0)(1), Array.fill(5)(0)
-        // Visit the full expression as source-preserving identifier
-        val text = extractSource(app.span)
-        updateCursor(app.span.end)
-        return new J.Identifier(Tree.randomId(), prefix, Markers.EMPTY,
-          Collections.emptyList(), text, typeFor(app.span), null)
+        // Curried call: f(1)(2), matrix(0)(1), Array.fill(5)(0), foo(1) { in => bar(in) }.
+        // Emit as S.FunctionCall — inner Apply is the function, outer arg list is a JContainer.
+        def asExpression(j: J): Expression = j match {
+          case e: Expression => e
+          case _ => new S.StatementExpression(Tree.randomId(), j)
+        }
+        def finishAtAppEnd(): Unit = if (app.span.exists) {
+          val adjustedEnd = Math.max(0, app.span.end - offsetAdjustment)
+          if (adjustedEnd > cursor && adjustedEnd <= source.length) cursor = adjustedEnd
+        }
+        val methodType = typeFor(app.span) match { case m: JavaType.Method => m; case _ => null }
+
+        val fn = asExpression(visitApply(innerApp))
+        val innerEnd = Math.max(0, innerApp.span.end - offsetAdjustment)
+        if (innerEnd > cursor && innerEnd <= source.length) cursor = innerEnd
+
+        // Outer arg list is `{ ... }` when next non-ws is `{`, otherwise `(...)`.
+        val firstNonWs = indexOfNextNonWhitespace(cursor)
+        val outerArgs = new util.ArrayList[JRightPadded[Expression]]()
+
+        if (firstNonWs < source.length && source.charAt(firstNonWs) == '{') {
+          // Block's own prefix captures the space between `)` and `{`, so leave fn's after-space empty.
+          for (arg <- app.args) outerArgs.add(JRightPadded.build(asExpression(visitTree(arg))))
+          finishAtAppEnd()
+          val markers = Markers.build(Collections.singletonList(new BlockArgument(Tree.randomId())))
+          return S.FunctionCall.build(Tree.randomId(), prefix, markers,
+            JRightPadded.build(fn), JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
+        }
+
+        val functionAfterSpace = if (firstNonWs > cursor) Space.format(source.substring(cursor, firstNonWs)) else Space.EMPTY
+        if (firstNonWs < source.length) cursor = firstNonWs + 1 // past `(`
+
+        for (i <- app.args.indices) {
+          val arg = app.args(i)
+          if (i > 0) {
+            val prevEnd = Math.max(0, app.args(i - 1).span.end - offsetAdjustment)
+            val commaIndex = source.indexOf(',', prevEnd)
+            if (commaIndex >= cursor) cursor = commaIndex + 1
+          }
+          val argExpr = asExpression(visitTree(arg))
+          val afterSpace = if (i == app.args.size - 1) {
+            val argEnd = Math.max(0, arg.span.end - offsetAdjustment)
+            val closePos = source.indexOf(')', Math.max(cursor, argEnd))
+            if (closePos > argEnd) Space.format(source.substring(argEnd, closePos)) else Space.EMPTY
+          } else Space.EMPTY
+          outerArgs.add(new JRightPadded(argExpr, afterSpace, Markers.EMPTY))
+        }
+
+        val closeParen = source.indexOf(')', cursor)
+        if (closeParen >= 0) cursor = closeParen + 1
+        finishAtAppEnd()
+        return S.FunctionCall.build(Tree.randomId(), prefix, Markers.EMPTY,
+          new JRightPadded(fn, functionAfterSpace, Markers.EMPTY),
+          JContainer.build(Space.EMPTY, outerArgs, Markers.EMPTY), methodType)
 
       case _ =>
         // Other function applications — preserve source

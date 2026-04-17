@@ -509,6 +509,8 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
             return visitTypeAlias((S.TypeAlias) tree, p);
         } else if (tree instanceof S.PatternDefinition) {
             return visitPatternDefinition((S.PatternDefinition) tree, p);
+        } else if (tree instanceof S.FunctionCall) {
+            return visitFunctionCall((S.FunctionCall) tree, p);
         }
         return super.visit(tree, p);
     }
@@ -901,6 +903,22 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         visit(typeAscription.getTypeTree(), p);
         afterSyntax(typeAscription, p);
         return typeAscription;
+    }
+
+    public J visitFunctionCall(S.FunctionCall fc, PrintOutputCapture<P> p) {
+        beforeSyntax(fc, Space.Location.LANGUAGE_EXTENSION, p);
+        visitRightPadded(fc.getPadding().getFunction(), JRightPadded.Location.LANGUAGE_EXTENSION, "", p);
+        if (fc.getMarkers().findFirst(BlockArgument.class).isPresent()) {
+            // Trailing block argument: `foo(1) { ... }`. The block prints its own braces,
+            // so we skip the parentheses and delimiters entirely.
+            for (Expression arg : fc.getArguments()) {
+                visit(arg, p);
+            }
+        } else {
+            visitContainer("(", fc.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
+        }
+        afterSyntax(fc, p);
+        return fc;
     }
 
     @Override
