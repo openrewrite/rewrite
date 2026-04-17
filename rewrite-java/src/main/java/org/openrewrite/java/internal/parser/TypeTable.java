@@ -237,10 +237,22 @@ public class TypeTable implements JavaParserClasspathLoader {
          * @param visitorSupplier Supplier to create a ClassVisitor for each class
          */
         public void read(InputStream is, Options options, Supplier<ClassVisitor> visitorSupplier) throws IOException {
+            read(is, options, visitorSupplier, (path, content) -> {});
+        }
+
+        /**
+         * Read a type table and process classes with custom ClassVisitors, and route non-class
+         * resources (e.g., {@code .kotlin_module} files) to the given consumer.
+         */
+        public void read(InputStream is, Options options, Supplier<ClassVisitor> visitorSupplier,
+                         ResourceConsumer resourceConsumer) throws IOException {
             parseTsvAndProcess(is, options,
-                    (gav, classes, nestedTypes) -> {
+                    (gav, classes, nestedTypes, resources) -> {
                         for (ClassDefinition classDef : classes.values()) {
                             processClass(classDef, nestedTypes.getOrDefault(classDef.getName(), emptyList()), visitorSupplier.get());
+                        }
+                        for (Map.Entry<String, byte[]> e : resources.entrySet()) {
+                            resourceConsumer.accept(e.getKey(), e.getValue());
                         }
                     });
         }
@@ -255,6 +267,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             Map<String, ClassDefinition> classesByName = new HashMap<>();
             // nested types appear first in type tables and therefore not stored in a `ClassDefinition` field
             Map<String, List<ClassDefinition>> nestedTypesByOwner = new HashMap<>();
+            Map<String, byte[]> resourcesByPath = new LinkedHashMap<>();
 
             try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
                 AtomicReference<@Nullable GroupArtifactVersion> lastGav = new AtomicReference<>();
@@ -264,11 +277,12 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                     if (!Objects.equals(rowGav, lastGav.get())) {
                         if (matchedGav.get() != null) {
-                            processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner);
+                            processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner, resourcesByPath);
                         }
                         matchedGav.set(null);
                         classesByName.clear();
                         nestedTypesByOwner.clear();
+                        resourcesByPath.clear();
 
                         String artifactVersion = fields[1] + "-" + fields[2];
 
@@ -280,16 +294,25 @@ public class TypeTable implements JavaParserClasspathLoader {
                     lastGav.set(rowGav);
 
                     if (matchedGav.get() != null) {
+                        int classAccess = Integer.parseInt(fields[3]);
+                        if (classAccess == -2) {
+                            // Resource row — see Writer.Jar.writeResource
+                            String resourcePath = fields[4];
+                            String base64 = fields.length > 17 ? fields[17] : "";
+                            resourcesByPath.put(resourcePath, Base64.getDecoder().decode(base64));
+                            return;
+                        }
                         String className = fields[4];
                         ClassDefinition classDefinition = classesByName.computeIfAbsent(className, name ->
                                 new ClassDefinition(
-                                        Integer.parseInt(fields[3]),
+                                        classAccess,
                                         name,
                                         fields[5].isEmpty() ? null : fields[5],
                                         fields[6].isEmpty() ? null : fields[6],
                                         fields[7].isEmpty() ? null : fields[7].split("\\|"),
                                         fields.length > 14 && !fields[14].isEmpty() ? fields[14] : null,  // elementAnnotations - raw string (may have | delimiters)
-                                        fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null  // constantValue moved to column 17
+                                        fields.length > 17 && !fields[17].isEmpty() ? fields[17] : null,  // constantValue moved to column 17
+                                        fields.length > 18 && !fields[18].isEmpty() ? TsvEscapeUtils.splitAnnotationList(fields[18], '|') : null
                                 ));
                         int lastIndexOf$ = className.lastIndexOf('$');
                         if (lastIndexOf$ != -1) {
@@ -319,17 +342,25 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             // Process final GAV if any
             if (matchedGav.get() != null) {
-                processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner);
+                processor.accept(matchedGav.get(), classesByName, nestedTypesByOwner, resourcesByPath);
             }
         }
 
         @FunctionalInterface
         interface ClassesProcessor {
             void accept(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes,
-                        Map<String, List<ClassDefinition>> nestedTypes);
+                        Map<String, List<ClassDefinition>> nestedTypes,
+                        Map<String, byte[]> resources);
         }
 
-        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes, Map<String, List<ClassDefinition>> nestedTypesByOwner) {
+        @FunctionalInterface
+        public interface ResourceConsumer {
+            void accept(String resourcePath, byte[] content);
+        }
+
+        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes,
+                                     Map<String, List<ClassDefinition>> nestedTypesByOwner,
+                                     Map<String, byte[]> resources) {
             if (gav == null) {
                 return;
             }
@@ -360,6 +391,15 @@ public class TypeTable implements JavaParserClasspathLoader {
                         throw new UncheckedIOException(e);
                     }
                 });
+                resources.forEach((resourcePath, content) -> {
+                    Path target = classesDir.resolve(resourcePath);
+                    try {
+                        Files.createDirectories(target.getParent());
+                        Files.write(target, content);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
                 future.complete(classesDir);
             } catch (Exception e) {
                 future.completeExceptionally(e);
@@ -385,13 +425,30 @@ public class TypeTable implements JavaParserClasspathLoader {
                 AnnotationApplier.applyAnnotations(classDef.getAnnotations(), classVisitor::visitAnnotation);
             }
 
-            for (ClassDefinition innerClassDef : nestedTypes) {
-                classVisitor.visitInnerClass(
-                        innerClassDef.getName(),
-                        classDef.getName(),
-                        innerClassDef.getName().substring(classDef.getName().length() + 1),
-                        innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
-                );
+            if (classDef.getInnerClasses() != null) {
+                for (String entry : classDef.getInnerClasses()) {
+                    // Format: name,outerName,innerName,access (outerName/innerName empty means null)
+                    String[] parts = entry.split(",", 4);
+                    if (parts.length == 4) {
+                        classVisitor.visitInnerClass(
+                                parts[0],
+                                parts[1].isEmpty() ? null : parts[1],
+                                parts[2].isEmpty() ? null : parts[2],
+                                Integer.parseInt(parts[3])
+                        );
+                    }
+                }
+            } else {
+                // Backward compatibility: replay inner classes derived from name suffixes
+                // for TSV files written before the innerClasses column was added.
+                for (ClassDefinition innerClassDef : nestedTypes) {
+                    classVisitor.visitInnerClass(
+                            innerClassDef.getName(),
+                            classDef.getName(),
+                            innerClassDef.getName().substring(classDef.getName().length() + 1),
+                            innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
+                    );
+                }
             }
 
             for (Member member : classDef.getMembers()) {
@@ -629,7 +686,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         public Writer(OutputStream out) throws IOException {
             this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
-            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue");
+            this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions\telementAnnotations\tparameterAnnotations\ttypeAnnotations\tconstantValue\tinnerClasses");
         }
 
         public Jar jar(String groupId, String artifactId, String version) {
@@ -657,11 +714,45 @@ public class TypeTable implements JavaParserClasspathLoader {
                             try (InputStream inputStream = jarFile.getInputStream(entry)) {
                                 writeClass(inputStream);
                             }
+                        } else if (entry.getName().endsWith(".kotlin_module")) {
+                            try (InputStream inputStream = jarFile.getInputStream(entry)) {
+                                writeResource(entry.getName(), readAllBytes(inputStream));
+                            }
                         }
                     }
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
+            }
+
+            private byte[] readAllBytes(InputStream in) throws IOException {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                byte[] chunk = new byte[8192];
+                int n;
+                while ((n = in.read(chunk)) != -1) {
+                    buffer.write(chunk, 0, n);
+                }
+                return buffer.toByteArray();
+            }
+
+            /**
+             * Write a non-class resource file (e.g., a Kotlin .kotlin_module file) so that the
+             * synthesized classpath has parity with the source jar for tooling that reads these
+             * files (like the Kotlin compiler, which needs .kotlin_module to resolve top-level
+             * functions in a package).
+             */
+            public void writeResource(String resourcePath, byte[] content) {
+                // Resource row: classAccess sentinel -2, className holds the path, content is
+                // base64-encoded in the constantValue column. All other columns are empty.
+                out.printf(
+                        "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                        groupId, artifactId, version,
+                        -2, resourcePath,
+                        "", "", "",
+                        -1, "", "", "", "", "",
+                        "", "", "",
+                        Base64.getEncoder().encodeToString(content),
+                        "");
             }
 
             /**
@@ -770,8 +861,10 @@ public class TypeTable implements JavaParserClasspathLoader {
                     @Override
                     public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
                                                                @Nullable String signature, String @Nullable [] exceptions) {
-                        // Repeating check from `writeMethod()` for performance reasons
-                        if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
+                        // Repeating check from `writeMethod()` for performance reasons.
+                        // Synthetic methods are kept: Kotlin extension functions, $default overloads,
+                        // and Java bridge methods are all synthetic but part of the user-visible API.
+                        if (classDefinition != null && (Opcodes.ACC_PRIVATE & access) == 0 &&
                                 name != null && !"<clinit>".equals(name)) {
                             Writer.Member member = new Writer.Member(access, name, descriptor, signature, exceptions, null);
                             return new MethodVisitor(Opcodes.ASM9) {
@@ -877,6 +970,17 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
 
                     @Override
+                    public void visitInnerClass(String name, @Nullable String outerName, @Nullable String innerName, int access) {
+                        if (classDefinition != null) {
+                            classDefinition.innerClasses.add(
+                                    name + "," +
+                                            (outerName == null ? "" : outerName) + "," +
+                                            (innerName == null ? "" : innerName) + "," +
+                                            access);
+                        }
+                    }
+
+                    @Override
                     public void visitEnd() {
                         if (classDefinition != null && !"module-info".equals(classDefinition.className)) {
                             // No fields or methods, which can happen for marker annotations for example
@@ -903,12 +1007,13 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             List<String> classAnnotations = new ArrayList<>(4);
             List<String> classTypeAnnotations = new ArrayList<>(4);
+            List<String> innerClasses = new ArrayList<>(4);
             List<Writer.Member> members = new ArrayList<>();
 
             public void writeClass() {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
                             classAccess, className,
                             classSignature == null ? "" : classSignature,
@@ -918,7 +1023,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classAnnotations.isEmpty() ? "" : String.join("", classAnnotations),
                             "", // Empty parameter annotations for class row
                             classTypeAnnotations.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(classTypeAnnotations),
-                            ""); // Empty constant value for class row
+                            "", // Empty constant value for class row
+                            innerClasses.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(innerClasses));
 
                     for (Writer.Member member : members) {
                         member.writeMember(jar, this);
@@ -955,9 +1061,9 @@ public class TypeTable implements JavaParserClasspathLoader {
             String constantValue;
 
             private void writeMember(Jar jar, ClassDefinition classDefinition) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
+                if ((Opcodes.ACC_PRIVATE & access) == 0) {
                     out.printf(
-                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
                             classDefinition.classAccess, classDefinition.className,
                             classDefinition.classSignature == null ? "" : classDefinition.classSignature,
@@ -970,7 +1076,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                             elementAnnotations.isEmpty() ? "" : String.join("", elementAnnotations),
                             serializeParameterAnnotations(parameterAnnotations, descriptor),
                             typeAnnotations.isEmpty() ? "" : PipeDelimitedJoiner.joinWithPipes(typeAnnotations),
-                            constantValue == null ? "" : constantValue
+                            constantValue == null ? "" : constantValue,
+                            "" // innerClasses column is written on class row only
                     );
                 }
             }
@@ -1003,6 +1110,8 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         @Nullable
         String constantValue;
+
+        String @Nullable [] innerClasses;
 
         @NonFinal
         @Nullable

@@ -268,14 +268,14 @@ class TypeTableTypeAnnotationsTest {
           "groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\t" +
             "classSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\t" +
             "descriptor\tsignature\tparameterNames\texceptions\telementAnnotations\t" +
-            "parameterAnnotations\ttypeAnnotations\tconstantValue"
+            "parameterAnnotations\ttypeAnnotations\tconstantValue\tinnerClasses"
         );
 
         // Find the field row and check constantValue is in the right place
         for (String line : lines) {
             if (line.contains("\tCONSTANT\t")) {
                 String[] cols = line.split("\t", -1);
-                assertThat(cols.length).isEqualTo(18);
+                assertThat(cols.length).isEqualTo(19);
                 assertThat(cols[14]).as("elementAnnotations").contains("@Ljava/lang/Deprecated;");
                 assertThat(cols[15]).as("parameterAnnotations").isEmpty();
                 assertThat(cols[16]).as("typeAnnotations").isEmpty();
