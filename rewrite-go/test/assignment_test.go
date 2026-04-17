@@ -110,3 +110,19 @@ func TestParseMultiAssignFromFunc(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseAssignmentIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				x :=  1
+				x +=/*c1*/3
+				x++
+				a, b := 1,
+					/*c2*/2
+				_, _, _ = x, a, b
+			}
+		`))
+}

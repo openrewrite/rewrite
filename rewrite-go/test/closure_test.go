@@ -46,3 +46,20 @@ func TestParseClosureWithReturn(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseClosureIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func run() {
+				apply(func(
+					x  int,
+					/*c1*/y int,
+				) int {
+					return x +
+						/*c2*/y
+				})
+			}
+		`))
+}

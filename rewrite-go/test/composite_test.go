@@ -54,3 +54,17 @@ func TestParseEmptyCompositeLiteral(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseCompositeIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func data()  map[string]int {
+				return map [string]int{
+					/*c1*/"a": 1,
+					"b":  2,
+				}
+			}
+		`))
+}

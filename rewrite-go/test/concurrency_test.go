@@ -54,3 +54,18 @@ func TestParseSendStatement(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseConcurrencyIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				go/*c1*/doWork()
+				defer  close()
+				ch  <- 42
+				v := <-ch
+				_ =/*c2*/v
+			}
+		`))
+}

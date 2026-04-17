@@ -175,3 +175,18 @@ func TestParseTrailingCommaMapOfSlices(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseTrailingCommaIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			var m = map[string]int{
+				"a":  1,
+				/*c1*/"b": 2,
+			}
+			var s =/*c2*/[]int{1,
+				2,
+			}
+		`))
+}

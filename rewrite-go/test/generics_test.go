@@ -123,3 +123,15 @@ func TestParseTildeConstraint(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseGenericsIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func Map[T any,/*c1*/U ~int](s  []T) []U {
+				var r  []U
+				return/*c2*/r
+			}
+		`))
+}

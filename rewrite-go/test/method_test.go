@@ -116,3 +116,19 @@ func TestParseNamedReturnGrouped(t *testing.T) {
 		`),
 	)
 }
+
+func TestParseMethodIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func (s  *Server) Start(
+				host string,
+				/*c1*/port int,
+			) (result int, err error) {
+				return port,
+					/*c2*/nil
+			}
+		`),
+	)
+}

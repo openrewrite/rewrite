@@ -53,3 +53,22 @@ func TestParseSelectSend(t *testing.T) {
 		`),
 	)
 }
+
+func TestParseSelectIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+				select {
+				case v :=/*c1*/<-ch:
+					use(v)
+				case ch  <- 1:
+					done()
+				/*c2*/default:
+					wait()
+				}
+			}
+		`),
+	)
+}

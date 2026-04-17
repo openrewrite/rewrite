@@ -67,3 +67,20 @@ func TestParseIfElseIf(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseIfIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func check(x int) string {
+				if y := x *  2;/*c1*/y == 0 {
+					return "zero"
+				} else if y < 0 {
+					return/*c2*/"neg"
+				} else {
+					return "pos"
+				}
+			}
+		`))
+}

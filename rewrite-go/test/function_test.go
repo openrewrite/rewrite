@@ -42,3 +42,18 @@ func TestParseFunctionWithReturn(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseFunctionIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package  main
+
+			func/*c1*/greet(
+				name  string,
+				/*c2*/age int,
+			) (string,  error) {
+				return "hi",
+					/*c3*/nil
+			}
+		`))
+}

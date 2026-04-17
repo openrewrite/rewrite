@@ -103,3 +103,21 @@ func TestParseSwitchWithInit(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseSwitchIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func check(v interface{}) string {
+				switch y := v;/*c1*/y.(type) {
+				case int, int32:
+					return "int"
+				case string:
+					return  "str"
+				default:
+					return/*c2*/"other"
+				}
+			}
+		`))
+}

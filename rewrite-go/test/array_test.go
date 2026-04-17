@@ -74,3 +74,16 @@ func TestParseSliceExpressionOpenEnd(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseArrayIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f(items []int,/*c1*/fixed [5]int) []int {
+				_ =  fixed[0]
+				return items[1:
+					/*c2*/3]
+			}
+		`))
+}

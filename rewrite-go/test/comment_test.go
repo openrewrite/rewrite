@@ -126,3 +126,16 @@ func TestParseMultilineBlockComment(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseCommentIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package  main
+
+			// doc line
+			func hello(name string)  string {
+				return fmt/*c1*/.Sprintf(/*c2*/"hi %s",
+					name) // trailing
+			}
+		`))
+}

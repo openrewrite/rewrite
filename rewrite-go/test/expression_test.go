@@ -32,3 +32,16 @@ func TestParseBinaryExpression(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseExpressionIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package  main
+
+			func/*c1*/add(
+			) int/*c2*/{
+				return 1 +
+					/*c3*/2*  3
+			}
+		`))
+}

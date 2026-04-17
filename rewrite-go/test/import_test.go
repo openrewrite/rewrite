@@ -80,3 +80,16 @@ func TestParseMultipleGroupedImportBlocks(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseImportIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import (
+				/*c1*/"fmt"
+				alias  "strings"
+				_/*c2*/"embed"
+			)
+		`))
+}

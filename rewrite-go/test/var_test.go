@@ -164,3 +164,17 @@ func TestParseGroupedVarWithInit(t *testing.T) {
 			)
 		`))
 }
+
+func TestParseVarIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			var (
+				/*c1*/x int = 5
+				y, z = 1,  2
+			)
+
+			const  A =/*c2*/42
+		`))
+}

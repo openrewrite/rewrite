@@ -164,3 +164,21 @@ func TestParseStructGroupedFields(t *testing.T) {
 		`),
 	)
 }
+
+func TestParseTypeDeclIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type Point struct {
+				X, Y int
+				/*c1*/Name  string
+			}
+
+			type Stringer interface {
+				String()  string
+				/*c2*/fmt.Stringer
+			}
+		`),
+	)
+}

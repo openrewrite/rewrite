@@ -69,3 +69,19 @@ func TestParseForRangeWithKeyValue(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseForIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func count(items []string) {
+				for i := 0;/*c1*/i < 10; i++ {
+					use(i)
+				}
+				for _, v := range items {
+					_ =/*c2*/v
+				}
+			}
+		`))
+}

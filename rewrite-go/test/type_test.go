@@ -93,3 +93,21 @@ func TestParseParenthesizedExpression(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseTypeIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f(
+				m map[string]int,
+				c chan <- int,
+				/*c1*/p *int,
+				x interface{},
+			) {
+				s := x.(string)
+				_ =/*c2*/s
+				_, _, _ = m, c, p
+			}
+		`))
+}

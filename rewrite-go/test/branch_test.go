@@ -88,3 +88,20 @@ func TestParseGotoStatement(t *testing.T) {
 			}
 		`))
 }
+
+func TestParseBranchIntenseWhitespace(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func f() {
+			outer:
+				for {
+					break/*c1*/outer
+					continue  outer
+					/*c2*/goto end
+				}
+			end:
+			}
+		`))
+}
