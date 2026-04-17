@@ -33,14 +33,7 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
 
     @Override
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
-        if (j instanceof J.MethodInvocation) {
-            before.insert(0, "class Template {\n");
-            JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
-            if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
-                before.append("var o : Any = ");
-            }
-            after.append(";\n}");
-        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
+        if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, "class Template {\n");
             before.append("var o : Any = ");
             after.append(";\n}");
