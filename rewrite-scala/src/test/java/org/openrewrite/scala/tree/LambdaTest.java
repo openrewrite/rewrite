@@ -144,4 +144,40 @@ class LambdaTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void partialFunctionLiteral() {
+        // A partial-function literal `{ case pat => ... }` is modeled by the Scala
+        // compiler as a Match tree with a synthetic NoSpan selector, which the parser
+        // must handle without falling through to visitUnknown.
+        rewriteRun(
+            scala(
+                """
+                val f: Int => Int = {
+                  case 1 => 1
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void partialFunctionLiteralAsMapArgument() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def run(): Unit = {
+                    List((1, "a")).collect {
+                      case (n, s) if n > 0 =>
+                        val label = s
+                        println(label)
+                      case (_, s) => println(s)
+                    }
+                  }
+                }
+                """
+            )
+        );
+    }
 }
