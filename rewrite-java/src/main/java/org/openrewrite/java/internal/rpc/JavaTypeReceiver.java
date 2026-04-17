@@ -37,23 +37,23 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
             JavaType element = q.receive(v.getElement(), t -> visit(t, q));
             if (v instanceof JavaType.Annotation.ArrayElementValue) {
                 JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
-                List<String> encodedConstants = q.receiveList(
-                        AnnotationConstantValueCodec.encodeList(aev.getConstantValues()), null);
+                List<Object> constantValues = q.receiveList(
+                        aev.getConstantValues() == null ? null : Arrays.asList(aev.getConstantValues()),
+                        null);
                 List<JavaType> referenceValues = q.receiveList(
                         aev.getReferenceValues() == null ? null : Arrays.asList(aev.getReferenceValues()),
                         t -> visit(t, q));
                 return new JavaType.Annotation.ArrayElementValue(
                         element,
-                        AnnotationConstantValueCodec.decodeArray(encodedConstants),
+                        constantValues == null ? null : constantValues.toArray(),
                         referenceValues == null ? null : referenceValues.toArray(EMPTY_JAVA_TYPE_ARRAY));
             }
             JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
-            String encodedConstant = q.receive(AnnotationConstantValueCodec.encode(sev.getConstantValue()));
+            // constantValue arrives as whatever the JSON-RPC layer deserialized — typically Integer for
+            // any non-fractional JSON number, Double for fractional, String for text, Boolean for bools.
+            Object constantValue = q.receive(sev.getConstantValue());
             JavaType referenceValue = q.receive(sev.getReferenceValue(), t -> visit(t, q));
-            return new JavaType.Annotation.SingleElementValue(
-                    element,
-                    AnnotationConstantValueCodec.decode(encodedConstant),
-                    referenceValue);
+            return new JavaType.Annotation.SingleElementValue(element, constantValue, referenceValue);
         });
         return annotation.unsafeSet(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
     }

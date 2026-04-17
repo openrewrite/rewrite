@@ -934,16 +934,17 @@ class PythonRpcSender:
         """Visit a JavaType.Annotation.ElementValue (Single or Array variant).
 
         Mirrors the Java JavaTypeSender visitor lambda inside visitAnnotation.
+        Constant values are sent as raw JSON-native values; numeric subtypes and
+        char/string distinctions are not preserved across the wire.
         """
         from rewrite.java.support_types import JavaType as JT
-        from rewrite.rpc._annotation_constant_value_codec import encode, encode_list
 
         q.get_and_send_as_ref(v, lambda e: getattr(e, '_element', None), lambda t: self._visit_type(t, q))
         if isinstance(v, JT.Annotation.ArrayElementValue):
             q.get_and_send_list(
                 v,
-                lambda e: encode_list(getattr(e, '_constant_values', None)),
-                lambda s: s if s is not None else '',
+                lambda e: getattr(e, '_constant_values', None),
+                lambda x: 'null' if x is None else str(x),
                 None,
             )
             q.get_and_send_list_as_ref(
@@ -954,7 +955,7 @@ class PythonRpcSender:
             )
         else:
             # SingleElementValue (default)
-            q.get_and_send(v, lambda e: encode(getattr(e, '_constant_value', None)))
+            q.get_and_send(v, lambda e: getattr(e, '_constant_value', None))
             q.get_and_send_as_ref(v, lambda e: getattr(e, '_reference_value', None), lambda t: self._visit_type(t, q))
 
     def _type_signature(self, java_type) -> str:

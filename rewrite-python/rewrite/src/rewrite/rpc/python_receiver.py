@@ -1462,27 +1462,25 @@ def _receive_annotation_element_value(v, q: RpcReceiveQueue):
     """Receive a JavaType.Annotation.ElementValue (Single or Array variant).
 
     Mirrors the Java JavaTypeReceiver visitor lambda inside visitAnnotation.
+    Constant values arrive as whatever the JSON-RPC layer deserialized.
     """
     from rewrite.java.support_types import JavaType as JT
-    from rewrite.rpc._annotation_constant_value_codec import encode, encode_list, decode, decode_list
 
     element = q.receive(getattr(v, '_element', None))
     if isinstance(v, JT.Annotation.ArrayElementValue):
-        before_constants = encode_list(getattr(v, '_constant_values', None))
-        encoded_constants = q.receive_list(before_constants, None)
+        constant_values = q.receive_list(getattr(v, '_constant_values', None), None)
         ref_values = q.receive_list(getattr(v, '_reference_values', None) or [])
         return JT.Annotation.ArrayElementValue(
             _element=element,
-            _constant_values=decode_list(encoded_constants),
+            _constant_values=constant_values,
             _reference_values=ref_values,
         )
     sev = v if isinstance(v, JT.Annotation.SingleElementValue) else None
-    before_constant = encode(getattr(sev, '_constant_value', None)) if sev is not None else None
-    encoded_constant = q.receive(before_constant)
+    constant_value = q.receive(getattr(sev, '_constant_value', None) if sev is not None else None)
     ref_value = q.receive(getattr(sev, '_reference_value', None) if sev is not None else None)
     return JT.Annotation.SingleElementValue(
         _element=element,
-        _constant_value=decode(encoded_constant),
+        _constant_value=constant_value,
         _reference_value=ref_value,
     )
 

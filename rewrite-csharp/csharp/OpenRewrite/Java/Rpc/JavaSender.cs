@@ -796,10 +796,12 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
         switch (v)
         {
             case JavaType.Annotation.ArrayElementValue array:
+                // Constant values are sent as raw JSON-native values; numeric subtype
+                // (int/long/float/double) and char/string distinctions are not preserved.
                 q.GetAndSendList(
                     array,
-                    a => AnnotationConstantValueCodec.EncodeList(a.ConstantValues),
-                    s => s ?? "",
+                    a => a.ConstantValues,
+                    x => x?.ToString() ?? "null",
                     null);
                 q.GetAndSendListAsRef(
                     array,
@@ -808,7 +810,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                     t => VisitType(t, q));
                 break;
             case JavaType.Annotation.SingleElementValue single:
-                q.GetAndSend(single, s => AnnotationConstantValueCodec.Encode(s.ConstantValue));
+                q.GetAndSend(single, s => s.ConstantValue);
                 q.GetAndSend(single, s => AsRef(s.ReferenceValue),
                     t => VisitType(GetValueNonNull<JavaType>(t), q));
                 break;

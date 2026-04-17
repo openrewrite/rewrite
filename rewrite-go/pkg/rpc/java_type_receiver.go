@@ -68,29 +68,13 @@ func (r *JavaTypeReceiver) receiveAnnotationElementValue(
 	element := receiveAsType[tree.JavaType](r, q, v.GetElement())
 	switch ev := v.(type) {
 	case *tree.JavaTypeAnnotationArrayElementValue:
-		beforeEncoded := EncodeAnnotationConstantList(ev.ConstantValues)
-		beforeEncodedAny := make([]any, len(beforeEncoded))
-		for i, s := range beforeEncoded {
-			beforeEncodedAny[i] = s
-		}
-		afterEncodedAny := q.ReceiveList(beforeEncodedAny, nil)
-		var afterEncoded []*string
-		if afterEncodedAny != nil {
-			afterEncoded = make([]*string, len(afterEncodedAny))
-			for i, x := range afterEncodedAny {
-				if x == nil {
-					afterEncoded[i] = nil
-				} else if ptr, ok := x.(*string); ok {
-					afterEncoded[i] = ptr
-				} else if s, ok := x.(string); ok {
-					afterEncoded[i] = &s
-				}
-			}
-		}
+		// Constant values arrive as whatever the JSON-RPC layer deserialized;
+		// numeric subtype and char/string distinctions are not preserved.
+		constantValues := q.ReceiveList(ev.ConstantValues, nil)
 		refValues := receiveTypeList(r, q, ev.ReferenceValues)
 		return &tree.JavaTypeAnnotationArrayElementValue{
 			Element:         element,
-			ConstantValues:  DecodeAnnotationConstantList(afterEncoded),
+			ConstantValues:  constantValues,
 			ReferenceValues: refValues,
 		}
 	default:
@@ -99,26 +83,16 @@ func (r *JavaTypeReceiver) receiveAnnotationElementValue(
 			sev = s
 		}
 		var beforeConstant any
-		if sev != nil {
-			beforeConstant = EncodeAnnotationConstant(sev.ConstantValue)
-		}
-		afterConstantAny := q.Receive(beforeConstant, nil)
-		var afterConstant *string
-		if afterConstantAny != nil {
-			if ptr, ok := afterConstantAny.(*string); ok {
-				afterConstant = ptr
-			} else if s, ok := afterConstantAny.(string); ok {
-				afterConstant = &s
-			}
-		}
 		var beforeRef tree.JavaType
 		if sev != nil {
+			beforeConstant = sev.ConstantValue
 			beforeRef = sev.ReferenceValue
 		}
+		constantValue := q.Receive(beforeConstant, nil)
 		refValue := receiveAsType[tree.JavaType](r, q, beforeRef)
 		return &tree.JavaTypeAnnotationSingleElementValue{
 			Element:        element,
-			ConstantValue:  DecodeAnnotationConstant(afterConstant),
+			ConstantValue:  constantValue,
 			ReferenceValue: refValue,
 		}
 	}

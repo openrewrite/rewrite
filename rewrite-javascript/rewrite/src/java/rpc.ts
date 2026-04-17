@@ -22,61 +22,6 @@ import {TypeVisitor} from "./type-visitor";
 import {updateIfChanged} from "../util";
 import Space = J.Space;
 
-/**
- * Wire codec for JavaType.Annotation constant element values. JSON cannot
- * distinguish e.g. Integer 42 from Long 42 or Character 'c' from String "c",
- * so each constant is encoded as a tagged string on the wire. Format:
- * "<kind>:<lexical>" where <kind> is one of s b i l S B f d c. Null is
- * encoded as "n" (and undefined values are dropped to undefined).
- *
- * The Java parser only ever produces String, Number, Boolean or Character
- * as constant values; class literals and enum constants flow through the
- * referenceValue branch as JavaType references. JavaScript receivers
- * collapse all numeric kinds to plain `number` (no int/long/etc. in JS).
- */
-function encodeConstant(value: any): string | undefined {
-    if (value === undefined || value === null) return undefined;
-    switch (typeof value) {
-        case "string":
-            return `s:${value}`;
-        case "boolean":
-            return `b:${value}`;
-        case "number":
-            return Number.isInteger(value) ? `i:${value}` : `d:${value}`;
-        default:
-            throw new Error(`Unsupported annotation constant value type: ${typeof value} (${value})`);
-    }
-}
-
-function decodeConstant(encoded: string | undefined): any {
-    if (encoded === undefined || encoded === null || encoded === "n") return undefined;
-    if (encoded.length < 2 || encoded.charAt(1) !== ":") {
-        throw new Error(`Malformed annotation constant value envelope: ${encoded}`);
-    }
-    const kind = encoded.charAt(0);
-    const body = encoded.substring(2);
-    switch (kind) {
-        case "s": return body;
-        case "b": return body === "true";
-        case "i":
-        case "l":
-        case "S":
-        case "B": return Number.parseInt(body, 10);
-        case "f":
-        case "d": return Number.parseFloat(body);
-        case "c": return body.charAt(0);
-        default: throw new Error(`Unknown annotation constant value kind: ${kind}`);
-    }
-}
-
-function encodeConstantList(values: any[] | undefined): (string | undefined)[] | undefined {
-    return values === undefined ? undefined : values.map(encodeConstant);
-}
-
-function decodeConstantList(encoded: (string | undefined)[] | undefined): any[] | undefined {
-    return encoded === undefined ? undefined : encoded.map(decodeConstant);
-}
-
 class TypeSender extends TypeVisitor<RpcSendQueue> {
     protected async visitPrimitive(primitive: Type.Primitive, q: RpcSendQueue): Promise<Type | undefined> {
         await q.getAndSend(primitive, p => p.keyword);
@@ -115,10 +60,12 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
                 await q.getAndSend(v, e => asRef(e.element), elem => this.visit(elem, q));
                 if (v.kind === Type.Kind.ArrayElementValue) {
                     const array = v as Type.Annotation.ArrayElementValue;
+                    // constantValues are sent as raw JSON-native values; numeric subtypes
+                    // (int/long/float/double) and char/string distinctions are not preserved.
                     await q.getAndSendList(
                         array,
-                        a => encodeConstantList(a.constantValues),
-                        s => s ?? "",
+                        a => a.constantValues,
+                        v => v == null ? "null" : v.toString(),
                     );
                     await q.getAndSendList(
                         array,
@@ -128,7 +75,7 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
                     );
                 } else {
                     const single = v as Type.Annotation.SingleElementValue;
-                    await q.getAndSend(single, s => encodeConstant(s.constantValue));
+                    await q.getAndSend(single, s => s.constantValue);
                     await q.getAndSend(single, s => asRef(s.referenceValue), ref => this.visit(ref, q));
                 }
             },
@@ -235,24 +182,22 @@ class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
             const element = await q.receive((v as Type.Annotation.ElementValue).element, elem => this.visit(elem, q));
             if (v.kind === Type.Kind.ArrayElementValue) {
                 const array = v as Type.Annotation.ArrayElementValue;
-                const beforeEncoded = encodeConstantList(array.constantValues);
-                const encoded = await q.receiveList(beforeEncoded);
+                const constantValues = await q.receiveList(array.constantValues);
                 const referenceValues = await q.receiveList(array.referenceValues, r => this.visit(r, q));
                 return {
                     kind: Type.Kind.ArrayElementValue,
                     element,
-                    constantValues: decodeConstantList(encoded),
+                    constantValues,
                     referenceValues,
                 } as Type.Annotation.ArrayElementValue;
             }
             const single = v as Type.Annotation.SingleElementValue;
-            const beforeEncoded = encodeConstant(single.constantValue);
-            const encoded = await q.receive(beforeEncoded);
+            const constantValue = await q.receive(single.constantValue);
             const referenceValue = await q.receive(single.referenceValue, ref => this.visit(ref, q));
             return {
                 kind: Type.Kind.SingleElementValue,
                 element,
-                constantValue: decodeConstant(encoded),
+                constantValue,
                 referenceValue,
             } as Type.Annotation.SingleElementValue;
         })) || [];

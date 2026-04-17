@@ -47,7 +47,9 @@ class JavaTypeAnnotationRpcTest {
         assertThat(roundTripped.getValues()).hasSize(1);
         JavaType.Annotation.SingleElementValue sev =
                 (JavaType.Annotation.SingleElementValue) roundTripped.getValues().get(0);
-        assertThat(sev.getConstantValue()).isEqualTo(42).isInstanceOf(Integer.class);
+        // Numeric constants compare by value via Number, since the wire collapses
+        // Integer/Long distinctions (the receiver gets whatever Jackson produces).
+        assertThat(((Number) sev.getConstantValue()).intValue()).isEqualTo(42);
         assertThat(sev.getReferenceValue()).isNull();
         assertThat(((JavaType.Method) sev.getElement()).getName()).isEqualTo("value");
     }
@@ -108,12 +110,12 @@ class JavaTypeAnnotationRpcTest {
     @Test
     void roundTripsAnnotationWithMixedValues() {
         JavaType.Method intElement = methodOn("com.example.Foo", "intVal", JavaType.Primitive.Int);
-        JavaType.Method longElement = methodOn("com.example.Foo", "longVal", JavaType.Primitive.Long);
+        JavaType.Method strElement = methodOn("com.example.Foo", "strVal", JavaType.Primitive.String);
         JavaType.Method arrayElement = methodOn("com.example.Foo", "arrVal", JavaType.Primitive.String);
 
         JavaType.Annotation original = annotation("com.example.Foo", List.of(
                 new JavaType.Annotation.SingleElementValue(intElement, 42, null),
-                new JavaType.Annotation.SingleElementValue(longElement, 42L, null),
+                new JavaType.Annotation.SingleElementValue(strElement, "hello", null),
                 new JavaType.Annotation.ArrayElementValue(arrayElement, new Object[]{"x", "y"}, null)));
 
         JavaType.Annotation roundTripped = sendAndReceive(original);
@@ -121,15 +123,14 @@ class JavaTypeAnnotationRpcTest {
         assertThat(roundTripped.getValues()).hasSize(3);
         JavaType.Annotation.SingleElementValue intSev =
                 (JavaType.Annotation.SingleElementValue) roundTripped.getValues().get(0);
-        JavaType.Annotation.SingleElementValue longSev =
+        JavaType.Annotation.SingleElementValue strSev =
                 (JavaType.Annotation.SingleElementValue) roundTripped.getValues().get(1);
-        JavaType.Annotation.ArrayElementValue strAev =
+        JavaType.Annotation.ArrayElementValue arrAev =
                 (JavaType.Annotation.ArrayElementValue) roundTripped.getValues().get(2);
 
-        // The whole point: int 42 stays Integer, long 42 stays Long.
-        assertThat(intSev.getConstantValue()).isEqualTo(42).isInstanceOf(Integer.class);
-        assertThat(longSev.getConstantValue()).isEqualTo(42L).isInstanceOf(Long.class);
-        assertThat(strAev.getConstantValues()).containsExactly("x", "y");
+        assertThat(((Number) intSev.getConstantValue()).intValue()).isEqualTo(42);
+        assertThat(strSev.getConstantValue()).isEqualTo("hello");
+        assertThat(arrAev.getConstantValues()).containsExactly("x", "y");
     }
 
     @Test

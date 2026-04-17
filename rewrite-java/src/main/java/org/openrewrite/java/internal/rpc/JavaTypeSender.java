@@ -37,11 +37,16 @@ public class JavaTypeSender extends JavaTypeVisitor<RpcSendQueue> {
                     q.getAndSend(v, e -> asRef(e.getElement()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
                     if (v instanceof JavaType.Annotation.SingleElementValue) {
                         JavaType.Annotation.SingleElementValue sev = (JavaType.Annotation.SingleElementValue) v;
-                        q.getAndSend(sev, e -> AnnotationConstantValueCodec.encode(e.getConstantValue()));
+                        // constantValue is sent as the raw JSON-native value: numeric/boolean/string types
+                        // can collapse on the wire (e.g. Long 42 → Integer 42, Character 'c' → String "c"),
+                        // which is acceptable since recipes rarely depend on the exact runtime subclass.
+                        q.getAndSend(sev, JavaType.Annotation.SingleElementValue::getConstantValue);
                         q.getAndSend(sev, e -> asRef(e.getReferenceValue()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
                     } else if (v instanceof JavaType.Annotation.ArrayElementValue) {
                         JavaType.Annotation.ArrayElementValue aev = (JavaType.Annotation.ArrayElementValue) v;
-                        q.getAndSendList(aev, e -> AnnotationConstantValueCodec.encodeList(e.getConstantValues()), s -> s, null);
+                        q.getAndSendList(aev,
+                                e -> e.getConstantValues() == null ? null : Arrays.asList(e.getConstantValues()),
+                                String::valueOf, null);
                         q.getAndSendListAsRef(aev, e -> e.getReferenceValues() == null ? null : Arrays.asList(e.getReferenceValues()),
                                 sig::signature, t -> visit(t, q));
                     }

@@ -17,6 +17,8 @@
 package rpc
 
 import (
+	"fmt"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -64,26 +66,17 @@ func (s *JavaTypeSender) visitAnnotationElementValue(v tree.JavaTypeAnnotationEl
 		func(t any) { s.Visit(GetValueNonNull(t).(tree.JavaType), q) })
 	switch ev := v.(type) {
 	case *tree.JavaTypeAnnotationArrayElementValue:
+		// Constant values are sent as raw JSON-native values; numeric subtype
+		// (int/long/float/double) and char/string distinctions are not preserved.
 		q.GetAndSendList(ev,
 			func(x any) []any {
-				encoded := EncodeAnnotationConstantList(x.(*tree.JavaTypeAnnotationArrayElementValue).ConstantValues)
-				if encoded == nil {
-					return nil
-				}
-				out := make([]any, len(encoded))
-				for i, s := range encoded {
-					out[i] = s
-				}
-				return out
+				return x.(*tree.JavaTypeAnnotationArrayElementValue).ConstantValues
 			},
 			func(x any) any {
 				if x == nil {
-					return ""
+					return "null"
 				}
-				if ptr, ok := x.(*string); ok && ptr != nil {
-					return *ptr
-				}
-				return ""
+				return fmt.Sprintf("%v", x)
 			},
 			nil)
 		q.GetAndSendListAsRef(ev,
@@ -95,7 +88,7 @@ func (s *JavaTypeSender) visitAnnotationElementValue(v tree.JavaTypeAnnotationEl
 	case *tree.JavaTypeAnnotationSingleElementValue:
 		q.GetAndSend(ev,
 			func(x any) any {
-				return EncodeAnnotationConstant(x.(*tree.JavaTypeAnnotationSingleElementValue).ConstantValue)
+				return x.(*tree.JavaTypeAnnotationSingleElementValue).ConstantValue
 			},
 			nil)
 		q.GetAndSend(ev,
