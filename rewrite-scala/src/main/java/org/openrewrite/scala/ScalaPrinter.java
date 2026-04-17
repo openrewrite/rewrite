@@ -1186,20 +1186,29 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
         // Check if this is infix notation (list map func instead of list.map(func))
         if (method.getMarkers().findFirst(org.openrewrite.scala.marker.InfixNotation.class).isPresent()) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
-            
-            // Print the select (e.g., "list")
-            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
-            
-            // Print the method name with its prefix space (e.g., " map")
-            visit(method.getName(), p);
-            
-            // Print the arguments without parentheses, just with their prefix space
-            if (method.getArguments() != null && !method.getArguments().isEmpty()) {
-                for (Expression arg : method.getArguments()) {
-                    visit(arg, p);
+
+            boolean rightAssoc = method.getMarkers().findFirst(org.openrewrite.scala.marker.RightAssociative.class).isPresent();
+
+            if (rightAssoc) {
+                // AST stores right-associative ops semantically (select = right, arg = left).
+                // Restore source order on output: <argument> <name> <select>.
+                if (method.getArguments() != null) {
+                    for (Expression arg : method.getArguments()) {
+                        visit(arg, p);
+                    }
+                }
+                visit(method.getName(), p);
+                visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+            } else {
+                visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
+                visit(method.getName(), p);
+                if (method.getArguments() != null) {
+                    for (Expression arg : method.getArguments()) {
+                        visit(arg, p);
+                    }
                 }
             }
-            
+
             afterSyntax(method, p);
             return method;
         }
