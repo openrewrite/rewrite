@@ -871,6 +871,10 @@ class PythonRpcSender:
             q.get_and_send_as_ref(java_type, lambda x: getattr(x, '_type', None), lambda t: self._visit_type(t, q))
             q.get_and_send_list_as_ref(java_type, lambda x: getattr(x, '_type_parameters', None) or [], self._type_signature, lambda t: self._visit_type(t, q))
 
+        elif isinstance(java_type, JT.Annotation):
+            # Annotation: type (FullyQualified) — values TODO on Java side
+            q.get_and_send_as_ref(java_type, lambda x: getattr(x, '_type', None), lambda t: self._visit_type(t, q))
+
         elif isinstance(java_type, JT.Class):
             # Class: flagsBitMap, kind, fullyQualifiedName, typeParameters, supertype,
             #        owningClass, annotations, interfaces, members, methods

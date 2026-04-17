@@ -238,6 +238,20 @@ class JavaType(ABC):
                 return t.fully_qualified_name
             return ''
 
+    class Annotation(FullyQualified):
+        _type: JavaType.FullyQualified
+
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return self._type
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
     @dataclass
     class GenericTypeVariable:
         _name: str = field(default="")
