@@ -733,6 +733,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             case JavaType.Annotation annotation:
                 annotation.AnnotationType = (JavaType.FullyQualified?)q.Receive(
                     (JavaType?)annotation.AnnotationType, t => VisitType(t, q)!);
+                annotation.Values = q.ReceiveList(annotation.Values,
+                    v => ReceiveAnnotationElementValue(v, q));
                 break;
 
             case JavaType.MultiCatch multiCatch:
@@ -820,6 +822,28 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         }
 
         return javaType;
+    }
+
+    private JavaType.Annotation.ElementValue ReceiveAnnotationElementValue(
+        JavaType.Annotation.ElementValue v, RpcReceiveQueue q)
+    {
+        var element = q.Receive(v.Element, t => VisitType(t, q)!);
+        switch (v)
+        {
+            case JavaType.Annotation.ArrayElementValue array:
+            {
+                var constantValues = q.ReceiveList(array.ConstantValues, x => x);
+                var refValues = q.ReceiveList(array.ReferenceValues, t => VisitType(t, q)!);
+                return new JavaType.Annotation.ArrayElementValue(element, constantValues, refValues);
+            }
+            default:
+            {
+                var single = v as JavaType.Annotation.SingleElementValue;
+                var constantValue = q.Receive(single?.ConstantValue);
+                var refValue = q.Receive(single?.ReferenceValue, t => VisitType(t, q)!);
+                return new JavaType.Annotation.SingleElementValue(element, constantValue, refValue);
+            }
+        }
     }
 
     // Utility methods
