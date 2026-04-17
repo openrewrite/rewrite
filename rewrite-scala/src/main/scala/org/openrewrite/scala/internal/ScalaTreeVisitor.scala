@@ -30,6 +30,7 @@ import org.openrewrite.scala.marker.LambdaParameter
 import org.openrewrite.scala.marker.IndentedBlock
 import org.openrewrite.scala.marker.OmitBraces
 import org.openrewrite.scala.marker.SObject
+import org.openrewrite.scala.marker.Semicolon
 import org.openrewrite.scala.marker.TypeProjection
 import org.openrewrite.scala.marker.ScalaForLoop
 import org.openrewrite.scala.marker.BlockArgument
@@ -3625,13 +3626,35 @@ class ScalaTreeVisitor(
           }
           
           var trailingSpace = Space.EMPTY
+          var rpMarkers = Markers.EMPTY
           val trailStart = Math.max(statEnd, cursor)
           if (trailStart < nextStart && nextStart <= source.length) {
-            trailingSpace = Space.format(source.substring(trailStart, nextStart))
-            cursor = nextStart
+            val between = source.substring(trailStart, nextStart)
+            // An explicit ';' separator appears before any newline and with only
+            // horizontal whitespace between it and the preceding statement.
+            val semiIdx = {
+              var idx = -1
+              var j = 0
+              while (idx < 0 && j < between.length) {
+                val c = between.charAt(j)
+                if (c == ';') idx = j
+                else if (c == '\n' || c == '\r') j = between.length
+                else if (c != ' ' && c != '\t') j = between.length
+                else j += 1
+              }
+              idx
+            }
+            if (semiIdx >= 0) {
+              trailingSpace = if (semiIdx > 0) Space.format(between.substring(0, semiIdx)) else Space.EMPTY
+              rpMarkers = Markers.EMPTY.add(new Semicolon(UUID.randomUUID()))
+              cursor = trailStart + semiIdx + 1
+            } else {
+              trailingSpace = Space.format(between)
+              cursor = nextStart
+            }
           }
-          
-          statements.add(JRightPadded.build(stmt).withAfter(trailingSpace))
+
+          statements.add(new JRightPadded[Statement](stmt, trailingSpace, rpMarkers))
         case _ => // Skip non-statement nodes
       }
     }

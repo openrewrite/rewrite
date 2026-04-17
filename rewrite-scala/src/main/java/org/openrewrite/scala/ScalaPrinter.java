@@ -30,9 +30,11 @@ import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.scala.marker.BlockArgument;
 import org.openrewrite.scala.marker.IndentedBlock;
 import org.openrewrite.scala.marker.SObject;
+import org.openrewrite.scala.marker.Semicolon;
 import org.openrewrite.scala.marker.TypeProjection;
 import org.openrewrite.scala.marker.ScalaForLoop;
 import org.openrewrite.scala.marker.TypeAscription;
@@ -436,11 +438,18 @@ public class ScalaPrinter<P> extends JavaPrinter<P> {
 
     @Override
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
-        // In Scala, semicolons are optional and generally not used
-        // Only print them if they were explicitly in the source
-        // For now, we'll skip semicolons entirely as proper semicolon preservation
-        // would require tracking whether they were present in the original source
+        // In Scala, semicolons are optional. An explicit ';' found in the source
+        // is preserved via a Semicolon marker on the JRightPadded and emitted by
+        // visitMarker below. No default terminator is printed here.
         return;
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if (marker instanceof Semicolon) {
+            p.append(';');
+        }
+        return super.visitMarker(marker, p);
     }
     
     /**
