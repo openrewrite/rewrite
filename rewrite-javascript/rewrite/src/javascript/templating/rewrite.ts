@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, ExecutionContext, Recipe} from '../..';
-import {J} from '../../java';
-import {RewriteRule, RewriteConfig, PreMatchContext, PostMatchContext} from './types';
-import {Pattern, MatchResult} from './pattern';
+import {Cursor, ExecutionContext, Recipe, TreeVisitor} from '../..';
+import {J, Statement} from '../../java';
+import {PostMatchContext, PreMatchContext, RewriteConfig, RewriteRule} from './types';
+import {MatchResult, Pattern} from './pattern';
 import {Template} from './template';
+import {JavaScriptVisitor} from '../visitor';
 
 /**
  * Implementation of a replacement rule.
@@ -227,4 +228,88 @@ export const fromRecipe = (recipe: Recipe, ctx: ExecutionContext): RewriteRule =
             return result !== tree ? result : undefined;
         }
     })();
+}
+
+/**
+ * Registers an after-visitor that will flatten a block's statements into its parent block.
+ *
+ * When a rewrite template produces a J.Block containing multiple statements, but you want
+ * those statements to be inserted directly into the parent block (not nested), use this
+ * function to register a follow-up visitor that performs the flattening.
+ *
+ * @param visitor The current visitor instance (to register the after-visitor)
+ * @param block The block whose statements should be flattened into its parent
+ * @returns The block (for chaining in return statements)
+ *
+ * @example
+ * ```typescript
+ * override async visitReturn(ret: J.Return, ctx: ExecutionContext): Promise<J | undefined> {
+ *     const result = await rewrite(() => ({
+ *         before: pattern`return #{cond} || #{arr}.some(#{cb})`,
+ *         after: template`{
+ *             if (#{cond}) return true;
+ *             for (const item of #{arr}) {
+ *                 if (await #{cb}(item)) return true;
+ *             }
+ *             return false;
+ *         }`
+ *     })).tryOn(this.cursor, ret);
+ *
+ *     if (result && result.kind === J.Kind.Block) {
+ *         return flattenBlock(this, result as J.Block);
+ *     }
+ *     return result ?? ret;
+ * }
+ * ```
+ */
+export function flattenBlock<P>(
+    visitor: TreeVisitor<any, P>,
+    block: J.Block
+): J.Block {
+    // Create a visitor that will flatten this specific block when found in a parent block
+    const flattenVisitor = new class extends JavaScriptVisitor<P> {
+        protected override async visitBlock(parentBlock: J.Block, p: P): Promise<J | undefined> {
+            let modified = false;
+            const newStatements: typeof parentBlock.statements = [];
+
+            for (const stmt of parentBlock.statements) {
+                // Check if this statement is the block we want to flatten
+                if (stmt.element === block || stmt.element.id === block.id) {
+                    // Splice in the inner block's statements
+                    for (let i = 0; i < block.statements.length; i++) {
+                        const innerStmt = block.statements[i];
+                        if (i === 0) {
+                            // First statement inherits the outer statement's padding
+                            newStatements.push({
+                                ...innerStmt,
+                                element: {
+                                    ...innerStmt.element,
+                                    prefix: stmt.element.prefix  // Use the original statement's prefix
+                                } as Statement
+                            });
+                        } else {
+                            newStatements.push(innerStmt);
+                        }
+                    }
+                    modified = true;
+                } else {
+                    newStatements.push(stmt);
+                }
+            }
+
+            if (modified) {
+                return {
+                    ...parentBlock,
+                    statements: newStatements
+                } as J.Block;
+            }
+
+            return super.visitBlock(parentBlock, p);
+        }
+    }();
+
+    // Register the flatten visitor to run after the main visitor completes
+    visitor.afterVisit.push(flattenVisitor);
+
+    return block;
 }

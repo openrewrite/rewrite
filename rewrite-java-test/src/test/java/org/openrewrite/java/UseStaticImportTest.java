@@ -459,4 +459,45 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/798")
+    @Test
+    void shouldAddStaticImportForSamePackageMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("de..* *(..)")),
+          java(
+            """
+              package de;
+
+              public class ClassB {
+                  public static String getSomething() {
+                      return "something";
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package de;
+
+              public class ClassA {
+                  static void methodA() {
+                      System.out.println(ClassB.getSomething());
+                  }
+              }
+              """,
+            """
+              package de;
+
+              import static de.ClassB.getSomething;
+
+              public class ClassA {
+                  static void methodA() {
+                      System.out.println(getSomething());
+                  }
+              }
+              """
+          )
+        );
+    }
 }

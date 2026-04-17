@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -24,19 +25,15 @@ import java.util.Optional;
 
 public class UseParentInference extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Use Maven 4 parent inference";
-    }
+    @Getter
+    final String displayName = "Use Maven 4 parent inference";
 
-    @Override
-    public String getDescription() {
-        return "Maven 4.1.0 supports automatic parent version inference when using a relative path. " +
-                "This recipe simplifies parent declarations by using the shorthand `<parent/>` form " +
-                "when the parent is in the default location (`..`), removing the explicit `<relativePath>`, " +
-                "`<groupId>`, `<artifactId>`, and `<version>` elements. Maven automatically infers these " +
-                "values from the parent POM.";
-    }
+    @Getter
+    final String description = "Maven 4.1.0 supports automatic parent version inference when using a relative path. " +
+        "This recipe simplifies parent declarations by using the shorthand `<parent/>` form " +
+        "when the parent is in the default location (`..`), removing the explicit `<relativePath>`, " +
+        "`<groupId>`, `<artifactId>`, and `<version>` elements. Maven automatically infers these " +
+        "values from the parent POM.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

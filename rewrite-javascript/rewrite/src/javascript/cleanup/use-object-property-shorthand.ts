@@ -20,7 +20,8 @@ import {ExecutionContext} from "../../execution";
 import {JavaScriptVisitor} from "../visitor";
 import {J} from "../../java";
 import {JS} from "../tree";
-import {produce} from "immer";
+import {create as produce} from "mutative";
+import {findMarker} from "../../markers";
 
 /**
  * Simplifies object properties where the key and value have the same name,
@@ -121,7 +122,13 @@ export class UseObjectPropertyShorthand extends Recipe {
 
                             // Check if the initializer is also an identifier with the same name
                             if (prop.initializer?.kind === J.Kind.Identifier) {
-                                const initName = (prop.initializer as J.Identifier).simpleName;
+                                const init = prop.initializer as J.Identifier;
+                                const initName = init.simpleName;
+
+                                // Skip if initializer has non-null assertion marker
+                                if (findMarker(init, JS.Markers.NonNullAssertion)) {
+                                    return stmt;
+                                }
 
                                 if (propName === initName) {
                                     hasChanges = true;

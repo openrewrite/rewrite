@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,7 +25,7 @@ import {
     typescript
 } from "../../../src/javascript";
 import { Expression, J } from "../../../src/java";
-import { createDraft, produce } from "immer";
+import { castDraft, create as produce } from "mutative";
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
@@ -41,9 +41,9 @@ describe('match extraction', () => {
                         // Extract the captured parts
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = createDraft((m.get("right"))!);
+                            draft.left = castDraft((m.get("right"))!);
                             draft.prefix = binary.left.prefix;
-                            draft.right = createDraft((m.get("left"))!);
+                            draft.right = castDraft((m.get("left"))!);
                             draft.right.prefix = binary.right.prefix;
                         });
                     }
@@ -115,9 +115,9 @@ describe('match extraction', () => {
 
                         // Create a new binary expression with the swapped operands
                         return produce(binary, draft => {
-                            draft.left = createDraft(rightValue!);
+                            draft.left = castDraft(rightValue!);
                             draft.prefix = binary.left.prefix;
-                            draft.right = createDraft(leftValue!);
+                            draft.right = castDraft(leftValue!);
                             draft.right.prefix = binary.right.prefix;
                         });
                     }

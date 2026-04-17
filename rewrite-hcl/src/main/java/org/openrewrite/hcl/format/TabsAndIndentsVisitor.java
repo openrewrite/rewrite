@@ -81,7 +81,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
 
     @Override
     public @Nullable Hcl preVisit(Hcl tree, P p) {
-        if (tree instanceof Hcl.Block || tree instanceof Hcl.ObjectValue) {
+        if (tree instanceof Hcl.Block || tree instanceof Hcl.ObjectValue || tree instanceof Hcl.Tuple) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else {
             getCursor().putMessage("indentType", IndentType.ALIGN);
@@ -143,7 +143,8 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                  elem.getPrefix().getLastWhitespace().contains("\n"))) {
                 switch (loc) {
                     case FUNCTION_CALL_ARGUMENT:
-                    case PARENTHESES: {
+                    case PARENTHESES:
+                    case TUPLE_VALUE: {
                         elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
                         break;
@@ -155,6 +156,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
             } else {
                 switch (loc) {
                     case FUNCTION_CALL_ARGUMENT:
+                    case TUPLE_VALUE:
                         if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
                             HclContainer<Expression> args = getCursor().getParentOrThrow().getValue();
                             boolean seenArg = false;
@@ -205,7 +207,8 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
 
         int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (container.getBefore().getLastWhitespace().contains("\n")) {
-            if (loc == HclContainer.Location.FUNCTION_CALL_ARGUMENTS) {
+            if (loc == HclContainer.Location.FUNCTION_CALL_ARGUMENTS ||
+                loc == HclContainer.Location.TUPLE_VALUES) {
                 before = indentTo(container.getBefore(), indent + style.getIndentSize(), loc.getBeforeLocation());
                 getCursor().putMessage("indentType", IndentType.ALIGN);
                 getCursor().putMessage("lastIndent", indent + style.getIndentSize());
@@ -215,7 +218,8 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                 js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
             }
         } else {
-            if (loc == HclContainer.Location.FUNCTION_CALL_ARGUMENTS) {
+            if (loc == HclContainer.Location.FUNCTION_CALL_ARGUMENTS ||
+                loc == HclContainer.Location.TUPLE_VALUES) {
                 getCursor().putMessage("indentType", IndentType.INDENT);
             }
             before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);

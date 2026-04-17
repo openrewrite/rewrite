@@ -34,16 +34,10 @@ public class RemoveImplements extends Recipe {
 
     private static final AnnotationMatcher OVERRIDE_MATCHER = new AnnotationMatcher("java.lang.Override");
 
-    @Override
-    public String getDisplayName() {
-        return "Remove interface implementations";
-    }
+    String displayName = "Remove interface implementations";
 
-    @Override
-    public String getDescription() {
-        return "Removes `implements` clauses from classes implementing the specified interface. " +
+    String description = "Removes `implements` clauses from classes implementing the specified interface. " +
                "Removes `@Overrides` annotations from methods which no longer override anything.";
-    }
 
     @Option(displayName = "Interface type",
             description = "The fully qualified name of the interface to remove.",

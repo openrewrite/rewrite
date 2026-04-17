@@ -579,9 +579,9 @@ class ClassDeclarationTest implements RewriteTest {
               """,
               spec -> spec.afterRecipe(cu -> {
                   assertThat(cu.getStatements()).satisfiesExactly(stmt -> {
-                      J.ClassDeclaration clazz = (J.ClassDeclaration) stmt;
+                      var clazz = (J.ClassDeclaration) stmt;
                       assertThat(clazz.getBody().getStatements()).satisfiesExactly(decl -> {
-                          K.Constructor constructor = (K.Constructor) decl;
+                          var constructor = (K.Constructor) decl;
                           assertThat(constructor.getMethodDeclaration().getParameters()).satisfiesExactly(
                               message -> assertThat(message).isInstanceOf(J.VariableDeclarations.class),
                               cause -> assertThat(cause).isInstanceOf(J.VariableDeclarations.class)

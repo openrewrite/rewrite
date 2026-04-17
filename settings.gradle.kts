@@ -10,13 +10,15 @@ rootProject.name = "rewrite"
 // ------ Included Projects --------------------------------------
 // ---------------------------------------------------------------
 
+// Projects that can be selectively included/excluded via IDE.properties
 val allProjects = listOf(
     "rewrite-benchmarks",
     "rewrite-bom",
     "rewrite-core",
+    "rewrite-csharp",
+    "rewrite-docker",
     "rewrite-gradle",
-    "rewrite-gradle-tooling-model:model",
-    "rewrite-gradle-tooling-model:plugin",
+    "rewrite-go",
     "rewrite-groovy",
     "rewrite-hcl",
     "rewrite-java",
@@ -31,10 +33,18 @@ val allProjects = listOf(
     "rewrite-maven",
     "rewrite-properties",
     "rewrite-protobuf",
+    "rewrite-python",
+    "rewrite-scala",
     "rewrite-test",
     "rewrite-toml",
     "rewrite-xml",
     "rewrite-yaml",
+)
+
+// Always included because their paths contain colons which can't be represented in IDE.properties
+val alwaysIncluded = listOf(
+    "rewrite-gradle-tooling-model:model",
+    "rewrite-gradle-tooling-model:plugin",
 )
 
 val includedProjects = file("IDE.properties").let {
@@ -43,33 +53,13 @@ val includedProjects = file("IDE.properties").let {
         it.reader().use { reader ->
             props.load(reader)
         }
-        allProjects.intersect(props.keys)
+        allProjects.filter { it in props.keys }
     } else {
         allProjects
     }
 }.toSet()
 
-include(*allProjects.toTypedArray())
-
-gradle.allprojects {
-    configurations.all {
-        resolutionStrategy.dependencySubstitution {
-            allProjects
-                .minus(includedProjects)
-                .minus(
-                    arrayOf(
-                        "rewrite-bom",
-                        "rewrite-gradle-tooling-model:model",
-                        "rewrite-gradle-tooling-model:plugin"
-                    )
-                )
-                .forEach {
-                    substitute(project(":$it"))
-                        .using(module("org.openrewrite:$it:latest.integration"))
-                }
-        }
-    }
-}
+include(*(includedProjects + alwaysIncluded).toTypedArray())
 
 if (System.getProperty("idea.active") == null &&
     System.getProperty("idea.sync.active") == null

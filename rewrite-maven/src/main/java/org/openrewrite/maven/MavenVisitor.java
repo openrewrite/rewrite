@@ -43,6 +43,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
+    static final XPathMatcher PROFILE_PROPERTY_MATCHER = new XPathMatcher("/project/profiles/profile/properties/*");
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher ANNOTATION_PROCESSORS_PATH_MATCHER = new XPathMatcher("//annotationProcessorPaths/path");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
@@ -101,6 +102,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return PROPERTY_MATCHER.matches(getCursor());
     }
 
+    public boolean isProfilePropertyTag() {
+        return PROFILE_PROPERTY_MATCHER.matches(getCursor());
+    }
+
     public boolean isDependencyTag() {
         return isTag("dependency") && DEPENDENCY_MATCHER.matches(getCursor());
     }
@@ -141,9 +146,13 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                             }
                         }
                         Dependency req = resolvedDependency.getRequested();
-                        String reqGroup = req.getGroupId();
-                        if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                                req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        ResolvedPom pom = getResolutionResult().getPom();
+                        String reqGroup = pom.getValue(req.getGroupId());
+                        String reqArtifact = pom.getValue(req.getArtifactId());
+                        String tagGroupId = pom.getValue(tag.getChildValue("groupId").orElse(null));
+                        String tagArtifactId = pom.getValue(tag.getChildValue("artifactId").orElse(null));
+                        if ((reqGroup == null || reqGroup.equals(tagGroupId)) &&
+                                reqArtifact.equals(tagArtifactId) &&
                                 scope == tagScope) {
                             return true;
                         }
@@ -219,6 +228,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
     }
 
+    public boolean isAnnotationProcessorPathTag(String groupId, String artifactId) {
+        if (!isTag("path") || !ANNOTATION_PROCESSORS_PATH_MATCHER.matches(getCursor())) {
+            return false;
+        }
+        Xml.Tag tag = getCursor().getValue();
+        return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
+                matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+    }
+
     public void maybeUpdateModel() {
         for (TreeVisitor<?, P> afterVisit : getAfterVisit()) {
             if (afterVisit instanceof UpdateMavenModel) {
@@ -291,6 +309,11 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         if (childTag.isPresent()) {
             String oldValue = childTag.get().getValue().orElse(null);
             if (newValue != null && !newValue.equals(oldValue)) {
+                if (isImplicitlyDefinedVersionProperty(oldValue)) {
+                    // Implicitly defined version properties like ${project.parent.version} should never be changed
+                    // as they represent intentional links to parent/project versions
+                    return tag;
+                }
                 if (isProperty(oldValue)) {
                     MavenResolutionResult resolutionResult = getResolutionResult();
                     String propertyName = oldValue.substring(2, oldValue.length() - 1);
@@ -325,8 +348,13 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     }
 
     @Contract("null -> false")
+    protected boolean isImplicitlyDefinedVersionProperty(@Nullable String value) {
+        return IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
+    }
+
+    @Contract("null -> false")
     protected boolean isProperty(@Nullable String value) {
-        return value != null && value.startsWith("${") && !IMPLICITLY_DEFINED_VERSION_PROPERTIES.contains(value);
+        return !isImplicitlyDefinedVersionProperty(value) && ResolvedPom.placeholderHelper.hasPlaceholders(value);
     }
 
     public @Nullable ResolvedDependency findDependency(Xml.Tag tag) {
@@ -389,11 +417,14 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
         }
+        ResolvedPom resolvedPom = getResolutionResult().getPom();
         for (Map.Entry<Scope, List<ResolvedDependency>> scope : getResolutionResult().getDependencies().entrySet()) {
             if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (ResolvedDependency d : scope.getValue()) {
-                    if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
-                            tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
+                    String tagGroupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(null));
+                    String tagArtifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null));
+                    if ((tagGroupId != null ? tagGroupId : resolvedPom.getGroupId()).equals(d.getGroupId()) &&
+                            (tagArtifactId != null ? tagArtifactId : resolvedPom.getArtifactId()).equals(d.getArtifactId())) {
                         return d;
                     }
                 }

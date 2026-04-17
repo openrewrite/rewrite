@@ -31,4 +31,22 @@ describe('shebang', () => {
             expect(firstStatement.kind).toBe(JS.Kind.Shebang);
         }
     }));
+
+    test('shebang with blank line after', () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `#!/usr/bin/env node
+
+const fs = require('fs');
+`)));
+
+    test('shebang followed by comment', () => spec.rewriteRun(
+        //language=javascript
+        javascript(
+            `#!/usr/bin/env node
+
+/* eslint-disable no-console */
+
+const FD = { STDIN: 0, STDOUT: 1 };
+`)));
 });

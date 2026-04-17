@@ -36,8 +36,8 @@ class AnnotationMatcherTest implements RewriteTest {
               class A
               """,
                 spec -> spec.afterRecipe(cu -> {
-                    AtomicBoolean found = new AtomicBoolean(false);
-                    AnnotationMatcher matcher = new AnnotationMatcher("@kotlin.Deprecated");
+                    var found = new AtomicBoolean(false);
+                    var matcher = new AnnotationMatcher("@kotlin.Deprecated");
                     new KotlinIsoVisitor<AtomicBoolean>() {
                         @Override
                         public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean atomicBoolean) {
@@ -51,5 +51,76 @@ class AnnotationMatcherTest implements RewriteTest {
                 })
           )
         );
+    }
+
+    @Test
+    void matchClassArgumentWithKotlinSyntax() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath("junit-jupiter-api")),
+          kotlin(
+            """
+              import org.junit.jupiter.api.extension.ExtendWith
+
+              class MyExtension : org.junit.jupiter.api.extension.Extension
+
+              @ExtendWith(MyExtension::class)
+              class A
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension.class)");
+                var foundJavaStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                assertThat(foundJavaStyle.get()).isTrue();
+
+                var kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(MyExtension::class)");
+                var foundKotlinStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                assertThat(foundKotlinStyle.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void matchJavaClassArgumentWithKotlinSyntax() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath("junit-jupiter-api")),
+          kotlin(
+            """
+              import org.junit.jupiter.api.extension.ExtendWith
+              import org.junit.jupiter.api.extension.Extension
+
+              @ExtendWith(Extension::class.java)
+              class A
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                var javaStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension.class)");
+                var foundJavaStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(javaStyleMatcher).visit(cu, foundJavaStyle);
+                assertThat(foundJavaStyle.get()).isTrue();
+
+                var kotlinStyleMatcher = new AnnotationMatcher("@org.junit.jupiter.api.extension.ExtendWith(org.junit.jupiter.api.extension.Extension::class.java)");
+                var foundKotlinStyle = new AtomicBoolean(false);
+
+                getMatcherVisitor(kotlinStyleMatcher).visit(cu, foundKotlinStyle);
+                assertThat(foundKotlinStyle.get()).isTrue();
+            })
+          )
+        );
+    }
+
+    private KotlinVisitor<AtomicBoolean> getMatcherVisitor(AnnotationMatcher matcher) {
+        return new KotlinIsoVisitor<>() {
+            @Override
+            public J.Annotation visitAnnotation(J.Annotation annotation, AtomicBoolean found) {
+                if (matcher.matches(annotation)) {
+                    found.set(true);
+                }
+                return super.visitAnnotation(annotation, found);
+            }
+        };
     }
 }

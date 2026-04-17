@@ -36,15 +36,9 @@ public class ReplaceMethodInvocationWithConstant extends Recipe {
             example = "null")
     String replacement;
 
-    @Override
-    public String getDisplayName() {
-        return "Replace method invocation with constant";
-    }
+    String displayName = "Replace method invocation with constant";
 
-    @Override
-    public String getDescription() {
-        return "Replace all method invocations matching the method pattern with the specified constant.";
-    }
+    String description = "Replace all method invocations matching the method pattern with the specified constant.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

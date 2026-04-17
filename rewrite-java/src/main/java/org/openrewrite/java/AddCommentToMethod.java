@@ -42,15 +42,9 @@ import java.util.regex.Pattern;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddCommentToMethod extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "Add comment to method declarations";
-    }
+    String displayName = "Add comment to method declarations";
 
-    @Override
-    public String getDescription() {
-        return "Add a comment to method declarations in a Java source file.";
-    }
+    String description = "Add a comment to method declarations in a Java source file.";
 
     @Option(displayName = "Comment",
             description = "The comment to add.",

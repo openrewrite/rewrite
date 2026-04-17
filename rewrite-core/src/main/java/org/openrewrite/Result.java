@@ -23,6 +23,8 @@ import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.binary.Binary;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
@@ -55,6 +57,12 @@ public class Result {
     @Getter
     private final Collection<List<Recipe>> recipes;
 
+    /**
+     * Sum of estimated time savings of all recipes that made changes to this source file.
+     * This is the potential time savings because if the before and after are identical, then no time is actually saved.
+     * This does not take multiple occurrences of the same change into account and just sums the estimated time savings
+     * of a single occurrence for each recipe that made a change.
+     */
     private final Duration potentialTimeSavings;
     private @Nullable Duration timeSavings;
 
@@ -64,12 +72,12 @@ public class Result {
         this.recipes = recipes;
 
         Duration timeSavings = Duration.ZERO;
+        // for each stack of recipes, take the last recipe in the stack (the leaf) and sum its estimated time savings
         for (List<Recipe> recipesStack : recipes) {
             if (recipesStack != null && !recipesStack.isEmpty()) {
                 Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
                 if (perOccurrence != null) {
-                    timeSavings = perOccurrence;
-                    break;
+                    timeSavings = timeSavings.plus(perOccurrence);
                 }
             }
         }
@@ -138,6 +146,11 @@ public class Result {
         }.reduce(root, new AtomicBoolean(false)).get();
     }
 
+    /**
+     * Sum of estimated time savings of all recipes that made changes to this source file.
+     * This does not take multiple occurrences of the same change into account and just sums the estimated time savings
+     * of a single occurrence for each recipe that made a change.
+     */
     public Duration getTimeSavings() {
         if (timeSavings == null) {
             if (potentialTimeSavings.isZero() || isLocalAndHasNoChanges(before, after)) {
@@ -208,21 +221,11 @@ public class Result {
 
     @Incubating(since = "7.34.0")
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
-        Path beforePath = before == null ? null : before.getSourcePath();
-        Path afterPath = null;
-        if (before == null && after == null) {
-            afterPath = (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
-        } else if (after != null) {
-            afterPath = after.getSourcePath();
-        }
+        return diff(relativeTo, markerPrinter, ignoreAllWhitespace, false);
+    }
 
-        PrintOutputCapture<Integer> out = markerPrinter == null ?
-                new PrintOutputCapture<>(0) :
-                new PrintOutputCapture<>(0, markerPrinter);
-
-        FileMode beforeMode = before != null && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-        FileMode afterMode = after != null && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-
+    @Incubating(since = "8.69.0")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace, boolean binaryPatch) {
         Set<Recipe> recipeSet = new HashSet<>(recipes.size());
         for (List<Recipe> rs : recipes) {
             if (!rs.isEmpty()) {
@@ -231,14 +234,12 @@ public class Result {
         }
 
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
-                beforePath,
-                afterPath,
+                before,
+                after,
                 relativeTo,
-                before == null ? "" : before.printAll(out),
-                after == null ? "" : after.printAll(out.clone()),
+                markerPrinter,
                 recipeSet,
-                beforeMode,
-                afterMode
+                binaryPatch
         )) {
             return diffEntry.getDiff(ignoreAllWhitespace);
         }
@@ -269,11 +270,21 @@ public class Result {
 
     public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
         try {
-            return (before == after) ||
-                   (before != null && after != null &&
-                    // Remote source files are fetched on `printAll`, let's avoid that cost.
-                    !(before instanceof Remote) && !(after instanceof Remote) &&
-                    before.printAll().equals(after.printAll()));
+            if (before == after) {
+                return true;
+            }
+            if (before == null || after == null) {
+                return false;
+            }
+            // Remote source files are fetched on `printAll`, let's avoid that cost.
+            if (before instanceof Remote || after instanceof Remote) {
+                return false;
+            }
+            // Quarks don't support printAll(); compare by source path instead
+            if (before instanceof Quark && after instanceof Quark) {
+                return before.getSourcePath().equals(after.getSourcePath());
+            }
+            return before.printAll().equals(after.printAll());
         } catch (Exception e) {
             return false;
         }

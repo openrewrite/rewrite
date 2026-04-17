@@ -103,7 +103,7 @@ class DependencyWorkspace {
                 );
 
                 // Run npm install
-                ProcessBuilder pb = new ProcessBuilder("npm", "install", "--silent");
+                ProcessBuilder pb = new ProcessBuilder(System.getProperty("os.name").toLowerCase().contains("windows") ? "npm.cmd" : "npm", "install", "--silent");
                 pb.directory(tempDir.toFile());
                 pb.inheritIO();
                 Process process = pb.start();

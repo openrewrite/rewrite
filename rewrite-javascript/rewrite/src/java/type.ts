@@ -232,6 +232,18 @@ export namespace Type {
         kind: Type.Kind.Unknown
     });
 
+    /**
+     * Type guard that checks if an unknown value is a JavaType.
+     * All JavaType kinds start with 'org.openrewrite.java.tree.JavaType$'.
+     */
+    export function isType(value: unknown): value is Type {
+        return value !== null &&
+            typeof value === 'object' &&
+            'kind' in value &&
+            typeof (value as { kind: unknown }).kind === 'string' &&
+            (value as { kind: string }).kind.startsWith('org.openrewrite.java.tree.JavaType$');
+    }
+
     export function isPrimitive(type?: Type): type is Type.Primitive {
         return type?.kind === Type.Kind.Primitive;
     }
@@ -396,6 +408,11 @@ export namespace Type {
                 // Initialize stack if needed
                 if (parameterizedStack === null) {
                     parameterizedStack = new Set<Type>();
+                }
+
+                // Check for recursion
+                if (parameterizedStack.has(parameterized)) {
+                    return FullyQualified.getFullyQualifiedName(parameterized);
                 }
 
                 // Add to stack to track cycles

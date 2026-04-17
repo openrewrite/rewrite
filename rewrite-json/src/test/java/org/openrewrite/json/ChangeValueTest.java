@@ -17,6 +17,8 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -335,6 +337,41 @@ class ChangeValueTest implements RewriteTest {
             """,
             """
             { "apiVersion": "'true'" }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6418")
+    @Test
+    void chainedChangeValueRecipes() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeValue("$.node", "18"),
+            new ChangeValue("$.node", "20")
+          ).expectedCyclesThatMakeChanges(2),
+          json(
+            """
+            { "node": 14 }
+            """,
+            """
+            { "node": 20 }
+            """
+          )
+        );
+    }
+
+    @Test
+    void sameRecipeDoesNotChangeValueTwice() {
+        Recipe recipe = new ChangeValue("$.node", "18");
+        rewriteRun(
+          spec -> spec.recipes(recipe, recipe),
+          json(
+            """
+            { "node": 14 }
+            """,
+            """
+            { "node": 18 }
             """
           )
         );

@@ -15,7 +15,10 @@
  */
 package org.openrewrite.gradle;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -79,10 +82,10 @@ class GradleParserTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
                 assertThat(cu.getStatements().getFirst()).isInstanceOf(J.Import.class);
-                J.Import i = (J.Import) cu.getStatements().getFirst();
+                var i = (J.Import) cu.getStatements().getFirst();
                 assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);
+                var m = (J.MethodInvocation) cu.getStatements().get(3);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
             })
@@ -114,11 +117,11 @@ class GradleParserTest implements RewriteTest {
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getStatements()).hasSize(4);
                 assertThat(cu.getStatements().get(2)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(2);
+                var m = (J.MethodInvocation) cu.getStatements().get(2);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
                 assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
-                J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(3);
+                var d = (J.MethodDeclaration) cu.getStatements().get(3);
                 assertThat(d.getSimpleName()).isEqualTo("greet");
             })
           )
@@ -274,7 +277,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInSingleDoubleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -296,7 +299,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInSingleSingleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -318,7 +321,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInTripleDoubleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -343,7 +346,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void escapedAndNonEscapedDollarSignsInTripleSingleQuotes() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString("""
           plugins {
             id 'java-library'
@@ -386,7 +389,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -403,7 +406,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -420,7 +423,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParameters() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
           // lang=groovy
           """
@@ -440,7 +443,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParameters() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
           // lang=groovy
           """
@@ -458,7 +461,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParametersAndClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -482,7 +485,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParametersAndClosures() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -509,7 +512,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void trailingCommaWithNamedParametersComplicated() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -533,7 +536,7 @@ class GradleParserTest implements RewriteTest {
 
     @Test
     void noTrailingCommaWithNamedParametersComplicated() {
-        GradleParser gradleParser = new GradleParser(new GradleParser.Builder());
+        var gradleParser = new GradleParser(new GradleParser.Builder());
         Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(Parser.Input.fromString(
             // lang=groovy
             """
@@ -553,5 +556,40 @@ class GradleParserTest implements RewriteTest {
         assertThat(optionalSourceFile).isPresent();
         SourceFile sourceFile = optionalSourceFile.get();
         assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    @MethodSource("escapedBackslashesAndInterpolationInGStringParams")
+    @ParameterizedTest
+    void escapedBackslashesAndInterpolationInGString(@Language("groovy") String groovy) {
+        var gradleParser = new GradleParser(new GradleParser.Builder());
+        Stream<SourceFile> sourceFileStream = gradleParser.parseInputs(List.of(
+          Parser.Input.fromString(groovy)
+        ), null, new InMemoryExecutionContext());
+        Optional<SourceFile> optionalSourceFile = sourceFileStream.findFirst();
+        assertThat(optionalSourceFile).isPresent();
+        SourceFile sourceFile = optionalSourceFile.get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+    }
+
+    /**
+     * Produces a stream of test expressions like `def a = "\\${System.getProperty('user.name')}"`
+     */
+    static Stream<String> escapedBackslashesAndInterpolationInGStringParams() {
+        return Stream.of(
+            "1 + 1",
+            "System.getProperty('user.name')"
+        ).flatMap(exp ->
+            """
+            %s
+            "%s"
+            "${%s}"
+            "\\${%s}"
+            "\\\\${%s}"
+            "\\\\\\${%s}"
+            "${%s}\\\\"
+            "\\t${%s}"
+            "${%s}\\t"
+            """.lines().map(s -> ("def a = " + s).formatted(exp))
+        );
     }
 }

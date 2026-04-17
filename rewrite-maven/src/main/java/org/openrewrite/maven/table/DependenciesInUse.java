@@ -16,6 +16,7 @@
 package org.openrewrite.maven.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
+import lombok.NonNull;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
@@ -23,7 +24,7 @@ import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
 @JsonIgnoreType
-public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
+public class DependenciesInUse extends DataTable<DependenciesInUse.@NonNull Row> {
 
     public DependenciesInUse(Recipe recipe) {
         super(recipe, "Dependencies in use", "Direct and transitive dependencies in use.");
@@ -61,12 +62,8 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
                               "specified in the POM.")
         String scope;
 
-        @Column(displayName = "Depth",
-                description = "How many levels removed from a direct dependency. This will be 0 for direct dependencies.")
-        Integer depth;
-
-        @Column(displayName = "Dependency graph",
-                description = "The dependency path that requested the dependency.")
-        String dependencyGraph;
+        @Column(displayName = "Count",
+                description = "How many times does this dependency appear.")
+        Integer count;
     }
 }

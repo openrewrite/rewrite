@@ -36,15 +36,9 @@ public class DoesNotUseType extends Recipe {
     @Nullable
     Boolean includeImplicit;
 
-    @Override
-    public String getDisplayName() {
-        return "Check whether a type is **not** in use";
-    }
+    String displayName = "Check whether a type is **not** in use";
 
-    @Override
-    public String getDescription() {
-        return "Useful as a precondition to skip over compilation units using the argument type.";
-    }
+    String description = "Useful as a precondition to skip over compilation units using the argument type.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

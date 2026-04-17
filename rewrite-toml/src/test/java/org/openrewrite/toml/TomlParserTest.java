@@ -452,4 +452,41 @@ class TomlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multilineEmptySequence() {
+        rewriteRun(
+          toml(
+            """
+            dependencies = [
+            ]
+            """
+          )
+        );
+    }
+
+    @Test
+    void multilineEmptySequenceMultipleEmptyLines() {
+        rewriteRun(
+          toml(
+            """
+            dependencies = [
+            
+            
+            ]
+            """
+          )
+        );
+    }
+
+    @Test
+    void singleLineEmptySequenceWithSpaces() {
+        rewriteRun(
+          toml(
+            """
+            dependencies = [    ]
+            """
+          )
+        );
+    }
 }

@@ -19,8 +19,10 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,7 +31,9 @@ import org.openrewrite.test.SourceSpec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -43,11 +47,11 @@ class ChangeTypeTest implements RewriteTest {
 
     @Language("java")
     String a1 = """
-          package a;
-          public class A1 extends Exception {
-              public static void stat() {}
-              public void foo() {}
-          }
+      package a;
+      public class A1 extends Exception {
+          public static void stat() {}
+          public void foo() {}
+      }
       """;
 
     @Language("java")
@@ -142,11 +146,41 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import java.lang.management.PlatformLoggingMXBean;
-              import java.util.logging.*;
 
               class Test {
                   static void method() {
                       PlatformLoggingMXBean loggingBean = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"deprecation", "KotlinRedundantDiagnosticSuppress"})
+    @Test
+    void starImportUnfoldedWhenOtherTypesUsed() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+          java(
+            """
+              import java.util.logging.*;
+
+              class Test {
+                  static void method() {
+                      LoggingMXBean loggingBean = null;
+                      Logger logger = null;
+                  }
+              }
+              """,
+            """
+              import java.lang.management.PlatformLoggingMXBean;
+              import java.util.logging.Logger;
+
+              class Test {
+                  static void method() {
+                      PlatformLoggingMXBean loggingBean = null;
+                      Logger logger = null;
                   }
               }
               """
@@ -406,6 +440,26 @@ class ChangeTypeTest implements RewriteTest {
 
               @A2 public class B {}
               """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedAnnotationOnPackageDeclaration() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+          java("package a.b.c;\npublic @interface A1 {}"),
+          java("package a.b.d;\npublic @interface A2 {}"),
+          java(
+            """
+              @a.b.c.A1 package foo;
+              """,
+            """
+              @A2 package foo;
+
+              import a.b.d.A2;
+              """,
+            spec -> spec.path("foo/package-info.java")
           )
         );
     }
@@ -2254,10 +2308,10 @@ class ChangeTypeTest implements RewriteTest {
             spec -> spec.beforeRecipe((source) -> {
                 TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
-                J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
+                var cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cu.getClasses().getFirst().getSimpleName());
 
-                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
+                var cd = (J.ClassDeclaration) visitor.visit(source.getClasses().getFirst(), new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cd.getSimpleName());
             }))
         );
@@ -2302,6 +2356,54 @@ class ChangeTypeTest implements RewriteTest {
                   d: String
               """,
             spec -> spec.path("application.yaml")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6410")
+    @Test
+    void nestedClassTypeInfoUpdatedWhenOuterClassRenamed() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeType(
+              "a.b.c.A",
+              "a.b.c.B",
+              false),
+            new ChangeMethodName(
+              "a.b.c.B foo()",
+              "newFoo",
+              null,
+              null),
+            // After ChangeType, the nested class should be referenced as a.b.c.B.NestedInA, not a.b.c.A.NestedInA
+            new ChangeMethodName(
+              "a.b.c.B$NestedInA bar()",
+              "newBar",
+              null,
+              null)
+          ),
+          java(
+            """
+              package a.b.c;
+
+              class A {
+                  void foo() {}
+
+                  class NestedInA {
+                      void bar() {}
+                  }
+              }
+              """,
+            """
+              package a.b.c;
+
+              class B {
+                  void newFoo() {}
+
+                  class NestedInA {
+                      void newBar() {}
+                  }
+              }
+              """
           )
         );
     }
@@ -2418,4 +2520,136 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void inheritedTypesUpdated() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("com.demo.Before", "com.demo.After", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package com.demo;
+                  
+                  public class Before { }
+                  """,
+                """
+                  package com.demo;
+                  
+                  public class After { }
+                  """
+              )
+            ),
+          java(
+            //language=java
+            """
+              package app;
+              
+              import com.demo.Before;
+              
+              class X extends Before { }
+              """,
+            """
+              package app;
+              
+              import com.demo.After;
+              
+              class X extends After { }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(FindTypes.find(cu, "app.X"))
+                .singleElement()
+                .extracting(NameTree::getType)
+                .matches(type -> TypeUtils.isAssignableTo("com.demo.After", type), "Assignable to updated type")
+            )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileContent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldImpl", "org.bar.NewImpl", false)),
+          text(
+            """
+              org.foo.OldImpl
+              org.other.Unrelated
+              """,
+            """
+              org.bar.NewImpl
+              org.other.Unrelated
+              """,
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldInterface", "org.bar.NewInterface", false)),
+          text(
+            "org.foo.SomeImpl\n",
+            "org.foo.SomeImpl\n",
+            spec -> spec.path("META-INF/services/org.foo.OldInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.NewInterface"))
+          )
+        );
+    }
+
+    @Test
+    void changeTypeAddsExplicitImportWhenStarImportsWouldBeAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Ambiguous", "b.Ambiguous", true))
+                  .beforeRecipe(withSourceTypesOnClasspath()),
+          java(
+            """
+              package a;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Other {}
+              """
+          ),
+          java(
+            """
+              package c;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              import a.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """,
+            """
+              import b.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """
+          )
+        );
+    }
+
 }

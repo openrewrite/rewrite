@@ -93,6 +93,21 @@ public class SemanticallyEqual {
             }
         }
 
+        protected <T extends J> void visitRightPaddedList(@Nullable List<JRightPadded<T>> list1, @Nullable List<JRightPadded<T>> list2) {
+            if (!isEqual.get() || nullListSizeMissMatch(list1, list2)) {
+                isEqual.set(false);
+                return;
+            }
+            if (list1 != null) {
+                for (int i = 0; i < list1.size(); i++) {
+                    visit(list1.get(i).getElement(), list2.get(i).getElement());
+                    if (!isEqual.get()) {
+                        return;
+                    }
+                }
+            }
+        }
+
         @Override
         public @Nullable J visit(@Nullable Tree tree, J j) {
             return super.visit(unwrap(tree), unwrap(j));
@@ -1003,15 +1018,19 @@ public class SemanticallyEqual {
                     isEqual.set(false);
                     return method;
                 }
-
-                boolean static_ = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
+                if (method.getMethodType() == null || compareTo.getMethodType() == null) {
+                    isEqual.set(false);
+                    return method;
+                }
+
+                boolean static_ = method.getMethodType().hasFlags(Flag.Static);
+                List<JRightPadded<Expression>> arguments = method.getPadding().getArguments().getPadding().getElements();
+                List<JRightPadded<Expression>> compareToArguments = compareTo.getPadding().getArguments().getPadding().getElements();
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    method.getArguments().size() != compareTo.getArguments().size() ||
-                    !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
+                        arguments.size() != compareToArguments.size() ||
+                    !(static_ == compareTo.getMethodType().hasFlags(Flag.Static) ||
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
-                    method.getMethodType() == null ||
-                    compareTo.getMethodType() == null ||
                     !isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
                     isEqual.set(false);
                     return method;
@@ -1037,8 +1056,8 @@ public class SemanticallyEqual {
                 }
                 boolean containsLiteral = false;
                 if (!compareMethodArguments) {
-                    for (int i = 0; i < method.getArguments().size(); i++) {
-                        if (method.getArguments().get(i) instanceof J.Literal || compareTo.getArguments().get(i) instanceof J.Literal) {
+                    for (int i = 0; i < arguments.size(); i++) {
+                        if (arguments.get(i).getElement() instanceof J.Literal || compareToArguments.get(i).getElement() instanceof J.Literal) {
                             containsLiteral = true;
                             break;
                         }
@@ -1052,7 +1071,7 @@ public class SemanticallyEqual {
                     }
                 }
                 if (compareMethodArguments || containsLiteral) {
-                    this.visitList(method.getArguments(), compareTo.getArguments());
+                    this.visitRightPaddedList(arguments, compareToArguments);
                 }
             }
             return method;

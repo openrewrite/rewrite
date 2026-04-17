@@ -47,6 +47,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.marker.TrailingComma;
@@ -1038,6 +1039,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 type);
 
         List<KtParameter> ktParameters = accessor.getValueParameters();
+        // In K2, LPAR/RPAR moved inside VALUE_PARAMETER_LIST, so use the list node for prefix/suffix
+        PsiElement paramList = accessor.getLeftParenthesis() != null ? accessor.getLeftParenthesis().getParent() : null;
         if (!ktParameters.isEmpty()) {
             if (ktParameters.size() != 1) {
                 throw new UnsupportedOperationException("TODO");
@@ -1045,21 +1048,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             List<JRightPadded<Statement>> parameters = new ArrayList<>();
             for (KtParameter ktParameter : ktParameters) {
-                Statement stmt = convertToStatement(ktParameter.accept(this, data).withPrefix(prefix(ktParameter.getParent())));
+                Statement stmt = convertToStatement(ktParameter.accept(this, data).withPrefix(suffix(accessor.getLeftParenthesis())));
                 parameters.add(padRight(stmt, prefix(accessor.getRightParenthesis())));
             }
 
-            params = JContainer.build(prefix(accessor.getLeftParenthesis()), parameters, Markers.EMPTY);
+            params = JContainer.build(prefix(paramList), parameters, Markers.EMPTY);
         } else {
             params = JContainer.build(
-                    prefix(accessor.getLeftParenthesis()),
+                    prefix(paramList),
                     singletonList(padRight(new J.Empty(randomId(), prefix(accessor.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)),
                     Markers.EMPTY
             );
         }
 
         if (accessor.getReturnTypeReference() != null) {
-            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(accessor.getRightParenthesis())));
+            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(paramList)));
             returnTypeExpression = accessor.getReturnTypeReference().accept(this, data).withPrefix(prefix(accessor.getReturnTypeReference()));
         }
 
@@ -3129,7 +3132,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private static String getString(KtStringTemplateExpression expression, StringBuilder valueSb) {
-        PsiElement openQuote = expression.getFirstChild();
+        PsiElement openQuote;
+        String prefix;
+        if (expression.getInterpolationPrefix() == null) {
+            openQuote = expression.getFirstChild();
+            prefix = "";
+        } else {
+            openQuote = expression.getFirstChild().getNextSibling();
+            prefix = expression.getInterpolationPrefix().getInterpolationPrefix();
+        }
+
         PsiElement closingQuota = expression.getLastChild();
         if (openQuote == null || closingQuota == null ||
             openQuote.getNode().getElementType() != KtTokens.OPEN_QUOTE ||
@@ -3137,7 +3149,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("This should never happen");
         }
 
-        return openQuote.getText() + valueSb + closingQuota.getText();
+        return prefix + openQuote.getText() + valueSb + closingQuota.getText();
     }
 
     @Override

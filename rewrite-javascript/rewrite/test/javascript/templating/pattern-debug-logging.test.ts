@@ -1,8 +1,9 @@
+import {type MockInstance} from 'vitest';
 import {capture, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
 import {J} from '../../../src/java';
 
 describe('Pattern Debug Logging', () => {
-    let consoleErrorSpy: jest.SpyInstance;
+    let consoleErrorSpy: MockInstance;
     let parser: JavaScriptParser;
 
     async function parseExpression(code: string): Promise<J> {
@@ -15,7 +16,7 @@ describe('Pattern Debug Logging', () => {
     beforeEach(() => {
         parser = new JavaScriptParser();
         // Spy on console.error to capture debug output
-        consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -122,9 +123,7 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        console.log('===== UPDATED OUTPUT =====');
         calls.forEach((call, i) => console.log(`${i}: ${call}`));
-        console.log('==========================');
         expect(calls.some(c => c.includes('❌ FAILED matching against'))).toBe(true);
         // At path may or may not appear depending on where mismatch occurred
         expect(calls.some(c => c.includes('Reason:'))).toBe(true);
@@ -173,9 +172,7 @@ describe('Pattern Debug Logging', () => {
         expect(consoleErrorSpy).toHaveBeenCalled();
 
         const calls = consoleErrorSpy.mock.calls.map(c => c[0]);
-        console.log('===== PATH EXAMPLE =====');
         calls.forEach((call, i) => console.log(`${i}: ${call}`));
-        console.log('==========================');
 
         // Should show path and operator mismatch
         expect(calls.some(c => c.includes('At path:'))).toBe(true);

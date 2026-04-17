@@ -15,6 +15,7 @@
  */
 package org.openrewrite.rpc;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -34,6 +35,7 @@ import static java.util.stream.Collectors.toMap;
 
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
+    @Getter
     private final transient RewriteRpc rpc;
     private transient @Nullable List<Recipe> recipeList;
 
@@ -43,8 +45,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
     private final String remoteId;
 
     private final RecipeDescriptor descriptor;
+    @Getter
     private final String editVisitor;
     private final @Nullable TreeVisitor<?, ExecutionContext> editPreconditionVisitor;
+    @Getter
     private final @Nullable String scanVisitor;
     private final @Nullable TreeVisitor<?, ExecutionContext> scanPreconditionVisitor;
 
@@ -135,5 +139,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         if (id != null) {
             rpc.getObject(id, null);
         }
+    }
+
+    @Override
+    protected RecipeDescriptor createRecipeDescriptor() {
+        return this.descriptor != null ? this.descriptor : super.createRecipeDescriptor();
     }
 }

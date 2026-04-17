@@ -13,12 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {setAutoFreeze} from "immer";
-
-// this is required because otherwise `asRef()` won't work for objects created using immer
-setAutoFreeze(false);
-
-const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
+const REFERENCE_KEY = Symbol.for("org.openrewrite.rpc.Reference");
 
 export interface Reference {
     [REFERENCE_KEY]: true;
@@ -88,5 +83,20 @@ export class ReferenceMap {
     set(ref: Reference, refId: number) {
         this.refs.set(ref, refId);
         this.refsById.set(refId, ref);
+    }
+
+    snapshot(): number {
+        return this.refCount;
+    }
+
+    rollbackTo(savedRefCount: number): void {
+        for (let i = savedRefCount; i < this.refCount; i++) {
+            const obj = this.refsById.get(i);
+            if (obj) {
+                this.refs.delete(obj);
+                this.refsById.delete(i);
+            }
+        }
+        this.refCount = savedRefCount;
     }
 }

@@ -38,8 +38,8 @@ public interface Style {
         return getClass().getName();
     }
 
-    default Style merge(Style lowerPrecedence) {
-        return this;
+    default Style merge(Style higherPriority) {
+        return StyleHelper.merge(this, higherPriority);
     }
 
     default Style applyDefaults() { return this; }

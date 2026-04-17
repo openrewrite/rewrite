@@ -22,6 +22,7 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.properties.AddProperty.InsertMode;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("UnusedProperty")
@@ -31,13 +32,10 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void newProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("true")
+            .build()),
           properties(
             """
               management=true
@@ -53,13 +51,10 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void emptyProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "",
-            "true",
-            null,
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("")
+            .value("true")
+            .build()),
           properties(
             """
               management.metrics.enable.process.files=true
@@ -71,13 +66,10 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void emptyValue() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "",
-            null,
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("")
+            .build()),
           properties(
             """
               management.metrics.enable.process.files=true
@@ -89,13 +81,12 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void containsProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null,
-            null
-          )),
+          spec -> spec.recipe(
+            AddProperty.builder()
+              .property("management.metrics.enable.process.files")
+              .value("true")
+              .build()
+          ),
           properties(
             """
               management.metrics.enable.process.files=true
@@ -108,13 +99,11 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void delimitedByColon() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            ":",
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("true")
+            .delimiter(":")
+            .build()),
           properties(
             """
               management=true
@@ -131,13 +120,11 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void delimitedByWhitespace() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            "    ",
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("true")
+            .delimiter("    ")
+            .build()),
           properties(
             """
               management=true
@@ -153,13 +140,10 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void addToEmptyFile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("true")
+            .build()),
           properties(
             "",
             """
@@ -172,13 +156,11 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void addCommentedPropertyToEmptyFile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            "Management metrics",
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("true")
+            .comment("Management metrics")
+            .build()),
           properties(
             "",
             """
@@ -192,13 +174,11 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void addCommentedPropertyToExistingFile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            "Management metrics",
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("true")
+            .comment("Management metrics")
+            .build()),
           properties(
             "management=true",
             """
@@ -213,13 +193,10 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void keepPropertyValueWithLineContinuations() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("management.metrics.enable.process.files")
+            .value("true")
+            .build()),
           properties(
             """
               management=tr\\
@@ -231,7 +208,7 @@ class AddPropertyTest implements RewriteTest {
               management.metrics.enable.process.files=true
               """,
             spec -> spec.afterRecipe(after -> {
-                Properties.Entry entry = (Properties.Entry) after.getContent().getFirst();
+                var entry = (Properties.Entry) after.getContent().getFirst();
                 assertThat(entry.getValue().getText()).isEqualTo("true");
                 assertThat(entry.getValue().getSource()).isEqualTo("tr\\\n  ue");
             })
@@ -242,13 +219,11 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void orderedInsertionBeginning() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "com.sam",
-            "true",
-            "sam",
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("com.sam")
+            .value("true")
+            .comment("sam")
+            .build()),
           properties(
             """
               com.zoe=true
@@ -265,13 +240,11 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void orderedInsertionMiddle() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "com.sam",
-            "true",
-            "sam",
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("com.sam")
+            .value("true")
+            .comment("sam")
+            .build()),
           properties(
             """
               # amy
@@ -302,13 +275,11 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void orderedInsertionEnd() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "com.sam",
-            "true",
-            "sam",
-            null,
-            null
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("com.sam")
+            .value("true")
+            .comment("sam")
+            .build()),
           properties(
             """
               com.amy=true
@@ -325,13 +296,12 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void unorderedInsertion() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "com.sam",
-            "true",
-            "sam",
-            null,
-            false
-          )),
+          spec -> spec.recipe(AddProperty.builder()
+            .property("com.sam")
+            .value("true")
+            .comment("sam")
+            .orderedInsertion(false)
+            .build()),
           properties(
             """
               # amy
@@ -357,6 +327,261 @@ class AddPropertyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void insertBeforeProperty() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .insertMode(InsertMode.Before)
+            .insertProperty("com.bea")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              new.prop=val
+              com.bea=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterProperty() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .insertMode(InsertMode.After)
+            .insertProperty("com.bea")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.bea=true
+              new.prop=val
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforePropertyWithPrecedingComment() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .insertMode(InsertMode.Before)
+            .insertProperty("com.bea")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              # bea comment
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              new.prop=val
+              # bea comment
+              com.bea=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforePropertyWithNewPropertyComment() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .comment("new property comment")
+            .insertMode(InsertMode.Before)
+            .insertProperty("com.bea")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              # new property comment
+              new.prop=val
+              com.bea=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterPropertyWithNewPropertyComment() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .comment("new property comment")
+            .insertMode(InsertMode.After)
+            .insertProperty("com.bea")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.bea=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.bea=true
+              # new property comment
+              new.prop=val
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforePropertyNotFoundFallsBackToAlphabetical() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("com.sam")
+            .value("true")
+            .insertMode(InsertMode.Before)
+            .insertProperty("nonexistent.key")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.sam=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterPropertyNotFoundUnordered() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("com.sam")
+            .value("true")
+            .orderedInsertion(false)
+            .insertMode(InsertMode.After)
+            .insertProperty("nonexistent.key")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.zoe=true
+              com.sam=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterLastEntry() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("zzz.last")
+            .value("val")
+            .insertMode(InsertMode.After)
+            .insertProperty("com.zoe")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              com.amy=true
+              com.zoe=true
+              zzz.last=val
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeOverridesOrderedInsertion() {
+        rewriteRun(
+          spec -> spec.recipe(AddProperty.builder()
+            .property("zzz.prop")
+            .value("val")
+            .orderedInsertion(true)
+            .insertMode(InsertMode.Before)
+            .insertProperty("com.amy")
+            .build()),
+          properties(
+            """
+              com.amy=true
+              com.zoe=true
+              """,
+            """
+              zzz.prop=val
+              com.amy=true
+              com.zoe=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertPropertyRequiredForBeforeMode() {
+        AddProperty recipe = AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .insertMode(InsertMode.Before)
+            .build();
+        assertThat(recipe.validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void insertPropertyRequiredForAfterMode() {
+        AddProperty recipe = AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .insertMode(InsertMode.After)
+            .build();
+        assertThat(recipe.validate().isInvalid()).isTrue();
+    }
+
+    @Test
+    void insertPropertyNotRequiredForLastMode() {
+        AddProperty recipe = AddProperty.builder()
+            .property("new.prop")
+            .value("val")
+            .insertMode(InsertMode.Last)
+            .build();
+        assertThat(recipe.validate().isValid()).isTrue();
     }
 
 }

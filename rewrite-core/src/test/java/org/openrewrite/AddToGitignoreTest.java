@@ -315,7 +315,7 @@ class AddToGitignoreTest implements RewriteTest {
 
     @Test
     void rootOnlyTargetingByDefault() {
-        AddToGitignore recipe = new AddToGitignore("*.log", null);
+        var recipe = new AddToGitignore("*.log", null);
         rewriteRun(
           spec -> spec.recipe(recipe),
           text(
@@ -340,7 +340,7 @@ class AddToGitignoreTest implements RewriteTest {
 
     @Test
     void targetSpecificSubdirectory() {
-        AddToGitignore recipe = new AddToGitignore("*.log", "src/.gitignore");
+        var recipe = new AddToGitignore("*.log", "src/.gitignore");
         rewriteRun(
           spec -> spec.recipe(recipe),
           text(
@@ -365,7 +365,7 @@ class AddToGitignoreTest implements RewriteTest {
 
     @Test
     void targetAllGitignoreFiles() {
-        AddToGitignore recipe = new AddToGitignore("*.log", "**/.gitignore");
+        var recipe = new AddToGitignore("*.log", "**/.gitignore");
         rewriteRun(
           spec -> spec.recipe(recipe),
           text(
@@ -406,7 +406,7 @@ class AddToGitignoreTest implements RewriteTest {
 
     @Test
     void createGitignoreInSpecificLocation() {
-        AddToGitignore recipe = new AddToGitignore("*.log", "src/.gitignore");
+        var recipe = new AddToGitignore("*.log", "src/.gitignore");
         rewriteRun(
           spec -> spec.recipe(recipe),
           text(
@@ -421,7 +421,7 @@ class AddToGitignoreTest implements RewriteTest {
 
     @Test
     void createRootGitignoreWhenPatternIsWildcard() {
-        AddToGitignore recipe = new AddToGitignore("*.log", "**/.gitignore");
+        var recipe = new AddToGitignore("*.log", "**/.gitignore");
         rewriteRun(
           spec -> spec.recipe(recipe),
           text(
@@ -443,6 +443,30 @@ class AddToGitignoreTest implements RewriteTest {
               *.tmp
               """,
             spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void addEntryToFileEndingWithNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new AddToGitignore("*.log", null)),
+          text(
+            "*.tmp\n.DS_Store\n",
+            "*.tmp\n.DS_Store\n\n*.log\n",
+            spec -> spec.path(".gitignore").noTrim()
+          )
+        );
+    }
+
+    @Test
+    void addEntryToFileEndingWithWindowsNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new AddToGitignore("*.log", null)),
+          text(
+            "*.tmp\r\n.DS_Store\r\n",
+            "*.tmp\r\n.DS_Store\r\n\r\n*.log\r\n",
+            spec -> spec.path(".gitignore").noTrim()
           )
         );
     }

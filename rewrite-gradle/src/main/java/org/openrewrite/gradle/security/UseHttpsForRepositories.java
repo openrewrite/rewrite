@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.security;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -34,25 +35,17 @@ import static java.util.Collections.singleton;
 
 public class UseHttpsForRepositories extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Use HTTPS for repositories";
-    }
+    @Getter
+    final String displayName = "Use HTTPS for repositories";
 
-    @Override
-    public String getDescription() {
-        return "Use HTTPS for repository URLs.";
-    }
+    @Getter
+    final String description = "Use HTTPS for repository URLs.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("security");
-    }
+    @Getter
+    final Set<String> tags = singleton("security");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    @Getter
+    final Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

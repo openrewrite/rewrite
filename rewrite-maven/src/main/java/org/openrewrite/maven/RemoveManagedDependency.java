@@ -46,20 +46,14 @@ public class RemoveManagedDependency extends Recipe {
     @Nullable
     String scope;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove Maven managed dependency";
-    }
+    String displayName = "Remove Maven managed dependency";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s:%s`", groupId, artifactId);
     }
 
-    @Override
-    public String getDescription() {
-        return "Removes a single managed dependency from the <dependencyManagement><dependencies> section of the pom.xml.";
-    }
+    String description = "Removes a single managed dependency from the <dependencyManagement><dependencies> section of the pom.xml.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

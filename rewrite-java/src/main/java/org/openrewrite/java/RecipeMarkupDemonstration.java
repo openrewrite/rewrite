@@ -32,15 +32,9 @@ public class RecipeMarkupDemonstration extends Recipe {
             valid = {"debug", "info", "warning", "error"})
     String level;
 
-    @Override
-    public String getDisplayName() {
-        return "Demonstrate rendering of `Markup` markers";
-    }
+    String displayName = "Demonstrate rendering of `Markup` markers";
 
-    @Override
-    public String getDescription() {
-        return "Tooling may decide to elide or display differently markup of different levels.";
-    }
+    String description = "Tooling may decide to elide or display differently markup of different levels.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

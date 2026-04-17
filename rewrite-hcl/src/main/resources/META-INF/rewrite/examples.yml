@@ -15,7 +15,7 @@
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.DeleteContent
 examples:
-- description: ''
+- description: '`DeleteContentTest#deleteBlock`'
   parameters:
   - $.before
   sources:
@@ -32,7 +32,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.MoveContentToFile
 examples:
-- description: ''
+- description: '`MoveContentToFileTest#newFile`'
   parameters:
   - $.before
   - from.tf
@@ -41,6 +41,7 @@ examples:
   - after: |
       before {
       }
+    path: to.tf
     language: hcl
   - before: |
       after {
@@ -50,12 +51,13 @@ examples:
     after: |
       after {
       }
+    path: from.tf
     language: hcl
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.ReplaceLegacyAttributeIndexSyntax
 examples:
-- description: ''
+- description: '`ReplaceLegacyAttributeIndexSyntaxTest#simple`'
   sources:
   - before: |
       locals {
@@ -70,18 +72,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.format.AutoFormat
 examples:
-- description: ''
-  sources:
-  - before: |
-      resource "aws_ebs_volume"    {    size      = 1
-      encrypted = true   }
-    after: |
-      resource "aws_ebs_volume" {
-        size      = 1
-        encrypted = true
-      }
-    language: hcl
-- description: ''
+- description: '`AutoFormatTest#objectValues`'
   sources:
   - before: |
       locals {
@@ -98,11 +89,22 @@ examples:
         }
       }
     language: hcl
+- description: '`BracketSpacesTest#blockBraces`'
+  sources:
+  - before: |
+      resource "aws_ebs_volume"    {    size      = 1
+      encrypted = true   }
+    after: |
+      resource "aws_ebs_volume" {
+        size      = 1
+        encrypted = true
+      }
+    language: hcl
 ---
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.format.Spaces
 examples:
-- description: ''
+- description: '`SpacesTest#columnarAlignment`'
   sources:
   - before: |
       resource "aws_ebs_volume" {
@@ -119,7 +121,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.search.FindAndReplaceLiteral
 examples:
-- description: ''
+- description: '`FindAndReplaceLiteralTest#defaultNonRegexReplace`'
   parameters:
   - app-cluster
   - new-app-cluster
@@ -143,7 +145,7 @@ examples:
 type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.hcl.search.FindContent
 examples:
-- description: ''
+- description: '`FindContentTest#find`'
   parameters:
   - $.provider
   sources:

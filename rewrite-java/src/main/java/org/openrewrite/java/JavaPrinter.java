@@ -19,9 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.java.marker.CompactConstructor;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.marker.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -29,6 +27,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
@@ -188,6 +187,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(annotatedType.getTypeExpression(), p);
         afterSyntax(annotatedType, p);
         return annotatedType;
+    }
+
+    @Override
+    public J visitArrayAccess(ArrayAccess arrayAccess, PrintOutputCapture<P> p) {
+        beforeSyntax(arrayAccess, Space.Location.ARRAY_ACCESS_PREFIX, p);
+        visit(arrayAccess.getIndexed(), p);
+        visit(arrayAccess.getDimension(), p);
+        afterSyntax(arrayAccess, p);
+        return arrayAccess;
     }
 
     @Override
@@ -381,10 +389,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
         }
 
-        p.append('{');
+        boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+        if (!omitBraces) {
+            p.append("{");
+        }
         visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
         visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
-        p.append('}');
+        if (!omitBraces) {
+            p.append("}");
+        }
         afterSyntax(block, p);
         return block;
     }
@@ -537,6 +550,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             case Record:
                 kind = "record";
                 break;
+        }
+
+        if (classDecl.getMarkers().findFirst(CompactSourceFile.class).isPresent()) {
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visit(classDecl.getBody(), p);
+            afterSyntax(classDecl, p);
+            return classDecl;
         }
 
         beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);

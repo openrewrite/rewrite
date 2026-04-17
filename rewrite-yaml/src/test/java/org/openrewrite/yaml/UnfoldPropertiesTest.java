@@ -472,4 +472,58 @@ class UnfoldPropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unfoldSpringPropertiesTwoSpace() {
+        rewriteRun(
+          yaml(
+            """
+            spring:
+              datasource:
+                url: jdbc:postgresql://localhost/test
+
+            spring.servlet.encoding.charset: UTF-8
+            spring.servlet.encoding.enabled: true
+            spring.servlet.encoding.force: true
+            """,
+            """
+            spring:
+              datasource:
+                url: jdbc:postgresql://localhost/test
+              servlet:
+                encoding:
+                  charset: UTF-8
+                  enabled: true
+                  force: true
+              """
+          )
+        );
+    }
+
+    @Test
+    void unfoldSpringPropertiesFourSpace() {
+        rewriteRun(
+          yaml(
+            """
+            spring:
+                datasource:
+                    url: jdbc:postgresql://localhost/test
+
+            spring.servlet.encoding.charset: UTF-8
+            spring.servlet.encoding.enabled: true
+            spring.servlet.encoding.force: true
+            """,
+            """
+            spring:
+                datasource:
+                    url: jdbc:postgresql://localhost/test
+                servlet:
+                    encoding:
+                        charset: UTF-8
+                        enabled: true
+                        force: true
+              """
+          )
+        );
+    }
 }

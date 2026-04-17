@@ -19,15 +19,20 @@ name: org.openrewrite.maven.BestPractices
 displayName: Apache Maven best practices
 description: Applies best practices to Maven POMs.
 recipeList:
+  - org.openrewrite.maven.cleanup.ExplicitDependencyVersion
   - org.openrewrite.maven.cleanup.ExplicitPluginGroupId
   - org.openrewrite.maven.cleanup.ExplicitPluginVersion
+  - org.openrewrite.maven.cleanup.NoSystemScopeDependencies
   - org.openrewrite.maven.cleanup.PrefixlessExpressions
   - org.openrewrite.maven.OrderPomElements
   - org.openrewrite.maven.RemoveDuplicateDependencies
   - org.openrewrite.maven.RemoveRedundantDependencyVersions
   - org.openrewrite.maven.RemoveRedundantProperties:
       onlyIfValuesMatch: true
+  - org.openrewrite.maven.cleanup.DependencyManagementDependencyRequiresVersion
+  - org.openrewrite.maven.ModernizeObsoletePoms
   - org.openrewrite.maven.plugin.DependencyPluginGoalResolveSources
+  - org.openrewrite.maven.SortDependencies
   - org.openrewrite.maven.UpdateScmFromGitOrigin
 ---
 type: specs.openrewrite.org/v1beta/recipe
@@ -141,3 +146,15 @@ recipeList:
   - org.openrewrite.xml.ChangeTagName:
       elementName: /project/modules
       newName: subprojects
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.RemoveMavenWrapper
+displayName: Remove Maven wrapper
+description: Remove Maven wrapper files from a project. This includes the `mvnw` and `mvnw.cmd` scripts, and the `.mvn/wrapper` directory.
+recipeList:
+  - org.openrewrite.DeleteSourceFiles:
+      filePattern: "**/mvnw"
+  - org.openrewrite.DeleteSourceFiles:
+      filePattern: "**/mvnw.cmd"
+  - org.openrewrite.DeleteSourceFiles:
+      filePattern: "**/.mvn/wrapper/**"

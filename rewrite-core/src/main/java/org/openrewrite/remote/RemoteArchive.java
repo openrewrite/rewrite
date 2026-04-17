@@ -120,6 +120,20 @@ public class RemoteArchive implements Remote {
                                 }
                                 return i;
                             }
+
+                            @Override
+                            public int read(byte[] b, int off, int len) throws IOException {
+                                int bytesRead = body.read(b, off, len);
+                                if (bytesRead > 0) {
+                                    count += bytesRead;
+                                    if (count > contentLength) {
+                                        throw new IOException("Too much data received");
+                                    }
+                                } else if (bytesRead == -1 && count < contentLength) {
+                                    throw new IOException("Unexpected end of stream");
+                                }
+                                return bytesRead;
+                            }
                         };
                     }
                     return body;
@@ -156,6 +170,11 @@ public class RemoteArchive implements Remote {
                             @Override
                             public int read() throws IOException {
                                 return zis.read();
+                            }
+
+                            @Override
+                            public int read(byte[] b, int off, int len) throws IOException {
+                                return zis.read(b, off, len);
                             }
 
                             @Override

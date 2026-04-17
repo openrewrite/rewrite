@@ -40,14 +40,13 @@ public class DeleteKey extends Recipe {
     @Nullable
     String filePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Delete key";
-    }
+    String displayName = "Delete key";
+
+    String description = "Delete a YAML mapping entry key.";
 
     @Override
-    public String getDescription() {
-        return "Delete a YAML mapping entry key.";
+    public Validated<Object> validate() {
+        return super.validate().and(JsonPathMatcher.validate("keyPath", keyPath));
     }
 
     @Override
@@ -56,12 +55,26 @@ public class DeleteKey extends Recipe {
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
 
             @Override
-            public  Yaml.Sequence.@Nullable Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
-                if (matcher.matches(getCursor()) || matcher.matches(new Cursor(getCursor(), entry.getBlock()))) {
-                    removeUnused(getCursor().getParent());
-                    return null;
+            public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
+                Yaml.Sequence s = super.visitSequence(sequence, ctx);
+                AtomicReference<@Nullable String> copyFirstPrefix = new AtomicReference<>();
+                s = s.withEntries(ListUtils.map(s.getEntries(), (i, e) -> {
+                    if (matcher.matches(new Cursor(getCursor(), e)) || matcher.matches(new Cursor(getCursor(), e.getBlock()))) {
+                        if (i == 0) {
+                            copyFirstPrefix.set(e.getPrefix());
+                        }
+                        removeUnused(getCursor());
+                        return null;
+                    }
+                    return e;
+                }));
+
+                if (!s.getEntries().isEmpty() && copyFirstPrefix.get() != null) {
+                    //noinspection DataFlowIssue
+                    s = s.withEntries(ListUtils.mapFirst(s.getEntries(), e -> e.withPrefix(copyFirstPrefix.get())));
                 }
-                return super.visitSequenceEntry(entry, ctx);
+
+                return s;
             }
 
             @Override

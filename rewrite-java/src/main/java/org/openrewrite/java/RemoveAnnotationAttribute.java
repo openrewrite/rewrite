@@ -38,10 +38,7 @@ public class RemoveAnnotationAttribute extends Recipe {
             example = "timeout")
     String attributeName;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove annotation attribute";
-    }
+    String displayName = "Remove annotation attribute";
 
     @Override
     public String getInstanceNameSuffix() {
@@ -49,10 +46,7 @@ public class RemoveAnnotationAttribute extends Recipe {
         return String.format("`@%s(%s)`", shortType, attributeName);
     }
 
-    @Override
-    public String getDescription() {
-        return "Some annotations accept arguments. This recipe removes an existing attribute.";
-    }
+    String description = "Some annotations accept arguments. This recipe removes an existing attribute.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

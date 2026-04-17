@@ -20,13 +20,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.search.SemanticallyEqual;
+import org.openrewrite.java.service.Span.ColSpan;
 import org.openrewrite.java.tree.*;
 
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * Service for computing source code position metrics such as column alignment positions and tree element lengths.
@@ -37,107 +37,75 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Incubating(since = "8.63.0")
 public class SourcePositionService {
     /**
-     * Computes the column position where an element should be aligned to.
-     * <p>
-     * For elements that should align with a previous element (e.g., in method chains or parameter lists),
-     * this calculates the column position of that alignment point. For elements that don't align,
-     * it returns the parent's indentation plus the continuation indent.
-     *
-     * @param cursor       the cursor pointing to the element whose alignment position should be computed
-     * @param continuation the continuation indent to add when the element doesn't align with another element
-     * @return the column position (0-indexed) where the element should align to
-     */
-    public int computeColumnToAlignTo(Cursor cursor, int continuation) {
-        Cursor alignWith = alignsWith(cursor);
-        Cursor newLinedElementCursor;
-        if (alignWith == null) {
-            // Do not align, just calculate parents indentation
-            newLinedElementCursor = computeNewLinedCursorElement(cursor.getParentTreeCursor());
-            return ((J) newLinedElementCursor.getValue()).getPrefix().getIndent().length() + continuation;
-        }
-        newLinedElementCursor = computeNewLinedCursorElement(alignWith);
-        if (alignWith == newLinedElementCursor) {
-            //If they are the same element, it means that the first / indentation base is already on new line -> we should just indent with the continuation based on the previous correctly indented value
-            Cursor parentCursor = computeNewLinedCursorElement(newLinedElementCursor.getParentTreeCursor());
-            return ((J) parentCursor.getValue()).getPrefix().getIndent().length() + continuation;
-        }
-        if (newLinedElementCursor.getValue() instanceof J) {
-            J j = newLinedElementCursor.getValue();
-            AtomicInteger indentation = new AtomicInteger(-1);
-            JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
-                @Override
-                public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                    if (multiVariable == alignWith.getValue() || SemanticallyEqual.areEqual(multiVariable, alignWith.getValue())) {
-                        beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
-                        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-                        indentation.set(p.getOut().length());
-                        return multiVariable;
-                    }
-                    return super.visitVariableDeclarations(multiVariable, p);
-                }
-
-                @Override
-                public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<TreeVisitor<?, ?>> p) {
-                    if (method == alignWith.getValue() || SemanticallyEqual.areEqual(method, alignWith.getValue())) {
-                        beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
-                        visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, "", p);
-                        indentation.set(p.getOut().length());
-                        return method;
-                    }
-                    return super.visitMethodInvocation(method, p);
-                }
-            };
-            PrintOutputCapture<TreeVisitor<?, ?>> printLine = new PrintOutputCapture<TreeVisitor<?, ?>>(javaPrinter, PrintOutputCapture.MarkerPrinter.SANITIZED) {
-                @Override
-                public PrintOutputCapture<TreeVisitor<?, ?>> append(@Nullable String text) {
-                    if (text != null && text.contains("\n")) {
-                        out.setLength(0);
-                        text = text.substring(text.lastIndexOf("\n") + 1);
-                    }
-                    return super.append(text);
-                }
-            };
-            javaPrinter.visit(j, printLine, cursor.getParentOrThrow());
-
-            return indentation.get();
-        }
-        throw new RuntimeException("Unable to calculate length due to unexpected cursor value: " + newLinedElementCursor.getValue().getClass());
-    }
-
-    /**
      * Computes the position span of the element at the given cursor.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor) {
-        return positionOfChild(cursor, cursor.getValue());
+        return positionOfChild(cursor, cursor.getValue(), getSpanPrintCursor(cursor));
     }
 
     /**
      * Computes the position span of a container element.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, JContainer<? extends J> container) {
-        return positionOfChild(cursor, container);
+        return positionOfChild(cursor, container, getSpanPrintCursor(cursor));
     }
 
     /**
      * Computes the position span of a right-padded element.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, JRightPadded<J> rightPadded) {
-        return positionOfChild(cursor, rightPadded);
+        return positionOfChild(cursor, rightPadded, getSpanPrintCursor(cursor));
     }
 
     /**
      * Computes the position span of a J element.
      *
-     * @see #positionOfChild(Cursor, Object)
+     * @see #positionOfChild(Cursor, Object, Cursor)
      */
     public Span positionOf(Cursor cursor, J child) {
-        return positionOfChild(cursor, child);
+        return positionOfChild(cursor, child, getSpanPrintCursor(cursor));
+    }
+
+    /**
+     * Computes the position span of the element at the given cursor.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor) {
+        return positionOfChild(cursor, cursor.getValue(), getColSpanPrintCursor(cursor)).getColSpan();
+    }
+
+    /**
+     * Computes the position span of a container element.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor, JContainer<? extends J> container) {
+        return positionOfChild(cursor, container, getColSpanPrintCursor(cursor)).getColSpan();
+    }
+
+    /**
+     * Computes the position span of a right-padded element.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor, JRightPadded<J> rightPadded) {
+        return positionOfChild(cursor, rightPadded, getColSpanPrintCursor(cursor)).getColSpan();
+    }
+
+    /**
+     * Computes the position span of a J element.
+     *
+     * @see #positionOfChild(Cursor, Object, Cursor)
+     */
+    public ColSpan columnsOf(Cursor cursor, J child) {
+        return positionOfChild(cursor, child, getColSpanPrintCursor(cursor)).getColSpan();
     }
 
     /**
@@ -150,71 +118,34 @@ public class SourcePositionService {
      * @param cursor the cursor to start searching from
      * @return the cursor pointing to the element with a newline prefix
      */
-    private Cursor computeNewLinedCursorElement(Cursor cursor) {
+    public Cursor computeNewLinedCursorElement(Cursor cursor) {
         Object cursorValue = cursor.getValue();
+        Cursor methodCursor = cursor;
         while (cursorValue instanceof J.MethodInvocation && ((J.MethodInvocation) cursorValue).getSelect() instanceof J.MethodInvocation) {
+            boolean hasNewLine = ((J.MethodInvocation) cursorValue).getPadding().getSelect().getAfter().getWhitespace().contains("\n") || ((J.MethodInvocation) cursorValue).getPadding().getSelect().getAfter().getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
+            if (hasNewLine) {
+                return methodCursor;
+            }
             cursorValue = ((J.MethodInvocation) cursorValue).getSelect();
+            methodCursor = new Cursor(methodCursor, ((J.MethodInvocation) cursorValue).getSelect());
         }
+        cursorValue = cursor.getValue();
         if (cursorValue instanceof J) {
             J j = (J) cursorValue;
             boolean hasNewLine = j.getPrefix().getWhitespace().contains("\n") || j.getComments().stream().anyMatch(c -> c.getSuffix().contains("\n"));
-            Cursor parent = cursor.getParentTreeCursor();
-            boolean isCompilationUnit = parent.getValue() instanceof J.CompilationUnit;
-            if (!hasNewLine && !isCompilationUnit) {
+            Cursor parent = cursor.dropParentUntil(it -> (!(it instanceof J.MethodInvocation || it instanceof JRightPadded || it instanceof JLeftPadded || (it instanceof J && ((J) it).getPrefix().getWhitespace().contains("\n"))))); // a newline in the method chain after the current cursor does not count as a newLinedCursorElement
+            while (!(parent.getValue() instanceof Tree) && parent.getParent() != null) {
+                parent = parent.getParent();
+            }
+            boolean isRootOrCompilationUnit = parent.getValue() instanceof JavaSourceFile || parent.getValue() == Cursor.ROOT_VALUE || parent.getParent() == null;
+            if (!hasNewLine && !isRootOrCompilationUnit) {
                 return computeNewLinedCursorElement(parent);
             }
+        } else if (cursor.getParent() != null && cursor.getParent().getValue() != Cursor.ROOT_VALUE) {
+            return computeNewLinedCursorElement(cursor.getParent());
         }
+
         return cursor;
-    }
-
-    /**
-     * Determines if the given cursor element should align with another element, and if so, returns
-     * a cursor pointing to that alignment target.
-     * <p>
-     * Elements should align when they are part of a container (e.g., parameter list, method chain)
-     * and the first element of that container is on the same line as the opening delimiter.
-     * For example, in {@code method(param1, param2)}, param2 should align with param1.
-     * But in {@code method(\n    param1,\n    param2)}, neither param should align since param1
-     * is already on a new line.
-     *
-     * @param cursor the cursor to check for alignment
-     * @return a cursor pointing to the element to align with, or null if no alignment is needed
-     */
-    private @Nullable Cursor alignsWith(Cursor cursor) {
-        J cursorValue = cursor.getValue();
-        Cursor parent = cursor;
-
-        while (parent != null && !(parent.getValue() instanceof SourceFile)) {
-            Object parentValue = parent.getValue();
-            if (parentValue instanceof JContainer) {
-                JContainer<J> container = parent.getValue();
-                if (container.getElements().stream().anyMatch(e -> e == cursorValue || SemanticallyEqual.areEqual(e, cursorValue))) {
-                    J firstElement = container.getElements().get(0);
-                    if (!firstElement.getPrefix().getLastWhitespace().contains("\n")) {
-                        if (firstElement == cursorValue || SemanticallyEqual.areEqual(firstElement, cursorValue)) {
-                            return cursor;
-                        }
-                        return new Cursor(parent, firstElement);
-                    }
-                    return null; //do no align when not needed
-                }
-            } else if (parentValue instanceof J.MethodInvocation) {
-                while (((J.MethodInvocation) parentValue).getSelect() instanceof J.MethodInvocation) {
-                    parentValue = ((J.MethodInvocation) parentValue).getSelect();
-                    parent = new Cursor(parent, parentValue);
-                }
-                J.MethodInvocation method = (J.MethodInvocation) parentValue;
-                if (parent.getPathAsStream(o -> o instanceof J.MethodInvocation).anyMatch(value -> value == cursorValue || SemanticallyEqual.areEqual((J) value, cursorValue))) {
-                    if (method.getPadding().getSelect() != null && !method.getPadding().getSelect().getAfter().getLastWhitespace().contains("\n")) {
-                        return parent;
-                    }
-                    return null; //do no align when not needed
-                }
-            }
-            parent = parent.getParent();
-        }
-
-        return null;
     }
 
     /**
@@ -240,13 +171,14 @@ public class SourcePositionService {
      * @throws IllegalArgumentException if the child is a raw {@link Collection} (use padding accessor methods instead),
      *                                  if the child type is not supported, or if the child cannot be found in the source file
      */
-    private Span positionOfChild(Cursor cursor, Object child) {
+    private Span positionOfChild(Cursor cursor, Object child, Cursor printCursor) {
         J findJ;
         JContainer<J> findJContainer;
         JRightPadded<J> findJRightPadded;
         if (child instanceof J) {
             findJContainer = null;
-            findJ = (J) child;
+            //JavaPrinter does not call visitContainer for Try-resources so resources themselves are not visited.
+            findJ = child instanceof J.Try.Resource ? ((J.Try.Resource) child).getVariableDeclarations() : (J) child;
             findJRightPadded = null;
         } else if (child instanceof JContainer) {
             findJContainer = (JContainer<J>) child;
@@ -261,12 +193,29 @@ public class SourcePositionService {
         } else {
             throw new IllegalArgumentException("Can only find J elements or their containers. Not on " + child.getClass().getSimpleName() + ".");
         }
+        AtomicBoolean indenting = new AtomicBoolean(true);
+        AtomicInteger rowIndent = new AtomicInteger(0);
         AtomicInteger startLine = new AtomicInteger(1);
         AtomicInteger startCol = new AtomicInteger(1);
         AtomicBoolean printing = new AtomicBoolean(false);
         AtomicBoolean found = new AtomicBoolean(false);
         JavaPrinter<TreeVisitor<?, ?>> javaPrinter = new JavaPrinter<TreeVisitor<?, ?>>() {
-            @Nullable J foundJ = null;
+            @Nullable
+            J foundJ = null;
+
+            @Override
+            protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, PrintOutputCapture<TreeVisitor<?, ?>> p) {
+                if (container != null && !container.getPadding().getElements().isEmpty() && cursor.getValue() instanceof JContainer) {
+                    Set<UUID> elements = container.getElements().stream().map(Tree::getId).collect(Collectors.toSet());
+                    ((JContainer<? extends J>) cursor.getValue()).getElements().stream().map(Tree::getId).forEach(elements::remove);
+                    if (elements.isEmpty()) {
+                        //if no elements remain, we should continue our search with the input cursor to receive its changes.
+                        super.visitContainer(before, cursor.getValue(), location, suffixBetween, after, p);
+                        return;
+                    }
+                }
+                super.visitContainer(before, container, location, suffixBetween, after, p);
+            }
 
             @Override
             protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<TreeVisitor<?, ?>> p) {
@@ -354,14 +303,25 @@ public class SourcePositionService {
                     if (c == '\n') {
                         startLine.incrementAndGet();
                         startCol.set(1);
+                        rowIndent.set(0);
+                        indenting.set(true);
+                        ;
                     } else if (c == '\r') {
                         // Skip \r in \r\n
                         if (i + 1 >= text.length() || text.charAt(i + 1) != '\n') {
                             startLine.incrementAndGet();
                             startCol.set(1);
+                            rowIndent.set(0);
+                            indenting.set(true);
+                            ;
                         }
                     } else {
                         startCol.incrementAndGet();
+                        if (indenting.get() && (c == ' ' || c == '\t')) {
+                            rowIndent.incrementAndGet();
+                        } else {
+                            indenting.set(false);
+                        }
                     }
                 }
                 return this;
@@ -378,17 +338,21 @@ public class SourcePositionService {
                 if (c == '\n' || c == '\r') {
                     startLine.incrementAndGet();
                     startCol.set(1);
+                    rowIndent.set(0);
+                    indenting.set(true);
                 } else {
                     startCol.incrementAndGet();
+                    if (indenting.get() && (c == ' ' || c == '\t')) {
+                        rowIndent.incrementAndGet();
+                    } else {
+                        indenting.set(false);
+                    }
                 }
                 return this;
             }
         };
-        Cursor printCursor = cursor;
-        if (!(cursor.getValue() instanceof JavaSourceFile)) {
-            printCursor = cursor.dropParentUntil(c -> c instanceof JavaSourceFile);
-        }
-        javaPrinter.visit(printCursor.getValue(), printLine, printCursor.getParent());
+        boolean printEntireSourceFile = printCursor.getValue() instanceof JavaSourceFile;
+        javaPrinter.visit(printCursor.getValue(), printLine, Objects.requireNonNull(printCursor.getParent()));
         String content = printLine.getOut();
         if (found.get()) {
             int indent = StringUtils.indent(content).length();
@@ -423,13 +387,34 @@ public class SourcePositionService {
             }
 
             return Span.builder()
-                    .startLine(startLine.get())
-                    .startColumn(startCol.get() + indent)
-                    .endLine(startLine.get() + lines)
-                    .endColumn(col)
-                    .maxColumn(maxColumn)
+                    .startLine(printEntireSourceFile ? startLine.get() : -1)
+                    .endLine(printEntireSourceFile ? startLine.get() + lines : -1)
+                    .colSpan(
+                            ColSpan.builder()
+                                    .startColumn(startCol.get() + indent)
+                                    .endColumn(col)
+                                    .maxColumn(maxColumn)
+                                    .indent(rowIndent.get())
+                                    .build())
                     .build();
         }
         throw new IllegalArgumentException("The child was not found in the sourceFile. Are you sure the passed in cursor's value contains the child and you are not searching for a mutated element in a non-mutated Cursor value?");
+    }
+
+    private Cursor getSpanPrintCursor(Cursor cursor) {
+        Cursor root = new Cursor(null, Cursor.ROOT_VALUE);
+        while (cursor.getParent() != null && cursor.getParent().getValue() != Cursor.ROOT_VALUE && !(cursor.getValue() instanceof JavaSourceFile)) {
+            cursor = cursor.getParent();
+        }
+        return new Cursor(root, cursor.getValue());
+    }
+
+    private Cursor getColSpanPrintCursor(Cursor cursor) {
+        Cursor root = new Cursor(null, Cursor.ROOT_VALUE);
+        try {
+            return new Cursor(root, computeNewLinedCursorElement(cursor.dropParentUntil(it -> it instanceof Tree && !(it instanceof J.MethodInvocation))).getValue());
+        } catch (IllegalStateException e) {
+            return new Cursor(root, computeNewLinedCursorElement(cursor).getValue());
+        }
     }
 }

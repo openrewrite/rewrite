@@ -27,7 +27,6 @@ import org.openrewrite.test.RewriteTest;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -81,20 +80,20 @@ class RenameVariableTest implements RewriteTest {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if ("A".equals(classDecl.getSimpleName())) {
-                    List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
+                    List<J.VariableDeclarations> variableDecls = new ArrayList<>(classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
                       .map(J.VariableDeclarations.class::cast)
-                      .collect(toList());
+                      .toList());
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
-                          classDecl.getBody().getStatements().stream()
+                            classDecl.getBody().getStatements().stream()
                             .filter(J.MethodDeclaration.class::isInstance)
                             .map(J.MethodDeclaration.class::cast)
                             .flatMap(it -> it.getParameters().stream())
                             .filter(J.VariableDeclarations.class::isInstance)
                             .map(J.VariableDeclarations.class::cast)
-                            .collect(toList())
+                            .toList()
                         );
                     }
 
@@ -1512,24 +1511,24 @@ class RenameVariableTest implements RewriteTest {
           ),
           java(
             """
-                public class Bar {
-                  private static final Foo foo = new Foo();
+              public class Bar {
+                private static final Foo foo = new Foo();
 
-                  public void bar() {
-                    foo.baz = (a, b) -> true;
-                    foo.baz2 = "hello";
-                  }
+                public void bar() {
+                  foo.baz = (a, b) -> true;
+                  foo.baz2 = "hello";
                 }
+              }
               """,
             """
-                public class Bar {
-                  private static final Foo FOO = new Foo();
+              public class Bar {
+                private static final Foo FOO = new Foo();
 
-                  public void bar() {
-                    FOO.baz = (a, b) -> true;
-                    FOO.baz2 = "hello";
-                  }
+                public void bar() {
+                  FOO.baz = (a, b) -> true;
+                  FOO.baz2 = "hello";
                 }
+              }
               """
           )
         );

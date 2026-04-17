@@ -147,7 +147,11 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
-          org.assertj.core.api.Assertions.assertThat(new SpacesVisitor<>(IntelliJ.spaces(), null,
-            new EmptyForIteratorPadStyle(false), null, false).visit(cu, 0)).isEqualTo(cu));
+          org.assertj.core.api.Assertions.assertThat(
+            new SpacesVisitor<>(
+              IntelliJ.spaces(),
+              null, new EmptyForIteratorPadStyle(false),
+              IntelliJ.wrappingAndBraces(),
+              null).visit(cu, 0)).isEqualTo(cu));
     }
 }

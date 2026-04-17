@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.format;
 
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -25,15 +26,11 @@ import org.openrewrite.xml.tree.Xml;
 
 public class NormalizeTabsOrSpaces extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Normalize to tabs or spaces";
-    }
+    @Getter
+    final String displayName = "Normalize to tabs or spaces";
 
-    @Override
-    public String getDescription() {
-        return "Consistently use either tabs or spaces in indentation.";
-    }
+    @Getter
+    final String description = "Consistently use either tabs or spaces in indentation.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

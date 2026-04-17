@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import io.github.classgraph.ClassGraph;
 import lombok.experimental.UtilityClass;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -129,6 +129,7 @@ public interface JavaParser extends Parser {
         }
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
         Set<String> missingArtifactNames = new LinkedHashSet<>(Arrays.asList(artifactNamesWithVersions));
+        List<String> availableArtifacts = new ArrayList<>();
 
         TypeTable typeTable = TypeTable.fromClasspath(ctx, missingArtifactNames);
         if (typeTable != null) {
@@ -139,6 +140,9 @@ public interface JavaParser extends Parser {
                     artifacts.add(located);
                     it.remove();
                 }
+            }
+            if (!missingArtifactNames.isEmpty()) {
+                availableArtifacts.addAll(typeTable.availableArtifacts());
             }
         }
 
@@ -151,12 +155,20 @@ public interface JavaParser extends Parser {
                         missingArtifactNames.remove(missingArtifactName);
                     }
                 }
+                if (!missingArtifactNames.isEmpty()) {
+                    availableArtifacts.addAll(classpathLoader.availableArtifacts());
+                }
             }
         }
 
         if (!missingArtifactNames.isEmpty()) {
             String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
-            throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
+            StringBuilder message = new StringBuilder();
+            message.append("Unable to find classpath resource dependencies beginning with: ").append(missing);
+            if (!availableArtifacts.isEmpty()) {
+                message.append(" in [").append(String.join(", ", availableArtifacts)).append(']');
+            }
+            throw new IllegalArgumentException(message.toString());
         }
 
         return artifacts;
@@ -389,12 +401,12 @@ class RuntimeClasspathCache {
             synchronized (RuntimeClasspathCache.class) {
                 paths = runtimeClasspath;
                 if (paths == null) {
-                    runtimeClasspath = paths = new ClassGraph()
-                            .disableNestedJarScanning()
-                            .getClasspathURIs().stream()
-                            .filter(uri -> "file".equals(uri.getScheme()))
-                            .map(Paths::get)
-                            .collect(toList());
+                    String cp = System.getProperty("java.class.path");
+                    runtimeClasspath = paths = cp == null ? Collections.emptyList() :
+                            Arrays.stream(cp.split(System.getProperty("path.separator")))
+                                    .map(Paths::get)
+                                    .filter(Files::exists)
+                                    .collect(toList());
                 }
             }
         }
@@ -429,21 +441,24 @@ class JdkParserBuilderCache {
 
             // Try to find and cache appropriate parser
 
-            // Java 23+ changed the return type of `DocCommentTable.getCommentTree` from `DCDocComment` to `DocCommentTree`
-            // That means Java 23 and above need the Java 25 parser, whereas Java 22 and below need the Java 21 parser
-            if (version > 22) {
+            // Parsers are compiled only for their matching Java version, given their use of internal/unstable APIs.
+            // Language features introduced in non-LTS versions are only supported from the next LTS version onwards.
+            // We recommend running on LTS versions wherever possible; non-LTS versions may struggle given the above.
+            // e.g.: Java 23+ changed the return type of `DocCommentTable.getCommentTree` from `DCDocComment` to `DocCommentTree`
+
+            if (version >= 25) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java25Parser");
             }
 
-            if (version > 17 && supplier == null) {
+            if (supplier == null && version >= 21) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java21Parser");
             }
 
-            if (version > 11 && supplier == null) {
+            if (supplier == null && version >= 17) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java17Parser");
             }
 
-            if (version > 8 && supplier == null) {
+            if (supplier == null && version >= 11) {
                 supplier = tryCreateBuilderSupplier("org.openrewrite.java.Java11Parser");
             }
 

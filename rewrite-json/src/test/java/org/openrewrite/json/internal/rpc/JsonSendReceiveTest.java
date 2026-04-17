@@ -15,10 +15,13 @@
  */
 package org.openrewrite.json.internal.rpc;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.SneakyThrows;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +38,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 
 import static org.openrewrite.json.Assertions.json;
+import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JsonSendReceiveTest implements RewriteTest {
@@ -43,16 +47,19 @@ class JsonSendReceiveTest implements RewriteTest {
 
     @BeforeEach
     void before() throws IOException {
-        PipedOutputStream serverOut = new PipedOutputStream();
-        PipedOutputStream clientOut = new PipedOutputStream();
-        PipedInputStream serverIn = new PipedInputStream(clientOut);
-        PipedInputStream clientIn = new PipedInputStream(serverOut);
+        var serverOut = new PipedOutputStream();
+        var clientOut = new PipedOutputStream();
+        var serverIn = new PipedInputStream(clientOut);
+        var clientIn = new PipedInputStream(serverOut);
 
         Environment env = Environment.builder().build();
 
-        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverIn, serverOut))), env)
+        var serverFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+        var clientFormatter = new JsonMessageFormatter(new ParameterNamesModule());
+
+        server = new RewriteRpc(new JsonRpc(new TraceMessageHandler("server", new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut))), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
-        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientIn, clientOut))), env)
+        client = new RewriteRpc(new JsonRpc(new TraceMessageHandler("client", new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut))), env.toMarketplace(runtimeClasspath()))
           .batchSize(1);
     }
 
@@ -67,7 +74,7 @@ class JsonSendReceiveTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new TreeVisitor<>() {
             @Override
             @SneakyThrows
-            public Tree preVisit(Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree preVisit(Tree tree, ExecutionContext ctx) {
                 Tree t = server.visit((SourceFile) tree, ChangeValue.class.getName(), 0);
                 stopAfterPreVisit();
                 return t;

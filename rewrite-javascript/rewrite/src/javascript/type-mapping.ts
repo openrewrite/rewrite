@@ -14,14 +14,9 @@
  * limitations under the License.
  */
 import ts from "typescript";
+import * as path from "path";
 import {Type} from "../java";
-import {immerable} from "immer";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
-
-// Helper class to create Type objects that immer won't traverse
-class NonDraftableType {
-    [immerable] = false;
-}
 
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
@@ -36,7 +31,8 @@ export class JavaScriptTypeMapping {
 
 
     constructor(
-        private readonly checker: ts.TypeChecker
+        private readonly checker: ts.TypeChecker,
+        private readonly sourceRoot?: string
     ) {
         this.regExpSymbol = checker.resolveName(
             "RegExp",
@@ -75,11 +71,14 @@ export class JavaScriptTypeMapping {
             // Fall through to regular type checking if not a variable
         }
 
+        // TypeNode needs getTypeFromTypeNode (resolves the annotation itself).
+        // Everything else — expressions, declarations, specifiers, bindings, etc. —
+        // uses getTypeAtLocation which works for virtually all node kinds.
         let type: ts.Type | undefined;
-        if (ts.isExpression(node)) {
-            type = this.checker.getTypeAtLocation(node);
-        } else if (ts.isTypeNode(node)) {
+        if (ts.isTypeNode(node)) {
             type = this.checker.getTypeFromTypeNode(node);
+        } else {
+            type = this.checker.getTypeAtLocation(node);
         }
         return type && this.getType(type);
     }
@@ -172,26 +171,30 @@ export class JavaScriptTypeMapping {
                                 this.populateClassType(classType, declaredType);
                             }
 
-                            // Resolve type arguments
+                            // Shell-cache: Create parameterized type wrapper with empty typeParameters
+                            // BEFORE resolving type arguments, to prevent infinite recursion
+                            // when type argument resolution cycles back to this parameterized type
+                            const parameterized = {
+                                kind: Type.Kind.Parameterized,
+                                type: classType,
+                                typeParameters: [],
+                                fullyQualifiedName: classType.fullyQualifiedName,
+                                toJSON: function () {
+                                    return Type.signature(this);
+                                }
+                            } as Type.Parameterized;
+                            this.typeCache.set(signature, parameterized);
+
+                            // Resolve type arguments (may recursively reference this parameterized type)
                             const typeParameters: Type[] = [];
                             for (const typeArg of typeRef.typeArguments!) {
                                 const resolvedArg = this.getType(typeArg as ts.Type);
                                 typeParameters.push(resolvedArg);
                             }
 
-                            // Create the parameterized type wrapper
-                            const parameterized = Object.assign(new NonDraftableType(), {
-                                kind: Type.Kind.Parameterized,
-                                type: classType,
-                                typeParameters: typeParameters,
-                                fullyQualifiedName: classType.fullyQualifiedName,
-                                toJSON: function () {
-                                    return Type.signature(this);
-                                }
-                            }) as Type.Parameterized;
+                            // Update the shell with resolved type parameters
+                            (parameterized as any).typeParameters = typeParameters;
 
-                            // Cache the parameterized type
-                            this.typeCache.set(signature, parameterized);
                             return parameterized;
                         }
                     }
@@ -293,7 +296,9 @@ export class JavaScriptTypeMapping {
             }
         }
 
-        // For non-object types, we can create them directly without recursion concerns
+        // Pre-cache as unknownType before resolving type aliases to prevent infinite
+        // recursion when alias resolution cycles back through getType with different type.ids
+        this.typeCache.set(signature, Type.unknownType);
         const result = this.createPrimitiveOrUnknownType(type);
         this.typeCache.set(signature, result);
         return result;
@@ -418,7 +423,7 @@ export class JavaScriptTypeMapping {
                     if (ts.isStringLiteral(importDecl.moduleSpecifier)) {
                         const moduleSpecifier = importDecl.moduleSpecifier.text;
                         // Create a Type.Class representing the module
-                        ownerType = Object.assign(new NonDraftableType(), {
+                        ownerType = {
                             kind: Type.Kind.Class,
                             flags: 0,
                             classKind: Type.Class.Kind.Interface,
@@ -431,7 +436,7 @@ export class JavaScriptTypeMapping {
                             toJSON: function () {
                                 return Type.signature(this);
                             }
-                        }) as Type.Class;
+                        } as Type.Class;
                     }
                 }
             }
@@ -461,7 +466,7 @@ export class JavaScriptTypeMapping {
                                     // Store the module as the owningClass for now
                                     // (This is a bit of a hack, but works with the current type system)
                                     if (Type.isClass(ownerType)) {
-                                        (ownerType as any).owningClass = Object.assign(new NonDraftableType(), {
+                                        (ownerType as any).owningClass = {
                                             kind: Type.Kind.Class,
                                             flags: 0,
                                             classKind: Type.Class.Kind.Interface,
@@ -474,7 +479,7 @@ export class JavaScriptTypeMapping {
                                             toJSON: function () {
                                                 return Type.signature(this);
                                             }
-                                        }) as Type.Class;
+                                        } as Type.Class;
                                     }
                                 }
                             }
@@ -485,7 +490,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Variable
-        const variable = Object.assign(new NonDraftableType(), {
+        const variable = {
             kind: Type.Kind.Variable,
             name: actualSymbol.getName(),
             owner: ownerType,
@@ -494,7 +499,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Variable;
+        } as Type.Variable;
 
         return variable;
     }
@@ -565,7 +570,7 @@ export class JavaScriptTypeMapping {
      */
     private createMethodType(
         signature: ts.Signature,
-        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
+        node: ts.MethodSignature | ts.FunctionDeclaration | ts.MethodDeclaration | ts.ConstructorDeclaration | ts.FunctionExpression | ts.CallExpression | ts.NewExpression,
         declaringType: Type.FullyQualified,
         name: string,
         declaredFormalTypeNames: string[] = []
@@ -593,7 +598,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create the Type.Method object
-        const method = Object.assign(new NonDraftableType(), {
+        const method = {
             kind: Type.Kind.Method,
             flags: 0, // FIXME - determine flags
             declaringType: declaringType,
@@ -608,7 +613,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Method;
+        } as Type.Method;
 
         this.methodCache.set(cacheKey, method);
         return method;
@@ -915,6 +920,22 @@ export class JavaScriptTypeMapping {
                     declaredFormalTypeNames.push(tp.name.getText());
                 }
             }
+        } else if (ts.isConstructorDeclaration(node)) {
+            // For constructor declarations
+            signature = this.checker.getSignatureFromDeclaration(node);
+            if (!signature) {
+                return undefined;
+            }
+
+            methodName = "<constructor>";
+
+            const parent = node.parent;
+            if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) {
+                const parentType = this.checker.getTypeAtLocation(parent);
+                declaringType = this.getType(parentType) as Type.FullyQualified;
+            } else {
+                declaringType = Type.unknownType as Type.FullyQualified;
+            }
         } else if (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node)) {
             // For function declarations/expressions
             signature = this.checker.getSignatureFromDeclaration(node);
@@ -923,7 +944,24 @@ export class JavaScriptTypeMapping {
             }
 
             methodName = node.name ? node.name.getText() : "<anonymous>";
-            declaringType = Type.unknownType as Type.FullyQualified;
+
+            // Derive declaring type from source file module path (like Go's type_mapper.go).
+            // Use the same relativization as getFullyQualifiedName() so that declarations
+            // and invocations produce matching FQNs.
+            let moduleFqn: string;
+            const fileName = node.getSourceFile().fileName;
+            if (this.sourceRoot && path.isAbsolute(fileName)) {
+                moduleFqn = path.relative(this.sourceRoot, fileName);
+            } else {
+                moduleFqn = fileName;
+            }
+            // Strip file extension to get the module name
+            moduleFqn = moduleFqn.replace(/\.[^/.]+$/, '');
+            declaringType = {
+                kind: Type.Kind.Class,
+                flags: 0,
+                fullyQualifiedName: moduleFqn
+            } as Type.FullyQualified;
 
             // Get type parameters from node
             if (node.typeParameters) {
@@ -1032,6 +1070,14 @@ export class JavaScriptTypeMapping {
                     cleanedName = packageName;
                 }
             }
+        } else if (path.isAbsolute(cleanedName)) {
+            // TypeScript returns absolute file paths as module names for project source files
+            // that are ES modules (have imports/exports). Relativize using sourceRoot.
+            // Example: /var/moderne/.../BookStack/resources/js/foo.MyClass
+            // Should become: resources/js/foo.MyClass
+            if (this.sourceRoot) {
+                cleanedName = path.relative(this.sourceRoot, cleanedName);
+            }
         }
 
         return cleanedName.endsWith('Constructor') ?
@@ -1062,7 +1108,7 @@ export class JavaScriptTypeMapping {
         }
 
         // Create empty class type shell (no members yet to avoid recursion)
-        return Object.assign(new NonDraftableType(), {
+        return {
             kind: Type.Kind.Class,
             flags: 0, // TODO - determine flags
             classKind: classKind,
@@ -1075,7 +1121,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Class;
+        } as Type.Class;
     }
 
     /**
@@ -1191,7 +1237,7 @@ export class JavaScriptTypeMapping {
             } else {
                 // Create Type.Variable for fields/properties
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
-                const variable: Type.Variable = Object.assign(new NonDraftableType(), {
+                const variable: Type.Variable = {
                     kind: Type.Kind.Variable,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
@@ -1200,7 +1246,7 @@ export class JavaScriptTypeMapping {
                     toJSON: function () {
                         return Type.signature(this);
                     }
-                }) as Type.Variable;
+                } as Type.Variable;
                 classType.members.push(variable);
             }
         }
@@ -1261,10 +1307,10 @@ export class JavaScriptTypeMapping {
      */
     private createUnionType(unionType: ts.UnionType, cacheKey: string | number): Type.Union {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const union = Object.assign(new NonDraftableType(), {
+        const union = {
             kind: Type.Kind.Union,
             bounds: []
-        }) as Type.Union;
+        } as Type.Union;
 
         this.typeCache.set(cacheKey, union);
 
@@ -1286,10 +1332,10 @@ export class JavaScriptTypeMapping {
      */
     private createIntersectionType(intersectionType: ts.IntersectionType, cacheKey: string | number): Type.Intersection {
         // Shell-cache FIRST to prevent infinite recursion (before resolving constituent types)
-        const intersection = Object.assign(new NonDraftableType(), {
+        const intersection = {
             kind: Type.Kind.Intersection,
             bounds: []
-        }) as Type.Intersection;
+        } as Type.Intersection;
 
         this.typeCache.set(cacheKey, intersection);
 
@@ -1315,12 +1361,12 @@ export class JavaScriptTypeMapping {
         const name = symbol ? symbol.getName() : '?';
 
         // Shell-cache: Create stub, cache it, then populate (prevents cycles)
-        const gtv = Object.assign(new NonDraftableType(), {
+        const gtv = {
             kind: Type.Kind.GenericTypeVariable,
             name: name,
             variance: Type.GenericTypeVariable.Variance.Invariant,
             bounds: []
-        }) as Type.GenericTypeVariable;
+        } as Type.GenericTypeVariable;
 
         this.typeCache.set(cacheKey, gtv);
 
@@ -1350,7 +1396,7 @@ export class JavaScriptTypeMapping {
      * The shell will be populated later to handle circular references.
      */
     private createEmptyFunctionType(): Type.Class {
-        return Object.assign(new NonDraftableType(), {
+        return {
             kind: Type.Kind.Class,
             flags: 0,
             classKind: Type.Class.Kind.Interface,
@@ -1363,7 +1409,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Class;
+        } as Type.Class;
     }
 
     /**
@@ -1394,27 +1440,27 @@ export class JavaScriptTypeMapping {
         const typeParameters: Type[] = [];
 
         // Return type parameter (covariant)
-        typeParameters.push(Object.assign(new NonDraftableType(), {
+        typeParameters.push({
             kind: Type.Kind.GenericTypeVariable,
             name: 'R',
             variance: Type.GenericTypeVariable.Variance.Covariant,
             bounds: [returnType]
-        }) as Type.GenericTypeVariable);
+        } as Type.GenericTypeVariable);
 
         // Parameter type variables (contravariant)
         parameterTypes.forEach((paramType, index) => {
-            typeParameters.push(Object.assign(new NonDraftableType(), {
+            typeParameters.push({
                 kind: Type.Kind.GenericTypeVariable,
                 name: `P${index + 1}`,
                 variance: Type.GenericTypeVariable.Variance.Contravariant,
                 bounds: [paramType]
-            }) as Type.GenericTypeVariable);
+            } as Type.GenericTypeVariable);
         });
 
         functionClass.typeParameters = typeParameters;
 
         // Create the apply() method
-        const applyMethod = Object.assign(new NonDraftableType(), {
+        const applyMethod = {
             kind: Type.Kind.Method,
             flags: 0,
             declaringType: functionClass,
@@ -1429,7 +1475,7 @@ export class JavaScriptTypeMapping {
             toJSON: function () {
                 return Type.signature(this);
             }
-        }) as Type.Method;
+        } as Type.Method;
 
         // Add the apply method to the function class
         functionClass.methods.push(applyMethod);

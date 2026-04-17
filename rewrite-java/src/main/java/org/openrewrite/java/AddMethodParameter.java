@@ -68,29 +68,27 @@ public class AddMethodParameter extends Recipe {
         return String.format("`%s %s` in methods `%s`", parameterType, parameterName, methodPattern);
     }
 
-    @Override
-    public String getDisplayName() {
-        return "Add method parameter to a method declaration";
-    }
+    String displayName = "Add method parameter to a method declaration";
 
-    @Override
-    public String getDescription() {
-        return "Adds a new method parameter to an existing method declaration.";
-    }
+    String description = "Adds a new method parameter to an existing method declaration.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         int idx = methodPattern.indexOf('#');
         idx = idx == -1 ? methodPattern.indexOf(' ') : idx;
         boolean typePattern = idx != -1 && methodPattern.lastIndexOf('*', idx) != -1;
-        return Preconditions.check(typePattern ? new DeclaresMatchingType(methodPattern.substring(0, idx)) : new DeclaresType<>(methodPattern.substring(0, idx)), new AddNullMethodArgumentVisitor(methodPattern));
+        return Preconditions.check(
+                typePattern ?
+                        new DeclaresMatchingType(methodPattern.substring(0, idx)) :
+                        new DeclaresType<>(methodPattern.substring(0, idx), true),
+                new AddNullMethodArgumentVisitor(methodPattern));
     }
 
     private class AddNullMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
 
         public AddNullMethodArgumentVisitor(String methodPattern) {
-            this.methodMatcher = new MethodMatcher(methodPattern);
+            this.methodMatcher = new MethodMatcher(methodPattern, true);
         }
 
         @Override
@@ -263,7 +261,7 @@ public class AddMethodParameter extends Recipe {
         private final TypeMatcher typeMatcher;
 
         public DeclaresMatchingType(String type) {
-            this.typeMatcher = new TypeMatcher(type);
+            this.typeMatcher = new TypeMatcher(type, true);
         }
 
         @Override

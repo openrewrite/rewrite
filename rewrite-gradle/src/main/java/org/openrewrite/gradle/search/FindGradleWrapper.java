@@ -67,15 +67,9 @@ public class FindGradleWrapper extends Recipe {
     @Nullable
     String distribution;
 
-    @Override
-    public String getDisplayName() {
-        return "Find Gradle wrappers";
-    }
+    String displayName = "Find Gradle wrappers";
 
-    @Override
-    public String getDescription() {
-        return "Find Gradle wrappers.";
-    }
+    String description = "Find Gradle wrappers.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

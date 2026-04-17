@@ -22,6 +22,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -96,6 +97,186 @@ class AddPropertyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addPropertyWhenLocalParentDoesNotDefineIt() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-child</module>
+                </modules>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-child</module>
+                </modules>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                    <relativePath>../pom.xml</relativePath>
+                  </parent>
+                  <artifactId>my-child</artifactId>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                    <relativePath>../pom.xml</relativePath>
+                  </parent>
+                  <artifactId>my-child</artifactId>
+                  <properties>
+                    <key>value</key>
+                  </properties>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void consolidatesToParentWhenBothDefineProperty() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-child</module>
+                </modules>
+                <properties>
+                  <key>oldValue</key>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-child</module>
+                </modules>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                    <relativePath>../pom.xml</relativePath>
+                  </parent>
+                  <artifactId>my-child</artifactId>
+                  <properties>
+                    <key>oldValue</key>
+                  </properties>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                    <relativePath>../pom.xml</relativePath>
+                  </parent>
+                  <artifactId>my-child</artifactId>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addPropertyToChildWithImplicitRelativePath() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-child</module>
+                </modules>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <modules>
+                  <module>my-child</module>
+                </modules>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
+              """
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-child</artifactId>
+                </project>
+                """,
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <artifactId>my-child</artifactId>
+                  <properties>
+                    <key>value</key>
+                  </properties>
+                </project>
+                """
+            )
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/3895")
     @Test
@@ -381,6 +562,83 @@ class AddPropertyTest implements RewriteTest {
               </properties>
             </project>
             """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2123")
+    @Test
+    void preserveSelfClosingProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("argLine", "", true, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <argLine/>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/moderneinc/customer-requests/issues/2123")
+    @Test
+    void updateSelfClosingProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("argLine", "some-value", null, false)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <argLine/>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <argLine>some-value</argLine>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void twiceInARow() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AddProperty("key", "value", null, false),
+            new AddProperty("key", "v", null, false)
+          ).cycles(1).expectedCyclesThatMakeChanges(1),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>v</key>
+                </properties>
+              </project>
+              """,
+            sourceSpecs -> sourceSpecs.after(actual ->
+              assertThat(actual)
+                .contains("<key>v</key>")
+                .actual()
+            )
           )
         );
     }

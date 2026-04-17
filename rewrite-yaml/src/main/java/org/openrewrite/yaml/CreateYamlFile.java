@@ -67,15 +67,9 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create YAML file";
-    }
+    String displayName = "Create YAML file";
 
-    @Override
-    public String getDescription() {
-        return "Create a new YAML file.";
-    }
+    String description = "Create a new YAML file.";
 
     @Override
     public AtomicBoolean getInitialValue(ExecutionContext ctx) {

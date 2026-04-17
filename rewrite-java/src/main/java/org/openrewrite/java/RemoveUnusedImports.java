@@ -45,27 +45,14 @@ import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveUnusedImports extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Remove unused imports";
-    }
+    String displayName = "Remove unused imports";
 
-    @Override
-    public String getDescription() {
-        return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
-               "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
-               "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
-    }
+    String description = "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
+               "will be removed from any source where unknown types are referenced.";
 
-    @Override
-    public Set<String> getTags() {
-        return singleton("RSPEC-S1128");
-    }
+    Set<String> tags = singleton("RSPEC-S1128");
 
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
+    Duration estimatedEffortPerOccurrence = Duration.ofMinutes(5);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -85,6 +72,10 @@ public class RemoveUnusedImports extends Recipe {
 
             // Collect all unqualified type references upfront for efficiency
             Set<String> unqualifiedTypeNames = collectUnqualifiedTypeNames(cu);
+
+            // Collect all identifier simple names from source (excluding imports) to detect
+            // types that only appear in type attribution but not in actual source references
+            Set<String> sourceIdentifierNames = collectSourceIdentifierNames(cu);
 
             for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
                 if (method.hasFlags(Flag.Static)) {
@@ -207,6 +198,8 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                     .getElement().withPrefix(elem.getPrefix())));
 
+                            anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
+
                             changed = true;
                         } else {
                             usedStaticWildcardImports.add(elem.getTypeName());
@@ -231,7 +224,7 @@ public class RemoveUnusedImports extends Recipe {
                             .filter(fq -> fq.getOwningClass() == null || !topLevelTypeNames.contains(fq.getOwningClass().getFullyQualifiedName()))
                             .collect(toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
-                    if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
+                    if ((combinedTypes.isEmpty() && !unqualifiedTypeNames.contains(elem.getTypeName())) || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
@@ -258,6 +251,7 @@ public class RemoveUnusedImports extends Recipe {
                             if (!anImport.imports.isEmpty()) {
                                 anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
                                         .getElement().withPrefix(elem.getPrefix())));
+                                anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
                                 changed = true;
                             } else {
                                 // No types are used unqualified, so remove the wildcard import entirely
@@ -267,12 +261,17 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             usedWildcardImports.add(target);
                         }
+                    } else if (!sourceIdentifierNames.contains(qualid.getSimpleName())) {
+                        // The imported type's simple name doesn't appear anywhere in the source code;
+                        // it only appears in type attribution (e.g., as a parameter type of a statically imported method)
+                        anImport.used = false;
+                        changed = true;
                     } else if (combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }
                         return fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName());
-                    })) {
+                    }) && !unqualifiedTypeNames.contains(elem.getTypeName())) {
                         anImport.used = false;
                         changed = true;
                     }
@@ -516,6 +515,25 @@ public class RemoveUnusedImports extends Recipe {
                         cursor = cursor.getParent();
                     }
                     return false;
+                }
+            }.reduce(cu, new HashSet<>());
+        }
+
+        /**
+         * Collect all identifier simple names appearing in source code, excluding import statements.
+         * Used to detect imports whose type name doesn't actually appear in the source.
+         */
+        private Set<String> collectSourceIdentifierNames(J.CompilationUnit cu) {
+            return new JavaIsoVisitor<Set<String>>() {
+                @Override
+                public J.Import visitImport(J.Import import_, Set<String> names) {
+                    return import_;
+                }
+
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> names) {
+                    names.add(identifier.getSimpleName());
+                    return super.visitIdentifier(identifier, names);
                 }
             }.reduce(cu, new HashSet<>());
         }

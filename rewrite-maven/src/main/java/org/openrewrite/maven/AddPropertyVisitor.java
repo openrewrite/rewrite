@@ -43,7 +43,7 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
         if (!properties.isPresent()) {
             Xml.Tag propertiesTag = Xml.Tag.build("<properties>\n<" + key + ">" + value + "</" + key + ">\n</properties>");
             d = (Xml.Document) new AddToTagVisitor<ExecutionContext>(root, propertiesTag, new MavenTagInsertionComparator(root.getChildren())).visitNonNull(d, ctx);
-        } else if (!properties.get().getChildValue(key).isPresent()) {
+        } else if (!properties.get().getChild(key).isPresent()) {
             Xml.Tag propertyTag = Xml.Tag.build("<" + key + ">" + value + "</" + key + ">");
             d = (Xml.Document) new AddToTagVisitor<>(properties.get(), propertyTag, new TagNameComparator()).visitNonNull(d, ctx);
         }
@@ -60,7 +60,7 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
             String tagValue = tag.getValue().orElse(null);
             // Only update if values are different, considering null values
             if (!Objects.equals(value, tagValue)) {
-                doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
+                return (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(tag, ctx);
             }
         }
         return super.visitTag(tag, ctx);

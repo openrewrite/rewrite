@@ -30,8 +30,6 @@ import java.nio.file.Path;
 import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.json.Assertions.json;
-
 @SuppressWarnings({"unused", "DataFlowIssue"})
 public class Assertions {
 
@@ -59,15 +57,20 @@ public class Assertions {
             }
         }
 
-        // Second pass: get or create cached workspace and symlink node_modules
+        // Second pass: get or create cached workspace and symlink node_modules and package-lock.json
         if (packageJsonContent != null) {
             Path workspaceDir = DependencyWorkspace.getOrCreateWorkspace(packageJsonContent);
             Path nodeModulesSource = workspaceDir.resolve("node_modules");
             Path nodeModulesTarget = relativeTo.resolve("node_modules");
+            Path lockFileSource = workspaceDir.resolve("package-lock.json");
+            Path lockFileTarget = relativeTo.resolve("package-lock.json");
 
             try {
                 if (Files.exists(nodeModulesSource) && !Files.exists(nodeModulesTarget)) {
                     Files.createSymbolicLink(nodeModulesTarget, nodeModulesSource);
+                }
+                if (Files.exists(lockFileSource) && !Files.exists(lockFileTarget)) {
+                    Files.createSymbolicLink(lockFileTarget, lockFileSource);
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for node_modules", e);
@@ -77,20 +80,41 @@ public class Assertions {
         return SourceSpecs.dir(relativeTo.toString(), sources);
     }
 
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before) {
-        return json(before, spec -> spec.path("package.json"));
-    }
-
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after) {
-        return json(before, after, spec -> spec.path("package.json"));
-    }
-
-    public static SourceSpecs packageJson(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
-                                          Consumer<SourceSpec<Json.Document>> spec) {
-        return json(before, after, s -> {
-            s.path("package.json");
-            spec.accept(s);
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before) {
+        return packageJson(before, s -> {
         });
+    }
+
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before,
+                                          Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, PackageJsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package.json");
+        spec.accept(json);
+        return json;
+    }
+
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before, @Language("json5") @Nullable String after) {
+        return packageJson(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs packageJson(@Language("json5") @Nullable String before, @Language("json5") @Nullable String after,
+                                          Consumer<SourceSpec<Json.Document>> spec) {
+        SourceSpec<Json.Document> json = new SourceSpec<>(
+                Json.Document.class, null, PackageJsonParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        json.path("package.json");
+        json.after(s -> after);
+        spec.accept(json);
+        return json;
     }
 
     public static SourceSpecs javascript(@Language("js") @Nullable String before) {

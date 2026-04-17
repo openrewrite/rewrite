@@ -19,7 +19,7 @@ import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor, JS} from "../../../javascript";
 import {J} from "../../../java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 export class ExportAssignmentToExportDefault extends Recipe {
     name = "org.openrewrite.javascript.migrate.typescript.export-assignment-to-export-default";

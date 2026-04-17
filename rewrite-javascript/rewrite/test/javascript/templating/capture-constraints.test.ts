@@ -472,9 +472,9 @@ describe('Capture Constraints', () => {
                 constraint: (node, context) => {
                     const aValue = context.captures.get(a) as J.Literal | undefined;
                     return typeof node.value === 'number' &&
-                           aValue !== undefined &&
-                           typeof aValue.value === 'number' &&
-                           node.value > aValue.value;
+                        aValue !== undefined &&
+                        typeof aValue.value === 'number' &&
+                        node.value > aValue.value;
                 }
             });
             const c = capture<J.Literal>({

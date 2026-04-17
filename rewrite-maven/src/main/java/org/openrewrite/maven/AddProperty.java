@@ -53,21 +53,15 @@ public class AddProperty extends Recipe {
     @Nullable
     Boolean trustParent;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven project property";
-    }
+    String displayName = "Add Maven project property";
 
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s=%s`", key, value);
     }
 
-    @Override
-    public String getDescription() {
-        return "Add a new property to the Maven project property. " +
+    String description = "Add a new property to the Maven project property. " +
                "Prefers to add the property to the parent if the project has multiple modules.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -81,8 +75,8 @@ public class AddProperty extends Recipe {
                     return document;
                 }
 
-                // If there is a parent pom in the same project, update the property there instead
-                if (document.getRoot().getChild("parent")
+                // If there is a parent pom in the same project and the property already exists locally, consolidate it to the parent instead
+                if (parentValue != null && document.getRoot().getChild("parent")
                         .flatMap(tag -> tag.getChild("relativePath"))
                         .flatMap(Xml.Tag::getValue)
                         .flatMap(v -> v.trim().isEmpty() ? Optional.empty() : Optional.of(v))

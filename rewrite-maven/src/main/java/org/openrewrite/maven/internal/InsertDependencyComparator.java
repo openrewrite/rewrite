@@ -25,29 +25,50 @@ public class InsertDependencyComparator implements Comparator<Content> {
     private final Map<Content, Float> positions = new LinkedHashMap<>();
 
     public InsertDependencyComparator(List<? extends Content> existingDependencies, Xml.Tag dependencyTag) {
-        for (int i = 0, existingDependenciesSize = existingDependencies.size(); i < existingDependenciesSize; i++) {
-            positions.put(existingDependencies.get(i), (float) i);
-        }
+        // Group comments with their following dependency tags
+        Map<Xml.Tag, List<Content>> dependencyWithPrecedingComments = new LinkedHashMap<>();
+        List<Content> currentComments = new ArrayList<>();
 
-        // Make a copy of statements with only dependencies
-        List<Xml.Tag> dependencies = new ArrayList<>();
-        for (Content c : existingDependencies) {
-            if (c instanceof Xml.Tag) {
-                dependencies.add((Xml.Tag) c);
+        for (int i = 0; i < existingDependencies.size(); i++) {
+            Content content = existingDependencies.get(i);
+            if (content instanceof Xml.Tag) {
+                dependencyWithPrecedingComments.put((Xml.Tag) content, new ArrayList<>(currentComments));
+                currentComments.clear();
+            } else {
+                currentComments.add(content);
             }
         }
 
+        // Assign initial positions based on current order, keeping comments with their dependencies
+        float position = 0f;
+        for (Map.Entry<Xml.Tag, List<Content>> entry : dependencyWithPrecedingComments.entrySet()) {
+            // Position the comments just before their dependency
+            for (Content comment : entry.getValue()) {
+                positions.put(comment, position);
+                position += 0.1f;
+            }
+            positions.put(entry.getKey(), position);
+            position += 1.0f;
+        }
+
+        for (Content comment : currentComments) {
+            positions.put(comment, position);
+            position += 0.1f;
+        }
+
+        List<Xml.Tag> dependencies = new ArrayList<>(dependencyWithPrecedingComments.keySet());
         if (dependencies.isEmpty()) {
-            positions.put(dependencyTag, existingDependencies.size() + 0.5f);
+            positions.put(dependencyTag, position);
             return;
         }
 
         dependencies.add(dependencyTag);
         dependencies.sort(dependencyComparator);
 
-        Content afterDependency = null;
+        // Find where the new dependency should go
+        Xml.Tag afterDependency = null;
         for (int i = 0; i < dependencies.size(); i++) {
-            Content d = dependencies.get(i);
+            Xml.Tag d = dependencies.get(i);
             if (dependencyTag == d) {
                 if (i > 0) {
                     afterDependency = dependencies.get(i - 1);
@@ -57,14 +78,12 @@ public class InsertDependencyComparator implements Comparator<Content> {
         }
 
         // Put `dependencyTag` at the proper place in the positions map
-        boolean isFirst = afterDependency == null;
-        for (float f = isFirst ? 0 : positions.get(afterDependency); f < existingDependencies.size(); f++) {
-            Content content = existingDependencies.get((int) f);
-            if (!(content instanceof Xml.Tag)) {
-                continue;
-            }
-            positions.put(dependencyTag, positions.get(content) + (isFirst ? -0.5f : 0.5f));
-            break;
+        if (afterDependency == null) {
+            // Insert at the beginning - position it before the first dependency
+            positions.put(dependencyTag, -0.5f);
+        } else {
+            // Insert after the specified dependency - position it between that dependency and the next
+            positions.put(dependencyTag, positions.get(afterDependency) + 0.5f);
         }
     }
 

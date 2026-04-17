@@ -18,9 +18,13 @@ package org.openrewrite.yaml;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.yaml.Assertions.yaml;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
@@ -1657,7 +1661,7 @@ class MergeYamlTest implements RewriteTest {
                 null,
                 null
               ),
-              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null, null))
             .expectedCyclesThatMakeChanges(2),
           yaml(
             """
@@ -1801,7 +1805,7 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(new MergeYaml(
-              "$.",
+              "$",
               // language=yaml
               """
                 script: |
@@ -3059,22 +3063,21 @@ class MergeYamlTest implements RewriteTest {
 
     @Test
     void invalidYaml() {
-        assertThrows(AssertionError.class, () -> rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.some.object",
-              // language=yaml
-              """
-                script: |-ParseError
-                """,
-              false,
-              "name",
-              null,
-              null,
-              null,
-              null
-            ))
-        ));
+        var recipe = new MergeYaml(
+          "$.some.object",
+          //language=text
+          """
+            script: |-ParseError
+            """,
+          false,
+          "name",
+          null,
+          null,
+          null,
+          null
+        );
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .anyMatch(msg -> msg.startsWith("Could not parse as YAML"));
     }
 
     @Test
@@ -3141,29 +3144,28 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("DataFlowIssue")
     @Test
     void sourceNull() {
-        assertThrows(AssertionError.class, () ->
-            rewriteRun(
-              spec -> spec
-                .recipe(new MergeYaml(
-                  "$.some.object",
-                  null,
-                  false,
-                  "name",
-                  null,
-                  null,
-                  null,
-                  null
-                ))
-            ));
+        var recipe = new MergeYaml(
+          "$.some.object",
+          null,
+          false,
+          "name",
+          null,
+          null,
+          null,
+          null
+        );
+        assertThat(recipe.validate().failures()).extracting(Validated.Invalid::getMessage)
+            .contains("Must be valid YAML");
     }
 
     @Test
     void lastEntryShouldKeepItsComment() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
-            "$.",
+            "$",
             "imagePullPolicy: Always",
             true,
             null,
@@ -3285,4 +3287,469 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mergeRecipePreconditionsInsertBefore() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              preconditions:
+                - org.openrewrite.Singleton
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "recipeList",
+            true
+          )),
+          yaml(
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.MyRecipe
+              displayName: My Recipe
+              description: Does something useful
+              preconditions:
+                - org.openrewrite.java.search.FindTypes:
+                    fullyQualifiedTypeName: org.openrewrite.Recipe
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """,
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.MyRecipe
+              displayName: My Recipe
+              description: Does something useful
+              preconditions:
+                - org.openrewrite.java.search.FindTypes:
+                    fullyQualifiedTypeName: org.openrewrite.Recipe
+                - org.openrewrite.Singleton
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeRecipePreconditionsInsertBeforeWithFoldedString() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              preconditions:
+                - org.openrewrite.Singleton
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "recipeList",
+            true
+          )),
+          yaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.FoldedStrip
+              displayName: Folded Strip
+              description: >-
+                Folded with strip.
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """,
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.example.FoldedStrip
+              displayName: Folded Strip
+              description: >-
+                Folded with strip.
+              preconditions:
+                - org.openrewrite.Singleton
+              recipeList:
+                - org.openrewrite.java.OrderImports
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterLiteralString() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              description: |-
+                Literal with strip.
+              nextKey: value
+              """,
+            """
+              description: |-
+                Literal with strip.
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterNestedMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              config:
+                nested:
+                  deep: value
+              nextKey: value
+              """,
+            """
+              config:
+                nested:
+                  deep: value
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              items:
+                - item1
+                - item2
+              nextKey: value
+              """,
+            """
+              items:
+                - item1
+                - item2
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeAfterPlainScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              newKey: newValue
+              """,
+            false,
+            null,
+            null,
+            Before,
+            "nextKey",
+            true
+          )),
+          yaml(
+            """
+              description: Plain scalar value
+              nextKey: value
+              """,
+            """
+              description: Plain scalar value
+              newKey: newValue
+              nextKey: value
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3950")
+    @Test
+    void deleteKeyFollowedByMergeYamlCompletesInTwoCycles() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(2)
+            .recipe(
+              new CompositeRecipe(
+                List.of(
+                  new DeleteKey("$.*", null),
+                  new MergeYaml("$", "foo: bar", null, null, "test.yml", null, null, null)
+                )
+              )
+            ),
+          yaml(
+            """
+              x: y
+              """,
+            """
+              foo: bar
+              """,
+            spec -> spec.path("test.yml")
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3539")
+    @Test
+    void mergeExistingKeyInMultiDocumentYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              app:
+                core:
+                  key2: value02
+              """,
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              app:
+                app.key: app
+              ---
+              com:
+                key1: value1
+              app:
+                core:
+                  key1: value01
+              """,
+            """
+              app:
+                app.key: app
+                core:
+                  key2: value02
+              ---
+              com:
+                key1: value1
+              app:
+                core:
+                  key1: value01
+                  key2: value02
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3310")
+    @Test
+    void wildcardMatchesEachChildMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.list.services.*",
+            //language=yaml
+            "beta: fixedValue",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              list:
+                services:
+                  foo:
+                    alpha: randomValue1
+                  bar:
+                    alpha: randomValue2
+              """,
+            """
+              list:
+                services:
+                  foo:
+                    alpha: randomValue1
+                    beta: fixedValue
+                  bar:
+                    alpha: randomValue2
+                    beta: fixedValue
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[18]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 18]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequenceMultipleIncoming() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[17, 18]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 18]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequenceNewBeforeExisting() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[16, 17]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """,
+            """
+              value: [17, 16]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2834")
+    @Test
+    void mergeFlowStyleSequenceNoDuplicate() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.value",
+            //language=yaml
+            "[17]",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              value: [17]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5135")
+    @Test
+    void mergeYamlPreservesInlineCommentOnDocumentEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$..containers",
+            //language=yaml
+            "imagePullPolicy: Always",
+            false,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>  # comment
+              """,
+            """
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>  # comment
+                    imagePullPolicy: Always
+              """
+          )
+        );
+    }
+
 }

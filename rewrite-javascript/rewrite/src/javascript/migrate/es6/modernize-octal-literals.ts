@@ -19,7 +19,7 @@ import {TreeVisitor} from "../../../visitor";
 import {ExecutionContext} from "../../../execution";
 import {JavaScriptVisitor} from "../../visitor";
 import {J} from "../../../java";
-import {produce} from "immer";
+import {create as produce} from "mutative";
 
 export class ModernizeOctalLiterals extends Recipe {
     name = "org.openrewrite.javascript.migrate.es6.modernize-octal-literals";

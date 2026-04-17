@@ -24,6 +24,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
+import org.openrewrite.xml.SemanticallyEqual;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -58,15 +59,9 @@ public class AddProfile extends Recipe {
     @Nullable
     String build;
 
-    @Override
-    public String getDisplayName() {
-        return "Add Maven profile";
-    }
+    String displayName = "Add Maven profile";
 
-    @Override
-    public String getDescription() {
-        return "Add a maven profile to a `pom.xml` file.";
-    }
+    String description = "Add a maven profile to a `pom.xml` file.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -90,6 +85,13 @@ public class AddProfile extends Recipe {
                     profiles = t.getChild("profiles").get();
                 }
 
+                Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +
+                                                   "<id>" + id + "</id>\n" +
+                                                   (activation != null ? activation.trim() + "\n" : "") +
+                                                   (properties != null ? properties.trim() + "\n" : "") +
+                                                   (build != null ? build.trim() + "\n" : "") +
+                                                   "</profile>");
+
                 Optional<Xml.Tag> maybeProfile = profiles.getChildren().stream()
                         .filter(profile ->
                                 profile.getChildValue("id").get().equals(id)
@@ -97,22 +99,18 @@ public class AddProfile extends Recipe {
                         .findAny();
 
                 if (maybeProfile.isPresent()) {
-                    Xml.Tag profile = maybeProfile.get();
-
-                    t = (Xml.Tag) new RemoveContentVisitor(profile, false, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
-
+                    Xml.Tag existing = maybeProfile.get();
+                    if (SemanticallyEqual.areEqual(existing, profileTag)) {
+                        return t;
+                    }
+                    t = (Xml.Tag) new RemoveContentVisitor(existing, false, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                 }
-                Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +
-                                                   "<id>" + id + "</id>\n" +
-                                                   (activation != null ? activation.trim() + "\n" : "") +
-                                                   (properties != null ? properties.trim() + "\n" : "") +
-                                                   (build != null ? build.trim() + "\n" : "") +
-                                                   "</profile>");
                 t = (Xml.Tag) new AddToTagVisitor<>(profiles, profileTag).visitNonNull(t, ctx, getCursor().getParentOrThrow());
 
             }
 
             return t;
         }
+
     }
 }

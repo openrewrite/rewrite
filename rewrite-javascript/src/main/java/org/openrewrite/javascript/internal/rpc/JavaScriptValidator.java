@@ -1,11 +1,11 @@
 /*
  * Copyright 2025 the original author or authors.
  * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
+ * https://docs.moderne.io/licensing/moderne-source-available-license
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -261,6 +261,12 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     @Override
     public JS.Shebang visitShebang(JS.Shebang shebang, P p) {
         return shebang;
+    }
+
+    @Override
+    public JS.Spread visitSpread(JS.Spread spread, P p) {
+        visitAndValidateNonNull(spread.getExpression(), Expression.class, p);
+        return spread;
     }
 
     @Override
@@ -721,7 +727,20 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
     }
 
     @Override
+    public J.Lambda.Parameters visitLambdaParameters(J.Lambda.Parameters parameters, P p) {
+        visitAndValidate(parameters.getParameters(), Expression.class, p);
+        return parameters;
+    }
+
+    @Override
     public J.Literal visitLiteral(J.Literal literal, P p) {
+        if (literal.getUnicodeEscapes() != null) {
+            for (Object unicodeEscape : literal.getUnicodeEscapes()) {
+                if (!(unicodeEscape instanceof J.Literal.UnicodeEscape)) {
+                    throw new ClassCastException("Unexpected type: " + unicodeEscape.getClass().getName());
+                }
+            }
+        }
         return literal;
     }
 
@@ -896,6 +915,13 @@ public class JavaScriptValidator<P> extends JavaScriptIsoVisitor<P> {
         visitAndValidateNonNull(typeCast.getClazz(), J.ControlParentheses.class, p);
         visitAndValidateNonNull(typeCast.getExpression(), Expression.class, p);
         return typeCast;
+    }
+
+    @Override
+    public J.TypeParameters visitTypeParameters(J.TypeParameters typeParameters, P p) {
+        visitAndValidate(typeParameters.getAnnotations(), J.Annotation.class, p);
+        visitAndValidate(typeParameters.getTypeParameters(), J.TypeParameter.class, p);
+        return typeParameters;
     }
 
     @Override

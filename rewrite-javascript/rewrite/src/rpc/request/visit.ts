@@ -15,7 +15,7 @@
  */
 import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
-import {Cursor, rootCursor, Tree} from "../../tree";
+import {Cursor, rootCursor, SourceFile, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 import {ExecutionContext} from "../../execution";
 import {withMetrics, extractSourcePath} from "./metrics";
@@ -24,13 +24,17 @@ export interface VisitResponse {
     modified: boolean
 }
 
+// Tracks the last phase (scan or edit) for each recipe to detect cycle transitions
+type RecipePhase = 'scan' | 'edit';
+const recipePhases: WeakMap<Recipe, RecipePhase> = new WeakMap();
+
 export class Visit {
-    constructor(private readonly visitor: string,
-                private readonly sourceFileType: string,
-                private readonly visitorOptions: Map<string, any> | undefined,
-                private readonly treeId: string,
-                private readonly p: string,
-                private readonly cursor: string[] | undefined) {
+    constructor(readonly visitor: string,
+                readonly sourceFileType: string,
+                readonly visitorOptions: Map<string, any> | undefined,
+                readonly treeId: string,
+                readonly p: string,
+                readonly cursor: string[] | undefined) {
     }
 
     static handle(connection: rpc.MessageConnection,
@@ -66,7 +70,7 @@ export class Visit {
         );
     }
 
-    private static async instantiateVisitor(request: Visit,
+    static async instantiateVisitor(request: {visitor: string, visitorOptions?: Map<string, any>},
                                       preparedRecipes: Map<String, Recipe>,
                                       recipeCursors: WeakMap<Recipe, Cursor>,
                                       p: any): Promise<TreeVisitor<any, any>> {
@@ -77,13 +81,27 @@ export class Visit {
             if (!recipe) {
                 throw new Error(`No scanning recipe found for key: ${recipeKey}`);
             }
+            // If we're transitioning from edit back to scan, this is a new cycle.
+            // Clear the cursor so a fresh accumulator is created.
+            if (recipePhases.get(recipe) === 'edit') {
+                recipeCursors.delete(recipe);
+            }
+            recipePhases.set(recipe, 'scan');
+
             let cursor = recipeCursors.get(recipe);
             if (!cursor) {
                 cursor = rootCursor();
                 recipeCursors.set(recipe, cursor);
             }
             const acc = recipe.accumulator(cursor, p);
+
             return new class extends TreeVisitor<any, ExecutionContext> {
+                // Delegate isAcceptable to the scanner visitor
+                // This ensures we only process source files the scanner can handle
+                async isAcceptable(sourceFile: SourceFile, ctx: ExecutionContext): Promise<boolean> {
+                    return (await recipe.scanner(acc)).isAcceptable(sourceFile, ctx);
+                }
+
                 protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
                     await (await recipe.scanner(acc)).visit(tree, ctx);
                     this.stopAfterPreVisit();
@@ -95,6 +113,19 @@ export class Visit {
             const recipe = preparedRecipes.get(recipeKey) as Recipe;
             if (!recipe) {
                 throw new Error(`No editing recipe found for key: ${recipeKey}`);
+            }
+            recipePhases.set(recipe, 'edit');
+
+            // For ScanningRecipe, we need to use the same cursor that was used during scanning
+            // to retrieve the accumulator that was stored there
+            if (recipe instanceof ScanningRecipe) {
+                let cursor = recipeCursors.get(recipe);
+                if (!cursor) {
+                    cursor = rootCursor();
+                    recipeCursors.set(recipe, cursor);
+                }
+                const acc = recipe.accumulator(cursor, p);
+                return recipe.editorWithData(acc);
             }
             return await recipe.editor();
         } else {

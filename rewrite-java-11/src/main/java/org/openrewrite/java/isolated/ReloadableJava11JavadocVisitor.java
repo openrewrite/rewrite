@@ -192,8 +192,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Override
     public Tree visitAttribute(AttributeTree node, List<Javadoc> body) {
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         List<Javadoc> beforeEqual;
         List<Javadoc> value;
 
@@ -400,8 +399,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitEndElement(EndElementTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("</"));
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         return new Javadoc.EndElement(
                 randomId(),
                 Markers.EMPTY,
@@ -622,9 +620,17 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
             cursor += ref.memberName.toString().length();
 
-            JavaType.Method methodRefType = methodReferenceType(ref, qualifierType);
-            JavaType.Variable fieldRefType = methodRefType == null ?
-                    fieldReferenceType(ref, qualifierType) : null;
+            JavaType.Method methodRefType;
+            JavaType.Variable fieldRefType;
+            if (ref.paramTypes != null) {
+                // Has parentheses -> must be a method reference
+                methodRefType = methodReferenceType(ref, qualifierType);
+                fieldRefType = null;
+            } else {
+                // No parentheses -> try field first (per Javadoc spec), fall back to method
+                fieldRefType = fieldReferenceType(ref, qualifierType);
+                methodRefType = fieldRefType == null ? methodReferenceType(ref, qualifierType) : null;
+            }
 
             if (ref.paramTypes != null) {
                 JContainer<Expression> paramContainer;
@@ -858,8 +864,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitStartElement(StartElementTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("<"));
-        String name = node.getName().toString();
-        cursor += name.length();
+        String name = consumeNameWithUnicodeEscapes(node.getName().toString());
         return new Javadoc.StartElement(
                 randomId(),
                 Markers.EMPTY,
@@ -946,6 +951,28 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     private static String unicodeEscaped(char c) {
         return String.format("\\u%04X", (int) c);
+    }
+
+    /**
+     * Consume the given {@code name} from the source, preserving any Unicode escape sequences (e.g. {@code \u00ef})
+     * that the Java compiler expanded before the Javadoc parser saw the source. Returns the raw source representation
+     * so that the printed output remains byte-for-byte identical to the input.
+     */
+    private String consumeNameWithUnicodeEscapes(String name) {
+        StringBuilder raw = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (cursor < source.length() && source.charAt(cursor) != c &&
+                    (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor))) {
+                int escapedCharLength = unicodeEscaped(c).length();
+                raw.append(source, cursor, cursor + escapedCharLength);
+                cursor += escapedCharLength;
+            } else {
+                raw.append(c);
+                cursor++;
+            }
+        }
+        return raw.toString();
     }
 
     @Override

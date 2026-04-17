@@ -1,0 +1,5 @@
+ecosystem,packageName,name,displayName,description,recipeCount,category1,category2
+maven,org.openrewrite:rewrite-groovy,org.openrewrite.groovy.format.AutoFormat,Format Groovy code,Format Groovy code using a standard comprehensive set of Groovy formatting recipes.,1,Format,Groovy
+maven,org.openrewrite:rewrite-groovy,org.openrewrite.groovy.format.GStringCurlyBraces,Groovy GString curly braces,"In Groovy [GStrings](https://docs.groovy-lang.org/latest/html/api/groovy/lang/GString.html), curly braces are optional for single variable expressions. This recipe adds them, so that the expression is always surrounded by curly braces.",1,Format,Groovy
+maven,org.openrewrite:rewrite-groovy,org.openrewrite.groovy.format.OmitParenthesesForLastArgumentLambda,Move a closure which is the last argument of a method invocation out of parentheses,Groovy allows a shorthand syntax that allows a closure to be placed outside of parentheses.,1,Format,Groovy
+maven,org.openrewrite:rewrite-groovy,org.openrewrite.groovy.format.OmitParenthesesFormat,Stylize Groovy code to omit parentheses,Omit parentheses for last argument lambdas in Groovy code.,1,Format,Groovy

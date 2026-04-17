@@ -37,6 +37,45 @@ recipeList:
       previewFeatureName: VERSION_ORDERING_V2
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:
       previewFeatureName: VERSION_CATALOGS
+
+  # https://docs.gradle.org/8.14/userguide/upgrading_version_8.html#groovy_space_assignment_syntax
+  - org.openrewrite.gradle.UseAssignmentForPropertySyntax
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.UseAssignmentForPropertySyntax
+displayName: Use `=` assignment syntax for well-known Gradle properties
+description: >
+  Converts deprecated Groovy DSL property assignment syntax from space/method-call form
+  (e.g., `description 'text'` or `description('text')`) to assignment form (`description = 'text'`)
+  for well-known Gradle project and task properties.
+  See the [Gradle 8.14 upgrade guide](https://docs.gradle.org/8.14/userguide/upgrading_version_8.html#groovy_space_assignment_syntax) for more information.
+recipeList:
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: description
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: group
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: version
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: sourceCompatibility
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: targetCompatibility
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: archivesBaseName
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: encoding
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: destinationDirectory
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: archiveClassifier
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: archiveBaseName
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: archiveVersion
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: archiveExtension
+  - org.openrewrite.gradle.UsePropertyAssignmentSyntax:
+      propertyName: archiveFileName
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.AddJUnitPlatformLauncher

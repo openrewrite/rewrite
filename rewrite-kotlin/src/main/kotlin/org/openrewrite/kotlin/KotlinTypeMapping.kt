@@ -27,12 +27,14 @@ import org.jetbrains.kotlin.fir.analysis.checkers.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.analysis.checkers.modality
 import org.jetbrains.kotlin.fir.analysis.checkers.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.DirectDeclarationsAccess
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.expressions.impl.FirResolvedArgumentList
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
@@ -40,8 +42,7 @@ import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.firProvider
-import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
-import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
+import org.jetbrains.kotlin.fir.resolve.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
@@ -77,7 +78,7 @@ class KotlinTypeMapping(
     private val signatureBuilder: KotlinTypeSignatureBuilder = KotlinTypeSignatureBuilder(firSession, firFile)
 
     override fun type(type: Any?): JavaType {
-        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef || type is FirResolvedQualifier && type.classId == null) {
+        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.resolvedType is ConeErrorType || type is FirResolvedQualifier && type.classId == null) {
             return Unknown.getInstance()
         }
 
@@ -91,7 +92,7 @@ class KotlinTypeMapping(
     }
 
     fun type(type: Any?, parent: Any?): JavaType? {
-        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef || type is FirResolvedQualifier && type.classId == null) {
+        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.resolvedType is ConeErrorType || type is FirResolvedQualifier && type.classId == null) {
             return Unknown.getInstance()
         }
         val signature = signatureBuilder.signature(type, parent)
@@ -120,6 +121,22 @@ class KotlinTypeMapping(
     fun type(type: Any?, parent: Any?, signature: String): JavaType? {
         return when (type) {
             is ConeClassLikeType, is FirClass, is FirResolvedQualifier -> {
+                // Kotlin primitives compile to JVM primitives (for non-nullable uses) or
+                // to boxed classes (for nullable uses / generic arguments). The parser
+                // surfaces the JVM primitive form so dedup/recipes match what the Java
+                // parser would produce. Class-definition contexts (where methods are being
+                // declared on kotlin.Int itself) still resolve through `classType()` —
+                // they don't reach `type()` for the declaring class.
+                val nonNullable = when (type) {
+                    is ConeClassLikeType -> !type.isMarkedNullable
+                    else -> true
+                }
+                if (nonNullable) {
+                    val primitive = kotlinPrimitiveFromFqn(signature)
+                    if (primitive != null) {
+                        return primitive
+                    }
+                }
                 classType(type, parent, signature)
             }
 
@@ -203,11 +220,11 @@ class KotlinTypeMapping(
             }
 
             is FirVariableAssignment -> {
-                type(type.lValue.typeRef, parent, signature)
+                type(type.lValue.resolvedType, parent, signature)
             }
 
             is FirExpression -> {
-                type(type.typeRef, parent, signature)
+                type(type.resolvedType, parent, signature)
             }
 
             is JavaElement -> {
@@ -243,12 +260,13 @@ class KotlinTypeMapping(
         return jt
     }
 
+    @OptIn(DirectDeclarationsAccess::class)
     private fun fileType(file: FirFile, signature: String): JavaType {
         val functions = buildList {
             file.declarations.forEach {
                 when (it) {
                     is FirSimpleFunction -> add(it)
-                    is FirScript -> it.statements.filterIsInstance<FirSimpleFunction>().forEach(::add)
+                    is FirScript -> it.declarations.filterIsInstance<FirSimpleFunction>().forEach(::add)
                     else -> {}
                 }
             }
@@ -279,21 +297,59 @@ class KotlinTypeMapping(
         typeCache.put(signature, gtv)
         if (type is ConeKotlinTypeProjectionIn) {
             variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
-            bounds = ArrayList(1)
-            bounds.add(type(type.type))
+            val bound = type(type.type)
+            // Match the Java parser: for `? super Object`, drop the `java.lang.Object`
+            // bound so the wildcard surfaces as `Generic{? super }` (bound elided, variance
+            // preserved). Without this, Kotlin-produced wildcards carry an explicit Object
+            // bound and never dedup against the Java parser's elided form.
+            if (bound !is FullyQualified || bound.fullyQualifiedName != "java.lang.Object") {
+                bounds = ArrayList(1)
+                bounds.add(bound)
+            }
         } else if (type is ConeKotlinTypeProjectionOut) {
             variance = JavaType.GenericTypeVariable.Variance.COVARIANT
-            bounds = ArrayList(1)
-            bounds.add(type(type.type))
+            val bound = type(type.type)
+            if (bound !is FullyQualified || bound.fullyQualifiedName != "java.lang.Object") {
+                bounds = ArrayList(1)
+                bounds.add(bound)
+            }
         } else if (type is ConeTypeParameterType) {
             val classifierSymbol: FirClassifierSymbol<*>? = type.lookupTag.toSymbol(firSession)
             if (classifierSymbol is FirTypeParameterSymbol) {
+                // Java-origin type parameters (e.g. java.util.Optional<T>) have their
+                // kotlin.Any bound stripped (matching Java's unbounded `<T>`). Kotlin-source
+                // `<T : Any>` keeps an explicit bound, remapped to java.lang.Object.
+                val paramFromJava = classifierSymbol.containingDeclarationSymbol.origin is FirDeclarationOrigin.Java
                 for (bound: FirResolvedTypeRef in classifierSymbol.resolvedBounds) {
                     if (bound !is FirImplicitNullableAnyTypeRef) {
+                        var mapped = type(bound)
+                        val fq = TypeUtils.asFullyQualified(mapped)
+                        val originalWasKotlinAny = fq != null && "kotlin.Any" == fq.fullyQualifiedName
+                        if (originalWasKotlinAny) {
+                            if (paramFromJava) {
+                                continue
+                            }
+                            mapped = remapKotlinBuiltin(fq!!)
+                        } else if (fq != null) {
+                            mapped = remapKotlinBuiltin(fq)
+                        }
+                        // When the original bound was `java.lang.Object` (not `kotlin.Any`),
+                        // strip it to match the Java parser's unbounded `<T>` form. This
+                        // handles Java-origin type parameters whose containing declaration's
+                        // `origin` may surface as `Library` rather than `Java` (e.g. JDK
+                        // classes loaded via Kotlin's classfile loader). Kotlin-source
+                        // `<T : Any>` explicitly names `kotlin.Any` and is kept (remapped
+                        // to `java.lang.Object`) to preserve the author's intent.
+                        if (!originalWasKotlinAny) {
+                            val mappedFq = TypeUtils.asFullyQualified(mapped)
+                            if (mappedFq != null && "java.lang.Object" == mappedFq.fullyQualifiedName) {
+                                continue
+                            }
+                        }
                         if (bounds == null) {
                             bounds = ArrayList()
                         }
-                        bounds.add(type(bound))
+                        bounds.add(mapped)
                     }
                 }
                 variance = when {
@@ -322,7 +378,7 @@ class KotlinTypeMapping(
         return gtv
     }
 
-    @OptIn(SymbolInternals::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
     private fun classType(type: Any, parent: Any?, signature: String): FullyQualified {
         val fqn = signatureBuilder.classSignature(type)
         val fq: FullyQualified? = typeCache.get(fqn)
@@ -330,7 +386,7 @@ class KotlinTypeMapping(
         val firClass = when (type) {
             is FirClass -> type
             is FirResolvedQualifier -> {
-                val ref = type.typeRef.toRegularClassSymbol(firSession)
+                val ref = type.resolvedType.toRegularClassSymbol(firSession)
                 if (type.typeArguments.isNotEmpty()) {
                     params = type.typeArguments
                 }
@@ -344,7 +400,7 @@ class KotlinTypeMapping(
             is ConeClassLikeType -> {
                 if (type.toSymbol(firSession) is FirTypeAliasSymbol) {
                     return classType(
-                        (type.toSymbol(firSession) as FirTypeAliasSymbol).resolvedExpandedTypeRef.type,
+                        (type.toSymbol(firSession) as FirTypeAliasSymbol).resolvedExpandedTypeRef.coneType,
                         parent,
                         signature
                     )
@@ -371,9 +427,29 @@ class KotlinTypeMapping(
         }
         var clazz: Class? = (if (fq is Parameterized) fq.type else fq) as Class?
         if (clazz == null) {
+            var flags = mapToFlagsBitmap(firClass.visibility, firClass.modality(), firClass.isStatic)
+            // Ensure class-kind flags align with the Java parser's output. Interfaces and
+            // annotation types are implicitly abstract in the JVM and must carry the
+            // Interface flag; they must not carry Final.
+            when (firClass.classKind) {
+                ClassKind.INTERFACE, ClassKind.ANNOTATION_CLASS -> {
+                    flags = flags or (1L shl 9)  // Interface
+                    flags = flags or (1L shl 10) // Abstract
+                    flags = flags and (1L shl 4).inv() // not Final
+                }
+                ClassKind.ENUM_CLASS -> {
+                    flags = flags or (1L shl 14) // Enum
+                }
+                else -> {}
+            }
+            // Nested interfaces and annotation types are always implicitly static on the JVM.
+            if (firClass.symbol.classId.isNestedClass &&
+                (firClass.classKind == ClassKind.INTERFACE || firClass.classKind == ClassKind.ANNOTATION_CLASS)) {
+                flags = flags or (1L shl 3) // Static
+            }
             clazz = Class(
                 null,
-                mapToFlagsBitmap(firClass.visibility, firClass.modality(), firClass.isStatic),
+                flags,
                 fqn,
                 mapKind(firClass.classKind),
                 null, null, null, null, null, null, null
@@ -397,10 +473,17 @@ class KotlinTypeMapping(
                     else -> {}
                 }
             }
-            val supertype =
+            var supertype =
                 if (superTypeRef == null || "java.lang.Object" == signature) null else TypeUtils.asFullyQualified(
                     type(superTypeRef)
                 )
+            // Kotlin's builtins (kotlin.Any, kotlin.Annotation, kotlin.String, etc.) compile
+            // to JVM types. Remap so the produced JavaType mirrors what the Java parser would
+            // produce for the same bytecode. Recipes that match on java.lang.Object /
+            // java.lang.String then work uniformly over Kotlin sources as well.
+            if (supertype != null) {
+                supertype = remapKotlinBuiltin(supertype)
+            }
             var declaringType: FullyQualified? = null
             if (!firClass.isLocal && firClass.symbol.classId.isNestedClass) {
                 val parentSymbol = firClass.symbol.classId.outerClassId!!.toSymbol(firSession)
@@ -424,7 +507,11 @@ class KotlinTypeMapping(
                 } else if (declaration is FirSimpleFunction) {
                     functions.add(declaration as FirFunction)
                 } else if (declaration is FirConstructor) {
-                    functions.add(declaration as FirFunction)
+                    // Annotation types have no real constructor in bytecode; the Java parser
+                    // omits them, so skip here for cross-parser dedup to match.
+                    if (firClass.classKind != ClassKind.ANNOTATION_CLASS) {
+                        functions.add(declaration as FirFunction)
+                    }
                 } else if (declaration is FirEnumEntry) {
                     enumEntries.add(declaration)
                 } else if (declaration is FirAnonymousInitializer) {
@@ -471,8 +558,9 @@ class KotlinTypeMapping(
             if (!interfaceTypeRefs.isNullOrEmpty()) {
                 interfaces = ArrayList(interfaceTypeRefs.size)
                 for (iParam: FirTypeRef? in interfaceTypeRefs) {
-                    val javaType = TypeUtils.asFullyQualified(type(iParam))
+                    var javaType = TypeUtils.asFullyQualified(type(iParam))
                     if (javaType != null) {
+                        javaType = remapKotlinBuiltin(javaType)
                         interfaces.add(javaType)
                     }
                 }
@@ -501,6 +589,10 @@ class KotlinTypeMapping(
             if (pt == null) {
                 val typeParameters: MutableList<JavaType> = ArrayList(firClass.typeParameters.size)
                 pt = Parameterized(null, null, null)
+                // Seed the Parameterized with its raw class before caching so recursive
+                // lookups during typeParameter resolution observe a usable base type
+                // rather than `Unknown`.
+                pt.unsafeSet(clazz, null as List<JavaType>?)
                 typeCache.put(signature, pt)
                 if (params == null) {
                     params = firClass.typeParameters
@@ -515,9 +607,9 @@ class KotlinTypeMapping(
         return clazz
     }
 
-    @OptIn(SymbolInternals::class)
+    @OptIn(SymbolInternals::class, DirectDeclarationsAccess::class)
     fun methodDeclarationType(enumEntry: FirEnumEntry): Method? {
-        val type = when (val fir = enumEntry.symbol.getContainingClassSymbol(firSession)?.fir) {
+        val type = when (val fir = enumEntry.symbol.getContainingClassSymbol()?.fir) {
             is FirClass -> {
                 when (val primary = fir.declarations.firstOrNull { it is FirPrimaryConstructor }) {
                     is FirPrimaryConstructor -> type(primary as FirFunction)
@@ -550,9 +642,33 @@ class KotlinTypeMapping(
                 paramNames.add(p.name.asString())
             }
         }
+        var methodFlags = mapToFlagsBitmap(function.visibility, function.modality, function.isStatic)
+        // Constructors never carry ACC_FINAL in bytecode (they can't be overridden).
+        // Kotlin's FIR synthesizes a `FINAL` modality for every constructor on a final
+        // class; the resulting `Flag.Final` bit would then diverge from the Java parser,
+        // which reads the bytecode's actual flags. Strip it so cross-parser dedup agrees.
+        if (function.symbol is FirConstructorSymbol) {
+            methodFlags = methodFlags and (1L shl 4).inv()
+        }
+        // Align with the Java parser: instance methods on an interface are always Abstract
+        // (even when they have a default body); additionally, non-abstract instance methods
+        // on an interface are default methods, which the Java parser marks with bit 43.
+        // Private interface methods (Java 9+) are concrete and stay non-abstract.
+        val parentClass = if (parent is FirRegularClass) parent else null
+        val isPrivate = methodFlags and (1L shl 1) != 0L
+        if (parentClass != null &&
+            parentClass.classKind == ClassKind.INTERFACE &&
+            !function.isStatic &&
+            !isPrivate &&
+            function.symbol !is FirConstructorSymbol) {
+            methodFlags = methodFlags or (1L shl 10) // Abstract
+            if (function.modality != Modality.ABSTRACT) {
+                methodFlags = methodFlags or (1L shl 43) // Default
+            }
+        }
         val method = Method(
             null,
-            mapToFlagsBitmap(function.visibility, function.modality, function.isStatic),
+            methodFlags,
             null,
             if (function.symbol is FirConstructorSymbol) "<constructor>" else methodName(function),
             null,
@@ -567,8 +683,8 @@ class KotlinTypeMapping(
         var parentType = when {
             function.symbol is FirConstructorSymbol -> type(function.returnTypeRef)
             function.dispatchReceiverType != null -> type(function.dispatchReceiverType!!)
-            function.symbol.getOwnerLookupTag()?.toFirRegularClass(firSession) != null -> {
-                type(function.symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession)!!)
+            function.symbol.getOwnerLookupTag()?.toRegularClassSymbol(firSession)?.fir != null -> {
+                type(function.symbol.getOwnerLookupTag()!!.toRegularClassSymbol(firSession)!!.fir)
             }
 
             parent is FirRegularClass || parent != null -> type(parent)
@@ -581,7 +697,15 @@ class KotlinTypeMapping(
             parentType = parentType.type
         }
         val resolvedDeclaringType = TypeUtils.asFullyQualified(parentType)
-        val returnType = type(function.returnTypeRef)
+        var returnType = type(function.returnTypeRef)
+        // Java parser uses the raw Class for a constructor's returnType, not the
+        // class's parameterized form. Kotlin's FIR renders a constructor's
+        // `returnTypeRef` as the class instantiated with its own type parameters
+        // (`Optional<T>`), which then surfaces as a `Parameterized`. Unwrap to the
+        // base Class to match the Java parser's representation.
+        if (function.symbol is FirConstructorSymbol && returnType is Parameterized) {
+            returnType = returnType.type
+        }
         val parameterTypes: MutableList<JavaType>? = when {
             function.receiverParameter != null || function.valueParameters.isNotEmpty() -> {
                 ArrayList(function.valueParameters.size + (if (function.receiverParameter != null) 1 else 0))
@@ -641,18 +765,48 @@ class KotlinTypeMapping(
                 defaultValues.add(javaMethod.annotationParameterDefaultValue!!.name!!.asString())
             }
         }
+        var methodFlags = if (javaMethod is BinaryJavaMethod) {
+            javaMethod.access.toLong()
+        } else {
+            convertToFlagsBitMap(
+                javaMethod.visibility,
+                javaMethod.isStatic,
+                javaMethod.isFinal,
+                javaMethod.isAbstract
+            )
+        }
+        // The JVM reuses bit 7 for both ACC_TRANSIENT (fields) and ACC_VARARGS (methods).
+        // OpenRewrite's Flag keeps them separate — Transient at bit 7, Varargs at bit 34.
+        // Rewrite the bit for method contexts so downstream dedup / recipes see Varargs.
+        if (methodFlags and (1L shl 7) != 0L) {
+            methodFlags = methodFlags and (1L shl 7).inv()
+            methodFlags = methodFlags or (1L shl 34) // Varargs
+        }
+        // Align with the Java parser: instance methods on an interface are always Abstract
+        // (even when they have a default body); additionally, non-abstract instance methods
+        // on an interface are default methods, which the Java parser marks with bit 43.
+        // Private instance methods on interfaces (Java 9+) are neither abstract nor
+        // default — they're concrete methods with private visibility.
+        val isPrivate = methodFlags and (1L shl 1) != 0L
+        if (javaMethod.containingClass.isInterface && !javaMethod.isStatic && !isPrivate) {
+            methodFlags = methodFlags or (1L shl 10) // Abstract
+            if (!javaMethod.isAbstract) {
+                methodFlags = methodFlags or (1L shl 43) // Default
+            }
+        }
+        // Methods annotated with @java.lang.invoke.MethodHandle.PolymorphicSignature
+        // (the invoke/invokeExact methods on MethodHandle, and compareAndExchange et al.
+        // on VarHandle) carry Flag.SignaturePolymorphic in the Java parser output.
+        for (ann in javaMethod.annotations) {
+            val classId = ann.classId
+            if (classId != null && "java.lang.invoke.MethodHandle.PolymorphicSignature" == classId.asSingleFqName().asString()) {
+                methodFlags = methodFlags or (1L shl 46) // SignaturePolymorphic
+                break
+            }
+        }
         val method = Method(
             null,
-            (if (javaMethod is BinaryJavaMethod) {
-                javaMethod.access.toLong()
-            } else {
-                convertToFlagsBitMap(
-                    javaMethod.visibility,
-                    javaMethod.isStatic,
-                    javaMethod.isFinal,
-                    javaMethod.isAbstract
-                )
-            }),
+            methodFlags,
             null,
             javaMethod.name.asString(),
             null,
@@ -690,7 +844,7 @@ class KotlinTypeMapping(
     }
 
     fun methodInvocationType(fir: FirFunctionCall): Method? {
-        if (fir.typeRef is FirErrorTypeRef) {
+        if (fir.resolvedType is ConeErrorType) {
             return null
         }
         val signature = signatureBuilder.methodCallSignature(fir)
@@ -704,7 +858,7 @@ class KotlinTypeMapping(
     @OptIn(SymbolInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
-        val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameter else null
+        val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameterSymbol else null
         val paramNames: MutableList<String>? = when {
             sym is FirFunctionSymbol<*> && (receiver != null ||
                     sym.valueParameterSymbols.isNotEmpty()) -> {
@@ -726,15 +880,29 @@ class KotlinTypeMapping(
                 }
             }
         }
+        var invocationFlags = when (sym) {
+            is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
+            is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
+            else -> {
+                throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
+            }
+        }
+        // Align with the Java parser: instance methods on an interface are always Abstract;
+        // non-abstract instance methods are default methods (bit 43).
+        if (sym is FirNamedFunctionSymbol) {
+            val invocationContainer = sym.containingClassLookupTag()?.toRegularClassSymbol(firSession)?.fir
+            if (invocationContainer != null &&
+                invocationContainer.classKind == ClassKind.INTERFACE &&
+                !sym.isStatic) {
+                invocationFlags = invocationFlags or (1L shl 10) // Abstract
+                if (sym.modality != Modality.ABSTRACT) {
+                    invocationFlags = invocationFlags or (1L shl 43) // Default
+                }
+            }
+        }
         val method = Method(
             null,
-            when (sym) {
-                is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
-                is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
-                else -> {
-                    throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
-                }
-            },
+            invocationFlags,
             null,
             when {
                 sym is FirConstructorSymbol ||
@@ -758,13 +926,13 @@ class KotlinTypeMapping(
             val resolvedSymbol =
                 (function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
-                declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.dispatchReceiverType))
+                declaringType = asDeclaringType(resolvedSymbol.dispatchReceiverType as ConeClassLikeType)
             } else if (resolvedSymbol.containingClassLookupTag() != null &&
-                resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession) != null
+                resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)?.fir != null
             ) {
                 declaringType = TypeUtils.asFullyQualified(
                     type(
-                        resolvedSymbol.containingClassLookupTag()!!.toFirRegularClass(firSession)
+                        resolvedSymbol.containingClassLookupTag()!!.toRegularClassSymbol(firSession)!!.fir
                     )
                 )
             } else if (resolvedSymbol.origin == FirDeclarationOrigin.Library) {
@@ -784,7 +952,7 @@ class KotlinTypeMapping(
                     declaringType = createShallowClass("kotlin.Library")
                 }
             } else if (resolvedSymbol.origin == FirDeclarationOrigin.SamConstructor) {
-                declaringType = when(val type = type(function.typeRef)) {
+                declaringType = when(val type = type(function.resolvedType)) {
                     is Class -> type
                     is Parameterized -> type.type
                     else -> Unknown.getInstance()
@@ -793,28 +961,21 @@ class KotlinTypeMapping(
                 declaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.getContainingFile()))
             }
         } else {
-            declaringType = TypeUtils.asFullyQualified(type(function.typeRef))
+            declaringType = TypeUtils.asFullyQualified(type(function.resolvedType))
         }
         if (declaringType == null) {
             declaringType = TypeUtils.asFullyQualified(type(firFile))
         }
-        val returnType = type(function.typeRef)
+        val returnType = type(function.resolvedType)
 
-        if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
-            paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
+        if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
+            paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.fir.typeRef))
         }
-        val mapNames = function.arguments.any { it is FirNamedArgumentExpression }
-        var args: MutableMap<String, FirNamedArgumentExpression>? = null
-        if (mapNames) {
-            for (a in function.arguments) {
-                if (args == null) {
-                    args = HashMap(function.arguments.size)
-                }
-                if (a is FirNamedArgumentExpression) {
-                    args[a.name.asString()] = a
-                }
-            }
-        }
+        // Build a mapping from parameter name to its corresponding argument expression
+        val paramToArg: Map<String, FirExpression>? =
+            (function.argumentList as? FirResolvedArgumentList)?.mapping
+                ?.entries?.associate { (arg, param) -> param.name.asString() to arg }
+
         val valueParams = (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters
         for ((index, p) in valueParams.withIndex()) {
             if (paramTypes == null) {
@@ -823,14 +984,11 @@ class KotlinTypeMapping(
             }
             val t = type(p.returnTypeRef)
             if (t is GenericTypeVariable) {
-                if (mapNames && args != null) {
-                    if (args.containsKey(p.name.asString())) {
-                        paramTypes.add(type(args[p.name.asString()]!!.typeRef, function)!!)
-                    } else {
-                        paramTypes.add(t)
-                    }
-                } else if (index < valueParams.size) {
-                    paramTypes.add(type(function.arguments[index].typeRef, function)!!)
+                val arg = paramToArg?.get(p.name.asString())
+                if (arg != null) {
+                    paramTypes.add(type(arg.resolvedType, function)!!)
+                } else {
+                    paramTypes.add(t)
                 }
             } else {
                 paramTypes.add(t)
@@ -842,6 +1000,151 @@ class KotlinTypeMapping(
             paramTypes, null, listAnnotations(function.annotations)
         )
         return method
+    }
+
+    /**
+     * Kotlin builtins like kotlin.Any, kotlin.Annotation, kotlin.String, kotlin.Int, etc.
+     * compile to specific JVM types (java.lang.Object, java.lang.annotation.Annotation, etc.).
+     * The Java parser produces the JVM FQNs directly, so when Kotlin's FIR resolves a type to
+     * a Kotlin builtin, we remap it to its JVM equivalent so cross-parser dedup can match them.
+     */
+    /**
+     * Synthesize the enum `static T[] values()` method that the Java compiler generates
+     * for every enum class. The Kotlin parser only sees source-declared methods, so
+     * cross-parser dedup of enum types needs these added back.
+     */
+    private fun enumValuesMethod(declaringType: Class): Method {
+        // ACC_PUBLIC | ACC_STATIC (matches the Java parser's output)
+        val flags = 1L or (1L shl 3)
+        val method = Method(
+            null, flags, null, "values", null,
+            null as MutableList<String>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?,
+            null as MutableList<String>?,
+            null as MutableList<String>?
+        )
+        val array = Array(null, null, null)
+        array.unsafeSet(declaringType, null)
+        method.unsafeSet(
+            declaringType, array as JavaType,
+            null as MutableList<JavaType>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?
+        )
+        return method
+    }
+
+    /**
+     * Synthesize the enum `static T valueOf(String)` method that the Java compiler
+     * generates for every enum class.
+     */
+    private fun enumValueOfMethod(declaringType: Class): Method {
+        // ACC_PUBLIC | ACC_STATIC
+        val flags = 1L or (1L shl 3)
+        val method = Method(
+            null, flags, null, "valueOf", null,
+            mutableListOf("name"),
+            null as MutableList<JavaType>?,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?,
+            null as MutableList<String>?,
+            null as MutableList<String>?
+        )
+        val stringType: JavaType = typeCache.get<FullyQualified>("java.lang.String") ?: ShallowClass.build("java.lang.String")
+        val params: MutableList<JavaType> = mutableListOf(stringType)
+        method.unsafeSet(
+            declaringType, declaringType as JavaType, params,
+            null as MutableList<JavaType>?,
+            null as MutableList<FullyQualified>?
+        )
+        return method
+    }
+
+    /**
+     * Resolve a Kotlin cone type to its declaring-class form (always {@link FullyQualified}),
+     * bypassing the primitive remap that {@link #type(Any?, Any?, String)} normally applies
+     * to non-nullable kotlin primitives. Method declaring types are class instances even
+     * when the receiver value is a JVM primitive — `kotlin.Char.toInt()` is a method on
+     * the kotlin.Char class, not on the JVM `char` primitive.
+     */
+    private fun asDeclaringType(coneType: ConeClassLikeType): FullyQualified? {
+        val signature = signatureBuilder.signature(coneType)
+        val cached = typeCache.get<FullyQualified>(signature)
+        if (cached != null) {
+            return cached
+        }
+        return TypeUtils.asFullyQualified(classType(coneType, firFile, signature))
+    }
+
+    private fun kotlinPrimitiveFromFqn(fqn: String): JavaType.Primitive? {
+        return when (fqn) {
+            "kotlin.Int" -> JavaType.Primitive.Int
+            "kotlin.Long" -> JavaType.Primitive.Long
+            "kotlin.Short" -> JavaType.Primitive.Short
+            "kotlin.Byte" -> JavaType.Primitive.Byte
+            "kotlin.Float" -> JavaType.Primitive.Float
+            "kotlin.Double" -> JavaType.Primitive.Double
+            "kotlin.Boolean" -> JavaType.Primitive.Boolean
+            "kotlin.Char" -> JavaType.Primitive.Char
+            "kotlin.Unit" -> JavaType.Primitive.Void
+            else -> null
+        }
+    }
+
+    /**
+     * Construct a JVM-style fully-qualified name for a binary Java class, where nested
+     * classes are separated by `$` from their containing class. Kotlin's
+     * `BinaryJavaClass.fqName` uses `.` throughout, which conflicts with the Java parser's
+     * output and prevents nested classes (e.g. `java.util.Map$Entry`) from dedup-matching.
+     */
+    private fun toJvmFqn(type: BinaryJavaClass): String {
+        val outer = type.outerClass
+        if (outer != null) {
+            return toJvmFqn(outer as BinaryJavaClass) + "$" + type.name.asString()
+        }
+        return type.fqName.asString()
+    }
+
+    private fun remapKotlinBuiltin(fq: FullyQualified): FullyQualified {
+        // For a Parameterized (e.g. kotlin.Enum<Foo>) remap the underlying raw type but
+        // keep the parameterization so we don't lose type argument information.
+        if (fq is Parameterized) {
+            val inner = fq.type ?: return fq
+            val remappedInner = remapKotlinBuiltin(inner)
+            if (remappedInner === inner) {
+                return fq
+            }
+            val pt = Parameterized(null, null, null)
+            pt.unsafeSet(remappedInner, fq.typeParameters)
+            return pt
+        }
+        val javaFqn = when (fq.fullyQualifiedName) {
+            "kotlin.Any" -> "java.lang.Object"
+            "kotlin.Annotation" -> "java.lang.annotation.Annotation"
+            "kotlin.Throwable" -> "java.lang.Throwable"
+            "kotlin.Comparable" -> "java.lang.Comparable"
+            "kotlin.CharSequence" -> "java.lang.CharSequence"
+            "kotlin.Number" -> "java.lang.Number"
+            "kotlin.String" -> "java.lang.String"
+            "kotlin.Enum" -> "java.lang.Enum"
+            // Kotlin translates meta-annotations read from Java class files into its own
+            // kotlin.annotation.* equivalents. Remap to the Java names so cross-parser
+            // dedup collapses them to a single instance.
+            "kotlin.annotation.Retention" -> "java.lang.annotation.Retention"
+            "kotlin.annotation.MustBeDocumented" -> "java.lang.annotation.Documented"
+            "kotlin.annotation.Target" -> "java.lang.annotation.Target"
+            "kotlin.annotation.Repeatable" -> "java.lang.annotation.Repeatable"
+            else -> return fq
+        }
+        // Prefer an existing entry in the type cache so we return the full Class rather
+        // than a minimal ShallowClass (which would hide the underlying type information).
+        val existing = typeCache.get<FullyQualified>(javaFqn)
+        if (existing != null) {
+            return existing
+        }
+        return ShallowClass.build(javaFqn)
     }
 
     private fun createShallowClass(name: String): FullyQualified {
@@ -876,14 +1179,46 @@ class KotlinTypeMapping(
         typeCache.put(signature, gtv)
         var bounds: MutableList<JavaType>? = null
         var variance: GenericTypeVariable.Variance = JavaType.GenericTypeVariable.Variance.INVARIANT
+        // Type parameters declared on Java-origin containers (e.g. java.util.Optional<T>) have
+        // their implicit kotlin.Any bound stripped so they match the Java parser's output
+        // (Java's unbounded `<T>` has no bound at all). Kotlin source `<T : Any>` has an
+        // explicit bound that we remap to java.lang.Object so Java recipes matching on the
+        // JVM type work uniformly over Kotlin code.
+        val containerFromJava = type.containingDeclarationSymbol.origin is FirDeclarationOrigin.Java
         if (!(type.bounds.size == 1 && type.bounds[0] is FirImplicitNullableAnyTypeRef)) {
             bounds = ArrayList(type.bounds.size)
             for (bound: FirTypeRef in type.bounds) {
-                bounds.add(type(bound))
+                var boundType = type(bound)
+                val fq = TypeUtils.asFullyQualified(boundType)
+                val originalWasKotlinAny = fq != null && "kotlin.Any" == fq.fullyQualifiedName
+                if (originalWasKotlinAny) {
+                    if (containerFromJava) {
+                        continue
+                    }
+                    boundType = remapKotlinBuiltin(fq!!)
+                } else if (fq != null) {
+                    boundType = remapKotlinBuiltin(fq)
+                }
+                // When the original bound was `java.lang.Object` (not `kotlin.Any`),
+                // strip it to match the Java parser's unbounded `<T>` form. This
+                // handles Java-origin type parameters whose containing declaration's
+                // `origin` may surface as `Library` rather than `Java` (e.g. JDK
+                // classes loaded via Kotlin's classfile loader). Kotlin-source
+                // `<T : Any>` explicitly names `kotlin.Any` and is kept (remapped
+                // to `java.lang.Object`) to preserve the author's intent.
+                if (!originalWasKotlinAny) {
+                    val mappedFq = TypeUtils.asFullyQualified(boundType)
+                    if (mappedFq != null && "java.lang.Object" == mappedFq.fullyQualifiedName) {
+                        continue
+                    }
+                }
+                bounds.add(boundType)
             }
-            if (type.variance == Variance.IN_VARIANCE) {
+            if (bounds.isEmpty()) {
+                bounds = null
+            } else if (type.variance == Variance.IN_VARIANCE) {
                 variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
-            } else if (bounds.isNotEmpty()) {
+            } else {
                 variance = JavaType.GenericTypeVariable.Variance.COVARIANT
             }
         }
@@ -916,9 +1251,9 @@ class KotlinTypeMapping(
                 declaringType = type(variable.symbol.dispatchReceiverType)
             }
 
-            variable.symbol.getContainingClassSymbol(firSession) != null -> {
-                if (variable.symbol.getContainingClassSymbol(firSession) !is FirAnonymousObjectSymbol) {
-                    declaringType = type(variable.symbol.getContainingClassSymbol(firSession)!!.fir)
+            variable.symbol.getContainingClassSymbol() != null -> {
+                if (variable.symbol.getContainingClassSymbol() !is FirAnonymousObjectSymbol) {
+                    declaringType = type(variable.symbol.getContainingClassSymbol()!!.fir)
                 }
             }
 
@@ -972,13 +1307,38 @@ class KotlinTypeMapping(
         if (type !is BinaryJavaClass) {
             throw UnsupportedOperationException("Unsupported JavaClassifier: ${type.javaClass.name}")
         }
-        val fqn = type.fqName.asString()
+        // Use the JVM-style FQN so nested classes appear as `Outer$Inner` rather than
+        // `Outer.Inner`. The Java parser (and recipes that match on FQN) uses the
+        // dollar-separated form; without this, a nested class surfaces under two
+        // different names depending on parser and never dedups.
+        val fqn = toJvmFqn(type)
         var clazz = typeCache.get<Class>(fqn)
         if (clazz == null) {
+            var flags = type.access.toLong()
+            // Ensure class-kind flags are set to match the Java parser's output.
+            // The Kotlin compiler's BinaryJavaClass.access may not include Interface/Abstract
+            // bits for interfaces and annotations.
+            if (type.isInterface || type.isAnnotationType) {
+                flags = flags or (1L shl 9)  // Interface
+                flags = flags or (1L shl 10) // Abstract
+                flags = flags and (1L shl 4).inv() // not Final
+            }
+            if (type.isEnum) {
+                flags = flags or (1L shl 14) // Enum
+            }
+            // JVM nested interfaces and annotation types are always implicitly static
+            // (only concrete classes can be inner classes). The ACC_STATIC bit is stored
+            // in the InnerClasses attribute and not on BinaryJavaClass.access, so apply it
+            // here to match the Java parser. Detect nesting via the `$`-separated JVM FQN
+            // since Kotlin's BinaryJavaClass.outerClass may not be populated for some
+            // synthetic/library classes.
+            if (fqn.contains('$') && (type.isInterface || type.isAnnotationType)) {
+                flags = flags or (1L shl 3) // Static
+            }
             clazz = Class(
                 null,
-                type.access.toLong(),
-                type.fqName.asString(),
+                flags,
+                fqn,
                 when {
                     type.isAnnotationType -> FullyQualified.Kind.Annotation
                     type.isEnum -> FullyQualified.Kind.Enum
@@ -1011,6 +1371,13 @@ class KotlinTypeMapping(
             if (type.fields.isNotEmpty()) {
                 fields = ArrayList(type.fields.size)
                 for (field: JavaField in type.fields) {
+                    // The Java parser filters String's `serialPersistentFields` member
+                    // (it's part of the serialization protocol and trips up downstream
+                    // Jackson serialization). Match that so cross-parser dedup doesn't
+                    // fail on a field-count mismatch for java.lang.String.
+                    if (fqn == "java.lang.String" && field.name.asString() == "serialPersistentFields") {
+                        continue
+                    }
                     fields.add(javaVariableType(field, clazz))
                 }
             }
@@ -1040,6 +1407,16 @@ class KotlinTypeMapping(
                     }
                 }
             }
+            // The JVM adds synthetic `static T[] values()` and `static T valueOf(String)`
+            // methods to every enum class. Kotlin's BinaryJavaClass only surfaces methods
+            // declared in source, so synthesize them here to match the Java parser.
+            if (type.isEnum) {
+                if (methods == null) {
+                    methods = ArrayList()
+                }
+                methods.add(enumValuesMethod(clazz))
+                methods.add(enumValueOfMethod(clazz))
+            }
             var typeParameters: MutableList<JavaType>? = null
             if (type.typeParameters.isNotEmpty()) {
                 typeParameters = ArrayList(type.typeParameters.size)
@@ -1061,6 +1438,13 @@ class KotlinTypeMapping(
             var pt = typeCache.get<Parameterized>(signature)
             if (pt == null) {
                 pt = Parameterized(null, null, null)
+                // Seed the Parameterized with its raw class before caching so recursive
+                // lookups during typeParameter resolution observe a usable base type
+                // rather than `Unknown`. Without this, cycles through members that
+                // reference this same class (e.g. a method whose return type involves
+                // this class) resolve through a partially-initialized cache entry and
+                // propagate `{undefined}` into downstream types.
+                pt.unsafeSet(clazz, null as List<JavaType>?)
                 typeCache.put(signature, pt)
                 val typeParameters: MutableList<JavaType> = ArrayList(type.typeParameters.size)
                 for (typeArgument: JavaTypeParameter in type.typeParameters) {
@@ -1074,6 +1458,16 @@ class KotlinTypeMapping(
     }
 
     private fun javaClassType(type: JavaClassifierType, signature: String): JavaType? {
+        // When the classifier is a type parameter (e.g. the `S` return type on a method
+        // declared with `<S extends BaseStream<T, S>>`), resolving it gives a
+        // GenericTypeVariable rather than a FullyQualified. A JavaClassifierType whose
+        // classifier is a type parameter can never be parameterized in its own right
+        // (type parameters don't take type arguments), so return the GTV directly —
+        // otherwise we fall through to a null FullyQualified and the enclosing
+        // `type()` returns Unknown, which breaks F-bounded generic resolution.
+        if (type.classifier is JavaTypeParameter && type.typeArguments.isEmpty()) {
+            return type(type.classifier!!)
+        }
         var clazz : FullyQualified?
         clazz = if (type.classifier != null) {
             TypeUtils.asFullyQualified(type(type.classifier!!))
@@ -1086,17 +1480,29 @@ class KotlinTypeMapping(
             var pt = typeCache.get<Parameterized>(ptSig)
             if (pt == null) {
                 pt = Parameterized(null, null, null)
+                if (clazz is Parameterized) {
+                    clazz = clazz.type
+                }
+                // Seed the Parameterized with its raw class before caching so recursive
+                // lookups during typeArgument resolution observe a usable base type
+                // rather than `Unknown`.
+                pt.unsafeSet(clazz, null as List<JavaType>?)
                 typeCache.put(signature, pt)
                 val typeParameters: MutableList<JavaType> = ArrayList(type.typeArguments.size)
                 for (typeArgument: org.jetbrains.kotlin.load.java.structure.JavaType? in type.typeArguments) {
                     typeParameters.add(type(typeArgument))
                 }
-                if (clazz is Parameterized) {
-                    clazz = clazz.type
-                }
                 pt.unsafeSet(clazz, typeParameters)
             }
             return pt
+        }
+        // A raw Java reference (e.g. a `Reference` field inside `class Reference<T>`)
+        // should surface as the raw Class, not the class's own Parameterized form.
+        // `type(type.classifier)` returns the Parameterized when the classifier has
+        // type parameters, so unwrap it here to match the Java parser's handling of
+        // raw types.
+        if (clazz is Parameterized) {
+            clazz = clazz.type
         }
         return clazz
     }
@@ -1119,18 +1525,30 @@ class KotlinTypeMapping(
             }
         }
         val defaultValues: List<String>? = null
+        var constructorFlags = if (constructor is BinaryJavaConstructor) {
+            constructor.access.toLong()
+        } else {
+            convertToFlagsBitMap(
+                constructor.visibility,
+                constructor.isStatic,
+                constructor.isFinal,
+                constructor.isAbstract
+            )
+        }
+        // JVM bit 7 means ACC_VARARGS on methods/constructors; OpenRewrite represents Varargs
+        // at bit 34 so it doesn't collide with the field-only ACC_TRANSIENT at bit 7.
+        if (constructorFlags and (1L shl 7) != 0L) {
+            constructorFlags = constructorFlags and (1L shl 7).inv()
+            constructorFlags = constructorFlags or (1L shl 34)
+        }
+        // Kotlin's BinaryJavaConstructor.access propagates the enclosing class's ACC_FINAL
+        // onto constructors; the JVM bytecode itself carries no `ACC_FINAL` on constructors
+        // (constructors can't be overridden), and the Java parser matches that. Clear the
+        // bit so cross-parser dedup sees identical flags.
+        constructorFlags = constructorFlags and (1L shl 4).inv()
         val method = Method(
             null,
-            (if (constructor is BinaryJavaConstructor) {
-                constructor.access.toLong()
-            } else {
-                convertToFlagsBitMap(
-                    constructor.visibility,
-                    constructor.isStatic,
-                    constructor.isFinal,
-                    constructor.isAbstract
-                )
-            }),
+            constructorFlags,
             null,
             "<constructor>",
             null,
@@ -1149,6 +1567,13 @@ class KotlinTypeMapping(
         }
         if (resolvedDeclaringType == null) {
             return null
+        }
+        // The Java parser uses the raw Class (not its Parameterized form) as both the
+        // declaringType and returnType of a constructor. Kotlin's FIR returns the
+        // class's raw Parameterized via `type(containingClass)`; unwrap it here so
+        // cross-parser dedup observes the same structure on both sides.
+        if (resolvedDeclaringType is Parameterized) {
+            resolvedDeclaringType = resolvedDeclaringType.type
         }
         var parameterTypes: MutableList<JavaType>? = null
         if (constructor.valueParameters.isNotEmpty()) {
@@ -1182,7 +1607,6 @@ class KotlinTypeMapping(
 
     private fun javaTypeParameter(type: JavaTypeParameter, signature: String): JavaType {
         val name = type.name.asString()
-
         val gtv = GenericTypeVariable(
             null,
             name, GenericTypeVariable.Variance.INVARIANT, null
@@ -1191,7 +1615,8 @@ class KotlinTypeMapping(
         var bounds: List<JavaType>? = null
         if (type.upperBounds.size == 1) {
             val mappedBound = type(type.upperBounds.toTypedArray()[0])
-            if (mappedBound !is FullyQualified || "java.lang.Object" != mappedBound.fullyQualifiedName) {
+            if (mappedBound !is FullyQualified ||
+                ("java.lang.Object" != mappedBound.fullyQualifiedName && "kotlin.Any" != mappedBound.fullyQualifiedName)) {
                 bounds = listOf(mappedBound)
             }
         } else {
@@ -1220,8 +1645,17 @@ class KotlinTypeMapping(
             } else {
                 GenericTypeVariable.Variance.CONTRAVARIANT
             }
-            bounds = ArrayList(1)
-            bounds.add(type(type.bound))
+            val bound = type(type.bound)
+            // Match the Java parser's handling of `? extends Object` / `? super Object`:
+            // when the bound is `java.lang.Object`, drop it so the wildcard surfaces with
+            // a variance but no bound. Keeping Object here produces divergent signatures
+            // (e.g. `Generic{? super java.lang.Object}` vs the Java parser's
+            // `Generic{? super }`) and blocks cross-parser dedup for parameterized types
+            // like `BiFunction<? super Object, ? super Object, ?>`.
+            if (bound !is FullyQualified || bound.fullyQualifiedName != "java.lang.Object") {
+                bounds = ArrayList(1)
+                bounds.add(bound)
+            }
         }
         gtv.unsafeSet(name, variance, bounds)
         return gtv
@@ -1253,14 +1687,14 @@ class KotlinTypeMapping(
     private fun listAnnotations(firAnnotations: List<FirAnnotation>): MutableList<FullyQualified>? {
         var annotations: MutableList<FullyQualified>? = null
         for (firAnnotation in firAnnotations) {
-            val fir = firAnnotation.typeRef.toRegularClassSymbol(firSession)?.fir
+            val fir = firAnnotation.annotationTypeRef.toRegularClassSymbol(firSession)?.fir
             if (fir != null && isNotSourceRetention(fir.annotations)) {
                 if (annotations == null) {
                     annotations = ArrayList()
                 }
                 val fq = TypeUtils.asFullyQualified(type(firAnnotation))
                 if (fq != null) {
-                    annotations.add(fq)
+                    annotations.add(remapKotlinBuiltin(fq))
                 }
             }
         }
@@ -1278,7 +1712,7 @@ class KotlinTypeMapping(
                 }
                 val fq = TypeUtils.asFullyQualified(type(javaAnnotation))
                 if (fq != null) {
-                    annotations.add(fq)
+                    annotations.add(remapKotlinBuiltin(fq))
                 }
             }
         }
@@ -1287,9 +1721,9 @@ class KotlinTypeMapping(
 
     private fun isNotSourceRetention(annotations: List<FirAnnotation>): Boolean {
         for (ann in annotations) {
-            if ("kotlin.annotation.Retention" == convertClassIdToFqn(ann.typeRef.coneType.classId)) {
+            if ("kotlin.annotation.Retention" == convertClassIdToFqn(ann.annotationTypeRef.coneType.classId)) {
                 for (v in ann.argumentMapping.mapping.values) {
-                    if (v.calleeReference is FirResolvedNamedReference && (v.calleeReference as FirResolvedNamedReference).name.asString() == "SOURCE") {
+                    if (v is FirQualifiedAccessExpression && v.calleeReference is FirResolvedNamedReference && (v.calleeReference as FirResolvedNamedReference).name.asString() == "SOURCE") {
                         return false
                     }
                 }
@@ -1365,7 +1799,7 @@ class KotlinTypeMapping(
 
     fun primitive(type: FirElement): Primitive {
         return when (type) {
-            is FirConstExpression<*> -> {
+            is FirLiteralExpression -> {
                 when (type.kind) {
                     ConstantValueKind.Boolean -> Primitive.Boolean
                     ConstantValueKind.Byte, ConstantValueKind.UnsignedByte -> Primitive.Byte

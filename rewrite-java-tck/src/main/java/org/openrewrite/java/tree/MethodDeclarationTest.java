@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -116,4 +119,91 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://openjdk.org/jeps/512")
+    @MinimumJava25
+    @Nested
+    class InstanceMainMethods implements RewriteTest {
+
+        @Test
+        void instanceMainMethodWithNoParameters() {
+            rewriteRun(
+              java(
+                """
+                  class HelloWorld {
+                      void main() {
+                          System.out.println("Hello, World!");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void instanceMainMethodWithStringArrayParameter() {
+            rewriteRun(
+              java(
+                """
+                  class HelloWorld {
+                      void main(String[] args) {
+                          System.out.println("Hello, World!");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void instanceMainMethodWithInstanceFields() {
+            rewriteRun(
+              java(
+                """
+                  class Counter {
+                      private int count = 0;
+
+                      void main() {
+                          count++;
+                          System.out.println("Count: " + count);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void instanceMainMethodCallingInstanceMethods() {
+            rewriteRun(
+              java(
+                """
+                  class Greeter {
+                      void main() {
+                          greet("World");
+                      }
+
+                      void greet(String name) {
+                          System.out.println("Hello, " + name + "!");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void staticMainMethodStillSupported() {
+            rewriteRun(
+              java(
+                """
+                  class TraditionalMain {
+                      public static void main(String[] args) {
+                          System.out.println("Traditional main method");
+                      }
+                  }
+                  """
+              )
+            );
+        }
+    }
 }

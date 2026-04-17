@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {createDraft, finishDraft} from "immer";
 import {ExecutionContext, Markers, randomId, Recipe, TreeVisitor} from "@openrewrite/rewrite";
+import {create} from "mutative";
 import {JavaScriptVisitor} from "@openrewrite/rewrite/javascript";
 import {J} from "@openrewrite/rewrite/java";
 
@@ -26,15 +26,15 @@ export class ReplaceId extends Recipe {
     async editor(): Promise<TreeVisitor<any, ExecutionContext>> {
         return new class extends JavaScriptVisitor<ExecutionContext> {
             protected async preVisit(tree: J, _p: ExecutionContext): Promise<J | undefined> {
-                let draft = createDraft(tree);
+                const [draft, finishDraft] = create(tree);
                 draft.id = randomId();
-                return finishDraft(draft);
+                return finishDraft();
             }
 
             protected async visitMarkers(markers: Markers, p: ExecutionContext): Promise<Markers> {
-                let draft = createDraft(markers);
+                const [draft, finishDraft] = create(markers);
                 draft.id = randomId();
-                return super.visitMarkers(finishDraft(draft), p);
+                return super.visitMarkers(finishDraft(), p);
             }
         }
     }

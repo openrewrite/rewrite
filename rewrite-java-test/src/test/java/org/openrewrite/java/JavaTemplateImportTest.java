@@ -30,7 +30,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
  */
 class JavaTemplateImportTest implements RewriteTest {
 
-    @Disabled
+    @Disabled("JavaTemplate has no support for J.Import replacement — no CoordinateBuilder.Import, no parseImport, and BlockStatementTemplateGenerator explicitly skips imports")
     @Test
     void replaceImport() {
         rewriteRun(

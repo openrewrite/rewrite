@@ -15,9 +15,12 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
@@ -31,9 +34,11 @@ import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@AllArgsConstructor(onConstructor = @__(@JsonCreator))
 public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     String name;
@@ -56,6 +61,9 @@ public class RecipeDescriptor {
     List<OptionDescriptor> options;
 
     @With
+    List<RecipeDescriptor> preconditions;
+
+    @With
     List<RecipeDescriptor> recipeList;
 
     @With
@@ -71,6 +79,16 @@ public class RecipeDescriptor {
     @Deprecated
     URI source;
 
+    @Deprecated
+    public RecipeDescriptor(String name, String displayName, String instanceName, String description,
+                            Set<String> tags, @Nullable Duration estimatedEffortPerOccurrence,
+                            List<OptionDescriptor> options, List<RecipeDescriptor> recipeList,
+                            List<DataTableDescriptor> dataTables, List<Maintainer> maintainers,
+                            List<Contributor> contributors, List<RecipeExample> examples, URI source) {
+        this(name, displayName, instanceName, description, tags, estimatedEffortPerOccurrence,
+                options, emptyList(), recipeList, dataTables, maintainers, contributors, examples, source);
+    }
+
     /**
      * @param env Provides a source of category descriptors to build category names from more
      *            than just the name segments.
@@ -78,17 +96,17 @@ public class RecipeDescriptor {
      * replacing individual segments of the display name with category descriptor names when those
      * are defined to the provided environment.
      */
-    public List<String> inferCategoriesFromName(Environment env) {
+    public List<CategoryDescriptor> inferCategoriesFromName(Environment env) {
         // Extract package from recipe name (everything before the last dot)
-        int lastDot = displayName.lastIndexOf('.');
+        int lastDot = name.lastIndexOf('.');
         if (lastDot == -1) {
             return emptyList();
         }
 
-        String packageName = displayName.substring(0, lastDot);
+        String packageName = name.substring(0, lastDot);
 
         String[] parts = packageName.split("\\.");
-        List<String> categories = new ArrayList<>(parts.length);
+        List<CategoryDescriptor> categories = new ArrayList<>(parts.length);
 
         nextPart:
         for (int i = 0; i < parts.length; i++) {
@@ -101,14 +119,15 @@ public class RecipeDescriptor {
                     if (categoryDescriptor.isRoot()) {
                         continue nextPart;
                     }
-                    categories.add(categoryDescriptor.getDisplayName());
+                    categories.add(categoryDescriptor);
                     continue nextPart;
                 }
             }
 
             if (!part.isEmpty()) {
-                String capitalized = Character.toUpperCase(part.charAt(0)) + part.substring(1);
-                categories.add(capitalized);
+                @Language("markdown") String capitalized = Character.toUpperCase(part.charAt(0)) + part.substring(1);
+                categories.add(new CategoryDescriptor(capitalized, partialPackage, "", emptySet(),
+                        false, 0, false));
             }
         }
 

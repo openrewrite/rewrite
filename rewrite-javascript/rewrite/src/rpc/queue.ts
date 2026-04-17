@@ -16,7 +16,7 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {emptyMarkers, Markers} from "../markers";
 import {saveTrace, trace} from "./trace";
-import {createDraft, finishDraft} from "immer";
+import {updateIfChanged} from "../util";
 import {isRef, ReferenceMap} from "../reference";
 
 /**
@@ -24,6 +24,14 @@ import {isRef, ReferenceMap} from "../reference";
  * for sending and receiving objects in an RPC communication.
  */
 export interface RpcCodec<T> {
+    /**
+     * Creates a new instance of the object type with proper constructor defaults.
+     * If not provided, a plain object `{kind: type}` will be created.
+     *
+     * @returns A new instance of the object type.
+     */
+    rpcNew?(): T;
+
     /**
      * Serializes and sends an object over an RPC send queue.
      *
@@ -177,10 +185,10 @@ export class RpcSendQueue {
             for (const anAfter of after) {
                 const beforePos = beforeIdx.get(id(anAfter));
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
-                if (!beforePos) {
+                if (beforePos === undefined) {
                     await this.add(anAfter, onChangeRun);
                 } else {
-                    const aBefore = before ? before[beforePos] : undefined;
+                    const aBefore = before?.[beforePos];
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else if (anAfter !== undefined && this.typesAreDifferent(anAfter, aBefore)) {
@@ -288,10 +296,10 @@ export class RpcReceiveQueue {
         }
         return this.receive(markers, async m => {
             return saveTrace(this.trace, async () => {
-                const draft = createDraft(markers!);
-                draft.id = await this.receive(m.id);
-                draft.markers = (await this.receiveList(m.markers))!;
-                return finishDraft(draft);
+                return updateIfChanged(markers!, {
+                    id: await this.receive(m.id),
+                    markers: (await this.receiveList(m.markers))!,
+                });
             })
         })
     }
@@ -340,6 +348,12 @@ export class RpcReceiveQueue {
                         after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
                         after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
+                    } else if (message.state === RpcObjectState.ADD && message.valueType) {
+                        throw new Error(
+                            `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
+                            `The Java side has a codec and sent property messages that will not be consumed, ` +
+                            `causing RPC queue desynchronization.`
+                        );
                     } else {
                         after = before;
                     }
@@ -397,9 +411,11 @@ export class RpcReceiveQueue {
     }
 
     private newObj<T>(type: string): T {
-        return {
-            kind: type
-        } as T;
+        const codec = RpcCodecs.forType(type, this.sourceFileType);
+        if (codec?.rpcNew) {
+            return codec.rpcNew();
+        }
+        return {kind: type} as T;
     }
 }
 

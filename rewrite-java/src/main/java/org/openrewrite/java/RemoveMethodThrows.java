@@ -45,15 +45,9 @@ public class RemoveMethodThrows extends Recipe {
             example = "java.io.IOException")
     String exceptionTypePattern;
 
-    @Override
-    public String getDisplayName() {
-        return "Remove elements from a method declaration `throws` clause";
-    }
+    String displayName = "Remove elements from a method declaration `throws` clause";
 
-    @Override
-    public String getDescription() {
-        return "Remove specific, or all exceptions from a method declaration `throws` clause.";
-    }
+    String description = "Remove specific, or all exceptions from a method declaration `throws` clause.";
 
     @Override
     public Validated<Object> validate() {

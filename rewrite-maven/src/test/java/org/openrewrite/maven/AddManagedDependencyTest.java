@@ -125,7 +125,7 @@ class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void validation()  {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+        var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "org.apache.logging:*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
@@ -133,7 +133,7 @@ class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void validationAllowsDashesInOnlyIfUsing()  {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+        var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "something-with:dashes-is-ok*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
@@ -141,7 +141,7 @@ class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void badCharactersInOnlyIfUsingAreInvalid() {
-        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+        var recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "spaced group:*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated.isValid()).isFalse();
@@ -420,6 +420,110 @@ class AddManagedDependencyTest implements RewriteTest {
                     <version>2.15.3</version>
                   </dependency>
                 </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleManagedDependenciesWithBecauseComments() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AddManagedDependency("org.apache.logging.log4j", "log4j-core", "2.17.2", null,
+              null, null, null, null, null, null, "CVE-2021-44228"),
+            new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.19.0", null,
+              null, null, null, null, null, null, "CVE-2020-36518")
+          ),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <!-- CVE-2020-36518 -->
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                      <version>2.19.0</version>
+                    </dependency>
+                    <!-- CVE-2021-44228 -->
+                    <dependency>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-core</artifactId>
+                      <version>2.17.2</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void preservesExistingCommentsWhenAddingNewManagedDependenciesWithBecause() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "2.19.0", null,
+              null, null, null, null, null, null, "CVE-2020-36518"),
+            new AddManagedDependency("org.springframework", "spring-core", "5.3.30", null,
+              null, null, null, null, null, null, "CVE-2023-20860")
+          ),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <!-- Existing comment for log4j -->
+                    <dependency>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-core</artifactId>
+                      <version>2.17.2</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <!-- CVE-2020-36518 -->
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                      <version>2.19.0</version>
+                    </dependency>
+                    <!-- Existing comment for log4j -->
+                    <dependency>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-core</artifactId>
+                      <version>2.17.2</version>
+                    </dependency>
+                    <!-- CVE-2023-20860 -->
+                    <dependency>
+                      <groupId>org.springframework</groupId>
+                      <artifactId>spring-core</artifactId>
+                      <version>5.3.30</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
               </project>
               """
           )

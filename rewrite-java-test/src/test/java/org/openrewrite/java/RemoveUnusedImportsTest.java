@@ -132,6 +132,54 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void retainImportIfUsedInJavaDoc() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Date;
+              import java.util.List;
+
+              /**
+               * referencing {@link Date} only in doc
+               */
+              class Test {
+                  List list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeImportIfFullyQualifiedInJavaDoc() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Date;
+              import java.util.List;
+
+              /**
+               * referencing {@link java.util.Date} only in doc
+               */
+              class Test2 {
+                  List list;
+              }
+              """,
+            """
+              import java.util.List;
+
+              /**
+               * referencing {@link java.util.Date} only in doc
+               */
+              class Test2 {
+                  List list;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1052")
     @Test
     void usedInJavadocWithThrows() {
@@ -508,6 +556,23 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import foo.Bar;
               import foo.Foo;
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/6519")
+    @Test
+    void retainPackageInfoAnnotationWithMissingTypeInformation() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion()).typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              @NullMarked
+              package org.openrewrite.java;
+
+              import org.jspecify.annotations.NullMarked;
+              """,
+            spec -> spec.path("src/main/java/org/openrewrite/java/package-info.java")
           )
         );
     }
@@ -1074,6 +1139,54 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/7333")
+    @Test
+    void removesImportUsedOnlyAsStaticImportParameterType() {
+        rewriteRun(
+          java(
+            """
+              package org.example.a;
+
+              public class Something {
+                  public static Something DEFAULT_SOMETHING = new Something();
+
+                  public static void doSomething(Something something) {
+                      System.out.println("Doing something... " + something);
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package org.example.b;
+
+              import org.example.a.Something;
+
+              import static org.example.a.Something.DEFAULT_SOMETHING;
+              import static org.example.a.Something.doSomething;
+
+              public class Test {
+                  public static void main(String[] args) {
+                      doSomething(DEFAULT_SOMETHING);
+                  }
+              }
+              """,
+            """
+              package org.example.b;
+
+              import static org.example.a.Something.DEFAULT_SOMETHING;
+              import static org.example.a.Something.doSomething;
+
+              public class Test {
+                  public static void main(String[] args) {
+                      doSomething(DEFAULT_SOMETHING);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/3275")
     @Test
     void doesNotRemoveReferencedClassesBeingUsedAsParameters() {
@@ -1457,7 +1570,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeWildcardImportWithDirectImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.util.*;
@@ -2174,7 +2286,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void wildcardImportsWithConflictingNames() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               import java.sql.*;
@@ -2283,6 +2394,135 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 Class<?> cls = TimeUnit.class;
             }
             """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7380")
+    @Test
+    void keepImportWhenUsedOnlyAsStaticFieldQualifier() {
+        rewriteRun(
+          java(
+            """
+            package foo;
+            public class A {
+                public static final int VALUE = 1;
+            }
+            """
+          ),
+          java(
+            """
+            package bar;
+
+            import foo.A;
+
+            public class Test {
+                public int getValue() {
+                    return A.VALUE;
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/6544")
+    @Test
+    void starImportWithExplicitImportsFromSamePackage() {
+        rewriteRun(
+          java(
+            """
+              package com.example.common.utils;
+
+              public class ListUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.common.utils;
+
+              public class ClassUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.common.utils;
+
+              public class StringUtil {
+                  public static void execute() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.service;
+
+              import com.example.common.utils.*;
+              import com.example.common.utils.ClassUtil;
+              import com.example.common.utils.StringUtil;
+
+              public class MyService {
+                  public void init() {
+                      StringUtil.execute();
+                  }
+              }
+              """,
+            """
+              package com.example.service;
+
+              import com.example.common.utils.StringUtil;
+
+              public class MyService {
+                  public void init() {
+                      StringUtil.execute();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainTypeUseAnnotationOnQualifiedArrayType() {
+        rewriteRun(
+          java(
+            """
+              package ann;
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(ElementType.TYPE_USE)
+              public @interface Nullable {
+              }
+              """
+          ),
+          java(
+            """
+              package foo;
+              public class Outer {
+                  public static class Inner {}
+              }
+              """
+          ),
+          java(
+            """
+              import ann.Nullable;
+              import foo.Outer;
+
+              class Test {
+                  Outer.@Nullable Inner[] items;
+              }
+              """
           )
         );
     }

@@ -34,15 +34,9 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
     String fullyQualifiedConstantName;
 
-    @Override
-    public String getDisplayName() {
-        return "Replace constant with another constant";
-    }
+    String displayName = "Replace constant with another constant";
 
-    @Override
-    public String getDescription() {
-        return "Replace a constant with another constant, adding/removing import on class if needed.";
-    }
+    String description = "Replace a constant with another constant, adding/removing import on class if needed.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -114,14 +108,17 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 String realName = hasNoConflictingImport ? newOwningType.getClassName() : newOwningType.getFullyQualifiedName();
                 if (target instanceof J.Identifier) {
                     target = ((J.Identifier) target).withType(newOwningType).withSimpleName(realName);
-                    name = name
-                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
-                            .withSimpleName(newConstantName);
                 } else {
                     target = (((J.FieldAccess) target).getName()).withType(newOwningType).withSimpleName(realName);
-                    name = name
-                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
-                            .withSimpleName(newConstantName);
+                }
+                JavaType nameType = name.getType();
+                name = name
+                        .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
+                        .withSimpleName(newConstantName)
+                        .withType(TypeUtils.isOfClassType(nameType, existingOwningType) ? newOwningType : nameType);
+                // manipulate the fieldAccess type to also handle enums
+                if (TypeUtils.isOfClassType(fieldAccess.getType(), existingOwningType)) {
+                    fieldAccess = fieldAccess.withType(newOwningType);
                 }
                 return fieldAccess
                         .withTarget(target)

@@ -17,14 +17,35 @@ package org.openrewrite.internal;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.FileAttributes;
+import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.jgit.api.ApplyResult;
+import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.lib.FileMode;
+import org.openrewrite.jgit.lib.Repository;
+import org.openrewrite.jgit.util.FileUtils;
+import org.openrewrite.marker.GitTreeEntry;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class InMemoryDiffEntryTest {
@@ -216,6 +237,7 @@ class InMemoryDiffEntryTest {
             );
         }
     }
+
     @Disabled("Does not work with CI due to jgit shadowJar")
     @Test
     void executableFile() {
@@ -241,6 +263,340 @@ class InMemoryDiffEntryTest {
                 -}
                 """
             );
+        }
+    }
+
+    @Test
+    void addBinary() {
+        PlainText after = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
+        after = after.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(after.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+
+        try (var entry = new InMemoryDiffEntry(null, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              new file mode 100644
+              index 0000000000000000000000000000000000000000..06085efc592f6851a3f54f502f1a270db233ebf0
+              GIT binary patch
+              literal 11
+              ScmeZB&B@8vQOL^AQv?7O<O8Vy
+              
+              literal 0
+              HcmV?d00001
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void deleteBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+
+        try (var entry = new InMemoryDiffEntry(before, null, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              deleted file mode 100644
+              index 0000000000000000000000000000000000000001..0000000000000000000000000000000000000000
+              GIT binary patch
+              literal 0
+              HcmV?d00001
+              
+              literal 11
+              ScmeZB&B@8vQOL^AQv?7O<O8Vy
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void renameBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "06085efc592f6851a3f54f502f1a270db233ebf0", 0100644)));
+        PlainText after = before.withSourcePath(Paths.get("renamed.txt"));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/renamed.txt
+              similarity index 0%
+              rename from file.txt
+              rename to renamed.txt
+              """);
+        }
+    }
+
+    @Test
+    void modifyBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+        PlainText after = before.withText("Hello, jon.bak!\n");
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              index 0000000000000000000000000000000000000001..88292b7f3bb636b57b68867e3457ad3bcb85eb28 100644
+              GIT binary patch
+              literal 16
+              XcmeZB&B@8vQOL^A(@RRsR^$QzE_wwI
+              
+              literal 12
+              TcmeZB&B@8vQOL^AQ{(~w8kYmJ
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void breakModifyBinary() {
+        PlainText before = (PlainText) PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get();
+        before = before.withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers().add(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644)));
+        PlainText after = before.withSourcePath(Paths.get("renamed.txt"))
+          .withText("Hello, jon.bak!\n");
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/renamed.txt
+              similarity index 0%
+              rename from file.txt
+              rename to renamed.txt
+              index 0000000000000000000000000000000000000001..88292b7f3bb636b57b68867e3457ad3bcb85eb28 100644
+              GIT binary patch
+              literal 16
+              XcmeZB&B@8vQOL^A(@RRsR^$QzE_wwI
+              
+              literal 12
+              TcmeZB&B@8vQOL^AQ{(~w8kYmJ
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void quarkBinary() {
+        Quark before = new Quark(randomId(), Paths.get("file.txt"), Markers.build(singletonList(new GitTreeEntry(randomId(), "0000000000000000000000000000000000000001", 0100644))), null, new FileAttributes(null, null, null, true, true, false, 0));
+        PlainText after = PlainTextParser.builder().build().parse("Hello, jon!\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"))
+          .withMarkers(before.getMarkers());
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), true)) {
+            assertThat(entry.getDiff()).isEqualTo("""
+              diff --git a/file.txt b/file.txt
+              index 0000000000000000000000000000000000000001..cb9108edf7f482e8a7249097fc986c15e4fec69f 100644
+              GIT binary patch
+              literal 12
+              TcmeZB&B@8vQOL^AQ{(~w8kYmJ
+              
+              literal 0
+              HcmV?d00001
+              
+              
+              """);
+        }
+    }
+
+    @Test
+    void nonUtf8SourceFileDiffPreservesCharset() {
+        // Use ISO-8859-1 charset with characters that encode differently than UTF-8.
+        // "café" contains é (0xE9 in ISO-8859-1, 0xC3 0xA9 in UTF-8).
+        // Without the fix, getDiff() would use the platform default charset (UTF-8 on
+        // most dev machines) to decode ISO-8859-1 bytes, corrupting the output.
+        Charset iso88591 = Charset.forName("ISO-8859-1");
+        PlainText before = PlainTextParser.builder().build()
+                .parse("line1\ncafé résumé naïve\nline3\n").findFirst().get()
+                .withSourcePath(Paths.get("file.txt"))
+                .withCharset(iso88591);
+        PlainText after = before.withText("line1\ncafé résumé naïve\nline3 changed\n");
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, null, Set.of(), false)) {
+            String diff = entry.getDiff();
+            assertThat(diff).isNotEmpty();
+            // The context line with ISO-8859-1 characters must be preserved
+            assertThat(diff).contains("café résumé naïve");
+            assertThat(diff).contains("-line3");
+            assertThat(diff).contains("+line3 changed");
+        }
+    }
+
+    @Test
+    void fencedMarkerPrinterIsApplied() {
+        PlainText before = PlainTextParser.builder().build().parse("Hello").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withText("Hello World")
+          .withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+            assertThat(diff).doesNotContain("~~>");
+        }
+    }
+
+    @Test
+    void fencedSearchResultOnFileWithTrailingNewline() {
+        // Files with trailing newlines should not produce "\ No newline at end of file"
+        // when fenced markers are applied. The closing fence must be placed before the
+        // trailing newline, not after it.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\nline2\nline3\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            assertThat(diff).doesNotContain("No newline at end of file");
+            // The fenced markers should be present
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+        }
+    }
+
+    @Test
+    void fencedSearchResultOnFileWithoutTrailingNewline() {
+        // Files without trailing newlines should still produce "\ No newline at end of file"
+        // on both sides of the diff, since neither before nor after ends with a newline.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\nline2").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+            assertThat(diff).contains("No newline at end of file");
+        }
+    }
+
+    @Test
+    void fencedSearchResultOnFileWithWindowsLineEndings() {
+        // Windows-style line endings (\r\n) should be handled the same way —
+        // the closing fence goes before the trailing \r\n.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\r\nline2\r\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            assertThat(diff).doesNotContain("No newline at end of file");
+            String expectedMarker = "{{" + searchResult.getId() + "}}";
+            assertThat(diff).contains(expectedMarker);
+        }
+    }
+
+    @Test
+    void unicodeDiffCanBeAppliedByJgit() throws Exception {
+        // Simulate the exact pipeline: InMemoryDiffEntry generates diff,
+        // diff is converted to bytes, jgit ApplyCommand applies it to the file on disk.
+        // This is the pipeline that fails for customer issue #1994.
+
+        StringBuilder before = new StringBuilder();
+        StringBuilder after = new StringBuilder();
+        for (int i = 1; i <= 210; i++) {
+            if (i == 203) {
+                String line = "        String content = \"ユーザー: \\\"佐藤\\\" — emoji: \uD83C\uDF89 — accented: café\";\n";
+                before.append(line);
+                after.append(line);
+            } else if (i == 204) {
+                String line = "        String id = ContentIdentifierUtil.generate(content, util.getCorpBondNamespace());\n";
+                before.append(line);
+                after.append(line);
+            } else if (i == 205) {
+                before.append("        assertNotNull(\"Should generate UUID for unicode content\", id);\n");
+                after.append("        assertNotNull(id, \"Should generate UUID for unicode content\");\n");
+            } else if (i == 206) {
+                before.append("        assertEquals(\"UUID should be 36 characters\", 36, id.length());\n");
+                after.append("        assertEquals(36, id.length(), \"UUID should be 36 characters\");\n");
+            } else {
+                String line = "        line " + i + ";\n";
+                before.append(line);
+                after.append(line);
+            }
+        }
+
+        String beforeStr = before.toString();
+        String afterStr = after.toString();
+
+        // Step 1: Generate diff using InMemoryDiffEntry (like the worker does)
+        String diff;
+        try (InMemoryDiffEntry entry = new InMemoryDiffEntry(
+                Path.of("Test.java"), Path.of("Test.java"), null,
+                beforeStr, afterStr, emptySet())) {
+            diff = entry.getDiff();
+        }
+        assertThat(diff).isNotEmpty();
+        assertThat(diff).contains("ユーザー");
+        assertThat(diff).contains("🎉");
+
+        // Step 2: Simulate SCM service applying the diff
+        // Create a temp git repo with the original file
+        File trash = Files.createTempDirectory("unicode-diff-test").toFile();
+        try {
+            Git git = Git.init().setDirectory(trash).call();
+            Repository db = git.getRepository();
+
+            // Write the original file
+            File testFile = new File(trash, "Test.java");
+            try (FileOutputStream fos = new FileOutputStream(testFile)) {
+                fos.write(beforeStr.getBytes(StandardCharsets.UTF_8));
+            }
+            git.add().addFilepattern("Test.java").call();
+            git.commit().setMessage("initial").call();
+
+            // Apply the diff (simulating GitClient.applyPatch)
+            byte[] diffBytes = diff.getBytes(StandardCharsets.UTF_8);
+            ApplyResult result = git.apply()
+                    .setPatch(new ByteArrayInputStream(diffBytes))
+                    .call();
+
+            assertThat(result.getUpdatedFiles()).isNotEmpty();
+
+            // Verify the result
+            String resultContent = new String(Files.readAllBytes(testFile.toPath()), StandardCharsets.UTF_8);
+            assertThat(resultContent).contains("assertNotNull(id, \"Should generate UUID for unicode content\")");
+            assertThat(resultContent).contains("assertEquals(36, id.length(), \"UUID should be 36 characters\")");
+            assertThat(resultContent).contains("ユーザー");
+            assertThat(resultContent).contains("🎉");
+            assertThat(resultContent).contains("café");
+
+            db.close();
+        } finally {
+            FileUtils.delete(trash, FileUtils.RECURSIVE | FileUtils.RETRY);
+        }
+    }
+
+    @Test
+    void fencedSearchResultPreservesLineCount() {
+        // A search-only result (text unchanged, only markers added) on a file with a
+        // trailing newline should not change the line count in the hunk header.
+        PlainText before = PlainTextParser.builder().build()
+          .parse("line1\nline2\nline3\n").findFirst().get()
+          .withSourcePath(Paths.get("file.txt"));
+
+        SearchResult searchResult = new SearchResult(randomId(), null);
+        PlainText after = before.withMarkers(before.getMarkers().add(searchResult));
+
+        try (var entry = new InMemoryDiffEntry(before, after, null, PrintOutputCapture.MarkerPrinter.FENCED, Set.of(), false)) {
+            String diff = entry.getDiff();
+            // Before has 3 lines, after should also have 3 lines (not 4)
+            assertThat(diff).contains("@@ -1,3 +1,3 @@");
         }
     }
 }

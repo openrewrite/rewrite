@@ -67,16 +67,10 @@ public class InlineMethodCalls extends Recipe {
     @Nullable
     Set<String> classpathFromResources;
 
-    @Override
-    public String getDisplayName() {
-        return "Inline method calls";
-    }
+    String displayName = "Inline method calls";
 
-    @Override
-    public String getDescription() {
-        return "Inline method calls using a template replacement pattern. " +
+    String description = "Inline method calls using a template replacement pattern. " +
                 "Supports both method invocations and constructor calls, with optional imports.";
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
