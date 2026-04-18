@@ -81,27 +81,12 @@ class PythonRpcReceiver:
         if tree is None:
             return None
 
-        # First handle common J fields via pre_visit
-        # Java's preVisit always sends id, prefix, markers for all J elements.
-        # ExpressionStatement and StatementExpression delegate prefix/markers to their child,
-        # but we still need to receive them to stay in sync with the queue.
+        # First handle common J fields via pre_visit.
+        # ExpressionStatement and StatementExpression delegate prefix/markers to their
+        # wrapped child: the sender skips them here and sends them via the child's preVisit.
         if isinstance(tree, J):
-            if isinstance(tree, ExpressionStatement):
-                # Java sends id, prefix, markers even though prefix/markers delegate to expression
-                # We must receive them to stay in sync, but only use the id
-                # Note: tree.prefix/markers would fail on fresh instances since _expression is None,
-                # so we pass None as the before value - the RPC data contains the actual values anyway.
+            if isinstance(tree, (ExpressionStatement, StatementExpression)):
                 new_id = q.receive(tree.id)
-                q.receive(None)    # Receive but discard prefix - delegated to expression
-                q.receive(None)    # Receive but discard markers - delegated to expression
-                tree = tree.replace(id=new_id) if new_id is not tree.id else tree
-            elif isinstance(tree, StatementExpression):
-                # Java sends id, prefix, markers even though prefix/markers delegate to statement
-                # We must receive them to stay in sync, but only use the id
-                # Note: tree.prefix/markers would fail on fresh instances since _statement is None
-                new_id = q.receive(tree.id)
-                q.receive(None)    # Receive but discard prefix - delegated to statement
-                q.receive(None)    # Receive but discard markers - delegated to statement
                 tree = tree.replace(id=new_id) if new_id is not tree.id else tree
             else:
                 tree = self._pre_visit(tree, q)

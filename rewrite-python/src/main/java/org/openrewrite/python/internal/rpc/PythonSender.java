@@ -45,6 +45,12 @@ public class PythonSender extends PythonVisitor<RpcSendQueue> {
     @Override
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
+        if (j instanceof Py.ExpressionStatement || j instanceof Py.StatementExpression) {
+            // prefix and markers delegate to the wrapped child, which receives them
+            // through its own preVisit. Sending them here would duplicate the data
+            // and the receiver skips them anyway.
+            return j;
+        }
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
         q.getAndSend(j, Tree::getMarkers);
 
