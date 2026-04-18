@@ -143,7 +143,7 @@ public class RemoveDependency extends Recipe {
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             return null;
                         }
