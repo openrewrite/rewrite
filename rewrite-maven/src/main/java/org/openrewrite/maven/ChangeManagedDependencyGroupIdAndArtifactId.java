@@ -102,6 +102,11 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         this.versionPattern = versionPattern;
     }
 
+    private boolean isGlobPattern() {
+        return oldGroupId.contains("*") || oldGroupId.contains("?") ||
+               oldArtifactId.contains("*") || oldArtifactId.contains("?");
+    }
+
     @Override
     public Validated<Object> validate() {
         Validated<Object> validated = super.validate();
@@ -187,6 +192,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                                 t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
                             }
                         } catch (MavenDownloadingException e) {
+                            if (isGlobPattern()) {
+                                return tag;
+                            }
                             return e.warn(t);
                         }
                     }

@@ -216,7 +216,7 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # Update our understanding of what Java has
         remote_objects[obj_id] = obj
         # Also update local_objects for consistency
-        local_objects[str(obj.id)] = obj
+        local_objects[obj_id] = obj
 
     return obj
 
@@ -396,7 +396,7 @@ def handle_parse(params: dict) -> List[str]:
             elif 'path' in input_item:
                 result = parse_python_file(input_item['path'], relative_to, ty_client)
             elif 'text' in input_item or 'source' in input_item:
-                source = input_item.get('text') or input_item.get('source')
+                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
                 path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
                 # For relative paths, write the source under the project root
                 # (tmpdir or relative_to) so ty-types can resolve imports from
@@ -924,6 +924,21 @@ _recipe_phases: Dict[str, str] = {}
 # Data table output directory - if set, data tables will be written to CSV files
 _data_table_output_dir: Optional[str] = None
 
+# Registry mapping fully-qualified visitor names to visitor classes.
+# Used to instantiate visitors by name when dispatched via RPC (e.g., auto-format).
+# Lazily initialized to avoid circular imports.
+_VISITOR_REGISTRY: Optional[Dict[str, type]] = None
+
+
+def _get_visitor_registry() -> Dict[str, type]:
+    global _VISITOR_REGISTRY
+    if _VISITOR_REGISTRY is None:
+        from rewrite.python.format.auto_format import AutoFormatVisitor
+        _VISITOR_REGISTRY = {
+            'org.openrewrite.python.format.AutoFormatVisitor': AutoFormatVisitor,
+        }
+    return _VISITOR_REGISTRY
+
 
 def _install_sub_recipes(recipe, marketplace) -> None:
     """Ensure sub-recipes from recipe_list() are registered in the marketplace."""
@@ -1074,9 +1089,16 @@ def handle_visit(params: dict) -> dict:
     # Instantiate the visitor
     visitor = _instantiate_visitor(visitor_name, ctx)
 
-    # Apply the visitor
+    # Reconstruct cursor from cursor IDs (if provided).
+    # Cursor IDs are ordered innermost-to-outermost, so we iterate in reverse
+    # to build the cursor chain from root inward (matching JS implementation).
     from rewrite.visitor import Cursor
     cursor = Cursor(None, Cursor.ROOT_VALUE)
+    if cursor_ids:
+        for cursor_id in reversed(cursor_ids):
+            cursor_obj = get_object_from_java(cursor_id, source_file_type)
+            if cursor_obj is not None:
+                cursor = Cursor(cursor, cursor_obj)
 
     before = tree
     after = visitor.visit(tree, ctx, cursor)
@@ -1264,7 +1286,11 @@ def _instantiate_visitor(visitor_name: str, ctx):
         return recipe.scanner(acc)
 
     else:
-        raise ValueError(f"Unknown visitor name format: {visitor_name}")
+        # Look up visitor by fully-qualified name from registry
+        visitor_cls = _get_visitor_registry().get(visitor_name)
+        if visitor_cls is None:
+            raise ValueError(f"Unknown visitor name format: {visitor_name}")
+        return visitor_cls()
 
 
 def handle_generate(params: dict) -> dict:

@@ -348,6 +348,12 @@ export class RpcReceiveQueue {
                         after = await codec.rpcReceive(before, this);
                     } else if (message.value !== undefined) {
                         after = message.valueType ? {kind: message.valueType, ...message.value} : message.value;
+                    } else if (message.state === RpcObjectState.ADD && message.valueType) {
+                        throw new Error(
+                            `No RPC codec registered on the TypeScript side for '${message.valueType}'. ` +
+                            `The Java side has a codec and sent property messages that will not be consumed, ` +
+                            `causing RPC queue desynchronization.`
+                        );
                     } else {
                         after = before;
                     }

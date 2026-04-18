@@ -35,9 +35,44 @@ import java.util.List;
 
 public class CSharpVisitor<P> extends JavaVisitor<P>
 {
+    protected CsDocCommentVisitor<P> csXmlDocVisitor;
+
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof Cs;
+    }
+
+    protected CsDocCommentVisitor<P> getCsDocCommentVisitor() {
+        return new CsDocCommentVisitor<>(this);
+    }
+
+    @Override
+    public Space visitSpace(@Nullable Space space, Space.Location loc, P p) {
+        if (space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null) {
+            return space;
+        } else if (space.getComments().isEmpty()) {
+            return space;
+        }
+        return space.withComments(ListUtils.map(space.getComments(), comment -> {
+            if (comment instanceof CsDocCommentRawComment) {
+                // Convert raw doc comment from RPC into structured tree, then visit
+                CsDocComment.DocComment parsed = CsDocCommentParser.parse((CsDocCommentRawComment) comment);
+                return visitCsDocCommentComment(parsed, p);
+            } else if (comment instanceof CsDocComment.DocComment) {
+                return visitCsDocCommentComment((CsDocComment.DocComment) comment, p);
+            }
+            return comment;
+        }));
+    }
+
+    private Comment visitCsDocCommentComment(CsDocComment.DocComment docComment, P p) {
+        if (csXmlDocVisitor == null) {
+            csXmlDocVisitor = getCsDocCommentVisitor();
+        }
+        Cursor previous = csXmlDocVisitor.getCursor();
+        Comment c = (Comment) csXmlDocVisitor.visit(docComment, p, getCursor());
+        csXmlDocVisitor.setCursor(previous);
+        return c;
     }
 
     public J visitCompilationUnit(Cs.CompilationUnit compilationUnit, P p) {

@@ -262,7 +262,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         var implements_ = q.Receive(classDecl.Implements, c => VisitContainer(c, q));
         var permits = q.Receive(classDecl.Permits, c => VisitContainer(c, q));
         var body = q.Receive((J)classDecl.Body, el => (J)VisitNonNull(el, q));
-        return classDecl.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithClassKind((ClassDeclaration.Kind)kind!).WithName((Identifier)name!).WithTypeParameters(typeParameters).WithPrimaryConstructor(primaryConstructor).WithExtends(extends_).WithImplements(implements_).WithPermits(permits).WithBody((Block)body!);
+        var type = q.Receive(classDecl.Type, t => (JavaType.FullyQualified?)VisitType(t, q));
+        return classDecl.WithId(_pvId).WithPrefix(_pvPrefix).WithMarkers(_pvMarkers).WithLeadingAnnotations(leadingAnnotations!).WithModifiers(modifiers!).WithClassKind((ClassDeclaration.Kind)kind!).WithName((Identifier)name!).WithTypeParameters(typeParameters).WithPrimaryConstructor(primaryConstructor).WithExtends(extends_).WithImplements(implements_).WithPermits(permits).WithBody((Block)body!).WithType(type);
     }
 
     private J VisitClassDeclarationKind(ClassDeclaration.Kind kind, RpcReceiveQueue q)
@@ -708,16 +709,16 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
     {
         var comments = q.ReceiveList(space.Comments, c =>
         {
-            if (c is TextComment tc)
+            var multiline = q.Receive(c.Multiline);
+            var text = q.Receive(c.Text);
+            var suffix = q.Receive(c.Suffix);
+            // C# Comment doesn't have Markers; consume and discard
+            q.Receive<Markers>(Markers.Empty);
+            if (c is XmlDocComment)
             {
-                var multiline = q.Receive(tc.Multiline);
-                var text = q.Receive(tc.Text);
-                var suffix = q.Receive(tc.Suffix);
-                // C# Comment doesn't have Markers; consume and discard
-                q.Receive<Markers>(Markers.Empty);
-                return new TextComment(text!, suffix!, multiline);
+                return new XmlDocComment(text!, suffix!, multiline);
             }
-            throw new ArgumentException($"Unexpected comment type {c.GetType().Name}");
+            return new TextComment(text!, suffix!, multiline);
         });
         var whitespace = q.Receive(space.Whitespace);
         return space.WithComments(comments!).WithWhitespace(whitespace!);
@@ -732,6 +733,8 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
             case JavaType.Annotation annotation:
                 annotation.AnnotationType = (JavaType.FullyQualified?)q.Receive(
                     (JavaType?)annotation.AnnotationType, t => VisitType(t, q)!);
+                annotation.Values = q.ReceiveList(annotation.Values,
+                    v => ReceiveAnnotationElementValue(v, q));
                 break;
 
             case JavaType.MultiCatch multiCatch:
@@ -819,6 +822,28 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
         }
 
         return javaType;
+    }
+
+    private JavaType.Annotation.ElementValue ReceiveAnnotationElementValue(
+        JavaType.Annotation.ElementValue v, RpcReceiveQueue q)
+    {
+        var element = q.Receive(v.Element, t => VisitType(t, q)!);
+        switch (v)
+        {
+            case JavaType.Annotation.ArrayElementValue array:
+            {
+                var constantValues = q.ReceiveList(array.ConstantValues, x => x);
+                var refValues = q.ReceiveList(array.ReferenceValues, t => VisitType(t, q)!);
+                return new JavaType.Annotation.ArrayElementValue(element, constantValues, refValues);
+            }
+            default:
+            {
+                var single = v as JavaType.Annotation.SingleElementValue;
+                var constantValue = q.Receive(single?.ConstantValue);
+                var refValue = q.Receive(single?.ReferenceValue, t => VisitType(t, q)!);
+                return new JavaType.Annotation.SingleElementValue(element, constantValue, refValue);
+            }
+        }
     }
 
     // Utility methods

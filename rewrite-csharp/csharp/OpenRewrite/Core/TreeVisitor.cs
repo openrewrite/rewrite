@@ -150,3 +150,19 @@ public class TreeVisitor<T, P> : ITreeVisitor<P> where T : class, Tree
         public override T? Visit(Tree? tree, P p) => tree as T;
     }
 }
+public static class TreeVisitorExtensions
+{
+    public static ITreeVisitor<T> Combine<T>(this ITreeVisitor<T> first, ITreeVisitor<T> second) where T : class
+    {
+        return new TreeVisitor<T>(first, second);
+    }
+    private class TreeVisitor<T>(ITreeVisitor<T> first, ITreeVisitor<T> second) : ITreeVisitor<T>
+    {
+        public Tree? Visit(Tree? tree, T p)
+        {
+            tree = first.Visit(tree, p);
+            tree = second.Visit(tree, p);
+            return tree;
+        }
+    }
+}

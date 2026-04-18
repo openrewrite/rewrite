@@ -727,10 +727,11 @@ class PythonRpcReceiver:
             lambda c: self._receive_container(c, q) if c else None
         )
         body = q.receive(class_decl.body)
+        type_ = q.receive(class_decl.type)
         return replace_if_changed(class_decl, leading_annotations=leading_annotations, modifiers=modifiers,
                                   kind=kind, name=name, type_parameters=type_parameters,
                                   primary_constructor=primary_constructor, extends=extends, implements=implements,
-                                  permits=permits, body=body)
+                                  permits=permits, body=body, type=type_)
 
     def _visit_j_class_declaration_kind(self, kind, q: RpcReceiveQueue):
         from rewrite.java.tree import ClassDeclaration
@@ -1443,6 +1444,47 @@ def _receive_java_type_parameterized(param, q: RpcReceiveQueue):
     return p
 
 
+def _receive_java_type_annotation(annotation, q: RpcReceiveQueue):
+    """Codec for receiving JavaType.Annotation - consumes type and values."""
+    from rewrite.java.support_types import JavaType as JT
+
+    type_ = q.receive(getattr(annotation, '_type', None))
+    before_values = getattr(annotation, '_values', None)
+    values = q.receive_list(before_values, lambda v: _receive_annotation_element_value(v, q))
+
+    a = JT.Annotation()
+    a._type = type_  # ty: ignore[invalid-assignment]  # RPC deserialization
+    a._values = values
+    return a
+
+
+def _receive_annotation_element_value(v, q: RpcReceiveQueue):
+    """Receive a JavaType.Annotation.ElementValue (Single or Array variant).
+
+    Mirrors the Java JavaTypeReceiver visitor lambda inside visitAnnotation.
+    Constant values arrive as whatever the JSON-RPC layer deserialized.
+    """
+    from rewrite.java.support_types import JavaType as JT
+
+    element = q.receive(getattr(v, '_element', None))
+    if isinstance(v, JT.Annotation.ArrayElementValue):
+        constant_values = q.receive_list(getattr(v, '_constant_values', None), None)
+        ref_values = q.receive_list(getattr(v, '_reference_values', None) or [])
+        return JT.Annotation.ArrayElementValue(
+            _element=element,
+            _constant_values=constant_values,
+            _reference_values=ref_values,
+        )
+    sev = v if isinstance(v, JT.Annotation.SingleElementValue) else None
+    constant_value = q.receive(getattr(sev, '_constant_value', None) if sev is not None else None)
+    ref_value = q.receive(getattr(sev, '_reference_value', None) if sev is not None else None)
+    return JT.Annotation.SingleElementValue(
+        _element=element,
+        _constant_value=constant_value,
+        _reference_value=ref_value,
+    )
+
+
 def _receive_java_type_array(array, q: RpcReceiveQueue):
     """Codec for receiving JavaType.Array - consumes elemType and annotations."""
     from rewrite.java.support_types import JavaType as JT
@@ -1554,6 +1596,30 @@ def _register_java_type_codecs():
         JT.Parameterized,
         _receive_java_type_parameterized,
         lambda: JT.Parameterized()  # Factory creates empty Parameterized
+    )
+
+    # JavaType.Annotation - type and values
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation',
+        JT.Annotation,
+        _receive_java_type_annotation,
+        lambda: JT.Annotation()  # Factory creates empty Annotation
+    )
+
+    # JavaType.Annotation.SingleElementValue - element + constantValue + referenceValue
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation$SingleElementValue',
+        JT.Annotation.SingleElementValue,
+        _receive_annotation_element_value,
+        lambda: JT.Annotation.SingleElementValue(),
+    )
+
+    # JavaType.Annotation.ArrayElementValue - element + constantValues + referenceValues
+    register_codec_with_both_names(
+        'org.openrewrite.java.tree.JavaType$Annotation$ArrayElementValue',
+        JT.Annotation.ArrayElementValue,
+        _receive_annotation_element_value,
+        lambda: JT.Annotation.ArrayElementValue(),
     )
 
     # JavaType.Array - element type and annotations

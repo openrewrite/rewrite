@@ -254,6 +254,50 @@ class ParseProjectIntegTest {
     }
 
 
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void includesAllRequirementsTxtFiles() throws IOException {
+        Path projectDir = tempDir.resolve("multi_requirements");
+        Files.createDirectories(projectDir);
+
+        Files.writeString(projectDir.resolve("main.py"), "x = 1");
+        Files.writeString(projectDir.resolve("requirements.txt"), """
+                requests>=2.28.0
+                """);
+        Files.writeString(projectDir.resolve("requirements-dev.txt"), """
+                pytest>=7.0
+                """);
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(Collectors.toList());
+
+        assertThat(sources)
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .contains("main.py", "requirements.txt", "requirements-dev.txt");
+
+        SourceFile reqsTxt = sources.stream()
+                .filter(s -> s.getSourcePath().getFileName().toString().equals("requirements.txt"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing requirements.txt"));
+        SourceFile reqsDevTxt = sources.stream()
+                .filter(s -> s.getSourcePath().getFileName().toString().equals("requirements-dev.txt"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Missing requirements-dev.txt"));
+
+        assertThat(reqsTxt).isInstanceOf(PlainText.class);
+        assertThat(reqsDevTxt).isInstanceOf(PlainText.class);
+
+        PythonResolutionResult baseMarker = reqsTxt.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        PythonResolutionResult devMarker = reqsDevTxt.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
+        assertThat(baseMarker).as("PythonResolutionResult marker on requirements.txt").isNotNull();
+        assertThat(devMarker).as("PythonResolutionResult marker on requirements-dev.txt").isNotNull();
+
+        // Each file should have its own distinct marker pointing to its own path
+        assertThat(baseMarker.getPath()).isEqualTo("requirements.txt");
+        assertThat(devMarker.getPath()).isEqualTo("requirements-dev.txt");
+    }
+
     private PythonRewriteRpc client() {
         return PythonRewriteRpc.getOrStart();
     }

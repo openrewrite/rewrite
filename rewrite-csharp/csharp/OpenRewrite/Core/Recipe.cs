@@ -127,16 +127,16 @@ public interface IScanningRecipe
 /// <summary>
 /// A recipe that first scans source files to accumulate data, then transforms them.
 /// </summary>
-/// <typeparam name="T">The type of the accumulator for scanning data.</typeparam>
-public abstract class ScanningRecipe<T> : Recipe, IScanningRecipe
+/// <typeparam name="TAccumulator">The type of the accumulator for scanning data.</typeparam>
+public abstract class ScanningRecipe<TAccumulator> : Recipe, IScanningRecipe
 {
-    public abstract T GetInitialValue(ExecutionContext ctx);
+    public abstract TAccumulator GetInitialValue(ExecutionContext ctx);
 
-    public abstract ITreeVisitor<ExecutionContext> GetScanner(T acc);
+    public abstract ITreeVisitor<ExecutionContext> GetScanner(TAccumulator acc);
 
-    public virtual ITreeVisitor<ExecutionContext> GetVisitor(T acc) => ITreeVisitor<ExecutionContext>.Noop();
+    public virtual ITreeVisitor<ExecutionContext> GetVisitor(TAccumulator acc) => ITreeVisitor<ExecutionContext>.Noop();
 
-    public virtual IEnumerable<SourceFile> Generate(T acc, ExecutionContext ctx) => [];
+    public virtual IEnumerable<SourceFile> Generate(TAccumulator acc, ExecutionContext ctx) => [];
 
     public sealed override ITreeVisitor<ExecutionContext> GetVisitor()
     {
@@ -146,9 +146,9 @@ public abstract class ScanningRecipe<T> : Recipe, IScanningRecipe
 
     // IScanningRecipe explicit implementation — type-erased bridge for the scheduler
     object IScanningRecipe.InitialValue(ExecutionContext ctx) => GetInitialValue(ctx)!;
-    ITreeVisitor<ExecutionContext> IScanningRecipe.Scanner(object acc) => GetScanner((T)acc);
-    ITreeVisitor<ExecutionContext> IScanningRecipe.Editor(object acc) => GetVisitor((T)acc);
-    IEnumerable<SourceFile> IScanningRecipe.Generate(object acc, ExecutionContext ctx) => Generate((T)acc, ctx);
+    ITreeVisitor<ExecutionContext> IScanningRecipe.Scanner(object acc) => GetScanner((TAccumulator)acc);
+    ITreeVisitor<ExecutionContext> IScanningRecipe.Editor(object acc) => GetVisitor((TAccumulator)acc);
+    IEnumerable<SourceFile> IScanningRecipe.Generate(object acc, ExecutionContext ctx) => Generate((TAccumulator)acc, ctx);
 }
 
 /// <summary>

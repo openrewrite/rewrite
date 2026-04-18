@@ -24,7 +24,9 @@ import {
 import {Json} from "../../../src/json";
 import {RecipeSpec} from "../../../src/test";
 import {withDir} from "tmp-promise";
-import {findMarker, MarkersKind} from "../../../src";
+import * as fs from "fs";
+import * as path from "path";
+import * as semver from "semver";
 
 describe("UpgradeDependencyVersion", () => {
 
@@ -292,7 +294,7 @@ describe("UpgradeDependencyVersion", () => {
         }, {unsafeCleanup: true});
     });
 
-    test("adds warning marker when version does not exist", async () => {
+    test("throws when install fails for non-existent version", async () => {
         const spec = new RecipeSpec();
         spec.recipe = new UpgradeDependencyVersion({
             packageName: "uuid",
@@ -300,13 +302,11 @@ describe("UpgradeDependencyVersion", () => {
         });
 
         await withDir(async (repo) => {
-            await spec.rewriteRun(
+            await expect(spec.rewriteRun(
                 npm(
                     repo.path,
                     typescript(`const x = 1;`),
-                    {
-                        // Version doesn't change, but warning marker is added
-                        ...packageJson(`
+                    packageJson(`
                         {
                             "name": "test-project",
                             "version": "1.0.0",
@@ -314,18 +314,42 @@ describe("UpgradeDependencyVersion", () => {
                                 "uuid": "^9.0.0"
                             }
                         }
-                    `, (actual: string) => {
-                            expect(actual).toContain('/*~~(Failed to upgrade uuid to ^999.0.0');
-                            return actual;
-                        }), afterRecipe: async (doc: Json.Document) => {
-                            // Should have a warning marker
-                            const warnMarker = findMarker(doc, MarkersKind.MarkupWarn);
-                            expect(warnMarker).toBeDefined();
-                            expect((warnMarker as any).message).toContain("Failed to upgrade uuid");
-                        }
-                    }
+                    `)
                 )
-            );
+            )).rejects.toThrow("Failed to upgrade uuid to ^999.0.0");
+        }, {unsafeCleanup: true});
+    });
+
+    test("throws when install fails due to engine version mismatch", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = new UpgradeDependencyVersion({
+            packageName: "uuid",
+            newVersion: "^10.0.0"
+        });
+
+        await withDir(async (repo) => {
+            // given
+            fs.writeFileSync(path.join(repo.path, '.npmrc'), 'engine-strict=true');
+
+            // when / then
+            await expect(spec.rewriteRun(
+                npm(
+                    repo.path,
+                    typescript(`const x = 1;`),
+                    packageJson(`
+                        {
+                            "name": "test-project",
+                            "version": "1.0.0",
+                            "engines": {
+                                "node": "504.436"
+                            },
+                            "dependencies": {
+                                "uuid": "^9.0.0"
+                            }
+                        }
+                    `)
+                )
+            )).rejects.toThrow(/^Error: Failed to upgrade uuid to \^10\.0\.0:/);
         }, {unsafeCleanup: true});
     });
 
@@ -482,9 +506,11 @@ describe("UpgradeDependencyVersion", () => {
                             const marker = findNodeResolutionResult(doc);
                             expect(marker).toBeDefined();
                             expect(marker!.dependencies[0].versionConstraint).toBe("^4.17.23");
-                            // The resolved version should still be 4.17.23 (unchanged)
+                            // The resolved version should still satisfy ^4.17.23 (unchanged)
                             // This proves we didn't run npm install - just updated the constraint
-                            expect(marker!.resolvedDependencies?.[0]?.version).toBe("4.17.23");
+                            const resolvedVersion = marker!.resolvedDependencies?.[0]?.version;
+                            expect(resolvedVersion).toBeDefined();
+                            expect(semver.satisfies(resolvedVersion!, "^4.17.23")).toBe(true);
                         }
                     }
                 )

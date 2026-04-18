@@ -447,6 +447,9 @@ public class JsonPathMatcher {
                 return mapping.getEntries();
             } else if (scope instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry member = (Yaml.Mapping.Entry) scope;
+                if (member.getValue() instanceof Yaml.Mapping) {
+                    return ((Yaml.Mapping) member.getValue()).getEntries();
+                }
                 return member.getValue();
             } else if (scope instanceof Yaml.Sequence) {
                 List<Object> matches = new ArrayList<>();
@@ -474,7 +477,14 @@ public class JsonPathMatcher {
                 List<Object> matches = new ArrayList<>();
                 if (stop != null && stop == getExpressionContext(ctx)) {
                     // Return the values of each result when the JsonPath ends with a wildcard.
-                    results.forEach(o -> matches.add(getValue(o)));
+                    for (Object o : results) {
+                        if (o instanceof List) {
+                            // Already expanded (e.g., entries from a Mapping), flatten directly.
+                            matches.addAll((List<Object>) o);
+                        } else {
+                            matches.add(getValue(o));
+                        }
+                    }
                 } else {
                     // Unwrap lists of results from visitProperty to match the position of the cursor.
                     for (Object result : results) {

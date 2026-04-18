@@ -15,24 +15,35 @@
  */
 package org.openrewrite.scala.marker;
 
-import lombok.Value;
-import lombok.With;
+import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 /**
- * Marker to preserve original Scala for-loop syntax when converting to J.ForLoop.
- * This allows us to print the loop back in Scala syntax while still having the
- * semantic information of a J.ForLoop for analysis and transformation.
+ * Marker indicating that a {@link org.openrewrite.java.tree.J.ForEachLoop} represents
+ * a Scala for-comprehension. The printer uses this to emit Scala syntax
+ * ({@code for (x <- iterable) body}) instead of Java syntax
+ * ({@code for (Type x : iterable) body}).
  */
-@Value
-@With
 public class ScalaForLoop implements Marker {
-    UUID id;
-    String originalSource;
-    
-    public static ScalaForLoop create(String originalSource) {
-        return new ScalaForLoop(UUID.randomUUID(), originalSource);
+    private final UUID id;
+
+    public ScalaForLoop(UUID id) {
+        this.id = id;
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
+    @Override
+    public ScalaForLoop withId(UUID id) {
+        return new ScalaForLoop(id);
+    }
+
+    public static ScalaForLoop create() {
+        return new ScalaForLoop(Tree.randomId());
     }
 }

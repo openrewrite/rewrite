@@ -346,7 +346,16 @@ class MavenPomDownloaderTest implements RewriteTest {
         void useHttpWhenHttpsFails() throws Exception {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             try (var mockRepo = new MockWebServer()) {
-                mockRepo.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
+                // Use a Dispatcher instead of enqueue to avoid flakiness: normalizeRepository()
+                // probes HTTPS first, and TLS bytes sent to this HTTP-only server can sometimes
+                // parse as valid HTTP, consuming an enqueued response before the real HTTP request.
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        return new MockResponse().setResponseCode(200).setBody("body");
+                    }
+                });
+                mockRepo.start();
                 var httpRepo = MavenRepository.builder()
                   .id("id")
                   .uri("http://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
@@ -1108,7 +1117,7 @@ class MavenPomDownloaderTest implements RewriteTest {
 
             var downloader = new MavenPomDownloader(pomsByPath, ctx);
 
-            assertThrows(IllegalArgumentException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
+            assertThrows(MavenDownloadingException.class, () -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
 
         @Test
@@ -1197,9 +1206,10 @@ class MavenPomDownloaderTest implements RewriteTest {
             assertDoesNotThrow(() -> downloader.download(requestedGav, null, resolvedPom, singletonList(nonexistentRepo)));
 
             // With empty relativePath (<relativePath/>), step 3 is skipped entirely.
-            // Since the parent can't be found by GAV match either, and the remote
-            // repo doesn't exist, download fails — proving local lookup was skipped.
-            assertThrows(Exception.class,
+            // Since the parent can't be found by GAV match either, the version still
+            // contains an unresolved placeholder, so download throws MavenDownloadingException
+            // instead of URISyntaxException from URI.create().
+            assertThrows(MavenDownloadingException.class,
               () -> downloader.download(requestedGav, "", resolvedPom, singletonList(nonexistentRepo)));
         }
 

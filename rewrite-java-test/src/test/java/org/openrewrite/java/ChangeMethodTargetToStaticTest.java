@@ -304,6 +304,177 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1804")
+    @Test
+    void constructorToStaticMethod() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ChangeMethodTargetToStatic("a.A <constructor>(String)", "b.B", "b.B", null, false),
+            new ChangeMethodName("b.B A(String)", "foo", null, null)
+          ),
+          java(
+            """
+              package a;
+              public class A {
+                 public A(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static B foo(String s) { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              class C {
+                 public void test() {
+                     new A("hello");
+                 }
+              }
+              """,
+            """
+              import b.B;
+
+              class C {
+                 public void test() {
+                     B.foo("hello");
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1804")
+    @Test
+    void constructorToStaticMethodWithReturnType() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeMethodTargetToStatic("a.A <constructor>(String)", "b.B", "b.B", null, false)
+          ),
+          java(
+            """
+              package a;
+              public class A {
+                 public A(String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static B A(String s) { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              class C {
+                 public void test() {
+                     new A("hello");
+                 }
+              }
+              """,
+            """
+              import b.B;
+
+              class C {
+                 public void test() {
+                     B.A("hello");
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1804")
+    @Test
+    void constructorWithAnonymousBodyNotChanged() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeMethodTargetToStatic("a.A <constructor>(String)", "b.B", "b.B", null, false)
+          ),
+          java(
+            """
+              package a;
+              public class A {
+                 public A(String s) {}
+                 public void doSomething() {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              class C {
+                 public void test() {
+                     new A("hello") {
+                         @Override
+                         public void doSomething() {}
+                     };
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void constructorNotChangedWhenMethodPatternIsWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeMethodTargetToStatic("a.A *(..)", "b.B", null, null, false)
+          ),
+          java(
+            """
+              package a;
+              public class A {
+                 public A() {}
+                 public void doSomething() {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+              public class B {
+                 public static void doSomething() {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.A;
+              class C {
+                 public void test() {
+                     A a = new A();
+                     a.doSomething();
+                 }
+              }
+              """,
+            """
+              import a.A;
+              import b.B;
+              
+              class C {
+                 public void test() {
+                     A a = new A();
+                     B.doSomething();
+                 }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/3085")
     @SuppressWarnings("ResultOfMethodCallIgnored")

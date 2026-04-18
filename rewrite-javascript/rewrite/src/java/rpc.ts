@@ -52,29 +52,34 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
 
     protected async visitAnnotation(annotation: Type.Annotation, q: RpcSendQueue): Promise<Type | undefined> {
         await q.getAndSend(annotation, a => asRef(a.type), t => this.visit(t, q));
-        // await q.getAndSendList(annotation, a => (a.values || []).map(v => asRef(v)), v => {
-        //     let value: any;
-        //     if (v.kind === Type.Kind.SingleElementValue) {
-        //         const single = v as Type.Annotation.SingleElementValue;
-        //         value = single.constantValue !== undefined ? single.constantValue : single.referenceValue;
-        //     } else {
-        //         const array = v as Type.Annotation.ArrayElementValue;
-        //         value = array.constantValues || array.referenceValues;
-        //     }
-        //     return `${Type.signature(v.element)}:${value == null ? "null" : value.toString()}`;
-        // }, async v => {
-        //     // Handle element values inline like the Java implementation
-        //     await q.getAndSend(v, e => asRef(e.element), elem => this.visit(elem, q));
-        //     if (v.kind === Type.Kind.SingleElementValue) {
-        //         const single = v as Type.Annotation.SingleElementValue;
-        //         await q.getAndSend(single, s => s.constantValue);
-        //         await q.getAndSend(single, s => asRef(s.referenceValue), ref => this.visit(ref, q));
-        //     } else if (v.kind === Type.Kind.ArrayElementValue) {
-        //         const array = v as Type.Annotation.ArrayElementValue;
-        //         await q.getAndSendList(array, a => a.constantValues || [], val => val == null ? "null" : val.toString());
-        //         await q.getAndSendList(array, a => (a.referenceValues || []).map(r => asRef(r)), t => Type.signature(t), r => this.visit(r, q));
-        //     }
-        // });
+        await q.getAndSendList(
+            annotation,
+            a => (a.values || []).map(v => asRef(v)),
+            v => Type.signature(v.element),
+            async v => {
+                await q.getAndSend(v, e => asRef(e.element), elem => this.visit(elem, q));
+                if (v.kind === Type.Kind.ArrayElementValue) {
+                    const array = v as Type.Annotation.ArrayElementValue;
+                    // constantValues are sent as raw JSON-native values; numeric subtypes
+                    // (int/long/float/double) and char/string distinctions are not preserved.
+                    await q.getAndSendList(
+                        array,
+                        a => a.constantValues,
+                        v => v == null ? "null" : v.toString(),
+                    );
+                    await q.getAndSendList(
+                        array,
+                        a => (a.referenceValues || []).map(r => asRef(r)),
+                        t => Type.signature(t),
+                        t => this.visit(t, q),
+                    );
+                } else {
+                    const single = v as Type.Annotation.SingleElementValue;
+                    await q.getAndSend(single, s => s.constantValue);
+                    await q.getAndSend(single, s => asRef(s.referenceValue), ref => this.visit(ref, q));
+                }
+            },
+        );
         return annotation;
     }
 
@@ -173,33 +178,29 @@ class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
 
     protected async visitAnnotation(annotation: Type.Annotation, q: RpcReceiveQueue): Promise<Type | undefined> {
         annotation.type = await q.receive(annotation.type, t => this.visit(t, q));
-        // annotation.values = await q.receiveList(annotation.values, async v => {
-        //     // Handle element values inline like the Java implementation
-        //     if (v.kind === Type.Kind.SingleElementValue) {
-        //         const single = v as Type.Annotation.SingleElementValue;
-        //         const element = await q.receive(single.element, elem => this.visit(elem, q));
-        //         const constantValue = await q.receive(single.constantValue);
-        //         const referenceValue = await q.receive(single.referenceValue, ref => this.visit(ref, q));
-        //         return {
-        //             kind: Type.Kind.SingleElementValue,
-        //             element,
-        //             constantValue,
-        //             referenceValue
-        //         } as Type.Annotation.SingleElementValue;
-        //     } else if (v.kind === Type.Kind.ArrayElementValue) {
-        //         const array = v as Type.Annotation.ArrayElementValue;
-        //         const element = await q.receive(array.element, elem => this.visit(elem, q));
-        //         const constantValues = await q.receiveList(array.constantValues);
-        //         const referenceValues = await q.receiveList(array.referenceValues, r => this.visit(r, q));
-        //         return {
-        //             kind: Type.Kind.ArrayElementValue,
-        //             element,
-        //             constantValues,
-        //             referenceValues
-        //         } as Type.Annotation.ArrayElementValue;
-        //     }
-        //     return v;
-        // }) || [];
+        annotation.values = (await q.receiveList(annotation.values, async v => {
+            const element = await q.receive((v as Type.Annotation.ElementValue).element, elem => this.visit(elem, q));
+            if (v.kind === Type.Kind.ArrayElementValue) {
+                const array = v as Type.Annotation.ArrayElementValue;
+                const constantValues = await q.receiveList(array.constantValues);
+                const referenceValues = await q.receiveList(array.referenceValues, r => this.visit(r, q));
+                return {
+                    kind: Type.Kind.ArrayElementValue,
+                    element,
+                    constantValues,
+                    referenceValues,
+                } as Type.Annotation.ArrayElementValue;
+            }
+            const single = v as Type.Annotation.SingleElementValue;
+            const constantValue = await q.receive(single.constantValue);
+            const referenceValue = await q.receive(single.referenceValue, ref => this.visit(ref, q));
+            return {
+                kind: Type.Kind.SingleElementValue,
+                element,
+                constantValue,
+                referenceValue,
+            } as Type.Annotation.SingleElementValue;
+        })) || [];
         return annotation;
     }
 
@@ -713,6 +714,7 @@ export class JavaSender extends JavaVisitor<RpcSendQueue> {
         await q.getAndSend(cls, c => c.implements, impl => this.visitContainer(impl, q));
         await q.getAndSend(cls, c => c.permitting, perm => this.visitContainer(perm, q));
         await q.getAndSend(cls, c => c.body, body => this.visit(body, q));
+        await q.getAndSend(cls, c => asRef(c.type), type => this.visitType(type, q));
         return cls;
     }
 
@@ -1435,7 +1437,8 @@ export class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
             extends: await q.receive(cls.extends, ext => this.visitLeftPadded(ext, q)),
             implements: await q.receive(cls.implements, impl => this.visitContainer(impl, q)),
             permitting: await q.receive(cls.permitting, perm => this.visitContainer(perm, q)),
-            body: await q.receive(cls.body, body => this.visit(body, q))
+            body: await q.receive(cls.body, body => this.visit(body, q)),
+            type: await q.receive(cls.type, type => this.visitType(type, q)) as Type.Class
         };
         return updateIfChanged(cls, updates);
     }

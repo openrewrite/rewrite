@@ -50,25 +50,31 @@ class ScalaCompilerBridge {
    *
    * On per-unit typer failure, that unit gets typedTree=None while others succeed.
    */
-  def compileAll(sources: JList[SourceEntry], classpath: JList[String]): JMap[String, ScalaParseResult] = {
+  def compileAll(sources: JList[SourceEntry], classpath: JList[String], outputDir: String = null): JMap[String, ScalaParseResult] = {
     val results = new HashMap[String, ScalaParseResult]()
 
     val driver = new ParsingDriver()
     val baseCtx: Context = driver.getInitialContext
 
-    // Configure classpath
-    given ctx: Context = if (classpath != null && !classpath.isEmpty) {
-      val cp = new StringBuilder()
-      val cpIter = classpath.iterator()
-      while (cpIter.hasNext) {
-        if (cp.nonEmpty) cp.append(File.pathSeparator)
-        cp.append(cpIter.next())
-      }
+    // Configure source version, output directory, and classpath.
+    given ctx: Context = {
       val fresh = baseCtx.fresh
-      fresh.setSetting(fresh.settings.classpath, cp.toString())
+      // Accept both Scala 2 and Scala 3 syntax (including indentation-based).
+      fresh.setSetting(fresh.settings.source, "3.6-migration")
+      // Send compiler output to a designated dir so .class files don't pollute cwd.
+      if (outputDir != null) {
+        fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
+      }
+      if (classpath != null && !classpath.isEmpty) {
+        val cp = new StringBuilder()
+        val cpIter = classpath.iterator()
+        while (cpIter.hasNext) {
+          if (cp.nonEmpty) cp.append(File.pathSeparator)
+          cp.append(cpIter.next())
+        }
+        fresh.setSetting(fresh.settings.classpath, cp.toString())
+      }
       fresh
-    } else {
-      baseCtx
     }
 
     // Phase 1: Parse all sources into CompilationUnits
@@ -161,9 +167,13 @@ class ScalaCompilerBridge {
     // Create a custom reporter to collect warnings
     val warnings = new ListBuffer[ScalaWarning]()
 
-    // Create our custom driver and get a proper context
+    // Create our custom driver and get a proper context with Scala 2 compat
     val driver = new ParsingDriver()
-    given Context = driver.getInitialContext
+    given Context = {
+      val fresh = driver.getInitialContext.fresh
+      fresh.setSetting(fresh.settings.source, "3.6-migration")
+      fresh
+    }
 
     // For simple expressions, wrap in a valid compilation unit
     val (adjustedContent, needsUnwrap) = if (isSimpleExpression(content)) {

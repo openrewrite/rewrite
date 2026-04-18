@@ -25,6 +25,7 @@ import {Json} from "../../../src/json";
 import {RecipeSpec} from "../../../src/test";
 import {withDir} from "tmp-promise";
 import {findMarker, MarkersKind} from "../../../src";
+import * as semver from "semver";
 
 describe("AddDependency", () => {
 
@@ -346,10 +347,10 @@ describe("AddDependency", () => {
                             throw new Error(`Expected root dependency lodash to be ^4.17.21, got ${rootPkg?.dependencies?.["lodash"]}`);
                         }
 
-                        // lodash should be in node_modules
+                        // lodash should be in node_modules with a version satisfying ^4.17.21
                         const lodashPkg = lockData.packages["node_modules/lodash"];
-                        if (!lodashPkg?.version?.startsWith("4.17.")) {
-                            throw new Error(`Expected lodash version to start with 4.17., got ${lodashPkg?.version}`);
+                        if (!lodashPkg?.version || !semver.satisfies(lodashPkg.version, "^4.17.21")) {
+                            throw new Error(`Expected lodash version satisfying ^4.17.21, got ${lodashPkg?.version}`);
                         }
 
                         return actual;

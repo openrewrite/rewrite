@@ -451,7 +451,15 @@ class PythonTypeMapping:
                 fqn = f"{module_name}.{class_name}"
             else:
                 fqn = class_name
-            class_type = self._create_class_type(fqn)
+
+            # Create a fresh JavaType.Class per type_id rather than deduplicating
+            # by FQN. ty-types can emit multiple classLiterals with the same FQN
+            # (e.g., class Pair(namedtuple('Pair', ...))) and collapsing them
+            # would cause self-referential supertypes.
+            class_type = JavaType.Class()
+            class_type._flags_bit_map = 0
+            class_type._fully_qualified_name = fqn
+            class_type._kind = JavaType.FullyQualified.Kind.Class
 
             # Infer Kind from supertypes before resolving them
             supertypes = descriptor.get('supertypes', [])
@@ -468,12 +476,12 @@ class PythonTypeMapping:
                         break
 
             # Populate supertypes: first → _supertype, rest → _interfaces
-            if supertypes and getattr(class_type, '_supertype', None) is None:
+            if supertypes:
                 super_type = self._resolve_type(supertypes[0])
                 if isinstance(super_type, JavaType.FullyQualified):
                     class_type._supertype = super_type
 
-                if len(supertypes) > 1 and getattr(class_type, '_interfaces', None) is None:
+                if len(supertypes) > 1:
                     interfaces = []
                     for st_id in supertypes[1:]:
                         iface = self._resolve_type(st_id)
@@ -781,7 +789,7 @@ class PythonTypeMapping:
 
         return JavaType.Method(
             _flags_bit_map=0,
-            _declaring_type=None,
+            _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
             _parameter_names=param_names if param_names else None,
@@ -1266,3 +1274,20 @@ class PythonTypeMapping:
     def module_to_fqn(module_path: str) -> str:
         """Convert a Python module path to a fully qualified name."""
         return module_path
+
+    def _get_declaration_declaring_type(self, descriptor: Dict[str, Any]) -> Optional[JavaType.FullyQualified]:
+        """Get the declaring type for a function declaration.
+
+        Mirrors the invocation-side logic from _get_declaring_type() to ensure
+        declarations and invocations produce matching FQNs.
+        """
+        class_name = descriptor.get('className')
+        if class_name:
+            module_name = descriptor.get('moduleName')
+            if module_name and module_name != 'builtins':
+                return self._create_class_type(f"{module_name}.{class_name}")
+            return self._create_class_type(class_name)
+        module_name = descriptor.get('moduleName')
+        if module_name and module_name != 'builtins':
+            return self._create_class_type(module_name)
+        return None

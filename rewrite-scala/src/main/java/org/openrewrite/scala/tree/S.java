@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * The Scala language-specific AST types extend the J interface and its sub-types.
@@ -178,13 +179,15 @@ public interface S extends J {
 
         @Override
         public List<J.ClassDeclaration> getClasses() {
-            // TODO: Extract class declarations from statements
-            return Collections.emptyList();
+            return statements.stream()
+                    .filter(J.ClassDeclaration.class::isInstance)
+                    .map(J.ClassDeclaration.class::cast)
+                    .collect(Collectors.toList());
         }
 
         @Override
         public S.CompilationUnit withClasses(List<J.ClassDeclaration> classes) {
-            // TODO: Handle class updates
+            // Scala compilation units use statements, not a separate classes list
             return this;
         }
 
@@ -431,48 +434,365 @@ public interface S extends J {
     }
 
     /**
-     * Represents a block used as an expression in Scala.
-     * In Scala, blocks are expressions that return the value of their last statement.
-     * For example: val x = { val temp = 10; temp * 2 }
+     * Wraps a Statement to make it usable as an Expression.
+     * In Scala, blocks, if/else, match, try/catch are all expressions.
+     * This wrapper is transparent — prefix, markers, and coordinates all
+     * delegate to the inner statement.
      */
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class BlockExpression implements S, Expression, TypedTree {
+    final class StatementExpression implements S, Expression, Statement {
 
-        @With
+        @Getter
         @EqualsAndHashCode.Include
         UUID id;
 
+        @Getter
+        J statement;
+
+        public StatementExpression(UUID id, J statement) {
+            this.id = id;
+            this.statement = statement;
+        }
+
+        public StatementExpression withId(UUID id) {
+            return this.id == id ? this : new StatementExpression(id, statement);
+        }
+
+        public StatementExpression withStatement(J statement) {
+            return this.statement == statement ? this : new StatementExpression(id, statement);
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            J j = v.visit(getStatement(), p);
+            if (j instanceof StatementExpression) {
+                return j;
+            } else if (j instanceof J) {
+                return withStatement(j);
+            }
+            return j;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withStatement(statement.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return statement.getPrefix();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withStatement(statement.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return statement.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return statement instanceof TypedTree ? ((TypedTree) statement).getType() : null;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T extends J> T withType(@Nullable JavaType type) {
+            if (statement instanceof TypedTree) {
+                return (T) withStatement((J) ((TypedTree) statement).withType(type));
+            }
+            return (T) this;
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents Scala type ascription: {@code expr: Type}.
+     * <p>
+     * This is NOT a cast — it's a compile-time type annotation that narrows/widens
+     * the type without generating cast bytecode. It's semantically different from
+     * {@code expr.asInstanceOf[Type]} which is a runtime cast.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class TypeAscription implements S, Expression, TypedTree {
+
         @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
-        
-        @With
-        J.Block block;
 
         @With
+        @Getter
+        Expression expression;
+
+        /**
+         * The type tree with its prefix representing the space around the colon.
+         */
+        @With
+        @Getter
+        TypeTree typeTree;
+
+        @With
+        @Getter
         @Nullable
         JavaType type;
 
-        public BlockExpression(UUID id, Space prefix, Markers markers, J.Block block, @Nullable JavaType type) {
+        public TypeAscription(UUID id, Space prefix, Markers markers,
+                              Expression expression, TypeTree typeTree, @Nullable JavaType type) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
-            this.block = block;
+            this.expression = expression;
+            this.typeTree = typeTree;
             this.type = type;
         }
 
         @Override
         public <P> J acceptScala(ScalaVisitor<P> v, P p) {
-            return v.visitBlockExpression(this, p);
+            return v.visitTypeAscription(this, p);
         }
 
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    /**
+     * Represents a Scala type alias or abstract type member.
+     * <p>
+     * Examples:
+     * <ul>
+     *   <li>{@code type Pair[A] = (A, A)}</li>
+     *   <li>{@code type Id[A] = A}</li>
+     *   <li>{@code type Inner} (abstract type)</li>
+     * </ul>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class TypeAlias implements S, Statement {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The original source text of the type alias declaration.
+         * Type aliases have rich internal structure (type params, bounds, RHS)
+         * that will be modeled with proper sub-fields in the future.
+         */
+        @With @Getter
+        String text;
+
+        public TypeAlias(UUID id, Space prefix, Markers markers, String text) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.text = text;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitTypeAlias(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents a Scala pattern definition (destructuring declaration).
+     * <p>
+     * Examples:
+     * <ul>
+     *   <li>{@code val (a, b) = (1, 2)}</li>
+     *   <li>{@code var (x, y) = point}</li>
+     *   <li>{@code case Red, Green, Blue} (enum cases)</li>
+     * </ul>
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class PatternDefinition implements S, Statement {
+
+        @With @Getter @EqualsAndHashCode.Include
+        UUID id;
+
+        @With @Getter
+        Space prefix;
+
+        @With @Getter
+        Markers markers;
+
+        /**
+         * The original source text. Pattern definitions have complex structure
+         * (multiple patterns, types, initializer) that will be fully modeled later.
+         */
+        @With @Getter
+        String text;
+
+        public PatternDefinition(UUID id, Space prefix, Markers markers, String text) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.text = text;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitPatternDefinition(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    /**
+     * Represents a function call where the callee is itself an expression rather than a simple
+     * method select. Used for Scala forms that are not adequately modelled by
+     * {@link J.MethodInvocation}, such as curried application of another application's result:
+     * <pre>{@code
+     * f(1)(2)
+     * matrix(0)(1)
+     * Array.fill(5)(0)
+     * }</pre>
+     * Mirrors the {@code JS.FunctionCall} concept in rewrite-javascript.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class FunctionCall implements S, Expression, Statement, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JRightPadded<Expression> function;
+
+        public Expression getFunction() {
+            return function.getElement();
+        }
+
+        public S.FunctionCall withFunction(Expression function) {
+            return getPadding().withFunction(JRightPadded.withElement(this.function, function));
+        }
+
+        JContainer<Expression> arguments;
+
+        public List<Expression> getArguments() {
+            return arguments.getElements();
+        }
+
+        public S.FunctionCall withArguments(List<Expression> arguments) {
+            return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
+        }
+
+        @With
+        @Getter
+        JavaType.@Nullable Method methodType;
+
+        public static FunctionCall build(UUID id, Space prefix, Markers markers,
+                                         JRightPadded<Expression> function,
+                                         JContainer<Expression> arguments,
+                                         JavaType.@Nullable Method methodType) {
+            return new FunctionCall(null, id, prefix, markers, function, arguments, methodType);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return methodType == null ? null : methodType.getReturnType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public S.FunctionCall withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public <P> J acceptScala(ScalaVisitor<P> v, P p) {
+            return v.visitFunctionCall(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final S.FunctionCall t;
+
+            public JRightPadded<Expression> getFunction() {
+                return t.function;
+            }
+
+            public S.FunctionCall withFunction(JRightPadded<Expression> function) {
+                return t.function == function ? t : new S.FunctionCall(null, t.id, t.prefix, t.markers, function, t.arguments, t.methodType);
+            }
+
+            public JContainer<Expression> getArguments() {
+                return t.arguments;
+            }
+
+            public S.FunctionCall withArguments(JContainer<Expression> arguments) {
+                return t.arguments == arguments ? t : new S.FunctionCall(null, t.id, t.prefix, t.markers, t.function, arguments, t.methodType);
+            }
         }
     }
 }

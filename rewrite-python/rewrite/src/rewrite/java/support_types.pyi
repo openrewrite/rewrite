@@ -98,6 +98,47 @@ class JavaType(ABC):
         @property
         def fully_qualified_name(self) -> str: ...
 
+    class Annotation(FullyQualified):
+        _type: JavaType.FullyQualified
+        _values: Optional[List[JavaType.Annotation.ElementValue]]
+
+        @property
+        def type(self) -> JavaType.FullyQualified: ...
+        @property
+        def values(self) -> List[JavaType.Annotation.ElementValue]: ...
+        @property
+        def fully_qualified_name(self) -> str: ...
+
+        class ElementValue:
+            @property
+            def element(self) -> Optional[JavaType]: ...
+
+        @dataclass
+        class SingleElementValue(ElementValue):
+            _element: Optional[JavaType]
+            _constant_value: Optional[Any]
+            _reference_value: Optional[JavaType]
+
+            @property
+            def element(self) -> Optional[JavaType]: ...
+            @property
+            def constant_value(self) -> Optional[Any]: ...
+            @property
+            def reference_value(self) -> Optional[JavaType]: ...
+
+        @dataclass
+        class ArrayElementValue(ElementValue):
+            _element: Optional[JavaType]
+            _constant_values: Optional[List[Any]]
+            _reference_values: Optional[List[JavaType]]
+
+            @property
+            def element(self) -> Optional[JavaType]: ...
+            @property
+            def constant_values(self) -> Optional[List[Any]]: ...
+            @property
+            def reference_values(self) -> Optional[List[JavaType]]: ...
+
 
     @dataclass
     class GenericTypeVariable:

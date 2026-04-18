@@ -200,4 +200,73 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void methodCallWithTypeArguments() {
+        rewriteRun(
+          scala(
+            """
+              import java.time.Instant
+              object Test {
+                val builder = List.newBuilder[Instant]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallWithTypeArgumentsAndArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val list = List.empty[Int]
+                val set = Set.apply[String]("a", "b")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodCallWithTypeArgumentsAndValueArgs() {
+        rewriteRun(
+          scala(
+            """
+              object Test {
+                val builder = List.fill[Int](3)(0)
+                val single = Option.apply[String]("hello")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void curriedCallWithBlockArgInsideBlock() {
+        rewriteRun(
+          scala(
+            """
+            val x = {
+              foo(1) { in => bar(in) }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void curriedCall() {
+        rewriteRun(
+          scala(
+            """
+              class Test {
+                def f(x: Int)(y: Int): Int = x + y
+                f(1)(2)
+              }
+              """
+          )
+        );
+    }
 }

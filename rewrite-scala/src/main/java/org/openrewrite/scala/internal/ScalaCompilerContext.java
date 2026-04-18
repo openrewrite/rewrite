@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.ParseWarning;
 import org.openrewrite.Parser;
 import org.openrewrite.Tree;
+import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -89,8 +90,20 @@ public class ScalaCompilerContext {
         java.util.List<SourceEntry> sourceList = new ArrayList<>(entries);
         java.util.List<String> cpList = new ArrayList<>(classpathStrings);
 
+        // Get a working directory for compiler output (.class files)
+        String outputDir;
+        try {
+            Path root = executionContext.getMessage(WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT);
+            if (root == null) {
+                root = java.nio.file.Files.createTempDirectory("rewrite-scala");
+            }
+            outputDir = java.nio.file.Files.createDirectories(root.resolve("scala-compiler")).toString();
+        } catch (java.io.IOException e) {
+            outputDir = System.getProperty("java.io.tmpdir");
+        }
+
         // Batch compile
-        Map<String, ScalaParseResult> compiled = bridge.compileAll(sourceList, cpList);
+        Map<String, ScalaParseResult> compiled = bridge.compileAll(sourceList, cpList, outputDir);
 
         // Convert to ParseResult map
         Map<String, ParseResult> results = new LinkedHashMap<>();

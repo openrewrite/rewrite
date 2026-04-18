@@ -257,6 +257,242 @@ class JavaTemplateTest8Test implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceContextSensitiveMethodInvocationInsideTypeCastInReturn() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("visitClassDeclaration") &&
+                      method.getSelect() != null &&
+                      !(method.getSelect() instanceof J.Identifier &&
+                        "super".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
+                      return JavaTemplate.builder("#{any()}.visit(#{any()}, #{any()}, getCursor().getParentTreeCursor())")
+                        .contextSensitive()
+                        .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(),
+                          method.getSelect(), method.getArguments().get(0), method.getArguments().get(1));
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                              J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                              return (J.ClassDeclaration) new JavaVisitor<ExecutionContext>() {}.visitClassDeclaration(cd, ctx);
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                              J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                              return (J.ClassDeclaration) new JavaVisitor<ExecutionContext>() {
+                              }.visit(cd, ctx, getCursor().getParentTreeCursor());
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceContextSensitiveExpressionWithInnerClassOfAnonymousClass() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+            .typeValidationOptions(org.openrewrite.test.TypeValidation.builder().methodInvocations(false).build())
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("visitMethodDeclaration") &&
+                      method.getSelect() != null &&
+                      method.getArguments().size() == 2 &&
+                      !(method.getSelect() instanceof J.Identifier &&
+                        "super".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
+                      return JavaTemplate.builder("#{any()}.visit(#{any()}, #{any()}, getCursor().getParentTreeCursor())")
+                        .contextSensitive()
+                        .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(),
+                          method.getSelect(), method.getArguments().get(0), method.getArguments().get(1));
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          class InnerVisitor extends JavaIsoVisitor<ExecutionContext> {
+                          }
+
+                          @Override
+                          public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                              J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+                              md = new InnerVisitor().visitMethodDeclaration(md, ctx);
+                              return md;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          class InnerVisitor extends JavaIsoVisitor<ExecutionContext> {
+                          }
+
+                          @Override
+                          public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                              J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+                              md = new InnerVisitor().visit(md, ctx, getCursor().getParentTreeCursor());
+                              return md;
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceContextSensitiveMethodInvocationStandaloneStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("visitClassDeclaration") &&
+                      method.getSelect() != null &&
+                      !(method.getSelect() instanceof J.Identifier &&
+                        "super".equals(((J.Identifier) method.getSelect()).getSimpleName()))) {
+                      return JavaTemplate.builder("#{any()}.visit(#{any()}, #{any()}, getCursor().getParentTreeCursor())")
+                        .contextSensitive()
+                        .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(),
+                          method.getSelect(), method.getArguments().get(0), method.getArguments().get(1));
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                              J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                              new JavaVisitor<ExecutionContext>() {}.visitClassDeclaration(cd, ctx);
+                              return cd;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              import org.openrewrite.*;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.tree.J;
+
+              class MyRecipe extends Recipe {
+                  @Override
+                  public String getDisplayName() { return ""; }
+                  @Override
+                  public String getDescription() { return ""; }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                              J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+                              new JavaVisitor<ExecutionContext>() {
+                              }.visit(cd, ctx, getCursor().getParentTreeCursor());
+                              return cd;
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void parameterizedMatch() {
@@ -393,6 +629,68 @@ class JavaTemplateTest8Test implements RewriteTest {
                   /*~~>*/List<java.lang.String>[] qs;
                   List<java.lang.Number>[] qn;
                   List<java.lang.Integer>[] qi;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceContextSensitiveMethodInvocationInAssignmentWithLocalClassType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  method = super.visitMethodInvocation(method, ctx);
+                  if (method.getSimpleName().equals("singletonMap") &&
+                      method.getMethodType() != null &&
+                      method.getMethodType().getDeclaringType().getFullyQualifiedName().equals("java.util.Collections")) {
+                      return JavaTemplate.builder("Map.of(#{any()}, #{any()})")
+                        .contextSensitive()
+                        .imports("java.util.Map")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(),
+                          method.getArguments().toArray());
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Map;
+
+              class Test {
+                  void test() {
+                      class Inner {
+                          String value;
+                      }
+                      class Entity {
+                          Map<String, List<Map<String, Inner>>> map;
+                      }
+                      var entity = new Entity();
+                      entity.map = Collections.singletonMap("collection",
+                              Collections.singletonList(Collections.singletonMap("dest", new Inner())));
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Map;
+
+              class Test {
+                  void test() {
+                      class Inner {
+                          String value;
+                      }
+                      class Entity {
+                          Map<String, List<Map<String, Inner>>> map;
+                      }
+                      var entity = new Entity();
+                      entity.map = Map.of("collection", Collections.singletonList(Map.of("dest", new Inner())));
+                  }
               }
               """
           )

@@ -169,6 +169,7 @@ shellFormTextElement
     | COMMAND_SUBST      // Allow $(command) in shell commands
     | BACKTICK_SUBST     // Allow `command` in shell commands
     | SPECIAL_VAR        // Allow $!, $$, $?, etc. in shell commands
+    | DOLLAR             // Allow lone $ in shell commands (e.g., $'hello' ANSI-C quoting)
     | EQUALS
     | FLAG               // Allow --option or --option=value in shell commands
     | DASH_DASH
@@ -200,6 +201,7 @@ preambleElement
     | COMMAND_SUBST
     | BACKTICK_SUBST
     | SPECIAL_VAR
+    | DOLLAR
     | EQUALS
     | FLAG
     | DASH_DASH
@@ -273,6 +275,7 @@ labelOldValueElement
     | COMMAND_SUBST
     | BACKTICK_SUBST
     | SPECIAL_VAR
+    | DOLLAR
     | EQUALS
     | FLAG
     | DASH_DASH
@@ -327,6 +330,7 @@ envTextElementEquals
     | COMMAND_SUBST
     | BACKTICK_SUBST
     | SPECIAL_VAR
+    | DOLLAR
     // NOTE: EQUALS is explicitly NOT included to allow multiple KEY=value pairs
     ;
 
@@ -410,6 +414,7 @@ textElement
     | COMMAND_SUBST   // Allow $(command) in text
     | BACKTICK_SUBST  // Allow `command` in text
     | SPECIAL_VAR     // Allow $!, $$, $?, etc. in text
+    | DOLLAR          // Allow lone $ in text (e.g., $'hello' ANSI-C quoting)
     | EQUALS     // Allow = in shell form text (e.g., ENV_VAR=value in RUN commands)
     | FLAG       // Allow --option or --option=value in text
     | DASH_DASH  // Allow -- in shell form text (e.g., --option in shell commands)

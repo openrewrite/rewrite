@@ -39,12 +39,12 @@ case class OmitBraces(id: UUID) extends Marker {
 /**
  * Marks a J.ClassDeclaration as a Scala object (singleton).
  * In Scala, object declarations create singleton instances.
- * 
+ *
  * This marker distinguishes between:
  * - Regular classes: class Foo
  * - Singleton objects: object Foo
  * - Case objects: case object Foo (would have this marker + case modifier)
- * 
+ *
  * @param id The marker ID
  * @param companion Whether this is a companion object (has the same name as a class in the same scope)
  */
@@ -56,4 +56,20 @@ case class SObject(id: UUID, companion: Boolean) extends Marker {
 object SObject {
   def create(): SObject = SObject(UUID.randomUUID(), false)
   def companion(): SObject = SObject(UUID.randomUUID(), true)
+}
+
+/**
+ * Marks a J.MethodDeclaration or J.Lambda whose body lambda represents a curried
+ * parameter list rather than an actual lambda expression.
+ *
+ * For `def map(fa: F[A])(f: A => B): F[B] = body`, the method declaration carries
+ * this marker. Its body contains a J.Lambda with params `(f: A => B)` and the actual body.
+ * The printer uses this to emit `(f: A => B): F[B] = body` instead of treating the
+ * lambda as a regular body expression.
+ *
+ * For 3+ param lists, intermediate J.Lambda nodes also carry this marker.
+ */
+case class Curried(id: UUID) extends Marker {
+  override def getId(): UUID = id
+  override def withId[M <: Marker](newId: UUID): M = copy(id = newId).asInstanceOf[M]
 }

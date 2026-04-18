@@ -31,7 +31,9 @@ import org.openrewrite.test.SourceSpec;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.withSourceTypesOnClasspath;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.xml.Assertions.xml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -2561,4 +2563,93 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileContent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldImpl", "org.bar.NewImpl", false)),
+          text(
+            """
+              org.foo.OldImpl
+              org.other.Unrelated
+              """,
+            """
+              org.bar.NewImpl
+              org.other.Unrelated
+              """,
+            spec -> spec.path("META-INF/services/org.foo.MyInterface")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2482")
+    void changeTypeInServiceProviderFileName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.foo.OldInterface", "org.bar.NewInterface", false)),
+          text(
+            "org.foo.SomeImpl\n",
+            "org.foo.SomeImpl\n",
+            spec -> spec.path("META-INF/services/org.foo.OldInterface")
+              .afterRecipe(pt -> assertThat(pt.getSourcePath().toString().replace('\\', '/'))
+                .isEqualTo("META-INF/services/org.bar.NewInterface"))
+          )
+        );
+    }
+
+    @Test
+    void changeTypeAddsExplicitImportWhenStarImportsWouldBeAmbiguous() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("a.Ambiguous", "b.Ambiguous", true))
+                  .beforeRecipe(withSourceTypesOnClasspath()),
+          java(
+            """
+              package a;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              package b;
+              public class Other {}
+              """
+          ),
+          java(
+            """
+              package c;
+              public class Ambiguous {}
+              """
+          ),
+          java(
+            """
+              import a.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """,
+            """
+              import b.Ambiguous;
+              import b.*;
+              import c.*;
+
+              class Test {
+                  Ambiguous a;
+                  Other o;
+              }
+              """
+          )
+        );
+    }
+
 }

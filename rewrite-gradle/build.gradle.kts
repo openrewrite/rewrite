@@ -88,7 +88,22 @@ java {
 
 tasks.withType<Test>().configureEach {
     dependsOn(pluginLocalTestClasspath)
-    systemProperty("org.openrewrite.gradle.local.use-embedded-classpath", pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!.path)
+    val manifestFile = pluginLocalTestClasspath.files.find { it.name == "test-manifest.txt" }!!
+    jvmArgumentProviders.add(object : CommandLineArgumentProvider {
+        // Track the actual classpath JARs for cache key (content-aware, path-insensitive)
+        // Filter out test-manifest.txt which contains absolute paths and is tracked separately as @Internal
+        @get:Classpath
+        val pluginClasspath: FileCollection = pluginLocalTestClasspath.filter { it.name != "test-manifest.txt" }
+
+        // The manifest file contains absolute paths, so exclude it from cache key;
+        // the classpath property above already tracks the actual content
+        @get:Internal
+        val manifest: File = manifestFile
+
+        override fun asArguments() = listOf(
+            "-Dorg.openrewrite.gradle.local.use-embedded-classpath=${manifest.absolutePath}"
+        )
+    })
     maxHeapSize = "2g"
 }
 

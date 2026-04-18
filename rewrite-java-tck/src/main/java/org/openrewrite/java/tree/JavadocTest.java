@@ -379,6 +379,31 @@ class JavadocTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unicodeEscapedCharAsHtmlElementName() {
+        // https://moderneinc.slack.com/archives/C06K78R5M4J/p1776321855348559
+        // The source literally contains the 6-character escape sequence `\u00ef`,
+        // which the Java compiler expands to `\u00ef` before the Javadoc parser sees it.
+        rewriteRun(
+          java(
+            "package com.foo;\n" +
+            "\n" +
+            "public class ArrayByte {\n" +
+            "  /**\n" +
+            "   * Replaces the element at the specified position in this ArrayByte\n" +
+            "   * with the specified element. <\\u00ef>\n" +
+            "   *\n" +
+            "   * @param  index the index of the element to be replaced.\n" +
+            "   * @param  element the element to be stored at the specified position.\n" +
+            "   * @return the element which was previously at the specified position.\n" +
+            "   * @exception ArrayIndexOutOfBoundsException if index is out of range.\n" +
+            "   */\n" +
+            "  public byte set(int index, byte element) { return 0; }\n" +
+            "}\n"
+          )
+        );
+    }
+
     // entity
     @Test
     void htmlEntity() {
@@ -1167,6 +1192,34 @@ class JavadocTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> assertTrue(TypeUtils.isAssignableTo("java.lang.String", cu.getTypesInUse().getVariables().iterator().next().getType())))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7228")
+    @Test
+    void seeWithFieldRefOnExternalType() {
+        rewriteRun(
+          java(
+            """
+                class Node {
+                    static final int LEAF = 1;
+                }
+                """
+          ),
+          java(
+            """
+              class Test {
+                  /**
+                   * @see Node#LEAF
+                   */
+                  boolean isLeaf() { return false; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getTypesInUse().getVariables()).isNotEmpty();
+                assertThat(cu.getTypesInUse().getVariables().iterator().next().getName()).isEqualTo("LEAF");
+            })
           )
         );
     }
