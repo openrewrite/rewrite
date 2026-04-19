@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Union, TYPE_CHECKING, cast
+from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
 
 from rewrite.java import J
 from .capture import Capture
@@ -42,7 +42,7 @@ class Template:
 
         # Template with capture from pattern match
         expr = capture('expr')
-        tmpl = template("print({expr})", expr=expr)
+        tmpl = template(f"print({expr})")
         result = tmpl.apply(cursor, values=match_result)
 
         # Template with imports
@@ -57,6 +57,8 @@ class Template:
         code: str,
         captures: Optional[Dict[str, Capture]] = None,
         imports: Optional[List[str]] = None,
+        context: Optional[List[str]] = None,
+        dependencies: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize a template.
@@ -64,12 +66,18 @@ class Template:
         Args:
             code: Python code with {name} placeholders.
             captures: Dict mapping capture names to Capture objects.
-            imports: Import statements to include for parsing.
+            imports: Deprecated — use ``context`` instead.
+            context: Arbitrary statements (imports, assignments, …) prepended
+                to the template code for parsing.
+            dependencies: PyPI packages required by the template
+                (``{package: ">=version"}``; bare versions default to ``>=``).
         """
         self._code = code
         self._captures = captures or {}
         self._options = TemplateOptions(
             imports=tuple(imports) if imports else (),
+            context=tuple(context) if context else (),
+            dependencies=tuple(sorted(dependencies.items())) if dependencies else (),
         )
         self._cached_tree: Optional[J] = None
 
@@ -102,7 +110,7 @@ class Template:
         self,
         cursor: 'Cursor',
         *,
-        values: Optional[Union['MatchResult', Dict[str, J]]] = None,
+        values: Optional[Union['MatchResult', Dict[str, Any]]] = None,
         coordinates: Optional[PythonCoordinates] = None,
     ) -> Optional[J]:
         """
@@ -130,35 +138,40 @@ class Template:
         template_tree = self.get_tree()
 
         # Convert MatchResult to dict if needed
-        values_dict: Dict[str, J] = {}
+        values_dict: Dict[str, Union[J, List[J]]] = {}
         if values is not None:
             if isinstance(values, dict):
-                values_dict = cast(Dict[str, J], values)
+                values_dict = values
             else:
                 # Assume it's a MatchResult
                 values_dict = values.as_dict()
 
-        # Apply substitutions
+        # Phase 1: placeholder substitution (no coordinates yet)
         if values_dict:
             result = TemplateEngine.apply_substitutions(
                 template_tree,
                 values_dict,
-                cursor,
-                coordinates,
             )
         else:
             result = template_tree
 
-        # If no explicit coordinates, create default replacement coordinates
-        if coordinates is None and cursor is not None:
+        # Phase 2: parenthesize the result if it has lower precedence than
+        # the surrounding context, mirroring JavaTemplate.doApply().
+        # This must happen before coordinates are applied, because
+        # apply_coordinates may wrap the expression in ExpressionStatement.
+        if result is not None and cursor is not None:
+            from .replacement import maybe_parenthesize
+            result = maybe_parenthesize(result, cursor)
+
+        # Phase 3: apply coordinates (prefix preservation, statement wrapping, auto-format)
+        effective_coords = coordinates
+        if effective_coords is None and cursor is not None:
             tree = cursor.value
             if tree is not None:
-                result = TemplateEngine.apply_substitutions(
-                    result if values_dict else template_tree,
-                    values_dict,
-                    cursor,
-                    PythonCoordinates.replace(tree),
-                )
+                effective_coords = PythonCoordinates.replace(tree)
+
+        if effective_coords is not None and result is not None:
+            result = TemplateEngine.apply_coordinates(result, cursor, effective_coords)
 
         return result
 
@@ -212,6 +225,8 @@ class TemplateBuilder:
         self._parts: List[str] = []
         self._captures: Dict[str, Capture] = {}
         self._imports: List[str] = []
+        self._context: List[str] = []
+        self._dependencies: Dict[str, str] = {}
 
     def code(self, code: str) -> 'TemplateBuilder':
         """
@@ -258,8 +273,7 @@ class TemplateBuilder:
         return self
 
     def imports(self, *import_statements: str) -> 'TemplateBuilder':
-        """
-        Add import statements for type resolution.
+        """Deprecated — use :meth:`context` instead.
 
         Args:
             *import_statements: Import statements.
@@ -268,6 +282,32 @@ class TemplateBuilder:
             This builder for chaining.
         """
         self._imports.extend(import_statements)
+        return self
+
+    def context(self, *statements: str) -> 'TemplateBuilder':
+        """
+        Add context statements prepended to the template for parsing.
+
+        Args:
+            *statements: Arbitrary Python statements (imports, type aliases, etc.).
+
+        Returns:
+            This builder for chaining.
+        """
+        self._context.extend(statements)
+        return self
+
+    def dependencies(self, deps: Dict[str, str]) -> 'TemplateBuilder':
+        """
+        Set PyPI dependencies required by the template.
+
+        Args:
+            deps: Mapping of package name to version string.
+
+        Returns:
+            This builder for chaining.
+        """
+        self._dependencies.update(deps)
         return self
 
     def build(self) -> Template:
@@ -282,6 +322,8 @@ class TemplateBuilder:
             code=code,
             captures=self._captures,
             imports=self._imports,
+            context=self._context if self._context else None,
+            dependencies=self._dependencies if self._dependencies else None,
         )
 
 
@@ -289,6 +331,8 @@ def template(
     code,
     *,
     imports: Optional[List[str]] = None,
+    context: Optional[List[str]] = None,
+    dependencies: Optional[Dict[str, str]] = None,
     **captures: Capture
 ) -> Template:
     """
@@ -299,7 +343,11 @@ def template(
     Args:
         code: Python code with {name} placeholders, or a t-string
               (Python 3.14+) with Capture/RawCode interpolations.
-        imports: Optional import statements for type resolution.
+        imports: Deprecated — use ``context`` instead.
+        context: Optional statements (imports, assignments, …) prepended to
+            the template code for parsing.
+        dependencies: Optional PyPI packages required by the template
+            (``{package: ">=version"}``; bare versions default to ``>=``).
         **captures: Named capture specifications (not allowed with t-strings).
 
     Returns:
@@ -309,9 +357,17 @@ def template(
         # Simple template
         tmpl = template("x + 1")
 
-        # Template with captures
+        # Template with captures (explicit kwargs)
         expr = capture('expr')
         tmpl = template("print({expr})", expr=expr)
+
+        # With f-string (Python 3.6+, no name duplication)
+        expr = capture('expr')
+        tmpl = template(f"print({expr})")
+
+        # Unnamed capture with f-string
+        expr = capture()
+        tmpl = template(f"print({expr})")
 
         # With t-string (Python 3.14+)
         expr = capture('expr')
@@ -322,19 +378,20 @@ def template(
             "datetime.now()",
             imports=["from datetime import datetime"]
         )
-    """
-    from ._tstring_support import is_tstring, convert_tstring
 
-    if is_tstring(code):
-        if captures:
-            raise TypeError(
-                "Cannot pass keyword captures when using a t-string; "
-                "interpolate Capture objects directly in the t-string instead"
-            )
-        code, captures = convert_tstring(code)
+        # With dependencies (enables ty type attribution)
+        tmpl = template(
+            "requests.get(url)",
+            dependencies={"requests": ">=2.31.0"}
+        )
+    """
+    from ._fstring_support import resolve_captures
+    code, captures = resolve_captures(code, captures)
 
     return Template(
         code=code,
         captures=captures,
         imports=imports,
+        context=context,
+        dependencies=dependencies,
     )

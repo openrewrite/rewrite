@@ -45,7 +45,7 @@ class Cursor:
     def first_enclosing_or_throw(self, type: Type[P]) -> P:
         result = self.first_enclosing(type)
         if result is None:
-            raise ValueError(f"Expected to find enclosing {T.__name__}")
+            raise ValueError(f"Expected to find enclosing {type.__name__}")
         return result
 
     def first_enclosing(self, type_: Type[P]) -> Optional[P]:
@@ -146,7 +146,7 @@ class TreeVisitor(ABC, Generic[T, P]):
                     if t is not None:
                         t = self.post_visit(t, p)
 
-            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter; ty#1379
+            self.cursor = self._cursor.parent  # ty: ignore[invalid-assignment]  # property setter (ty#628)
 
             if top_level:
                 if t is not None and self._after_visit is not None:

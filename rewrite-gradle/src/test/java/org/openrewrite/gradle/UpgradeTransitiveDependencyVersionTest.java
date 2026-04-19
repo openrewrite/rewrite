@@ -1295,8 +1295,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Test
     void canHandleNullScannedAccumulator() {
-        UpgradeTransitiveDependencyVersion updateClassgraph = new UpgradeTransitiveDependencyVersion("io.github.classgraph", "classgraph", "4.8.112", null, null, null);
-        UpgradeTransitiveDependencyVersion updateJackson = new UpgradeTransitiveDependencyVersion("com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null);
+        var updateClassgraph = new UpgradeTransitiveDependencyVersion("io.github.classgraph", "classgraph", "4.8.112", null, null, null);
+        var updateJackson = new UpgradeTransitiveDependencyVersion("com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null);
         rewriteRun(
           spec -> spec.recipe(new ScanningAccumulatedUpgradeRecipe(updateClassgraph, updateJackson)),
           buildGradle(
@@ -1517,13 +1517,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                       // A recipe that updates an existing dependency in the Gradle build file.
                       // That dependency itself declares the one targeted by UpgradeTransitiveDependencyVersion as a transitive dependency.
                       // In this case, "org.openrewrite:rewrite-java" has "com.fasterxml.jackson.core:jackson-databind" as a transitive dependency.
-                      UpgradeDependencyVersion upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
+                      var upgrade = new UpgradeDependencyVersion("org.openrewrite", "rewrite-java", "8.0.0", null);
                       UpgradeDependencyVersion.DependencyVersionState acc = upgrade.getInitialValue(ctx);
                       upgrade.getScanner(acc).visit(tree, ctx);
                       tree = upgrade.getVisitor(acc).visit(tree, ctx);
 
                       // Use the changed tree as input for a UpgradeTransitiveDependencyVersion run
-                      UpgradeTransitiveDependencyVersion upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
+                      var upgradeTransitive = new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-databind", "2.15.1", null, null, null);
                       UpgradeTransitiveDependencyVersion.DependencyVersionState accTransitive2 = upgradeTransitive.getInitialValue(ctx);
                       upgradeTransitive.getScanner(accTransitive2).visit(tree, ctx);
                       tree = upgradeTransitive.getVisitor(accTransitive2).visit(tree, ctx);

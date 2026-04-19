@@ -136,7 +136,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindFieldsOfType("java.util.List", true))
             .afterRecipe(recipeRun -> {
-                List<FieldsOfTypeUses.Row> fields = recipeRun.getDataTableRows(FieldsOfTypeUses.class.getName());
+                List<FieldsOfTypeUses.Row> fields = recipeRun.getDataTableRows(FieldsOfTypeUses.class);
                 assertThat(fields).containsExactlyInAnyOrderElementsOf(expectedFields);
             }),
           java(

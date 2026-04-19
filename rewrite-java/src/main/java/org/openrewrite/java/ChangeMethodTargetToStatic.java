@@ -98,7 +98,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
         return matchUnknown ? visitor : Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), visitor);
     }
 
-    private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private class ChangeMethodTargetToStaticVisitor extends JavaVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
         private final boolean matchUnknownTypes;
         private final JavaType.FullyQualified classType = JavaType.ShallowClass.build(fullyQualifiedTargetTypeName);
@@ -136,8 +136,8 @@ public class ChangeMethodTargetToStatic extends Recipe {
         }
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             Expression select = method.getSelect();
             if (!isAlreadyStaticCallOnTargetType(select, method) &&
                 methodMatcher.matches(method, matchUnknownTypes)) {
@@ -170,8 +170,8 @@ public class ChangeMethodTargetToStatic extends Recipe {
         }
 
         @Override
-        public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
-            J.MemberReference m = super.visitMemberReference(memberRef, ctx);
+        public J visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+            J.MemberReference m = (J.MemberReference) super.visitMemberReference(memberRef, ctx);
             Expression containing = memberRef.getContaining();
             if (!isAlreadyStaticCallOnTargetType(containing, memberRef) &&
                 methodMatcher.matches(memberRef)) {
@@ -194,6 +194,66 @@ public class ChangeMethodTargetToStatic extends Recipe {
                 m = m.withMethodType(transformedType);
             }
             return m;
+        }
+
+        @Override
+        public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = (J.NewClass) super.visitNewClass(newClass, ctx);
+            if (n.getBody() != null || n.getEnclosing() != null) {
+                return n;
+            }
+            if (!methodPattern.contains("<constructor>") && !methodPattern.contains("<init>")) {
+                return n;
+            }
+            if (methodMatcher.matches(n)) {
+                String methodName;
+                JavaType.Method transformedType = null;
+                if (n.getConstructorType() != null) {
+                    methodName = n.getConstructorType().getConstructorName();
+                    if (methodName == null) {
+                        return n;
+                    }
+                    maybeRemoveImport(n.getConstructorType().getDeclaringType());
+                    transformedType = transformMethodType(n.getConstructorType())
+                            .withName(methodName);
+                } else {
+                    return n;
+                }
+
+                maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
+
+                J.Identifier selectId = new J.Identifier(
+                        randomId(),
+                        n.getPrefix(),
+                        Markers.EMPTY,
+                        emptyList(),
+                        classType.getClassName(),
+                        classType,
+                        null
+                );
+
+                J.Identifier nameId = new J.Identifier(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        emptyList(),
+                        methodName,
+                        transformedType,
+                        null
+                );
+
+                return new J.MethodInvocation(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        JRightPadded.build(selectId),
+                        null,
+                        nameId,
+                        n.getPadding().getArguments(),
+                        transformedType
+                );
+            }
+            return n;
         }
     }
 }

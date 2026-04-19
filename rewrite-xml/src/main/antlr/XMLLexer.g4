@@ -94,8 +94,11 @@ mode INSIDE_MARKUP;
 MARK_UP_CLOSE       :  '>' -> popMode ;
 MARKUP_SUBSET_OPEN  :  '[' -> more, pushMode(INSIDE_MARKUP_SUBSET) ;
 MARKUP_S            :  S -> skip ;
+MARKUP_STRING       :  '"' ~["]* '"'
+                    |  '\'' ~[']* '\''
+                    ;
 
-MARKUP_TEXT         :  ~[>[]+ ;  // match any 16 bit char other than > and [
+MARKUP_TEXT         :  ~[>"'[]+ ;  // match any 16 bit char other than >, quotes, and [
 
 // INSIDE of MARKUP SUBSET --------------------------------
 mode INSIDE_MARKUP_SUBSET;

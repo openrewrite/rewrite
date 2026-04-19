@@ -84,12 +84,31 @@ public class PropertyPlaceholderHelper {
         return placeholders;
     }
 
+    /**
+     * Replace placeholders in the given value, resolving each against the supplied properties.
+     * A backslash before the placeholder prefix (e.g. {@code \${...}}) escapes it as a literal.
+     */
     public String replacePlaceholders(String value, final Properties properties) {
         return replacePlaceholders(value, properties::getProperty);
     }
 
+    /**
+     * Replace placeholders in the given value, resolving each via {@code placeholderResolver}.
+     * A backslash before the placeholder prefix (e.g. {@code \${...}}) escapes it as a literal.
+     */
     public String replacePlaceholders(String value, Function<String, @Nullable String> placeholderResolver) {
-        return parseStringValue(value, placeholderResolver, null);
+        // Support escaping: a backslash before the placeholder prefix produces a literal
+        // prefix. E.g., for prefix "${", writing "\${" produces literal "${".
+        String escapePrefix = "\\" + placeholderPrefix;
+        boolean hasEscaped = value.contains(escapePrefix);
+        if (hasEscaped) {
+            value = value.replace(escapePrefix, "\u0000\u0001\u0002");
+        }
+        String result = parseStringValue(value, placeholderResolver, null);
+        if (hasEscaped) {
+            result = result.replace("\u0000\u0001\u0002", placeholderPrefix);
+        }
+        return result;
     }
 
     protected String parseStringValue(String value, Function<String, @Nullable String> placeholderResolver,
@@ -108,10 +127,13 @@ public class PropertyPlaceholderHelper {
                 if (visitedPlaceholders == null) {
                     visitedPlaceholders = new HashSet<>(4);
                 }
-                if (visitedPlaceholders.add(originalPlaceholder)) {
-                    placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
+                if (!visitedPlaceholders.add(originalPlaceholder)) {
+                    // Circular reference detected - leave this placeholder unresolved
+                    startIndex = result.indexOf(placeholderPrefix, endIndex + placeholderSuffix.length());
+                    continue;
                 }
                 // Recursive invocation, parsing placeholders contained in the placeholder key.
+                placeholder = parseStringValue(placeholder, placeholderResolver, visitedPlaceholders);
                 // Now obtain the value for the fully resolved key...
                 String propVal = placeholderResolver.apply(placeholder);
                 if (propVal == null && valueSeparator != null) {

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.xml;
 
-import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -36,6 +35,7 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -59,6 +59,40 @@ class XmlParserTest implements RewriteTest {
               }
           }
         ));
+    }
+
+    @Test
+    void internalDTDWithExternalPublicIdentifierEntity() {
+        rewriteRun(
+          //language=xml
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!DOCTYPE book [
+                <!ENTITY % extDTD PUBLIC "-//Example//DTD Extra//EN" "extra.dtd">
+              ]>
+              <book></book>
+              """
+          )
+        );
+    }
+
+    @Test
+    void internalDTDWithMultipleEntities() {
+        rewriteRun(
+          //language=xml
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!DOCTYPE book [
+                <!ENTITY % extDTD PUBLIC "-//Example//DTD Extra//EN" "extra.dtd">
+                <!ENTITY % other PUBLIC "-//Example//DTD Other//EN" "other.dtd">
+                <!ELEMENT p ANY>
+              ]>
+              <book></book>
+              """
+          )
+        );
     }
 
     @Test
@@ -172,6 +206,46 @@ class XmlParserTest implements RewriteTest {
               </html>
               """,
             spec -> spec.path("comment.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspEmptyFile() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              """,
+            spec -> spec.path("empty.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspNoHtmlContent() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%-- This is a JSP comment that won't appear in the HTML output --%>
+              """,
+            spec -> spec.path("noHtmlContent.jsp")
+          )
+        );
+    }
+
+    @Test
+    void jspScriptletBeforeHtml() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <%-- This is a JSP comment that won't appear in the HTML output --%>
+              <% String test = "hello"; %>
+              <html></html>
+              """,
+            spec -> spec.path("scripletBeforeHtml.jsp")
           )
         );
     }
@@ -474,6 +548,30 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2567")
+    @Test
+    void dtdEntityWithAngleBracketsInQuotedValue() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <!DOCTYPE rules [
+              <!ENTITY ambiguous_date '
+                      <token regexp="yes">0?[1-9]|1[0-2]</token>
+                      <token>/</token>
+                      <token regexp="yes">0?[1-9]|1[0-2]</token>
+                      <token>/</token>
+                      <token regexp="yes">\\d\\d\\d\\d</token>
+                  '>
+              ]>
+              <rules>
+                  <rule>&ambiguous_date;</rule>
+              </rules>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1243")
     @Test
     void processingInstructions() {
@@ -588,9 +686,15 @@ class XmlParserTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {
       "foo.xml",
+      "foo.XML",
       "proj.csproj",
+      "proj.Csproj",
       "/foo/bar/baz.jsp",
-      "packages.config"
+      "packages.config",
+      "Packages.config",
+      "nuget.config",
+      "NuGet.config",
+      "NuGet.Config"
     })
     void acceptWithValidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isTrue();

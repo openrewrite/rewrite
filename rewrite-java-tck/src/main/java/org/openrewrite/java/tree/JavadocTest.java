@@ -18,10 +18,13 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.MinimumJava11;
+import org.openrewrite.java.MinimumJava25;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
@@ -372,6 +375,31 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void unicodeEscapedCharAsHtmlElementName() {
+        // https://moderneinc.slack.com/archives/C06K78R5M4J/p1776321855348559
+        // The source literally contains the 6-character escape sequence `\u00ef`,
+        // which the Java compiler expands to `\u00ef` before the Javadoc parser sees it.
+        rewriteRun(
+          java(
+            "package com.foo;\n" +
+            "\n" +
+            "public class ArrayByte {\n" +
+            "  /**\n" +
+            "   * Replaces the element at the specified position in this ArrayByte\n" +
+            "   * with the specified element. <\\u00ef>\n" +
+            "   *\n" +
+            "   * @param  index the index of the element to be replaced.\n" +
+            "   * @param  element the element to be stored at the specified position.\n" +
+            "   * @return the element which was previously at the specified position.\n" +
+            "   * @exception ArrayIndexOutOfBoundsException if index is out of range.\n" +
+            "   */\n" +
+            "  public byte set(int index, byte element) { return 0; }\n" +
+            "}\n"
           )
         );
     }
@@ -1164,6 +1192,34 @@ class JavadocTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> assertTrue(TypeUtils.isAssignableTo("java.lang.String", cu.getTypesInUse().getVariables().iterator().next().getType())))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7228")
+    @Test
+    void seeWithFieldRefOnExternalType() {
+        rewriteRun(
+          java(
+            """
+                class Node {
+                    static final int LEAF = 1;
+                }
+                """
+          ),
+          java(
+            """
+              class Test {
+                  /**
+                   * @see Node#LEAF
+                   */
+                  boolean isLeaf() { return false; }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getTypesInUse().getVariables()).isNotEmpty();
+                assertThat(cu.getTypesInUse().getVariables().iterator().next().getName()).isEqualTo("LEAF");
+            })
           )
         );
     }
@@ -2602,6 +2658,180 @@ class JavadocTest implements RewriteTest {
                        * }
                        */
                       void method() {}
+                  }
+                  """
+              )
+            );
+        }
+    }
+
+    @Nested
+    @MinimumJava25
+    class MarkdownDocComment {
+        @Test
+        void tripleSlashRoundTrip() {
+            rewriteRun(
+              java(
+                """
+                  /// A simple doc comment.
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashMultiLine() {
+            rewriteRun(
+              java(
+                """
+                  /// First line.
+                  /// Second line.
+                  /// Third line.
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashParsedAsDocComment() {
+            rewriteRun(
+              java(
+                """
+                  /// A simple doc comment.
+                  class Test {}
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var comments = cu.getClasses().get(0).getPrefix().getComments();
+                    assertThat(comments).hasSize(1);
+                    assertThat(comments.get(0)).isInstanceOf(Javadoc.DocComment.class);
+                })
+              )
+            );
+        }
+
+        @Test
+        void multiLineTripleSlashMergedIntoSingleDocComment() {
+            rewriteRun(
+              java(
+                """
+                  /// First line.
+                  /// Second line.
+                  class Test {}
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var comments = cu.getClasses().get(0).getPrefix().getComments();
+                    assertThat(comments).hasSize(1);
+                    assertThat(comments.get(0)).isInstanceOf(Javadoc.DocComment.class);
+                })
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithParam() {
+            rewriteRun(
+              java(
+                """
+                  class Test {
+                      /// Returns the sum.
+                      /// @param a first number
+                      /// @param b second number
+                      /// @return the sum
+                      int add(int a, int b) { return a + b; }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithLink() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+                  /// See {@link List} for details.
+                  class Test {}
+                  """
+              )
+            );
+        }
+
+        @Test
+        void tripleSlashWithMarkdownCodeBlock() {
+            rewriteRun(
+              java(
+                """
+                  import java.util.List;
+                  import java.util.ArrayList;
+                  /// Example:
+                  /// ```java
+                  /// List<String> items = new ArrayList<>();
+                  /// ```
+                  class Test {
+                      List<String> field;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeTypeInTripleSlashLink() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", null)),
+              java(
+                """
+                  import java.util.List;
+
+                  /// See {@link List} for details.
+                  class Test {
+                      List<String> field;
+                  }
+                  """,
+                """
+                  import java.util.Collection;
+
+                  /// See {@link Collection} for details.
+                  class Test {
+                      Collection<String> field;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeTypeIgnoresMarkdownCodeBlock() {
+            rewriteRun(
+              spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", null)),
+              java(
+                """
+                  import java.util.List;
+                  import java.util.ArrayList;
+
+                  /// Example:
+                  /// ```java
+                  /// List<String> items = new ArrayList<>();
+                  /// ```
+                  /// See {@link List}.
+                  class Test {
+                      List<String> field;
+                  }
+                  """,
+                """
+                  import java.util.ArrayList;
+                  import java.util.Collection;
+
+                  /// Example:
+                  /// ```java
+                  /// List<String> items = new ArrayList<>();
+                  /// ```
+                  /// See {@link Collection}.
+                  class Test {
+                      Collection<String> field;
                   }
                   """
               )

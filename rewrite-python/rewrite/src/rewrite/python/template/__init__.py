@@ -26,10 +26,10 @@ Examples:
     expr = capture('expr')
 
     # Create a pattern to match print() calls
-    pat = pattern("print({expr})", expr=expr)
+    pat = pattern(f"print({expr})")
 
     # Create a template to generate logging calls
-    tmpl = template("logging.info({expr})", expr=expr)
+    tmpl = template(f"logging.info({expr})")
 
     # In a visitor
     class MyVisitor(PythonVisitor):
@@ -42,6 +42,7 @@ Examples:
 
 from .capture import Capture, capture, RawCode, raw
 from .coordinates import PythonCoordinates, CoordinateMode, CoordinateLocation
+from .dependency_workspace import DependencyWorkspace
 from .pattern import Pattern, MatchResult, pattern
 from .template import Template, TemplateBuilder, template
 from .engine import TemplateEngine, TemplateOptions
@@ -57,6 +58,9 @@ __all__ = [
     "PythonCoordinates",
     "CoordinateMode",
     "CoordinateLocation",
+
+    # Dependency workspace
+    "DependencyWorkspace",
 
     # Pattern
     "Pattern",

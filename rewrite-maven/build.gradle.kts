@@ -43,6 +43,7 @@ dependencies {
     testImplementation("com.squareup.okio:okio-jvm:3.9.1")
     testImplementation("org.mapdb:mapdb:latest.release")
 
+    testRuntimeOnly("org.slf4j:jul-to-slf4j:latest.release")
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:10.2.1")
@@ -60,6 +61,10 @@ tasks.register<JavaExec>("generateAntlrSources") {
     classpath = sourceSets["main"].runtimeClasspath
 
     finalizedBy("licenseFormat")
+}
+
+tasks.withType<Test>().configureEach {
+    jvmArgs("-Djava.util.logging.config.file=${file("src/test/resources/logging.properties").absolutePath}")
 }
 
 tasks.withType<Javadoc>().configureEach {

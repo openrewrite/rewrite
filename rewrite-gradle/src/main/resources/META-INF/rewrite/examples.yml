@@ -292,6 +292,24 @@ examples:
     language: groovy
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.ChangeTaskToTasksRegister
+examples:
+- description: '`ChangeTaskToTasksRegisterTest#groovyTaskWithClosure`'
+  sources:
+  - before: |
+      task taskName(type: Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    after: |
+      tasks.register("taskName", Copy) {
+          from 'src/main/resources'
+          into 'build/generated-resources'
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.DependencyConstraintToRule
 examples:
 - description: '`DependencyConstraintToRuleTest#newResolutionStrategyBlock`'
@@ -519,6 +537,40 @@ examples:
     language: toml
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.gradle.MigrateToGradle9
+examples:
+- description: '`MigrateToGradle9Test#multipleSubRecipesApplyTogether`'
+  sources:
+  - before: |
+      plugins {
+          id 'java'
+          id 'jacoco'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation group: 'com.google.guava', name: 'guava', version: '31.1-jre'
+      }
+    after: |
+      plugins {
+          id 'java'
+          id 'jacoco'
+      }
+
+      repositories {
+          mavenCentral()
+      }
+
+      dependencies {
+          implementation "com.google.guava:guava:31.1-jre"
+      }
+    path: build.gradle
+    language: groovy
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.gradle.RemoveDependency
 examples:
 - description: '`RemoveDependencyTest#removeGradleDependencyUsingStringNotation`'
@@ -715,13 +767,13 @@ examples:
   - before: |
       distributionBase=GRADLE_USER_HOME
       distributionPath=wrapper/dists
-      distributionUrl=https\://services.gradle.org/distributions/gradle-7.4-bin.zip
+      distributionUrl=https\://downloads.gradle.org/distributions/gradle-7.4-bin.zip
       zipStoreBase=GRADLE_USER_HOME
       zipStorePath=wrapper/dists
     after: |
       distributionBase=GRADLE_USER_HOME
       distributionPath=wrapper/dists
-      distributionUrl=https\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+      distributionUrl=https\://downloads.gradle.org/distributions/gradle-7.4.2-bin.zip
       zipStoreBase=GRADLE_USER_HOME
       zipStorePath=wrapper/dists
       distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
@@ -1281,13 +1333,13 @@ examples:
   - before: |
       distributionBase=GRADLE_USER_HOME
       distributionPath=wrapper/dists
-      distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-all.zip
+      distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-all.zip
       zipStoreBase=GRADLE_USER_HOME
       zipStorePath=wrapper/dists
     after: |
       distributionBase=GRADLE_USER_HOME
       distributionPath=wrapper/dists
-      ~~>distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-all.zip
+      ~~>distributionUrl=https\\://downloads.gradle.org/distributions/gradle-7.4-all.zip
       zipStoreBase=GRADLE_USER_HOME
       zipStorePath=wrapper/dists
     path: gradle/wrapper/gradle-wrapper.properties

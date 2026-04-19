@@ -146,7 +146,8 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                 .getPadding().withExtends(q.receive(classDecl.getPadding().getExtends(), e -> visitLeftPadded(e, q)))
                 .getPadding().withImplements(q.receive(classDecl.getPadding().getImplements(), i -> visitContainer(i, q)))
                 .getPadding().withPermits(q.receive(classDecl.getPadding().getPermits(), p -> visitContainer(p, q)))
-                .withBody(q.receive(classDecl.getBody(), b -> (J.Block) visitNonNull(b, q)));
+                .withBody(q.receive(classDecl.getBody(), b -> (J.Block) visitNonNull(b, q)))
+                .withType(q.receive(classDecl.getType(), t -> (JavaType.FullyQualified) visitType(t, q)));
     }
 
     private J.ClassDeclaration.Kind visitClassDeclarationKind(J.ClassDeclaration.Kind kind, RpcReceiveQueue q) {
@@ -340,7 +341,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
                     String codePoint = q.receive(s != null ? s.getCodePoint() : null);
                     return new J.Literal.UnicodeEscape(valueSourceIndex, codePoint);
                 }))
-                .withType(q.receive(literal.getType(), t -> (JavaType.Primitive) visitType(t, q)));
+                .withType(q.receive((JavaType) literal.getType(), t -> visitType(t, q)));
     }
 
     @Override
@@ -378,12 +379,14 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, RpcReceiveQueue q) {
-        return method
+        method = method
                 .getPadding().withSelect(q.receive(method.getPadding().getSelect(), s -> visitRightPadded(s, q)))
-                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)))
-                .withName(q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q)))
+                .getPadding().withTypeParameters(q.receive(method.getPadding().getTypeParameters(), tp -> visitContainer(tp, q)));
+        J.Identifier name = q.receive(method.getName(), n -> (J.Identifier) visitNonNull(n, q));
+        return method
                 .getPadding().withArguments(q.receive(method.getPadding().getArguments(), a -> visitContainer(a, q)))
-                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)));
+                .withMethodType(q.receive(method.getMethodType(), t -> (JavaType.Method) visitType(t, q)))
+                .withName(name);
     }
 
     @Override
@@ -459,7 +462,7 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     @Override
     public J visitPrimitive(J.Primitive primitive, RpcReceiveQueue q) {
         return primitive
-                .withType(q.receive(primitive.getType()));
+                .withType(q.receive(primitive.getType(), t -> (JavaType.Primitive) visitType(t, q)));
     }
 
     @Override
@@ -651,17 +654,18 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
     }
 
     public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, RpcReceiveQueue q) {
+        T element = q.receive(right.getElement(), t -> {
+            if (t instanceof J) {
+                //noinspection unchecked
+                return (T) visitNonNull((J) t, q);
+            } else if (t instanceof Space) {
+                //noinspection unchecked
+                return (T) visitSpace((Space) t, q);
+            }
+            return t;
+        });
         return right
-                .withElement(q.receive(right.getElement(), t -> {
-                    if (t instanceof J) {
-                        //noinspection unchecked
-                        return (T) visitNonNull((J) t, q);
-                    } else if (t instanceof Space) {
-                        //noinspection unchecked
-                        return (T) visitSpace((Space) t, q);
-                    }
-                    return t;
-                }))
+                .withElement(element)
                 .withAfter(q.receive(right.getAfter(), s -> visitSpace(s, q)))
                 .withMarkers(q.receive(right.getMarkers()));
     }
@@ -678,4 +682,3 @@ public class JavaReceiver extends JavaVisitor<RpcReceiveQueue> {
         return javaTypeReceiver.visit(javaType, q);
     }
 }
-

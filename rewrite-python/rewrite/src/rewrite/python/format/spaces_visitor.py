@@ -28,7 +28,7 @@ class SpacesVisitor(PythonVisitor):
                 implements=space_before_container(c.padding.implements, self._style.before_parentheses.method_call)
             )
 
-            param_size = len(c.padding.implements.elements)
+            param_size = len(c.padding.implements.elements)  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
             use_space = self._style.within.method_call_parentheses
 
             def _process_argument(index, arg, args_size):
@@ -46,9 +46,9 @@ class SpacesVisitor(PythonVisitor):
 
             if c.implements:
                 c = c.padding.replace(
-                    implements=c.padding.implements.padding.replace(
+                    implements=c.padding.implements.padding.replace(  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                         elements=list_map(lambda arg, index: _process_argument(index, arg, param_size),
-                                          c.padding.implements.padding.elements)))
+                                          c.padding.implements.padding.elements)))  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
         return c
 
     def visit_method_declaration(self, method: MethodDeclaration, p: P) -> J:
@@ -107,8 +107,13 @@ class SpacesVisitor(PythonVisitor):
 
     def visit_control_parentheses(self, control_parens: ControlParentheses[J2], p: P) -> J:
         cp = cast(ControlParentheses[J2], super().visit_control_parentheses(control_parens, p))
-        cp = space_before(cp, False)
-        cp = cp.padding.replace(tree=cp.padding.tree.replace(element=space_before(cp.tree, True)))
+        parent = self.cursor.parent_tree_cursor()
+        if parent is not None and isinstance(parent.value, Try.Catch):
+            cp = space_before(cp, False)
+            cp = cp.padding.replace(tree=cp.padding.tree.replace(element=space_before(cp.tree, True)))
+        else:
+            cp = space_before(cp, True)
+            cp = cp.padding.replace(tree=cp.padding.tree.replace(element=space_before(cp.tree, False)))
         return cp
 
     def visit_named_argument(self, named: NamedArgument, p: P) -> J:
@@ -319,10 +324,10 @@ class SpacesVisitor(PythonVisitor):
         control = fl.control
 
         # Set single space before loop target e.g. for    i in...: <-> for i in ...:
-        var_rp = control.padding.variable
-        var_rp = var_rp.replace(element=space_before(var_rp.element, True))
+        control = space_before(control, True)
 
         # Set single space before 'in' keyword
+        var_rp = control.padding.variable
         var_rp = space_after_right_padded(var_rp, True)
 
         # Set single space before loop iterable e.g. for i in    []: <-> for i in []:
@@ -350,12 +355,12 @@ class SpacesVisitor(PythonVisitor):
             return arg
 
         pt = pt.padding.replace(
-            type_parameters=pt.padding.type_parameters.padding.replace(
+            type_parameters=pt.padding.type_parameters.padding.replace(  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                 elements=list_map(
                     lambda arg, idx: _process_element(idx, arg,
-                                                      last=idx == len(pt.padding.type_parameters.padding.elements) - 1,
+                                                      last=idx == len(pt.padding.type_parameters.padding.elements) - 1,  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                                                       use_space=self._style.within.brackets),
-                    pt.padding.type_parameters.padding.elements
+                    pt.padding.type_parameters.padding.elements  # ty: ignore[unresolved-attribute]  # guarded by truthiness check above
                 )
             )
         )
@@ -458,8 +463,9 @@ class SpacesVisitor(PythonVisitor):
     def visit_import(self, import_: Import, p: P) -> J:
         imp: Import = cast(Import, super().visit_import(import_, p))
         if imp.padding.alias:
-            imp = imp.replace(alias=space_before(imp.alias, True))
-            imp = imp.padding.replace(alias=space_before_left_padded(imp.padding.alias, True))
+            new_alias = space_before_left_padded(imp.padding.alias, True)
+            new_alias = space_before_left_padded_element(new_alias, True)
+            imp = imp.padding.replace(alias=new_alias)
         return imp
 
     def visit_type_hint(self, hint: TypeHint, p: P) -> J:
@@ -526,9 +532,9 @@ def space_before(j: J2, add_space: bool) -> J2:
         return j
 
     if add_space and not_single_space(prefix.whitespace):
-        return j.replace(prefix=prefix.replace(whitespace=" "))  # ty: ignore[unresolved-attribute]
+        return j.replace(prefix=prefix.replace(whitespace=" "))
     elif not add_space and only_spaces_and_not_empty(prefix.whitespace):
-        return j.replace(prefix=prefix.replace(whitespace=""))  # ty: ignore[unresolved-attribute]
+        return j.replace(prefix=prefix.replace(whitespace=""))
 
     return j
 
@@ -580,7 +586,7 @@ def space_before_left_padded(j: JLeftPadded[J2], add_space) -> JLeftPadded[J2]:
 
 
 def space_after(j: J2, add_space: bool) -> J2:
-    space: Space = cast(Space, j.after)
+    space: Space = cast(Space, j.after)  # ty: ignore[unresolved-attribute]  # J2 is JRightPadded at call site
     if space.comments or '\\' in space.whitespace:
         return j
 

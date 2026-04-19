@@ -242,3 +242,17 @@ class TestPatternMatching:
 
         assert pat.matches(target_x, self._cursor_for(target_x)) is True
         assert pat.matches(target_y, self._cursor_for(target_y)) is False
+
+
+class TestPatternFactoryOptions:
+    """Tests for context/dependencies keyword arguments on pattern()."""
+
+    def test_pattern_factory_with_context(self):
+        """pattern() factory accepts context parameter."""
+        pat = pattern("x + 1", context=["MyType = int"])
+        assert pat._options.context == ("MyType = int",)
+
+    def test_pattern_factory_with_dependencies(self):
+        """pattern() factory accepts dependencies parameter."""
+        pat = pattern("x", dependencies={"flask": "3.0.0"})
+        assert pat._options.dependencies == (("flask", "3.0.0"),)

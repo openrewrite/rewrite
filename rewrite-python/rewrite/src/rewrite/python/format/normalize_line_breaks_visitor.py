@@ -18,7 +18,7 @@ class NormalizeLineBreaksVisitor(PythonVisitor[P]):
 
     def visit_space(self, space: Optional[Space], p: P) -> Space:
         if not space or space is Space.EMPTY or not space.whitespace:
-            return space  # type: ignore
+            return space  # ty: ignore[invalid-return-type]
         s = space.replace(whitespace=_normalize_new_lines(space.whitespace, self._style.use_crlf_new_lines))
 
         def process_comment(comment: Comment) -> Comment:

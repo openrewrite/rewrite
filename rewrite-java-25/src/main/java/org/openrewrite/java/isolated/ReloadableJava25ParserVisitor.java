@@ -23,10 +23,12 @@ import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Symtab;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
+import com.sun.tools.javac.parser.Tokens;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Position;
 import org.jetbrains.annotations.Contract;
@@ -554,10 +556,12 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
                 return Markers.EMPTY;
             });
 
+            Space enumValueSetPrefix = enumValues.get(0).getElement().getPrefix();
+            enumValues.set(0, enumValues.get(0).withElement(enumValues.get(0).getElement().withPrefix(EMPTY)));
             enumSet = padRight(
                     new J.EnumValueSet(
                             randomId(),
-                            EMPTY,
+                            enumValueSetPrefix,
                             Markers.EMPTY,
                             enumValues,
                             skip(";") != null
@@ -844,7 +848,12 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitImport(ImportTree node, Space fmt) {
-        skip("import");
+        Space beforeImport = sourceBefore("import");
+        if (!beforeImport.isEmpty()) {
+            fmt = Space.build(
+                    fmt.getWhitespace() + beforeImport.getWhitespace(),
+                    ListUtils.concatAll(fmt.getComments(), beforeImport.getComments()));
+        }
         return new J.Import(randomId(), fmt, Markers.EMPTY,
                 new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
                         node.isStatic(), Markers.EMPTY),
@@ -1540,6 +1549,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
         JCArrayTypeTree arrayTypeTree = null;
         while (typeIdent instanceof JCAnnotatedType || typeIdent instanceof JCArrayTypeTree) {
             if (typeIdent instanceof JCAnnotatedType) {
+                if (count > 0) {
+                    mapAnnotations(((JCAnnotatedType) typeIdent).getAnnotations(), annotationPosTable);
+                }
                 typeIdent = ((JCAnnotatedType) typeIdent).getUnderlyingType();
             }
             if (typeIdent instanceof JCArrayTypeTree) {
@@ -1551,16 +1563,26 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
 
+        List<J.Annotation> leadingAnnotations = leadingAnnotations(annotationPosTable);
         Space prefix = whitespace();
-        TypeTree elemType = convert(typeIdent);
+        TypeTree elemType;
+        if (!annotationPosTable.isEmpty() && typeIdent instanceof JCFieldAccess) {
+            elemType = annotatedTypeTree(typeIdent, annotationPosTable);
+        } else {
+            elemType = convert(typeIdent);
+        }
         List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
         JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         assert arrayTypeTree != null;
-        return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
+        TypeTree result = new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, arrayTypeTree.getType(), annotationPosTable),
                 annotations,
                 dimension,
                 typeMapping.type(tree));
+        if (!leadingAnnotations.isEmpty()) {
+            result = new J.AnnotatedType(randomId(), EMPTY, Markers.EMPTY, leadingAnnotations, result);
+        }
+        return result;
     }
 
     private TypeTree mapDimensions(TypeTree baseType, Tree tree, Map<Integer, JCAnnotation> annotationPosTable) {
@@ -1775,8 +1797,9 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
-        if (typeExpr == null && node.declaredUsingVar()) {
-            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+        if (typeExpr == null && (node.declaredUsingVar() ||
+                ((node.sym.flags() & Flags.MATCH_BINDING) != 0 && source.startsWith("var", indexOfNextNonWhitespace(cursor, source))))) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", vartype != null ? typeMapping.type(vartype) : typeMapping.type(node.sym.type), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -2549,36 +2572,108 @@ public class ReloadableJava25ParserVisitor extends TreePathScanner<J, Space> {
 
     Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DocCommentTree commentTree) {
         Space fmt = format(prefix);
-        if (commentTree != null) {
-            List<Comment> comments = fmt.getComments();
-            int i;
-            for (i = comments.size() - 1; i >= 0; i--) {
-                Comment comment = comments.get(i);
-                if (comment.isMultiline() && ((TextComment) comment).getText().startsWith("*")) {
-                    break;
-                }
-            }
-
-            AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
-            for (int j = 0; j < comments.size(); j++) {
-                if (i == j) {
-                    javadoc.set((Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
-                            context,
-                            getCurrentPath(),
-                            typeMapping,
-                            "/*" + ((TextComment) comments.get(j)).getText(),
-                            tree
-                    ).scan(commentTree, new ArrayList<>(1)));
-                    break;
-                }
-            }
-
-            int javadocIndex = i;
-            return fmt.withComments(ListUtils.map(fmt.getComments(), (j, c) ->
-                    j == javadocIndex ? javadoc.get().withSuffix(c.getSuffix()) : c));
+        if (commentTree == null) {
+            return fmt;
         }
 
-        return fmt;
+        // Check if this is a markdown-style (///) doc comment
+        boolean isMarkdown = commentTree instanceof DCTree.DCDocComment dcDoc &&
+                dcDoc.comment.getStyle() == Tokens.Comment.CommentStyle.JAVADOC_LINE;
+        if (isMarkdown) {
+            return formatWithMarkdownJavaDoc(tree, commentTree, fmt.getComments(), fmt);
+        }
+        return formatWithTraditionalJavaDoc(tree, commentTree, fmt.getComments(), fmt);
+    }
+
+    private Space formatWithMarkdownJavaDoc(JCTree tree, DocCommentTree commentTree, List<Comment> comments, Space fmt) {
+        // Find the last consecutive group of single-line comments starting with '/'
+        // (these are the /// lines parsed by Space.format() as TextComments)
+        int last = -1;
+        for (int k = comments.size() - 1; k >= 0; k--) {
+            Comment c = comments.get(k);
+            if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
+                if (last == -1) {
+                    last = k;
+                }
+            } else if (last != -1) {
+                break;
+            }
+        }
+        if (last == -1) {
+            return fmt;
+        }
+        int first = last;
+        for (int k = last - 1; k >= 0; k--) {
+            Comment c = comments.get(k);
+            if (!c.isMultiline() && c instanceof TextComment tc && tc.getText().startsWith("/")) {
+                first = k;
+            } else {
+                break;
+            }
+        }
+
+        // Reconstruct the source: "//" + text gives "///" + content for each line
+        StringBuilder src = new StringBuilder();
+        src.append("//").append(((TextComment) comments.get(first)).getText());
+        for (int k = first + 1; k <= last; k++) {
+            src.append(comments.get(k - 1).getSuffix());
+            src.append("//").append(((TextComment) comments.get(k)).getText());
+        }
+
+        String lastSuffix = comments.get(last).getSuffix();
+        Javadoc.DocComment javadoc = (Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
+                context,
+                getCurrentPath(),
+                typeMapping,
+                src.toString(),
+                tree,
+                true
+        ).scan(commentTree, new ArrayList<>(1));
+        javadoc = javadoc.withMarkers(javadoc.getMarkers().addIfAbsent(new LineComment(randomId())));
+        javadoc = javadoc.withSuffix(lastSuffix);
+
+        int firstIdx = first;
+        int lastIdx = last;
+        Javadoc.DocComment finalJavadoc = javadoc;
+        List<Comment> newComments = new ArrayList<>();
+        for (int k = 0; k < comments.size(); k++) {
+            if (k == firstIdx) {
+                newComments.add(finalJavadoc);
+            } else if (k < firstIdx || k > lastIdx) {
+                newComments.add(comments.get(k));
+            }
+            // skip k > firstIdx && k <= lastIdx (merged into the javadoc)
+        }
+        return fmt.withComments(newComments);
+    }
+
+    private Space formatWithTraditionalJavaDoc(JCTree tree, DocCommentTree commentTree, List<Comment> comments, Space fmt) {
+        // Traditional /** ... */ javadoc
+        int i;
+        for (i = comments.size() - 1; i >= 0; i--) {
+            Comment comment = comments.get(i);
+            if (comment.isMultiline() && ((TextComment) comment).getText().startsWith("*")) {
+                break;
+            }
+        }
+
+        AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
+        for (int j = 0; j < comments.size(); j++) {
+            if (i == j) {
+                javadoc.set((Javadoc.DocComment) new ReloadableJava25JavadocVisitor(
+                        context,
+                        getCurrentPath(),
+                        typeMapping,
+                        "/*" + ((TextComment) comments.get(j)).getText(),
+                        tree
+                ).scan(commentTree, new ArrayList<>(1)));
+                break;
+            }
+        }
+
+        int javadocIndex = i;
+        return fmt.withComments(ListUtils.map(fmt.getComments(), (j, c) ->
+                j == javadocIndex ? javadoc.get().withSuffix(c.getSuffix()) : c));
     }
 
     private void addPossibleEmptyStatementsBeforeClosingBrace(List<JRightPadded<Statement>> converted) {

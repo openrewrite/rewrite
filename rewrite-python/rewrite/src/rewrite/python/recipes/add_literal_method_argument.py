@@ -21,9 +21,12 @@ from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
 from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
 
 
+@categorize(Python)
 class AddLiteralMethodArgument(Recipe):
     """
     Add a literal argument to method invocations matching a pattern.
@@ -58,9 +61,9 @@ class AddLiteralMethodArgument(Recipe):
 
     def __init__(
         self,
-        method_pattern: str,
-        argument_index: int,
-        literal: str
+        method_pattern: str = "",
+        argument_index: int = 0,
+        literal: str = ""
     ):
         self.method_pattern = method_pattern
         self.argument_index = argument_index

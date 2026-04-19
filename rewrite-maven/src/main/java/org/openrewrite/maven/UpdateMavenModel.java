@@ -139,8 +139,13 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
 
         try {
+            Map<Path, Pom> projectPoms = resolutionResult.getProjectPoms();
+            Path sourcePath = requested.getSourcePath();
+            if (sourcePath != null) {
+                projectPoms.put(sourcePath, requested);
+            }
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    resolutionResult.getProjectPoms());
+                    projectPoms);
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {

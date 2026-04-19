@@ -21,6 +21,7 @@ import com.puppycrawl.tools.checkstyle.api.Configuration;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ToBeRemoved;
 import org.xml.sax.InputSource;
 
 import java.io.ByteArrayInputStream;
@@ -33,7 +34,6 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static java.lang.Boolean.parseBoolean;
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.*;
 import static org.openrewrite.java.style.Checkstyle.defaultBlockPolicy;
 import static org.openrewrite.java.style.Checkstyle.defaultOperatorWrapStyleOption;
@@ -93,7 +93,7 @@ public class CheckstyleConfigLoader {
                                 parenPadStyle(conf))
                         .filter(Objects::nonNull)
                         .flatMap(Set::stream)
-                        .collect(toSet()));
+                        .collect(toCollection(LinkedHashSet::new)));
     }
 
     private static @Nullable Set<DefaultComesLastStyle> defaultComesLast(Map<String, List<Module>> conf) {
@@ -269,7 +269,7 @@ public class CheckstyleConfigLoader {
                     boolean dot = false;
                     boolean inc = true;
                     boolean dec = true;
-                    boolean bnoc = true;
+                    boolean bnot = true;
                     boolean lnot = true;
                     boolean unaryPlus = true;
                     boolean unaryMinus = true;
@@ -285,7 +285,7 @@ public class CheckstyleConfigLoader {
                         dot = tokens.contains("DOT");
                         inc = tokens.contains("INC");
                         dec = tokens.contains("DEC");
-                        bnoc = tokens.contains("BNOT");
+                        bnot = tokens.contains("BNOT");
                         lnot = tokens.contains("LNOT");
                         unaryPlus = tokens.contains("UNARY_PLUS");
                         unaryMinus = tokens.contains("UNARY_MINUS");
@@ -301,7 +301,7 @@ public class CheckstyleConfigLoader {
                             dot,
                             inc,
                             dec,
-                            bnoc,
+                            bnot,
                             lnot,
                             unaryPlus,
                             unaryMinus
@@ -657,7 +657,9 @@ public class CheckstyleConfigLoader {
                         builder.importAllOthers();
                     }
 
-                    return builder.build();
+                    return builder.build()
+                            .withClassCountToUseStarImport(null)
+                            .withNameCountToUseStarImport(null);
                 })
                 .collect(toSet());
     }
@@ -690,8 +692,8 @@ public class CheckstyleConfigLoader {
                 .map(module -> new ImportLayoutStyle(
                         Integer.MAX_VALUE,
                         Integer.MAX_VALUE,
-                        emptyList(),
-                        emptyList()
+                        null,
+                        null
                 ))
                 .collect(toSet());
     }
@@ -1046,6 +1048,8 @@ public class CheckstyleConfigLoader {
                         }
                     }
 
+                    boolean isInflow = !staticsOnTop && !staticsOnBottom && shouldKnowInflowStyle();
+
                     // Add non-static import groups
                     if (groups != null && !groups.isEmpty()) {
                         addGroupBlocks(builder, groups, separated, false);
@@ -1053,9 +1057,17 @@ public class CheckstyleConfigLoader {
                         if (separated) {
                             builder.blankLine();
                         }
-                        builder.importAllOthers();
+                        if (isInflow) {
+                            builder.importAllOthersInflow();
+                        } else {
+                            builder.importAllOthers();
+                        }
                     } else {
-                        builder.importAllOthers();
+                        if (isInflow) {
+                            builder.importAllOthersInflow();
+                        } else {
+                            builder.importAllOthers();
+                        }
                     }
 
                     if (staticsOnBottom) {
@@ -1067,14 +1079,21 @@ public class CheckstyleConfigLoader {
                         }
                     }
 
-                    // If "inflow", statics are mixed with non-statics — use catch-all
-                    if (!staticsOnTop && !staticsOnBottom) {
-                        builder.importStaticAllOthers();
-                    }
-
-                    return builder.build();
+                    return builder.build()
+                            .withClassCountToUseStarImport(null)
+                            .withNameCountToUseStarImport(null);
                 })
                 .collect(toSet());
+    }
+
+    @ToBeRemoved(after = "2026-06-01", reason = "All parent runtimes have had few weeks to update")
+    private static boolean shouldKnowInflowStyle() {
+        try {
+            ImportLayoutStyle.Builder.class.getMethod("importAllOthersInflow");
+            return true;
+        } catch (NoSuchMethodError | NoSuchMethodException e) {
+            return false;
+        }
     }
 
     private static void addGroupBlocks(ImportLayoutStyle.Builder builder, String groups, boolean separated, boolean isStatic) {

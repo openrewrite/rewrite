@@ -24,7 +24,8 @@ from rewrite.marketplace import Python
 from rewrite.recipe import option
 from rewrite.java import J
 from rewrite.java.support_types import JavaType
-from rewrite.java.tree import Empty, FieldAccess, Identifier, Import, MethodInvocation
+from rewrite.java.tree import FieldAccess, Identifier, Import, MethodDeclaration, MethodInvocation
+from rewrite.python.import_utils import get_qualid_name, get_name_string, get_alias_name
 from rewrite.python.tree import CompilationUnit, MultiImport
 from rewrite.python.visitor import PythonVisitor
 from rewrite.python.add_import import AddImportOptions, maybe_add_import
@@ -35,7 +36,11 @@ _Imports = [*Python, CategoryDescriptor(display_name="Imports")]
 
 
 def _create_module_type(fqn: str) -> JavaType.Class:
-    """Create a JavaType.Class for a module from its fully qualified name."""
+    """Create a JavaType.Class for a module from its fully qualified name.
+
+    JavaType.Class is not a dataclass, so fields are set directly after
+    construction.  This matches the pattern used elsewhere in the codebase.
+    """
     class_type = JavaType.Class()
     class_type._flags_bit_map = 0
     class_type._fully_qualified_name = fqn
@@ -131,12 +136,12 @@ class ChangeImport(Recipe):
         new_alias = self.new_alias
 
         class ChangeImportVisitor(PythonVisitor[ExecutionContext]):
-            has_old_import: bool
-            old_alias: Optional[str]
-            has_direct_module_import: bool
-            module_alias: Optional[str]
-            rewrote_qualified_refs: bool
-            new_module_type: Optional[JavaType.Class]
+            has_old_import: bool = False
+            old_alias: Optional[str] = None
+            has_direct_module_import: bool = False
+            module_alias: Optional[str] = None
+            rewrote_qualified_refs: bool = False
+            new_module_type: Optional[JavaType.Class] = None
 
             def visit_compilation_unit(self, cu: CompilationUnit, p: ExecutionContext) -> J:
                 self.has_old_import = False
@@ -155,10 +160,10 @@ class ChangeImport(Recipe):
                                 self.has_old_import = True
                                 self.old_alias = alias if alias != "" else None
                         if old_name and not self.has_direct_module_import:
-                            name = self._get_qualid_name(stmt.qualid)
+                            name = get_qualid_name(stmt.qualid)
                             if name == old_module:
                                 self.has_direct_module_import = True
-                                self.module_alias = self._get_alias_name(stmt)
+                                self.module_alias = get_alias_name(stmt)
                     elif isinstance(stmt, MultiImport):
                         if not self.has_old_import:
                             alias = self._check_for_old_import(stmt)
@@ -167,10 +172,10 @@ class ChangeImport(Recipe):
                                 self.old_alias = alias if alias != "" else None
                         if old_name and not self.has_direct_module_import and stmt.from_ is None:
                             for imp in stmt.names:
-                                name = self._get_qualid_name(imp.qualid)
+                                name = get_qualid_name(imp.qualid)
                                 if name == old_module:
                                     self.has_direct_module_import = True
-                                    self.module_alias = self._get_alias_name(imp)
+                                    self.module_alias = get_alias_name(imp)
                                     break
 
                 if not self.has_old_import and not self.has_direct_module_import:
@@ -237,18 +242,51 @@ class ChangeImport(Recipe):
                     # import X - remove entire import
                     return self._remove_module_from_import(multi, old_module)
 
+            def visit_identifier(self, ident: Identifier, p: ExecutionContext) -> J:
+                ident = super().visit_identifier(ident, p)  # ty: ignore[invalid-assignment]  # visitor covariance
+                if not isinstance(ident, Identifier):
+                    return ident
+                if not old_name or not new_name or not self.has_old_import:
+                    return ident
+                old_ref_name = self.old_alias or old_name
+                new_ref_name = new_alias or self.old_alias or new_name
+                if old_ref_name == new_ref_name:
+                    return ident
+                if ident.simple_name != old_ref_name:
+                    return ident
+                # Skip identifiers inside import statements
+                if self.cursor.first_enclosing(Import):
+                    return ident
+                # Skip local variables that shadow the imported name.
+                # Only check field_type inside function scopes — at module level,
+                # bare references to the imported name always need renaming.
+                # When ty is unavailable, field_type is None for all identifiers
+                # and shadowed locals may be incorrectly renamed.
+                if self.cursor.first_enclosing(MethodDeclaration) is not None:
+                    if ident.field_type is not None:
+                        return ident
+                return ident.replace(_simple_name=new_ref_name)
+
             def visit_method_invocation(self, method: MethodInvocation, p: ExecutionContext) -> J:
-                method = super().visit_method_invocation(method, p)
-                if not old_name or not self.has_direct_module_import:
-                    return method
+                method = super().visit_method_invocation(method, p)  # ty: ignore[invalid-assignment]  # visitor covariance
                 if not isinstance(method, MethodInvocation):
                     return method
+                if not old_name or not self.has_direct_module_import:
+                    return method
+                # Only matches simple module.func() calls where the select is an
+                # Identifier. Nested attribute chains like pkg.module.func()
+                # (where select is a FieldAccess) are not currently handled.
                 if not isinstance(method.select, Identifier):
                     return method
                 if not isinstance(method.name, Identifier):
                     return method
 
                 select_name = method.select.simple_name
+                # For dotted modules without aliases (e.g. `import os.path`),
+                # `old_module` is a dotted string like "os.path" which will
+                # never match a simple Identifier name — but those cases are
+                # already excluded by the `isinstance(method.select, Identifier)`
+                # guard above (the select would be a FieldAccess instead).
                 expected_name = self.module_alias or old_module
                 if select_name != expected_name:
                     return method
@@ -278,7 +316,7 @@ class ChangeImport(Recipe):
                 return result
 
             def visit_field_access(self, field_access: FieldAccess, p: ExecutionContext) -> J:
-                field_access = super().visit_field_access(field_access, p)
+                field_access = super().visit_field_access(field_access, p)  # ty: ignore[invalid-assignment]  # visitor covariance
                 if not old_name or not self.has_direct_module_import:
                     return field_access
                 if not isinstance(field_access, FieldAccess):
@@ -314,9 +352,9 @@ class ChangeImport(Recipe):
                 """Check if a standalone J.Import matches the old import."""
                 if old_name:
                     return None
-                name = self._get_qualid_name(imp.qualid)
+                name = get_qualid_name(imp.qualid)
                 if name == old_module:
-                    return self._get_alias_name(imp) or ""
+                    return get_alias_name(imp) or ""
                 return None
 
             def _check_for_old_import(self, multi: MultiImport) -> Optional[str]:
@@ -331,21 +369,21 @@ class ChangeImport(Recipe):
                     # Looking for: from old_module import old_name [as alias]
                     if multi.from_ is None:
                         return None
-                    from_name = self._get_name_string(multi.from_)
+                    from_name = get_name_string(multi.from_)
                     if from_name != old_module:
                         return None
                     for imp in multi.names:
-                        name = self._get_qualid_name(imp.qualid)
+                        name = get_qualid_name(imp.qualid)
                         if name == old_name:
-                            return self._get_alias_name(imp) or ""
+                            return get_alias_name(imp) or ""
                 else:
                     # Looking for: import old_module [as alias]
                     if multi.from_ is not None:
                         return None
                     for imp in multi.names:
-                        name = self._get_qualid_name(imp.qualid)
+                        name = get_qualid_name(imp.qualid)
                         if name == old_module:
-                            return self._get_alias_name(imp) or ""
+                            return get_alias_name(imp) or ""
                 return None
 
             def _remove_name_from_import(self, multi: MultiImport, name_to_remove: str) -> Optional[J]:
@@ -356,7 +394,7 @@ class ChangeImport(Recipe):
                 existing_padded = multi.padding.names.padding.elements
                 new_padded = [
                     p for p in existing_padded
-                    if self._get_qualid_name(p.element.qualid) != name_to_remove
+                    if get_qualid_name(p.element.qualid) != name_to_remove
                 ]
 
                 if len(new_padded) == 0:
@@ -383,7 +421,7 @@ class ChangeImport(Recipe):
                 existing_padded = multi.padding.names.padding.elements
                 new_padded = [
                     p for p in existing_padded
-                    if self._get_qualid_name(p.element.qualid) != module_to_remove
+                    if get_qualid_name(p.element.qualid) != module_to_remove
                 ]
 
                 if len(new_padded) == 0:
@@ -400,39 +438,5 @@ class ChangeImport(Recipe):
                         )
                     )
                 return multi
-
-            def _get_qualid_name(self, qualid) -> str:
-                """Get the string representation of a qualified name."""
-                if isinstance(qualid, Identifier):
-                    return qualid.simple_name
-                elif isinstance(qualid, FieldAccess):
-                    target = self._get_name_string(qualid.target)
-                    name = qualid.name.simple_name
-                    if target:
-                        return f"{target}.{name}"
-                    return name
-                return ""
-
-            def _get_name_string(self, name) -> str:
-                """Get string from a NameTree."""
-                if isinstance(name, Identifier):
-                    return name.simple_name
-                elif isinstance(name, FieldAccess):
-                    target = self._get_name_string(name.target)
-                    if target:
-                        return f"{target}.{name.name.simple_name}"
-                    return name.name.simple_name
-                elif isinstance(name, Empty):
-                    return ""
-                return str(name) if name else ""
-
-            def _get_alias_name(self, imp: Import) -> Optional[str]:
-                """Get the alias name from an Import, or None if no alias."""
-                if imp.alias is None:
-                    return None
-                alias = imp.alias
-                if isinstance(alias, Identifier):
-                    return alias.simple_name
-                return None
 
         return ChangeImportVisitor()

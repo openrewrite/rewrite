@@ -21,9 +21,12 @@ from dataclasses import field
 from typing import Any, Optional
 
 from rewrite import ExecutionContext, Recipe, TreeVisitor, option
+from rewrite.decorators import categorize
+from rewrite.marketplace import Python
 from rewrite.rpc.java_recipe import prepare_java_recipe, JavaRecipeVisitor, PreparedJavaRecipe
 
 
+@categorize(Python)
 class ChangePackage(Recipe):
     """
     Change package/module references from one name to another.
@@ -58,8 +61,8 @@ class ChangePackage(Recipe):
 
     def __init__(
         self,
-        old_package_name: str,
-        new_package_name: str,
+        old_package_name: str = "",
+        new_package_name: str = "",
         recursive: bool = True
     ):
         self.old_package_name = old_package_name

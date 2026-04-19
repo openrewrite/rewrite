@@ -544,4 +544,126 @@ class DeletePropertyKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotDeletePreExistingEmptyMappings() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("spring.some.property", null, null, null)),
+          yaml(
+            """
+              name: CI workflow
+              on:
+                push:
+                  branches:
+                    - main
+                workflow_dispatch: {}
+
+              jobs:
+                build:
+                  runs-on: ubuntu-latest
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteSiblingOfEmptyMappingPreservesEmptyMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("on.push", null, null, null)),
+          yaml(
+            """
+              name: CI workflow
+              on:
+                push:
+                  branches:
+                    - main
+                  paths:
+                    - 'src/**'
+                workflow_dispatch: {}
+              """,
+            """
+              name: CI workflow
+              on:
+                workflow_dispatch: {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void deletesEmptyMappingThatBecameEmptyFromDeletion() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("parent.child", null, null, null)),
+          yaml(
+            """
+              parent:
+                child: value
+              other: keep
+              """,
+            """
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
+    void cascadingDeleteOfDeeplyNestedProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.b.c.d", null, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: value
+              other: keep
+              """,
+            """
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
+    void cascadingDeletePreservesEmptyMappingSiblingDeeplyNested() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("a.b.c.d", null, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: value
+                  empty: {}
+              other: keep
+              """,
+            """
+              a:
+                b:
+                  empty: {}
+              other: keep
+              """
+          )
+        );
+    }
+
+    @Test
+    void deleteLastEntryPreservesInlineCommentOnPreviousEntry() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("root.delete-me", null, null, null)),
+          yaml(
+            """
+              root:
+                keep: yes # inline comment
+                delete-me: val
+              """,
+            """
+              root:
+                keep: yes # inline comment
+              """
+          )
+        );
+    }
 }

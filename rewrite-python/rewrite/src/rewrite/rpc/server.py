@@ -27,15 +27,22 @@ import logging
 import os
 import select
 import sys
+import tempfile
+import time
 import traceback
 import threading
+
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from uuid import uuid4
 
+# Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
+# overflow the default recursion limit (1000) during RPC serialization.
+sys.setrecursionlimit(sys.getrecursionlimit() * 2)
+
 # Configure logging - log to file by default to avoid filling stderr buffer
 # (which can cause deadlock if parent process doesn't read stderr)
-_default_log_file = '/tmp/python-rpc.log'
+_default_log_file = os.path.join(tempfile.gettempdir(), 'python-rpc.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -75,7 +82,7 @@ def _next_request_id() -> int:
         return _request_id_counter
 
 
-def send_request(method: str, params: dict, timeout_seconds: float = 10.0) -> Any:
+def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
     """Send a JSON-RPC request to Java and wait for the response.
 
     This enables bidirectional communication - Python can request
@@ -84,7 +91,7 @@ def send_request(method: str, params: dict, timeout_seconds: float = 10.0) -> An
     Args:
         method: The RPC method name
         params: The request parameters
-        timeout_seconds: Maximum time to wait for response (default 10s)
+        timeout_seconds: Maximum time to wait for response (default 30s)
 
     Returns:
         The result from the RPC response
@@ -188,18 +195,28 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
     before = remote_objects.get(obj_id)
 
     # Receive and deserialize the object (applies diffs to before state)
-    obj = receiver.receive(before, q)
+    try:
+        obj = receiver.receive(before, q)
 
-    # Verify we received the complete object (END_OF_OBJECT was in the final batch)
-    # This matches Java's RewriteRpc.java line 474-475 which explicitly checks for END_OF_OBJECT
-    if not received_end:
-        raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
+        # After receive() completes, END_OF_OBJECT may still be pending in a
+        # separate batch (happens when data items are an exact multiple of the
+        # handler's batchSize). Drain it — analogous to Java's explicit
+        # q.take() after receive().
+        if not received_end:
+            pull_batch()
+        if not received_end:
+            raise RuntimeError(f"Did not receive END_OF_OBJECT marker for object {obj_id}")
+    except Exception:
+        # Reset our tracking of the remote state so the next interaction
+        # forces a full object sync (ADD) instead of a delta (CHANGE).
+        remote_objects.pop(obj_id, None)
+        raise
 
     if obj is not None:
         # Update our understanding of what Java has
         remote_objects[obj_id] = obj
         # Also update local_objects for consistency
-        local_objects[str(obj.id)] = obj
+        local_objects[obj_id] = obj
 
     return obj
 
@@ -209,14 +226,14 @@ def generate_id() -> str:
     return str(uuid4())
 
 
-def parse_python_file(path: str, relative_to: Optional[str] = None) -> dict:
+def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse a Python file and return its LST."""
     with open(path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return parse_python_source(source, path, relative_to)
+    return parse_python_source(source, path, relative_to, ty_client)
 
 
-def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None) -> dict:
+def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the REWRITE_PYTHON_VERSION environment variable:
@@ -241,7 +258,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             try:
                 source_for_ast = source[1:] if source.startswith('\ufeff') else source
                 tree = ast.parse(source_for_ast, path)
-                cu = ParserVisitor(source, path).visit(tree)
+                cu = ParserVisitor(source, path, ty_client).visit(tree)
             except SyntaxError:
                 from rewrite.python._py2_parser_visitor import Py2ParserVisitor
                 cu = Py2ParserVisitor(source, path, _python_version).parse()
@@ -256,28 +273,26 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             tree = ast.parse(source_for_ast, path)
 
             # Convert to OpenRewrite LST
-            cu = ParserVisitor(source, path).visit(tree)
+            cu = ParserVisitor(source, path, ty_client).visit(tree)
 
-        cu = cu.replace(source_path=source_path)
-        cu = cu.replace(markers=Markers.EMPTY)
+        cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
 
         # Store and return
         obj_id = str(cu.id)
         local_objects[obj_id] = cu
         return {
             'id': obj_id,
-            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit'
+            'sourceFileType': 'org.openrewrite.python.tree.Py$CompilationUnit',
+            'sourcePath': str(source_path)
         }
     except ImportError as e:
-        logger.error(f"Failed to import parser: {e}")
-        traceback.print_exc()
+        logger.exception(f"Failed to import parser: {e}")
         return _create_parse_error(str(source_path), str(e), source)
     except SyntaxError as e:
         logger.error(f"Syntax error parsing {path}: {e}")
         return _create_parse_error(str(source_path), str(e), source)
     except Exception as e:
-        logger.error(f"Error parsing {path}: {e}")
-        traceback.print_exc()
+        logger.exception(f"Error parsing {path}: {e}")
         return _create_parse_error(str(source_path), str(e), source)
 
 
@@ -315,31 +330,95 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
 
     obj_id = str(parse_error.id)
     local_objects[obj_id] = parse_error
-    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError'}
+    return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
+
+
+def _infer_project_root(inputs: list) -> Optional[str]:
+    """Infer the project root from input paths.
+
+    When relativeTo is not provided, look at the input paths to find a
+    directory that contains a .venv or pyproject.toml — this is likely
+    the project root that ty-types should use.
+    """
+    for item in inputs:
+        path = None
+        if isinstance(item, str):
+            path = item
+        elif isinstance(item, dict):
+            path = item.get('sourcePath') or item.get('path')
+        if path and os.path.isabs(path):
+            parent = os.path.dirname(path)
+            # Walk up looking for a project root marker
+            for _ in range(10):
+                if os.path.isdir(os.path.join(parent, '.venv')) or \
+                   os.path.isfile(os.path.join(parent, 'pyproject.toml')):
+                    return parent
+                up = os.path.dirname(parent)
+                if up == parent:
+                    break
+                parent = up
+    return None
 
 
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
+    import tempfile
+    import shutil
+
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
     results = []
 
-    for i, input_item in enumerate(inputs):
-        if isinstance(input_item, str):
-            # PathInput serialized via @JsonValue as a bare path string
-            result = parse_python_file(input_item, relative_to)
-        elif 'path' in input_item:
-            # File input as dict
-            result = parse_python_file(input_item['path'], relative_to)
-        elif 'text' in input_item or 'source' in input_item:
-            # String input - Java sends 'text' and 'sourcePath'
-            source = input_item.get('text') or input_item.get('source')
-            path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-            result = parse_python_source(source, path, relative_to)
+    # If no relativeTo provided, try to infer from absolute input paths
+    if not relative_to:
+        relative_to = _infer_project_root(inputs)
+
+    # Create a ty-types client for this parse batch
+    ty_client = None
+    tmpdir = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        if relative_to:
+            ty_client.initialize(relative_to)
         else:
-            logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-            continue
-        results.append(result['id'])
+            # For inline text inputs without a project root, create a temp directory
+            # so ty-types can still provide type attribution
+            tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
+            ty_client.initialize(tmpdir)
+    except (ImportError, RuntimeError):
+        ty_client = None  # ty-types not available
+
+    try:
+        for i, input_item in enumerate(inputs):
+            if isinstance(input_item, str):
+                result = parse_python_file(input_item, relative_to, ty_client)
+            elif 'path' in input_item:
+                result = parse_python_file(input_item['path'], relative_to, ty_client)
+            elif 'text' in input_item or 'source' in input_item:
+                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
+                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
+                # For relative paths, write the source under the project root
+                # (tmpdir or relative_to) so ty-types can resolve imports from
+                # the project's .venv and dependencies.
+                base_dir = tmpdir or relative_to
+                if base_dir and not os.path.isabs(path):
+                    disk_path = os.path.join(base_dir, path)
+                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                    with open(disk_path, 'w', encoding='utf-8') as f:
+                        f.write(source)
+                    result = parse_python_source(source, disk_path, base_dir, ty_client)
+                else:
+                    result = parse_python_source(source, path, relative_to, ty_client)
+            else:
+                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
+                continue
+            results.append(result['id'])
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
+        if tmpdir is not None:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
     return results
 
@@ -349,23 +428,34 @@ def handle_parse_project(params: dict) -> List[dict]:
     import fnmatch
 
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info'])
+    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
     relative_to = params.get('relativeTo') or project_path
 
     results = []
 
-    for root, dirs, files in os.walk(project_path):
-        # Filter out excluded directories
-        dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+    ty_client = None
+    try:
+        from rewrite.python.ty_client import TyTypesClient
+        ty_client = TyTypesClient()
+        ty_client.initialize(project_path)
+    except (ImportError, RuntimeError):
+        pass
 
-        for file in files:
-            if file.endswith('.py'):
-                path = os.path.join(root, file)
-                try:
-                    result = parse_python_file(path, relative_to)
-                    results.append(result)
-                except Exception as e:
-                    logger.error(f"Error parsing {path}: {e}")
+    try:
+        for root, dirs, files in os.walk(project_path):
+            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
+
+            for file in files:
+                if file.endswith('.py'):
+                    path = os.path.join(root, file)
+                    try:
+                        result = parse_python_file(path, relative_to, ty_client)
+                        results.append(result)
+                    except Exception as e:
+                        logger.error(f"Error parsing {path}: {e}")
+    finally:
+        if ty_client is not None:
+            ty_client.shutdown()
 
     return results
 
@@ -409,9 +499,7 @@ def handle_get_object(params: dict) -> List[dict]:
 
     except BaseException as e:
         source_path = getattr(obj, 'source_path', None)
-        logger.error(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
-        import traceback as tb
-        tb.print_exc()
+        logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
 
 
@@ -488,13 +576,6 @@ def handle_reset(params: dict) -> bool:
     _execution_contexts.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
-
-    # Reset TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
 
     logger.info("Reset: cleared all cached state")
     return True
@@ -843,6 +924,29 @@ _recipe_phases: Dict[str, str] = {}
 # Data table output directory - if set, data tables will be written to CSV files
 _data_table_output_dir: Optional[str] = None
 
+# Registry mapping fully-qualified visitor names to visitor classes.
+# Used to instantiate visitors by name when dispatched via RPC (e.g., auto-format).
+# Lazily initialized to avoid circular imports.
+_VISITOR_REGISTRY: Optional[Dict[str, type]] = None
+
+
+def _get_visitor_registry() -> Dict[str, type]:
+    global _VISITOR_REGISTRY
+    if _VISITOR_REGISTRY is None:
+        from rewrite.python.format.auto_format import AutoFormatVisitor
+        _VISITOR_REGISTRY = {
+            'org.openrewrite.python.format.AutoFormatVisitor': AutoFormatVisitor,
+        }
+    return _VISITOR_REGISTRY
+
+
+def _install_sub_recipes(recipe, marketplace) -> None:
+    """Ensure sub-recipes from recipe_list() are registered in the marketplace."""
+    for sub_recipe in recipe.recipe_list():
+        if not marketplace.find_recipe(sub_recipe.name):
+            marketplace.install(type(sub_recipe), [])
+            _install_sub_recipes(sub_recipe, marketplace)
+
 
 def handle_prepare_recipe(params: dict) -> dict:
     """Handle a PrepareRecipe RPC request.
@@ -894,6 +998,8 @@ def handle_prepare_recipe(params: dict) -> dict:
     prepared_id = generate_id()
     _prepared_recipes[prepared_id] = recipe
 
+    _install_sub_recipes(recipe, marketplace)
+
     # Build the response
     descriptor = recipe.descriptor()
 
@@ -909,6 +1015,13 @@ def handle_prepare_recipe(params: dict) -> dict:
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
+
+    # If the recipe declares delegation to a Java recipe, include it in the response
+    if hasattr(recipe, 'java_recipe_name'):
+        response['delegatesTo'] = {
+            'recipeName': recipe.java_recipe_name,
+            'options': getattr(recipe, 'delegates_to_options', {}),
+        }
 
     logger.debug(f"PrepareRecipe response: {response}")
     return response
@@ -964,11 +1077,11 @@ def handle_visit(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
-    # Get the tree - fetch from Java if we don't have it locally
-    tree = local_objects.get(tree_id)
-    if tree is None:
-        tree = get_object_from_java(tree_id, source_file_type)
+    # Always fetch the tree from Java to ensure we have the latest version.
+    # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
+    tree = get_object_from_java(tree_id, source_file_type)
 
     if tree is None:
         raise ValueError(f"Tree not found: {tree_id}")
@@ -976,9 +1089,16 @@ def handle_visit(params: dict) -> dict:
     # Instantiate the visitor
     visitor = _instantiate_visitor(visitor_name, ctx)
 
-    # Apply the visitor
+    # Reconstruct cursor from cursor IDs (if provided).
+    # Cursor IDs are ordered innermost-to-outermost, so we iterate in reverse
+    # to build the cursor chain from root inward (matching JS implementation).
     from rewrite.visitor import Cursor
     cursor = Cursor(None, Cursor.ROOT_VALUE)
+    if cursor_ids:
+        for cursor_id in reversed(cursor_ids):
+            cursor_obj = get_object_from_java(cursor_id, source_file_type)
+            if cursor_obj is not None:
+                cursor = Cursor(cursor, cursor_obj)
 
     before = tree
     after = visitor.visit(tree, ctx, cursor)
@@ -1001,6 +1121,115 @@ def handle_visit(params: dict) -> dict:
 
     logger.debug(f"Visit result: modified={modified}, tree_id={tree_id}, before.id={before.id}, after.id={after.id if after else None}")
     return {'modified': modified}
+
+
+def handle_batch_visit(params: dict) -> dict:
+    """Handle a BatchVisit RPC request.
+
+    Runs multiple visitors in sequence on the same tree, collecting
+    per-visitor metadata (modified, deleted, new search result IDs).
+    """
+    tree_id = params.get('treeId')
+    source_file_type = params.get('sourceFileType')
+    p_id = params.get('p')
+    visitors = params.get('visitors', [])
+
+    if not tree_id:
+        raise ValueError("'treeId' is required")
+
+    logger.debug(f"BatchVisit: treeId={tree_id}, visitors={len(visitors)}")
+
+    # Get or create execution context
+    if p_id and p_id in _execution_contexts:
+        ctx = _execution_contexts[p_id]
+    else:
+        from rewrite import InMemoryExecutionContext
+        ctx = InMemoryExecutionContext()
+        if _data_table_output_dir:
+            from rewrite.data_table import CsvDataTableStore, DATA_TABLE_STORE
+            store = CsvDataTableStore(_data_table_output_dir)
+            store.accept_rows(True)
+            ctx.put_message(DATA_TABLE_STORE, store)
+        if p_id:
+            _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
+
+    # Fetch tree once from Java
+    tree = get_object_from_java(tree_id, source_file_type)
+    if tree is None:
+        raise ValueError(f"Tree not found: {tree_id}")
+
+    from rewrite.visitor import Cursor
+    from rewrite.markers import SearchResult
+    cursor = Cursor(None, Cursor.ROOT_VALUE)
+
+    results = []
+    known_ids = _collect_search_result_ids(tree)
+
+    for item in visitors:
+        visitor_name = item.get('visitor', '')
+
+        # Instantiate and run visitor
+        visitor = _instantiate_visitor(visitor_name, ctx)
+        before = tree
+        after = visitor.visit(tree, ctx, cursor)
+
+        modified = after is not before
+        deleted = after is None
+
+        # Diff SearchResult IDs against the running set
+        if deleted:
+            search_result_ids = []
+        else:
+            after_ids = _collect_search_result_ids(after)
+            search_result_ids = list(after_ids - known_ids)
+            known_ids.update(search_result_ids)
+
+        results.append({
+            'modified': modified,
+            'deleted': deleted,
+            'hasNewMessages': False,
+            'searchResultIds': search_result_ids,
+        })
+
+        if deleted:
+            if tree_id in local_objects:
+                del local_objects[tree_id]
+            break
+
+        if modified:
+            tree = after
+
+    # Store final tree in localObjects for subsequent GetObject
+    if tree is not None:
+        local_objects[str(tree.id)] = tree
+        if str(tree.id) != tree_id:
+            local_objects[tree_id] = tree
+
+    return {'results': results}
+
+
+def _collect_search_result_ids(tree) -> set:
+    """Collect all SearchResult marker UUIDs from a tree."""
+    from rewrite.markers import SearchResult
+    ids = set()
+    if tree is None:
+        return ids
+
+    def _walk(node):
+        if hasattr(node, 'markers') and node.markers is not None:
+            for m in node.markers.markers:
+                if isinstance(m, SearchResult):
+                    ids.add(str(m.id))
+
+    # Use the visitor framework to walk all nodes
+    from rewrite.visitor import TreeVisitor
+    class _Collector(TreeVisitor):
+        def pre_visit(self, tree, p):
+            _walk(tree)
+            return tree
+    _Collector().visit(tree, None)
+    return ids
 
 
 def _instantiate_visitor(visitor_name: str, ctx):
@@ -1057,7 +1286,11 @@ def _instantiate_visitor(visitor_name: str, ctx):
         return recipe.scanner(acc)
 
     else:
-        raise ValueError(f"Unknown visitor name format: {visitor_name}")
+        # Look up visitor by fully-qualified name from registry
+        visitor_cls = _get_visitor_registry().get(visitor_name)
+        if visitor_cls is None:
+            raise ValueError(f"Unknown visitor name format: {visitor_name}")
+        return visitor_cls()
 
 
 def handle_generate(params: dict) -> dict:
@@ -1101,6 +1334,7 @@ def handle_generate(params: dict) -> dict:
             ctx.put_message(DATA_TABLE_STORE, store)
         if p_id:
             _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
 
     # Only scanning recipes can generate files
     from rewrite.recipe import ScanningRecipe
@@ -1141,6 +1375,7 @@ def handle_request(method: str, params: dict) -> Any:
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
         'Visit': handle_visit,
+        'BatchVisit': handle_batch_visit,
         'Generate': handle_generate,
     }
 
@@ -1151,11 +1386,93 @@ def handle_request(method: str, params: dict) -> Any:
         raise ValueError(f"Unknown method: {method}")
 
 
+class _StdinBuffer:
+    """Buffered reader for raw stdin file descriptor.
+
+    Reads in chunks to reduce syscall overhead.  A single module-level
+    instance is shared by read_message() and read_message_with_timeout().
+    """
+
+    _CHUNK_SIZE = 8192
+
+    def __init__(self):
+        self._fd: Optional[int] = None
+        self._buf = bytearray()
+
+    def _get_fd(self) -> int:
+        fd = self._fd
+        if fd is None:
+            fd = sys.stdin.fileno()
+            self._fd = fd
+        return fd
+
+    def read_line(self, deadline: Optional[float] = None) -> Optional[bytes]:
+        """Read until ``\\n``.  Returns the line including the newline,
+        or ``None`` on EOF/timeout."""
+        while True:
+            idx = self._buf.find(b'\n')
+            if idx >= 0:
+                line = bytes(self._buf[:idx + 1])
+                del self._buf[:idx + 1]
+                return line
+            if not self._fill(deadline):
+                return None
+
+    def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
+        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout."""
+        while len(self._buf) < n:
+            if not self._fill(deadline):
+                return None
+        result = bytes(self._buf[:n])
+        del self._buf[:n]
+        return result
+
+    def _fill(self, deadline: Optional[float] = None) -> bool:
+        """Read more data into the internal buffer.
+
+        When *deadline* is set, uses ``select()`` to respect the timeout
+        on Unix, or a background-thread read on Windows (where ``select()``
+        does not work on pipes).  Returns ``False`` on EOF or timeout.
+        """
+        if deadline is not None:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return False
+            if os.name == 'nt':
+                # Windows: select() doesn't support pipes, use a thread
+                result: list = []
+
+                def _read():
+                    try:
+                        data = os.read(self._get_fd(), self._CHUNK_SIZE)
+                        result.append(data)
+                    except OSError:
+                        result.append(b'')
+
+                t = threading.Thread(target=_read, daemon=True)
+                t.start()
+                t.join(timeout=remaining)
+                if not result:
+                    return False
+                chunk = result[0]
+            else:
+                readable, _, _ = select.select([self._get_fd()], [], [], remaining)
+                if not readable:
+                    return False
+                chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
+        else:
+            chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
+        if not chunk:
+            return False
+        self._buf += chunk
+        return True
+
+
+_stdin_buffer = _StdinBuffer()
+
+
 def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
     """Read a JSON-RPC message from stdin with timeout.
-
-    Uses select() on the raw file descriptor and unbuffered binary I/O
-    to avoid issues with Python's buffered TextIOWrapper.
 
     Args:
         timeout_seconds: Maximum time to wait for complete message
@@ -1163,54 +1480,11 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
     Returns:
         Parsed JSON message, or None on timeout/error
     """
-    import time
-    import os
-    start_time = time.time()
-    fd = sys.stdin.fileno()
-
-    def remaining_timeout() -> float:
-        elapsed = time.time() - start_time
-        return max(0, timeout_seconds - elapsed)
-
-    def read_bytes_with_timeout(n: int) -> Optional[bytes]:
-        """Read exactly n bytes from stdin fd with timeout."""
-        result = []
-        remaining = n
-        while remaining > 0:
-            timeout = remaining_timeout()
-            if timeout <= 0:
-                return None
-            readable, _, _ = select.select([fd], [], [], timeout)
-            if not readable:
-                return None
-            chunk = os.read(fd, remaining)
-            if not chunk:
-                return None  # EOF
-            result.append(chunk)
-            remaining -= len(chunk)
-        return b''.join(result)
-
-    def read_line_with_timeout() -> Optional[bytes]:
-        """Read a line (up to \n) from stdin fd with timeout."""
-        result = []
-        while True:
-            timeout = remaining_timeout()
-            if timeout <= 0:
-                return None
-            readable, _, _ = select.select([fd], [], [], timeout)
-            if not readable:
-                return None
-            byte = os.read(fd, 1)
-            if not byte:
-                return None  # EOF
-            result.append(byte)
-            if byte == b'\n':
-                break
-        return b''.join(result)
+    deadline = time.time() + timeout_seconds
 
     try:
         # Read Content-Length header
-        header_line = read_line_with_timeout()
+        header_line = _stdin_buffer.read_line(deadline)
         if not header_line:
             logger.warning(f"Timeout waiting for RPC response header after {timeout_seconds}s")
             return None
@@ -1223,13 +1497,13 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
         content_length = int(header_str.split(':')[1].strip())
 
         # Read empty line (separator)
-        separator = read_line_with_timeout()
+        separator = _stdin_buffer.read_line(deadline)
         if separator is None:
             logger.warning(f"Timeout waiting for header separator")
             return None
 
         # Read content
-        content_bytes = read_bytes_with_timeout(content_length)
+        content_bytes = _stdin_buffer.read_bytes(content_length, deadline)
         if content_bytes is None:
             logger.warning(f"Timeout waiting for message content")
             return None
@@ -1241,41 +1515,10 @@ def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
 
 
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin (blocking, no timeout).
-
-    Uses unbuffered binary I/O (os.read) to be consistent with
-    read_message_with_timeout() and avoid buffering conflicts.
-    """
-    import os
-    fd = sys.stdin.fileno()
-
-    def read_line() -> Optional[bytes]:
-        """Read a line (up to \n) from stdin fd."""
-        result = []
-        while True:
-            byte = os.read(fd, 1)
-            if not byte:
-                return None  # EOF
-            result.append(byte)
-            if byte == b'\n':
-                break
-        return b''.join(result)
-
-    def read_bytes(n: int) -> Optional[bytes]:
-        """Read exactly n bytes from stdin fd."""
-        result = []
-        remaining = n
-        while remaining > 0:
-            chunk = os.read(fd, remaining)
-            if not chunk:
-                return None  # EOF
-            result.append(chunk)
-            remaining -= len(chunk)
-        return b''.join(result)
-
+    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
     try:
         # Read Content-Length header
-        header_line = read_line()
+        header_line = _stdin_buffer.read_line()
         if not header_line:
             return None
 
@@ -1287,10 +1530,10 @@ def read_message() -> Optional[dict]:
         content_length = int(header_str.split(':')[1].strip())
 
         # Read empty line (separator)
-        read_line()
+        _stdin_buffer.read_line()
 
         # Read content
-        content_bytes = read_bytes(content_length)
+        content_bytes = _stdin_buffer.read_bytes(content_length)
         if not content_bytes:
             return None
         return json.loads(content_bytes.decode('utf-8'))
@@ -1300,14 +1543,15 @@ def read_message() -> Optional[dict]:
 
 
 def write_message(response: dict):
-    """Write a JSON-RPC message to stdout."""
-    content = json.dumps(response)
-    content_bytes = content.encode('utf-8')
+    """Write a JSON-RPC message to stdout.
 
-    sys.stdout.write(f"Content-Length: {len(content_bytes)}\r\n")
-    sys.stdout.write("\r\n")
-    sys.stdout.write(content)
-    sys.stdout.flush()
+    Uses unbuffered binary I/O to avoid line-ending translation on Windows
+    that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
+    used by read_message() which uses os.read() on the read side.
+    """
+    content_bytes = json.dumps(response).encode('utf-8')
+    header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
+    os.write(sys.stdout.fileno(), header + content_bytes)
 
 
 def main():
@@ -1356,8 +1600,7 @@ def main():
                     'result': result
                 }
             except Exception as e:
-                logger.error(f"Error handling request: {e}")
-                traceback.print_exc()
+                logger.exception(f"Error handling request: {e}")
                 # Include full stack trace in error response for debugging
                 tb_str = traceback.format_exc()
                 response = {
@@ -1376,16 +1619,10 @@ def main():
             write_message(response)
 
         except Exception as e:
-            logger.error(f"Fatal error: {e}")
-            traceback.print_exc()
+            logger.exception(f"Fatal error: {e}")
             break
 
-    # Shutdown TyLspClient if it was initialized
-    try:
-        from rewrite.python.ty_client import TyLspClient
-        TyLspClient.reset()
-    except ImportError:
-        pass  # ty not available
+    # No ty-types cleanup needed here — clients are scoped per parse batch
 
     logger.info("Python RPC server shutting down...")
 

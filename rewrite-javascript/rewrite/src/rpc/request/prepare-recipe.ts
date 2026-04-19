@@ -58,7 +58,9 @@ export class PrepareRecipe {
 
                     preparedRecipes.set(id, recipe);
 
-                    const result = {
+                    await this.installSubRecipes(recipe, marketplace);
+
+                    const result: PrepareRecipeResponse = {
                         id: id,
                         descriptor: await recipe.descriptor(),
                         editVisitor: `edit:${id}`,
@@ -67,10 +69,26 @@ export class PrepareRecipe {
                         scanPreconditions: scanPreconditions
                     };
 
+                    if ('javaRecipeName' in recipe) {
+                        result.delegatesTo = {
+                            recipeName: (recipe as any).javaRecipeName,
+                            options: (recipe as any).delegatesToOptions ?? {}
+                        };
+                    }
+
                     return result;
                 }
             )
         );
+    }
+
+    private static async installSubRecipes(recipe: Recipe, marketplace: RecipeMarketplace) {
+        for (const subRecipe of await recipe.recipeList()) {
+            if (!marketplace.findRecipe(subRecipe.name)) {
+                await marketplace.install(subRecipe.constructor as any, []);
+                await this.installSubRecipes(subRecipe, marketplace);
+            }
+        }
     }
 
     /**
@@ -110,22 +128,22 @@ export class PrepareRecipe {
                         }
                 )
             }
-            this.visitorTypePrecondition(preconditions, visitor.v);
+            await this.visitorTypePrecondition(preconditions, visitor.v);
         } else {
-            this.visitorTypePrecondition(preconditions, visitor!);
+            await this.visitorTypePrecondition(preconditions, visitor!);
         }
         return recipe;
     }
 
-    private static visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Precondition[] {
+    private static async visitorTypePrecondition(preconditions: Precondition[], v: TreeVisitor<any, ExecutionContext>): Promise<Precondition[]> {
         let treeType: string | undefined;
 
-        // Use CommonJS require to defer loading and avoid circular dependencies
-        const {JsonVisitor} = require("../../json");
-        const {JavaScriptVisitor} = require("../../javascript");
-        const {JavaVisitor} = require("../../java");
-        const {PlainTextVisitor} = require("../../text");
-        const {YamlVisitor} = require("../../yaml");
+        // Use dynamic import to defer loading and avoid circular dependencies
+        const {JsonVisitor} = await import("../../json/index.js");
+        const {JavaScriptVisitor} = await import("../../javascript/index.js");
+        const {JavaVisitor} = await import("../../java/index.js");
+        const {PlainTextVisitor} = await import("../../text/index.js");
+        const {YamlVisitor} = await import("../../yaml/index.js");
 
         if (v instanceof JsonVisitor) {
             treeType = "org.openrewrite.json.tree.Json";
@@ -150,6 +168,11 @@ export class PrepareRecipe {
     }
 }
 
+export interface DelegatesTo {
+    recipeName: string
+    options: Record<string, any>
+}
+
 export interface PrepareRecipeResponse {
     id: string
     descriptor: RecipeDescriptor
@@ -157,6 +180,7 @@ export interface PrepareRecipeResponse {
     editPreconditions: Precondition[]
     scanVisitor?: string
     scanPreconditions: Precondition[]
+    delegatesTo?: DelegatesTo
 }
 
 export interface Precondition {

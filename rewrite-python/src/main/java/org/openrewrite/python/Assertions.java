@@ -47,6 +47,7 @@ public final class Assertions {
      */
     public static SourceSpecs uv(Path relativeTo, SourceSpecs... sources) {
         String pyprojectContent = null;
+        SourceSpec<Toml.Document> pyprojectSpec = null;
 
         // First pass: find pyproject.toml content and write it
         for (SourceSpecs multiSpec : sources) {
@@ -55,6 +56,8 @@ public final class Assertions {
                 Path sourcePath = spec.getSourcePath();
                 if (sourcePath != null && "pyproject.toml".equals(sourcePath.toFile().getName())) {
                     pyprojectContent = spec.getBefore();
+                    //noinspection unchecked
+                    pyprojectSpec = (SourceSpec<Toml.Document>) multiSpec;
                     try {
                         Path pyproject = relativeTo.resolve(sourcePath);
                         Files.write(pyproject, requireNonNull(pyprojectContent).getBytes(StandardCharsets.UTF_8));
@@ -84,6 +87,16 @@ public final class Assertions {
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to create symlink for .venv", e);
             }
+
+            // Delete symlinks after recipe run so JUnit's @TempDir cleanup
+            // doesn't warn about symlinks pointing outside the temp directory
+            pyprojectSpec.afterRecipe(doc -> {
+                try {
+                    Files.deleteIfExists(venvTarget);
+                    Files.deleteIfExists(lockFileTarget);
+                } catch (IOException ignored) {
+                }
+            });
         }
 
         return SourceSpecs.dir(relativeTo.toString(), sources);
@@ -222,6 +235,45 @@ public final class Assertions {
         text.after(s -> after);
         spec.accept(text);
         return text;
+    }
+
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before) {
+        return pipfile(before, s -> {
+        });
+    }
+
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before,
+                                       Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, PipfileParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("Pipfile");
+        spec.accept(toml);
+        return toml;
+    }
+
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before,
+                                       @Language("toml") @Nullable String after) {
+        return pipfile(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs pipfile(@Language("toml") @Nullable String before,
+                                       @Language("toml") @Nullable String after,
+                                       Consumer<SourceSpec<Toml.Document>> spec) {
+        SourceSpec<Toml.Document> toml = new SourceSpec<>(
+                Toml.Document.class, null, PipfileParser.builder(), before,
+                SourceSpec.ValidateSource.noop,
+                ctx -> {
+                }
+        );
+        toml.path("Pipfile");
+        toml.after(s -> after);
+        spec.accept(toml);
+        return toml;
     }
 
     public static SourceSpecs python(@Language("py") @Nullable String before) {

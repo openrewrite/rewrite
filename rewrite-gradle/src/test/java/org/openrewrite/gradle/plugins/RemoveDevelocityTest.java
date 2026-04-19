@@ -30,7 +30,7 @@ class RemoveDevelocityTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec
           .beforeRecipe(withToolingApi())
-          .recipeFromResource("/META-INF/rewrite/gradle.yml", "org.openrewrite.gradle.plugins.RemoveDevelocity");
+          .recipeFromResource("/META-INF/rewrite/develocity.yml", "org.openrewrite.gradle.plugins.RemoveDevelocity");
     }
 
     @DocumentExample

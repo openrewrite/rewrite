@@ -26,12 +26,19 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.utilities.JavaSourceSetUpdater;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 
@@ -137,6 +144,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
+        @Nullable
+        String resolvedVersion;
+        List<MavenRepository> repositories = new ArrayList<>();
+        @Nullable
+        Exception versionResolutionFailure;
     }
 
     @Override
@@ -150,6 +162,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Nullable
             UsesType<ExecutionContext> usesType = null;
+            final TreeVisitor<?, ExecutionContext> hasTestSourceSet = new HasSourceSet("test").getVisitor();
 
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
                 if (onlyIfUsing == null) {
@@ -167,7 +180,16 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
+                if (sourceFile instanceof JavaSourceFile &&
+                        configuration != null && onlyIfUsing != null &&
+                        configuration.startsWith("test") && configuration.length() > 4 &&
+                        Character.isUpperCase(configuration.charAt(4)) &&
+                        sourceFile == hasTestSourceSet.visit(sourceFile, ctx)) {
+                    return tree;
+                }
+                Optional<JavaProject> maybeJavaProject = sourceFile.getMarkers().findFirst(JavaProject.class);
+                if (maybeJavaProject.isPresent()) {
+                    JavaProject javaProject = maybeJavaProject.get();
                     boolean uses = usesType(sourceFile, ctx);
                     acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || uses);
 
@@ -176,7 +198,25 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
                                 configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
                     }
-                });
+
+                    // Resolve version once for JavaSourceSet updates
+                    if (acc.resolvedVersion == null && version != null) {
+                        Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
+                        if (maybeGp.isPresent()) {
+                            try {
+                                DependencyVersionSelector selector = new DependencyVersionSelector(metadataFailures, maybeGp.get(), null);
+                                acc.resolvedVersion = selector.select(
+                                        new GroupArtifact(groupId, artifactId), "implementation",
+                                        version, versionPattern, ctx);
+                                if (acc.resolvedVersion != null) {
+                                    acc.repositories = maybeGp.get().getMavenRepositories();
+                                }
+                            } catch (MavenDownloadingException e) {
+                                acc.versionResolutionFailure = e;
+                            }
+                        }
+                    }
+                }
                 return tree;
             }
         };
@@ -187,7 +227,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         // Allow when configuration is explicitly provided, when onlyIfUsing is not set (default to "implementation"),
         // or when source files were scanned
         boolean hasExplicitConfiguration = !StringUtils.isBlank(configuration);
-        return Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
+        TreeVisitor<?, ExecutionContext> gradleVisitor = Preconditions.check(hasExplicitConfiguration || onlyIfUsing == null || !acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(true), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
@@ -202,11 +242,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (!maybeGp.isPresent()) {
                             return s;
                         }
-                        // When configuration needs to be inferred and onlyIfUsing is set, require JavaProject and source set info
-                        if (!hasExplicitConfiguration && onlyIfUsing != null) {
-                            if (!maybeJp.isPresent() ||
-                                    !acc.usingType.getOrDefault(maybeJp.get(), false) ||
-                                    !acc.configurationsByProject.containsKey(maybeJp.get())) {
+                        if (onlyIfUsing != null) {
+                            // When onlyIfUsing is set, skip projects that don't use the specified type
+                            if (!maybeJp.isPresent() || !acc.usingType.getOrDefault(maybeJp.get(), false)) {
+                                return s;
+                            }
+                            // When configuration needs to be inferred, also require source set info
+                            if (!hasExplicitConfiguration && !acc.configurationsByProject.containsKey(maybeJp.get())) {
                                 return s;
                             }
                         }
@@ -269,5 +311,69 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 })
         );
+
+        if (acc.configurationsByProject.isEmpty() || acc.resolvedVersion == null) {
+            if (acc.versionResolutionFailure != null) {
+                Exception failure = acc.versionResolutionFailure;
+                return new TreeVisitor<Tree, ExecutionContext>() {
+                    @Override
+                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                        return gradleVisitor.isAcceptable(sourceFile, ctx);
+                    }
+
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        Tree result = gradleVisitor.visit(tree, ctx);
+                        if (result != tree) {
+                            result = Markup.warn(result, failure);
+                        }
+                        return result;
+                    }
+                };
+            }
+            return gradleVisitor;
+        }
+
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Nullable
+            private JavaSourceSetUpdater updater;
+            private final Map<String, JavaSourceSet> updatedSourceSets = new HashMap<>();
+
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return gradleVisitor.isAcceptable(sourceFile, ctx) || sourceFile instanceof JavaSourceFile;
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sf = (SourceFile) tree;
+                if (gradleVisitor.isAcceptable(sf, ctx)) {
+                    return gradleVisitor.visit(tree, ctx);
+                }
+                if (sf instanceof JavaSourceFile) {
+                    return updateJavaSourceSet(sf, ctx);
+                }
+                return tree;
+            }
+
+            private SourceFile updateJavaSourceSet(SourceFile sf, ExecutionContext ctx) {
+                Optional<JavaProject> maybeJp = sf.getMarkers().findFirst(JavaProject.class);
+                if (!maybeJp.isPresent() || !acc.configurationsByProject.containsKey(maybeJp.get())) {
+                    return sf;
+                }
+                return JavaSourceSet.updateOnSourceFile(sf, updatedSourceSets, sourceSet -> {
+                    if (sourceSet.getGavToTypes().isEmpty()) {
+                        return sourceSet;
+                    }
+                    if (updater == null) {
+                        updater = new JavaSourceSetUpdater(ctx);
+                    }
+                    return updater.addDependency(sourceSet, groupId, artifactId, acc.resolvedVersion, acc.repositories);
+                });
+            }
+        };
     }
 }

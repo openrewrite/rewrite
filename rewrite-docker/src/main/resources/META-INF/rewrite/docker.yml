@@ -23,8 +23,6 @@ description: >-
   industry best practices.
 tags:
   - docker
-  - security
-  - best-practices
 recipeList:
   - org.openrewrite.docker.DockerSecurityBestPractices
   - org.openrewrite.docker.DockerBuildOptimization

@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class RpcReceiveQueueTest {
 
@@ -104,6 +105,19 @@ public class RpcReceiveQueueTest {
 
         assertThat(received).isInstanceOf(Checksum.class);
         assertThat(((Checksum) received).getAlgorithm()).isEqualTo("SHA-256");
+    }
+
+    @Test
+    void detectsMissingCodecOnReceiverSide() {
+        // given
+        batches.addLast(List.of(
+            new RpcObjectData(RpcObjectData.State.ADD, "java.lang.StringBuilder", null, null, false)
+        ));
+
+        // when / then
+        assertThatThrownBy(() -> rq.receive(null))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("No RPC codec registered on the Java side for 'java.lang.StringBuilder'");
     }
 
     private List<RpcObjectData> encode(List<RpcObjectData> batch) {

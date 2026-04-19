@@ -203,7 +203,7 @@ class JavaType(ABC):
     class Class(FullyQualified):
         _flags_bit_map: int
         _fully_qualified_name: str
-        _kind: FullyQualified.Kind
+        _kind: JavaType.FullyQualified.Kind
         _type_parameters: Optional[List[JavaType]]
         _supertype: Optional[JavaType.FullyQualified]
         _owning_class: Optional[JavaType.FullyQualified]
@@ -212,6 +212,10 @@ class JavaType(ABC):
         _members: Optional[List[JavaType.Variable]]
         _methods: Optional[List[JavaType.Method]]
 
+        @property
+        def fully_qualified_name(self) -> str:
+            return self._fully_qualified_name
+
     class ShallowClass(Class):
         pass
 
@@ -219,11 +223,126 @@ class JavaType(ABC):
         _type: JavaType.FullyQualified
         _type_parameters: Optional[List[JavaType]]
 
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return self._type
+
+        @property
+        def type_parameters(self) -> Optional[List[JavaType]]:
+            return self._type_parameters
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
+    class Annotation(FullyQualified):
+        _type: JavaType.FullyQualified
+        _values: Optional[List[JavaType.Annotation.ElementValue]]
+
+        @property
+        def type(self) -> JavaType.FullyQualified:
+            return self._type
+
+        @property
+        def values(self) -> List[JavaType.Annotation.ElementValue]:
+            return self._values if self._values is not None else []
+
+        @property
+        def fully_qualified_name(self) -> str:
+            t = getattr(self, '_type', None)
+            if t is not None and hasattr(t, 'fully_qualified_name'):
+                return t.fully_qualified_name
+            return ''
+
+        class ElementValue(ABC):
+            """Base class for annotation element values."""
+
+            @property
+            @abstractmethod
+            def element(self) -> Optional[JavaType]:
+                ...
+
+        @dataclass
+        class SingleElementValue(ElementValue):
+            """A single annotation element value (one constant or one reference)."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_value: Optional[Any] = field(default=None)
+            _reference_value: Optional[JavaType] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_value(self) -> Optional[Any]:
+                return self._constant_value
+
+            @property
+            def reference_value(self) -> Optional[JavaType]:
+                return self._reference_value
+
+        @dataclass
+        class ArrayElementValue(ElementValue):
+            """An array of annotation element values."""
+            _element: Optional[JavaType] = field(default=None)
+            _constant_values: Optional[List[Any]] = field(default=None)
+            _reference_values: Optional[List[JavaType]] = field(default=None)
+
+            @property
+            def element(self) -> Optional[JavaType]:
+                return self._element
+
+            @property
+            def constant_values(self) -> Optional[List[Any]]:
+                return self._constant_values
+
+            @property
+            def reference_values(self) -> Optional[List[JavaType]]:
+                return self._reference_values
+
+    @dataclass
     class GenericTypeVariable:
+        _name: str = field(default="")
+        _variance: GenericTypeVariable.Variance = field(default=None)
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
         class Variance(Enum):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        @property
+        def variance(self) -> GenericTypeVariable.Variance:
+            return self._variance
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
+
+    @dataclass
+    class Union:
+        """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
+
+    @dataclass
+    class Intersection:
+        """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
+        _bounds: Optional[List[JavaType]] = field(default=None)
+
+        @property
+        def bounds(self) -> List[JavaType]:
+            return self._bounds if self._bounds is not None else []
 
     class Primitive(Enum):
         Boolean = 0
@@ -298,11 +417,46 @@ class JavaType(ABC):
         def declared_formal_type_names(self) -> Optional[List[str]]:
             return self._declared_formal_type_names
 
+    @dataclass
     class Variable:
-        pass
+        _flags_bit_map: int = field(default=0)
+        _name: str = field(default="")
+        _owner: Optional[JavaType] = field(default=None)
+        _type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
 
+        @property
+        def flags_bit_map(self) -> int:
+            return self._flags_bit_map
+
+        @property
+        def name(self) -> str:
+            return self._name
+
+        @property
+        def owner(self) -> Optional[JavaType]:
+            return self._owner
+
+        @property
+        def type(self) -> Optional[JavaType]:
+            return self._type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
+
+    @dataclass
     class Array:
-        pass
+        _elem_type: Optional[JavaType] = field(default=None)
+        _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
+
+        @property
+        def elem_type(self) -> Optional[JavaType]:
+            return self._elem_type
+
+        @property
+        def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
+            return self._annotations
 
 
 T = TypeVar('T')
@@ -480,7 +634,7 @@ class JContainer(Generic[J2]):
         else:
             p = self._padding()
             # noinspection PyProtectedMember
-            if p is None or p._t != self:
+            if p is None or p._t is not self:
                 p = JContainer.PaddingHelper(self)
                 object.__setattr__(self, '_padding', weakref.ref(p))
         return p
@@ -500,5 +654,5 @@ class JContainer(Generic[J2]):
     def empty(cls) -> JContainer[J2]:
         if cls._EMPTY is None:
             cls._EMPTY = JContainer(Space.EMPTY, [], Markers.EMPTY)
-        return cls._EMPTY  # type: ignore[return-value]  # _EMPTY is JContainer[J] but J2 is bound to J
+        return cls._EMPTY  # ty: ignore[invalid-return-type]  # _EMPTY is JContainer[J] but J2 is bound to J
 

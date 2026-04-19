@@ -19,8 +19,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -62,6 +68,78 @@ class KotlinTemplateTest implements RewriteTest {
     }
 
     @Test
+    void addStatementToMethodInClass() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  var m = (J.MethodDeclaration) super.visitMethodDeclaration(method, ctx);
+                  if (m.getSimpleName().equals("configure")) {
+                      List<Statement> statements = m.getBody().getStatements();
+                      if (statements.stream().noneMatch(s -> s.toString().contains("println"))) {
+                          return JavaTemplate.builder("println(\"added\")")
+                            .contextSensitive()
+                            .build()
+                            .apply(getCursor(), statements.get(statements.size() - 1).getCoordinates().after());
+                      }
+                  }
+                  return m;
+              }
+          })),
+          kotlin(
+            """
+              class MyConfig {
+                  fun configure(value: Int) {
+                      val x = value + 1
+                  }
+              }
+              """,
+            """
+              class MyConfig {
+                  fun configure(value: Int) {
+                      val x = value + 1
+                      println("added")
+                  }
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceUnitReturningMethodInvocation() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none())
+            .recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if ("foo".equals(method.getSimpleName())) {
+                      return KotlinTemplate.builder("bar()")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace());
+                  }
+                  return super.visitMethodInvocation(method, ctx);
+              }
+          })),
+          kotlin(
+            """
+              fun foo() {}
+              fun bar() {}
+              fun test() {
+                  foo()
+              }
+              """,
+            """
+              fun foo() {}
+              fun bar() {}
+              fun test() {
+                  bar()
+              }
+              """
+          ));
+    }
+
+    @Test
     void parserClasspath() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
@@ -94,7 +172,7 @@ class KotlinTemplateTest implements RewriteTest {
               """,
             """
               import com.fasterxml.jackson.databind.ObjectMapper
-              
+
               class Test {
                   fun foo() {
                       val mapper = ObjectMapper()
@@ -102,5 +180,41 @@ class KotlinTemplateTest implements RewriteTest {
               }
               """
           ));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/7407")
+    @Test
+    void parameterTypeWithCallerScopeTypeVariable() {
+        StringBuilder capturedTemplate = new StringBuilder();
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()).recipe(toRecipe(() -> new KotlinVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().size() == 1 &&
+                      "x".equals(multiVariable.getVariables().getFirst().getSimpleName())) {
+                      J initializer = multiVariable.getVariables().getFirst().getInitializer();
+                      return KotlinTemplate.builder("println(#{any()})")
+                        .doBeforeParseTemplate(capturedTemplate::append)
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(), initializer);
+                  }
+                  return super.visitVariableDeclarations(multiVariable, ctx);
+              }
+          }).withMaxCycles(1)),
+          kotlin(
+            """
+              class Container<T : Any>(val value: T)
+              fun <T : Any> test(c: Container<T>) {
+                  val x = c
+              }
+              """,
+            """
+              class Container<T : Any>(val value: T)
+              fun <T : Any> test(c: Container<T>) {
+                  println(c)
+              }
+              """
+          ));
+        assertThat(capturedTemplate.toString()).contains("class Template<T");
     }
 }
