@@ -3104,12 +3104,12 @@ public class GroovyParserVisitor {
      */
     private String sourceSubstring(int beginIndex, String untilDelim, int fromIndex) {
         if (fromIndex < beginIndex) {
-            throw new IllegalArgumentException("beginIndex: " + beginIndex + " should be < fromIndex: "+ fromIndex);
+            throw new IllegalArgumentException("beginIndex: " + beginIndex + " should be < fromIndex: " + fromIndex);
         }
         int endIndex = source.indexOf(untilDelim, fromIndex);
         if (endIndex < 0) {
             throw new IllegalArgumentException(
-                "Couldn't find delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+                    "Couldn't find delimiter: " + untilDelim + " with fromIndex: " + fromIndex
             );
         }
         // don't stop if the last char is escaped.
@@ -3119,7 +3119,7 @@ public class GroovyParserVisitor {
         }
         if (endIndex < 0) {
             throw new IllegalArgumentException(
-                "Couldn't find unescaped delimiter: " + untilDelim + " with fromIndex: " + fromIndex
+                    "Couldn't find unescaped delimiter: " + untilDelim + " with fromIndex: " + fromIndex
             );
         }
         return source.substring(beginIndex, endIndex);
