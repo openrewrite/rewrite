@@ -26,6 +26,7 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.javascript.JavaScriptIsoVisitor;
 import org.openrewrite.javascript.JavaScriptParser;
 import org.openrewrite.javascript.style.Autodetect;
@@ -615,6 +616,37 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
                 }
                 """
             )
+          )
+        );
+    }
+
+    /**
+     * Regression test for <a href="https://github.com/moderneinc/customer-requests/issues/2234">#2234</a>:
+     * a string enum declaration would send a {@link JavaType.Primitive} (resolved from the union of
+     * enum literals) for {@code J.ClassDeclaration.type}, which the Java-side RPC receiver rejects
+     * with "A class can only be type attributed with a fully qualified type name".
+     */
+    @Test
+    void parseStringEnumDeclaration() {
+        rewriteRun(
+          typescript(
+            """
+              export enum ContentType {
+                APPLICATION_JSON = 'application/json',
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaScriptIsoVisitor<Integer>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+                    assertThat(classDecl.getType())
+                      .as("enum declaration must have a FullyQualified type")
+                      .isInstanceOf(JavaType.Class.class);
+                    JavaType.Class type = (JavaType.Class) classDecl.getType();
+                    assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+                    assertThat(type.getFullyQualifiedName()).contains("ContentType");
+                    return classDecl;
+                }
+            }.visit(cu, 0))
           )
         );
     }
