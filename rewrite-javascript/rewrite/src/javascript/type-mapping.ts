@@ -83,6 +83,86 @@ export class JavaScriptTypeMapping {
         return type && this.getType(type);
     }
 
+    /**
+     * Resolve the declared type of a class / interface / enum / class-expression.
+     *
+     * Using {@code getTypeAtLocation} on these declaration nodes is unsafe: TypeScript returns
+     * the type of the declared *value*, not the type itself. For string or numeric enums that
+     * ends up being the union of enum literals, which on the JS side resolves to
+     * {@link Type.Primitive} (e.g. String for string enums). The Java-side RPC receiver then
+     * rejects it with "A class can only be type attributed with a fully qualified type name",
+     * because {@code J.ClassDeclaration.type} must be {@link Type.FullyQualified}.
+     *
+     * Instead, we resolve through the declaration's own symbol. For classes and interfaces we
+     * reuse the full type mapping pipeline (so members, methods, supertypes and type parameters
+     * are populated). For enums — which have no class-shaped representation in TypeScript — and
+     * any residual non-FQ result, we build a minimal class shell whose FQN and {@code classKind}
+     * are derived from the declaration itself.
+     */
+    declarationType(node: ts.ClassDeclaration | ts.ClassExpression | ts.InterfaceDeclaration | ts.EnumDeclaration): Type.FullyQualified | undefined {
+        const symbol = (node as { symbol?: ts.Symbol }).symbol
+            ?? (node.name ? this.checker.getSymbolAtLocation(node.name) : undefined);
+        if (!symbol) {
+            return undefined;
+        }
+
+        // For classes and interfaces `getDeclaredTypeOfSymbol` yields a class-shaped ts.Type whose
+        // symbol we can feed through the normal pipeline. For enums, however, TypeScript returns the
+        // union of enum literals — which on the JS side resolves to `Type.Primitive` (e.g. String for
+        // string enums) and therefore is NOT `FullyQualified`. The Java side then rejects it with
+        // "A class can only be type attributed with a fully qualified type name".
+        //
+        // Since JavaScript/TypeScript has no separate enum runtime representation, we build the
+        // class-shaped type directly from the declaration's own symbol. The `classKind` is derived
+        // from the declaration node kind, not the (lossy) resolved type.
+        let classKind: Type.Class.Kind;
+        if (ts.isEnumDeclaration(node)) {
+            classKind = Type.Class.Kind.Enum;
+        } else if (ts.isInterfaceDeclaration(node)) {
+            classKind = Type.Class.Kind.Interface;
+        } else {
+            classKind = Type.Class.Kind.Class;
+        }
+
+        const fullyQualifiedName = this.getFullyQualifiedNameFromSymbol(symbol);
+        const cacheKey = `decl:${classKind}:${fullyQualifiedName}`;
+        const cached = this.typeCache.get(cacheKey);
+        if (cached && Type.isFullyQualified(cached)) {
+            return cached as Type.FullyQualified;
+        }
+
+        // For classes and interfaces reuse the existing type-based path so that members, methods,
+        // supertypes and type parameters are populated. Enums (and any fallback that produced a
+        // non-FQ result) get a minimal class shell with the correct FQN + kind.
+        if (!ts.isEnumDeclaration(node)) {
+            const declaredType = this.checker.getDeclaredTypeOfSymbol(symbol);
+            if (declaredType) {
+                const mapped = this.getType(declaredType);
+                if (Type.isFullyQualified(mapped)) {
+                    this.typeCache.set(cacheKey, mapped);
+                    return mapped;
+                }
+            }
+        }
+
+        const classType: Type.Class = {
+            kind: Type.Kind.Class,
+            flags: 0,
+            classKind,
+            fullyQualifiedName,
+            typeParameters: [],
+            annotations: [],
+            interfaces: [],
+            members: [],
+            methods: [],
+            toJSON: function () {
+                return Type.signature(this);
+            }
+        } as Type.Class;
+        this.typeCache.set(cacheKey, classType);
+        return classType;
+    }
+
     private getType(type: ts.Type): Type {
         // Check for error types first - these indicate type-checking failures
         // and should not be processed further
@@ -990,7 +1070,10 @@ export class JavaScriptTypeMapping {
         if (!symbol) {
             return "unknown";
         }
+        return this.getFullyQualifiedNameFromSymbol(symbol);
+    }
 
+    private getFullyQualifiedNameFromSymbol(symbol: ts.Symbol): string {
         // First, check if this symbol is an import/alias
         // For imported types, we want to use the module specifier instead of the file path
         if (symbol.flags & ts.SymbolFlags.Alias) {

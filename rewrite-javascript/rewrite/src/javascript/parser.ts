@@ -733,7 +733,7 @@ export class JavaScriptParserVisitor {
                 )),
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node)
+            type: this.mapDeclarationType(node)
         };
     }
 
@@ -2723,7 +2723,7 @@ export class JavaScriptParserVisitor {
                     })),
                     end: this.prefix(node.getLastToken()!)
                 },
-                type: this.mapType(node)
+                type: this.mapDeclarationType(node)
             } satisfies J.ClassDeclaration as J.ClassDeclaration,
         }
     }
@@ -3414,7 +3414,7 @@ export class JavaScriptParserVisitor {
                 })),
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node)
+            type: this.mapDeclarationType(node)
         };
     }
 
@@ -3475,7 +3475,7 @@ export class JavaScriptParserVisitor {
                     emptySpace)],
                 end: this.prefix(node.getLastToken()!)
             },
-            type: this.mapType(node) as Type.Class
+            type: this.mapDeclarationType(node) as Type.Class
         };
     }
 
@@ -4425,6 +4425,10 @@ export class JavaScriptParserVisitor {
 
     private mapType(node: ts.Node): Type | undefined {
         return this.typeMapping?.type(node);
+    }
+
+    private mapDeclarationType(node: ts.ClassDeclaration | ts.ClassExpression | ts.InterfaceDeclaration | ts.EnumDeclaration): Type.FullyQualified | undefined {
+        return this.typeMapping?.declarationType(node);
     }
 
     private mapPrimitiveType(node: ts.Node): Type.Primitive {

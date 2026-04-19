@@ -179,27 +179,46 @@ public class JavaScriptRewriteRpc extends RewriteRpc {
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
 
-                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
-                // for status update messages
-                Parser.Input input = Parser.Input.fromFile(sourceFile.getSourcePath());
-                parsingListener.startedParsing(input);
+                SourceFile sourceFile;
                 try {
+                    sourceFile = getObject(item.getId(), item.getSourceFileType());
+                    parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                     if (sourceFile instanceof JS.CompilationUnit) {
                         validator.visit(sourceFile, 0);
                     }
                 } catch (Exception e) {
-                    sourceFile = new ParseError(
-                            sourceFile.getId(),
-                            new Markers(Tree.randomId(), singletonList(
-                                    ParseExceptionResult.build(JavaScriptParser.class, e, e.getMessage()))),
-                            sourceFile.getSourcePath(),
-                            null,
-                            null,
-                            false,
-                            null,
-                            input.getSource(ctx).readFully(),
-                            null
-                    );
+                    // A single file's RPC deserialization or validation failed. Convert it to a
+                    // ParseError pointing at the offending file and keep the stream going.
+                    //
+                    // `item.sourcePath` may be null when talking to an older TypeScript peer that
+                    // doesn't populate it yet — fall back to the RPC object id so we still produce
+                    // a usable ParseError rather than crashing the whole stream with an NPE.
+                    String relativePath = item.getSourcePath() != null ? item.getSourcePath() : item.getId();
+                    Path sourcePath = Paths.get(relativePath);
+                    Path absoluteSourcePath = projectPath.resolve(sourcePath);
+                    try {
+                        sourceFile = ParseError.build(
+                                JavaScriptParser.builder().build(),
+                                Parser.Input.fromFile(absoluteSourcePath),
+                                projectPath,
+                                ctx,
+                                e);
+                    } catch (Exception readFailure) {
+                        // If the file can't be read (e.g. fallback path from id doesn't exist on
+                        // disk), still emit a ParseError so the stream can continue. Without the
+                        // source text the error is less useful but at least it doesn't abort.
+                        sourceFile = new ParseError(
+                                Tree.randomId(),
+                                new Markers(Tree.randomId(), singletonList(
+                                        ParseExceptionResult.build(JavaScriptParser.class, e, null))),
+                                sourcePath,
+                                null,
+                                null,
+                                false,
+                                null,
+                                "",
+                                null);
+                    }
                 }
                 action.accept(sourceFile);
                 return true;
