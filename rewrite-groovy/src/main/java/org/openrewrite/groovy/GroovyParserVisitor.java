@@ -1965,7 +1965,7 @@ public class GroovyParserVisitor {
                     }
                 } else if (e instanceof ConstantExpression) {
                     // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                    String value = sourceSubstring(cursor, delimiter.close);
+                    String value = sourceSubstring(cursor, delimiter.close, cursor + e.getText().length());
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
                     while (isEscaped(indexNextSign, delimiter)) {
@@ -3099,10 +3099,13 @@ public class GroovyParserVisitor {
 
     /**
      * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
+     * The search starts from the fromIndex.
      * The cursor will not be moved.
      */
-    private String sourceSubstring(int beginIndex, String untilDelim) {
-        int fromIndex = Math.max(beginIndex, cursor + untilDelim.length());
+    private String sourceSubstring(int beginIndex, String untilDelim, int fromIndex) {
+        if (fromIndex < beginIndex) {
+            throw new IllegalArgumentException("beginIndex: " + beginIndex + " should be < fromIndex: "+ fromIndex);
+        }
         int endIndex = source.indexOf(untilDelim, fromIndex);
         if (endIndex < 0) {
             throw new IllegalArgumentException(
@@ -3120,6 +3123,15 @@ public class GroovyParserVisitor {
             );
         }
         return source.substring(beginIndex, endIndex);
+    }
+
+    /**
+     * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
+     * The cursor will not be moved.
+     */
+    private String sourceSubstring(int beginIndex, String untilDelim) {
+        int fromIndex = Math.max(beginIndex, cursor + 1);
+        return sourceSubstring(beginIndex, untilDelim, fromIndex);
     }
 
     private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
