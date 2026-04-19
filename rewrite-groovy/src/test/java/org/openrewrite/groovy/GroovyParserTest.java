@@ -342,22 +342,23 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                String name = \"\"\"
-                    foo
-                \"\"\"
-                """
+              String name = \"""
+                  foo
+              \"""
+              """
           )
         );
     }
+
     @Test
     void testMultilineStringInterpolation() {
         rewriteRun(
           groovy(
             """
-                String name = \"\"\"
-                    ${foo}
-                \"\"\"
-                """
+              String name = \"""
+                  ${foo}
+              \"""
+              """
           )
         );
     }
