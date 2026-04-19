@@ -11,6 +11,7 @@ dependencies {
     jmh(project(":rewrite-core"))
     jmh(project(":rewrite-java"))
     jmh(project(":rewrite-java-21"))
+    jmh(project(":rewrite-javascript"))
     jmh(project(":rewrite-maven"))
     jmh("org.antlr:antlr4-runtime:4.13.2")
     jmh("org.rocksdb:rocksdbjni:10.2.1")
