@@ -704,7 +704,7 @@ class KotlinTypeMapping(
             parentType = parentType.type
         }
         val resolvedDeclaringType = TypeUtils.asFullyQualified(parentType)
-        var returnType = type(function.returnTypeRef)
+        var returnType = remapKotlinBuiltin(type(function.returnTypeRef))
         // Java parser uses the raw Class for a constructor's returnType, not the
         // class's parameterized form. Kotlin's FIR renders a constructor's
         // `returnTypeRef` as the class instantiated with its own type parameters
@@ -721,11 +721,11 @@ class KotlinTypeMapping(
             else -> null
         }
         if (function.receiverParameter != null) {
-            parameterTypes!!.add(type(function.receiverParameter!!.typeRef))
+            parameterTypes!!.add(remapKotlinBuiltin(type(function.receiverParameter!!.typeRef))!!)
         }
         if (function.valueParameters.isNotEmpty()) {
             for (p in function.valueParameters) {
-                val t = type(p.returnTypeRef, function)
+                val t = remapKotlinBuiltin(type(p.returnTypeRef, function))
                 if (t != null) {
                     parameterTypes!!.add(t)
                 }
@@ -973,10 +973,10 @@ class KotlinTypeMapping(
         if (declaringType == null) {
             declaringType = TypeUtils.asFullyQualified(type(firFile))
         }
-        val returnType = type(function.resolvedType)
+        val returnType = remapKotlinBuiltin(type(function.resolvedType))
 
         if (function.toResolvedCallableSymbol()?.receiverParameterSymbol != null) {
-            paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.fir.typeRef))
+            paramTypes!!.add(remapKotlinBuiltin(type(function.toResolvedCallableSymbol()?.receiverParameterSymbol!!.fir.typeRef))!!)
         }
         // Build a mapping from parameter name to its corresponding argument expression
         val paramToArg: Map<String, FirExpression>? =
@@ -993,12 +993,12 @@ class KotlinTypeMapping(
             if (t is GenericTypeVariable) {
                 val arg = paramToArg?.get(p.name.asString())
                 if (arg != null) {
-                    paramTypes.add(type(arg.resolvedType, function)!!)
+                    paramTypes.add(remapKotlinBuiltin(type(arg.resolvedType, function))!!)
                 } else {
                     paramTypes.add(t)
                 }
             } else {
-                paramTypes.add(t)
+                paramTypes.add(remapKotlinBuiltin(t)!!)
             }
         }
         method.unsafeSet(
@@ -1112,6 +1112,18 @@ class KotlinTypeMapping(
             return toJvmFqn(outer as BinaryJavaClass) + "$" + type.name.asString()
         }
         return type.fqName.asString()
+    }
+
+    /**
+     * Convenience overload: apply [remapKotlinBuiltin] to any [JavaType], returning the
+     * input unchanged when it is not a [FullyQualified]. Callers use this on method
+     * parameter, receiver, return, and field types so Kotlin builtins (kotlin.String /
+     * kotlin.Throwable / ...) surface as the JVM FQN the Java parser would produce.
+     */
+    private fun remapKotlinBuiltin(t: JavaType?): JavaType? {
+        if (t == null) return null
+        val fq = TypeUtils.asFullyQualified(t)
+        return if (fq != null) remapKotlinBuiltin(fq) else t
     }
 
     private fun remapKotlinBuiltin(fq: FullyQualified): FullyQualified {
@@ -1279,7 +1291,7 @@ class KotlinTypeMapping(
             declaringType = declaringType.type
         }
 
-        val typeRef = type(variable.returnTypeRef)
+        val typeRef = remapKotlinBuiltin(type(variable.returnTypeRef))
         vt.unsafeSet(declaringType!!, typeRef, annotations)
         return vt
     }

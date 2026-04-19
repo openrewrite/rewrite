@@ -535,7 +535,7 @@ class KotlinTypeMappingTest {
                             @Override
                             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
                                 if ("println".equals(method.getSimpleName())) {
-                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.io.ConsoleKt{name=println,return=void,parameters=[kotlin.Any]}");
+                                    assertThat(method.getMethodType().toString()).isEqualTo("kotlin.io.ConsoleKt{name=println,return=void,parameters=[java.lang.Object]}");
                                     found.set(true);
                                 }
                                 return super.visitMethodInvocation(method, atomicBoolean);
@@ -543,6 +543,39 @@ class KotlinTypeMappingTest {
                         }.visit(cu, found);
                         assertThat(found.get()).isTrue();
                     })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/7427")
+        @Test
+        void constructorParameterTypesRemapKotlinBuiltins() {
+            // A Kotlin constructor taking `String` / `Throwable` must surface parameter types
+            // as the Java-parser's `java.lang.String` / `java.lang.Throwable`, not the Kotlin
+            // builtins, so `MethodMatcher` patterns written against the Java FQN match.
+            rewriteRun(
+              kotlin(
+                """
+                  fun example(cause: Throwable): IllegalArgumentException {
+                      return IllegalArgumentException("message", cause)
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var matcher = new MethodMatcher("java.lang.IllegalArgumentException <constructor>(String, Throwable)");
+                    var found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.NewClass visitNewClass(J.NewClass newClass, AtomicBoolean atomicBoolean) {
+                            var paramTypes = newClass.getConstructorType().getParameterTypes();
+                            assertThat(paramTypes.get(0).toString()).isEqualTo("java.lang.String");
+                            assertThat(paramTypes.get(1).toString()).isEqualTo("java.lang.Throwable");
+                            assertThat(matcher.matches(newClass)).isTrue();
+                            atomicBoolean.set(true);
+                            return super.visitNewClass(newClass, atomicBoolean);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
               )
             );
         }
@@ -658,13 +691,13 @@ class KotlinTypeMappingTest {
 
         @CsvSource(value = {
           // Method type on overload with no named arguments.
-          "foo(\"\", 1, true)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean]}",
+          "foo(\"\", 1, true)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[java.lang.String,int,boolean]}",
           // Method type on overload with named arguments.
           "foo(b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[int,boolean]}",
           // Method type when named arguments are declared out of order.
-          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}",
+          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[java.lang.String,int,boolean,boolean,kotlin.Function0<void>]}",
           // Method type with trailing lambda
-          "foo(b = 1, noDefault = true) {}~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[kotlin.String,int,boolean,boolean,kotlin.Function0<void>]}"
+          "foo(b = 1, noDefault = true) {}~org.example.openRewriteFile0Kt{name=foo,return=void,parameters=[java.lang.String,int,boolean,boolean,kotlin.Function0<void>]}"
         }, delimiter = '~')
         @ParameterizedTest
         void methodInvocationWithDefaults(String invocation, String methodType) {
