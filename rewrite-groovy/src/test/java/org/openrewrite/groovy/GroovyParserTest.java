@@ -337,4 +337,29 @@ class GroovyParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void testMultilineString() {
+        rewriteRun(
+          groovy(
+            """
+                String name = \"\"\"
+                    foo
+                \"\"\"
+                """
+          )
+        );
+    }
+    @Test
+    void testMultilineStringInterpolation() {
+        rewriteRun(
+          groovy(
+            """
+                String name = \"\"\"
+                    ${foo}
+                \"\"\"
+                """
+          )
+        );
+    }
+
 }
