@@ -67,4 +67,15 @@ public static class Preconditions
     {
         return new AndVisitor(visitors);
     }
+
+    public static ITreeVisitor<ExecutionContext> And(this ITreeVisitor<ExecutionContext> first, params ITreeVisitor<ExecutionContext>[] others)
+    {
+        return And(others.Prepend(first).ToArray());
+    }
+
+    public static ITreeVisitor<ExecutionContext> And(
+        params Recipe[] recipes)
+    {
+        return new AndVisitor(recipes.Select(x => x.GetVisitor()).ToArray());
+    }
 }
