@@ -511,6 +511,16 @@ type ImportBlock struct {
 
 func (b ImportBlock) ID() uuid.UUID { return b.Ident }
 
+// ChanDirMarker stores whitespace around the direction operator in a channel type.
+// For send channels (`chan <- T`), Before holds the space before `<-`.
+// For recv channels (`<- chan T`), Before holds the space before `chan`.
+type ChanDirMarker struct {
+	Ident  uuid.UUID
+	Before Space
+}
+
+func (c ChanDirMarker) ID() uuid.UUID { return c.Ident }
+
 // MultiAssignment represents a multi-value assignment: `x, y = 1, 2` or `x, y := f()`.
 type MultiAssignment struct {
 	ID        uuid.UUID
