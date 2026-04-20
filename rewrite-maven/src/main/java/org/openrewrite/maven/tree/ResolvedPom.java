@@ -996,11 +996,27 @@ public class ResolvedPom {
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
-        return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
+        return doResolveDependencies(scope, new HashMap<>(), true, downloader, ctx);
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
                                                         MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, requirements, true, downloader, ctx);
+    }
+
+    /**
+     * Resolves the requested dependencies in the given scope without downloading their transitive closure.
+     * Each returned {@link ResolvedDependency} has an empty {@code dependencies} list. This allows callers who only
+     * need the direct coordinates (for example to re-resolve after a version mutation) to avoid the cost of
+     * transitive POM downloads.
+     */
+    public List<ResolvedDependency> resolveDirectDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
+        return doResolveDependencies(scope, new HashMap<>(), false, downloader, ctx);
+    }
+
+    private List<ResolvedDependency> doResolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
+                                                           boolean resolveTransitives,
+                                                           MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
         Map<GroupArtifact, DependencyAndDependent> rootDependencies = new LinkedHashMap<>();
@@ -1066,7 +1082,7 @@ public class ResolvedPom {
                             MavenExecutionContextView.view(ctx)
                                     .getResolutionListener()
                                     .clear();
-                            return resolveDependencies(scope, requirements, downloader, ctx);
+                            return doResolveDependencies(scope, requirements, resolveTransitives, downloader, ctx);
                         } else if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
@@ -1131,6 +1147,10 @@ public class ResolvedPom {
                     if (dd.getScope().transitiveOf(scope) == scope) {
                         dependencies.add(resolved);
                     } else {
+                        continue;
+                    }
+
+                    if (!resolveTransitives) {
                         continue;
                     }
 

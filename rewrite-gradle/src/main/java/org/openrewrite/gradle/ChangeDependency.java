@@ -207,7 +207,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                     if (maybeJp.isPresent() && !acc.modulesWithOldDependency.containsKey(maybeJp.get())) {
                         outer:
                         for (GradleDependencyConfiguration config : gradleProject.getConfigurations()) {
-                            for (ResolvedDependency resolved : config.getDirectResolved()) {
+                            for (ResolvedDependency resolved : config.getDirectResolvedShallow()) {
                                 if (StringUtils.matchesGlob(resolved.getGroupId(), oldGroupId) &&
                                     StringUtils.matchesGlob(resolved.getArtifactId(), oldArtifactId)) {
                                     acc.modulesWithOldDependency.put(maybeJp.get(), resolved);
@@ -459,7 +459,7 @@ public class ChangeDependency extends ScanningRecipe<ChangeDependency.Accumulato
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
                         assert resolved != null;
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             resolved = updatedResolved.computeIfAbsent(resolved, r -> {

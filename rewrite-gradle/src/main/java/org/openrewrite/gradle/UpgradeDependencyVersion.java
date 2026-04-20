@@ -168,7 +168,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             DependencyMatcher depMatcher = new DependencyMatcher(groupId, artifactId, null);
                             Set<ResolvedDependency> matched = new HashSet<>();
                             for (GradleDependencyConfiguration config : gradleProject.getConfigurations()) {
-                                for (ResolvedDependency resolved : config.getDirectResolved()) {
+                                for (ResolvedDependency resolved : config.getDirectResolvedShallow()) {
                                     if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                                         matched.add(resolved);
                                     }
@@ -524,11 +524,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     continue;
                 }
 
-                for (ResolvedDependency resolved : configuration.getResolved()) {
-                    if (!resolved.isDirect()) {
-                        continue;
-                    }
-
+                for (ResolvedDependency resolved : configuration.getDirectResolvedShallow()) {
                     if (!dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                         continue;
                     }
