@@ -72,4 +72,42 @@ class ClasspathScanningLoaderTest {
         assertThat(recipe).isNotNull();
         assertThat(recipe.getName()).isEqualTo("com.example.TestRecipe");
     }
+
+    @Test
+    void scanYamlInSubdirectory(@TempDir Path tempDir) throws Exception {
+        Path resourcesDir = tempDir.resolve("resources");
+        Path metaInfSubdir = resourcesDir.resolve("META-INF/rewrite/subdir");
+        Files.createDirectories(metaInfSubdir);
+
+        Files.writeString(metaInfSubdir.resolve("recipe.yml"),
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: com.example.SubdirRecipe
+            displayName: Subdir Recipe
+            description: A test recipe in a subdir.
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                  toText: subdir
+            """);
+
+        List<Path> classpath = List.of(resourcesDir);
+        URL[] urls = classpath.stream()
+            .map(p -> {
+                try {
+                    return p.toUri().toURL();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            })
+            .toArray(URL[]::new);
+        ClassLoader cl = new URLClassLoader(urls, Recipe.class.getClassLoader());
+
+        Environment env = Environment.builder()
+            .scanJar(resourcesDir, classpath, cl)
+            .build();
+
+        Recipe recipe = env.activateRecipes("com.example.SubdirRecipe");
+        assertThat(recipe).isNotNull();
+        assertThat(recipe.getName()).isEqualTo("com.example.SubdirRecipe");
+    }
 }
