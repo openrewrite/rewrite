@@ -46,6 +46,20 @@ class TestChangeImport:
             )
         )
 
+    def test_change_import_only_statement(self):
+        """Import is the only statement in the file — no leading newline in output."""
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='typing',
+            old_name='Callable',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                "from typing import Callable\n",
+                "from collections.abc import Callable\n",
+            )
+        )
+
     def test_change_direct_import(self):
         """Change: import os -> import pathlib"""
         spec = RecipeSpec(recipe=ChangeImport(
