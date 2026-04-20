@@ -771,14 +771,8 @@ class PythonTypeMapping:
             self, descriptor: Dict[str, Any], name: str
     ) -> JavaType.Method:
         """Build a JavaType.Method from a function descriptor with parameters/returnType."""
-        param_names: List[str] = []
-        param_types: List[JavaType] = []
-        for param in descriptor.get('parameters', []):
-            p_name = param.get('name', '')
-            if p_name in ('self', 'cls'):
-                continue
-            param_names.append(p_name)
-            param_types.append(self._resolve_param_type(param))
+        param_names, param_types = self._process_method_params(
+            descriptor.get('parameters', []))
 
         return_type = None
         ret_id = descriptor.get('returnType')
@@ -873,6 +867,40 @@ class PythonTypeMapping:
                 return result
         return _UNKNOWN
 
+    def _process_method_params(
+            self, params: List[Dict[str, Any]]
+    ) -> Tuple[List[str], List[JavaType]]:
+        """Normalize a ParameterInfo list into (names, types) for JavaType.Method.
+
+        Applies:
+        - Skip `self` / `cls`.
+        - Collapse the synthetic `*args` / `**kwargs` pair emitted for a
+          `ParamSpec` tail (both carry the same ``paramSpecName``) into a
+          single entry whose name is the ParamSpec's name and whose type
+          is `_UNKNOWN`. This avoids exposing `P.args` / `P.kwargs` as two
+          distinct variadic parameters on the produced method.
+        - Treat `concatenatePrefix` params as ordinary positional params.
+        """
+        names: List[str] = []
+        types: List[JavaType] = []
+        last_spec_emitted: Optional[str] = None
+        for p in params:
+            p_name = p.get('name', '')
+            if p_name in ('self', 'cls'):
+                continue
+            spec_name = p.get('paramSpecName')
+            if spec_name is not None:
+                if spec_name == last_spec_emitted:
+                    continue
+                names.append(spec_name)
+                types.append(_UNKNOWN)
+                last_spec_emitted = spec_name
+                continue
+            last_spec_emitted = None
+            names.append(p_name)
+            types.append(self._resolve_param_type(p))
+        return names, types
+
     def _get_method_signature(self, node: ast.Call) -> Tuple[List[str], List[JavaType]]:
         """Get parameter names and types from the method signature.
 
@@ -885,11 +913,7 @@ class PythonTypeMapping:
         if sig:
             params = sig.get('parameters', [])
             if params:
-                names = [p['name'] for p in params
-                         if p['name'] not in ('self', 'cls')]
-                types = [self._resolve_param_type(p) for p in params
-                         if p['name'] not in ('self', 'cls')]
-                return names, types
+                return self._process_method_params(params)
 
         # Try function/method descriptor parameters
         func_type_id = self._lookup_func_type_id(node)
@@ -898,11 +922,7 @@ class PythonTypeMapping:
             if descriptor:
                 params = descriptor.get('parameters', [])
                 if params:
-                    names = [p['name'] for p in params
-                             if p['name'] not in ('self', 'cls')]
-                    types = [self._resolve_param_type(p) for p in params
-                             if p['name'] not in ('self', 'cls')]
-                    return names, types
+                    return self._process_method_params(params)
 
         # Fall back to placeholder names
         return self._generate_placeholder_names(node)
@@ -1205,20 +1225,9 @@ class PythonTypeMapping:
         if return_type_id is not None:
             return_type = self._resolve_type(return_type_id)
 
-        # Resolve parameters (skip self/cls)
-        param_names = []
-        param_types = []
-        for param in descriptor.get('parameters', []):
-            p_name = param.get('name', '')
-            if p_name in ('self', 'cls'):
-                continue
-            param_names.append(p_name)
-            p_type_id = param.get('typeId')
-            if p_type_id is not None:
-                p_type = self._resolve_type(p_type_id)
-                param_types.append(p_type if p_type else _UNKNOWN)
-            else:
-                param_types.append(_UNKNOWN)
+        # Resolve parameters (skip self/cls, collapse ParamSpec *args/**kwargs pairs)
+        param_names, param_types = self._process_method_params(
+            descriptor.get('parameters', []))
 
         type_param_names = self._extract_type_param_names(descriptor)
 
