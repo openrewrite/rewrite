@@ -96,7 +96,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirErrorNamedReference -> {
-                return type.name.asString()
+                type.name.asString()
             }
 
             is FirFile -> {
@@ -244,7 +244,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 if (type.typeArguments.isNotEmpty()) {
                     throw UnsupportedOperationException("Unsupported ConeCapturedType with type arguments: ${type.javaClass.name}")
                 }
-                return "Generic{?}"
+                "Generic{?}"
             }
 
             is ConeIntersectionType -> {
@@ -415,7 +415,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 ?.entries?.associate { (arg, param) -> param.name.asString() to arg }
 
         val valueParams = (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters
-        for ((index, p) in valueParams.withIndex()) {
+        for ((_, p) in valueParams.withIndex()) {
             val sig = signature(p.returnTypeRef, function)
             if (sig.startsWith("Generic{")) {
                 val arg = paramToArg?.get(p.name.asString())
@@ -481,16 +481,16 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 when (type.variance) {
                     Variance.INVARIANT -> signature(type.typeRef)
                     Variance.IN_VARIANCE -> {
-                        return "Generic{? super " + signature(type.typeRef)
+                        "Generic{? super " + signature(type.typeRef)
                     }
 
                     Variance.OUT_VARIANCE -> {
-                        return "Generic{? extends " + signature(type.typeRef)
+                        "Generic{? extends " + signature(type.typeRef)
                     }
                 }
             }
             is FirStarProjection -> {
-                return "Generic{?}"
+                "Generic{?}"
             }
 
             else -> throw UnsupportedOperationException("Unsupported FirTypeProjection: ${type.javaClass.name}")
@@ -506,8 +506,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 convertClassIdToFqn(property.dispatchReceiverType!!.toRegularClassSymbol(firSession)!!.classId)
             }
 
-            property.symbol.callableId.classId != null -> {
-                var oSig = convertClassIdToFqn(property.symbol.callableId.classId)
+            property.symbol.callableId?.classId != null -> {
+                var oSig = convertClassIdToFqn(property.symbol.callableId?.classId)
                 if (oSig.contains("<")) {
                     oSig = oSig.substring(0, oSig.indexOf('<'))
                 }
@@ -567,7 +567,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         // which blocks cross-parser cache coherence for nested classes.
         val outer = type.outerClass
         if (outer != null) {
-            return "${javaClassSignature(outer)}${'$'}${type.name.asString()}"
+            return $$"$${javaClassSignature(outer)}$$${type.name.asString()}"
         }
         return type.fqName.asString()
     }
@@ -577,7 +577,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             return "{undefined}"
         }
         return when {
-            type.outerClass != null -> "${javaClassSignature(type.outerClass!!)}${'$'}${type.name}"
+            type.outerClass != null -> $$"$${javaClassSignature(type.outerClass!!)}$$${type.name}"
             else -> type.fqName!!.asString()
         }
     }
